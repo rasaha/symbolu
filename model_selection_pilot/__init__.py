@@ -13,5 +13,5 @@ chooses within policy; routing dispatches; provider execution invokes — three 
 concerns). Its selection modes and I/O differ from the canonical dataclass core, so it is
 classified as a genuinely different *research algorithm*, not a copy, and is not folded
 into or exported from the canonical package. See
-``docs/migrations/model_selection/RESEARCH_SEPARATION.md``.
+``Project_documentation/repository/docs/migrations/model_selection/RESEARCH_SEPARATION.md``.
 """

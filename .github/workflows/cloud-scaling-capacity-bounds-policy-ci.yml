@@ -1,0 +1,380 @@
+name: cloud-scaling-capacity-bounds-policy-ci
+
+# Scoped CI for the Cloud Scaling capacity-bounds policy family
+# (ugence-cloud-scaling-capacity-bounds-policy): the shared Policy Authority's SECOND policy
+# family, and the first registered from OUTSIDE the authority's own distribution.
+#
+# Why this workflow exists. The repository's per-package workflows are path-scoped, and this
+# package is new, so without this file its suite would run nowhere automated — the exact defect
+# cloud-scaling-policy-authenticity-ci was created to repair for Phase 5B-0B ("merged with its
+# suite running nowhere automated"). Repeating that on a package whose whole purpose is to make
+# a bound authentic would be a poor trade.
+#
+# What this package claims, and therefore what must be measured:
+#   * a capacity bound is issuable, signable and resolvable through the shared authority;
+#   * a second policy family needs NO core change to the authority;
+#   * the leaf boundary holds — one first-party dependency, reached only through its public
+#     `api` module, no signing, no clock, no local canonicalization.
+#
+# ADDITIVE and PATH-SCOPED. It does not touch, weaken or modify
+# cloud-scaling-policy-authenticity-ci, cloud-scaling-authorization-contracts-ci,
+# cloud-scaling-producer-attestation-ci, the Policy Authority workflows, or any Risk Authority
+# workflow.
+
+on:
+  pull_request:
+    paths:
+      - "packages/integration/cloud-scaling-capacity-bounds-policy/**"
+      - "packages/policy-authority/**"
+      # The sweep engine. A change to an operator or a detector changes what this
+      # package's guard sweep measures without touching a byte inside the package, so
+      # a filter that omitted it would let the engine drift past this gate unmeasured.
+      - "scripts/cloud_scaling/guard_sweep.py"
+      - "scripts/cloud_scaling/tests/**"
+      - ".github/workflows/cloud-scaling-capacity-bounds-policy-ci.yml"
+  push:
+    branches:
+      - "claude/r8-**"
+      - "claude/phase-5b-**"
+      - "claude/setup-symbolu-monorepo-**"
+      - "claude/guard-coverage-**"
+    paths:
+      - "packages/integration/cloud-scaling-capacity-bounds-policy/**"
+      - "scripts/cloud_scaling/guard_sweep.py"
+      - "scripts/cloud_scaling/tests/**"
+      - ".github/workflows/cloud-scaling-capacity-bounds-policy-ci.yml"
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  # Installed in dependency order so each distribution's declared first-party requirement is
+  # already present; the monorepo's packages are not on any index, so a resolve would fail.
+  #
+  # uvi-policy-contracts and governance-contracts are NOT this package's dependencies. They
+  # arrive because ugence-policy-authority declares the UVI contracts for its first adapter,
+  # and its `api` module imports that adapter — a transitive cost this package's pyproject
+  # records rather than discovers. Nothing here imports either, and
+  # tests/test_import_boundary.py asserts that against the shipped source.
+  FIRST_PARTY: >-
+    packages/governance-contracts
+    packages/uvi-policy-contracts
+    packages/policy-authority
+    packages/integration/cloud-scaling-capacity-bounds-policy
+
+jobs:
+  capacity-bounds-suite:
+    name: Capacity-bounds policy family suite (source)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install tooling + first-party packages (editable, in dependency order)
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest
+          for pkg in $FIRST_PARTY; do pip install -e "$pkg"; done
+      - name: Full suite (one run; the report below is read, not re-measured)
+        run: |
+          python -m pytest packages/integration/cloud-scaling-capacity-bounds-policy/tests \
+            -rs --junitxml=/tmp/junit.xml
+      - name: The suite collected its properties, and none skipped silently
+        # Reads the report the run above already produced rather than running the suite twice.
+        #
+        # Zero collected is a failure, not a pass: pytest exits 5 for "no tests collected", so
+        # a rename or a moved path would otherwise turn this workflow green while running
+        # nothing. The floor is a floor, not an equality — adding properties must not fail it.
+        #
+        # A skip is also a failure here. Nothing in this suite is conditional on an
+        # unresolvable neighbour, so on a complete checkout every property must run.
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import sys
+          import xml.etree.ElementTree as ET
+
+          MINIMUM = 85
+
+          root = ET.parse("/tmp/junit.xml").getroot()
+          suites = [root] if root.tag == "testsuite" else list(root)
+          total = sum(int(s.get("tests", 0)) for s in suites)
+          failures = sum(int(s.get("failures", 0)) + int(s.get("errors", 0)) for s in suites)
+          skipped = [
+              case.get("name", "?")
+              for suite in suites
+              for case in suite.iter("testcase")
+              if case.find("skipped") is not None
+          ]
+          print(f"collected={total} failures={failures} skipped={len(skipped)}")
+          if failures:
+              sys.exit(f"FAIL: {failures} properties failed or errored")
+          if total < MINIMUM:
+              sys.exit(
+                  f"FAIL: collected {total} properties, expected at least {MINIMUM}. A target "
+                  "that collects nothing is a failure, not a green suite."
+              )
+          if skipped:
+              sys.exit(f"FAIL: {len(skipped)} properties skipped on a complete checkout: {skipped}")
+          PY
+      - name: The second family registers with no core change to the authority
+        # The claim this package exists to test, and the one a reader is most likely to doubt.
+        # Drives genuine issuance, real Ed25519 signing, the real registry and real resolution
+        # from OUTSIDE the authority's distribution.
+        run: |
+          python -m pytest \
+            packages/integration/cloud-scaling-capacity-bounds-policy/tests/test_authority_registration.py
+      - name: Leaf boundary — one dependency, public api only, no signing, no clock
+        # The load-bearing prohibition is the Phase 5A candidate contract: borrowing the D-4
+        # canonical action-type set from it would look like reuse and would in fact place the
+        # Risk Authority transitively behind a declarative artifact.
+        run: |
+          python -m pytest \
+            packages/integration/cloud-scaling-capacity-bounds-policy/tests/test_import_boundary.py
+      - name: Artifact construction is fail-closed
+        run: |
+          python -m pytest \
+            packages/integration/cloud-scaling-capacity-bounds-policy/tests/test_artifact.py
+
+  authority-baseline:
+    name: The authority this family registers with remains green
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install tooling + first-party packages
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest
+          for pkg in $FIRST_PARTY; do pip install -e "$pkg"; done
+      - name: Policy Authority suite
+        # This family delegates issuance, signing, the registry, resolution and revocation
+        # entirely to the authority. Its own guarantees are only as good as that suite.
+        run: python -m pytest packages/policy-authority
+      - name: The baseline actually collected tests
+        run: |
+          set -euo pipefail
+          python -m pytest packages/policy-authority --co > /tmp/c.txt 2>&1
+          count=$(grep -oE '[0-9]+ tests? collected' /tmp/c.txt | tail -1 | grep -oE '^[0-9]+')
+          if [ -z "${count:-}" ] || [ "$count" -eq 0 ]; then
+            echo "::error::packages/policy-authority collected zero tests"
+            tail -30 /tmp/c.txt
+            exit 1
+          fi
+          echo "packages/policy-authority: $count tests collected"
+
+  guard-sweep:
+    name: Gate-removal mutation sweep (single shard, all 37 sites)
+    runs-on: ubuntu-latest
+    # Measured at 5m38s locally for 37 mutants against a 130-test suite — roughly 9s a
+    # mutant. One shard is the honest configuration here, not a shortcut: Phase 5A and 5B
+    # are sharded eight ways because 109 guards against a 138s suite is four wall-clock
+    # hours, and this package is two orders of magnitude cheaper. The timeout is generous
+    # against a slower runner rather than tight against the local measurement.
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install tooling + first-party packages (editable, in dependency order)
+        # Byte-for-byte the sequence the suite job above uses, reading the same
+        # $FIRST_PARTY. The sweep runs this package's own suite in a copy outside the
+        # repository, so a copy installed differently from the one CI measures would be
+        # measuring a different program.
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest
+          for pkg in $FIRST_PARTY; do pip install -e "$pkg"; done
+
+      - name: The checked-in inventory is regenerated, not hand-edited
+        # Runs before the sweep, deliberately: this is the cheap check that catches a guard
+        # added without a classification or removed without anyone noticing, and a stale
+        # inventory would make every number below answer a question about a different
+        # program. `--inventory-only` also fails on an exclusion that names no guard, one
+        # with a reason outside the closed vocabulary, and one whose key is ambiguous.
+        run: |
+          python scripts/cloud_scaling/guard_sweep.py capacity-bounds-policy --inventory-only
+          git diff --exit-code -- \
+            packages/integration/cloud-scaling-capacity-bounds-policy/GUARD_INVENTORY.md \
+            packages/integration/cloud-scaling-capacity-bounds-policy/guard_inventory.json \
+            packages/integration/cloud-scaling-capacity-bounds-policy/guard_classification.json
+
+      - name: The sweep's own enforcement machinery is measured, not assumed
+        # The additive decision classes this package enables — D-GC-4 call deletion and
+        # D-GC-5 else-arm deletion — plus the method mint site and the recalibrated
+        # typed-read vocabulary. D-GC-5 has no member in this package, so without these
+        # tests its operator would ship exercised by nothing at all.
+        run: python -m pytest scripts/cloud_scaling/tests -q
+
+      - name: Sweep every site
+        # Refuses a red baseline outright (exit 2) rather than scoring against it: a test
+        # that was already failing satisfies "some test failed" without the mutation having
+        # done anything, which would credit every guard with a kill it did not earn. Also
+        # exits non-zero on a surviving scored guard or an unscored one.
+        run: python scripts/cloud_scaling/guard_sweep.py capacity-bounds-policy --shard 1/1
+
+      - name: The tracked tree was not mutated
+        # The sweep works in a disposable copy outside the repository. This is what proves it.
+        run: git diff --exit-code
+        if: always()
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: capacity-bounds-policy-guard-sweep-shard-1
+          path: /tmp/ugence-sweep-capacity-bounds-policy/*.json
+          if-no-files-found: warn
+
+  guard-sweep-aggregate:
+    name: Every inventoried site produced exactly one result
+    runs-on: ubuntu-latest
+    needs: guard-sweep
+    if: always()
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: capacity-bounds-policy-guard-sweep-shard-*
+          merge-multiple: true
+          path: shards
+      - name: Prove the sweep was total, and block on every way it can be incomplete
+        # A single shard still has to prove totality: a job that died halfway produces no
+        # duplicate either, so absence is checked directly against the real inventory
+        # rather than inferred from the shard arithmetic. Measured at `--shards 1`, the
+        # aggregator exits non-zero on each of — a shard that never reported, a site with
+        # no result, a site swept twice, a site with no classification, an exclusion naming
+        # no guard, an exclusion with a reason outside the closed vocabulary, an exclusion
+        # whose key matches more than one guard, a guard classified SCORED that survived, a
+        # guard classified EXCLUDED that was in fact killed, a kill attributable only to a
+        # message assertion, and a site the sweep could not score at all.
+        #
+        # Two of the aggregator's checks are **vacuous at n=1** and are not claimed here:
+        # `misassigned_guards` is always empty because `shard_of(i, 1)` is 1 for every i,
+        # and `baseline_agrees` is trivially true over a single baseline value. The step
+        # below pins the baseline population instead, so a sweep run against a suite that
+        # collected the wrong number of tests fails rather than passing unnoticed.
+        run: |
+          python scripts/cloud_scaling/guard_sweep.py capacity-bounds-policy \
+            --aggregate shards --shards 1
+      - name: The totals are the ones this package ratified
+        # The aggregator proves the sweep was well-formed; this asserts the *result*. A
+        # future change that silently traded a killed site for an excluded one would pass
+        # every check above and fail here, where the closed exclusion vocabulary is not a
+        # decision CI may make on its own.
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          import sys
+
+          report = json.load(
+              open(
+                  "packages/integration/cloud-scaling-capacity-bounds-policy/"
+                  "guard_sweep_aggregate.json"
+              )
+          )
+          excluded = sum(
+              1 for row in report["classification"].values() if row["status"] == "EXCLUDED"
+          )
+          print(
+              f"inventory={report['inventory_total']} killed={len(report['killed'])} "
+              f"survived={len(report['survived'])} unscored={len(report['unscored'])} "
+              f"excluded={excluded} minting={len(report['minting_guards'])} "
+              f"message_only={len(report['message_only_kills'])} "
+              f"baselines={report['baselines']}"
+          )
+          problems = []
+          # The baseline population, pinned because `baseline_agrees` cannot check it at
+          # n=1. A sweep whose baseline collected a different number of tests is measuring
+          # a different suite, and every other check above would still pass.
+          if report["baselines"] != {"1": 130}:
+              problems.append(
+                  f"baseline collected {report['baselines']}, expected {{'1': 130}}"
+              )
+          if report["inventory_total"] != 37:
+              problems.append(f"inventory is {report['inventory_total']}, not 37")
+          if len(report["killed"]) != report["inventory_total"]:
+              problems.append(
+                  f"{len(report['killed'])} of {report['inventory_total']} sites killed"
+              )
+          if excluded:
+              problems.append(
+                  f"{excluded} site(s) classified EXCLUDED; this package excludes none, and "
+                  "the owner ruled its survivors closed by tests rather than exclusions"
+              )
+          if problems:
+              sys.exit("FAIL: " + "; ".join(problems))
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: capacity-bounds-policy-guard-sweep-aggregate
+          path: packages/integration/cloud-scaling-capacity-bounds-policy/guard_sweep_aggregate.json
+          if-no-files-found: warn
+
+  packaging:
+    name: Wheel and sdist build cleanly, and ship no test payload
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Build both artifacts
+        run: |
+          python -m pip install --upgrade pip
+          pip install build
+          python -m build packages/integration/cloud-scaling-capacity-bounds-policy
+      - name: The wheel ships the package and no tests
+        # A wheel carrying the test tree would ship the fixtures' synthetic family to
+        # consumers. `tool.setuptools.packages.find` scopes to src/, and this checks it held.
+        run: |
+          set -euo pipefail
+          cd packages/integration/cloud-scaling-capacity-bounds-policy
+          wheel=$(ls dist/*.whl)
+          python - "$wheel" <<'PY'
+          import sys
+          import zipfile
+
+          names = zipfile.ZipFile(sys.argv[1]).namelist()
+          top = {n.split("/")[0] for n in names}
+          expected = "ugence_cloud_scaling_capacity_bounds_policy"
+          if expected not in top:
+              sys.exit(f"FAIL: wheel does not ship {expected}; top-level = {sorted(top)}")
+          leaked = sorted(n for n in names if n.startswith(("tests/", "conftest")))
+          if leaked:
+              sys.exit(f"FAIL: wheel ships test payload: {leaked}")
+          if f"{expected}/py.typed" not in names:
+              sys.exit("FAIL: wheel omits py.typed")
+          print(f"wheel top-level: {sorted(top)}")
+          PY
+      - name: The distribution installs and imports in a clean environment
+        # An import failure here means the declared dependencies are wrong, which the source
+        # run above cannot catch: it installs every first-party package editable.
+        run: |
+          set -euo pipefail
+          cd packages/integration/cloud-scaling-capacity-bounds-policy
+          python -m venv /tmp/clean
+          /tmp/clean/bin/pip install --upgrade pip --quiet
+          /tmp/clean/bin/pip install --quiet \
+            ../../governance-contracts ../../uvi-policy-contracts ../../policy-authority
+          /tmp/clean/bin/pip install --quiet dist/*.whl
+          /tmp/clean/bin/python - <<'PY'
+          from ugence_cloud_scaling_capacity_bounds_policy import (
+              CAPACITY_BOUNDS_ADAPTER_ID,
+              CapacityBoundsPolicyFamilyAdapter,
+              __version__,
+          )
+
+          adapter = CapacityBoundsPolicyFamilyAdapter()
+          assert adapter.adapter_id == CAPACITY_BOUNDS_ADAPTER_ID, adapter.adapter_id
+          print(f"installed {__version__}, adapter {adapter.adapter_id}")
+          PY

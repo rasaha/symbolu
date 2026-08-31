@@ -1,0 +1,31 @@
+{
+  "schema": "bindingslots_v100_reference/integrity/v1",
+  "gates": {
+    "1_accuracy_within_0.1pp_of_T0": true,
+    "2_incorrect_verified_returns_zero": true,
+    "3_incorrect_corrections_zero": true,
+    "4_all_disagreements_detected": true,
+    "5_all_disagreements_corrected": true,
+    "6_provenance_completeness_100pct": true,
+    "7_cross_session_leakage_zero": true,
+    "8_cross_tenant_leakage_zero": true,
+    "9_stale_returns_zero": true,
+    "10_expired_returns_zero": true,
+    "11_deleted_returns_zero": true,
+    "12_incorrect_version_returns_zero": true,
+    "13_table_unavailable_abstains": true,
+    "14_injected_failures_fail_closed": true,
+    "15_no_model_state_change": true,
+    "16_deterministic_replay_succeeds": true,
+    "17_cleanup_zero_live_session_records": true,
+    "exactly_one_read_per_v100_query": true,
+    "all_pass": true
+  },
+  "scenarios_all_pass": true,
+  "reproduction_matches_committed_b0": true,
+  "m0_byte_identical_to_frozen_baseline": true,
+  "no_model_state_change": true,
+  "eval_optimizer_steps": 0,
+  "kda_validation_blocked": true,
+  "ready_for_kda_validation_emitted": false
+}

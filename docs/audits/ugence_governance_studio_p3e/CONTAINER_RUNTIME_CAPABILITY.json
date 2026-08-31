@@ -1,17 +1,149 @@
 {
   "check": "governance_studio_p3e_container_runtime_capability",
   "docker_client_version": "29.3.1",
-  "docker_daemon": {"startable": true, "running": true, "socket": "/var/run/docker.sock", "server_version": "29.3.1", "storage_driver": "overlayfs"},
+  "docker_daemon": {
+    "startable": true,
+    "running": true,
+    "socket": "/var/run/docker.sock",
+    "server_version": "29.3.1",
+    "storage_driver": "overlayfs"
+  },
   "buildx_version": "0.31.1",
   "compose_version": "5.1.1",
   "scratch_build_works": true,
-  "base_image_pull": {"result": "FORBIDDEN_403", "hosts_denied": ["production.cloudfront.docker.com", "pkg-containers.githubusercontent.com"]},
-  "manifest_inspect": {"result": "FORBIDDEN_403"},
+  "base_image_pull": {
+    "result": "FORBIDDEN_403",
+    "hosts_denied": [
+      "production.cloudfront.docker.com",
+      "pkg-containers.githubusercontent.com"
+    ]
+  },
+  "manifest_inspect": {
+    "result": "FORBIDDEN_403"
+  },
   "pypi_npm_allowlisted": true,
   "argon2_cffi_installable": true,
   "missing_capability": "organization egress policy denies all container-registry blob CDNs (403 on CONNECT); base images cannot be pulled and base digests cannot be resolved/pinned",
   "container_gates_executable": false,
-  "blocked_gates": ["C2", "C4", "C5", "C6", "C7", "C8", "C9", "C10", "C11", "C12", "C13", "C14", "C15", "C16-image", "C17-image", "C18", "C19"],
-  "executable_this_pass": ["argon2id_password_hardening", "source_python_audit", "npm_production_audit", "application_regression"],
-  "policy_note": "proxy README: 403/407 policy denials must be reported, not retried or bypassed; no FROM-scratch substitute image was fabricated"
+  "blocked_gates": [
+    "C2",
+    "C4",
+    "C5",
+    "C6",
+    "C7",
+    "C8",
+    "C9",
+    "C10",
+    "C11",
+    "C12",
+    "C13",
+    "C14",
+    "C15",
+    "C16",
+    "C17",
+    "C18",
+    "C19"
+  ],
+  "executable_this_pass": [
+    "argon2id_password_hardening",
+    "source_python_audit",
+    "npm_production_audit",
+    "application_regression"
+  ],
+  "policy_note": "proxy README: 403/407 policy denials must be reported, not retried or bypassed; no FROM-scratch substitute image was fabricated",
+  "gate_definition": "docs/audits/ugence_governance_studio_p3e/CONTAINER_GATE_DEFINITION.json",
+  "gate_identifier_reconciliation": {
+    "note": "Reconciled to the canonical identifier set in CONTAINER_GATE_DEFINITION.json on 2026-08-29. C16-image and C17-image were deprecated, noncanonical aliases of C16 and C17 by owner decision (rasaha) and are not distinct additional gates.",
+    "previous_blocked_gates": [
+      "C2",
+      "C4",
+      "C5",
+      "C6",
+      "C7",
+      "C8",
+      "C9",
+      "C10",
+      "C11",
+      "C12",
+      "C13",
+      "C14",
+      "C15",
+      "C16-image",
+      "C17-image",
+      "C18",
+      "C19"
+    ],
+    "change": "C16-image -> C16, C17-image -> C17; no gate added or removed",
+    "gate_count_before": 17,
+    "gate_count_after": 17
+  },
+  "gate_execution_state_unchanged": "every P3E-CTR gate and every historical gate remains NOT_EXECUTED; no evidence obligation is marked complete",
+  "distinguished_conditions": {
+    "note": "Six separate conditions were previously conflated as one 'egress' story. They are distinguished here; each stands or falls on its own.",
+    "1_sandbox_egress_limitation": {
+      "scope": "the agent sandbox in which the P3E work was performed - NOT GitHub Actions",
+      "condition": "the organization egress proxy denies container-registry blob CDNs (403 on CONNECT to production.cloudfront.docker.com and pkg-containers.githubusercontent.com)",
+      "status": "STILL_PRESENT in that sandbox",
+      "effect": "no container gate can be executed from the sandbox; this is why the P3E pass reported the gates NOT_EXECUTED"
+    },
+    "2_malformed_trivy_action_reference": {
+      "condition": "the workflow pinned aquasecurity/trivy-action@0.28.0 while the upstream tag is v0.28.0, so action resolution failed before any step ran",
+      "status": "CLEARED_BY_PIN_CHANGE",
+      "cleared_by": "re-pin to aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 (v0.36.0)",
+      "confirmed_by_run": "https://github.com/rasaha/symbolu/actions/runs/33268204975",
+      "scope_limit": "confirms only that the action resolves and the job starts; the run never reached the scan step, so Trivy's executable and vulnerability databases remain UNTESTED from any environment"
+    },
+    "3_ci_registry_reachability": {
+      "finding": "GitHub Actions CI CAN reach the container registry",
+      "evidence": "in https://github.com/rasaha/symbolu/actions/runs/33268204975 resolve_base_images resolved both images successfully; the step failed on a digest comparison, not on a 403",
+      "consequence": "condition 1 must not be generalized to CI. Registry reachability is not what blocks the container gates in CI."
+    },
+    "4_upstream_tag_drift": {
+      "condition": "the mutable tags now resolve to different index digests than the ratified pins",
+      "observed": {
+        "docker.io/library/node:22-bookworm-slim": "live sha256:83f487e0... vs ratified sha256:f32b8106...",
+        "docker.io/library/python:3.11-slim-bookworm": "live sha256:0bee7276... vs ratified sha256:b1899299..."
+      },
+      "status": "PRESENT - this is what fails base-image-digest-verification in CI today",
+      "interpretation": "expected behaviour of a mutable tag; it says nothing about the images the ratified digests name"
+    },
+    "5_owner_decision_hold_ratified_digests": {
+      "decision": "HOLD_EXISTING_RATIFIED_DIGESTS",
+      "ruled_by": "rasaha",
+      "ruled_on": "2026-08-29",
+      "statement": "tag movement does not authorize a re-pin; the ratified digests stay authoritative and are to be sourced from the approved internal mirror when provisioned",
+      "observed_digests_recorded_as": "UNAPPROVED_OBSERVATION_ONLY candidates in BASE_IMAGE_MIRROR_DECISION.json",
+      "consequence": "the container job stays red at base-image-digest-verification until the mirror serves the ratified digests. That halt is the ratified MUST_HALT_ON_DIGEST_MISMATCH control working, not a defect.",
+      "future_change": "only via the controlled base-image refresh recorded in the ratification record",
+      "ci_confirmation": {
+        "confirmed_by_run": "https://github.com/rasaha/symbolu/actions/runs/33269251316 (container job 99144840292, commit f42c4012)",
+        "container_job_step_outcomes": "checkout, setup-python, evidence-dir-init, install-e2e-driver-deps and ratified-pin-conformance all succeeded; base-image-digest-verification FAILED; every downstream gate step was skipped; evidence-manifest and upload-evidence succeeded under if: always()",
+        "conclusion": "the sole failure in the container job is the ratified digest-mismatch halt. No other blocker remains: action resolution succeeded, and no gate step failed on its own merits.",
+        "gate_consequence": "every P3E-CTR gate remains NOT_EXECUTED; the run's evidence manifest is INCOMPLETE and no evidence obligation is satisfied"
+      }
+    },
+    "6_evidence_manifest_flaw": {
+      "condition": "the evidence-manifest step hashed files from a repository directory holding seven committed records, several stating result NOT_EXECUTED, so a run that scanned nothing reported non-null scan hashes",
+      "status": "CORRECTED",
+      "correction": [
+        "runtime evidence is written to a fresh run-scoped directory under RUNNER_TEMP keyed by run id and attempt, outside the checkout, and asserted empty at creation",
+        "an artifact is hashed only when its producer step reported success in this run",
+        "a failed, skipped or absent producer yields a null hash, the producer status and INCOMPLETE, with no fallback to a pre-existing file",
+        "the manifest records commit, run id, run attempt and the producing step per entry",
+        "the seven committed records were moved to reference-evidence/ and labelled, not deleted",
+        "deployment/governance-studio/artifacts/ is git-ignored so run output cannot be committed"
+      ],
+      "tests": "deployment/governance-studio/tests/test_evidence_manifest.py - ten tests, including negatives for committed records, pre-populated directories, and failed and skipped producers",
+      "obligations_unaffected": "no evidence obligation is marked complete by this correction",
+      "ci_confirmation": {
+        "confirmed_by_run": "https://github.com/rasaha/symbolu/actions/runs/33269251316 (container job 99144840292, commit f42c4012)",
+        "evidence_dir_used": "/home/runner/work/_temp/p3e-evidence-33269251316-1 (RUNNER_TEMP, keyed by run id and attempt, outside the checkout)",
+        "observed": [
+          "every producer step was skipped, and every manifest entry came back sha256 null with status NOT_PRODUCED_THIS_RUN - in the equivalent earlier run the same scenario reported non-null vuln_report_sha256 and secret_scan_sha256 from committed records",
+          "the uploaded evidence artifact contained 1 file, the manifest itself, against 8 in the earlier run where seven committed records were swept up as evidence"
+        ],
+        "conclusion": "the flaw is corrected in CI, not only under test"
+      }
+    }
+  }
 }

@@ -2,7 +2,7 @@
 # =============================================================================
 # RunPod execution script — CG signal-governance pilot (first true 30-50 run)
 # =============================================================================
-# Runbook: experiments/signal_gov/CG_PILOT_RUNBOOK.md
+# Runbook: Project_documentation/governance/experiments/signal_gov/CG_PILOT_RUNBOOK.md
 # This runs the real CG checkpoint path (--mode real_cg with MistralCGAdapter),
 # caches features, and replays offline. It does NOT claim any result — a 30-50
 # scenario pilot is underpowered (the report says so automatically).

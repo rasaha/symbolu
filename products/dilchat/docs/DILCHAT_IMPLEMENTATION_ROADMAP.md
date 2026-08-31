@@ -3,7 +3,7 @@
 **Product:** DilChat (consumer) · **Company:** Ugence Labs · **Site:** dilchat.com
 **Document:** 10 of the DilChat design-document suite (the roadmap/operations doc).
 **Status:** Design phase. **No production implementation begins until specs (documents 1–9) are approved.**
-**Subordinate to:** [`DILCHAT_DECISION_LOG.md`](./DILCHAT_DECISION_LOG.md) — canonical. This roadmap sequences and gates the work; it never re-decides architecture, rule packs, or provenance. On any conflict, the Decision Log wins.
+**Subordinate to:** [`DILCHAT_DECISION_LOG.md`](DILCHAT_DECISION_LOG.md) — canonical. This roadmap sequences and gates the work; it never re-decides architecture, rule packs, or provenance. On any conflict, the Decision Log wins.
 
 > **Flagship first milestone (verbatim, the north star of the MVP):**
 > *"Two users independently create birth profiles, securely pair, and receive a reproducible shared Guna Milan scorecard plus individual daily Moon-interest profiles, with private and shared authorization boundaries enforced."*
@@ -62,9 +62,9 @@
 > mobile track adds **Phase 2 (device/native hardening)** and **Phase 3 (secure
 > shared chat)** ahead of AI Assist (Phases 4A–4D). This refines — and is
 > sequenced by — the dedicated
-> [`DILCHAT_AI_ASSIST_DEVELOPMENT_ROADMAP.md`](./DILCHAT_AI_ASSIST_DEVELOPMENT_ROADMAP.md);
-> see also [`DILCHAT_AI_ASSIST_PRODUCT_REQUIREMENTS.md`](./DILCHAT_AI_ASSIST_PRODUCT_REQUIREMENTS.md)
-> and [`DILCHAT_RELATIONSHIP_SIGNAL_FUSION_REQUIREMENTS.md`](./DILCHAT_RELATIONSHIP_SIGNAL_FUSION_REQUIREMENTS.md).
+> [`DILCHAT_AI_ASSIST_DEVELOPMENT_ROADMAP.md`](DILCHAT_AI_ASSIST_DEVELOPMENT_ROADMAP.md);
+> see also [`DILCHAT_AI_ASSIST_PRODUCT_REQUIREMENTS.md`](DILCHAT_AI_ASSIST_PRODUCT_REQUIREMENTS.md)
+> and [`DILCHAT_RELATIONSHIP_SIGNAL_FUSION_REQUIREMENTS.md`](DILCHAT_RELATIONSHIP_SIGNAL_FUSION_REQUIREMENTS.md).
 > No AI Assist implementation is authorized by this note; **AI Assist must not be
 > built before secure shared chat and privacy boundaries exist.**
 >
@@ -685,15 +685,44 @@ Ordered by recommended sequence after MVP launch:
 
 | Document | Authoritative for | Roadmap dependency |
 |----------|-------------------|--------------------|
-| [`DILCHAT_DECISION_LOG.md`](./DILCHAT_DECISION_LOG.md) | All decisions, provenance tuple, open questions — **canonical** | Every phase & gate |
-| [`DILCHAT_BACKEND_PRODUCT_REQUIREMENTS.md`](./DILCHAT_BACKEND_PRODUCT_REQUIREMENTS.md) | FR/NFR, personas, journeys, MVP boundaries | Every phase |
-| [`DILCHAT_BACKEND_ARCHITECTURE.md`](./DILCHAT_BACKEND_ARCHITECTURE.md) | Modular monolith, data flows, deployment | A–F |
-| [`DILCHAT_API_SPEC.md`](./DILCHAT_API_SPEC.md) / [`openapi/dilchat.openapi.yaml`](./openapi/dilchat.openapi.yaml) | HTTP contract | B–F |
+| [`DILCHAT_DECISION_LOG.md`](DILCHAT_DECISION_LOG.md) | All decisions, provenance tuple, open questions — **canonical** | Every phase & gate |
+| [`DILCHAT_BACKEND_PRODUCT_REQUIREMENTS.md`](DILCHAT_BACKEND_PRODUCT_REQUIREMENTS.md) | FR/NFR, personas, journeys, MVP boundaries | Every phase |
+| [`DILCHAT_BACKEND_ARCHITECTURE.md`](DILCHAT_BACKEND_ARCHITECTURE.md) | Modular monolith, data flows, deployment | A–F |
+| [`DILCHAT_API_SPEC.md`](DILCHAT_API_SPEC.md) / [`openapi/dilchat.openapi.yaml`](./openapi/dilchat.openapi.yaml) | HTTP contract | B–F |
 | `DILCHAT_DATA_MODEL.md` | Tables, scope columns, RLS | B, C, D, G |
 | `DILCHAT_ASTROLOGY_ENGINE_SPEC.md` | Ephemeris math, ayanamsa, tz, transits | A, B, C, E |
 | `DILCHAT_PRIVACY_CONSENT_AND_SECURITY.md` | Consent state machine, scope guard | D, E, F, G |
 | `DILCHAT_AI_GUIDANCE_SPEC.md` | AIProvider port, guardrails | F, G |
 | `DILCHAT_TEST_AND_VALIDATION_PLAN.md` | Goldens, adversarial scope, oracle, red-team | A–G |
+
+---
+
+## Secure chat sequence (Phase 3)
+
+The secure-chat build is sequenced so that the security-critical backend
+foundation is delivered and audited before any transport or UI, and well before
+any AI. Each phase gates the next.
+
+```
+Phase 3A — Secure chat backend core     ← IMPLEMENTED (backend-only; this workstream)
+Phase 3B — Safety, block/report, retention/export policy
+Phase 3C — Real-time delivery transport (consumes the Phase 3A transactional outbox)
+Phase 3D — Mobile chat interface
+Phase 4A — Conversation evidence
+Phase 4B — Guna structural prior
+Phase 4C — Moon receptivity
+Phase 4D — AI Assist (DEC-048; privacy-gated, unchanged)
+```
+
+- **Phase 3A** (this workstream) delivers relationship-scoped conversations,
+  idempotent text messages, cursor pagination, read state, transactional
+  revocation at unpair, a transactional outbox, and forced RLS — backend only.
+  See the `DILCHAT_SECURE_CHAT_BACKEND_*` docs.
+- Phase 3A alone does **not** make the product production-ready.
+- Friends Finder / Relationship Discovery remains a **separate** requirements
+  track, not part of this sequence.
+- No message content is ever exposed to AI, analytics, or astrology systems;
+  DEC-048 and the AI Assist requirements are unchanged.
 
 ---
 

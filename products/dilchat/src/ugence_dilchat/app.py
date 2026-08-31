@@ -41,9 +41,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         version=__version__,
         description=(
             "DilChat backend foundation (Ugence Labs): identity, birth profiles, "
-            "deterministic natal-Moon derivation, three-scope authorization, and "
-            "couple/consent/audit primitives. No user-facing Guna Milan, AI, daily "
-            "transits, chat, or agreements are exposed in this phase."
+            "deterministic natal-Moon derivation, three-scope authorization, "
+            "couple/consent/audit primitives, and the Phase 3A secure shared chat "
+            "core (relationship-scoped conversations, idempotent text messages, "
+            "cursor pagination, read state, transactional outbox). No user-facing "
+            "Guna Milan, AI Assist, daily transits, or agreements are exposed."
         ),
         lifespan=lifespan,
         openapi_url=f"{settings.api_v1_prefix}/openapi.json",

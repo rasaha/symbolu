@@ -2,8 +2,9 @@
 
 Execution / approval / orchestration / live-telemetry / live-shadow code for the
 Cloud Scaling Controller. This namespace was separated **out** of the advisory
-distribution `ugence-cloud-scaling-controller` (v0.1.1) so that wheel stays
-advisory-only (no code capable of applying scaling advice).
+distribution `ugence-cloud-scaling-controller` (first separated at v0.1.1; the advisory
+distribution is now v0.3.x and this operations package depends on `>=0.3.0,<0.4`) so that
+wheel stays advisory-only (no code capable of applying scaling advice).
 
 **Status**
 

@@ -1,0 +1,32 @@
+{
+  "schema": "bindingslots_external_fallback/latency/v1",
+  "read_p95_latency_s": 5.763000444858335e-06,
+  "ceiling_s": 0.05,
+  "table_ops": [
+    {
+      "writes": 120,
+      "reads": 248,
+      "bytes_written": 12206
+    },
+    {
+      "writes": 120,
+      "reads": 346,
+      "bytes_written": 12214
+    },
+    {
+      "writes": 120,
+      "reads": 299,
+      "bytes_written": 12212
+    },
+    {
+      "writes": 120,
+      "reads": 341,
+      "bytes_written": 12210
+    },
+    {
+      "writes": 120,
+      "reads": 360,
+      "bytes_written": 12210
+    }
+  ]
+}

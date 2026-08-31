@@ -25,6 +25,7 @@ sys.path.insert(0, str(ROOT / "src"))
 
 from ugence_context_minimization import api, reasons  # noqa: E402
 from ugence_context_minimization.models import MinimizationResult  # noqa: E402
+from ugence_context_minimization import token_accounting as ta  # noqa: E402
 
 ART = ROOT / "artifacts"
 
@@ -162,6 +163,109 @@ def invariance_contract() -> dict:
     }
 
 
+def _fields(dc: object) -> list:
+    return [{"name": f.name, "type": _type_name(f.type)} for f in dataclasses.fields(dc)]
+
+
+def token_accounting_schema() -> dict:
+    """Machine-readable schema for the CM-TA1 token-accounting contracts.
+
+    Three DISTINCT measurements, never collapsed: context reduction (A), the
+    complete-request estimate (B), and provider-reported usage (C).
+    """
+    return {
+        "contract_version": api.CONTRACT_VERSION,
+        "module": "ugence_context_minimization.token_accounting",
+        "principle": (
+            "Context Minimization measures how much context was safely removed (A). "
+            "The request estimate measures the complete serialized request (B) via an "
+            "INJECTED counter — the core implements no provider tokenizer. Provider "
+            "usage measures what the API reported consuming (C); it is authoritative for "
+            "the response being reconciled, never overwrites the estimate, and is NOT an "
+            "invoice. Unknown usage is None, never zero."
+        ),
+        "enums": {
+            "TokenCountBasis": [b.value for b in ta.TokenCountBasis],
+            "AttemptStatus": [s.value for s in ta.AttemptStatus],
+            "UsageAvailability": [u.value for u in ta.UsageAvailability],
+        },
+        "models": {
+            "RequestTokenEstimate": {
+                "measurement": "B",
+                "fields": _fields(ta.RequestTokenEstimate),
+                "note": "estimated_input_tokens is distinct from MinimizationResult.resulting_tokens",
+            },
+            "ProviderTokenUsage": {
+                "measurement": "C",
+                "fields": _fields(ta.ProviderTokenUsage),
+                "optional_int_fields_unknown_is_null": [
+                    "input_tokens", "cached_input_tokens", "cache_write_input_tokens",
+                    "output_tokens", "reasoning_tokens", "total_tokens",
+                ],
+                "derived_total": "input+output ONLY (cached/cache_write/reasoning excluded to avoid double-count); reported total_tokens preserved separately",
+            },
+            "ApiCallTokenRecord": {
+                "fields": _fields(ta.ApiCallTokenRecord),
+                "computed_properties": ["is_retry", "reduction_pct", "record_fingerprint"],
+                "fingerprint_domain": "ugence-context-minimization/api-call/1",
+                "excludes": ["prompt_text", "credentials", "secrets", "provider_response_payload"],
+            },
+            "LogicalRequestTokenSummary": {
+                "fields": _fields(ta.LogicalRequestTokenSummary),
+                "computed_properties": ["summary_fingerprint"],
+                "fingerprint_domain": "ugence-context-minimization/logical-request/1",
+                "note": "context savings counted once per logical request; unknown usage keeps complete=False",
+                "total_provenance": {
+                    "provider_reported_total_tokens": "sum of ONLY explicit provider-reported totals; never a derived value",
+                    "attempts_reporting_total": "count of known attempts that carried an explicit provider total",
+                    "derived_total_tokens": "sum of derived input+output; cached/cache_write/reasoning excluded (never re-added)",
+                    "settlement_token_units": "documented settlement selection per attempt (reported total if present, else derived); meaningful only when complete",
+                    "rule": "a field named 'provider ... total' contains ONLY provider-reported values; provider-reported and derived totals are never blended into one field",
+                },
+            },
+        },
+        "protocols": ["RequestTokenCounter", "TokenAccountingSink"],
+        "apis": [
+            "prepare_api_call_measurement",
+            "reconcile_api_call_measurement",
+            "aggregate_logical_request_usage",
+            "canonical_tenant_namespace",
+        ],
+        "tenant_isolation": {
+            "namespace_helper": "canonical_tenant_namespace(tenant_id)",
+            "single_tenant_namespace": "tenant_id is None -> 's' (domain-separated; NEVER an empty string)",
+            "named_tenant_namespace": "tenant_id present -> 't:' + tenant (must be non-empty, non-whitespace)",
+            "attempt_id_binding": "the tenant namespace is a prefix-free segment of the derived attempt id, so identical tenant-local ids in different tenants derive different attempt ids",
+            "sink_idempotency_key": "(tenant_namespace, attempt_id) — two tenants may store the same explicit attempt_id; same-tenant replay is idempotent; same-tenant conflict is rejected; tenant isolation does not rely on record fingerprints",
+            "fingerprint": "tenant_id is bound into ApiCallTokenRecord.record_fingerprint via attribution",
+            "explicit_retry_reference": {
+                "type": "ExplicitAttemptReference(attempt_id, tenant_id)",
+                "rule": "explicit retry linkage is a tenant-scoped reference, never a raw opaque string (N3)",
+                "enforcement": "reconcile_api_call_measurement fails closed with InvalidRequestError if retry_of.tenant_namespace != canonical_tenant_namespace(prepared.attribution.tenant_id), BEFORE any record is built or written to a sink; the current tenant is never silently substituted",
+                "scope": "tenant-scope validation only; it does NOT assert the referenced parent record exists (durable referential-integrity is deferred)",
+                "serialization": "the parent's tenant namespace equals the record's own (enforced), so retry lineage inherits an unambiguous namespace; retry_of_attempt_id + attribution.tenant_id are both bound in record_fingerprint",
+            },
+        },
+        "fail_closed_conditions": [
+            "negative / bool / float / NaN / inf / str token count -> InvalidUnitError/InvalidRequestError",
+            "usage AVAILABLE without any known field -> InvalidRequestError",
+            "usage AVAILABLE while provider not invoked -> InvalidRequestError",
+            "provider_usage supplied while availability is UNAVAILABLE -> InvalidRequestError",
+            "context_tokens_eliminated != before-after, or after>before -> InvalidRequestError",
+            "attempt_number < 1 -> InvalidRequestError",
+            "duplicate attempt_id with conflicting content -> InvalidRequestError (idempotent replay must be byte-identical)",
+            "aggregation over divergent minimization run fingerprints -> InvalidRequestError",
+        ],
+        "boundary": {
+            "is": ["neutral accounting of already-measured facts", "deterministic fingerprints"],
+            "is_not": [
+                "provider tokenizer", "model SDK", "network/database/filesystem persistence",
+                "pricing authority", "invoice reconciliation", "wall-clock or random id generation",
+            ],
+        },
+    }
+
+
 def acceptance_scenarios() -> dict:
     return {
         "contract_version": api.CONTRACT_VERSION,
@@ -194,6 +298,37 @@ def acceptance_scenarios() -> dict:
              "expect": "requested_reduction echoes the caller's target on every path"},
             {"id": "two_fingerprints", "mode": "ANY",
              "expect": "run_fingerprint and outcome_fingerprint are distinct; fingerprint aliases outcome"},
+            # -- CM-TA1 token accounting -----------------------------------------
+            {"id": "ta_prepare_copies_context_counts", "mode": "ACCOUNTING",
+             "expect": "prepare copies MinimizationResult before/after/eliminated verbatim; run_fingerprint preserved"},
+            {"id": "ta_default_counter_approximate", "mode": "ACCOUNTING",
+             "expect": "default request counter -> DEFAULT_APPROXIMATE, is_approximate True"},
+            {"id": "ta_injected_counter_exact", "mode": "ACCOUNTING",
+             "expect": "injected full-coverage counter -> INJECTED_COUNTER, is_approximate False"},
+            {"id": "ta_estimate_distinct_from_context", "mode": "ACCOUNTING",
+             "expect": "full-request estimate (B) is a different number than minimized context (A)"},
+            {"id": "ta_worked_example", "mode": "ACCOUNTING",
+             "expect": "before 8214 / after 2310 / eliminated 5904; provider input 2337 / cached 1500 / output 428"},
+            {"id": "ta_failed_attempt_known_usage", "mode": "ACCOUNTING",
+             "expect": "FAILED attempt with usage keeps AVAILABLE usage (failed calls can consume tokens)"},
+            {"id": "ta_failed_attempt_unknown_usage", "mode": "ACCOUNTING",
+             "expect": "FAILED/EXCEPTION with no usage -> UNAVAILABLE_*, provider_usage None (unknown != zero)"},
+            {"id": "ta_no_provider_call_no_record", "mode": "ACCOUNTING",
+             "expect": "governance HOLD/BLOCK/ESCALATE never invokes provider -> no ApiCallTokenRecord"},
+            {"id": "ta_cached_reasoning_not_double_counted", "mode": "ACCOUNTING",
+             "expect": "derived_total = input+output only; cached/cache_write/reasoning excluded and still visible"},
+            {"id": "ta_unknown_fields_null", "mode": "ACCOUNTING",
+             "expect": "unknown usage fields serialize as null, not zero"},
+            {"id": "ta_malformed_counts_rejected", "mode": "ACCOUNTING",
+             "expect": "negative/bool/float/NaN/inf/str token counts rejected fail-closed"},
+            {"id": "ta_duplicate_attempt_conflict_rejected", "mode": "ACCOUNTING",
+             "expect": "duplicate attempt_id with conflicting content rejected; identical replay idempotent"},
+            {"id": "ta_three_attempts_three_records", "mode": "ACCOUNTING",
+             "expect": "three attempts under one logical request remain three records"},
+            {"id": "ta_summary_marks_gaps", "mode": "ACCOUNTING",
+             "expect": "any unknown-usage attempt -> summary.complete False; savings counted once"},
+            {"id": "ta_deterministic_fingerprints", "mode": "ACCOUNTING",
+             "expect": "record + summary fingerprints deterministic; counter id/version and usage changes shift the record fp"},
         ],
     }
 
@@ -205,6 +340,7 @@ def main() -> int:
         "reason_codes.json": reason_codes(),
         "minimization_result_schema.json": result_schema(),
         "invariance_contract.json": invariance_contract(),
+        "token_accounting_schema.json": token_accounting_schema(),
         "acceptance_scenarios.json": acceptance_scenarios(),
     }
     for name, data in outputs.items():

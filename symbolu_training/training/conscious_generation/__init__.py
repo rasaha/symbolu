@@ -23,7 +23,7 @@ Phase 3: Governance integration
   - PrimitiveAuxiliaryLosses: Per-primitive contrastive token losses
   - BlissCoherenceLoss: Correct tokens → high Bliss, negatives → low Bliss
 
-Reference: docs/design/CONSCIOUS_GENERATION_DESIGN.md, Appendix D
+Reference: Project_documentation/repository/docs/design/CONSCIOUS_GENERATION_DESIGN.md, Appendix D
 """
 
 from symbolu_training.training.conscious_generation.token_ontology import TokenOntologyProjector

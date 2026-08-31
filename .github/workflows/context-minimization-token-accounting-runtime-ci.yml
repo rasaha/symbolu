@@ -1,0 +1,82 @@
+name: context-minimization-token-accounting-runtime-ci
+
+# Scoped CI for the CM-TA1 integration package
+# (ugence-context-minimization-token-accounting-runtime). It composes the two
+# independent cores (ugence-context-minimization, ugence-agent-runtime) one-way and
+# translates neutral Agent Runtime provider-attempt telemetry into Context
+# Minimization token-accounting records, settling H22-D budgets from measured usage.
+#
+# Additive and path-scoped: it does NOT touch or weaken context-minimization-ci or
+# agent-runtime-ci (which continue to prove each core in isolation). It runs the
+# integration suite (translation + runtime bridge + budget settlement + boundary),
+# a regression of BOTH core suites to prove the additive seams are unchanged, and the
+# integration package's wheel build + isolated-install verifier.
+
+on:
+  pull_request:
+    paths:
+      - "packages/integration/context-minimization-token-accounting-runtime/**"
+      - "packages/capabilities/context-minimization/**"
+      - "packages/runtime/agent-runtime/**"
+      - ".github/workflows/context-minimization-token-accounting-runtime-ci.yml"
+  push:
+    branches:
+      - "claude/cm-ta1-**"
+      - "claude/setup-symbolu-monorepo-**"
+    paths:
+      - "packages/integration/context-minimization-token-accounting-runtime/**"
+      - ".github/workflows/context-minimization-token-accounting-runtime-ci.yml"
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  integration-suite:
+    name: CM-TA1 integration suite (source)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install tooling
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest build
+      - name: Integration suite (translation, runtime bridge, budget settlement, boundary)
+        run: python -m pytest packages/integration/context-minimization-token-accounting-runtime/tests -q
+
+  core-regression:
+    name: Both cores remain green (additive seams unchanged)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install tooling
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest
+      - name: Context Minimization package suite
+        run: python -m pytest packages/capabilities/context-minimization/tests -q
+      - name: Agent Runtime package suite
+        run: python -m pytest packages/runtime/agent-runtime/tests -q
+
+  isolated-install:
+    name: Integration wheel build + isolated-install verification
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install build tooling
+        run: |
+          python -m pip install --upgrade pip
+          pip install build wheel pytest
+      - name: Build first-party wheels, install from declared deps, run the end-to-end proof
+        run: python packages/integration/context-minimization-token-accounting-runtime/scripts/verify_isolated_install.py

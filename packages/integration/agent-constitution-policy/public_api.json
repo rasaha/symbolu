@@ -1,0 +1,159 @@
+{
+  "distribution": "ugence-agent-constitution-policy",
+  "namespace": "ugence_agent_constitution_policy",
+  "package_version": "0.1.0",
+  "policy_family": "agent_governance.agent_constitution",
+  "adapter_id": "ugence.agent-constitution/v1",
+  "policy_type": "AgentConstitutionPolicy",
+  "constitution_vocabulary_version": "ugence.agent-constitution/clauses/v1",
+  "note": "Machine-readable snapshot of the curated public API (ugence_agent_constitution_policy.__all__). Generated from the installed package; tests/test_public_api.py asserts this file equals the actual package surface, including dataclass field ORDER and the exact value of every string constant. This distribution is a POLICY FAMILY and an adapter: it supplies an issuable, digest-bound AgentConstitutionPolicy artifact, registers it with the shared Ugence Policy Authority from outside that authority's own distribution, and ships the ACC-S1-Q3 registration-time family-collision guard (register_agent_constitution_policy_family / assert_agent_constitution_family_registration). It resolves nothing, verifies no conformance, signs nothing, holds no registry and no reference mapping, reads no clock, opens no socket, touches no storage and loads no plugin. It authorizes no runtime action, grants no compute and carries no role lifecycle authority (OD-C4=A); no verifier disposition exists anywhere in it (OD-C3=B). adapter_id, policy_family, policy_type and constitution_vocabulary_version are IDENTITY, not configuration - the ACC-S1-Q1 table ratified them whole, each is framed into a body digest, a coordinate, or both, so moving one moves every issued policy's digest. governed_role_refs and the three bounds are duplicate-free and stored in ascending codepoint order, rejected if unsorted and never silently reordered; every closed-bound member is the exact string value of a CandidateDisposition or ReviewAction member imported from ugence-agentic-proposer, the single source of truth, while the tool-scope bound is an open C5b Token vocabulary that alone may be empty. Constructing any artifact here is NOT authenticity - only the authority's resolve_policy produces an authority-evaluated resolution, and this distribution never calls it.",
+  "constants": {
+    "ACTIVE_LIFECYCLE_STATE": "APPROVED_ACTIVE",
+    "AGENT_CONSTITUTION_ADAPTER_ID": "ugence.agent-constitution/v1",
+    "AGENT_CONSTITUTION_POLICY_FAMILY": "agent_governance.agent_constitution",
+    "AGENT_CONSTITUTION_POLICY_TYPE": "AgentConstitutionPolicy",
+    "CONSTITUTION_VOCABULARY_VERSION": "ugence.agent-constitution/clauses/v1",
+    "LIFECYCLE_APPROVED_ACTIVE": "APPROVED_ACTIVE",
+    "LIFECYCLE_DRAFT": "DRAFT",
+    "LIFECYCLE_SUPERSEDED": "SUPERSEDED",
+    "LIFECYCLE_WITHDRAWN": "WITHDRAWN",
+    "PLACEHOLDER_CONTENT_DIGEST": "0000000000000000000000000000000000000000000000000000000000000000",
+    "POLICY_SCOPE_GLOBAL": "GLOBAL",
+    "POLICY_SCOPE_TENANT": "TENANT"
+  },
+  "symbols": {
+    "ACTIVE_LIFECYCLE_STATE": {
+      "kind": "str_constant",
+      "value": "APPROVED_ACTIVE"
+    },
+    "ADMITTED_CANDIDATE_DISPOSITION_TOKENS": {
+      "kind": "frozenset_constant",
+      "values": [
+        "ESCALATE_EXCEPTION",
+        "RECOMMEND_MATCHED_FOR_APPROVAL",
+        "RECOMMEND_WITHHOLD",
+        "REQUEST_EVIDENCE"
+      ]
+    },
+    "ADMITTED_LIFECYCLE_STATES": {
+      "kind": "frozenset_constant",
+      "values": [
+        "APPROVED_ACTIVE",
+        "DRAFT",
+        "SUPERSEDED",
+        "WITHDRAWN"
+      ]
+    },
+    "ADMITTED_POLICY_SCOPES": {
+      "kind": "frozenset_constant",
+      "values": [
+        "GLOBAL",
+        "TENANT"
+      ]
+    },
+    "ADMITTED_REVIEW_ACTION_TOKENS": {
+      "kind": "frozenset_constant",
+      "values": [
+        "CREATE_EXCEPTION_REVIEW_BUNDLE",
+        "ROUTE_APPROVAL_BUNDLE"
+      ]
+    },
+    "AGENT_CONSTITUTION_ADAPTER_ID": {
+      "kind": "str_constant",
+      "value": "ugence.agent-constitution/v1"
+    },
+    "AGENT_CONSTITUTION_POLICY_FAMILY": {
+      "kind": "str_constant",
+      "value": "agent_governance.agent_constitution"
+    },
+    "AGENT_CONSTITUTION_POLICY_TYPE": {
+      "kind": "str_constant",
+      "value": "AgentConstitutionPolicy"
+    },
+    "AgentConstitutionDuplicateError": {
+      "kind": "exception"
+    },
+    "AgentConstitutionFamilyCollisionError": {
+      "kind": "exception"
+    },
+    "AgentConstitutionFieldError": {
+      "kind": "exception"
+    },
+    "AgentConstitutionOrderingError": {
+      "kind": "exception"
+    },
+    "AgentConstitutionPolicy": {
+      "kind": "dataclass",
+      "fields": [
+        "metadata",
+        "agent_constitution_ref",
+        "governed_role_refs",
+        "permitted_candidate_dispositions_bound",
+        "permitted_review_actions_bound",
+        "permitted_tool_scopes_bound",
+        "constitution_vocabulary_version"
+      ]
+    },
+    "AgentConstitutionPolicyError": {
+      "kind": "exception"
+    },
+    "AgentConstitutionPolicyFamilyAdapter": {
+      "kind": "class"
+    },
+    "AgentConstitutionPolicyMetadata": {
+      "kind": "dataclass",
+      "fields": [
+        "policy_id",
+        "version",
+        "content_digest",
+        "scope",
+        "lifecycle_state",
+        "tenant_id",
+        "supersedes_ref",
+        "effective_from",
+        "effective_to"
+      ]
+    },
+    "CONSTITUTION_VOCABULARY_VERSION": {
+      "kind": "str_constant",
+      "value": "ugence.agent-constitution/clauses/v1"
+    },
+    "LIFECYCLE_APPROVED_ACTIVE": {
+      "kind": "str_constant",
+      "value": "APPROVED_ACTIVE"
+    },
+    "LIFECYCLE_DRAFT": {
+      "kind": "str_constant",
+      "value": "DRAFT"
+    },
+    "LIFECYCLE_SUPERSEDED": {
+      "kind": "str_constant",
+      "value": "SUPERSEDED"
+    },
+    "LIFECYCLE_WITHDRAWN": {
+      "kind": "str_constant",
+      "value": "WITHDRAWN"
+    },
+    "PLACEHOLDER_CONTENT_DIGEST": {
+      "kind": "str_constant",
+      "value": "0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    "POLICY_SCOPE_GLOBAL": {
+      "kind": "str_constant",
+      "value": "GLOBAL"
+    },
+    "POLICY_SCOPE_TENANT": {
+      "kind": "str_constant",
+      "value": "TENANT"
+    },
+    "agent_constitution_coordinate": {
+      "kind": "function"
+    },
+    "assert_agent_constitution_family_registration": {
+      "kind": "function"
+    },
+    "register_agent_constitution_policy_family": {
+      "kind": "function"
+    }
+  }
+}

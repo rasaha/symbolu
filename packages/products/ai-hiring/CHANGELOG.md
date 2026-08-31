@@ -7,6 +7,187 @@ the **distribution** (wheel packaging) version, which is distinct from the
 The format follows [Keep a Changelog](https://keepachangelog.com/); the
 distribution uses pre-1.0 semantic versioning.
 
+## [Unreleased] — Hiring Decision Authority: post-hire calibration loop (1/3/6/12-month)
+
+Implements spec §21 step 6 — the closed-loop policy-improvement path. Additive
+only: new `ugence_ai_hiring.hiring_calibration` package (canonical re-export at
+`ugence_ai_hiring.hiring.calibration`); the existing `CalibrationProposal` gained
+optional governance-context fields; no existing API removed; no product behavior
+changed; `production_certified` remains `False`. Full suite 889 passed / 12
+skipped (25 new tests); `python -m ugence_ai_hiring verify` PASS.
+
+### Added
+- **`PostHireReviewService`** — records structured 1/3/6/12-month reviews with
+  timing windows; **job-related, observable evidence only** (no personality /
+  culture-fit / psychological-resilience / health / protected-attribute
+  inference); append-only (never mutates the historical decision). Role
+  Sustainability & Adaptation accumulates as a post-hire observed dimension.
+- **`HiringCalibrationReport`** + `build_calibration_report` — cohort aggregation
+  by role/policy version × contract version × dimension × horizon × confidence
+  band; predicted-vs-observed deltas, over/underprediction, missing-evidence
+  patterns, dimension reliability, optional descriptive retention/OFI. Preserves
+  predicted-compatibility / observed-outcome / calibration-error as distinct
+  quantities. The cohort key is governance-scoped (role/policy/contract) with no
+  demographics, so calibration data cannot proxy a protected attribute.
+- **`generate_calibration_proposal`** → governed `CalibrationProposal` (affected
+  role/policy, current IR/contract version, supporting evidence, proposed change,
+  rationale, impact summary, required approver, next-version target). Reads
+  deltas + missing-evidence only — never the Overall Fit Index.
+- **`CalibrationApprovalService`** — approval-before-recompile; routes an APPROVED
+  proposal's human-edited policy back through the Step-1 `HiringPolicyCompiler` to
+  produce a NEW versioned `HiringWorkflowIR` + `HiringDecisionContract`. Never
+  mutates an active contract; enforces version advancement and required approver.
+- **`CalibrationProvenance`** + `build_provenance` — links decision case →
+  execution receipt → post-hire reviews → calibration report → proposal → next
+  policy version.
+- **`CalibrationSinkPort`** — optional integration boundary to a shared
+  analytics/reconciliation system (aggregation itself is local and standalone).
+- 25 tests (`tests/test_hiring_calibration.py`).
+
+### Changed
+- `ugence_ai_hiring.hiring_decision.reviews.CalibrationProposal` — additive
+  optional fields (affected_role_id, source_case_ids, report_id,
+  supporting_evidence, proposed_change, impact_summary, required_approver,
+  approved_by). Existing construction is unaffected.
+- Docs: new `docs/schemas/hiring_calibration_report.schema.json` and
+  `hiring_calibration_proposal.schema.json`; spec §21.1 marks step 6 done and the
+  core architecture functionally complete (remaining work is packaging/
+  integration, not core decision logic).
+
+## [Unreleased] — Hiring Decision Authority: action-assurance orchestration spine
+
+Implements spec §21 step 5. Additive only: new orchestrator + artifacts inside
+`ugence_ai_hiring.hiring_decision`; no existing API changed; no product behavior
+changed; `production_certified` remains `False`. Full suite 864 passed / 12
+skipped (22 new tests); `python -m ugence_ai_hiring verify` PASS.
+
+### Added
+- **`HiringDecisionService`** (`hiring_decision.service`) — thin orchestrator:
+  `build action request → ActionGate authorization → Runtime Assurance → HRIS
+  execution handoff → Execution Receipt → Reconciliation`. Ordering is enforced
+  structurally (`assure` accepts only an `AuthorizedAction`; `execute` accepts
+  only a `ClearedAction`).
+- **Fail-closed guards:** no binding decision / not eligible / eligibility pending
+  / wrong disposition / contract mismatch → no action request; ActionGate denial →
+  runtime assurance never runs; runtime not clear → no HRIS execution; action
+  payload mutation after authorization → reject.
+- **`HiringExecutionReceipt`** (`hiring_decision.execution`) — immutable record:
+  decision case id, contract digest+version, binding decision + authority ref,
+  action-request digest, ActionGate ref, Runtime Assurance ref, HRIS/ATS ref,
+  actor, authorized/assured/executed timestamps, execution status, result digest.
+- **`HiringReconciliationRecord`** + `classify_reconciliation` /
+  `build_reconciliation_record` — execution reconciliation comparing authorized vs
+  executed action + HRIS state → `RECONCILED` / `DEVIATION` / `PARTIAL` /
+  `FAILED` / `UNKNOWN`. The shared cross-system reconciliation engine stays
+  external (`ReconciliationPort`).
+- **`HRISExecutionPort`** + `ExecutionOutcome` — execution-handoff integration
+  boundary (no provider-specific connectors). `ActionAuthorizationOutcome` /
+  `AssuranceOutcome` gained reference ids + `authorized_action_digest` (additive).
+- **`HiringActionRequest.content_digest`** (semantic action digest, excludes the
+  random id) + `.snapshot()`; `to_cer_payload()` now carries `action_digest`.
+- 22 tests (`tests/test_hiring_action_assurance.py`) covering sequencing,
+  fail-closed behavior, payload binding, port-call ordering, standalone operation,
+  receipt integrity, and reconciliation classification.
+
+### Changed (design contracts)
+- `docs/schemas/hiring_execution_receipt.schema.json` — aligned to the implemented
+  execution receipt.
+- `docs/schemas/hiring_reconciliation_record.schema.json` — repurposed to the
+  implemented **execution** reconciliation (authorized vs executed + status);
+  post-hire predicted-vs-actual stays in `review_and_calibration.schema.json`.
+- `docs/HIRING_DECISION_AUTHORITY_DESIGN_SPEC.md` §21.1 — step 5 build status.
+
+## [Unreleased] — Hiring Decision Authority: decision plane (assessment → gates → eligibility → recommendation)
+
+Implements spec §21 steps 2–4, 6 (models), and 9. Additive only: new
+`ugence_ai_hiring.hiring_decision` package (canonical re-export at
+`ugence_ai_hiring.hiring.decision`); no existing API changed; no product behavior
+changed; `production_certified` remains `False`. Full suite 842 passed / 12
+skipped (32 new tests); `python -m ugence_ai_hiring verify` PASS.
+
+### Added
+- **`hiring_decision` package** — the governance-first decision layer:
+  - `HiringDecisionCase` — aggregate root for one candidate-role lifecycle;
+    immutable, append-only history; binds **only** via a `DecisionAuthorityOutcome`
+    (HUMAN, binding=True).
+  - `DimensionAssessment` — advisory per-dimension `{dimension, outcome, score,
+    confidence, evidence_refs, assessment_version, rationale, provenance}`;
+    rejects CULTURE_FIT/RESILIENCE; keeps ROLE_SUSTAINABILITY_AND_ADAPTATION
+    post-hire unless `pre_hire_justified` with job-relevant evidence.
+  - `MandatoryGateEvaluator` — deterministic, **admitted-evidence-only**,
+    fail-closed (`PASS`/`FAIL`/`INDETERMINATE`); unadmitted/missing evidence can
+    never satisfy a gate.
+  - `Eligibility` + `derive_eligibility` — derived from mandatory gates only; no
+    score/OFI input.
+  - `HiringRecommendation` + `build_recommendation` — advisory
+    (`actor_type=AI`, `binding=False`); forces `NOT_ELIGIBLE` on gate failure;
+    never reads the Overall Fit Index.
+  - `HiringActionRequest` + `to_cer_payload()` — hiring-domain action contract
+    translated to the neutral CER / shared-ActionGate payload (carries decision +
+    contract provenance).
+  - Post-hire `ReviewRecord` / `ReviewObservation` (1/3/6/12-month) and
+    `CalibrationProposal` — proposes/versions Decision Contract or role-policy
+    changes; **no hidden-weight retraining**.
+- **Analytics-only `OverallFitIndex`** (`hiring_decision.analytics`) — weighted
+  fit + HIGH/MEDIUM/LOW range; intentionally **not** re-exported from the plane
+  and not importable by gate/eligibility/policy code (enforced by tests).
+- **Integration ports (interfaces only, no implementations):**
+  `EvidenceAdmissionPort` → TAP; `DecisionAuthorityPort`;
+  `ActionAuthorizationPort` → ActionGate; `RuntimeAssurancePort` → Runtime
+  Assurance / ACP; `ReconciliationPort`. Shared governance capabilities are
+  referenced through ports, never copied into this package; the package imports
+  and runs standalone with test adapters (no platform required at import).
+- 32 tests (`tests/test_hiring_decision.py`, `tests/hiring_decision_fakes.py`).
+
+### Changed (design contracts)
+- `docs/schemas/dimension_assessment.schema.json` — aligned to the implemented
+  model (`evidence_refs`, `assessment_version`, `rationale`, `provenance`,
+  `pre_hire_justified`).
+- `docs/schemas/hiring_recommendation.schema.json` — added `binding` (const
+  false) and `proposed_action.employment_type`.
+- `docs/schemas/hiring_action_request.schema.json` — new contract.
+- `docs/HIRING_DECISION_AUTHORITY_DESIGN_SPEC.md` §21.1 — build status.
+
+## [Unreleased] — Hiring Decision Authority: policy plane (PWC → IR → Contract)
+
+Implements spec §21 step 1 of
+[`docs/HIRING_DECISION_AUTHORITY_DESIGN_SPEC.md`](docs/HIRING_DECISION_AUTHORITY_DESIGN_SPEC.md).
+Additive only: new `ugence_ai_hiring.hiring_policy` package (canonical re-export
+at `ugence_ai_hiring.hiring.policy`); no existing API changed; no product
+behavior changed; `production_certified` remains `False`.
+
+### Added
+- **`hiring_policy` package** — the governance-first authoring surface, mirroring
+  the platform Policy Workflow Compiler / WorkflowIR / Decision Contract pattern:
+  - `HiringPolicy` — declarative, human-authored policy source (HR declares
+    requirements, not weights).
+  - `HiringPolicyCompiler` (PWC) — compiles a policy into a signed,
+    content-addressed `HiringWorkflowIR` (`hiring_workflow_ir.v1`); derivation is
+    deterministic (same policy → same digest).
+  - `HiringWorkflowIR` — canonical compiled artifact (dimensions, normalized
+    weights summing to 1.0, mandatory gates, per-dimension required evidence,
+    confidence thresholds, action constraints, runtime-assurance checks, human
+    approval chain), with a SHA-256 content digest over its semantic body and a
+    detached signature (offline `DeterministicHMACSigner`).
+  - `HiringDecisionContract` + `project_contract()` — a deployable projection of
+    one IR digest, carrying `compiled_from` provenance; projection verifies the
+    IR digest (and signature when a signer is supplied) and refuses a tampered IR.
+- **Compile-time rejections** enforcing the invariants: (a) no Overall Fit Index
+  reference and no forbidden legacy dimension (`CULTURE_FIT`→Operating Environment
+  Compatibility, `RESILIENCE`→Role Sustainability & Adaptation); (b) mandatory
+  requirements are gates, never weighted/compensable dimensions; (c) every
+  weighted dimension declares required evidence; (d) human-only approval chain;
+  (e) action constraints within some approver's authority; (f) constrained actions
+  carry the required runtime-assurance checks. All violations are reported at once.
+- 22 tests (`tests/test_hiring_policy_compiler.py`).
+
+### Notes
+- The Overall Fit Index is structurally absent from the IR and contract (it is
+  analytics-only and never enters policy). This layer authors/compiles/signs/
+  projects policy only — it does not evaluate gates, score candidates, gate
+  actions, run runtime assurance, write to any HRIS/ATS, or make/authorize a
+  decision (later spine stages; spec §21 steps 2–7).
+
 ## [0.1.1] — Canonical TAP / ActionGate dependency normalization
 
 A **packaging / dependency-metadata change only.** The AI Hiring **product

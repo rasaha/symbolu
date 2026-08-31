@@ -84,15 +84,21 @@ jobs:
       - name: CLI smoke (non-mutating default)
         run: |
           python - <<'PY'
-          import json, subprocess, sys, os
+          import json, subprocess, sys, os, re, pathlib
           src = "packages/capabilities/cloud-scaling-operations/src"
           adv = "packages/capabilities/cloud-scaling-controller/src"
+          # Track the single source of truth (version.py) rather than a hardcoded literal,
+          # so an operations version bump can never silently drift this smoke check.
+          expected_version = re.search(
+              r'__version__\s*=\s*"([^"]+)"',
+              pathlib.Path(src, "ugence_cloud_scaling_operations", "version.py").read_text(),
+          ).group(1)
           def run(args, **kw):
               return subprocess.run([sys.executable, "-m",
                   "ugence_cloud_scaling_operations.cli", *args],
                   env={"PYTHONPATH": os.pathsep.join([src, adv]), "PATH": os.environ["PATH"]},
                   capture_output=True, text=True, **kw)
-          v = run(["version"]); assert v.returncode == 0 and "0.1.0" in v.stdout, v.stderr
+          v = run(["version"]); assert v.returncode == 0 and expected_version in v.stdout, (expected_version, v.stdout, v.stderr)
           i = run(["inspect-capabilities"]); assert "INFRASTRUCTURE_MUTATION" in i.stdout, i.stderr
           e = run(["execute"]); assert e.returncode != 0, "execute must not mutate by default"
           print("CLI smoke OK")

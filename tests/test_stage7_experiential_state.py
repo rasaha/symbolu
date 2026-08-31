@@ -5,7 +5,7 @@ Tests for Appendix F Stage 7C — Dual-Space Architecture (Experiential State)
 Verifies that ExperientialStateModule correctly implements the P_t
 recurrence equation with stability constraints.
 
-Reference: docs/design/CONSCIOUS_GENERATION_DESIGN.md, §F.10.6.3
+Reference: Project_documentation/repository/docs/design/CONSCIOUS_GENERATION_DESIGN.md, §F.10.6.3
 """
 
 import pytest

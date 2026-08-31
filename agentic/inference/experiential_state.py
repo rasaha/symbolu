@@ -32,7 +32,7 @@ Architecture::
 Bounded introduction: λ = 0.0 initially so P_t accumulates but does
 not influence generation. Ramp λ during fine-tuning.
 
-Reference: docs/design/CONSCIOUS_GENERATION_DESIGN.md, Appendix F §F.10.6.3
+Reference: Project_documentation/repository/docs/design/CONSCIOUS_GENERATION_DESIGN.md, Appendix F §F.10.6.3
 
 Author: Sovereign-1 Training Initiative
 Date: March 2026

@@ -1,0 +1,59 @@
+# Independent distribution for the Ugence Agent Value Readiness Contracts.
+#
+# A narrow internal *technical* leaf (NOT a customer-facing module) holding the
+# non-financial contract SHAPES for the Agent Value Readiness engine of Ugence
+# Value Intelligence (GV-3R-a, milestone M-3R.1 of the UVI ADR
+# docs/architecture/ADR_UGENCE_VALUE_INTELLIGENCE_GV2C_GV2E_GV3R.md).
+#
+# It defines the vocabulary for assessing whether an agent is ready for an
+# intended outcome under a Geography/Domain/Intended-Outcome + Readiness policy
+# context, the single deterministic determination evaluator over it (GV-3R-b),
+# and the fail-closed trusted orchestration boundary around that evaluator
+# capability. It implements NO deployment authority, NO condition enforcement and
+# NO financial value, and it mints no policy authority: the exact ReadinessPolicy
+# is resolved through the PUBLIC API of the shared Ugence Policy Authority, whose
+# internals are never imported.
+#
+# Build:    python -m build packages/capabilities/agent-value-readiness
+# Verify:   python packages/capabilities/agent-value-readiness/verify_agent_value_readiness_distribution.py
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ugence-agent-value-readiness"
+dynamic = ["version"]
+description = "Ugence Agent Value Readiness — non-financial readiness contract shapes, the deterministic determination evaluator, and its fail-closed trusted orchestration boundary (internal technical leaf)."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "Proprietary" }
+authors = [{ name = "Rakesh Mohan" }]
+keywords = ["ugence", "value-intelligence", "readiness", "contracts", "agent"]
+# Depends on the neutral governance-contracts leaf (evidence vocabulary AND the
+# assessed-system identity contract, >=0.3.1 — the first version whose binding
+# canonicalization normalizes aware instants to UTC, so equal bindings share a
+# digest), the
+# uvi-policy-contracts leaf (policy/context shapes), and the PUBLIC API of the
+# shared, platform-wide Ugence Policy Authority (trusted policy resolution only).
+# No governed-value and no third-party runtime dependency. The authority
+# dependency is one-way and public-surface only: no authority internal is ever
+# imported, and the authority imports no engine (UVI ADR §21; Policy Authority
+# ADR §10.4). An automated dependency-boundary test enforces both directions.
+dependencies = [
+    "ugence-governance-contracts>=0.3.1",
+    "ugence-uvi-policy-contracts>=0.1.0",
+    "ugence-policy-authority>=0.1.0",
+]
+
+[project.optional-dependencies]
+test = ["pytest>=7.0"]
+
+[tool.setuptools.dynamic]
+version = { attr = "ugence_agent_value_readiness.__version__" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["ugence_agent_value_readiness*"]
+
+[tool.setuptools.package-data]
+ugence_agent_value_readiness = ["py.typed"]

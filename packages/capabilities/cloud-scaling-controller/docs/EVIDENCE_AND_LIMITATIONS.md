@@ -59,3 +59,67 @@ floors, cooldowns) were tuned. No benchmark numbers were altered. The IdentityEM
 randomness was not seeded. The change set is: moving execution/operations code OUT of
 the wheel, adding the determinism disclosure + build provenance, and correcting
 metadata/docs — verified by exact decision-baseline parity.
+
+## Predictive Capacity Intelligence (Phase 2) — evidence & maturity
+
+**Implementation maturity: IMPLEMENTED_AND_LOCALLY_VERIFIED.** New in v0.3.0.
+**Model quality: BASELINE_FORECASTING_IMPLEMENTED · PREDICTIVE_QUALITY_NOT_ESTABLISHED.**
+
+The `forecasting` subpackage is a deterministic, provider-neutral, **shadow-only**
+forecasting and replay-evaluation layer (`CanonicalCapacitySeries` → `ForecastInputWindow`
+→ baseline forecaster → `CapacityForecast` → `CapacityForecastEvidence` →
+`ForecastEvaluationRecord`). It is pure-stdlib, adds no dependency, performs no
+actuation/network/subprocess/credential/LLM activity, and **never** feeds the controller.
+
+| Concern | Status | Evidence |
+|---------|--------|----------|
+| Implemented | ✅ | `src/ugence_cloud_scaling_controller/forecasting/` — series, window, targets, baselines, uncertainty, forecast/evidence, evaluation, replay. |
+| Unit-tested | ✅ | `tests/forecasting/` (90 tests): series policy, leakage-safe windows, baselines, empirical uncertainty, forecast/evidence + digest boundary, evaluation/aggregate, adversarial replay/leakage, demand scenarios, boundary. |
+| Leakage-prevented | ✅ | Windows contain only `event_time <= cutoff` (invariant-checked); replay matches strictly-later actuals; harness fails closed on residual leakage (adversarial tests). |
+| Shadow-only / advisory-only | ✅ | Every forecast + evidence: `advisory_only=True`, `shadow_only=True`, `actuation_performed=False`, `authority_class="ADVISORY"`, `execution_capability="NONE"`. |
+| Evidence identity | ✅ | `sha256:` digest over all authoritative fields; excludes production time + non-authoritative annotation. |
+| **Forecast accuracy** | ❌ **NOT established** | Baselines (persistence/linear-trend) are **not** evaluated on representative external workloads against preregistered acceptance thresholds. Passing tests prove implementation correctness, **not** production accuracy → **PREDICTIVE_QUALITY_NOT_ESTABLISHED**. |
+
+## Canonical Capacity Intelligence (Phase 1) — evidence & determinism
+
+**Status: IMPLEMENTED_AND_LOCALLY_VERIFIED.** New in v0.2.0.
+
+| Concern | Status | Evidence |
+|---------|--------|----------|
+| Implemented | ✅ | `src/ugence_cloud_scaling_controller/canonical/` — canonical state, measurement/units, provenance, normalization, projection, evidence, read-only sources. |
+| Unit-tested | ✅ | `tests/canonical/` (88 tests): serialization/digest, state validation, normalization, projection, evidence integrity, RA/authority boundary, provider-neutrality & side-effects. |
+| Additive / non-regressive | ✅ | The controller decision kernel is unchanged; the behavior-baseline parity suite still passes byte-for-byte. |
+| Distribution | ✅ | The canonical modules ship in the wheel and pass the advisory distribution verifier (forbidden-symbol/path/mutation scans, isolated install). |
+| Live-cluster validated | ❌ | Not performed. |
+| Production-certified | ❌ | Not performed. |
+
+### Determinism scope (canonical layer)
+
+For identical `(CanonicalCapacityState, NormalizationPolicy, ControllerConfig, controller
+history)`, the following are reproducible: normalization results, the projected
+`ScalingObservation`, the controller decision fields, and the **evidence content digest**.
+
+The evidence digest is computed over a documented, domain-separated canonical form
+(sorted keys; NFC strings; RFC3339-UTC timestamps; floats round-tripped with NaN/inf
+rejected and `-0.0` normalized; nulls preserved; `sha256:`-prefixed hex). It **excludes**:
+
+- `evidence_produced_at` — an evidence-production timestamp isolated from the deterministic
+  decision path (caller-supplied trusted time; defaults to `observed_at` to stay
+  clock-free);
+- `controller_explanation` — a human rendering that embeds the controller's **disclosed**
+  nondeterministic `identity_deviation` "Identity Drift" line;
+- the digest field itself.
+
+The controller's `identity_deviation` diagnostic is never carried in the evidence. This
+preserves the existing distinction between **decision determinism** and diagnostic/
+externally-sourced nondeterminism: projection being deterministic does **not** imply the
+raw operational world is deterministic. Observation time (`observed_at`) and
+evidence-production time (`evidence_produced_at`) are kept distinct and never conflated.
+
+### What Phase 1 does NOT prove
+
+Production quality of future cloud collectors; better scaling outcomes; cost savings;
+forecasting accuracy; dependency-awareness; safe autonomous execution; Risk Authority
+integration; provider mutation safety; post-execution effectiveness. These require
+downstream execution receipts and observed-effect reconciliation that Phase 1 does not
+implement.

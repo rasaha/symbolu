@@ -1,0 +1,26 @@
+{
+  "schema": "bindingslots_e1/dev_calibration_plan/v1",
+  "committed_before_selection_run": true,
+  "dev_seeds": [500, 501, 502],
+  "selection_dev_seed": 500,
+  "candidates": {
+    "C1": {"steps": 1200, "tau": 0.07, "train_no_match_frac": 0.30},
+    "C2": {"steps": 1800, "tau": 0.05, "train_no_match_frac": 0.30},
+    "C3": {"steps": 1800, "tau": 0.05, "train_no_match_frac": 0.40},
+    "C4": {"steps": 1500, "tau": 0.05, "train_no_match_frac": 0.40}
+  },
+  "fixed_across_candidates": {"D": 64, "batch": 48, "lr": 0.001, "train_episodes": 1500,
+    "train_episode_seed": 7, "keys_per_episode": 32, "no_match_mechanism": "learned_null_key",
+    "score": "cosine", "read": "hard_top1"},
+  "max_candidate_configurations": 4,
+  "max_development_runs": 40,
+  "max_steps_per_run": 1800,
+  "max_wall_clock_per_run_s": 120,
+  "total_dev_compute_budget_minutes": 30,
+  "selection_rule": "on dev seed 500, score = mean(addressing over {G1,G2,G3,G4,G5,G7}) - max(0, nomatch_false_accept - 0.30), subject to determinism_ok and leakage all_pass; argmax; tie-break lower nomatch_false_accept, then fewer steps; winner frozen as config.SELECTED and asserted by run_dev_selection.py",
+  "no_candidate_expansion_after_results": true,
+  "final_cohort_seeds": [3140, 3141, 3142, 3143, 3144],
+  "burned_seeds_not_final_cohort": [2028, 2029, 2030, 2031, 2032],
+  "seed_disjointness": "final cohort disjoint from V100 seeds [28-32], dev seeds [500-502], and burned seeds",
+  "no_match_primary_mechanism": "learned_null_key (not replaceable by margin thresholding; not selected after viewing reserved results)"
+}

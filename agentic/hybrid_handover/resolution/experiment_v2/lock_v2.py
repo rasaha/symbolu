@@ -24,9 +24,9 @@ _V2_FILES = [
     "agentic/hybrid_handover/resolution/experiment_v2/hybrid_resolver_v2.py",
     "agentic/hybrid_handover/resolution/experiment_v2/run_validation_experiment.py",
     "agentic/hybrid_handover/resolution/experiment_v2/lock_v2.py",
-    "agentic/hybrid_handover/resolution/experiment_v2/PROPOSAL_VALIDATION_PREREGISTRATION.md",
-    "agentic/hybrid_handover/resolution/experiment_v2/VALIDATION_RULEBOOK.md",
-    "agentic/hybrid_handover/resolution/experiment_v2/CONFIDENCE_VECTOR_SPEC.md",
+    "Project_documentation/agentic_framework/agentic/hybrid_handover/resolution/experiment_v2/PROPOSAL_VALIDATION_PREREGISTRATION.md",
+    "Project_documentation/agentic_framework/agentic/hybrid_handover/resolution/experiment_v2/VALIDATION_RULEBOOK.md",
+    "Project_documentation/agentic_framework/agentic/hybrid_handover/resolution/experiment_v2/CONFIDENCE_VECTOR_SPEC.md",
 ]
 
 # frozen dependencies reused unchanged (v0.1 experiment + frozen platform)

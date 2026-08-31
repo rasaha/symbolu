@@ -2,7 +2,7 @@
 """§13.18 experiment — Single-trajectory forced-allocation-gap probe.
 
 Reference:
-  symbolu_robotics/bcvf_autonomous/DESIGN.md §6.1 / §6.7 — autonomy-
+  Project_documentation/autonomous_robotics/symbolu_robotics/bcvf_autonomous/DESIGN.md §6.1 / §6.7 — autonomy-
   domain BCVF observable `S3_map_error_accel` peak that passed
   validation, motivating the 2nd-difference operator applied here.
 
@@ -878,7 +878,7 @@ def main() -> int:
         "References: ChatGPT mechanism analysis (Softmax flattens "
         "absolute logit magnitude → forced allocation despite low "
         "support → autoregressive amplification). "
-        "`symbolu_robotics/bcvf_autonomous/DESIGN.md` §6.1 / §6.7 — "
+        "`Project_documentation/autonomous_robotics/symbolu_robotics/bcvf_autonomous/DESIGN.md` §6.1 / §6.7 — "
         "autonomy-domain `S3_map_error_accel` peak motivating the "
         "2nd-difference operator. §13.17 — narrowing of the BCVF "
         "transfer claim that this probe tests at the un-rejected "

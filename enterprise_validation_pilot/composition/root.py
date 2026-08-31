@@ -129,7 +129,10 @@ class PilotComposition:
         return resolved, record
 
     def control_plane(self, action_provider) -> ActionGovernanceControlPlaneAdapter:
-        return ActionGovernanceControlPlaneAdapter(action_provider)
+        # The scenario clock is authoritative for a replayed scenario: the adapter
+        # must read the same instant the CER was issued against, or CER expiry and
+        # authorization validity land in two different time domains.
+        return ActionGovernanceControlPlaneAdapter(action_provider, clock=self._clock)
 
     # --- DGM service bundle -------------------------------------------------
 
@@ -142,21 +145,24 @@ class PilotComposition:
         grants.add(AccessGrant("reviewer", t, frozenset(Permission)))
         grants.add(AccessGrant("senior", t, frozenset(Permission)))
         policy = EvidenceAccessPolicy(grants)
-        audit = AuditService(InMemoryAuditRepository())
+        # One time domain per replayed scenario (D1): every collaborator that
+        # stamps or compares an instant reads the scenario clock, including the
+        # ones whose own default is the wall clock.
+        idf, clk = self._id_factory, self._clock
+        audit = AuditService(InMemoryAuditRepository(), clock=clk)
         cr, ar, er = (InMemoryDecisionCaseRepository(), InMemoryActionRequestRepository(),
                       InMemoryExecutionRepository())
         val = CaseValidationService(_NeutralLinked())
-        idf, clk = self._id_factory, self._clock
         return DGMServices(
             cases=DecisionCaseService(cr, val, audit, idp, policy, id_factory=idf, clock=clk),
             rec=CaseRecommendationService(cr, val, audit, idp, policy, id_factory=idf, clock=clk),
             dec=CaseDecisionService(cr, val, audit, idp, policy, id_factory=idf, clock=clk),
-            acts=ActionRequestService(ar, cr, ActionRequestValidationService(ar, cr),
+            acts=ActionRequestService(ar, cr, ActionRequestValidationService(ar, cr, clock=clk),
                                       audit, idp, policy, id_factory=idf, clock=clk),
             cer=CERBindingService(ar, cr, audit, idp, policy, id_factory=idf, clock=clk),
             authz=ActionAuthorizationService(ar, control_plane, audit, idp, policy,
                                              id_factory=idf, clock=clk),
-            exe=ExecutionService(er, ar, ExecutionValidationService(er, ar),
+            exe=ExecutionService(er, ar, ExecutionValidationService(er, ar, clock=clk),
                                  self.execution_adapter, audit, idp, policy,
                                  id_factory=idf, clock=clk),
             reconcile=ReconciliationService(er, self.execution_adapter, audit, idp, policy,

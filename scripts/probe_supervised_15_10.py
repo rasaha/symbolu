@@ -6,7 +6,7 @@ commitment. Tests whether Qwen2.5-7B-Instruct's hidden
 representations contain truth signal that the unsupervised
 BCVF-style score family failed to extract.
 
-Reference: docs/design/BCVF_LLM_TRUST_ROUTING_DESIGN.md §15.10.
+Reference: Project_documentation/repository/docs/design/BCVF_LLM_TRUST_ROUTING_DESIGN.md §15.10.
 
 What this script DOES:
   * Loads correctness labels from the existing §13.10 dumps

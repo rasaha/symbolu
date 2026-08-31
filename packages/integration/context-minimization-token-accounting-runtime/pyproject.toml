@@ -1,0 +1,55 @@
+# Ugence Context Minimization × Token Accounting × Agent Runtime — CM-TA1 integration.
+#
+# This is NOT a leaf: it is the narrowly-scoped integration/composition layer that wires
+# the Context Minimization token-accounting contracts together with the Agent Runtime's
+# neutral provider-attempt telemetry. The dependency direction is one-way — this package
+# imports BOTH cores; neither core imports this package, and both remain independent,
+# stdlib-only distributions.
+#
+# It translates a neutral Agent Runtime ProviderAttempt into a Context Minimization
+# ApiCallTokenRecord (via an INJECTED, provider-specific usage normalizer), and feeds
+# authoritative provider-reported usage into the existing H22-D budget settlement seam —
+# preserving the conservative full-reservation settlement when usage is unavailable and
+# surfacing BudgetEstimateExceeded rather than clamping an overrun.
+#
+# Base install contains NO concrete OpenAI/Anthropic/Google SDK. Provider-specific usage
+# normalizers are optional and live outside this package.
+#
+# Build:   python -m build packages/integration/context-minimization-token-accounting-runtime
+# Verify:  python packages/integration/context-minimization-token-accounting-runtime/scripts/verify_isolated_install.py
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ugence-context-minimization-token-accounting-runtime"
+dynamic = ["version"]
+description = "Ugence CM-TA1 — translate Agent Runtime provider-attempt telemetry into Context Minimization token-accounting records and settle H22-D budgets from measured usage."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "Proprietary" }
+authors = [{ name = "Ugence Labs" }]
+keywords = ["token", "accounting", "context", "minimization", "agent", "runtime", "budget", "ugence"]
+# The integration package composes the two independent cores. It adds NO third-party
+# runtime dependency of its own — no provider SDK, no tokenizer, no database.
+dependencies = [
+    "ugence-context-minimization>=0.2.0",
+    "ugence-agent-runtime>=0.7.0",
+]
+
+[project.optional-dependencies]
+test = ["pytest>=7.0"]
+
+[tool.setuptools.dynamic]
+version = { attr = "ugence_cm_token_accounting_runtime.version.__version__" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["ugence_cm_token_accounting_runtime*"]
+
+[tool.setuptools.package-data]
+ugence_cm_token_accounting_runtime = ["py.typed"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"

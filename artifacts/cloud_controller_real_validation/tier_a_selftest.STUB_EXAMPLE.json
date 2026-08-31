@@ -1,7 +1,7 @@
 {
   "label": "real-trace-replay (estimate pending live adjudication)",
   "is_tooling_self_test": true,
-  "spec_doc": "docs/cloud_scaling_real_validation/TIER_A_DETECTOR_SPEC.md",
+  "spec_doc": "Project_documentation/governance/docs/cloud_scaling_real_validation/TIER_A_DETECTOR_SPEC.md",
   "clusters": [
     {
       "cluster": "fixture-cluster",

@@ -7,8 +7,8 @@ Provenance
 - Pinned commit:   e4bbb68bb532c530952c1667c26f8bfe79002078
 - Pinned date:     2026-04-02
 - Vendored at:     simulator/pcam/reference/attention_evictor_vendored.py
-- Contract:        docs/design/ADR-0001-CTM-KV-SCORING-SOURCE-OF-TRUTH.md
-- Update ritual:   simulator/pcam/docs/VENDORED_REFERENCE_UPDATE_RITUAL.md
+- Contract:        Project_documentation/repository/docs/design/ADR-0001-CTM-KV-SCORING-SOURCE-OF-TRUTH.md
+- Update ritual:   Project_documentation/simulator/simulator/pcam/docs/VENDORED_REFERENCE_UPDATE_RITUAL.md
 
 Role
 ----

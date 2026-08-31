@@ -1,0 +1,33 @@
+{
+  "schema": "bindingslots_value_path_diagnosis/prerequisite_audit/v1",
+  "result": "BINDINGSLOTS_DIAGNOSTIC_PREREQUISITE_VERIFIED",
+  "checks": {
+    "default_branch": "claude/setup-symbolu-monorepo-014vhNMAoVW2Ys5RBBr3bKDF",
+    "default_tip_at_branch_creation": "87f4fcf57da8988625661b3a330add5d7dc4277b",
+    "persistence_merge_commit": "05dcee8e6944d4dc59019d16ebb23f9536732562",
+    "merge_reachable_from_default_tip": true,
+    "merge_is_ancestor_not_tip": "default tip advanced via PR #1339 (87f4fcf5) after the persistence merge; 05dcee8e is an ancestor",
+    "pr_1340_state": "closed",
+    "pr_1340_merged": true,
+    "pr_1340_merged_at": "2026-08-04T20:22:26Z",
+    "reconstructed_verdict": "NO_PERSISTENCE_INTERVENTION_SELECTED",
+    "reconstructed_kda_readiness": "KDA_VALIDATION_BLOCKED",
+    "provenance_source_execution_commits": {"A+": "5cc392e1", "R0": "5cc392e1", "O1R": "5cc392e1", "H2": "9380bdb1"},
+    "h2_correction_authorized_and_documented": true,
+    "abc_json_sha256": "b31989a3135b150ef4cf693e42f173aadb51bba876b6e956da73f022d539b482",
+    "abc_json_unchanged": true,
+    "persistence_arms_matches_9380bdb1": true,
+    "inherited_tests": {"test_persistence": "14 passed", "test_adaptive_plan": "19 passed"},
+    "inherited_verifiers": {"verify_persistence_prereg": "48 checks, 0 failures",
+                            "verify_amendment": "35 checks, 0 failures"},
+    "working_tree_clean_at_branch_creation": true,
+    "branch": "claude/bindingslots-value-path-gradient-diagnosis"
+  },
+  "determinism_control_proof": {
+    "control_run": "A+ seed 25",
+    "needle_by_dist_exact_match": true,
+    "ppl_exact_match": true,
+    "trajectory_exact_at_common_checkpoints": true,
+    "note": "byte-identical reproduction established on a control BEFORE any failure exemplar"
+  }
+}

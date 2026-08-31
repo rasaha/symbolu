@@ -4,6 +4,101 @@ All notable changes to this package are documented here. This package follows
 SemVer for the distribution version and carries a separate `CONTRACT_VERSION` for
 the minimization contract (result shape, reason-code vocabulary, oracle protocol).
 
+## 0.2.0 — measurable token accounting (CM-TA1)
+
+**Package maturity: `IMPLEMENTED_AND_LOCALLY_OFFLINE_VERIFIED`** (upgrade to
+`IMPLEMENTED_AND_CI_VERIFIED` only after the scoped Actions run is observed green).
+Contract version `1.0.2` → `1.1.0`. **Purely additive**: the minimization algorithm,
+protected-span behavior, oracle equivalence semantics, and BOTH fingerprint digests
+(`outcome_fingerprint`, `run_fingerprint`) are byte-unchanged. No provider SDK, no
+tokenizer, no network/database/filesystem persistence, and no pricing authority
+enters the leaf.
+
+### Added — a new neutral, stdlib-only `token_accounting` module
+Three measurements are kept **distinct** and never collapsed into one field:
+
+- **A — context reduction** (unchanged): `MinimizationResult.original_tokens /
+  resulting_tokens / achieved_reduction`. The accounting module *copies* these; it
+  never re-runs or mutates a minimization result.
+- **B — complete-request estimate**: `RequestTokenEstimate` — the estimated input-token
+  size of the *complete serialized request* (system + messages + minimized context +
+  tool definitions + schemas + provider wrappers), produced by an **injected**
+  `RequestTokenCounter`. The core ships only the transparent `DefaultApproximateRequestCounter`
+  (word/punctuation, labelled `DEFAULT_APPROXIMATE`) — it implements **no** provider tokenizer.
+- **C — provider-reported usage**: `ProviderTokenUsage` — optional non-negative ints for
+  `input_tokens`, `cached_input_tokens`, `cache_write_input_tokens`, `output_tokens`,
+  `reasoning_tokens`, `total_tokens`, plus `provider_request_id` / `usage_schema` /
+  `adapter_id` / `adapter_version`. **Unknown is `None`, never fabricated as zero.**
+  Cached/cache-write/reasoning are provider-specific subsets/details and are **not** added
+  into input/output; `derived_total()` = input+output only and is explicitly *derived*,
+  distinct from the provider-reported `total_tokens`.
+
+New contracts: `TokenCountBasis`, `AttemptStatus`, `UsageAvailability`,
+`RequestComponents`, `RequestTokenEstimate`, `ProviderTokenUsage`, `RequestAttribution`,
+`ApiCallTokenRecord` (domain-separated `record_fingerprint`, `api-call/1`),
+`LogicalRequestTokenSummary` (`logical-request/1`), the `RequestTokenCounter` and
+`TokenAccountingSink` protocols, the `DefaultApproximateRequestCounter` and
+`InMemoryTokenAccountingSink` reference implementations, and the
+`prepare_api_call_measurement` / `reconcile_api_call_measurement` /
+`aggregate_logical_request_usage` APIs.
+
+### Accounting semantics (enforced, fail-closed)
+- A retry is a **new** `attempt_id`; three attempts under one logical request stay three
+  records. Retried/failed attempts are preserved separately, never collapsed into the
+  final success.
+- A failed attempt with known usage still contributes to consumption; a failed/exception
+  attempt with no usage is `UNAVAILABLE_*` and keeps the logical-request summary
+  `complete=False` — a gap is never reported as zero.
+- Context-token savings and billed-token savings are **different quantities**; savings are
+  attributed **once** per logical request (never multiplied per attempt).
+- Negative / bool / float / NaN / inf / str token counts are rejected; a duplicate
+  `attempt_id` with conflicting content is rejected (idempotent replay must be
+  byte-identical). Deterministic replay reads no wall clock and generates no random ids —
+  every id is caller-supplied.
+- Provider-reported usage is authoritative for the API response being reconciled; it never
+  overwrites the pre-call estimate, and it is **not** an invoice.
+
+### Artifacts / docs
+- New `artifacts/token_accounting_schema.json`; extended `acceptance_scenarios.json`;
+  regenerated `public_api.json`. New `docs/TOKEN_ACCOUNTING.md`. Boundary, limitations, and
+  security/failure-mode docs updated. Adversarial + compatibility tests added under
+  `tests/accounting/` (deny/failure/unknown paths outnumber happy paths); the isolated
+  single-wheel verifier now proves the accounting surface on the installed wheel.
+
+### Audit remediation (pre-merge; part of the same unreleased 0.2.0 contract)
+- **F1 — total provenance is never blended.** `LogicalRequestTokenSummary.provider_total_tokens`
+  (which had folded derived input+output totals into a "provider" field) is **replaced** by three
+  distinctly-named quantities: `provider_reported_total_tokens` (ONLY explicit provider
+  `total_tokens`), `derived_total_tokens` (input+output, cached/cache-write/reasoning excluded),
+  and `settlement_token_units` (the documented per-attempt selection: reported total if present,
+  else derived), plus `attempts_reporting_total`. A field named "provider … total" now contains
+  only provider-reported values. Corrected in place (0.2.0 is unreleased, so no consumer depends
+  on the ambiguous shape); the summary schema and fingerprint reflect the new fields.
+- **F4 — `InMemoryTokenAccountingSink` is thread-safe.** Duplicate detection and insertion are
+  atomic under a lock; snapshots never observe partial state. Still a reference/in-memory sink,
+  **not** durable storage (production persistence remains follow-on work).
+- **N1 — tenant-safe attempt identity + sink partition.** `RequestAttribution.tenant_id` now
+  rejects whitespace-only values and exposes `tenant_namespace`; new `canonical_tenant_namespace`
+  helper maps absence to a domain-separated single-tenant namespace (`"s"`, never an empty
+  string) and a present tenant to `"t:" + tenant`. `InMemoryTokenAccountingSink` partitions
+  idempotency/conflict detection by the pair **`(tenant_namespace, attempt_id)`** — two tenants
+  may store the same explicit `attempt_id` (both retained), same-tenant replay stays idempotent,
+  same-tenant conflict is still rejected, and tenant isolation does **not** rely on record
+  fingerprints. `tenant_id` was already bound into `record_fingerprint` via attribution. (The
+  matching tenant-bound attempt-id derivation lives in the integration package.)
+- **N3 — explicit retry linkage is tenant-scoped and fails closed.** New
+  `ExplicitAttemptReference(attempt_id, tenant_id)` binds a parent attempt's tenant namespace
+  explicitly (never inferred from the opaque id). `reconcile_api_call_measurement` replaces the
+  raw `retry_of_attempt_id: str` parameter with `retry_of: ExplicitAttemptReference` and **fails
+  closed** with `InvalidRequestError` when the reference's tenant namespace does not equal this
+  attempt's (`prepared.attribution.tenant_id`) — BEFORE any record is built or written to a sink,
+  and it never substitutes the current tenant for a supplied one. This makes cross-tenant retry
+  linkage impossible in both the explicit and derived identity modes (both converge on one
+  tenant-scoped reference). The raw opaque string form is removed (unreleased, so no alias
+  retained). This is tenant-scope validation only; it does **not** assert the referenced parent
+  record exists (durable referential-integrity remains deferred). New export:
+  `ExplicitAttemptReference`.
+
 ## 0.1.2 — timestamp validation & fingerprint documentation correction
 
 **Package maturity: `IMPLEMENTED_AND_LOCALLY_OFFLINE_VERIFIED`** (upgrade to

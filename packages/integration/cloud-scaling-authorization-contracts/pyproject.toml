@@ -1,0 +1,61 @@
+# Ugence Cloud Scaling Authorization Contracts — Cloud Scaling Phase 5A.
+#
+# A one-way LEAF CONTRACT package. It imports the Cloud Scaling Controller (canonical
+# ActionKind), Risk Authority (the v2 seam contracts and the public canonicalization) and
+# the Phase 4C risk integration (the projection and the D-4 ratified identifiers). None of
+# the three imports this package.
+#
+# It owns NO authority. It holds no policy, no policy resolver, no evidence source, no
+# keys, no credentials, no clock and no execution surface. It does not verify a signature,
+# mint a decision, issue an envelope, invoke ActionGate, broker a credential, call a cloud
+# provider, scale anything, verify an effect or learn from an outcome. Phase 5B/5C/5X/5D
+# and Phase 6 are all excluded, and no capability toward any of them is introduced here.
+#
+# Build:   python -m build packages/integration/cloud-scaling-authorization-contracts
+# Verify:  python packages/integration/cloud-scaling-authorization-contracts/scripts/verify_isolated_install.py
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ugence-cloud-scaling-authorization-contracts"
+dynamic = ["version"]
+description = "Ugence Cloud Scaling Authorization Contracts — Phase 5A non-authoritative capacity authorization candidate binding. A candidate grants nothing."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "Proprietary" }
+authors = [{ name = "Ugence Labs" }]
+keywords = ["cloud-scaling", "authorization", "candidate", "non-authoritative", "contracts", "ugence"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Operating System :: OS Independent",
+    "Typing :: Typed",
+]
+# Exactly three first-party dependencies, all already merged on the default branch. No
+# third-party runtime dependency is added; the cryptographic/canonicalization surface is
+# reached only through Risk Authority's public API. There is deliberately NO dependency on
+# Policy Authority, Decision Authority, ActionGate, a Credential Broker, Cloud Scaling
+# Operations, a cloud SDK or a Kubernetes client.
+dependencies = [
+    "ugence-cloud-scaling-controller>=0.4.0",
+    "ugence-risk-authority>=0.5.0",
+    "ugence-cloud-scaling-risk-integration>=0.1.0",
+]
+
+[project.optional-dependencies]
+test = ["pytest>=7.0"]
+dev = ["pytest>=7.0", "build>=1.0"]
+
+[tool.setuptools.dynamic]
+version = { attr = "ugence_cloud_scaling_authorization_contracts.version.__version__" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["ugence_cloud_scaling_authorization_contracts*"]
+
+[tool.setuptools.package-data]
+ugence_cloud_scaling_authorization_contracts = ["py.typed"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"

@@ -16,10 +16,13 @@ Import the curated surface from :mod:`ugence_governance_contracts.api`.
 
 from __future__ import annotations
 
-__version__ = "0.1.0"
+__version__ = "0.3.1"
 
 #: The provider-contract version this package publishes (unchanged from the
-#: pre-migration ``governance_providers`` framework value).
+#: pre-migration ``governance_providers`` framework value). The GV-2E-a evidence
+#: contracts and the M-3R.3 neutral assessed-system identity contracts are new,
+#: additive, backward-compatible neutral families; neither changes the provider
+#: contract surface, so this value is deliberately unchanged.
 CONTRACT_VERSION = "1.0.0"
 
 from .errors import (  # noqa: E402
@@ -55,13 +58,32 @@ from .contracts import (  # noqa: E402
     AssertionGovernanceProvider,
     AssertionGovernanceRequest,
     AssertionGovernanceResult,
+    AssessedSystemBinding,
+    AssessmentWindow,
+    AttestationStatus,
+    AttributionStatus,
     BaseProvider,
+    BenchmarkReference,
+    ConfidenceBasis,
+    EvidenceContractError,
+    EvidenceProvenance,
+    EvidenceReference,
+    EvidenceUsageScope,
     ExecutionBusinessOutcome,
     ExecutionDispatchRequest,
     ExecutionDispatchResult,
     ExecutionObservation,
     ExternalExecutionProvider,
+    ForecastHorizon,
+    MetricClaim,
+    MetricObservation,
+    PopulationSlice,
     Provider,
+    SourceBasis,
+    SystemBindingAuthenticityStatus,
+    SystemIdentityContractError,
+    TransformationMethod,
+    VerificationStatus,
 )
 
 from . import api  # noqa: E402,F401
@@ -86,5 +108,15 @@ __all__ = [
     "ActionGovernanceResult", "ActionGovernanceOutcome",
     "ExternalExecutionProvider", "ExecutionDispatchRequest",
     "ExecutionDispatchResult", "ExecutionObservation", "ExecutionBusinessOutcome",
+    # GV-2E-a neutral evidence contracts (additive)
+    "SourceBasis", "TransformationMethod", "AttestationStatus",
+    "AttributionStatus", "VerificationStatus", "EvidenceUsageScope",
+    "EvidenceContractError",
+    "EvidenceReference", "EvidenceProvenance", "BenchmarkReference",
+    "AssessmentWindow", "ForecastHorizon", "PopulationSlice", "ConfidenceBasis",
+    "MetricClaim", "MetricObservation",
+    # M-3R.3 neutral assessed-system identity (additive)
+    "AssessedSystemBinding", "SystemBindingAuthenticityStatus",
+    "SystemIdentityContractError",
     "api",
 ]

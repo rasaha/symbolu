@@ -2,7 +2,7 @@
   "lock_version": "v0.1",
   "experiment_hashes": {
     "agentic/hybrid_handover/resolution/experiment/hybrid_resolver.py": "a2bb9803f0d180dd80a0f3c7806247dde284b9830240a44095fdd4632b887add",
-    "agentic/hybrid_handover/resolution/experiment/EXPERIMENT_PREREGISTRATION.md": "4048942d804e4ed2468f60f95255c9b796c3d10e3abc47ee7e50a00928c6f0f6",
+    "Project_documentation/agentic_framework/agentic/hybrid_handover/resolution/experiment/EXPERIMENT_PREREGISTRATION.md": "4048942d804e4ed2468f60f95255c9b796c3d10e3abc47ee7e50a00928c6f0f6",
     "agentic/hybrid_handover/resolution/experiment/stats.py": "03ca5b37b5da45dce5c43f80e2a82299895665f219d847ba6f6751976fc82cd3",
     "agentic/hybrid_handover/resolution/experiment/hidden_metrics.py": "b878994f23a312de2d09d008661c52f3b19cbb6b913cd8b98b683388f3e90228",
     "agentic/hybrid_handover/resolution/experiment/hidden_data.py": "a32119d1b4bf84f8f871d88f2b52b704da2ff25ef9840191710b7bfe10973813",

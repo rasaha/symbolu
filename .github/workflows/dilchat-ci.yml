@@ -230,6 +230,37 @@ jobs:
           for p in paths:
               print("  ", p)
           PY
+      - name: Secure-chat contract gate (routes, required idempotency key, no body in summary)
+        run: |
+          python - <<'PY'
+          from ugence_dilchat.app import create_app
+          from ugence_dilchat.config import Environment, Settings
+          app = create_app(Settings(environment=Environment.TEST, database_url="sqlite+aiosqlite://"))
+          spec = app.openapi()
+          paths = spec["paths"]
+          expected = {
+              "/v1/conversations/current": {"get"},
+              "/v1/conversations/{conversation_id}/messages": {"get", "post"},
+              "/v1/conversations/{conversation_id}/messages/{message_id}": {"delete"},
+              "/v1/conversations/{conversation_id}/read-state": {"put"},
+          }
+          for p, methods in expected.items():
+              assert p in paths, f"missing chat route: {p}"
+              assert methods <= set(paths[p]), (p, list(paths[p]))
+          schemas = spec["components"]["schemas"]
+          assert "client_message_id" in schemas["MessageCreateRequest"]["required"], \
+              "client_message_id must be required"
+          assert "body" not in schemas["ConversationResponse"]["properties"], \
+              "conversation summary must not expose a message body"
+          mbody = schemas["MessageResponse"]["properties"]["body"]
+          assert {"type": "null"} in mbody.get("anyOf", []), "message body must be nullable (tombstone)"
+          # No forbidden classical-matching / AI-Assist exposure in the chat surface.
+          import json
+          blob = json.dumps({"paths": list(paths), "schemas": list(schemas)}).lower()
+          for term in ("guna", "compatibility", "moon-receptivity", "ai-assist", "friends-finder"):
+              assert term not in blob, f"forbidden exposure: {term}"
+          print("Secure-chat contract gate PASSED:", len(expected), "routes; no body in summary")
+          PY
       - name: Rule-pack validation (JSON, dup-key, checksum, maxima=36, refs, executable-state, parihara, manual)
         run: python scripts/validate_rule_pack.py
       - name: Guna fail-closed guards

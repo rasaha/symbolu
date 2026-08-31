@@ -9155,7 +9155,7 @@ class UnifiedTrainingConfig:
     seed: int = 42
 
     # ==========================================================================
-    # Reference: docs/architecture/SOVEREIGN_REASONING_KERNEL_DESIGN.md
+    # Reference: Project_documentation/repository/docs/architecture/SOVEREIGN_REASONING_KERNEL_DESIGN.md
     # ==========================================================================
 
 
@@ -9191,7 +9191,7 @@ class UnifiedTrainingConfig:
 
     # ==========================================================================
     # Phase-JEPA: Joint Embedding Predictive Architecture Configuration
-    # Reference: docs/design/HYBRID_PHASE_JEPA_DESIGN.md
+    # Reference: Project_documentation/repository/docs/design/HYBRID_PHASE_JEPA_DESIGN.md
     # ==========================================================================
     enable_jepa: bool = False                # Master toggle for Phase-JEPA system
     jepa_hidden_dim: int = 256               # Hidden dimension for JEPA predictor
@@ -9332,7 +9332,7 @@ MODEL_PRESETS = {
 
 # =============================================================================
 # =============================================================================
-# Reference: docs/architecture/SOVEREIGN_REASONING_KERNEL_DESIGN.md Appendix G
+# Reference: Project_documentation/repository/docs/architecture/SOVEREIGN_REASONING_KERNEL_DESIGN.md Appendix G
 #
 # =============================================================================
 
@@ -12382,7 +12382,7 @@ def train(config: UnifiedTrainingConfig):
 
     # ==========================================================================
     # Phase-JEPA: Joint Embedding Predictive Architecture Initialization
-    # Reference: docs/design/HYBRID_PHASE_JEPA_DESIGN.md
+    # Reference: Project_documentation/repository/docs/design/HYBRID_PHASE_JEPA_DESIGN.md
     # ==========================================================================
     jepa_model = None
     jepa_curriculum = None
@@ -16828,7 +16828,7 @@ def main():
     # Friction Controller (V9.4.5)
 
     # ==========================================================================
-    # Reference: docs/architecture/SOVEREIGN_REASONING_KERNEL_DESIGN.md
+    # Reference: Project_documentation/repository/docs/architecture/SOVEREIGN_REASONING_KERNEL_DESIGN.md
     # ==========================================================================
 
     # ==========================================================================
@@ -16883,7 +16883,7 @@ def main():
 
     # ==========================================================================
     # Phase-JEPA: Joint Embedding Predictive Architecture
-    # Reference: docs/design/HYBRID_PHASE_JEPA_DESIGN.md
+    # Reference: Project_documentation/repository/docs/design/HYBRID_PHASE_JEPA_DESIGN.md
     # ==========================================================================
     parser.add_argument("--enable_jepa", action="store_true",
                        help="Enable Phase-JEPA training (Sensor model for perception)")

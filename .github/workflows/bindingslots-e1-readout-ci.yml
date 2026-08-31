@@ -1,0 +1,73 @@
+name: bindingslots-e1-readout-ci
+
+on:
+  push:
+    paths:
+      - 'experiments/bindingslots_e1_readout/**'
+      - 'docs/audits/bindingslots_e1_readout/**'
+      - '.github/workflows/bindingslots-e1-readout-ci.yml'
+  pull_request:
+    paths:
+      - 'experiments/bindingslots_e1_readout/**'
+      - '.github/workflows/bindingslots-e1-readout-ci.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  e1-readout-integrity:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: {fetch-depth: 0}
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.11'}
+
+      - name: Frozen abc.json digest (pre)
+        run: sha256sum experiments/phase_lc/results/abc.json | tee /tmp/abc_before.txt
+
+      - name: Readout gates / conclusion / selection / leakage tests (torch-free)
+        run: python experiments/bindingslots_e1_readout/tests/test_readout_gates.py
+
+      - name: No-oracle-at-inference proof (AST + signature, torch-free)
+        run: |
+          python - <<'PY'
+          import sys
+          sys.path.insert(0, "experiments/bindingslots_e1_readout")
+          import readout_leakage as L
+          r = L.check_scoring_no_oracle()
+          assert r["pass"], r["problems"]
+          assert r["scores_signature_ok"]
+          assert L.check_no_table_import()["pass"]
+          print("no-oracle-at-inference: PASS")
+          PY
+
+      - name: Conclusion invariants (if evidence present)
+        run: |
+          python - <<'PY'
+          import json, pathlib
+          a = pathlib.Path("experiments/bindingslots_e1_readout/results/readout_analysis.json")
+          if a.exists():
+              d = json.loads(a.read_text())
+              allowed = {"FROZEN_REPRESENTATION_READOUT_SIGNAL_PRESENT","FROZEN_REPRESENTATION_READOUT_SIGNAL_PARTIAL",
+                "FROZEN_REPRESENTATION_READOUT_SIGNAL_NOT_FOUND","FROZEN_REPRESENTATION_READOUT_PROTOCOL_VIOLATED",
+                "FROZEN_REPRESENTATION_READOUT_RESOURCE_BLOCKED"}
+              assert d["conclusion"] in allowed, d["conclusion"]
+              for tok in ("E1_TEMPORAL_TRANSFER_PARTIAL","ORIGINAL_BINDINGSLOTS_NEURAL_ROUTING_UNRESOLVED","KDA_VALIDATION_BLOCKED"):
+                  assert tok in d["preserved"], tok
+              scan = dict(d); scan.pop("never_emit", None)   # never_emit legitimately lists these tokens
+              blob = json.dumps(scan)
+              for forbidden in ("E1_TEMPORAL_TRANSFER_VALIDATED","E1_STRUCTURAL_TRANSFER_CONFIRMED","E1_FOLLOW_ON_RESEARCH_ELIGIBLE"):
+                  assert forbidden not in blob, forbidden
+              # R3 may never be the selected primary learned readout
+              assert d["selected_arm"] != "R3", d["selected_arm"]
+              print("conclusion:", d["conclusion"], "| selected:", d["selected_arm"],
+                    "| structural_only:", d["structural_prior_only_signal"])
+          else:
+              print("no readout conclusion yet")
+          PY
+
+      - name: Frozen abc.json unchanged
+        run: |
+          sha256sum experiments/phase_lc/results/abc.json | tee /tmp/abc_after.txt
+          diff /tmp/abc_before.txt /tmp/abc_after.txt && echo "abc.json unchanged"

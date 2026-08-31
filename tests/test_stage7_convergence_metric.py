@@ -6,7 +6,7 @@ Verifies that the UnifiedCoherenceController correctly computes
 C_agreement = 1 - |C_token - C_latent| and integrates it into
 the four-term aggregation formula.
 
-Reference: docs/design/CONSCIOUS_GENERATION_DESIGN.md, §F.10.6.7
+Reference: Project_documentation/repository/docs/design/CONSCIOUS_GENERATION_DESIGN.md, §F.10.6.7
 """
 
 import pytest

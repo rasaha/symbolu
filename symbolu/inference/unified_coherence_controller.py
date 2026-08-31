@@ -28,7 +28,7 @@ EMA smoothing prevents jitter::
 
     C_total_ema = ema_alpha · C_total + (1 - ema_alpha) · C_total_ema
 
-Reference: docs/design/CONSCIOUS_GENERATION_DESIGN.md, Appendix F §F.6, §F.10.6.1, §F.10.6.7
+Reference: Project_documentation/repository/docs/design/CONSCIOUS_GENERATION_DESIGN.md, Appendix F §F.6, §F.10.6.1, §F.10.6.7
 
 Author: Sovereign-1 Training Initiative
 Date: March 2026

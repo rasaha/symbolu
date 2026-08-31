@@ -8,5 +8,5 @@ vs C lexicographic) layered read-only on ``model_selection_experiment``. It exis
 compare selection *objectives* on the synthetic corpus; the variants B/C are research
 policies, not production defaults, and the audited soft-by-default quality floor is left
 unchanged by this migration. It is not folded into, nor exported from, the canonical
-package. See ``docs/migrations/model_selection/RESEARCH_SEPARATION.md``.
+package. See ``Project_documentation/repository/docs/migrations/model_selection/RESEARCH_SEPARATION.md``.
 """

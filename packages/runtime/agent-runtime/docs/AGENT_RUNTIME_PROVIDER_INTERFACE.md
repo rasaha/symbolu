@@ -56,3 +56,14 @@ unregistered provider yields a `PROVIDER_NOT_FOUND` failure (fail closed), not a
 
 This release introduces no new provider kind. The provider boundary is a single
 neutral protocol; specialization happens in concrete implementations outside the core.
+
+## Neutral usage on `ToolResult` (CM-TA1)
+
+A provider MAY attach an **opaque** usage mapping to its result at
+`ToolResult.metadata["token_usage"]` (`PROVIDER_USAGE_METADATA_KEY`). The runtime
+forwards this mapping **verbatim** into the neutral attempt telemetry
+(`ProviderAttempt.neutral_usage`) and **never interprets** provider-specific token
+field names. Attaching usage is entirely optional; an absent or non-mapping value is
+treated as unknown (`None`), never fabricated as empty. Normalizing usage into typed
+token fields belongs to an integration adapter, not the runtime. See
+[`AGENT_RUNTIME_ATTEMPT_TELEMETRY.md`](AGENT_RUNTIME_ATTEMPT_TELEMETRY.md).

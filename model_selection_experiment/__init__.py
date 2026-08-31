@@ -12,5 +12,5 @@ genuinely different *research algorithm*, not a copy of the canonical engine. It
 folded into, nor exported from, the canonical package: unifying the two would change
 selection behaviour, which this behaviour-preserving migration does not do. The
 canonical core is the production-shaped source (formerly ``execution_gate``); this
-package remains research. See ``docs/migrations/model_selection/RESEARCH_SEPARATION.md``.
+package remains research. See ``Project_documentation/repository/docs/migrations/model_selection/RESEARCH_SEPARATION.md``.
 """

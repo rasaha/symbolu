@@ -13,7 +13,7 @@ PKG_ROOT = pathlib.Path(OPS.__file__).parents[2]  # .../cloud-scaling-operations
 
 def test_version_matches_manifest():
     manifest = json.loads((PKG_ROOT / "module_manifest.json").read_text())
-    assert __version__ == "0.1.0"
+    assert __version__ == "0.1.2"
     assert manifest["version"] == __version__
 
 
@@ -46,5 +46,8 @@ def test_public_api_exports():
 
 
 def test_advisory_dependency_range_declared():
+    # The operations distribution depends on the CURRENT controller line (0.4.x) and must
+    # be installable against it. The previous <0.2 pin was unsatisfiable once the controller
+    # advanced to 0.3.0/0.4.0; the range is the narrowest justified, installed-wheel-verified.
     text = (PKG_ROOT / "pyproject.toml").read_text()
-    assert "ugence-cloud-scaling-controller>=0.1.1,<0.2" in text
+    assert "ugence-cloud-scaling-controller>=0.4.0,<0.5" in text

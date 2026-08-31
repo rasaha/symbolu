@@ -1,0 +1,59 @@
+# Ugence Cloud Scaling Risk Integration — Cloud Scaling Phase 4C adapter.
+#
+# A one-way LEAF INTEGRATION: it imports the Cloud Scaling Controller (for the canonical
+# recommendation/abstention contracts) and Risk Authority (for the v2 neutral contracts
+# and the stop-at-decision evaluation seam). Neither of them imports this package —
+# the controller stays an advisory leaf and ugence-risk-authority stays a stdlib-only
+# leaf. It is an integration/projection package, not a composition runtime: it owns no
+# runtime and no authority, holds no policy, control catalog, evidence source, keys,
+# credentials, clock or execution surface, and terminates at a non-executable
+# SubjectRiskDecision. Phase 5 (envelope/ActionGate/execution) and Phase 6 (effect
+# verification/learning) are excluded.
+#
+# Build:   python -m build packages/integration/cloud-scaling-risk-integration
+# Verify:  python packages/integration/cloud-scaling-risk-integration/scripts/verify_isolated_install.py
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ugence-cloud-scaling-risk-integration"
+dynamic = ["version"]
+description = "Ugence Cloud Scaling Risk Integration — Phase 4C one-way, non-executing projection of an advisory capacity-action recommendation into a Risk Authority v2 subject-risk evaluation."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "Proprietary" }
+authors = [{ name = "Ugence Labs" }]
+keywords = ["cloud-scaling", "risk", "authority", "integration", "advisory", "non-executing", "ugence"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Operating System :: OS Independent",
+    "Typing :: Typed",
+]
+# Exactly two first-party dependencies, both already merged on the default branch.
+# `>=0.4.0` on Risk Authority is load-bearing: the v2 subject-context contracts landed
+# in 0.4.0 (Phase 4A) and the seam's validated v2 admission in the same release
+# (Phase 4B). The controller floor is its Phase 3 recommendation contract release.
+# This package adds no third-party runtime dependency of its own.
+dependencies = [
+    "ugence-cloud-scaling-controller>=0.4.0",
+    "ugence-risk-authority>=0.4.0",
+]
+
+[project.optional-dependencies]
+test = ["pytest>=7.0"]
+dev = ["pytest>=7.0", "build>=1.0"]
+
+[tool.setuptools.dynamic]
+version = { attr = "ugence_cloud_scaling_risk_integration.version.__version__" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["ugence_cloud_scaling_risk_integration*"]
+
+[tool.setuptools.package-data]
+ugence_cloud_scaling_risk_integration = ["py.typed"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"

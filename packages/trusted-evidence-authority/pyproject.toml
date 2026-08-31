@@ -1,0 +1,104 @@
+# Independent distribution for the Ugence Trusted Evidence Authority (TEV-1 + TEV-2).
+#
+# The platform Trust Assurance role's package, ratified in
+# docs/architecture/ADR_UGENCE_TRUSTED_EVIDENCE_AND_BENCHMARK_REGISTRY.md
+# (E-1, E-2, §6.2).
+#
+# TEV-1 (§30) — contract shapes: canonical evidence identity and coordinates,
+# one deterministic canonicalization/digest path, the §12 six-stage trust
+# vocabulary, the §28 lifecycle relation, the §11 typed refusal vocabulary, the
+# verification request, and the structural EvidenceVerificationReceiptPayload
+# ("shape = TEV-1, service = TEV-2", §32).
+#
+# TEV-2 (§30) — the verification authority: evidence-verification orchestration
+# behind an explicit protocol port, trust-anchor and public-key resolution by
+# exact coordinate, key validity and revocation evaluation, receipt-payload
+# issuance only after successful verification, Ed25519 signing of the
+# already-ratified payload, the immutable signed receipt envelope, independent
+# envelope re-verification, typed fail-closed outcomes and deterministic audit
+# records.
+#
+# Internal platform infrastructure — NOT a customer-facing module, NOT a
+# product, and NOT a fourth UVI engine (B-2). It mints no *runtime* authority:
+# a verified receipt authorizes no deployment, no runtime action, no policy
+# sufficiency, no economic value and no causal attribution (§13.2, E-12), and
+# E-14 keeps TAP off the runtime path. There is no allow-all resolver and no
+# permissive stub; with no trust anchor configured the answer is deny (E-8).
+# It is explicitly NOT ugence-tap-provider (§6.1), NOT
+# risk_authority.integrations.tap (RA-scoped, preserved unchanged by E-13),
+# NOT the truth_assurance_pipeline research corpus, and NOT the Policy
+# Authority, Benchmark Registry, Decision Authority, ActionGate, Readiness or
+# Governed Value.
+#
+# A leaf with NO Ugence dependency and exactly TWO third-party runtime
+# dependencies, both cryptographic and both maintained: `cryptography` (OpenSSL)
+# for Ed25519 signing, verification and public-key derivation, and `PyNaCl`
+# (libsodium) for strict Ed25519 point validation. Nothing else. ADR §23 permits
+# TAP to depend on governance-contracts; the narrower no-Ugence-dependency
+# option is kept because DD-2 (which contracts land in that leaf) is explicitly
+# blocked on "the concrete contract shapes from TEV-1/BR-1".
+#
+# An earlier revision of this package implemented Ed25519 to RFC 8032 in-package
+# and described itself as zero-dependency. The independent TEV-2 closure audit
+# found real vulnerabilities in that implementation, and the correction was to
+# delete it. ADR §23 does not forbid maintained third-party cryptographic
+# primitives — it governs the direction of dependencies *between Ugence
+# packages* — and the earlier claim that it did was an overread. The isolated
+# --no-index install proof still holds: it installs from a prepared local
+# wheelhouse rather than from an empty dependency set, and fails if any
+# dependency is satisfied from the host instead. See the README for the full
+# security posture. AssessedSystemBinding is referenced by opaque reference +
+# digest and is never redefined (§14). Automated tests enforce every one of
+# these facts.
+#
+# Build:    python -m build packages/trusted-evidence-authority
+# Verify:   python packages/trusted-evidence-authority/verify_trusted_evidence_authority_distribution.py
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ugence-trusted-evidence-authority"
+dynamic = ["version"]
+description = "Ugence Trusted Evidence Authority — trusted-evidence contracts and the TEV-2 verification authority: trust anchors, key trust and revocation, Ed25519-signed verification receipts and independent re-verification (internal platform infrastructure)."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "Proprietary" }
+authors = [{ name = "Rakesh Mohan" }]
+keywords = [
+    "ugence", "trusted-evidence", "tap", "contracts", "platform",
+    "verification", "trust-anchor", "ed25519", "signed-receipt",
+]
+# Exactly two runtime dependencies, both maintained cryptographic backends, both
+# bounded on each side so a future major version cannot change signature or
+# validation behaviour silently. No Ugence package, and nothing else at all: a
+# test AST-scans every module and fails on any other third-party import, and on
+# a backend import from any module other than authority/backend.py.
+#
+# Lower bounds are the versions this package is verified against; upper bounds
+# exclude the next major of each project.
+dependencies = [
+    "cryptography>=41.0.7,<47.0.0",
+    "PyNaCl>=1.5.0,<2.0.0",
+]
+
+[project.optional-dependencies]
+test = ["pytest>=7.0"]
+
+[tool.setuptools.dynamic]
+version = { attr = "ugence_trusted_evidence_authority.__version__" }
+
+# Exactly one top-level namespace ships, including the authority subpackage.
+# Tests, probes, fixtures and every non-production test key are excluded.
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["ugence_trusted_evidence_authority*"]
+
+# The package is fully type-annotated; ship the PEP 561 marker so typed
+# consumers get the contract types under mypy/pyright.
+[tool.setuptools.package-data]
+ugence_trusted_evidence_authority = ["py.typed"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"

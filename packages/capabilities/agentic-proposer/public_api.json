@@ -1,0 +1,411 @@
+{
+  "distribution": "ugence-agentic-proposer",
+  "namespace": "ugence_agentic_proposer",
+  "package_version": "0.3.1",
+  "note": "Machine-readable snapshot of the curated public API (ugence_agentic_proposer.__all__). Generated from the installed package; tests/test_public_api.py asserts this file equals the actual package surface. Regenerate when the curated API changes, which for this package means a ratified amendment to docs/S1_CONTRACT_AND_EQUATION_SPECIFICATION.md.",
+  "symbols": {
+    "ADVISORY_IDENTITY_NFC_PATHS": {
+      "kind": "constant",
+      "value": []
+    },
+    "ADVISORY_IDENTITY_SET_PATHS": {
+      "kind": "constant",
+      "value": []
+    },
+    "ADVISORY_KIND": {
+      "kind": "constant",
+      "value": "ugence.agentic_proposer.advisory.v0"
+    },
+    "AdvisoryCandidateSet": {
+      "kind": "model",
+      "fields": [
+        "schema_version",
+        "tenant_id",
+        "created_at",
+        "candidate_set_id",
+        "case_ref",
+        "candidates",
+        "domain_evaluation_profile_id",
+        "domain_evaluation_profile_version",
+        "selected_candidate_id",
+        "selection_policy_id",
+        "selection_policy_version",
+        "selection_reason_codes"
+      ]
+    },
+    "AgentIdentityRef": {
+      "kind": "model",
+      "fields": [
+        "schema_version",
+        "tenant_id",
+        "created_at",
+        "agent_id",
+        "agent_version",
+        "lifecycle_state",
+        "bound_role_contract_id",
+        "owner_role_ref"
+      ]
+    },
+    "AgentLifecycleState": {
+      "kind": "enum",
+      "values": [
+        "ACTIVE",
+        "INACTIVE",
+        "SUSPENDED",
+        "REVOKED"
+      ]
+    },
+    "BoundedContextEnvelope": {
+      "kind": "model",
+      "fields": [
+        "schema_version",
+        "tenant_id",
+        "created_at",
+        "context_id",
+        "mandate_id",
+        "allowed_record_refs",
+        "excluded_data_classes",
+        "context_hash",
+        "expires_at"
+      ]
+    },
+    "CandidateAdvisory": {
+      "kind": "model",
+      "fields": [
+        "candidate_id",
+        "disposition",
+        "requested_review_action",
+        "is_eligible",
+        "domain_check_completion",
+        "domain_evaluation_outcome",
+        "evaluated_at",
+        "claim_refs",
+        "observation_refs",
+        "assumptions",
+        "uncertainties"
+      ]
+    },
+    "CandidateDisposition": {
+      "kind": "enum",
+      "values": [
+        "RECOMMEND_MATCHED_FOR_APPROVAL",
+        "RECOMMEND_WITHHOLD",
+        "REQUEST_EVIDENCE",
+        "ESCALATE_EXCEPTION"
+      ]
+    },
+    "CognitiveRoleContract": {
+      "kind": "model",
+      "fields": [
+        "schema_version",
+        "tenant_id",
+        "created_at",
+        "role_contract_id",
+        "primary_function",
+        "permitted_tool_scopes",
+        "permitted_candidate_dispositions",
+        "permitted_review_actions",
+        "escalation_role_ref",
+        "activation_status",
+        "strategy_policy_ref"
+      ]
+    },
+    "CrossContractViolationError": {
+      "kind": "exception"
+    },
+    "DomainCheckCompletion": {
+      "kind": "enum",
+      "values": [
+        "NOT_EVALUATED",
+        "COMPLETE"
+      ]
+    },
+    "DomainEvaluationOutcome": {
+      "kind": "enum",
+      "values": [
+        "SATISFIED",
+        "NOT_SATISFIED",
+        "INCONCLUSIVE"
+      ]
+    },
+    "DomainEvaluationProvider": {
+      "kind": "protocol",
+      "methods": []
+    },
+    "DomainEvaluationProviderError": {
+      "kind": "exception"
+    },
+    "DomainEvaluationRequest": {
+      "kind": "model",
+      "fields": [
+        "candidate_id",
+        "profile_id",
+        "profile_version",
+        "mandate",
+        "context",
+        "observations"
+      ]
+    },
+    "DomainEvaluationResponse": {
+      "kind": "model",
+      "fields": [
+        "candidate_id",
+        "profile_id",
+        "profile_version",
+        "outcome"
+      ]
+    },
+    "EligibilityMismatchError": {
+      "kind": "exception"
+    },
+    "ProposerAdvisory": {
+      "kind": "model",
+      "fields": [
+        "schema_version",
+        "tenant_id",
+        "created_at",
+        "kind",
+        "advisory_version",
+        "advisory_digest",
+        "parent_advisory_digest",
+        "case_ref",
+        "agent_id",
+        "role_contract_id",
+        "mandate_id",
+        "context_id",
+        "candidate_set_id",
+        "candidates",
+        "domain_evaluation_profile_id",
+        "domain_evaluation_profile_version",
+        "selected_candidate_id",
+        "selection_policy_id",
+        "selection_policy_version",
+        "strategy_policy_id",
+        "strategy_policy_version",
+        "declared_strategy",
+        "recommended_disposition",
+        "requested_review_action",
+        "requested_review_destination_role_ref",
+        "claim_summaries",
+        "observation_refs",
+        "uncertainties",
+        "reason_codes",
+        "expires_at"
+      ]
+    },
+    "ProposerProcessRecord": {
+      "kind": "model",
+      "fields": [
+        "schema_version",
+        "tenant_id",
+        "created_at",
+        "process_record_id",
+        "case_ref",
+        "declared_strategy",
+        "state_transitions",
+        "tool_invocations",
+        "deterministic_checks",
+        "candidate_ids",
+        "selected_candidate_id",
+        "semantic_audit_refs",
+        "terminal_outcome",
+        "reason_codes",
+        "advisory_digest",
+        "jcs_distribution_version",
+        "started_at",
+        "completed_at"
+      ]
+    },
+    "ProposerProcessState": {
+      "kind": "enum",
+      "values": [
+        "RECEIVED",
+        "VALIDATED",
+        "OBSERVING",
+        "RECONCILING",
+        "EVALUATING",
+        "PROPOSAL",
+        "NEED_EVIDENCE",
+        "ABSTAIN",
+        "ESCALATE"
+      ]
+    },
+    "ProposerProcessStateTransition": {
+      "kind": "model",
+      "fields": [
+        "state",
+        "at"
+      ]
+    },
+    "RESERVED_AUTHORITY_VOCABULARY": {
+      "kind": "constant",
+      "value": [
+        "AUTHORIZED",
+        "AUTHORIZED_WITH_CONSTRAINTS",
+        "BLOCK",
+        "CLEAR",
+        "CONSTRAINED",
+        "DENIED",
+        "EXPIRED",
+        "HOLD",
+        "INDETERMINATE",
+        "SUPPORTED",
+        "UNSUPPORTED"
+      ]
+    },
+    "ReasoningStrategy": {
+      "kind": "enum",
+      "values": [
+        "SINGLE_CANDIDATE_UNREVISED",
+        "MULTI_CANDIDATE_UNREVISED",
+        "REVISED_ADVISORY"
+      ]
+    },
+    "ReviewAction": {
+      "kind": "enum",
+      "values": [
+        "ROUTE_APPROVAL_BUNDLE",
+        "CREATE_EXCEPTION_REVIEW_BUNDLE"
+      ]
+    },
+    "RoleActivationStatus": {
+      "kind": "enum",
+      "values": [
+        "ACTIVE",
+        "INACTIVE"
+      ]
+    },
+    "SemanticAuditorFindingStatus": {
+      "kind": "enum",
+      "values": [
+        "CONSISTENT",
+        "INCONSISTENT",
+        "INDETERMINATE",
+        "CONFLICTING"
+      ]
+    },
+    "StrategyPolicyRequest": {
+      "kind": "model",
+      "fields": [
+        "strategy_policy_ref",
+        "tenant_id",
+        "case_ref",
+        "as_of"
+      ]
+    },
+    "StrategyPolicyResolver": {
+      "kind": "protocol",
+      "methods": []
+    },
+    "StrategyPolicyResponse": {
+      "kind": "model",
+      "fields": [
+        "strategy_policy_id",
+        "strategy_policy_version",
+        "permitted_strategies",
+        "strategy_policy_ref"
+      ]
+    },
+    "TerminalOutcome": {
+      "kind": "enum",
+      "values": [
+        "PROPOSAL",
+        "NEED_EVIDENCE",
+        "ABSTAIN",
+        "ESCALATE"
+      ]
+    },
+    "ToolObservation": {
+      "kind": "model",
+      "fields": [
+        "schema_version",
+        "tenant_id",
+        "created_at",
+        "observation_id",
+        "case_ref",
+        "tool_name",
+        "operation_class",
+        "source_ref",
+        "observed_at",
+        "content_hash",
+        "normalized_fields",
+        "admission_status"
+      ]
+    },
+    "ToolObservationAdmissionStatus": {
+      "kind": "enum",
+      "values": [
+        "NOT_EVALUATED"
+      ]
+    },
+    "ToolOperationClass": {
+      "kind": "enum",
+      "values": [
+        "READ_ONLY"
+      ]
+    },
+    "WorkMandate": {
+      "kind": "model",
+      "fields": [
+        "schema_version",
+        "tenant_id",
+        "created_at",
+        "mandate_id",
+        "case_ref",
+        "assigned_role_contract_id",
+        "purpose",
+        "allowed_source_scopes",
+        "expires_at"
+      ]
+    },
+    "__version__": {
+      "kind": "constant",
+      "value": "0.3.1"
+    },
+    "build_advisory_candidate_set": {
+      "kind": "function"
+    },
+    "build_advisory_revision": {
+      "kind": "function"
+    },
+    "build_candidate_advisory": {
+      "kind": "function"
+    },
+    "build_proposer_advisory": {
+      "kind": "function"
+    },
+    "build_proposer_process_record": {
+      "kind": "function"
+    },
+    "compute_advisory_identity": {
+      "kind": "function"
+    },
+    "evaluate_eligibility": {
+      "kind": "function"
+    },
+    "evaluate_readiness": {
+      "kind": "function"
+    },
+    "verify_advisory_identity": {
+      "kind": "function"
+    },
+    "verify_advisory_selection": {
+      "kind": "function"
+    },
+    "verify_candidate_eligibility": {
+      "kind": "function"
+    },
+    "verify_deterministic_selection": {
+      "kind": "function"
+    },
+    "verify_domain_evaluation": {
+      "kind": "function"
+    },
+    "verify_observation_resolution": {
+      "kind": "function"
+    },
+    "verify_strategy_permission": {
+      "kind": "function"
+    }
+  }
+}

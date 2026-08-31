@@ -1,0 +1,63 @@
+name: bindingslots-v100-reference-ci
+
+# Torch-free CI: V100 semantics / lifecycle / integrity / verdict-reconstruction tests + (when present)
+# verdict invariants. No model inference here (that requires torch and runs offline).
+
+on:
+  push:
+    paths:
+      - 'experiments/bindingslots_v100_reference/**'
+      - 'docs/audits/bindingslots_v100_reference/**'
+      - '.github/workflows/bindingslots-v100-reference-ci.yml'
+  pull_request:
+    paths:
+      - 'experiments/bindingslots_v100_reference/**'
+      - '.github/workflows/bindingslots-v100-reference-ci.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  v100-integrity:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: {fetch-depth: 0}
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.11'}
+
+      - name: Frozen abc.json digest (pre)
+        run: sha256sum experiments/phase_lc/results/abc.json | tee /tmp/abc_before.txt
+
+      - name: V100 semantics / lifecycle / integrity / verdict tests
+        run: python experiments/bindingslots_v100_reference/tests/test_v100_semantics.py
+
+      - name: Model invariance tests (RESOURCE_BLOCKED without torch -> green)
+        run: python experiments/bindingslots_v100_reference/tests/test_v100_model.py
+
+      - name: Verdict invariants (if evidence present)
+        run: |
+          python - <<'PY'
+          import json, pathlib
+          agg = pathlib.Path("experiments/bindingslots_v100_reference/results/aggregate_verdict.json")
+          if agg.exists():
+              d = json.loads(agg.read_text())
+              allowed = {"ALWAYS_VERIFY_RELIABILITY_VERIFIED_OPERATIONAL_COST_UNRESOLVED",
+                "ALWAYS_VERIFY_RELIABILITY_GATE_FAILED","EXTERNAL_VERIFICATION_INTEGRITY_FAILED",
+                "EXTERNAL_VERIFICATION_PROTOCOL_VIOLATED","EXTERNAL_VERIFICATION_RESULTS_INCONCLUSIVE",
+                "EXTERNAL_VERIFICATION_RESOURCE_BLOCKED"}
+              assert d["primary_verdict"] in allowed, d["primary_verdict"]
+              assert d["primary_verdict"] != "ALWAYS_VERIFY_OPERATIONALLY_QUALIFIED"
+              for tok in ("KEY_CONSISTENCY_SIGNAL_NOT_AVAILABLE","BINDINGSLOTS_NEURAL_ROUTING_UNRESOLVED",
+                          "KDA_VALIDATION_BLOCKED"):
+                  assert tok in d["co_emitted"], tok
+              assert d["kda_readiness"] == "KDA_VALIDATION_BLOCKED"
+              print("verdict:", d["primary_verdict"], "| co-emits routing-unresolved + KDA-blocked + key-consistency-N/A")
+          else:
+              print("no verdict yet (pre-execution)")
+          PY
+
+      - name: Frozen abc.json unchanged
+        run: |
+          sha256sum experiments/phase_lc/results/abc.json | tee /tmp/abc_after.txt
+          diff /tmp/abc_before.txt /tmp/abc_after.txt && echo "abc.json unchanged"

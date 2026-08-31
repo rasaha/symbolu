@@ -1,0 +1,206 @@
+name: trusted-evidence-authority-ci
+
+# Scoped CI for the independent ugence-trusted-evidence-authority leaf package —
+# the platform Trust Assurance role (ADR_UGENCE_TRUSTED_EVIDENCE_AND_BENCHMARK_REGISTRY.md,
+# E-1/E-2/§6.2), at milestone TEV-2 (§30: the verification authority, trust anchors,
+# key trust/revocation, signing, independent verification).
+#
+# Resolves the Low finding carried from the TEV-1 closure audit ("no dedicated TEV
+# package CI"). Runs the package suite and the independent adversarial probes, builds
+# a clean wheel, verifies isolated --no-index installation from a prepared temporary
+# wheelhouse and public-API parity across source/manifest/wheel/installed runtime,
+# re-asserts the dependency and reverse-dependency guards and the
+# no-clock/nondeterminism scans, reproduces the pinned TEV-1 and TEV-2 byte vectors,
+# and runs the platform-freeze verifier.
+#
+# The package calls two maintained cryptographic backends — `cryptography` for Ed25519
+# signing and verification, and `PyNaCl` (libsodium) for strict point validation. It
+# implements no cryptography of its own; an earlier revision did, and the independent
+# TEV-2 closure audit found that implementation unsafe. Both backends are installed
+# here, and dedicated jobs run the strict malformed corpus and the cross-backend
+# differential suite.
+#
+# It publishes nothing, uses no secret, and contacts no external trust service. All
+# cryptographic key material it touches is fixed, hard-coded, unmistakably
+# non-production test material (see tests/_authority_builders.py).
+
+on:
+  pull_request:
+    paths:
+      - "packages/trusted-evidence-authority/**"
+      - "docs/architecture/ADR_UGENCE_TRUSTED_EVIDENCE_AND_BENCHMARK_REGISTRY.md"
+      - ".github/workflows/trusted-evidence-authority-ci.yml"
+  push:
+    # Feature branches AND the repository's actual default branch, so a merge
+    # touching the package (matching the path filter) gets a recorded CI run.
+    branches:
+      - "claude/setup-symbolu-monorepo-**"
+      - "claude/tev-**"
+      - "claude/trusted-evidence-**"
+    paths:
+      - "packages/trusted-evidence-authority/**"
+      - "docs/architecture/ADR_UGENCE_TRUSTED_EVIDENCE_AND_BENCHMARK_REGISTRY.md"
+      - ".github/workflows/trusted-evidence-authority-ci.yml"
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  package-suite:
+    name: Trusted Evidence package suite (source)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        # The two declared cryptographic backends, plus pytest. The package is
+        # not zero-dependency: it calls `cryptography` and `PyNaCl` and
+        # implements no cryptography itself. The differential suite imports
+        # PyNaCl directly to cross-check the package against libsodium.
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest "cryptography>=41.0.7,<47.0.0" "PyNaCl>=1.5.0,<2.0.0"
+          python -c "import importlib.metadata as m; print('cryptography', m.version('cryptography')); print('PyNaCl', m.version('PyNaCl'))"
+      - name: Package suite (contracts, authority, canonicalization, packaging)
+        run: python -m pytest packages/trusted-evidence-authority/tests -q
+      - name: TEV-1 backward compatibility — the four pinned digests and the 29 symbols
+        run: |
+          python -m pytest \
+            packages/trusted-evidence-authority/tests/authority/test_tev2_canonicalization_vectors.py \
+            packages/trusted-evidence-authority/tests/contract/test_canonicalization.py \
+            packages/trusted-evidence-authority/tests/packaging/test_public_api.py -q
+      - name: RFC 8032 conformance — the published Ed25519 vectors
+        run: |
+          python -m pytest \
+            packages/trusted-evidence-authority/tests/authority/test_backend_ed25519_conformance.py -q
+      - name: Strict Ed25519 corpus — identity, torsion, non-canonical, malleable
+        # Closure-audit F-01/F-03/F-06. Every untrustworthy point is refused at
+        # construction so it can never enter a trust-anchor store, and every
+        # malformed signature is a fail-closed False.
+        run: |
+          python -m pytest \
+            packages/trusted-evidence-authority/tests/authority/test_backend_strict_corpus.py -q
+      - name: Differential agreement — cryptography vs libsodium
+        # 1,800 valid triples plus the RFC vectors and the full mutation corpus,
+        # cross-checked against a second maintained implementation.
+        run: |
+          python -m pytest \
+            packages/trusted-evidence-authority/tests/authority/test_backend_differential.py -q
+      - name: Re-verification gates — each one shown to catch its own case
+        run: |
+          python -m pytest \
+            packages/trusted-evidence-authority/tests/authority/test_reverification_gates.py -q
+      - name: Anti-forgery, replay, revocation and time-boundary matrices
+        run: |
+          python -m pytest \
+            packages/trusted-evidence-authority/tests/authority/test_anti_forgery_and_replay.py \
+            packages/trusted-evidence-authority/tests/authority/test_trust_anchor_lifecycle.py \
+            packages/trusted-evidence-authority/tests/contract/test_anti_forgery.py -q
+      - name: Key-material hygiene — no seed reaches any artifact
+        run: |
+          python -m pytest \
+            packages/trusted-evidence-authority/tests/authority/test_key_material_hygiene.py -q
+      - name: Dependency and reverse-dependency guards
+        # Exactly two third-party runtime dependencies, imported from exactly
+        # one module, with no optional-import fallback anywhere.
+        run: |
+          python -m pytest \
+            packages/trusted-evidence-authority/tests/packaging/test_dependency_boundary.py -q
+      - name: No truthiness gating — no security decision made by emptiness
+        # Closure-audit F-04/F-05. Structural, so a new gate cannot be written
+        # the old way even if every behavioural test still passes.
+        run: |
+          python -m pytest \
+            packages/trusted-evidence-authority/tests/packaging/test_no_truthiness_gating.py -q
+      - name: No-clock and nondeterminism scans
+        run: |
+          python -m pytest \
+            packages/trusted-evidence-authority/tests/packaging/test_no_clock_or_environment.py -q
+      - name: Milestone boundary — TEV-2 stops where the ADR says it stops
+        run: |
+          python -m pytest \
+            packages/trusted-evidence-authority/tests/packaging/test_milestone_boundary.py -q
+
+  adversarial-probes:
+    name: Independent adversarial probes (source)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install the declared cryptographic backends
+        run: |
+          python -m pip install --upgrade pip
+          pip install "cryptography>=41.0.7,<47.0.0" "PyNaCl>=1.5.0,<2.0.0"
+      - name: Independent probe harness (curated API + stdlib only)
+        # Imports no test module, no _builders helper, no conftest and no
+        # private submodule; reconstructs the signed bytes by hand and verifies
+        # a fixed signature vector.
+        env:
+          PYTHONPATH: packages/trusted-evidence-authority/src
+        run: python packages/trusted-evidence-authority/adversarial_probes.py
+
+  isolated-install:
+    name: Wheel build and isolated wheelhouse installation verification
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install build tooling
+        run: |
+          python -m pip install --upgrade pip
+          pip install build pytest
+      - name: Build the wheel, install from a prepared --no-index wheelhouse, prove the leaf
+        # The verifier prepares a *temporary* wheelhouse containing the two
+        # declared backends (the only step allowed to reach an index), then
+        # installs with --no-index and PIP_NO_INDEX=1 into a venv with no system
+        # site packages and no PYTHONPATH. It fails if a dependency is satisfied
+        # from the host, if PYTHONPATH leaks, if monorepo source shadows the
+        # wheel, if declared metadata is missing, or if the install falls back
+        # to an index. No third-party wheel is committed to this repository.
+        run: python packages/trusted-evidence-authority/verify_trusted_evidence_authority_distribution.py
+
+  api-parity:
+    name: Public API parity (source vs committed manifest)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest "cryptography>=41.0.7,<47.0.0" "PyNaCl>=1.5.0,<2.0.0"
+      - name: public_api.json equals the actual curated surface
+        run: |
+          python -m pytest \
+            packages/trusted-evidence-authority/tests/packaging/test_public_api.py -q
+      - name: py.typed marker ships
+        run: |
+          test -f packages/trusted-evidence-authority/src/ugence_trusted_evidence_authority/py.typed
+
+  freeze:
+    name: Platform-freeze verification
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest pydantic
+      - name: Freeze verification (blocking — frozen artifacts must be unchanged)
+        run: python -m platform_freeze.verify --manifest platform/PLATFORM_FREEZE_V1.json

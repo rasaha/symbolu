@@ -1,0 +1,281 @@
+{
+  "distribution": "ugence-benchmark-registry",
+  "namespace": "ugence_benchmark_registry",
+  "package_version": "0.1.0",
+  "curated_api_module": "ugence_benchmark_registry.api",
+  "note": "Machine-readable snapshot of the curated public API (ugence_benchmark_registry.api.__all__). Generated from the package surface; tests/packaging/test_public_api.py asserts this file equals the actual package surface, and verify_benchmark_registry_distribution.py asserts the same for the built wheel and the isolated installed runtime. Regenerate when the curated API changes.",
+  "symbols": {
+    "BENCHMARK_DEFINITION_IDENTITY_DIGEST_DOMAIN": {
+      "kind": "constant",
+      "value": "ugence.benchmark-registry/benchmark-definition-identity/v1"
+    },
+    "BENCHMARK_IDENTITY_COORDINATES": {
+      "kind": "constant",
+      "value": [
+        "coordinate.benchmark_id",
+        "coordinate.benchmark_family",
+        "coordinate.benchmark_version",
+        "content_digest",
+        "coordinate.scope",
+        "coordinate.geography",
+        "coordinate.domain",
+        "measurement.intended_outcome_ref",
+        "measurement.metric_ref",
+        "measurement.unit",
+        "measurement.measurement_protocol_ref",
+        "measurement.population_ref",
+        "measurement.aggregation_semantics_ref",
+        "measurement.observation_window_ref",
+        "effective_period",
+        "source_requirements",
+        "approval",
+        "publisher_id",
+        "lifecycle_state",
+        "supersession"
+      ]
+    },
+    "BENCHMARK_LIFECYCLE_ORDER": {
+      "kind": "constant",
+      "value": [
+        "AUTHORED",
+        "APPROVED",
+        "REGISTERED",
+        "REVOKED"
+      ]
+    },
+    "BENCHMARK_LIFECYCLE_TRANSITIONS": {
+      "kind": "constant",
+      "value": {
+        "AUTHORED": [
+          "APPROVED"
+        ],
+        "APPROVED": [
+          "REGISTERED"
+        ],
+        "REGISTERED": [
+          "REVOKED"
+        ],
+        "REVOKED": []
+      }
+    },
+    "BENCHMARK_REFUSAL_REASONS": {
+      "kind": "constant",
+      "value": [
+        "BENCHMARK_APPLICABILITY_INCONSISTENT",
+        "BENCHMARK_APPROVAL_REFERENCE_INVALID",
+        "BENCHMARK_CANONICALIZATION_FAILED",
+        "BENCHMARK_COORDINATE_NOT_EXACT",
+        "BENCHMARK_DEFINITION_MISSING",
+        "BENCHMARK_EFFECTIVE_PERIOD_INVALID",
+        "BENCHMARK_EXPIRED",
+        "BENCHMARK_IDENTITY_COORDINATE_MISSING",
+        "BENCHMARK_INVALID_LIFECYCLE_TRANSITION",
+        "BENCHMARK_MALFORMED_CONTRACT",
+        "BENCHMARK_MEASUREMENT_SEMANTICS_INCOMPLETE",
+        "BENCHMARK_NOT_YET_EFFECTIVE",
+        "BENCHMARK_RESOLUTION_NOT_PERFORMED",
+        "BENCHMARK_REVOKED",
+        "BENCHMARK_ROLE_SEPARATION_VIOLATED",
+        "BENCHMARK_SOURCE_REQUIREMENTS_INVALID",
+        "BENCHMARK_SUPERSESSION_DECLARATION_INVALID"
+      ]
+    },
+    "BENCHMARK_REGISTRY_CANONICALIZATION_VERSION": {
+      "kind": "constant",
+      "value": "ugence.benchmark-registry/canonicalization/v1"
+    },
+    "BENCHMARK_TERMINAL_LIFECYCLE_STATES": {
+      "kind": "constant",
+      "value": [
+        "REVOKED"
+      ]
+    },
+    "BR1_BENCHMARK_REFUSAL_REASONS": {
+      "kind": "constant",
+      "value": [
+        "BENCHMARK_APPLICABILITY_INCONSISTENT",
+        "BENCHMARK_APPROVAL_REFERENCE_INVALID",
+        "BENCHMARK_CANONICALIZATION_FAILED",
+        "BENCHMARK_COORDINATE_NOT_EXACT",
+        "BENCHMARK_DEFINITION_MISSING",
+        "BENCHMARK_EFFECTIVE_PERIOD_INVALID",
+        "BENCHMARK_EXPIRED",
+        "BENCHMARK_IDENTITY_COORDINATE_MISSING",
+        "BENCHMARK_INVALID_LIFECYCLE_TRANSITION",
+        "BENCHMARK_MALFORMED_CONTRACT",
+        "BENCHMARK_MEASUREMENT_SEMANTICS_INCOMPLETE",
+        "BENCHMARK_NOT_YET_EFFECTIVE",
+        "BENCHMARK_RESOLUTION_NOT_PERFORMED",
+        "BENCHMARK_REVOKED",
+        "BENCHMARK_ROLE_SEPARATION_VIOLATED",
+        "BENCHMARK_SOURCE_REQUIREMENTS_INVALID",
+        "BENCHMARK_SUPERSESSION_DECLARATION_INVALID"
+      ]
+    },
+    "BenchmarkApplicabilityCoordinate": {
+      "kind": "dataclass",
+      "fields": [
+        "declaration",
+        "value"
+      ]
+    },
+    "BenchmarkApplicabilityDeclaration": {
+      "kind": "enum",
+      "values": [
+        "APPLICABLE",
+        "NOT_APPLICABLE"
+      ]
+    },
+    "BenchmarkApprovalReference": {
+      "kind": "dataclass",
+      "fields": [
+        "approval_ref",
+        "approval_authority_ref",
+        "approved_content_digest"
+      ]
+    },
+    "BenchmarkCanonicalizationError": {
+      "kind": "exception"
+    },
+    "BenchmarkContractError": {
+      "kind": "exception"
+    },
+    "BenchmarkCoordinate": {
+      "kind": "dataclass",
+      "fields": [
+        "benchmark_id",
+        "benchmark_family",
+        "benchmark_version",
+        "scope",
+        "geography",
+        "domain"
+      ]
+    },
+    "BenchmarkEffectivePeriod": {
+      "kind": "dataclass",
+      "fields": [
+        "effective_from",
+        "end_declaration",
+        "effective_to"
+      ]
+    },
+    "BenchmarkLifecycleError": {
+      "kind": "exception"
+    },
+    "BenchmarkLifecycleState": {
+      "kind": "enum",
+      "values": [
+        "AUTHORED",
+        "APPROVED",
+        "REGISTERED",
+        "REVOKED"
+      ]
+    },
+    "BenchmarkMeasurementSemantics": {
+      "kind": "dataclass",
+      "fields": [
+        "intended_outcome_ref",
+        "metric_ref",
+        "unit",
+        "measurement_protocol_ref",
+        "population_ref",
+        "aggregation_semantics_ref",
+        "observation_window_ref"
+      ]
+    },
+    "BenchmarkRefusalReason": {
+      "kind": "enum",
+      "values": [
+        "BENCHMARK_DEFINITION_MISSING",
+        "BENCHMARK_MALFORMED_CONTRACT",
+        "BENCHMARK_CANONICALIZATION_FAILED",
+        "BENCHMARK_IDENTITY_COORDINATE_MISSING",
+        "BENCHMARK_COORDINATE_NOT_EXACT",
+        "BENCHMARK_APPLICABILITY_INCONSISTENT",
+        "BENCHMARK_MEASUREMENT_SEMANTICS_INCOMPLETE",
+        "BENCHMARK_SOURCE_REQUIREMENTS_INVALID",
+        "BENCHMARK_APPROVAL_REFERENCE_INVALID",
+        "BENCHMARK_ROLE_SEPARATION_VIOLATED",
+        "BENCHMARK_EFFECTIVE_PERIOD_INVALID",
+        "BENCHMARK_NOT_YET_EFFECTIVE",
+        "BENCHMARK_EXPIRED",
+        "BENCHMARK_INVALID_LIFECYCLE_TRANSITION",
+        "BENCHMARK_REVOKED",
+        "BENCHMARK_SUPERSESSION_DECLARATION_INVALID",
+        "BENCHMARK_RESOLUTION_NOT_PERFORMED"
+      ]
+    },
+    "BenchmarkScope": {
+      "kind": "dataclass",
+      "fields": [
+        "kind",
+        "tenant_id"
+      ]
+    },
+    "BenchmarkScopeKind": {
+      "kind": "enum",
+      "values": [
+        "PLATFORM_WIDE",
+        "TENANT"
+      ]
+    },
+    "BenchmarkSourceRequirements": {
+      "kind": "dataclass",
+      "fields": [
+        "source_ref",
+        "provenance_requirement_refs"
+      ]
+    },
+    "BenchmarkStructuralStatus": {
+      "kind": "enum",
+      "values": [
+        "STRUCTURAL_UNVERIFIED"
+      ]
+    },
+    "BenchmarkSupersessionDeclaration": {
+      "kind": "dataclass",
+      "fields": [
+        "status"
+      ]
+    },
+    "BenchmarkSupersessionStatus": {
+      "kind": "enum",
+      "values": [
+        "UNDETERMINED"
+      ]
+    },
+    "CanonicalBenchmarkDefinitionIdentity": {
+      "kind": "dataclass",
+      "fields": [
+        "coordinate",
+        "content_digest",
+        "measurement",
+        "effective_period",
+        "source_requirements",
+        "approval",
+        "publisher_id",
+        "lifecycle_state",
+        "supersession"
+      ]
+    },
+    "TemporalBoundDeclaration": {
+      "kind": "enum",
+      "values": [
+        "BOUNDED",
+        "OPEN_ENDED"
+      ]
+    },
+    "canonical_bytes": {
+      "kind": "function"
+    },
+    "canonical_digest": {
+      "kind": "function"
+    },
+    "is_valid_lifecycle_transition": {
+      "kind": "function"
+    },
+    "require_valid_lifecycle_transition": {
+      "kind": "function"
+    }
+  }
+}

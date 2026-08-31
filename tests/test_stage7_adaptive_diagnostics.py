@@ -5,7 +5,7 @@ Tests for Appendix F Stage 7B — Adaptive Diagnostic Controller
 Verifies that AdaptiveDiagnosticController correctly monitors diagnostic
 signals and triggers appropriate adaptive responses.
 
-Reference: docs/design/CONSCIOUS_GENERATION_DESIGN.md, §F.10.6.2
+Reference: Project_documentation/repository/docs/design/CONSCIOUS_GENERATION_DESIGN.md, §F.10.6.2
 """
 
 import pytest

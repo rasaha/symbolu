@@ -61,6 +61,12 @@ async def accept_invitation(
     correlation_id: str | None = Depends(get_correlation_id),
 ) -> CoupleResponse:
     couple = await services.couples.accept_invitation(token, principal.user_id, correlation_id)
+    # Provision the relationship's secure chat conversation in the SAME request
+    # transaction as pairing (single commit at the request boundary). Uniqueness on
+    # couple_id makes this safe under concurrent acceptance.
+    await services.chat.provision_conversation(
+        couple.id, actor_user_id=principal.user_id, correlation_id=correlation_id
+    )
     return await _couple_response(services, couple.id)
 
 
@@ -71,6 +77,11 @@ async def unpair(
     services: ServiceRegistry = Depends(get_services),
     correlation_id: str | None = Depends(get_correlation_id),
 ) -> None:
+    # Revoke the conversation FIRST — while the actor is still an active member so
+    # the update satisfies RLS — then dissolve the pairing. Both run in one
+    # transaction; the conversation row lock serialises this against message sends,
+    # guaranteeing no message can commit after revocation is effective.
+    await services.chat.revoke_conversation(couple_id, principal.user_id, correlation_id)
     await services.couples.unpair(couple_id, principal.user_id, correlation_id)
 
 

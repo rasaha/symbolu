@@ -1229,7 +1229,7 @@ def train(config: UnifiedTrainingConfig):
 
     # ==========================================================================
     # V9.8.0: Sovereign Reasoning Kernel (SRK) Initialization
-    # Reference: docs/architecture/SOVEREIGN_REASONING_KERNEL_DESIGN.md
+    # Reference: Project_documentation/repository/docs/architecture/SOVEREIGN_REASONING_KERNEL_DESIGN.md
     # ==========================================================================
     srk = None
     srk_loss_fn = None
@@ -1328,7 +1328,7 @@ def train(config: UnifiedTrainingConfig):
 
     # ==========================================================================
     # Phase-JEPA: Joint Embedding Predictive Architecture Initialization
-    # Reference: docs/design/HYBRID_PHASE_JEPA_DESIGN.md
+    # Reference: Project_documentation/repository/docs/design/HYBRID_PHASE_JEPA_DESIGN.md
     # ==========================================================================
     jepa_model = None
     jepa_curriculum = None
@@ -2073,7 +2073,7 @@ def train(config: UnifiedTrainingConfig):
 
     # ==========================================================================
     # v2.3.0: Kosha Gyroscope + Vritti Resonance - Homeostatic Self-Regulation
-    # Reference: docs/design/KOSHA_GYROSCOPE_DESIGN.md
+    # Reference: Project_documentation/repository/docs/design/KOSHA_GYROSCOPE_DESIGN.md
     # ==========================================================================
     kosha_gyroscope = None
     kosha_graduation_monitor = None
@@ -4320,7 +4320,7 @@ def train(config: UnifiedTrainingConfig):
             # =====================================================================
             # v2.2.1: KOSHA GYROSCOPE - Homeostatic Self-Regulation Loss
             # Enforces balance across Kosha dimensions to prevent pathological states
-            # Reference: docs/design/KOSHA_GYROSCOPE_DESIGN.md
+            # Reference: Project_documentation/repository/docs/design/KOSHA_GYROSCOPE_DESIGN.md
             # =====================================================================
             gyroscope_loss = 0.0
             gyroscope_components = {}
@@ -9382,7 +9382,7 @@ def main():
 
     # ==========================================================================
     # v2.2.1: Kosha Gyroscope - Homeostatic Self-Regulation Loss
-    # Reference: docs/design/KOSHA_GYROSCOPE_DESIGN.md
+    # Reference: Project_documentation/repository/docs/design/KOSHA_GYROSCOPE_DESIGN.md
     # ==========================================================================
     parser.add_argument("--enable_kosha_gyroscope", action="store_true",
                        help="Enable Kosha Gyroscope homeostatic self-regulation loss")
@@ -9951,7 +9951,7 @@ def main():
 
     # ==========================================================================
     # V9.8.0: Sovereign Reasoning Kernel (SRK)
-    # Reference: docs/architecture/SOVEREIGN_REASONING_KERNEL_DESIGN.md
+    # Reference: Project_documentation/repository/docs/architecture/SOVEREIGN_REASONING_KERNEL_DESIGN.md
     # ==========================================================================
     parser.add_argument("--enable_srk", action="store_true",
                        help="Enable Sovereign Reasoning Kernel (replaces scattered ontological flags)")
@@ -10062,7 +10062,7 @@ def main():
 
     # ==========================================================================
     # Phase-JEPA: Joint Embedding Predictive Architecture
-    # Reference: docs/design/HYBRID_PHASE_JEPA_DESIGN.md
+    # Reference: Project_documentation/repository/docs/design/HYBRID_PHASE_JEPA_DESIGN.md
     # ==========================================================================
     parser.add_argument("--enable_jepa", action="store_true",
                        help="Enable Phase-JEPA training (Sensor model for perception)")
@@ -10236,7 +10236,7 @@ def main():
 
     # ==========================================================================
     # Conscious Generation (Phase 1+): Token-Side Ontological Foundation
-    # Reference: docs/design/CONSCIOUS_GENERATION_DESIGN.md, Appendix D
+    # Reference: Project_documentation/repository/docs/design/CONSCIOUS_GENERATION_DESIGN.md, Appendix D
     # ==========================================================================
     parser.add_argument("--enable_conscious_generation", action="store_true",
                        help="Enable conscious generation modules (token-side ontological projection)")

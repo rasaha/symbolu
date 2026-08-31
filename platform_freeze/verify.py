@@ -55,16 +55,25 @@ def _benchmark_identity() -> dict:
 
 
 def _docs_presence() -> dict:
+    # Documentation locations after the repository restructuring moved these
+    # governance docs under Project_documentation/. Paths are repo-root-relative.
+    _PLATFORM_DOCS_DIR = pathlib.Path("Project_documentation") / "repository" / "docs" / "platform-v1"
+    _HIRING_DOCS_DIR = pathlib.Path("Project_documentation") / "ai_hiring" / "docs" / "ai-hiring"
+    _CHANGELOG_PLATFORM_V1 = (
+        pathlib.Path("Project_documentation") / "governance" / "decision_platform" / "CHANGELOG_PLATFORM_V1.md"
+    )
     missing = []
     for d in _PLATFORM_DOCS:
-        if not (REPO / "docs" / "platform-v1" / d).exists():
-            missing.append(f"docs/platform-v1/{d}")
+        rel = _PLATFORM_DOCS_DIR / d
+        if not (REPO / rel).exists():
+            missing.append(str(rel))
     for d in _HIRING_DOCS:
-        if not (REPO / "docs" / "ai-hiring" / d).exists():
-            missing.append(f"docs/ai-hiring/{d}")
-    for extra in ("CHANGELOG_PLATFORM_V1.md",):
+        rel = _HIRING_DOCS_DIR / d
+        if not (REPO / rel).exists():
+            missing.append(str(rel))
+    for extra in (_CHANGELOG_PLATFORM_V1,):
         if not (REPO / extra).exists():
-            missing.append(extra)
+            missing.append(str(extra))
     return {"passed": not missing, "missing": missing}
 
 

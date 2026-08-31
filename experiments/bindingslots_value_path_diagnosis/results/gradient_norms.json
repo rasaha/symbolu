@@ -1,0 +1,785 @@
+{
+  "schema": "bindingslots_value_path_diagnosis/gradient_norms/v1",
+  "runs": [
+    {
+      "arm": "R0",
+      "seed": 24,
+      "grad_norms_by_group": {
+        "900": {
+          "lm": {
+            "embeddings": 1.46701312,
+            "backbone": 0.31256568,
+            "slot_keys": 0.01602769,
+            "write_addr_proj": 0.05072141,
+            "read_addr_proj": 0.00059974,
+            "write_value_proj": 0.09750389,
+            "write_gate": 0.14921774,
+            "memory_readout_Wo": 0.07090838,
+            "slot_norm": 0.06651079
+          }
+        },
+        "1200": {
+          "lm": {
+            "embeddings": 0.47742712,
+            "backbone": 0.09821412,
+            "slot_keys": 0.00524272,
+            "write_addr_proj": 0.01426512,
+            "read_addr_proj": 0.00090173,
+            "write_value_proj": 0.01851446,
+            "write_gate": 0.04446549,
+            "memory_readout_Wo": 0.01864033,
+            "slot_norm": 0.02244736
+          }
+        }
+      },
+      "persist_to_lm_norm_ratio": {
+        "900": null,
+        "1200": null
+      },
+      "teacher_to_lm_norm_ratio": {
+        "900": null,
+        "1200": null
+      },
+      "param_group_audit": {
+        "group_numel": {
+          "embeddings": 318848,
+          "backbone": 1474916,
+          "slot_keys": 8192,
+          "write_addr_proj": 32768,
+          "read_addr_proj": 32768,
+          "write_value_proj": 65536,
+          "write_gate": 516,
+          "memory_readout_Wo": 65536,
+          "slot_norm": 1024
+        },
+        "group_param_count": {
+          "embeddings": 2,
+          "backbone": 50,
+          "slot_keys": 4,
+          "write_addr_proj": 4,
+          "read_addr_proj": 4,
+          "write_value_proj": 4,
+          "write_gate": 8,
+          "memory_readout_Wo": 4,
+          "slot_norm": 8
+        },
+        "total_numel": 2000104,
+        "covered_numel": 2000104,
+        "complete": true,
+        "non_overlapping": true
+      },
+      "state_hash_unchanged": {
+        "900": true,
+        "1200": true
+      }
+    },
+    {
+      "arm": "O1R",
+      "seed": 23,
+      "grad_norms_by_group": {
+        "900": {
+          "lm": {
+            "embeddings": 1.49905753,
+            "backbone": 0.28616878,
+            "slot_keys": 0.00046668,
+            "write_addr_proj": 0.00099095,
+            "read_addr_proj": 0.00131847,
+            "write_value_proj": 0.06792243,
+            "write_gate": 0.02019287,
+            "memory_readout_Wo": 0.08392486,
+            "slot_norm": 0.02595719
+          },
+          "persist": {
+            "embeddings": 0.79224861,
+            "backbone": 0.32122442,
+            "slot_keys": 0.18960376,
+            "write_addr_proj": 0.00342191,
+            "read_addr_proj": 0.12498656,
+            "write_value_proj": 0.13940905,
+            "write_gate": 0.03454091,
+            "memory_readout_Wo": 0.14285232,
+            "slot_norm": 0.17937016
+          }
+        },
+        "1200": {
+          "lm": {
+            "embeddings": 0.37162018,
+            "backbone": 0.08097439,
+            "slot_keys": 0.00059854,
+            "write_addr_proj": 0.00087524,
+            "read_addr_proj": 0.00111907,
+            "write_value_proj": 0.01686589,
+            "write_gate": 0.01286476,
+            "memory_readout_Wo": 0.02157737,
+            "slot_norm": 0.00831299
+          },
+          "persist": {
+            "embeddings": 0.29144958,
+            "backbone": 0.14314641,
+            "slot_keys": 0.10810361,
+            "write_addr_proj": 0.00629091,
+            "read_addr_proj": 0.11390717,
+            "write_value_proj": 0.07002727,
+            "write_gate": 0.02289314,
+            "memory_readout_Wo": 0.12344176,
+            "slot_norm": 0.08207486
+          }
+        }
+      },
+      "persist_to_lm_norm_ratio": {
+        "900": 0.60446132,
+        "1200": 1.04002154
+      },
+      "teacher_to_lm_norm_ratio": {
+        "900": null,
+        "1200": null
+      },
+      "param_group_audit": {
+        "group_numel": {
+          "embeddings": 318848,
+          "backbone": 1474916,
+          "slot_keys": 8192,
+          "write_addr_proj": 32768,
+          "read_addr_proj": 32768,
+          "write_value_proj": 65536,
+          "write_gate": 516,
+          "memory_readout_Wo": 65536,
+          "slot_norm": 1024
+        },
+        "group_param_count": {
+          "embeddings": 2,
+          "backbone": 50,
+          "slot_keys": 4,
+          "write_addr_proj": 4,
+          "read_addr_proj": 4,
+          "write_value_proj": 4,
+          "write_gate": 8,
+          "memory_readout_Wo": 4,
+          "slot_norm": 8
+        },
+        "total_numel": 2000104,
+        "covered_numel": 2000104,
+        "complete": true,
+        "non_overlapping": true
+      },
+      "state_hash_unchanged": {
+        "900": true,
+        "1200": true
+      }
+    },
+    {
+      "arm": "H2",
+      "seed": 24,
+      "grad_norms_by_group": {
+        "900": {
+          "lm": {
+            "embeddings": 0.33101419,
+            "backbone": 0.06427468,
+            "slot_keys": 0.00209266,
+            "write_addr_proj": 0.00655332,
+            "read_addr_proj": 0.00161173,
+            "write_value_proj": 0.0147155,
+            "write_gate": 0.01471719,
+            "memory_readout_Wo": 0.01681901,
+            "slot_norm": 0.01029812
+          },
+          "teacher": {
+            "embeddings": 0.01480756,
+            "backbone": 0.00872134,
+            "slot_keys": 0.00471552,
+            "write_addr_proj": 0.00012171,
+            "read_addr_proj": 0.00170598,
+            "write_value_proj": 0.00250396,
+            "write_gate": 0.00065096,
+            "memory_readout_Wo": 0.00552623,
+            "slot_norm": 0.0027571
+          }
+        },
+        "1200": {
+          "lm": {
+            "embeddings": 0.28202662,
+            "backbone": 0.06997398,
+            "slot_keys": 0.01392894,
+            "write_addr_proj": 0.01298298,
+            "read_addr_proj": 0.01462707,
+            "write_value_proj": 0.02963359,
+            "write_gate": 0.10198318,
+            "memory_readout_Wo": 0.02646374,
+            "slot_norm": 0.01888179
+          },
+          "teacher": {
+            "embeddings": 0.12293467,
+            "backbone": 0.06629127,
+            "slot_keys": 0.02520706,
+            "write_addr_proj": 0.00041074,
+            "read_addr_proj": 0.01778989,
+            "write_value_proj": 0.02523035,
+            "write_gate": 0.00778431,
+            "memory_readout_Wo": 0.04312936,
+            "slot_norm": 0.03342886
+          }
+        }
+      },
+      "persist_to_lm_norm_ratio": {
+        "900": null,
+        "1200": null
+      },
+      "teacher_to_lm_norm_ratio": {
+        "900": 0.05646706,
+        "1200": 0.49791485
+      },
+      "param_group_audit": {
+        "group_numel": {
+          "embeddings": 318848,
+          "backbone": 1474916,
+          "slot_keys": 8192,
+          "write_addr_proj": 32768,
+          "read_addr_proj": 32768,
+          "write_value_proj": 65536,
+          "write_gate": 516,
+          "memory_readout_Wo": 65536,
+          "slot_norm": 1024
+        },
+        "group_param_count": {
+          "embeddings": 2,
+          "backbone": 50,
+          "slot_keys": 4,
+          "write_addr_proj": 4,
+          "read_addr_proj": 4,
+          "write_value_proj": 4,
+          "write_gate": 8,
+          "memory_readout_Wo": 4,
+          "slot_norm": 8
+        },
+        "total_numel": 2000104,
+        "covered_numel": 2000104,
+        "complete": true,
+        "non_overlapping": true
+      },
+      "state_hash_unchanged": {
+        "900": true,
+        "1200": true
+      }
+    },
+    {
+      "arm": "H2",
+      "seed": 23,
+      "grad_norms_by_group": {
+        "900": {
+          "lm": {
+            "embeddings": 0.44185713,
+            "backbone": 0.06026633,
+            "slot_keys": 0.01096923,
+            "write_addr_proj": 0.00126873,
+            "read_addr_proj": 0.00401514,
+            "write_value_proj": 0.03361086,
+            "write_gate": 0.09020735,
+            "memory_readout_Wo": 0.03360141,
+            "slot_norm": 0.01365639
+          },
+          "teacher": {
+            "embeddings": 0.02703824,
+            "backbone": 0.00848081,
+            "slot_keys": 0.00250745,
+            "write_addr_proj": 0.00068241,
+            "read_addr_proj": 0.00250926,
+            "write_value_proj": 0.00497294,
+            "write_gate": 0.0066929,
+            "memory_readout_Wo": 0.00550552,
+            "slot_norm": 0.00339532
+          }
+        },
+        "1200": {
+          "lm": {
+            "embeddings": 0.93610257,
+            "backbone": 0.19776294,
+            "slot_keys": 0.00151246,
+            "write_addr_proj": 0.00386558,
+            "read_addr_proj": 0.00210442,
+            "write_value_proj": 0.0515568,
+            "write_gate": 0.05181761,
+            "memory_readout_Wo": 0.06836287,
+            "slot_norm": 0.02189895
+          },
+          "teacher": {
+            "embeddings": 0.17411874,
+            "backbone": 0.06560519,
+            "slot_keys": 0.01783812,
+            "write_addr_proj": 0.00607723,
+            "read_addr_proj": 0.02014224,
+            "write_value_proj": 0.04043478,
+            "write_gate": 0.05234624,
+            "memory_readout_Wo": 0.04551193,
+            "slot_norm": 0.037278
+          }
+        }
+      },
+      "persist_to_lm_norm_ratio": {
+        "900": null,
+        "1200": null
+      },
+      "teacher_to_lm_norm_ratio": {
+        "900": 0.06651947,
+        "1200": 0.21604691
+      },
+      "param_group_audit": {
+        "group_numel": {
+          "embeddings": 318848,
+          "backbone": 1474916,
+          "slot_keys": 8192,
+          "write_addr_proj": 32768,
+          "read_addr_proj": 32768,
+          "write_value_proj": 65536,
+          "write_gate": 516,
+          "memory_readout_Wo": 65536,
+          "slot_norm": 1024
+        },
+        "group_param_count": {
+          "embeddings": 2,
+          "backbone": 50,
+          "slot_keys": 4,
+          "write_addr_proj": 4,
+          "read_addr_proj": 4,
+          "write_value_proj": 4,
+          "write_gate": 8,
+          "memory_readout_Wo": 4,
+          "slot_norm": 8
+        },
+        "total_numel": 2000104,
+        "covered_numel": 2000104,
+        "complete": true,
+        "non_overlapping": true
+      },
+      "state_hash_unchanged": {
+        "900": true,
+        "1200": true
+      }
+    },
+    {
+      "arm": "H2",
+      "seed": 25,
+      "grad_norms_by_group": {
+        "900": {
+          "lm": {
+            "embeddings": 0.70453024,
+            "backbone": 0.17175825,
+            "slot_keys": 0.00361913,
+            "write_addr_proj": 0.0074365,
+            "read_addr_proj": 0.00154692,
+            "write_value_proj": 0.02034131,
+            "write_gate": 0.02042104,
+            "memory_readout_Wo": 0.02677424,
+            "slot_norm": 0.014032
+          },
+          "teacher": {
+            "embeddings": 0.01976813,
+            "backbone": 0.00609966,
+            "slot_keys": 0.00567373,
+            "write_addr_proj": 0.00010102,
+            "read_addr_proj": 0.00197023,
+            "write_value_proj": 0.00405074,
+            "write_gate": 0.00056881,
+            "memory_readout_Wo": 0.00533375,
+            "slot_norm": 0.00321834
+          }
+        },
+        "1200": {
+          "lm": {
+            "embeddings": 0.28608927,
+            "backbone": 0.06508453,
+            "slot_keys": 0.00302847,
+            "write_addr_proj": 0.00278372,
+            "read_addr_proj": 0.00329823,
+            "write_value_proj": 0.01050085,
+            "write_gate": 0.00848271,
+            "memory_readout_Wo": 0.01028072,
+            "slot_norm": 0.00617365
+          },
+          "teacher": {
+            "embeddings": 0.04378552,
+            "backbone": 0.01390287,
+            "slot_keys": 0.00860319,
+            "write_addr_proj": 0.000147,
+            "read_addr_proj": 0.00392413,
+            "write_value_proj": 0.0093518,
+            "write_gate": 0.00046647,
+            "memory_readout_Wo": 0.01450138,
+            "slot_norm": 0.00746404
+          }
+        }
+      },
+      "persist_to_lm_norm_ratio": {
+        "900": null,
+        "1200": null
+      },
+      "teacher_to_lm_norm_ratio": {
+        "900": 0.03137996,
+        "1200": 0.17187968
+      },
+      "param_group_audit": {
+        "group_numel": {
+          "embeddings": 318848,
+          "backbone": 1474916,
+          "slot_keys": 8192,
+          "write_addr_proj": 32768,
+          "read_addr_proj": 32768,
+          "write_value_proj": 65536,
+          "write_gate": 516,
+          "memory_readout_Wo": 65536,
+          "slot_norm": 1024
+        },
+        "group_param_count": {
+          "embeddings": 2,
+          "backbone": 50,
+          "slot_keys": 4,
+          "write_addr_proj": 4,
+          "read_addr_proj": 4,
+          "write_value_proj": 4,
+          "write_gate": 8,
+          "memory_readout_Wo": 4,
+          "slot_norm": 8
+        },
+        "total_numel": 2000104,
+        "covered_numel": 2000104,
+        "complete": true,
+        "non_overlapping": true
+      },
+      "state_hash_unchanged": {
+        "900": true,
+        "1200": true
+      }
+    },
+    {
+      "arm": "O1R",
+      "seed": 24,
+      "grad_norms_by_group": {
+        "900": {
+          "lm": {
+            "embeddings": 0.44992271,
+            "backbone": 0.05339262,
+            "slot_keys": 0.00017993,
+            "write_addr_proj": 0.00014815,
+            "read_addr_proj": 7.054e-05,
+            "write_value_proj": 0.02166323,
+            "write_gate": 0.00747194,
+            "memory_readout_Wo": 0.03548352,
+            "slot_norm": 0.00779649
+          },
+          "persist": {
+            "embeddings": 3.03157187,
+            "backbone": 0.62511319,
+            "slot_keys": 0.34145299,
+            "write_addr_proj": 0.0083652,
+            "read_addr_proj": 0.24799964,
+            "write_value_proj": 0.38436025,
+            "write_gate": 0.10561255,
+            "memory_readout_Wo": 0.37692073,
+            "slot_norm": 0.20297201
+          }
+        },
+        "1200": {
+          "lm": {
+            "embeddings": 0.32986954,
+            "backbone": 0.05850191,
+            "slot_keys": 0.00187993,
+            "write_addr_proj": 0.00170627,
+            "read_addr_proj": 0.00106949,
+            "write_value_proj": 0.02965695,
+            "write_gate": 0.02417447,
+            "memory_readout_Wo": 0.03605883,
+            "slot_norm": 0.01300883
+          },
+          "persist": {
+            "embeddings": 0.72196972,
+            "backbone": 0.17959279,
+            "slot_keys": 0.41158545,
+            "write_addr_proj": 0.01384782,
+            "read_addr_proj": 0.19506194,
+            "write_value_proj": 0.15335804,
+            "write_gate": 0.0490593,
+            "memory_readout_Wo": 0.16251597,
+            "slot_norm": 0.10431651
+          }
+        }
+      },
+      "persist_to_lm_norm_ratio": {
+        "900": 6.98353968,
+        "1200": 2.67530843
+      },
+      "teacher_to_lm_norm_ratio": {
+        "900": null,
+        "1200": null
+      },
+      "param_group_audit": {
+        "group_numel": {
+          "embeddings": 318848,
+          "backbone": 1474916,
+          "slot_keys": 8192,
+          "write_addr_proj": 32768,
+          "read_addr_proj": 32768,
+          "write_value_proj": 65536,
+          "write_gate": 516,
+          "memory_readout_Wo": 65536,
+          "slot_norm": 1024
+        },
+        "group_param_count": {
+          "embeddings": 2,
+          "backbone": 50,
+          "slot_keys": 4,
+          "write_addr_proj": 4,
+          "read_addr_proj": 4,
+          "write_value_proj": 4,
+          "write_gate": 8,
+          "memory_readout_Wo": 4,
+          "slot_norm": 8
+        },
+        "total_numel": 2000104,
+        "covered_numel": 2000104,
+        "complete": true,
+        "non_overlapping": true
+      },
+      "state_hash_unchanged": {
+        "900": true,
+        "1200": true
+      }
+    },
+    {
+      "arm": "O1R",
+      "seed": 25,
+      "grad_norms_by_group": {
+        "900": {
+          "lm": {
+            "embeddings": 0.88959545,
+            "backbone": 0.25510183,
+            "slot_keys": 0.00279773,
+            "write_addr_proj": 0.00589583,
+            "read_addr_proj": 0.00205356,
+            "write_value_proj": 0.08950927,
+            "write_gate": 0.09578144,
+            "memory_readout_Wo": 0.08707154,
+            "slot_norm": 0.04061644
+          },
+          "persist": {
+            "embeddings": 0.56096864,
+            "backbone": 0.20555037,
+            "slot_keys": 0.70935589,
+            "write_addr_proj": 0.00120331,
+            "read_addr_proj": 0.18905328,
+            "write_value_proj": 0.13456708,
+            "write_gate": 0.01845832,
+            "memory_readout_Wo": 0.1606333,
+            "slot_norm": 0.07827208
+          }
+        },
+        "1200": {
+          "lm": {
+            "embeddings": 1.51368201,
+            "backbone": 0.49253833,
+            "slot_keys": 0.00392083,
+            "write_addr_proj": 0.00604708,
+            "read_addr_proj": 0.01079987,
+            "write_value_proj": 0.08528749,
+            "write_gate": 0.16859049,
+            "memory_readout_Wo": 0.10600111,
+            "slot_norm": 0.03913284
+          },
+          "persist": {
+            "embeddings": 0.47975123,
+            "backbone": 0.17373316,
+            "slot_keys": 0.51015955,
+            "write_addr_proj": 0.00039606,
+            "read_addr_proj": 0.11784981,
+            "write_value_proj": 0.08895788,
+            "write_gate": 0.01228093,
+            "memory_readout_Wo": 0.11591259,
+            "slot_norm": 0.08132294
+          }
+        }
+      },
+      "persist_to_lm_norm_ratio": {
+        "900": 1.03523893,
+        "1200": 0.46675254
+      },
+      "teacher_to_lm_norm_ratio": {
+        "900": null,
+        "1200": null
+      },
+      "param_group_audit": {
+        "group_numel": {
+          "embeddings": 318848,
+          "backbone": 1474916,
+          "slot_keys": 8192,
+          "write_addr_proj": 32768,
+          "read_addr_proj": 32768,
+          "write_value_proj": 65536,
+          "write_gate": 516,
+          "memory_readout_Wo": 65536,
+          "slot_norm": 1024
+        },
+        "group_param_count": {
+          "embeddings": 2,
+          "backbone": 50,
+          "slot_keys": 4,
+          "write_addr_proj": 4,
+          "read_addr_proj": 4,
+          "write_value_proj": 4,
+          "write_gate": 8,
+          "memory_readout_Wo": 4,
+          "slot_norm": 8
+        },
+        "total_numel": 2000104,
+        "covered_numel": 2000104,
+        "complete": true,
+        "non_overlapping": true
+      },
+      "state_hash_unchanged": {
+        "900": true,
+        "1200": true
+      }
+    },
+    {
+      "arm": "R0",
+      "seed": 23,
+      "grad_norms_by_group": {
+        "900": {
+          "lm": {
+            "embeddings": 0.62759787,
+            "backbone": 0.07528679,
+            "slot_keys": 0.01373848,
+            "write_addr_proj": 0.00183405,
+            "read_addr_proj": 0.00776813,
+            "write_value_proj": 0.02565478,
+            "write_gate": 0.02233821,
+            "memory_readout_Wo": 0.03251591,
+            "slot_norm": 0.01178443
+          }
+        },
+        "1200": {
+          "lm": {
+            "embeddings": 0.27632868,
+            "backbone": 0.05630872,
+            "slot_keys": 0.00603417,
+            "write_addr_proj": 0.00769563,
+            "read_addr_proj": 0.00470049,
+            "write_value_proj": 0.01709868,
+            "write_gate": 0.02808268,
+            "memory_readout_Wo": 0.01877606,
+            "slot_norm": 0.00999935
+          }
+        }
+      },
+      "persist_to_lm_norm_ratio": {
+        "900": null,
+        "1200": null
+      },
+      "teacher_to_lm_norm_ratio": {
+        "900": null,
+        "1200": null
+      },
+      "param_group_audit": {
+        "group_numel": {
+          "embeddings": 318848,
+          "backbone": 1474916,
+          "slot_keys": 8192,
+          "write_addr_proj": 32768,
+          "read_addr_proj": 32768,
+          "write_value_proj": 65536,
+          "write_gate": 516,
+          "memory_readout_Wo": 65536,
+          "slot_norm": 1024
+        },
+        "group_param_count": {
+          "embeddings": 2,
+          "backbone": 50,
+          "slot_keys": 4,
+          "write_addr_proj": 4,
+          "read_addr_proj": 4,
+          "write_value_proj": 4,
+          "write_gate": 8,
+          "memory_readout_Wo": 4,
+          "slot_norm": 8
+        },
+        "total_numel": 2000104,
+        "covered_numel": 2000104,
+        "complete": true,
+        "non_overlapping": true
+      },
+      "state_hash_unchanged": {
+        "900": true,
+        "1200": true
+      }
+    },
+    {
+      "arm": "R0",
+      "seed": 25,
+      "grad_norms_by_group": {
+        "900": {
+          "lm": {
+            "embeddings": 0.39993882,
+            "backbone": 0.06177192,
+            "slot_keys": 0.00279846,
+            "write_addr_proj": 0.00336611,
+            "read_addr_proj": 0.00151472,
+            "write_value_proj": 0.02503082,
+            "write_gate": 0.02590096,
+            "memory_readout_Wo": 0.0299763,
+            "slot_norm": 0.01038045
+          }
+        },
+        "1200": {
+          "lm": {
+            "embeddings": 0.72623783,
+            "backbone": 0.1582174,
+            "slot_keys": 0.0067231,
+            "write_addr_proj": 0.01883042,
+            "read_addr_proj": 0.00685957,
+            "write_value_proj": 0.0338204,
+            "write_gate": 0.01809731,
+            "memory_readout_Wo": 0.04836336,
+            "slot_norm": 0.0223843
+          }
+        }
+      },
+      "persist_to_lm_norm_ratio": {
+        "900": null,
+        "1200": null
+      },
+      "teacher_to_lm_norm_ratio": {
+        "900": null,
+        "1200": null
+      },
+      "param_group_audit": {
+        "group_numel": {
+          "embeddings": 318848,
+          "backbone": 1474916,
+          "slot_keys": 8192,
+          "write_addr_proj": 32768,
+          "read_addr_proj": 32768,
+          "write_value_proj": 65536,
+          "write_gate": 516,
+          "memory_readout_Wo": 65536,
+          "slot_norm": 1024
+        },
+        "group_param_count": {
+          "embeddings": 2,
+          "backbone": 50,
+          "slot_keys": 4,
+          "write_addr_proj": 4,
+          "read_addr_proj": 4,
+          "write_value_proj": 4,
+          "write_gate": 8,
+          "memory_readout_Wo": 4,
+          "slot_norm": 8
+        },
+        "total_numel": 2000104,
+        "covered_numel": 2000104,
+        "complete": true,
+        "non_overlapping": true
+      },
+      "state_hash_unchanged": {
+        "900": true,
+        "1200": true
+      }
+    }
+  ]
+}

@@ -324,7 +324,7 @@ class UnifiedTrainingConfig:
 
     # ==========================================================================
     # v2.2.1: Kosha Gyroscope - Homeostatic Self-Regulation Loss
-    # Reference: docs/design/KOSHA_GYROSCOPE_DESIGN.md
+    # Reference: Project_documentation/repository/docs/design/KOSHA_GYROSCOPE_DESIGN.md
     # ==========================================================================
     enable_kosha_gyroscope: bool = False     # Master toggle for Kosha Gyroscope system
     # V9.8.7: Dynamic three-phase engagement based on Val PPL thresholds
@@ -691,7 +691,7 @@ class UnifiedTrainingConfig:
 
     # ==========================================================================
     # Appendix G: Bliss Coherence Functional & Monitoring
-    # Reference: docs/design/LATENT_SEMANTIC_TOKEN_BRIDGE_DESIGN.md, §G.10
+    # Reference: Project_documentation/repository/docs/design/LATENT_SEMANTIC_TOKEN_BRIDGE_DESIGN.md, §G.10
     # Phase 1/2: measure + log (no gating)
     # Phase 3: Bliss gates CSR injection strength via λ_eff
     # ==========================================================================
@@ -808,7 +808,7 @@ class UnifiedTrainingConfig:
 
     # ==========================================================================
     # V9.8.0: Sovereign Reasoning Kernel (SRK) Configuration
-    # Reference: docs/architecture/SOVEREIGN_REASONING_KERNEL_DESIGN.md
+    # Reference: Project_documentation/repository/docs/architecture/SOVEREIGN_REASONING_KERNEL_DESIGN.md
     # ==========================================================================
     enable_srk: bool = False                 # Master toggle for SRK system
     srk_hidden_dim: int = 768                # Hidden dimension for SRK projections
@@ -874,7 +874,7 @@ class UnifiedTrainingConfig:
 
     # ==========================================================================
     # Phase-JEPA: Joint Embedding Predictive Architecture Configuration
-    # Reference: docs/design/HYBRID_PHASE_JEPA_DESIGN.md
+    # Reference: Project_documentation/repository/docs/design/HYBRID_PHASE_JEPA_DESIGN.md
     # ==========================================================================
     enable_jepa: bool = False                # Master toggle for Phase-JEPA system
     jepa_hidden_dim: int = 256               # Hidden dimension for JEPA predictor
@@ -993,7 +993,7 @@ class UnifiedTrainingConfig:
 
     # ==========================================================================
     # Conscious Generation (Phase 1+): Token-Side Ontological Foundation
-    # Reference: docs/design/CONSCIOUS_GENERATION_DESIGN.md, Appendix D
+    # Reference: Project_documentation/repository/docs/design/CONSCIOUS_GENERATION_DESIGN.md, Appendix D
     # ==========================================================================
     enable_conscious_generation: bool = False      # Master toggle for conscious generation modules
     token_ontology_dim: int = 32                   # Must match SOVEREIGN_STATE_DIM
@@ -1015,7 +1015,7 @@ class UnifiedTrainingConfig:
     use_shared_token_basis: bool = False           # Share intermediate projection across primitives
 
     # CRS Phase 2: Combined Cognitive–Resonance–Semantic scorer
-    # Reference: docs/audits/CRS_DOCTRINE_FREEZE.md
+    # Reference: Project_documentation/repository/docs/audits/CRS_DOCTRINE_FREEZE.md
     use_crs_combined_scorer: bool = False          # Replace CSR column with CRS combined scorer
     semantic_dim: int = 32                         # d_s for S branch representations (increased from 16 for expressiveness)
     crs_semantic_threshold: float = 0.45           # τ_s: semantic gate threshold
@@ -1123,7 +1123,7 @@ class UnifiedTrainingConfig:
 
     # ==========================================================================
     # Appendix F Stage 0: Binding Cache + CTM+ Observation Tracers
-    # Reference: docs/design/CONSCIOUS_GENERATION_DESIGN.md, F.2.7–F.2.9
+    # Reference: Project_documentation/repository/docs/design/CONSCIOUS_GENERATION_DESIGN.md, F.2.7–F.2.9
     # ==========================================================================
     enable_binding_cache_tracer: bool = False       # Enable Binding Cache observation (Stage 0)
     binding_cache_top_k: int = 64                   # Simulated Top-K for cache hit rate estimation
@@ -1136,7 +1136,7 @@ class UnifiedTrainingConfig:
 
     # ==========================================================================
     # Appendix F Stage 8: Perspective Synthesizer (Representation Conditioning)
-    # Reference: docs/design/CONSCIOUS_GENERATION_DESIGN.md §F.12
+    # Reference: Project_documentation/repository/docs/design/CONSCIOUS_GENERATION_DESIGN.md §F.12
     # ==========================================================================
     enable_perspective_synthesizer: bool = False  # Master toggle for Stage 8
     perspective_d_synthesis: int = 64             # Synthesis MLP hidden dimension
@@ -1442,7 +1442,7 @@ MODEL_PRESETS = {
 # V9.8.0: SRK BACKWARD COMPATIBILITY BRIDGE
 # =============================================================================
 # Maps legacy ontological intervention flags to unified SRK configuration.
-# Reference: docs/architecture/SOVEREIGN_REASONING_KERNEL_DESIGN.md Appendix G
+# Reference: Project_documentation/repository/docs/architecture/SOVEREIGN_REASONING_KERNEL_DESIGN.md Appendix G
 #
 # Option (A) Implementation: Legacy flags become aliases that auto-enable SRK
 # and configure the appropriate SRK component.

@@ -1,0 +1,107 @@
+{
+  "schema": "bindingslots_e1_temporal/protocol/v1",
+  "frozen": true,
+  "recipe_C1": {
+    "steps": 1200,
+    "tau": 0.07,
+    "train_no_match_frac": 0.3,
+    "batch": 48,
+    "lr": 0.001,
+    "D": 64,
+    "train_episodes": 1500,
+    "no_match": "learned_null_key",
+    "read": "hard_top1",
+    "keys_per_episode": 32
+  },
+  "gates": {
+    "improvement_over_b0_min": 0.5,
+    "T1_min": 0.8,
+    "T2_min": 0.8,
+    "T3_min": 0.8,
+    "T4_min": 0.85,
+    "T6_min": 0.8,
+    "T7_min": 0.8,
+    "T9_min_no_material_regression": 0.9,
+    "nomatch_max_false_accept": 0.3,
+    "nomatch_max_false_reject": 0.15,
+    "nomatch_min_recall": 0.7,
+    "nomatch_min_precision": 0.7,
+    "worst_seed_min_T3T4_floor": 0.7,
+    "required_seeds_pass": 4
+  },
+  "dev_seeds": [
+    720,
+    721,
+    722
+  ],
+  "final_seeds": [
+    6140,
+    6141,
+    6142,
+    6143,
+    6144
+  ],
+  "train_seed": 73,
+  "seed_disjoint_from_all_prior": true,
+  "prior_seeds": {
+    "v100_final": [
+      28,
+      29,
+      30,
+      31,
+      32
+    ],
+    "e1_dev": [
+      500,
+      501,
+      502
+    ],
+    "e1_burned": [
+      2028,
+      2029,
+      2030,
+      2031,
+      2032
+    ],
+    "e1_final": [
+      3140,
+      3141,
+      3142,
+      3143,
+      3144
+    ],
+    "e1_train_seed": [
+      7
+    ],
+    "conf_train": [
+      71
+    ],
+    "conf_dev": [
+      700,
+      701,
+      702
+    ],
+    "conf_final": [
+      5140,
+      5141,
+      5142,
+      5143,
+      5144
+    ]
+  },
+  "determinism_ok": true,
+  "leakage_all_pass": true,
+  "final_seeds_unused_before_lock": true,
+  "dataset_hashes": {
+    "identity_pools": "a2d6b818fba93a135facffd1327248c658ab88a221c3f2639d7b01f9b8438e75",
+    "pool_sizes": {
+      "train": 522,
+      "dev": 134,
+      "final": 124
+    },
+    "train_episodes": "d8f834b7c2ddac9119f653b75b20b3902243ab052d779066a2b7275c8816870a",
+    "dev_eval_splits": "064eee5880d415d46dd492b7347e2024f2e8a991804214b0e693ce1853e7b526"
+  },
+  "t5_is_diagnostic_only": true,
+  "primary_structural_metric": "macro_avg(T3_temporal_order, T4_latest); each must pass individually; worst-seed floor on min(T3,T4)"
+}

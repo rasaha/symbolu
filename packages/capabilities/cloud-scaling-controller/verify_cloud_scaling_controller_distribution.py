@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Advisory-boundary distribution verifier for ugence-cloud-scaling-controller (0.1.1).
+"""Advisory-boundary distribution verifier for ugence-cloud-scaling-controller (0.3.0).
 
 Builds wheel + sdist, inspects the PACKAGED Python source inside the wheel for any
 execution capability, installs ONLY the wheel into an isolated venv created OUTSIDE
@@ -35,7 +35,7 @@ PKG = Path(__file__).resolve().parent
 ARTIFACTS = PKG / "artifacts"
 DIST_NAME = "ugence-cloud-scaling-controller"
 IMPORT_NAME = "ugence_cloud_scaling_controller"
-EXPECTED_VERSION = "0.1.1"
+EXPECTED_VERSION = "0.4.0"
 BASELINE_COMMIT = "0d5d4dde5b68ef61e6dec994cc4b9e55fa57e363"
 
 FORBIDDEN_UGENCE = [
@@ -219,6 +219,47 @@ out["correlation_id"] = d["correlation_id"]
 out["json_ok"] = json.loads(rec.to_json())["schema_version"] == "1.1"
 out["determinism_present"] = isinstance(d.get("determinism"), dict) and \
     "identity_deviation" in d["determinism"].get("nondeterministic_fields", [])
+
+# --- Phase 2 shadow forecasting smoke (installed wheel), full chain ---
+from datetime import datetime, timedelta, timezone
+from ugence_cloud_scaling_controller import (
+    CanonicalCapacityState, CapacitySubject, Measurement, Unit,
+    NormalizationPolicy, NormalizationMethod,
+)
+from ugence_cloud_scaling_controller.canonical import InfrastructureState, CapacityState
+from ugence_cloud_scaling_controller.forecasting import (
+    CanonicalCapacitySeries, ForecastTarget, ForecastHorizon, build_input_window,
+    PersistenceForecaster, UncertaintyConfig, forecast_with_evidence, evaluate_forecast,
+)
+_subj = CapacitySubject(workload_id="verify-wl", tenant_id="verify-tenant")
+_t0 = datetime(2026, 1, 1, tzinfo=timezone.utc)
+_hist = [CanonicalCapacityState(subject=_subj, observed_at=_t0 + timedelta(seconds=60 * i),
+         infrastructure=InfrastructureState(cpu_utilization=Measurement(50.0 + i, Unit.PERCENT)),
+         capacity=CapacityState(running_replicas=4)) for i in range(8)]
+_series = CanonicalCapacitySeries.build(_hist)
+_npol = NormalizationPolicy(policy_id="verify-pol",
+                            method_by_signal={"cpu": NormalizationMethod.PERCENT_TO_RATIO})
+_cut = _hist[-1].observed_at
+_win = build_input_window(_series, ForecastTarget.CPU_UTILIZATION, _cut, ForecastHorizon(60.0))
+_ev = forecast_with_evidence(_series, ForecastTarget.CPU_UTILIZATION, _cut, ForecastHorizon(60.0),
+      PersistenceForecaster(), normalization_policy=_npol,
+      uncertainty_config=UncertaintyConfig(min_calibration_samples=3, match_tolerance_seconds=5.0))
+_actual = CanonicalCapacityState(subject=_subj, observed_at=_ev.forecast.forecast_for,
+          infrastructure=InfrastructureState(cpu_utilization=Measurement(60.0, Unit.PERCENT)),
+          capacity=CapacityState(running_replicas=4))
+_rec2 = evaluate_forecast(_ev, _actual, match_tolerance_seconds=5.0)
+out["forecast_status"] = _ev.forecast.status
+out["forecast_shadow_only"] = _ev.forecast.shadow_only
+out["forecast_advisory_only"] = _ev.forecast.advisory_only
+out["forecast_actuation"] = _ev.forecast.actuation_performed
+out["forecast_authority"] = _ev.forecast.authority_class
+out["forecast_execution_capability"] = _ev.forecast.execution_capability
+out["forecast_window_samples"] = _win.sample_count
+out["forecast_evidence_digest_ok"] = _ev.digest().startswith("sha256:")
+out["forecast_evaluation_status"] = _rec2.status.value
+# Live path unchanged: the recommendation above is byte-identical to Phase-1 behavior.
+out["live_path_advisory"] = d["advisory_only"] is True and d["actuation_performed"] is False
+
 forbidden = %r + %r + %r
 out["forbidden_importable"] = [m for m in forbidden if _iu.find_spec(m.split(".")[0]) is not None]
 out["legacy_cloud_controller_importable"] = _iu.find_spec("cloud_controller") is not None
@@ -244,6 +285,22 @@ print(json.dumps(out))
                     probe_out.get("legacy_cloud_controller_importable") is False)
             c.check("operations_not_shipped_in_wheel",
                     probe_out.get("operations_importable") is False)
+            # Phase 2 shadow forecasting: full chain executes from the installed wheel and
+            # is shadow-only / advisory-only, and the live recommendation path is unchanged.
+            c.check("forecast_full_chain_executes",
+                    probe_out.get("forecast_status") == "forecast"
+                    and probe_out.get("forecast_window_samples") == 8
+                    and probe_out.get("forecast_evaluation_status") == "evaluated")
+            c.check("forecast_shadow_advisory_invariant",
+                    probe_out.get("forecast_shadow_only") is True
+                    and probe_out.get("forecast_advisory_only") is True
+                    and probe_out.get("forecast_actuation") is False
+                    and probe_out.get("forecast_authority") == "ADVISORY"
+                    and probe_out.get("forecast_execution_capability") == "NONE")
+            c.check("forecast_evidence_digest_present",
+                    probe_out.get("forecast_evidence_digest_ok") is True)
+            c.check("live_recommendation_path_unchanged",
+                    probe_out.get("live_path_advisory") is True)
 
         cli_ver = _run([str(script), "version"], cwd=str(work), env=clean_env)
         c.check("cli_version", cli_ver.returncode == 0 and EXPECTED_VERSION in cli_ver.stdout)

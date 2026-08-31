@@ -23,8 +23,12 @@ parts of Phase B**).
 >   endpoint, no report is produced or exposed.
 >
 > This package deliberately contains **no** user-facing Guna Milan, Living
-> Compatibility, AI/LLM guidance, daily transits, shared/private chat,
-> agreements, mobile/web clients, billing, or production-deployment code. See the
+> Compatibility, AI/LLM guidance, daily transits, chat UI, real-time chat
+> transport, push notifications, agreements, mobile/web clients, billing, or
+> production-deployment code. (The **Phase 3A secure chat _backend_ core** —
+> relationship-scoped conversations, idempotent text messages, cursor pagination,
+> read state, transactional outbox, RLS — is present as a backend-only foundation;
+> see below.) See the
 > design and audit documents under [`docs/`](docs/) (indexed by
 > [`docs/DILCHAT_DOCS_INDEX.md`](docs/DILCHAT_DOCS_INDEX.md)), the phase report
 > [`docs/DILCHAT_PHASE_A_B_IMPLEMENTATION_REPORT.md`](docs/DILCHAT_PHASE_A_B_IMPLEMENTATION_REPORT.md),
@@ -41,8 +45,9 @@ parts of Phase B**).
 > calculation, API, model, or migration is implemented, and no runtime Guna rule
 > pack is enabled. Start at
 > [`docs/DILCHAT_AI_ASSIST_PRODUCT_REQUIREMENTS.md`](docs/DILCHAT_AI_ASSIST_PRODUCT_REQUIREMENTS.md).
-> Next engineering phase remains **Mobile Phase 2 (device/native hardening)**, then
-> secure shared chat, then AI Assist.
+> The secure-chat sequence is **3A backend core (this workstream)** → 3B safety /
+> retention → 3C real-time transport → 3D mobile chat UI → 4A–4D (evidence, Guna
+> prior, Moon receptivity, AI Assist). No message content is exposed to AI.
 
 ## What this package implements
 
@@ -66,6 +71,17 @@ parts of Phase B**).
   boundary arithmetic — no single point estimate for uncertain input.
 - **PostgreSQL row-level security** backstop on all 10 tables (non-owner runtime
   roles, ENABLE+FORCE, transaction-local context), proven via a non-owner role.
+- **Secure shared chat backend core (Phase 3A, backend only):** one
+  relationship-scoped conversation per couple, durable text-only messages with
+  idempotent creation `(conversation, sender, client_message_id)`, monotonic
+  server-sequence **cursor pagination**, per-member forward-only **read state**,
+  **tombstone** deletion, transactional revocation at unpair (no message commits
+  after revocation is effective), and a **transactional outbox** for later
+  real-time delivery — all under forced RLS with the outbox restricted to an
+  internal worker role. Message content never reaches logs, audit, or events. No
+  chat UI, real-time transport, or AI consumes it. See the
+  [`DILCHAT_SECURE_CHAT_BACKEND_*`](docs/DILCHAT_SECURE_CHAT_BACKEND_REQUIREMENTS.md)
+  docs and Decision-Log entries DEC-049…DEC-058.
 
 > **Phase A/B hardening** (provider safety, birth-time uncertainty, exact
 > boundaries, RLS, fixture integrity) is recorded in

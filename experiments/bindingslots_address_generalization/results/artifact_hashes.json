@@ -1,0 +1,14 @@
+{
+  "schema": "bindingslots_address_generalization/artifact_hashes/v1",
+  "sha256": {
+    "aggregate_verdict.json": "37faa0db3ece0889b70c1b1ce4384ea28a3db108aa2a7a46f450349dcf546700",
+    "evaluation_routing_metrics.json": "a21b4d0259e9f4e0b1452ca323901a75cf05c661f2af76af4273c7de1062dae7",
+    "futility_decisions.json": "59d0853986c87218301aa8e636ab69334b14236b79599b9effac0c1698817656",
+    "gradient_projection_metrics.json": "85a58c12674753d7886184f868fbaae504f025dcbe4e2fc6e236487896a3f8ff",
+    "integrity_report.json": "444713798989180e5cafde539003578529eb00f6ddbf7efab1798ac4e43eb384",
+    "paired_comparisons.json": "6704c1d908a52b917063200c1a3dc5d1e763ecb21b7d2a2bbab0bcad6483e4e6",
+    "pre_intervention_rank_audit.json": "adef719ae7fff733cde5e566cb78ad3227de80ec5aa7f476a189978a684b76f2",
+    "quality_results.json": "c0a28d14be8600fb190e4744297d9139707bee7699b6220f60452493a21ea464",
+    "run_trajectories.json": "d79e188cdf20ae60c461d1f7bd6db25482f99942152ad87acdbbb886c761e54b"
+  }
+}

@@ -1,0 +1,59 @@
+name: bindingslots-e1-ci
+
+# Torch-free CI: task/leakage/gate/verdict tests + (when present) verdict invariants. Model training
+# runs offline (needs torch); not executed here.
+
+on:
+  push:
+    paths:
+      - 'experiments/bindingslots_e1/**'
+      - 'docs/audits/bindingslots_e1/**'
+      - '.github/workflows/bindingslots-e1-ci.yml'
+  pull_request:
+    paths:
+      - 'experiments/bindingslots_e1/**'
+      - '.github/workflows/bindingslots-e1-ci.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  e1-integrity:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: {fetch-depth: 0}
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.11'}
+
+      - name: Frozen abc.json digest (pre)
+        run: sha256sum experiments/phase_lc/results/abc.json | tee /tmp/abc_before.txt
+
+      - name: E1 task / leakage / gate / verdict tests
+        run: python experiments/bindingslots_e1/tests/test_e1.py
+
+      - name: Verdict invariants (if evidence present)
+        run: |
+          python - <<'PY'
+          import json, pathlib
+          agg = pathlib.Path("experiments/bindingslots_e1/results/aggregate_verdict.json")
+          if agg.exists():
+              d = json.loads(agg.read_text())
+              allowed = {"EXPLICIT_KEY_SEMANTIC_MATCHING_VALIDATED","EXPLICIT_KEY_SEMANTIC_MATCHING_PARTIAL",
+                "EXPLICIT_KEY_SEMANTIC_MATCHING_NOT_SELECTED","EXPLICIT_KEY_NO_MATCH_GATE_FAILED",
+                "EXPLICIT_KEY_GENERALIZATION_GATE_FAILED","EXPLICIT_KEY_STABLE_CASE_REGRESSION",
+                "EXPLICIT_KEY_DETERMINISM_NOT_ESTABLISHED","EXPLICIT_KEY_SHORTCUT_OR_LEAKAGE_DETECTED",
+                "EXPLICIT_KEY_PROTOCOL_VIOLATED","EXPLICIT_KEY_RESULTS_INCONCLUSIVE","EXPLICIT_KEY_RESOURCE_BLOCKED"}
+              assert d["primary_verdict"] in allowed, d["primary_verdict"]
+              for tok in ("ORIGINAL_BINDINGSLOTS_NEURAL_ROUTING_UNRESOLVED","KDA_VALIDATION_BLOCKED"):
+                  assert tok in d["co_emitted"], tok
+              assert d["kda_readiness"] == "KDA_VALIDATION_BLOCKED"
+              print("verdict:", d["primary_verdict"], "| routing unresolved + KDA blocked preserved")
+          else:
+              print("no reserved verdict yet")
+          PY
+
+      - name: Frozen abc.json unchanged
+        run: |
+          sha256sum experiments/phase_lc/results/abc.json | tee /tmp/abc_after.txt
+          diff /tmp/abc_before.txt /tmp/abc_after.txt && echo "abc.json unchanged"

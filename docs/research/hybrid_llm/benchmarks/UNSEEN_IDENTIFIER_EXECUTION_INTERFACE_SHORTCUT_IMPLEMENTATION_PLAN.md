@@ -1,0 +1,199 @@
+# Unseen-identifier execution-interface & shortcut completion — implementation plan (DRAFT, docs-only)
+
+**Documentation-only. No code, no execution, no cohort, no seed consumption in this session.**
+This plan freezes a *future*, separately-authorized implementation that completes the execution
+interface and the shortcut suite so PR #1373 can later present exact, supported commands. It reuses
+the frozen model/tokenizer/trainer/config by import; it does not change the protocol, gates, recipe,
+tokenizer, seeds, task definitions, or claim boundary.
+
+Always preserved: `ORIGINAL_BINDINGSLOTS_NEURAL_ROUTING_UNRESOLVED` · `E1_TEMPORAL_TRANSFER_PARTIAL`
+· `KDA_VALIDATION_BLOCKED`.
+
+## Decision 1 — Frozen planned package changes (smallest extension)
+The future implementation extends `experiments/unseen_identifier_copy_selection/` without
+duplicating the frozen model/tokenizer/trainer/config. Every file it may add or modify:
+
+| File | New/Mod | Purpose | Allowed side effects | Forbidden |
+|---|---|---|---|---|
+| `cli.py` | new | argparse CLI + subcommands; per-command authorization + guard checks | parse args; call orchestrators; write only under `--output-dir` | no wildcard/range/list seeds; no env-only auth |
+| `__main__.py` | new | `python -m …` entry → `cli.main` | none beyond `cli` | no logic of its own |
+| `execution.py` | mod | add fail-closed authorization-record schema + validation | none | no scientific token minted here |
+| `training.py` | new | frozen-model training orchestration (encode → `train_in_memory` → checkpoint) | write checkpoint under output-dir | no new module/head/loss/optimizer; no training in tests |
+| `evaluation.py` | new | checkpoint load → greedy decode → parse → per-example predictions/metrics | write traces/metrics under output-dir | no constrained decoding; no candidate-index; no silent repair |
+| `replay.py` | new | deterministic replay + digest comparison | write replay manifest under output-dir | no scientific run in tests |
+| `evidence.py` | new | run-manifest assembly + per-example trace emission (atomic) | write evidence files under output-dir | no aggregate-only package; no write outside output-dir |
+| `manifest.py` | mod | add run-manifest schema helpers (actual digests) | none | none |
+| `shortcuts.py` | mod | add the 4 missing baselines + cross-seed aggregation | none | no threshold/candidate/seed change |
+| `runner.py` | mod | thin orchestration helpers if needed (still fail-closed) | none | no bypass of primitive guards |
+| `tests/experiments/unseen_identifier_copy_selection/test_*.py` | new/mod | fixture-only tests (seeds 993000–993004) | none | no reserved seed; no training; no scientific artifact |
+| `.github/workflows/unseen-identifier-integrity.yml` | mod | run the new fixture-only tests | none | no train/cohort/reserved-seed/verdict |
+
+**No unspecified file may be changed during later implementation without a scoped authorization
+correction.** Fewer files are acceptable if sufficient (e.g., `training.py`/`evaluation.py`/
+`replay.py`/`evidence.py` could be consolidated), provided every capability below is delivered and
+every guard is preserved.
+
+## Decision 2 — Frozen CLI surface (real, not illustrative)
+Invocation: `python -m experiments.unseen_identifier_copy_selection <subcommand> ...`. Required
+subcommands, each with frozen name / required args / optional args / accepted values / output
+artifacts / exit codes / refusal conditions:
+
+| Subcommand | Required args | Output | Refuses when |
+|---|---|---|---|
+| `build-cohort` | `--seed` `--cohort` `--authorization-record` `--output-dir` | cohort + dataset digests | reserved seed w/o valid record; existing output-dir |
+| `shortcut-precheck` | `--seed` `--cohort` `--authorization-record` `--output-dir` | shortcut results (per-split, per-seed) | same |
+| `train` | `--seed` `--cohort` `--authorization-record` `--output-dir` | checkpoint + init/batch digests | same; missing dataset |
+| `evaluate` | `--seed` `--cohort` `--authorization-record` `--output-dir` | per-example traces + metrics | same; missing checkpoint |
+| `replay` | `--seed` `--cohort` `--authorization-record` `--output-dir` | replay manifest + digest compare | same; digest mismatch |
+| `assemble-manifest` | `--seed` `--cohort` `--authorization-record` `--output-dir` | run manifest | same; incomplete run |
+
+Every scientific-facing subcommand requires **exactly one explicit `--seed`**, explicit `--cohort`,
+explicit `--authorization-record`, explicit `--output-dir`, and verifies frozen
+source/config/protocol identity. **No wildcard · no range · no seed list · no implicit
+"all development seeds" mode · no environment-variable-only authorization.** A command must be
+**incapable** of including a final seed via range/glob/alias/default. The CLI may be implemented
+later; **no valid scientific authorization record or token is created under this authorization.**
+
+## Decision 3 — Frozen authorization-record contract (fail-closed)
+A future authorization record binds: authorization state · exact permitted cohort · exact permitted
+seed(s) · protocol-lock commit · implementation-authorization commit · implementation commit ·
+model-recipe hashes · parameter count · one-run/expiry scope (if repo practice supports it) · record
+digest. The CLI must: require the record explicitly · validate it **before any pool generation** ·
+thread authorization through **every** generation primitive (`build_pools`/`generate_pool`/
+`generate_split`) · reject unknown/malformed records · reject mismatched commits · reject mismatched
+cohort · reject any unlisted seed · reject final seeds unless a later explicit final authorization
+exists. Fixture tests may use **fixture-only** authorization records bound exclusively to fixture
+seeds `993000–993004`. **No scientific authorization record is created in this session.**
+
+## Decision 4 — Frozen training orchestration
+Reuses **by import**: frozen model (`build_model`), tokenizer (`LexicalTokenizer`), trainer
+(`train_in_memory`), config (`FROZEN_MODEL_RECIPE`/`FROZEN_TRAIN_RECIPE`). Freeze: model
+construction path · tokenizer path · optimizer recipe · update count (2000) · batch size (8) ·
+clipping · initialization (`fork_rng` + `manual_seed(sub_seed(seed,'init'))`) · checkpoint format ·
+checkpoint naming (`<output-dir>/<seed>/checkpoint.*`) · device (CPU) / precision (float32) ·
+deterministic flags · output-directory structure. Fail-closed assertions (raise): parameter count
+**= 209,728** · frozen source hashes match · frozen tokenizer behavior · **no** new trainable
+module / task-specific head / changed loss / changed optimizer / architecture branch. **No training
+occurs during implementation or fixture tests**; training orchestration is tested only via mocks,
+dry structural checks, or fixture-safe refusal tests.
+
+## Decision 5 — Frozen evaluation and decoding
+Path: checkpoint load · frozen tokenizer · frozen input allowance (512) · frozen output allowance
+(384) · **greedy** decoding · **no** constrained decoding · **no** candidate-index output · exact
+`parser` · exact `metrics` · per-example trace production. Freeze: decode stopping condition
+(EOS / max length) · maximum generated length (arm-neutral, cannot truncate a valid identifier) ·
+malformed-output handling (classified, **not** repaired) · in-context-wrong-ID classification ·
+fabricated-ID classification · abstention classification · trace schema · metric schema. **No
+post-processing may repair malformed identifiers. No evaluation occurs during this session.**
+
+## Decision 6 — Frozen deterministic replay
+Replay reconstructs, for one explicitly-authorized seed: identifier pools · datasets · serialization
+· initialization · batch order · training · checkpoint · predictions · parsing · metrics · manifest.
+**Definition (per merged protocol + prior benchmark practice):** replay = **complete deterministic
+retraining and re-evaluation** from the frozen recipe and authorized seed, compared against the
+original run by **actual digest values** (not booleans). A replay digest mismatch **fails closed**
+and blocks evidence acceptance. Replay may be implemented later but is **not run** during
+fixture-only implementation work.
+
+## Decision 7 — Frozen evidence and manifest emission
+The interface must produce **actual files** for: source digest · config digest · tokenizer digest ·
+authorization-record digest · identifier-pool digest · dataset digest · serializer digest ·
+initialization digest · batch-order digest · checkpoint/parameter digest · prediction digest ·
+evaluator digest · environment digest · per-example prediction traces · parser-category counts ·
+per-task metrics · shortcut results · resource measurements · protocol-compliance report. Freeze:
+exact file names · directory layout (`<output-dir>/<seed>/<cohort>/…`) · JSON schemas · canonical
+serialization (sorted keys, ASCII, fixed separators) · **atomic-write** behavior (temp + rename) ·
+**overwrite refusal** · an **incomplete-run marker** cleared only on success · provenance labels.
+**No aggregate-only evidence package.** No evidence file may be written outside the explicit
+`--output-dir`.
+
+## Decision 8 — Complete the shortcut suite (8 present → 12 frozen)
+Currently implemented (verified in merged `shortcuts._baselines_on`, 8): first-target · last-target ·
+middle-target · most-frequent-target · lexical-similarity · prefix-match · character-overlap ·
+constant-abstention. Authorize implementation of exactly the **4 missing** frozen baselines, each
+defined **mechanically from existing task metadata** (`pairs`, `query_source`, `cohort`,
+`task_name`, `seen_unseen`) — no new scientific rule:
+
+- **source–target co-occurrence** — for each example, among its candidate targets pick the target
+  whose `(query_source, target)` pair count is highest across the (seed, split) cohort; deterministic
+  lexicographic tie-break. (Memorization baseline; opaque unique IDs → ~chance.)
+- **seen-ID frequency** — pick the candidate target with the highest occurrence count across the
+  (seed, split) cohort's identifier multiset; lexicographic tie-break. (Frequency prior.)
+- **output-template leakage** — exploit only the output contract's structure; the bare-identifier
+  output fixes no answer position, so the heuristic returns the candidate at the frozen output
+  position (index 0); lexicographic tie-break. (Verifies the output template encodes no answer.)
+- **task-label leakage** — exploit only the `TASK` label; map `task_name` deterministically to a
+  candidate index (`hash(task_name) mod candidate_count`, frozen hash). (Label is constant per split
+  and answer-independent → ~chance; verifies the task label leaks nothing.)
+
+For **all twelve** baselines freeze: exact input information available to the heuristic · applicable
+tasks/splits · prediction rule · deterministic tie-breaking · chance calculation · non-applicable
+handling · malformed handling · score formula · competence-floor comparison. **Do not alter** task
+construction · candidate count · split size · seeds · thresholds · protocol scope. (All four missing
+baselines are mechanically definable from merged metadata; **`SHORTCUT_BASELINE_DEFINITION_BLOCKED`
+does not apply.**)
+
+## Decision 9 — Frozen shortcut aggregation (implementation must not infer)
+1. Generate heuristic predictions separately for **each seed and applicable split**.
+2. Derive frequency-based state (incl. `most_frequent_target`, co-occurrence, seen-ID frequency)
+   **separately within that seed and split**.
+3. **Never** recompute a frequency-based heuristic from a combined multi-seed pool.
+4. Record per-seed, per-split: correct count · example count · score · chance · threshold · pass/fail.
+5. Aggregate across development seeds as
+   `sum(seed-local correct counts) / sum(seed-local applicable example counts)` — an
+   **example-count-weighted mean of seed-local scores**.
+6. Do not silently include non-applicable examples.
+7. Missing heuristic output is an **implementation defect**, not an omitted example.
+8. Threshold equality **passes**: `score <= chance + 0.05`.
+9. Compare each heuristic to the frozen competence floor for the corresponding task/split.
+10. Any applicable split whose frozen aggregate shortcut bound fails **blocks further execution**.
+11. Per-seed values remain visible descriptively even when the aggregate is the primary gate.
+
+This clarification changes **no** frozen numeric threshold, cohort, candidate count, seed, or
+scientific claim; it fixes the aggregation the earlier smoke/dev plan left underspecified and forbids
+the combined-pool frequency artifact.
+
+## Decision 10 — Frozen orchestration order
+The interface must support the later sequence **without manual Python intervention**: 1. validate
+authorization record → 2. verify authoritative source identity → 3. verify recipe hashes +
+parameter count → 4. create explicit run directory → 5. generate one authorized cohort →
+6. serialize → 7. shortcut precheck (where applicable) → 8. train → 9. checkpoint → 10. evaluate →
+11. emit traces + metrics → 12. assemble manifest → 13. replay → 14. compare digests → 15. emit
+integrity status → 16. stop. **No automatic smoke→development transition.** Every seed requires a
+**separate explicit command** and authorization check.
+
+## Decision 11 — Frozen fail-closed behavior
+The interface must reject: missing/malformed/unknown-state authorization record · wrong seed · wrong
+cohort · a final seed under smoke/dev authorization · mismatched protocol commit · mismatched
+implementation commit · mismatched model hashes · parameter-count mismatch · source-hash mismatch ·
+non-empty output directory · overwrite attempt · stale checkpoint · incomplete prior run ·
+unsupported subcommand · wildcard/range/list seed input · unresolved shortcut state · replay
+mismatch. **No command begins cohort generation before all preconditions pass.** Direct
+internal-function calls remain protected by the primitive-level guards (already merged in PR #1372).
+
+## Decision 12 — Frozen fixture-only test & CI plan
+Corrective implementation runs only fixture tests using seeds `993000–993004`, covering: CLI parser
++ `--help` · every subcommand's argument schema · rejection of missing authorization · rejection of
+scientific seeds · rejection of final seeds · one-seed-only enforcement · no wildcard/range/list ·
+primitive guard threading · model-recipe assertions · training-orchestrator structure **without
+training** · evaluation-path structure **without model execution** · replay-orchestration structure
+**without replay execution** · manifest schema + atomic writes · per-example trace schema · **all
+twelve** shortcut baselines · aggregation weighting · per-split frequency isolation · competence-
+floor comparison · threshold equality · missing-output blocking · no scientific-artifact generation ·
+no model training · no scientific verdict. CI (`unseen-identifier-integrity`) remains fixture-only
+and must **not** instantiate a scientific run · generate a scientific pool · train · evaluate
+scientific data · replay · emit scientific evidence · mint a scientific authorization record.
+
+## Corrective lifecycle (this session performs only step 1's authoring)
+1. this documentation-only authorization draft opened → 2. separate session independently audits it →
+3. authorization PR conditionally merged → 4. the implementing session builds only the authorized
+scope and opens a draft corrective implementation PR, then stops → 5. separate session independently
+audits the implementation → 6. conditional merge → 7. PR #1373 updated/replaced with real executable
+commands → 8. separate session independently audits the updated smoke/dev authorization →
+9. conditional merge → 10. only then may smoke seed 9070 be considered.
+
+## Claim boundary
+No outcome of this corrective program supports typed superiority · unseen-ID competence · selection ·
+generalization · evidence grounding · tenant competence · multi-hop · temporal · BindingSlots · KDA ·
+production readiness. Preserved: `ORIGINAL_BINDINGSLOTS_NEURAL_ROUTING_UNRESOLVED` ·
+`E1_TEMPORAL_TRANSFER_PARTIAL` · `KDA_VALIDATION_BLOCKED`.

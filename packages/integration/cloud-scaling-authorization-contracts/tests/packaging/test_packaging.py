@@ -1,0 +1,118 @@
+"""Distribution-level guarantees: metadata, wheel contents and the leaf direction."""
+
+from __future__ import annotations
+
+import pathlib
+import re
+
+import pytest
+
+import ugence_cloud_scaling_authorization_contracts as pkg
+
+SRC = pathlib.Path(pkg.__file__).resolve().parent
+PROJECT = SRC.parents[1]
+PYPROJECT = (PROJECT / "pyproject.toml").read_text(encoding="utf-8")
+
+
+def test_version_is_the_declared_version():
+    """``0.7.0``: the temporal guards accept canonical values only, never live objects.
+
+    ``0.6.0`` moved ordering off canonical strings onto parsed instants and left an
+    ``isinstance`` branch that accepted a live ``datetime`` from the snapshot. Canonicalization
+    renders such an object to exactly the string it would have been, so no digest could tell
+    them apart, and a subclass overriding ``__gt__`` satisfied both orderings by fiat. Exact
+    types close it.
+
+    ``0.6.0`` was the R-12b ordering repair: orderings compare instants, not strings.
+
+    ``0.5.0`` compared canonical strings and inverted below year 1000, admitting an unbounded
+    backdate of the very instant it existed to bound. A refusal that was not happening now
+    happens, which is the same shape of change as every bump below.
+
+    ``0.5.0`` was R-12b: the decision instants come from the digest-bound snapshot.
+
+    Unlike every bump below it, this one **moves digests**: the Risk Authority decision
+    snapshot gained ``evaluated_at``, so ``FROZEN_DECISION_DIGEST`` and, beneath it,
+    ``FROZEN_CANDIDATE_DIGEST`` both moved. It also raises this package's floor on
+    ``ugence-risk-authority`` to ``0.5.0``, because a decision snapshot minted by an earlier
+    version cannot supply the instant and is refused rather than fallen back from.
+
+    ``0.4.0`` was R-12: the builder refuses candidates it used to accept.
+
+    R-12 adds temporal-coherence refusals, so a candidate whose carried instants contradict
+    each other no longer constructs. Same shape of change as 0.3.0 below and the same reason
+    for a bump: nothing a consumer pins looks different, and the same inputs now raise.
+
+    5B-1 took this to ``0.2.0`` — the candidate gained a required field and its digest moved.
+    5B-2 moves no digest and no schema identifier; what it changes is that a candidate
+    constructible at ``0.2.0`` may be refused at ``0.3.0`` (R-9). Pre-1.0 that is still a minor
+    bump, and it is the kind a consumer most needs told: nothing they pin looks different, and
+    the same inputs now raise.
+    """
+
+    assert pkg.__version__ == "0.7.0"
+
+
+def test_distribution_and_namespace_names():
+    assert 'name = "ugence-cloud-scaling-authorization-contracts"' in PYPROJECT
+    assert pkg.__name__ == "ugence_cloud_scaling_authorization_contracts"
+
+
+def test_py_typed_is_present_and_declared():
+    assert (SRC / "py.typed").exists()
+    assert "py.typed" in PYPROJECT
+
+
+def test_exactly_three_first_party_dependencies():
+    block = PYPROJECT.split("dependencies = [", 1)[1].split("]", 1)[0]
+    declared = re.findall(r'"([^"]+)"', block)
+    assert sorted(d.split(">=")[0] for d in declared) == [
+        "ugence-cloud-scaling-controller",
+        "ugence-cloud-scaling-risk-integration",
+        "ugence-risk-authority",
+    ]
+
+
+def test_no_third_party_runtime_dependency_is_added():
+    block = PYPROJECT.split("dependencies = [", 1)[1].split("]", 1)[0]
+    for forbidden in ("cryptography", "pynacl", "boto3", "kubernetes", "requests",
+                      "pydantic", "numpy"):
+        assert forbidden not in block
+
+
+def test_public_api_is_exactly_the_declared_surface():
+    assert len(pkg.__all__) == len(set(pkg.__all__)), "duplicate export"
+    for symbol in pkg.__all__:
+        assert hasattr(pkg, symbol), f"{symbol} is exported but absent"
+    # Nothing public leaks that is not declared. Submodule names are reachable as an
+    # unavoidable consequence of the import machinery, and ``annotations`` is the
+    # ``from __future__`` flag object — neither is an exported contract.
+    public = {n for n in dir(pkg) if not n.startswith("_")}
+    submodules = {
+        "attestation", "candidate", "canonical", "errors", "identifiers",
+        "reconciliation", "target", "trust", "version",
+    }
+    declared = {n for n in pkg.__all__ if not n.startswith("_")}
+    assert public - submodules - {"annotations"} == declared
+    # ``__version__`` is dunder-named and so is excluded from ``public`` above; assert it
+    # separately rather than letting it slip out of the parity check entirely.
+    assert "__version__" in pkg.__all__ and hasattr(pkg, "__version__")
+
+
+def test_no_test_material_lives_inside_the_package_source():
+    for path in SRC.rglob("*"):
+        assert path.name != "conftest.py", f"{path} would ship in the wheel"
+        assert not path.name.startswith("test_"), f"{path} would ship in the wheel"
+        assert path.name != "tests", f"{path} would ship in the wheel"
+
+
+def test_setuptools_only_finds_the_one_namespace():
+    assert 'include = ["ugence_cloud_scaling_authorization_contracts*"]' in PYPROJECT
+    assert 'where = ["src"]' in PYPROJECT
+
+
+def test_readme_exists_and_states_the_boundary():
+    readme = (PROJECT / "README.md").read_text(encoding="utf-8")
+    assert "candidate grants nothing" in readme.lower()
+    for phrase in ("PRESENT_BUT_NOT_TRUST_VERIFIED", "Phase 5B", "5X"):
+        assert phrase in readme

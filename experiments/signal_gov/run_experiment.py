@@ -432,7 +432,7 @@ def _write_report(results: Dict, path: Path) -> None:
     lines.append("`results.json` · `metrics.csv` · `signal_importance.csv` · "
                  "`roc_overlay.png` · `catch_at_budget.png`")
     lines.append("")
-    lines.append("See `experiments/signal_gov/README.md` for the pre-registered "
+    lines.append("See `Project_documentation/governance/experiments/signal_gov/README.md` for the pre-registered "
                  "success/failure criteria the *real* experiment is judged against.")
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 

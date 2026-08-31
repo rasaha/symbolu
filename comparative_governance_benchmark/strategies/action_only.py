@@ -17,7 +17,7 @@ from governance_providers.api import ProviderResolutionError
 from ..runners.common import run_action_flow, run_case_flow
 from ..runners.dgm import build_services
 from ..runners.execution import build_execution_adapter
-from ..runners.determinism import make_id_factory
+from ..runners.determinism import make_clock, make_id_factory
 from ..schemas.result import NOT_APPLICABLE, NOT_PERFORMED, StrategyResult
 from ._actiongate_support import resolve_actiongate
 from .protocol import zero_cost
@@ -43,13 +43,15 @@ class ActionOnlyStrategy:
         r.recommendation_posture = "ADVANCE"          # trusted; app proceeds to the action
 
         # execution adapter shared with all strategies (fairness B12)
+        seed = scenario.scenario_id + ":B"
         adapter = build_execution_adapter(
             pa.action_type, scenario.execution,
-            id_factory=make_id_factory(scenario.scenario_id + ":execB"))
+            id_factory=make_id_factory(scenario.scenario_id + ":execB"),
+            clock=make_clock(seed))
 
         try:
             control_plane, _rec = resolve_actiongate(pa.action_type, scenario.action_policy,
-                                                     register=not registry_failure)
+                                                     seed=seed, register=not registry_failure)
         except ProviderResolutionError:
             # registry failure → no authorization, fail-safe: nothing dispatches
             r.authorization_performed = True
@@ -63,8 +65,7 @@ class ActionOnlyStrategy:
                        "authorization_outcome": "INDETERMINATE", "dispatched": False}
             return r
 
-        dgm = build_services(scenario.scenario_id + ":B", control_plane=control_plane,
-                             execution_adapter=adapter)
+        dgm = build_services(seed, control_plane=control_plane, execution_adapter=adapter)
         assessment_id = "app-" + hashlib.sha256(scenario.assertion.encode()).hexdigest()[:12]
         flow = run_case_flow(dgm, scenario, coverage="SUPPORTED", assessment_id=assessment_id)
         cost["assessment_records"] += 1

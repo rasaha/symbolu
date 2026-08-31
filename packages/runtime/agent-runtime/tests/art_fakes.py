@@ -55,6 +55,36 @@ class FailingProvider(Provider):
         raise ProviderExecutionError("boom", retriable=self._retriable)
 
 
+class UsageProvider(Provider):
+    """A neutral fake that attaches an OPAQUE usage mapping to its result metadata.
+
+    The runtime must forward this mapping verbatim (uninterpreted) as an attempt's
+    ``neutral_usage``. The field names here are provider-specific on purpose — the
+    runtime never parses them.
+    """
+
+    def __init__(self, provider_id: str = "usage", *, usage=None, ok=True, error=None):
+        self.provider_id = provider_id
+        self.version = "1.0.0"
+        self.calls = 0
+        self._usage = usage if usage is not None else {"prompt_tokens": 2337, "completion_tokens": 428}
+        self._ok = ok
+        self._error = error
+
+    def execute(self, invocation: ToolInvocation) -> ToolResult:
+        self.calls += 1
+        from ugence_agent_runtime.observability.attempts import PROVIDER_USAGE_METADATA_KEY
+
+        return ToolResult(
+            provider_id=self.provider_id,
+            operation=invocation.operation,
+            ok=self._ok,
+            output={"op": invocation.operation} if self._ok else None,
+            error=None if self._ok else (self._error or "reported failure"),
+            metadata={PROVIDER_USAGE_METADATA_KEY: dict(self._usage)},
+        )
+
+
 class DispositionHook(GovernanceHook):
     """A neutral fake governance hook returning a fixed disposition.
 

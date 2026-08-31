@@ -1,0 +1,125 @@
+name: risk-authority-execution-assurance-ci
+
+# Scoped CI for the RA-8 execution / effect reconciliation integration package
+# (ugence-risk-authority-execution-assurance). RA-8 correlates a governed authority
+# context, the Agent Runtime execution attempt, and a trusted external effect
+# observation; composes the Decision Authority reconciliation kernel under a safe,
+# non-compensatory aggregation; and — on a *material* post-effect mismatch — emits a
+# neutral AuthorityReassessmentSignal (EXECUTION_EFFECT_MISMATCH) into the RA-6
+# intake. RA-8 OBSERVES, CORRELATES, AGGREGATES, AND ASSESSES; RA-6 OWNS AUTHORITY
+# CONSEQUENCES.
+#
+# This workflow is additive and path-scoped: it does NOT touch or weaken the
+# existing risk-authority-* workflows. It runs the deny-heavy RA-8 42-case matrix,
+# proves the RA leaf / RA-6 / RA-7 / DA / Agent Runtime baselines remain green and
+# unchanged, and runs the package's wheel build + isolated-install verifier and the
+# package-boundary tests (no reverse dependency, no second authority artifact, no
+# third execution ledger, no Agent Runtime import).
+
+on:
+  pull_request:
+    paths:
+      - "packages/integration/risk-authority-execution-assurance/**"
+      - "packages/integration/risk-authority-status-runtime/**"
+      - "packages/capabilities/decision-authority/**"
+      - "packages/governance-contracts/**"
+      - "packages/risk_authority/**"
+      - ".github/workflows/risk-authority-execution-assurance-ci.yml"
+  push:
+    branches:
+      - "claude/ra8-**"
+      - "claude/setup-symbolu-monorepo-**"
+    paths:
+      - "packages/integration/risk-authority-execution-assurance/**"
+      - ".github/workflows/risk-authority-execution-assurance-ci.yml"
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  ra8-suite:
+    name: RA-8 execution-assurance suite + deny-heavy 42-case matrix (source)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install tooling + first-party packages (editable)
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest pydantic
+          pip install -e packages/governance-contracts
+          pip install -e packages/risk_authority
+          pip install -e packages/integration/risk-authority-status-runtime
+          pip install -e packages/capabilities/decision-authority
+          # RA-7 is a baseline compatibility dependency for test_35_ra7_unchanged,
+          # which asserts RA-7's surface is undisturbed by RA-8. Install it so the
+          # regression is actually exercised (not ImportError-skipped).
+          pip install -e packages/integration/risk-authority-runtime-assurance
+          pip install -e packages/integration/risk-authority-execution-assurance
+      - name: RA-8 suite (contracts, correlation, ingress, aggregation, assurance, handoff, e2e)
+        run: python -m pytest packages/integration/risk-authority-execution-assurance/tests -q
+      - name: Deny-heavy subset (42-case matrix, aggregation M-1, ingress trust, boundaries)
+        run: |
+          python -m pytest \
+            packages/integration/risk-authority-execution-assurance/tests/test_adversarial.py \
+            packages/integration/risk-authority-execution-assurance/tests/test_aggregation.py \
+            packages/integration/risk-authority-execution-assurance/tests/test_ingress.py \
+            packages/integration/risk-authority-execution-assurance/tests/test_boundaries.py \
+            packages/integration/risk-authority-execution-assurance/tests/test_end_to_end.py -q
+
+  baseline-regression:
+    name: RA leaf + RA-6 + RA-7 + DA + Agent Runtime baselines remain green & unchanged
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install tooling
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest pydantic
+          pip install -e packages/governance-contracts
+          pip install -e packages/risk_authority
+          pip install -e packages/runtime/agent-runtime
+          pip install -e packages/integration/risk-authority-status-runtime
+          pip install -e packages/capabilities/decision-authority
+          pip install -e packages/integration/risk-authority-runtime-assurance
+      - name: Risk Authority leaf conformance (must remain green; carries additive EXECUTION_EFFECT_MISMATCH)
+        run: python -m pytest packages/risk_authority/tests -q
+      - name: RA-6 status-runtime suite (must remain green + unchanged)
+        run: python -m pytest packages/integration/risk-authority-status-runtime/tests -q
+      - name: RA-7 runtime-assurance suite (must remain green; leaf-enum boundary updated for D-D)
+        run: python -m pytest packages/integration/risk-authority-runtime-assurance/tests -q
+      - name: Decision Authority surface/packaging (reused, not re-implemented)
+        run: python -m pytest packages/capabilities/decision-authority/tests -q
+      - name: Agent Runtime suite (must remain green + unchanged; no RA/DA import)
+        run: python -m pytest packages/runtime/agent-runtime/tests -q
+
+  isolated-install:
+    name: Wheel build + isolated-install verification + boundaries
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install build tooling
+        run: |
+          python -m pip install --upgrade pip
+          pip install build wheel pytest pydantic
+      - name: Build first-party wheels, install from wheelhouse, run assess->signal->RA-6 revoke proof
+        run: python packages/integration/risk-authority-execution-assurance/scripts/verify_isolated_install.py
+      - name: Package boundary tests (declared deps, no reverse cycle, no second authority, no third ledger)
+        run: |
+          pip install -e packages/governance-contracts \
+                      -e packages/risk_authority \
+                      -e packages/integration/risk-authority-status-runtime \
+                      -e packages/capabilities/decision-authority \
+                      -e packages/integration/risk-authority-execution-assurance
+          python -m pytest packages/integration/risk-authority-execution-assurance/tests/packaging -q

@@ -22,7 +22,7 @@ Training protocol (F.7.4):
   Stage C: Enable λ_csr, λ_vritti, λ_ont (primitive activation)
   Stage D: Enable λ_bliss, all losses active (full integration)
 
-Reference: docs/design/CONSCIOUS_GENERATION_DESIGN.md, Appendix F §F.7
+Reference: Project_documentation/repository/docs/design/CONSCIOUS_GENERATION_DESIGN.md, Appendix F §F.7
 
 Author: Sovereign-1 Training Initiative
 Date: March 2026

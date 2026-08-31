@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import concurrent.futures
 
-from tests.conftest import result_of
+from _support import result_of
 
 
 def _plan_fingerprint(client, sid="procurement"):

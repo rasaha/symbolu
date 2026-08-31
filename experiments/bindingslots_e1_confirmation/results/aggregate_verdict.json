@@ -1,0 +1,17 @@
+{
+  "schema": "bindingslots_e1_confirmation/aggregate_verdict/v1",
+  "primary_verdict": "E1_INDEPENDENTLY_CONFIRMED",
+  "co_emitted": [
+    "ORIGINAL_BINDINGSLOTS_NEURAL_ROUTING_UNRESOLVED",
+    "KDA_VALIDATION_BLOCKED",
+    "E1_FOLLOW_ON_RESEARCH_ELIGIBLE"
+  ],
+  "kda_readiness": "KDA_VALIDATION_BLOCKED",
+  "seeds_passing_all_primary": 5,
+  "required_to_pass": 4,
+  "determinism_ok": true,
+  "leakage_ok": true,
+  "protocol_ok": true,
+  "recipe": "frozen C1 (reused); independent task + evaluator + fresh seeds",
+  "scope": "independent confirmation of the bundled controlled-task result; NOT a repair of anonymous BindingSlots; does NOT unblock KDA"
+}

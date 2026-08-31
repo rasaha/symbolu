@@ -1,0 +1,27 @@
+{
+  "schema": "bindingslots_v100_reference/prerequisite_audit/v1",
+  "phase": "Phase-Free External Table Always-Verify Reference-Backend Characterization",
+  "authorization": "explicit two-stage authorization; Stage 1 (audit+merge PR #1348) complete; Stage 2 approved scope only",
+  "branch": "claude/bindingslots-v100-reference-characterization",
+  "base_default_branch": "claude/setup-symbolu-monorepo-014vhNMAoVW2Ys5RBBr3bKDF",
+  "base_default_tip_at_branch_creation": "2e159f17733c20cd359065d861324c9ef00d59d4",
+  "pr_1348_merge_commit": "2e159f17733c20cd359065d861324c9ef00d59d4",
+  "pr_1348_state": "closed+merged",
+  "reused_merged_artifacts": {
+    "external_fallback_phase_merge_commit": "6a9ad7ed3d3e4190b91a09424016caf6d85b1dbe",
+    "frozen_trigger_thresholds": {"prob_min": 0.1, "margin_min": 0.05, "entropy_max": 1.0},
+    "frozen_calibration_hash_prefix": "7421fbfb",
+    "committed_b0_evidence": "experiments/bindingslots_address_generalization/results/run_trajectories.json"
+  },
+  "frozen_cohort": {"seeds": [28, 29, 30, 31, 32], "n_per_seed": 120, "total_queries": 600,
+                    "same_examples_as_pr_1346": true, "same_frozen_model_states_as_pr_1346": true,
+                    "replacement_seeds_allowed": false},
+  "reproduction_contract": "B0 == frozen run_h2; each seed reconstructed deterministically and accepted only on trajectory equality (needle_by_dist + ppl) vs committed B0; reconstructed state used for inference only",
+  "invariants_preserved": ["BINDINGSLOTS_NEURAL_ROUTING_UNRESOLVED", "KDA_VALIDATION_BLOCKED",
+                           "KEY_CONSISTENCY_SIGNAL_NOT_AVAILABLE"],
+  "frozen_abc_json": "experiments/phase_lc/results/abc.json (must remain unchanged)",
+  "out_of_scope_not_run": ["K1", "V75", "V50", "partial-coverage stress", "unverified-neural-return policy",
+                           "confidence-threshold sweeps", "neural training", "optimizer steps", "routing changes",
+                           "base-recipe redesign", "Phase", "KDA", "MLA"],
+  "not_a_neural_routing_intervention": true
+}

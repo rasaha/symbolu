@@ -5,7 +5,7 @@
       "artifact_id": "nat-00040a5830cfedf8",
       "char_len": 573,
       "source_kind": "doc",
-      "source_path": "agent_runtime_v2/04_RUNTIME_CAPABILITIES.md",
+      "source_path": "Project_documentation/agentic_framework/agent_runtime_v2/04_RUNTIME_CAPABILITIES.md",
       "text": "**RECOMMENDATION \u2014 priority order for the gaps:** (1) durable run store + checkpointing (unlocks reliable long-running tasks and honest \"replay\"); (2) observability export (enterprise table-stakes); (3) agent identity (required for the Control-Plane binding to be meaningful); (4) agent/capability registry; (5) multi-agent coordination. Rationale: 1\u20133 harden the *existing* single-agent runtime and are prerequisites for the Control-Plane integration to be trustworthy; 4\u20135 are the expansion into multi-agent (Deliverable 5). None competes with ActionGate/ACP/Context-Min.",
       "use_case": "compliance_summary_review",
       "word_len": 82
@@ -35,7 +35,7 @@
       "artifact_id": "nat-00fdef1529c9e2b7",
       "char_len": 335,
       "source_kind": "doc",
-      "source_path": "acp/ACP_CLOUD_ADAPTER_DESIGN.md",
+      "source_path": "Project_documentation/control_plane/acp/ACP_CLOUD_ADAPTER_DESIGN.md",
       "text": "`observe(...)` returns a `CloudShadowResult` (ACP decision, cloud recommendation, optional `CompositionResult`, per-candidate evidence, and the appended record) or `None` when disabled. `CloudShadowRecord.content_dict()` is a fully deterministic view (every field is a deterministic function of inputs), used for rerun-identity checks.",
       "use_case": "software_engineering_recommendation_review",
       "word_len": 41
@@ -105,7 +105,7 @@
       "artifact_id": "nat-02c8d285b870a946",
       "char_len": 241,
       "source_kind": "doc",
-      "source_path": "acp/ACP_ACTIONGATE_BOUNDARY.md",
+      "source_path": "Project_documentation/control_plane/acp/ACP_ACTIONGATE_BOUNDARY.md",
       "text": "ACP and ActionGate are **two different control layers** that a cloud operation must pass **both** of. This document fixes the boundary so neither reimplements the other. Code: `symbolu_robotics/autonomous_control_plane/cloud/composition.py`.",
       "use_case": "compliance_summary_review",
       "word_len": 32
@@ -125,7 +125,7 @@
       "artifact_id": "nat-03300838dc9a120f",
       "char_len": 637,
       "source_kind": "doc",
-      "source_path": "cyber_security/COMBINED_ARCHITECTURE_BCVF2_USE_SCC.md",
+      "source_path": "Project_documentation/action_gate_cyber/cyber_security/COMBINED_ARCHITECTURE_BCVF2_USE_SCC.md",
       "text": "**Rev. 2 (pre-freeze corrections incorporated):** SCC soft fusion replaced by a single calibrated discriminative risk `g_\u03b8` (no double-counted subtractive penalties); three-state attestation/liveness gates (`PASS`/`FAIL`/`UNAVAILABLE`) so absent evidence escalates instead of auto-rejecting; USE-humanness relabeled two-tier (reliable vs crude, unproven vs coordinated); E1 baseline strengthened to a joint model; E4 reframed as a security-vs-friction trade-off; E6 tightened with `\u0394_min`/no-regression/cost bounds; the two product paths marked separable in evaluation (\u00a74.5); component-wise execution order and expected end-state added.",
       "use_case": "cybersecurity_advisory_review",
       "word_len": 92
@@ -135,7 +135,7 @@
       "artifact_id": "nat-033f0055084fda54",
       "char_len": 300,
       "source_kind": "doc",
-      "source_path": "acp/ACP_CROSS_DOMAIN_REUSE_ANALYSIS.md",
+      "source_path": "Project_documentation/control_plane/acp/ACP_CROSS_DOMAIN_REUSE_ANALYSIS.md",
       "text": "`UNCHANGED_CORE` reused byte-for-byte \u00b7 `GENERALIZED_CLEANLY` a core *pattern* re-instantiated with cloud types, no core edit \u00b7 `DOMAIN_ADAPTER_ONLY` cloud-specific code any domain must write \u00b7 `CORE_CHANGE_REQUIRED` forced a core edit \u00b7 `DID_NOT_TRANSFER` robotics-only, correctly absent from cloud.",
       "use_case": "software_engineering_recommendation_review",
       "word_len": 37
@@ -165,7 +165,7 @@
       "artifact_id": "nat-041dc450e6d640f0",
       "char_len": 349,
       "source_kind": "doc",
-      "source_path": "agent_runtime_v2/01_RUNTIME_RESPONSIBILITY_MATRIX.md",
+      "source_path": "Project_documentation/agentic_framework/agent_runtime_v2/01_RUNTIME_RESPONSIBILITY_MATRIX.md",
       "text": "**Milestone:** Agent Runtime V2 \u2014 design only. No production code, no refactoring, no implementation. **Premise (given):** the AI Control Plane (Context Minimization + ActionGate + ACP) already owns governance. The Agentic Framework becomes a **pure Agent Runtime**: the layer responsible only for *intelligence generation* and *workflow execution*.",
       "use_case": "compliance_summary_review",
       "word_len": 44
@@ -185,7 +185,7 @@
       "artifact_id": "nat-0461683d99df7c20",
       "char_len": 456,
       "source_kind": "doc",
-      "source_path": "cyber_security/INDEPENDENT_ARCHITECTURAL_VALIDATION.md",
+      "source_path": "Project_documentation/action_gate_cyber/cyber_security/INDEPENDENT_ARCHITECTURAL_VALIDATION.md",
       "text": "*An adversarial replication study by a notional independent security research group. Prior verdicts (`ISOLATED_GATE_THESIS_SUPPORTED`, \"26/26 blocked\", \"production-grade isolation\") are treated as unproven until re-established from code, tests, and runtime behavior. Where implementation contradicts documentation, implementation wins. No code was written or changed for this study; all findings are grounded in source inspection with file:line citations.*",
       "use_case": "cybersecurity_advisory_review",
       "word_len": 59
@@ -245,7 +245,7 @@
       "artifact_id": "nat-051b3d9d133f01d0",
       "char_len": 268,
       "source_kind": "doc",
-      "source_path": "cyber_security/GAP_REGISTER.md",
+      "source_path": "Project_documentation/action_gate_cyber/cyber_security/GAP_REGISTER.md",
       "text": "Legend for **closure instrument**: `DESIGN` = enterprise/app-context modeling (NOT behavioral biometrics); `RSYS` = real-systems engineering spike; `RDATA` = real behavioral data; `SYN` = synthetic study. Legend for **status**: mature / buildable / pending / frontier.",
       "use_case": "software_engineering_recommendation_review",
       "word_len": 31
@@ -255,7 +255,7 @@
       "artifact_id": "nat-051bc900810bd451",
       "char_len": 346,
       "source_kind": "doc",
-      "source_path": "acp/ACP_CLOUD_ADAPTER_DESIGN.md",
+      "source_path": "Project_documentation/control_plane/acp/ACP_CLOUD_ADAPTER_DESIGN.md",
       "text": "- **Kill switch:** `enabled=False` (default) disables all shadow work instantly. The adapter is not wired into any production path. - **Rollback:** delete `symbolu_robotics/autonomous_control_plane/cloud/` and `robotics_reliability_bench/acp_cloud/`; nothing in production imports them, and the frozen ACP core + `cloud_controller` are untouched.",
       "use_case": "it_operations_guidance",
       "word_len": 40
@@ -275,7 +275,7 @@
       "artifact_id": "nat-06199f1e9aa4294c",
       "char_len": 296,
       "source_kind": "doc",
-      "source_path": "acp/ACP_CANONICAL_IDENTITY.md",
+      "source_path": "Project_documentation/control_plane/acp/ACP_CANONICAL_IDENTITY.md",
       "text": "- **Included:** every dataclass field by default. - **Excluded:** fields explicitly tagged `field(metadata={\"identity\": False})` \u2014 currently `CanonicalWorldState.label` and `CanonicalActionCandidate.provenance` (free-text/provenance that must not change identity). Nothing is excluded implicitly.",
       "use_case": "software_engineering_recommendation_review",
       "word_len": 32
@@ -295,7 +295,7 @@
       "artifact_id": "nat-064ea8ec26776346",
       "char_len": 253,
       "source_kind": "doc",
-      "source_path": "cyber_security/ACTION_CANONICALIZATION_AND_HASHING_SPEC.md",
+      "source_path": "Project_documentation/action_gate_cyber/cyber_security/ACTION_CANONICALIZATION_AND_HASHING_SPEC.md",
       "text": "**Selected standard: RFC 8785 JSON Canonicalization Scheme (JCS)**, restricted by the narrow **Action Profile** below. JCS is chosen because it is an established IETF standard, is language-independent, and already fixes the hard parts deterministically:",
       "use_case": "enterprise_policy_interpretation",
       "word_len": 35
@@ -345,7 +345,7 @@
       "artifact_id": "nat-07422b467f5b3d1a",
       "char_len": 307,
       "source_kind": "doc",
-      "source_path": "agent_runtime_v2/01_RUNTIME_RESPONSIBILITY_MATRIX.md",
+      "source_path": "Project_documentation/agentic_framework/agent_runtime_v2/01_RUNTIME_RESPONSIBILITY_MATRIX.md",
       "text": "**RECOMMENDATION.** *The Agent Runtime decides **what to attempt, how to reason about it, and how confident it is** \u2014 and executes only what the AI Control Plane authorizes. It never mints authority, never judges operational safety, never enforces deterministic policy, and never governs context relevance.*",
       "use_case": "cybersecurity_advisory_review",
       "word_len": 44
@@ -365,7 +365,7 @@
       "artifact_id": "nat-0754efeff1cd6792",
       "char_len": 425,
       "source_kind": "doc",
-      "source_path": "agent_runtime_v2/08_ENTERPRISE_USE_CASES.md",
+      "source_path": "Project_documentation/agentic_framework/agent_runtime_v2/08_ENTERPRISE_USE_CASES.md",
       "text": "**RECOMMENDATION.** Financial services is where the **hard, non-compensatory** nature of ActionGate is the selling point \u2014 a probabilistic agent alone is unshippable in a regulated trading desk; the agent + a deterministic authority is the wedge. (Note: `agentic/policy/trading_guardrail_engine.py` exists as an agent-behavior guardrail \u2014 FACT \u2014 but authoritative trade authorization must be ActionGate's, not the runtime's.)",
       "use_case": "cybersecurity_advisory_review",
       "word_len": 59
@@ -385,7 +385,7 @@
       "artifact_id": "nat-07949582b80e81b5",
       "char_len": 244,
       "source_kind": "doc",
-      "source_path": "acp/ACP_ARCHITECTURE.md",
+      "source_path": "Project_documentation/control_plane/acp/ACP_ARCHITECTURE.md",
       "text": "Each field is deterministic, bounded, physically meaningful, and explainable. \"Low confidence\" is never a mood; it is \"0.15 m margin, 2 of 4 predictors SUSPECT, evidence 0.6.\" This is what makes a safety case and an operator dashboard possible.",
       "use_case": "it_operations_guidance",
       "word_len": 41
@@ -405,7 +405,7 @@
       "artifact_id": "nat-0823690fd2609490",
       "char_len": 326,
       "source_kind": "doc",
-      "source_path": "cyber_security/CRITICAL_TRANSITION_GOVERNANCE.md",
+      "source_path": "Project_documentation/action_gate_cyber/cyber_security/CRITICAL_TRANSITION_GOVERNANCE.md",
       "text": "These transitions are what matter; ordinary activity is not. The **critical transitions are exactly the critical actions the Phase \u22121 threat model already enumerates** \u2014 so governance reuses that artifact. Ordinary actions route to the lightweight risk-based flow; critical transitions route to the governance handshake below.",
       "use_case": "cybersecurity_advisory_review",
       "word_len": 46
@@ -505,7 +505,7 @@
       "artifact_id": "nat-0b2231511f1923ac",
       "char_len": 130,
       "source_kind": "doc",
-      "source_path": "simulator/README.md",
+      "source_path": "Project_documentation/simulator/simulator/README.md",
       "text": "**Key point:** The physical memory is still DRAM and NAND. CTM+ changes how data is placed, not the underlying storage technology.",
       "use_case": "software_engineering_recommendation_review",
       "word_len": 21
@@ -545,7 +545,7 @@
       "artifact_id": "nat-0c1265b9a5f790ef",
       "char_len": 399,
       "source_kind": "doc",
-      "source_path": "acp/ACP_CLOUD_DOMAIN_MODEL.md",
+      "source_path": "Project_documentation/control_plane/acp/ACP_CLOUD_DOMAIN_MODEL.md",
       "text": "- `deploy/gke/demo-app.yaml` \u2014 `demo-app`, ns `default`, `replicas: 3`, `nginx:1.25-alpine` (RollingUpdate) \u2192 `healthy_rollout`, `safe_constrained_rollout`. - `deploy/gke/deployment.yaml` \u2014 `ncc-controller`, ns `ncc`, `replicas: 1` \u2192 `ncc_controller_scale`. - `deploy/gke/configmap.yaml` \u2014 `max_scale_out_fraction 0.50`, `max_scale_in_fraction 0.25`, `min_replicas 1` \u2192 seed the real `SafetyConfig`.",
       "use_case": "compliance_summary_review",
       "word_len": 45
@@ -555,7 +555,7 @@
       "artifact_id": "nat-0c868982f4a0fd4e",
       "char_len": 462,
       "source_kind": "doc",
-      "source_path": "acp/ACP_CLOUD_CONSTRAINTS.md",
+      "source_path": "Project_documentation/control_plane/acp/ACP_CLOUD_CONSTRAINTS.md",
       "text": "Code: `symbolu_robotics/autonomous_control_plane/cloud/constraints.py` (`CloudConstraintEvaluator`). Every constraint is **HARD** and **non-compensatory** \u2014 a single failed HARD result makes the candidate inadmissible, and no soft score can rescue it (enforced by the frozen `action_selection.filter_admissible`). Every result is a frozen-core `ConstraintResult`, binding to `candidate.identity` (via the constraint set) and `world.version` (via `evidence_ref`).",
       "use_case": "software_engineering_recommendation_review",
       "word_len": 56
@@ -685,7 +685,7 @@
       "artifact_id": "nat-10a93343c4f8a5e1",
       "char_len": 206,
       "source_kind": "doc",
-      "source_path": "cyber_security/CRITICAL_TRANSITION_GOVERNANCE.md",
+      "source_path": "Project_documentation/action_gate_cyber/cyber_security/CRITICAL_TRANSITION_GOVERNANCE.md",
       "text": "- **Authentication (all prior layers):** *is this the legitimate, live, trustworthy user?* - **Governance (this layer):** *even if it is \u2014 should this organizational state transition happen, now, this way?*",
       "use_case": "cybersecurity_advisory_review",
       "word_len": 27
@@ -775,7 +775,7 @@
       "artifact_id": "nat-12ae8acbb41636e8",
       "char_len": 305,
       "source_kind": "doc",
-      "source_path": "truth_assurance_pipeline/tap_e1_intent/README.md",
+      "source_path": "Project_documentation/truth_assurance_pipeline/truth_assurance_pipeline/tap_e1_intent/README.md",
       "text": "Everything TAP-E1 lives in this one tree (it is understandable, testable, movable, and removable as a unit). The only files outside it are the canonical docs under `docs/truth_assurance_pipeline/experiments/tap_e1_intent_understanding/` and the empty `truth_assurance_pipeline/__init__.py` package marker.",
       "use_case": "software_engineering_recommendation_review",
       "word_len": 40
@@ -815,7 +815,7 @@
       "artifact_id": "nat-12fe5807aa2c9182",
       "char_len": 231,
       "source_kind": "doc",
-      "source_path": "acp/ACP_ARCHITECTURE.md",
+      "source_path": "Project_documentation/control_plane/acp/ACP_ARCHITECTURE.md",
       "text": "ACP is the **deterministic decision-and-authorization runtime** that sits between a robot's perception/prediction stack and its actuators. It answers one question every control tick, with a defensible, replayable, explained answer:",
       "use_case": "cybersecurity_advisory_review",
       "word_len": 33
@@ -855,7 +855,7 @@
       "artifact_id": "nat-152280f424d8e633",
       "char_len": 188,
       "source_kind": "doc",
-      "source_path": "cyber_security/CRITICAL_TRANSITION_GOVERNANCE.md",
+      "source_path": "Project_documentation/action_gate_cyber/cyber_security/CRITICAL_TRANSITION_GOVERNANCE.md",
       "text": "The second is orthogonal to identity, and it catches a class the entire evidence stack (behavioral, BCVF, USE, attestation) structurally **cannot**, because there is no attacker to detect:",
       "use_case": "cybersecurity_advisory_review",
       "word_len": 28
@@ -875,7 +875,7 @@
       "artifact_id": "nat-155c71ffedc01675",
       "char_len": 196,
       "source_kind": "doc",
-      "source_path": "acp/ACP_ACTION_SELECTION_IMPLEMENTATION.md",
+      "source_path": "Project_documentation/control_plane/acp/ACP_ACTION_SELECTION_IMPLEMENTATION.md",
       "text": "The deterministic selection actually used in shadow: hard filter \u2192 refuse if empty \u2192 lexicographic order among survivors \u2192 total id tie-break. Code: `autonomous_control_plane/action_selection.py`.",
       "use_case": "software_engineering_recommendation_review",
       "word_len": 24
@@ -925,7 +925,7 @@
       "artifact_id": "nat-15ebffd4b3585ed9",
       "char_len": 1395,
       "source_kind": "doc",
-      "source_path": "execution_proposal_engine/EXECUTION_PROPOSAL_SCHEMA.md",
+      "source_path": "Project_documentation/governance/execution_proposal_engine/EXECUTION_PROPOSAL_SCHEMA.md",
       "text": "1. **Describe the ACTION, never the reasoning.** `FACT`: the audits in `../ai_control_plane_v3/02_RUNTIME_INDEPENDENCE_AUDIT.md` showed ActionGate/ACP read only the action, world-state, authority, evidence, and policy \u2014 never prompt/reasoning/memory/model/orchestration. So the schema carries only what governance actually consumes. 2. **Every mandatory field must be producible by the *weakest* runtime.** If a field can only come from a runtime with a specific internal (a trace, a plan graph, a model logit), it cannot be mandatory. 3. **Provenance is metadata, never identity.** `FACT`: ActionGate currently hashes `runtime`/`model_provider`/`objective` into the action identity, which breaks cross-runtime portability (`projection.py:44\u201346`). This schema records provenance but **excludes it from the identity digest** \u2014 the pattern ACP already uses for its `provenance` field (`envelopes.py:62`). 4. **Optional fields raise scrutiny; they never lower a bar.** `FACT`: ActionGate evidence \"can only raise scrutiny, never lower a hard invariant\" (`ACTIONGATE_VC_BRIEF.md`). A runtime that omits an optional field gets *more* scrutiny, never a bypass. 5. **Governance pulls world + policy elsewhere.** The runtime does not supply policy or live world-state; the Control Plane pulls those from the enterprise root-of-trust and a domain `WorldStateProvider`. Keeps the runtime's burden minimal.",
       "use_case": "cybersecurity_advisory_review",
       "word_len": 201
@@ -945,7 +945,7 @@
       "artifact_id": "nat-1663517c57a215a2",
       "char_len": 143,
       "source_kind": "doc",
-      "source_path": "agent_runtime_v2/08_ENTERPRISE_USE_CASES.md",
+      "source_path": "Project_documentation/agentic_framework/agent_runtime_v2/08_ENTERPRISE_USE_CASES.md",
       "text": "Labels: `FACT` (a product capability verified in the repo) / `INTERPRETATION` / `RECOMMENDATION`. Where a capability is a V2 gap, it is marked.",
       "use_case": "software_engineering_recommendation_review",
       "word_len": 21
@@ -985,7 +985,7 @@
       "artifact_id": "nat-179cd7c7ddc2baea",
       "char_len": 182,
       "source_kind": "doc",
-      "source_path": "agent_runtime_v2/02_REMOVE_OWNERSHIP_AUDIT.md",
+      "source_path": "Project_documentation/agentic_framework/agent_runtime_v2/02_REMOVE_OWNERSHIP_AUDIT.md",
       "text": "Every Agentic Framework subsystem classified for Agent Runtime V2: **KEEP** \u00b7 **MOVE TO ACTIONGATE** \u00b7 **MOVE TO ACP** \u00b7 **MOVE TO CONTEXT MINIMIZATION** \u00b7 **DELETE** \u00b7 **REDESIGN**.",
       "use_case": "software_engineering_recommendation_review",
       "word_len": 22
@@ -1015,7 +1015,7 @@
       "artifact_id": "nat-1816dd73e7174e86",
       "char_len": 160,
       "source_kind": "doc",
-      "source_path": "agent_runtime_v2/05_MULTI_AGENT_READINESS.md",
+      "source_path": "Project_documentation/agentic_framework/agent_runtime_v2/05_MULTI_AGENT_READINESS.md",
       "text": "Should Agent Runtime V2 remain single-agent, become multi-agent capable, or be hierarchical? Recommendation with an architecture, grounded in what exists today.",
       "use_case": "software_engineering_recommendation_review",
       "word_len": 23
@@ -1025,7 +1025,7 @@
       "artifact_id": "nat-185e71e5f5c25f59",
       "char_len": 147,
       "source_kind": "doc",
-      "source_path": "acp/ACP_CLOUD_DOMAIN_MODEL.md",
+      "source_path": "Project_documentation/control_plane/acp/ACP_CLOUD_DOMAIN_MODEL.md",
       "text": "A proposed operation. `.identity` is its content identity; `origin_state_version` binds it to the state it was generated on (state/action binding).",
       "use_case": "it_operations_guidance",
       "word_len": 21
@@ -1065,7 +1065,7 @@
       "artifact_id": "nat-1a01c49d508877cc",
       "char_len": 372,
       "source_kind": "doc",
-      "source_path": "acp/ACP_ACTION_SELECTION_V2.md",
+      "source_path": "Project_documentation/control_plane/acp/ACP_ACTION_SELECTION_V2.md",
       "text": "**Design stance:** there is **no BCVF here.** The `REPLACE_ACTION_BCVF` verdict is honored by construction. The reference implementation is the validated deterministic selector in `robotics_reliability_bench/action_baselines.py` (which, in the prior benchmark, never selected a hard-inadmissible candidate, while unguarded BCVF selected an unsafe action in 3/4 scenarios).",
       "use_case": "software_engineering_recommendation_review",
       "word_len": 48
@@ -1105,7 +1105,7 @@
       "artifact_id": "nat-1accfc7f34128a23",
       "char_len": 252,
       "source_kind": "doc",
-      "source_path": "agent_runtime_v2/09_COMPETITIVE_GAP_ANALYSIS.md",
+      "source_path": "Project_documentation/agentic_framework/agent_runtime_v2/09_COMPETITIVE_GAP_ANALYSIS.md",
       "text": "**INTERPRETATION.** The gaps are concentrated in *agent-runtime maturity* (multi-agent, durability, observability, hosting) \u2014 exactly the V2 capability gaps in Deliverable 4. None of them require building governance; they require finishing the runtime.",
       "use_case": "compliance_summary_review",
       "word_len": 33
@@ -1155,7 +1155,7 @@
       "artifact_id": "nat-1cca0c96a9f9f8f4",
       "char_len": 211,
       "source_kind": "doc",
-      "source_path": "cyber_security/ACTION_GATE_SPECIFICATION.md",
+      "source_path": "Project_documentation/action_gate_cyber/cyber_security/ACTION_GATE_SPECIFICATION.md",
       "text": "**Field discipline.** Any missing/malformed **required** field \u21d2 `DENY` at `VALIDATED` (fail-to- safe). **Optional** fields may only *raise* achievable assurance; their absence MUST NOT lower a hard requirement.",
       "use_case": "software_engineering_recommendation_review",
       "word_len": 28
@@ -1185,7 +1185,7 @@
       "artifact_id": "nat-1d721e13619039c3",
       "char_len": 249,
       "source_kind": "doc",
-      "source_path": "trading/README.md",
+      "source_path": "Project_documentation/trading/trading/README.md",
       "text": "- [ ] Multi-timeframe fusion (combine multiple \u03b1 values) - [ ] Correlation-aware portfolio management - [ ] Transaction cost modeling - [ ] Slippage estimation - [ ] More sophisticated regime detection - [ ] Backtesting harness for local development",
       "use_case": "software_engineering_recommendation_review",
       "word_len": 25
@@ -1245,7 +1245,7 @@
       "artifact_id": "nat-1f16f2e28f345c05",
       "char_len": 125,
       "source_kind": "doc",
-      "source_path": "agent_runtime_v2/08_ENTERPRISE_USE_CASES.md",
+      "source_path": "Project_documentation/agentic_framework/agent_runtime_v2/08_ENTERPRISE_USE_CASES.md",
       "text": "**Scenario.** An agent proposes portfolio rebalancing or a vendor payment; regulation demands hard authorization + four-eyes.",
       "use_case": "cybersecurity_advisory_review",
       "word_len": 16
@@ -1255,7 +1255,7 @@
       "artifact_id": "nat-1f17c4477879fc0f",
       "char_len": 126,
       "source_kind": "doc",
-      "source_path": "agent_runtime_v2/09_COMPETITIVE_GAP_ANALYSIS.md",
+      "source_path": "Project_documentation/agentic_framework/agent_runtime_v2/09_COMPETITIVE_GAP_ANALYSIS.md",
       "text": "Rows = capability categories. `AR2` = Agent Runtime V2 (this design, with the Control Plane). Competitor cells are `EXTERNAL`.",
       "use_case": "compliance_summary_review",
       "word_len": 17
@@ -1265,7 +1265,7 @@
       "artifact_id": "nat-1f37df9282c5ff1d",
       "char_len": 196,
       "source_kind": "doc",
-      "source_path": "acp/ACP_CLOUD_SHADOW_METHOD.md",
+      "source_path": "Project_documentation/control_plane/acp/ACP_CLOUD_SHADOW_METHOD.md",
       "text": "How the cloud shadow benchmark runs and measures. Code: `robotics_reliability_bench/acp_cloud/{corpus.py,run_cloud_bench.py}`. Results: `robotics_reliability_bench/results/acp_cloud_results.json`.",
       "use_case": "software_engineering_recommendation_review",
       "word_len": 20
@@ -1275,7 +1275,7 @@
       "artifact_id": "nat-1f3ee66575293855",
       "char_len": 281,
       "source_kind": "doc",
-      "source_path": "cyber_security/PROOF_PLAN_EVALUATION.md",
+      "source_path": "Project_documentation/action_gate_cyber/cyber_security/PROOF_PLAN_EVALUATION.md",
       "text": "This document consolidates three review passes: the original design review, a critique of the proof plan, and a third-party (ChatGPT) round that accepted the critique and extended it. It records where all three converge, and the additional corrections that survive the third round.",
       "use_case": "software_engineering_recommendation_review",
       "word_len": 44
@@ -1285,7 +1285,7 @@
       "artifact_id": "nat-1f4f17118df275a0",
       "char_len": 140,
       "source_kind": "doc",
-      "source_path": "cyber_security/PROOF_PLAN_EVALUATION.md",
+      "source_path": "Project_documentation/action_gate_cyber/cyber_security/PROOF_PLAN_EVALUATION.md",
       "text": "BCVF-Bio is therefore a *composite guarded-adaptation architecture*, not a claim that the second derivative is a complete takeover detector.",
       "use_case": "software_engineering_recommendation_review",
       "word_len": 21
@@ -1345,7 +1345,7 @@
       "artifact_id": "nat-20fe00fe27686547",
       "char_len": 140,
       "source_kind": "doc",
-      "source_path": "trading/README.md",
+      "source_path": "Project_documentation/trading/trading/README.md",
       "text": "- **trending**: Boost momentum signals - **ranging**: Boost mean-reversion signals - **crisis**: Heavily dampen all signals, reduce position",
       "use_case": "software_engineering_recommendation_review",
       "word_len": 16
@@ -1365,7 +1365,7 @@
       "artifact_id": "nat-219975bbf63d0df4",
       "char_len": 186,
       "source_kind": "doc",
-      "source_path": "acp/ACP_CLOUD_SHADOW_METHOD.md",
+      "source_path": "Project_documentation/control_plane/acp/ACP_CLOUD_SHADOW_METHOD.md",
       "text": "**Cloud shadow:** decision distribution (`ActionDecision`), recommendation distribution (`CloudRecommendation`), fail-closed count, and the invariant \"every fail-closed evidence \u21d2 HOLD\".",
       "use_case": "software_engineering_recommendation_review",
       "word_len": 19
@@ -1375,7 +1375,7 @@
       "artifact_id": "nat-21aa6bd717571c09",
       "char_len": 148,
       "source_kind": "doc",
-      "source_path": "cyber_security/BIOMETRIC_BCVF_SECURITY_REVIEW.md",
+      "source_path": "Project_documentation/action_gate_cyber/cyber_security/BIOMETRIC_BCVF_SECURITY_REVIEW.md",
       "text": "So the reformulation faithfully extends existing work. This review takes that faithfulness as given and evaluates whether the extension is *secure*.",
       "use_case": "software_engineering_recommendation_review",
       "word_len": 21
@@ -1395,8 +1395,8 @@
       "artifact_id": "nat-22085eaa313f4ee2",
       "char_len": 575,
       "source_kind": "doc",
-      "source_path": "cyber_security/BIOMETRIC_BCVF_SECURITY_REVIEW.md",
-      "text": "- **Second-order invariance.** `symbolu_robotics/bcvf_autonomous/DESIGN.md` implements the operator `a_ij(k) = [e(k+1) \u2212 2\u00b7e(k) + e(k\u22121)] / dt\u00b2` (Def 3) with a `test_linear_drift_zero_cost` unit test (\u00a72.4.1). Constant and linear-drift disagreement produce zero cost; only acceleration produces a positive signal (\"Lemma 1 invariance\"). - **Consumer layer (EMA centering + deadband).** `AUTONOMOUS_ROBOTICS_VC_BRIEF.md` records the validated config `T=0.05, \u03b2=400, EMA \u03b1=0.05, deadband k=2\u03c3, non-anchor pairing`, validated at N=21 seeds *in a simulator* (sign test p=0.0072).",
+      "source_path": "Project_documentation/action_gate_cyber/cyber_security/BIOMETRIC_BCVF_SECURITY_REVIEW.md",
+      "text": "- **Second-order invariance.** `Project_documentation/autonomous_robotics/symbolu_robotics/bcvf_autonomous/DESIGN.md` implements the operator `a_ij(k) = [e(k+1) \u2212 2\u00b7e(k) + e(k\u22121)] / dt\u00b2` (Def 3) with a `test_linear_drift_zero_cost` unit test (\u00a72.4.1). Constant and linear-drift disagreement produce zero cost; only acceleration produces a positive signal (\"Lemma 1 invariance\"). - **Consumer layer (EMA centering + deadband).** `AUTONOMOUS_ROBOTICS_VC_BRIEF.md` records the validated config `T=0.05, \u03b2=400, EMA \u03b1=0.05, deadband k=2\u03c3, non-anchor pairing`, validated at N=21 seeds *in a simulator* (sign test p=0.0072).",
       "use_case": "it_operations_guidance",
       "word_len": 88
     },
@@ -1485,7 +1485,7 @@
       "artifact_id": "nat-23935f799d12e80a",
       "char_len": 101,
       "source_kind": "doc",
-      "source_path": "cyber_security/PROOF_PLAN_EVALUATION.md",
+      "source_path": "Project_documentation/action_gate_cyber/cyber_security/PROOF_PLAN_EVALUATION.md",
       "text": "The four guards the composite thesis leans on are all conventional and none is the second-order term:",
       "use_case": "software_engineering_recommendation_review",
       "word_len": 18
@@ -1585,7 +1585,7 @@
       "artifact_id": "nat-25f68f6dd10320e7",
       "char_len": 312,
       "source_kind": "doc",
-      "source_path": "agent_runtime_v2/00_AGENT_RUNTIME_V2_DESIGN_SUMMARY.md",
+      "source_path": "Project_documentation/agentic_framework/agent_runtime_v2/00_AGENT_RUNTIME_V2_DESIGN_SUMMARY.md",
       "text": "The single crossing point is `ExecutionProposal \u2192 verdict + token`. Because ActionGate accepts evidence that \"can only raise scrutiny, never lower a hard invariant\" (FACT: `ACTIONGATE_VC_BRIEF.md`), the runtime's risk/uncertainty signals integrate with zero new Control-Plane concepts and are monotonically safe.",
       "use_case": "compliance_summary_review",
       "word_len": 42
@@ -1625,7 +1625,7 @@
       "artifact_id": "nat-275ddc27625b37b2",
       "char_len": 316,
       "source_kind": "doc",
-      "source_path": "acp/ACP_ACTION_SELECTION_V2.md",
+      "source_path": "Project_documentation/control_plane/acp/ACP_ACTION_SELECTION_V2.md",
       "text": "- **Non-compensatory:** a single false hard flag removes the candidate. No weighting, no score. - **Fixed evaluation order** so the *first* violated constraint is the deterministic rejection reason (drives explainability \u2014 Task 8). - Malformed/NaN feature \u2192 treated as a violation (fail-closed). - `O(K\u00b7C)`, bounded.",
       "use_case": "software_engineering_recommendation_review",
       "word_len": 44
@@ -1655,7 +1655,7 @@
       "artifact_id": "nat-27aa5e77408eae35",
       "char_len": 234,
       "source_kind": "doc",
-      "source_path": "execution_proposal_engine/EXECUTION_PROPOSAL_SCHEMA.md",
+      "source_path": "Project_documentation/governance/execution_proposal_engine/EXECUTION_PROPOSAL_SCHEMA.md",
       "text": "This schema is the *only* object that crosses the runtime \u2192 AI Control Plane boundary. It supersedes the Ugence-flavored draft in `../ai_control_plane_v3/01_RUNTIME_CONTRACT.md` by removing every field that assumed the Ugence runtime.",
       "use_case": "compliance_summary_review",
       "word_len": 33
@@ -1675,7 +1675,7 @@
       "artifact_id": "nat-27cb19b5a11cb9c0",
       "char_len": 427,
       "source_kind": "doc",
-      "source_path": "acp/ACP_ACTIONGATE_BOUNDARY.md",
+      "source_path": "Project_documentation/control_plane/acp/ACP_ACTIONGATE_BOUNDARY.md",
       "text": "- ACP does **not** reimplement ActionGate's authorization, identity, evidence, nonce, or approval logic. `composition.py` imports **nothing** from ActionGate; it consumes the gate's already-computed verdict as an opaque `AuthorizationVerdict` token. - ActionGate is **not** rebranded as ACP. It remains the authorization layer. - An action must pass **both** layers: authorized by ActionGate **and** operationally safe per ACP.",
       "use_case": "cybersecurity_advisory_review",
       "word_len": 57
@@ -1695,8 +1695,8 @@
       "artifact_id": "nat-28115d135ccd7748",
       "char_len": 303,
       "source_kind": "doc",
-      "source_path": "agent_runtime_v2/01_RUNTIME_RESPONSIBILITY_MATRIX.md",
-      "text": "This mirrors the ACP pipeline's own ownership split \u2014 \"relevance \u27c2 proposal \u27c2 authorization \u27c2 operational safety\" (`FACT`, `acp/RESPONSIBILITY_MATRIX.md`) \u2014 and makes the runtime the explicit, sole owner of **proposal** (the \"LLM reader \u2192 Proposed Action\" box in `acp/AI_CONTROL_PLANE_ARCHITECTURE.md`).",
+      "source_path": "Project_documentation/agentic_framework/agent_runtime_v2/01_RUNTIME_RESPONSIBILITY_MATRIX.md",
+      "text": "This mirrors the ACP pipeline's own ownership split \u2014 \"relevance \u27c2 proposal \u27c2 authorization \u27c2 operational safety\" (`FACT`, `Project_documentation/control_plane/acp/RESPONSIBILITY_MATRIX.md`) \u2014 and makes the runtime the explicit, sole owner of **proposal** (the \"LLM reader \u2192 Proposed Action\" box in `Project_documentation/control_plane/acp/AI_CONTROL_PLANE_ARCHITECTURE.md`).",
       "use_case": "cybersecurity_advisory_review",
       "word_len": 38
     },
@@ -1735,7 +1735,7 @@
       "artifact_id": "nat-2a2566991b996508",
       "char_len": 97,
       "source_kind": "doc",
-      "source_path": "trading/README.md",
+      "source_path": "Project_documentation/trading/trading/README.md",
       "text": "Where signal_contribution is weighted by state and adjusted for recent P&L (asymmetric learning).",
       "use_case": "software_engineering_recommendation_review",
       "word_len": 14
@@ -1875,7 +1875,7 @@
       "artifact_id": "nat-2dc67e96dbd2a6a8",
       "char_len": 316,
       "source_kind": "doc",
-      "source_path": "agent_runtime_v2/03_RUNTIME_PIPELINE_V2.md",
+      "source_path": "Project_documentation/agentic_framework/agent_runtime_v2/03_RUNTIME_PIPELINE_V2.md",
       "text": "**INTERPRETATION.** These branches are where the runtime's *reflection and self-correction* capabilities (Deliverable 4) earn their keep: a denied or held proposal is an observation to reason about, not a wall. The runtime's job is to *converge on a proposal the Control Plane will authorize* \u2014 not to argue with it.",
       "use_case": "cybersecurity_advisory_review",
       "word_len": 52
@@ -1975,7 +1975,7 @@
       "artifact_id": "nat-2fa0ad299d2e8ef1",
       "char_len": 104,
       "source_kind": "doc",
-      "source_path": "trading/pinescript/README.md",
+      "source_path": "Project_documentation/trading/trading/pinescript/README.md",
       "text": "1. Open TradingView 2. Go to Pine Editor 3. Copy the content of the `.pine` file 4. Click \"Add to Chart\"",
       "use_case": "software_engineering_recommendation_review",
       "word_len": 21
@@ -2125,7 +2125,7 @@
       "artifact_id": "nat-35cde142da591cec",
       "char_len": 133,
       "source_kind": "doc",
-      "source_path": "agent_runtime_v2/05_MULTI_AGENT_READINESS.md",
+      "source_path": "Project_documentation/agentic_framework/agent_runtime_v2/05_MULTI_AGENT_READINESS.md",
       "text": "The runtime should be architected so multi-agent and hierarchical are *configurations of the same primitives*, not separate products:",
       "use_case": "software_engineering_recommendation_review",
       "word_len": 19
@@ -2155,7 +2155,7 @@
       "artifact_id": "nat-36ec36ba5e934bf2",
       "char_len": 261,
       "source_kind": "doc",
-      "source_path": "acp/ACP_CROSS_DOMAIN_REUSE_ANALYSIS.md",
+      "source_path": "Project_documentation/control_plane/acp/ACP_CROSS_DOMAIN_REUSE_ANALYSIS.md",
       "text": "Classifies every ACP property by how it transferred from robotics to cloud, and reports honest reuse percentages. The frozen V1 core's combined SHA-256 is **unchanged** at V2 completion \u2014 see `ACP_V1_FREEZE.md` \u00a74 (verified: `8f8660e293308cf94c983a26a2ae69c9`).",
       "use_case": "software_engineering_recommendation_review",
       "word_len": 36
@@ -2245,7 +2245,7 @@
       "artifact_id": "nat-3a29439dbe147cc1",
       "char_len": 279,
       "source_kind": "doc",
-      "source_path": "cyber_security/GAP_REGISTER.md",
+      "source_path": "Project_documentation/action_gate_cyber/cyber_security/GAP_REGISTER.md",
       "text": "**Status:** working register of what is unknown/unbuilt, ranked by whether it blocks a damage-preventing product. Supersedes the implicit \"detector-first\" ordering. Companion to `COMBINED_ARCHITECTURE_BCVF2_USE_SCC.md`, `BCVF_CONCEPT_DIRECTION.md`, and `USE_CONTRIBUTION_MAP.md`.",
       "use_case": "software_engineering_recommendation_review",
       "word_len": 32
@@ -2255,7 +2255,7 @@
       "artifact_id": "nat-3a75adf2b58ce3dd",
       "char_len": 487,
       "source_kind": "doc",
-      "source_path": "agent_runtime_v2/05_MULTI_AGENT_READINESS.md",
+      "source_path": "Project_documentation/agentic_framework/agent_runtime_v2/05_MULTI_AGENT_READINESS.md",
       "text": "**INTERPRETATION \u2014 why hierarchy is \"just composition.\"** A hierarchical orchestrator is an agent whose action space includes \"invoke sub-agent X on sub-goal Y.\" That invocation is itself a runtime step and, if it triggers a consequential action, flows through the Control Plane like any other. So hierarchy needs **no new governance** \u2014 it reuses the single-agent pipeline recursively. This is the key architectural insight that keeps multi-agent from re-introducing a governance layer.",
       "use_case": "compliance_summary_review",
       "word_len": 75
@@ -2265,7 +2265,7 @@
       "artifact_id": "nat-3ab69d17d33c517b",
       "char_len": 304,
       "source_kind": "doc",
-      "source_path": "agent_runtime_v2/02_REMOVE_OWNERSHIP_AUDIT.md",
+      "source_path": "Project_documentation/agentic_framework/agent_runtime_v2/02_REMOVE_OWNERSHIP_AUDIT.md",
       "text": "\"MOVE TO X\" means *the responsibility belongs to X; the runtime stops owning it and instead consumes X.* Because the milestone forbids duplicating anything ActionGate/ACP/Context-Min already provide, \"MOVE\" usually means **delete the framework's copy and call the Control Plane** \u2014 not port code into it.",
       "use_case": "compliance_summary_review",
       "word_len": 48
@@ -2295,7 +2295,7 @@
       "artifact_id": "nat-3bb5731037e078d7",
       "char_len": 494,
       "source_kind": "doc",
-      "source_path": "truth_assurance_pipeline/tap_e1_1_realmodel/README.md",
+      "source_path": "Project_documentation/truth_assurance_pipeline/truth_assurance_pipeline/tap_e1_1_realmodel/README.md",
       "text": "A validation track (not a new layer) for the frozen **TAP-E1 Intent Analysis Layer**. The only variable under study is the interpretation engine: the deterministic placeholder is replaced with an **LLM**. Everything else (schema, deterministic extraction, provenance, ambiguity, conflict, clarification, metrics) is imported **unchanged** from `../tap_e1_intent/`. (The directory keeps the name `tap_e1_1_realmodel` for reproducibility; the accurate phase name is \"LLM Integration Validation\".)",
       "use_case": "software_engineering_recommendation_review",
       "word_len": 63
@@ -2375,8 +2375,8 @@
       "artifact_id": "nat-3e27663c5cb536f5",
       "char_len": 527,
       "source_kind": "doc",
-      "source_path": "agent_runtime_v2/05_MULTI_AGENT_READINESS.md",
-      "text": "**FACT.** The current framework is strictly single-agent by design: - `agentic/agentic_framework/README.md`: \"Not a multi-agent platform. Governs a single agent's execution path. No agent-to-agent handoffs or orchestration.\" - `FRAMEWORK_STATUS.md`: multi-agent orchestration is \"Intentionally deferred\u2026 Out of scope.\" - No agent registry, no agent identity, no capability registry (confirmed absent in the prior review). - The independent readiness audit: \"a single-generation, plan-then-execute loop, not a multi-step agent.\"",
+      "source_path": "Project_documentation/agentic_framework/agent_runtime_v2/05_MULTI_AGENT_READINESS.md",
+      "text": "**FACT.** The current framework is strictly single-agent by design: - `Project_documentation/agentic_framework/agentic/agentic_framework/README.md`: \"Not a multi-agent platform. Governs a single agent's execution path. No agent-to-agent handoffs or orchestration.\" - `FRAMEWORK_STATUS.md`: multi-agent orchestration is \"Intentionally deferred\u2026 Out of scope.\" - No agent registry, no agent identity, no capability registry (confirmed absent in the prior review). - The independent readiness audit: \"a single-generation, plan-then-execute loop, not a multi-step agent.\"",
       "use_case": "compliance_summary_review",
       "word_len": 75
     },
@@ -2385,7 +2385,7 @@
       "artifact_id": "nat-3e7cb315cfe787e3",
       "char_len": 143,
       "source_kind": "doc",
-      "source_path": "execution_proposal_engine/UNIVERSAL_RUNTIME_AUDIT.md",
+      "source_path": "Project_documentation/governance/execution_proposal_engine/UNIVERSAL_RUNTIME_AUDIT.md",
       "text": "Can every existing agent framework emit an Execution Proposal (per `EXECUTION_PROPOSAL_SCHEMA.md`)? For each: yes/no, and the adapter required.",
       "use_case": "software_engineering_recommendation_review",
       "word_len": 20
@@ -2395,7 +2395,7 @@
       "artifact_id": "nat-3e7ea63520fd5fbb",
       "char_len": 377,
       "source_kind": "doc",
-      "source_path": "agent_runtime_v2/03_RUNTIME_PIPELINE_V2.md",
+      "source_path": "Project_documentation/agentic_framework/agent_runtime_v2/03_RUNTIME_PIPELINE_V2.md",
       "text": "**INTERPRETATION.** The pipeline makes the boundary structurally visible: everything left of the `ExecutionProposal` arrow is probabilistic reasoning the runtime owns; everything between the arrows is deterministic governance the runtime *calls*; execution resumes only after a token exists. There is no place in the loop where the runtime could accidentally re-own governance.",
       "use_case": "compliance_summary_review",
       "word_len": 52
@@ -2415,7 +2415,7 @@
       "artifact_id": "nat-3f18daf4d978b83d",
       "char_len": 261,
       "source_kind": "doc",
-      "source_path": "simulator/README.md",
+      "source_path": "Project_documentation/simulator/simulator/README.md",
       "text": "- **Hit rate**: Tier-0 hits / total accesses - **Latency**: Simulated access latency (ns) - **Move rate**: Promotions + demotions / total accesses - **BCVF rejection rate**: Proposed moves rejected by BCVF gate - **Coherence**: Mean coherence of pages in tier-0",
       "use_case": "software_engineering_recommendation_review",
       "word_len": 35
@@ -2445,7 +2445,7 @@
       "artifact_id": "nat-3f6b8d27b9666b35",
       "char_len": 1083,
       "source_kind": "doc",
-      "source_path": "acp/ACP_CLOUD_ADAPTER_DESIGN.md",
+      "source_path": "Project_documentation/control_plane/acp/ACP_CLOUD_ADAPTER_DESIGN.md",
       "text": "- **OFF by default** (`enabled=False`). A disabled adapter does no work and returns `None`; nothing is recorded. This is the kill switch. - **Never actuates.** No Kubernetes client import (asserted by a test), no Deployment patch, no ActionGate token minted. Every `CloudShadowRecord` is `shadow_only=True`. - **Contained exceptions.** Any failure inside `_observe` is caught, recorded as `shadow_error=True` with `error_kind`, and returned as a `HOLD` \u2014 it never propagates to the caller (a real control loop must be unaffected). - **Bounded logging.** `BoundedCloudSink` is a fixed-capacity `deque(maxlen)` (reusing the robotics bounded-sink pattern); evicted records are counted in `dropped`. No unbounded growth / DoS path. - **Commit-time revalidation.** `commit_revalidate` reuses the **frozen** `ReferenceCommitRevalidator` to detect cluster drift (resourceVersion / state change), candidate rebinding (a manifest digest mutated after the decision), and expiry between decision and commit (TOCTOU). It gates nothing \u2014 it records whether the earlier recommendation still holds.",
       "use_case": "compliance_summary_review",
       "word_len": 144
@@ -2455,7 +2455,7 @@
       "artifact_id": "nat-3fbf58472b9ba31d",
       "char_len": 98,
       "source_kind": "doc",
-      "source_path": "cyber_security/ACTION_CANONICALIZATION_AND_HASHING_SPEC.md",
+      "source_path": "Project_documentation/action_gate_cyber/cyber_security/ACTION_CANONICALIZATION_AND_HASHING_SPEC.md",
       "text": "Explicit non-property: **hashing does not establish the truthfulness of the enclosed data** (\u00a721).",
       "use_case": "software_engineering_recommendation_review",
       "word_len": 14
@@ -2485,7 +2485,7 @@
       "artifact_id": "nat-407adc7961886c56",
       "char_len": 497,
       "source_kind": "doc",
-      "source_path": "cyber_security/AGENT_ACTION_ADMISSIBILITY_MVP.md",
+      "source_path": "Project_documentation/action_gate_cyber/cyber_security/AGENT_ACTION_ADMISSIBILITY_MVP.md",
       "text": "**Core thesis.** A **vendor-neutral pre-commit admissibility gate at the autonomous-agent tool-invocation boundary**, initially for **production-infrastructure actions**. The gate permits a consequential action only when the proposed transition leaves the system inside a **conservatively enforceable approximation of the safe viability kernel**. It wins by **safely allowing more legitimate autonomy** than static permissions or approve-everything workflows \u2014 not merely by blocking more actions.",
       "use_case": "procurement_policy_review",
       "word_len": 66
@@ -2555,7 +2555,7 @@
       "artifact_id": "nat-4503709b420ab110",
       "char_len": 246,
       "source_kind": "doc",
-      "source_path": "agent_runtime_v2/03_RUNTIME_PIPELINE_V2.md",
+      "source_path": "Project_documentation/agentic_framework/agent_runtime_v2/03_RUNTIME_PIPELINE_V2.md",
       "text": "The Agent Runtime V2 execution pipeline, assuming the AI Control Plane already exists. The pipeline is where the boundary is enforced: the runtime reasons and proposes; the Control Plane authorizes; the runtime executes only what returns a token.",
       "use_case": "cybersecurity_advisory_review",
       "word_len": 38
@@ -2595,7 +2595,7 @@
       "artifact_id": "nat-45a1abfa935d27f8",
       "char_len": 355,
       "source_kind": "doc",
-      "source_path": "acp/ACP_ACTION_SELECTION_V2.md",
+      "source_path": "Project_documentation/control_plane/acp/ACP_ACTION_SELECTION_V2.md",
       "text": "- Fixed motion-primitive library or fixed lattice; **fixed count** `K \u2264 64`. - Trajectories rolled out against the PR-V2 trusted consensus. - No RNG. If sampling is used it is a fixed low-discrepancy sequence, seeded and identical every run. `O(K\u00b7H)`. - Emits `Candidates[K]`; may be empty (fully blocked) \u2014 that is a valid input to stage 7, not an error.",
       "use_case": "software_engineering_recommendation_review",
       "word_len": 60
@@ -2635,7 +2635,7 @@
       "artifact_id": "nat-46e48ca9c0c30eed",
       "char_len": 405,
       "source_kind": "doc",
-      "source_path": "execution_proposal_engine/UNIVERSAL_RUNTIME_AUDIT.md",
+      "source_path": "Project_documentation/governance/execution_proposal_engine/UNIVERSAL_RUNTIME_AUDIT.md",
       "text": "`INTERPRETATION`: Claude Code is not evidence that Ugence's *specific* Control Plane is adopted (it is not), but it is strong evidence that the *architecture pattern* (propose \u2192 external governance \u2192 execute \u2192 observe) is real, shippable, and already the design of a mature agent runtime. The Execution Proposal is the generalization of what Claude Code's tool-permission boundary already does informally.",
       "use_case": "compliance_summary_review",
       "word_len": 60
@@ -2685,7 +2685,7 @@
       "artifact_id": "nat-47a8a613d707d472",
       "char_len": 312,
       "source_kind": "doc",
-      "source_path": "execution_proposal_engine/EXECUTION_PROPOSAL_SCHEMA.md",
+      "source_path": "Project_documentation/governance/execution_proposal_engine/EXECUTION_PROPOSAL_SCHEMA.md",
       "text": "**FACT.** Context Minimization requires ActionGate-shaped spans (`SemanticUnit.contrib`, a single action `base`, a frozen `source_type` taxonomy) and its guarantee is computed against ActionGate specifically; generic text yields a *vacuous* guarantee (`compressor.py:36\u201358`, `units.py:41`, `extractor.py:76\u201379`).",
       "use_case": "software_engineering_recommendation_review",
       "word_len": 42
@@ -2705,7 +2705,7 @@
       "artifact_id": "nat-482f7b70e04c353f",
       "char_len": 154,
       "source_kind": "doc",
-      "source_path": "acp/ACP_CLOUD_SHADOW_METHOD.md",
+      "source_path": "Project_documentation/control_plane/acp/ACP_CLOUD_SHADOW_METHOD.md",
       "text": "**Latency:** lazy imports of the real `cloud_controller` modules are warmed up first, then `perf_counter` wraps each `observe`; mean / p95 / max reported.",
       "use_case": "software_engineering_recommendation_review",
       "word_len": 21
@@ -2735,7 +2735,7 @@
       "artifact_id": "nat-49a7baf8fd321aa4",
       "char_len": 265,
       "source_kind": "doc",
-      "source_path": "truth_assurance_pipeline/tap_e1_intent/README.md",
+      "source_path": "Project_documentation/truth_assurance_pipeline/truth_assurance_pipeline/tap_e1_intent/README.md",
       "text": "A **new, self-contained** research track for the first phase of the Truth Assurance Platform (TAP). It converts a raw user request into an explicit, structured `IntentRecord` describing *what the user appears to want and what remains unresolved* \u2014 and nothing more.",
       "use_case": "software_engineering_recommendation_review",
       "word_len": 41
@@ -2765,7 +2765,7 @@
       "artifact_id": "nat-4a63b86875869810",
       "char_len": 747,
       "source_kind": "doc",
-      "source_path": "execution_proposal_engine/EXECUTION_PROPOSAL_ENGINE.md",
+      "source_path": "Project_documentation/governance/execution_proposal_engine/EXECUTION_PROPOSAL_ENGINE.md",
       "text": "**Claim under test:** the runtime can own \"tool selection\" without owning \"authorization.\" **Attempted disproof:** to select a tool well, the runtime must know which tools it is *allowed* to use \u2014 so tool selection and authorization are coupled, and the runtime can't cleanly shed authorization. **FACT + INTERPRETATION.** They are distinct. The runtime *modeling* policy to propose efficiently (avoid proposing doomed actions) is not the same as *deciding* authorization. The runtime can be wrong; ActionGate is authoritative and non-compensatory (`gate.py`). A policy-aware pre-screen is *evidence* that \"can only raise scrutiny\" (`ACTIONGATE_VC_BRIEF.md`), never a grant. **The coupling is advisory, not authoritative \u2014 the boundary survives.**",
       "use_case": "cybersecurity_advisory_review",
       "word_len": 107
@@ -2785,7 +2785,7 @@
       "artifact_id": "nat-4ad2677b66d92d58",
       "char_len": 113,
       "source_kind": "doc",
-      "source_path": "acp/ACP_ARCHITECTURE.md",
+      "source_path": "Project_documentation/control_plane/acp/ACP_ARCHITECTURE.md",
       "text": "Every stage of ACP is derived from these seven axioms. Where an axiom and a convenience conflict, the axiom wins.",
       "use_case": "software_engineering_recommendation_review",
       "word_len": 20
@@ -2825,7 +2825,7 @@
       "artifact_id": "nat-4cc41b2127e3f8f3",
       "char_len": 174,
       "source_kind": "doc",
-      "source_path": "acp/ACP_CLOUD_DOMAIN_MODEL.md",
+      "source_path": "Project_documentation/control_plane/acp/ACP_CLOUD_DOMAIN_MODEL.md",
       "text": "- `blast_radius` \u2014 SCALE: `|desired \u2212 current|`; DELETE: `current` (all replicas); otherwise `max(max_surge, max_unavailable, 1)`. - `is_destructive` \u2014 `operation is DELETE`.",
       "use_case": "it_operations_guidance",
       "word_len": 17
@@ -2855,7 +2855,7 @@
       "artifact_id": "nat-4d18ee21e729b417",
       "char_len": 242,
       "source_kind": "doc",
-      "source_path": "acp/ACP_CLOUD_SHADOW_METHOD.md",
+      "source_path": "Project_documentation/control_plane/acp/ACP_CLOUD_SHADOW_METHOD.md",
       "text": "**Determinism:** the whole corpus is run twice; the deterministic content signature (decision, recommendation, combined, validity, reason codes, revalidation \u2014 latency excluded) is compared for byte-identity. Sink `seen` / `dropped` reported.",
       "use_case": "software_engineering_recommendation_review",
       "word_len": 29
@@ -2905,7 +2905,7 @@
       "artifact_id": "nat-4f0e2c75c5d3bc60",
       "char_len": 623,
       "source_kind": "doc",
-      "source_path": "execution_proposal_engine/UNIVERSAL_RUNTIME_AUDIT.md",
+      "source_path": "Project_documentation/governance/execution_proposal_engine/UNIVERSAL_RUNTIME_AUDIT.md",
       "text": "**Why this matters for the verdict:** it is an existence proof, in a widely-used product, of exactly the split this milestone proposes \u2014 *the runtime generates intelligence; a separate layer governs execution.* It also validates two of the falsification corrections in the master doc: - **F1 (return path):** Claude Code's tool results return to the model to continue reasoning \u2014 the loop, not a one-way pipeline. - **F2 (risk-tiering):** Claude Code already tiers \u2014 read-only calls are often auto-allowed while consequential calls prompt \u2014 demonstrating that per-action governance is only practical when risk-proportional.",
       "use_case": "compliance_summary_review",
       "word_len": 95
@@ -2925,7 +2925,7 @@
       "artifact_id": "nat-4f6e0f06fe963a88",
       "char_len": 210,
       "source_kind": "doc",
-      "source_path": "agent_runtime_v2/01_RUNTIME_RESPONSIBILITY_MATRIX.md",
+      "source_path": "Project_documentation/agentic_framework/agent_runtime_v2/01_RUNTIME_RESPONSIBILITY_MATRIX.md",
       "text": "Grouped by the two responsibilities the runtime is allowed to have: **intelligence generation** and **workflow execution**. Each row cites the existing module that already provides it (or notes it as a V2 gap).",
       "use_case": "software_engineering_recommendation_review",
       "word_len": 33
@@ -2975,8 +2975,8 @@
       "artifact_id": "nat-521598c855c6bf1a",
       "char_len": 625,
       "source_kind": "doc",
-      "source_path": "agent_runtime_v2/04_RUNTIME_CAPABILITIES.md",
-      "text": "**INTERPRETATION \u2014 the compensation boundary (subtle, important).** ACP owns \"rollback-available now\" for a *single infrastructure action* (FACT: `acp/ACP_ACTIONGATE_BOUNDARY.md`). But undoing a *multi-step workflow* (e.g., \"step 3 failed, so semantically reverse steps 1\u20132\") is a reasoning/plan concern the Control Plane cannot own \u2014 it has no notion of the runtime's plan. So the runtime owns **saga-style compensation across steps**, implemented by *proposing compensating actions back through the Control Plane* (each of which ActionGate/ACP authorize independently). The runtime never executes an un-authorized rollback.",
+      "source_path": "Project_documentation/agentic_framework/agent_runtime_v2/04_RUNTIME_CAPABILITIES.md",
+      "text": "**INTERPRETATION \u2014 the compensation boundary (subtle, important).** ACP owns \"rollback-available now\" for a *single infrastructure action* (FACT: `Project_documentation/control_plane/acp/ACP_ACTIONGATE_BOUNDARY.md`). But undoing a *multi-step workflow* (e.g., \"step 3 failed, so semantically reverse steps 1\u20132\") is a reasoning/plan concern the Control Plane cannot own \u2014 it has no notion of the runtime's plan. So the runtime owns **saga-style compensation across steps**, implemented by *proposing compensating actions back through the Control Plane* (each of which ActionGate/ACP authorize independently). The runtime never executes an un-authorized rollback.",
       "use_case": "cybersecurity_advisory_review",
       "word_len": 90
     },
@@ -2985,7 +2985,7 @@
       "artifact_id": "nat-52932a9f53c26bcf",
       "char_len": 244,
       "source_kind": "doc",
-      "source_path": "cyber_security/CRITICAL_TRANSITION_GOVERNANCE.md",
+      "source_path": "Project_documentation/action_gate_cyber/cyber_security/CRITICAL_TRANSITION_GOVERNANCE.md",
       "text": "This is the maker-checker / dual-authorization pattern that banks already apply to large wire transfers (initiator + approver + second approver + treasury policy + business limits), **generalized to every critical organizational state change.**",
       "use_case": "cybersecurity_advisory_review",
       "word_len": 31
@@ -2995,7 +2995,7 @@
       "artifact_id": "nat-5305746d102faa88",
       "char_len": 269,
       "source_kind": "doc",
-      "source_path": "agent_runtime_v2/08_ENTERPRISE_USE_CASES.md",
+      "source_path": "Project_documentation/agentic_framework/agent_runtime_v2/08_ENTERPRISE_USE_CASES.md",
       "text": "Legend: **AR**=Agent Runtime \u00b7 **CM**=Context Minimization \u00b7 **AG**=ActionGate \u00b7 **ACP**=Autonomous Control Plane \u00b7 **HLM**=Hybrid LLM \u00b7 **CG**=LLM Steering Controller \u00b7 **KV**=KVPro \u00b7 **CSC**=Cloud Scaling Controller. Canonical taxonomy: `UGENCE_PLATFORM_OVERVIEW.md`.",
       "use_case": "compliance_summary_review",
       "word_len": 30
@@ -3005,7 +3005,7 @@
       "artifact_id": "nat-5311931f19e5c258",
       "char_len": 504,
       "source_kind": "doc",
-      "source_path": "agent_runtime_v2/06_RUNTIME_VS_CONTROL_PLANE_OWNERSHIP.md",
+      "source_path": "Project_documentation/agentic_framework/agent_runtime_v2/06_RUNTIME_VS_CONTROL_PLANE_OWNERSHIP.md",
       "text": "For every responsibility 1\u201331, exactly one system's code makes the decision. In V2 this is enforceable structurally: - The runtime imports an `ActionGateClient` / `ContextMinimizationClient` but **contains no authorization, credential, operational-safety, or compression logic of its own** (the \"MOVE/DELETE\" verdicts in Deliverable 2 remove the existing copies). - The Control Plane **contains no LLM, planning, reasoning, or memory** (FACT: ActionGate is stdlib-only \"no AI\"; ACP \"consumes a planner\").",
       "use_case": "cybersecurity_advisory_review",
       "word_len": 70
@@ -3035,7 +3035,7 @@
       "artifact_id": "nat-5406e033790656ea",
       "char_len": 867,
       "source_kind": "doc",
-      "source_path": "truth_assurance_pipeline/tap_e1_1_realmodel/README.md",
+      "source_path": "Project_documentation/truth_assurance_pipeline/truth_assurance_pipeline/tap_e1_1_realmodel/README.md",
       "text": "Selected baseline **D** (LLM + deterministic extraction + provenance). All preregistered gates pass on the locked eval; verdict **`PASS_WITH_LIMITED_CLAIM`**. Supported claim: *the TAP-E1 architecture can successfully constrain, structure, and evaluate LLM-generated intent representations under the conditions tested* \u2014 it does **not** independently validate any model's reasoning. With the LLM supplying the core, constraint preservation rises 0.60 \u2192 1.00, fidelity 0.54 \u2192 0.94, and severe failures fall 7 \u2192 0 vs the deterministic interpreter \u2014 but raw LLM without the schema (A) is the worst configuration, and the clarification layer (F) regresses. **TAP-E1 is frozen as the baseline; future work should compare against it.** See [`E1_1_EXPERIMENT_REPORT.md`](../../docs/truth_assurance_pipeline/experiments/tap_e1_intent_understanding/E1_1_EXPERIMENT_REPORT.md).",
       "use_case": "technical_support_review",
       "word_len": 113
@@ -3055,7 +3055,7 @@
       "artifact_id": "nat-54e7f7e724d37122",
       "char_len": 155,
       "source_kind": "doc",
-      "source_path": "cyber_security/ACTION_GATE_SPECIFICATION.md",
+      "source_path": "Project_documentation/action_gate_cyber/cyber_security/ACTION_GATE_SPECIFICATION.md",
       "text": "All evidence entering the gate, by class. **Hard classes are dispositive; advisory classes are never dispositive and MUST NOT override a hard constraint.**",
       "use_case": "software_engineering_recommendation_review",
       "word_len": 23
@@ -3095,7 +3095,7 @@
       "artifact_id": "nat-56dfb0886bbd4a79",
       "char_len": 483,
       "source_kind": "doc",
-      "source_path": "acp/ACP_CLOUD_ADAPTER_DESIGN.md",
+      "source_path": "Project_documentation/control_plane/acp/ACP_CLOUD_ADAPTER_DESIGN.md",
       "text": "`commit_revalidate` constructs a frozen `ControlAuthorization` purely to drive the revalidator's binding check. This is a **content-identity binding**, explicitly **not** a cryptographic execution credential. ACP never mints a real execution token \u2014 that is ActionGate's exclusive role (see `ACP_ACTIONGATE_BOUNDARY.md`). The object exists only so the frozen TOCTOU machinery can be reused unchanged to answer \"does ACP's earlier decision still bind the thing about to be committed?\"",
       "use_case": "cybersecurity_advisory_review",
       "word_len": 69
@@ -3135,7 +3135,7 @@
       "artifact_id": "nat-5774a2421f2263b1",
       "char_len": 240,
       "source_kind": "doc",
-      "source_path": "acp/ACP_CLOUD_CONSTRAINTS.md",
+      "source_path": "Project_documentation/control_plane/acp/ACP_CLOUD_CONSTRAINTS.md",
       "text": "All three are pure-Python, deterministic, and touch no Kubernetes client. The evaluator is a pure function of `(candidate, world, now_s, freshness_s)` + config \u2014 no wall clock, no randomness, no I/O \u2014 so runs are byte-for-byte reproducible.",
       "use_case": "software_engineering_recommendation_review",
       "word_len": 38
@@ -3185,7 +3185,7 @@
       "artifact_id": "nat-58a5cfcfa7fe54c0",
       "char_len": 124,
       "source_kind": "doc",
-      "source_path": "trading/pinescript/README.md",
+      "source_path": "Project_documentation/trading/trading/pinescript/README.md",
       "text": "Available alerts: - Long Entry Signal - Short Entry Signal - Exit Signal - Strong Buy - Strong Sell - Crisis Mode Activation",
       "use_case": "software_engineering_recommendation_review",
       "word_len": 17
@@ -3245,7 +3245,7 @@
       "artifact_id": "nat-5a79745586f94b55",
       "char_len": 266,
       "source_kind": "doc",
-      "source_path": "cyber_security/GAP_REGISTER.md",
+      "source_path": "Project_documentation/action_gate_cyber/cyber_security/GAP_REGISTER.md",
       "text": "Why this holds: at a **critical or irreversible** action the impact term dominates, so the system can **always** step up regardless of a weak `P(attack)`. Consequence-gating makes a weak detector acceptable, which decouples \"prevent damage\" from \"identify the user.\"",
       "use_case": "cybersecurity_advisory_review",
       "word_len": 41
@@ -3265,7 +3265,7 @@
       "artifact_id": "nat-5ad2b8443484b181",
       "char_len": 121,
       "source_kind": "doc",
-      "source_path": "acp/ACP_ACTIONGATE_BOUNDARY.md",
+      "source_path": "Project_documentation/control_plane/acp/ACP_ACTIONGATE_BOUNDARY.md",
       "text": "`PROCEED` requires BOTH: an authorizing verdict (`ALLOW` / `ALLOW_WITH_CONSTRAINTS`) AND a permissive ACP recommendation.",
       "use_case": "cybersecurity_advisory_review",
       "word_len": 13
@@ -3315,7 +3315,7 @@
       "artifact_id": "nat-5b2df690643e5da5",
       "char_len": 286,
       "source_kind": "doc",
-      "source_path": "acp/ACP_CANDIDATE_TRAJECTORY_BRIDGE.md",
+      "source_path": "Project_documentation/control_plane/acp/ACP_CANDIDATE_TRAJECTORY_BRIDGE.md",
       "text": "`safety_adapters/live_planner_adapter.py` + `safety_adapters/candidate_bridge.py` \u2014 translate the real deliberative planner's output (`Plan` \u2192 `ActuatorCommand`) into the existing `TrajectoryPoint` representation the real `TrajectoryValidator` consumes, WITHOUT fabricating information.",
       "use_case": "software_engineering_recommendation_review",
       "word_len": 27
@@ -3335,7 +3335,7 @@
       "artifact_id": "nat-5bc850ce79981e9e",
       "char_len": 624,
       "source_kind": "doc",
-      "source_path": "cyber_security/ACTION_GATE_SPECIFICATION.md",
+      "source_path": "Project_documentation/action_gate_cyber/cyber_security/ACTION_GATE_SPECIFICATION.md",
       "text": "**MVP crosswalk (consistency).** These names are the canonical machine schema; each maps 1:1 to an `AGENT_ACTION_ADMISSIBILITY_MVP.md` \u00a72 concept: `runtime`\u2190`agent_runtime`, `objective`\u2190`delegated_objective`, `tool`\u2190`tool_server_identity`, `credential_scope`\u2190`credential_privilege_scope`, `current_state_hash`\u2190hash(`current_observed_state`), `expected_effects`\u2190`predicted_effects`, `reversibility`\u2190`reversibility_class`, `linked_ticket`\u2190`linked_change`, `attestation`\u2190`attestation_evidence`, `correlation_id`+`sequence_id`\u2190`correlation_ids`. `timestamp` is added for audit/replay binding. No concept is dropped or broadened.",
       "use_case": "compliance_summary_review",
       "word_len": 55
@@ -3395,7 +3395,7 @@
       "artifact_id": "nat-5cd45d342e8dac6a",
       "char_len": 169,
       "source_kind": "doc",
-      "source_path": "acp/ACP_CANDIDATE_TRAJECTORY_BRIDGE.md",
+      "source_path": "Project_documentation/control_plane/acp/ACP_CANDIDATE_TRAJECTORY_BRIDGE.md",
       "text": "Any non-`SUPPORTED` status makes the candidate inadmissible (the hook records a fail-closed `NO_SAFE_ACTION`); **no missing physical value is interpolated or inferred**.",
       "use_case": "technical_support_review",
       "word_len": 23
@@ -3405,7 +3405,7 @@
       "artifact_id": "nat-5cf56986ff61e3f0",
       "char_len": 162,
       "source_kind": "doc",
-      "source_path": "cyber_security/CRITICAL_TRANSITION_GOVERNANCE.md",
+      "source_path": "Project_documentation/action_gate_cyber/cyber_security/CRITICAL_TRANSITION_GOVERNANCE.md",
       "text": "Before a critical transition is allowed, multiple independent pieces of evidence must agree \u2014 richer than MFA, and required **even of legitimate administrators**:",
       "use_case": "software_engineering_recommendation_review",
       "word_len": 22
@@ -3415,7 +3415,7 @@
       "artifact_id": "nat-5d5fc39188fc2452",
       "char_len": 138,
       "source_kind": "doc",
-      "source_path": "cyber_security/ACTION_GATE_SPECIFICATION.md",
+      "source_path": "Project_documentation/action_gate_cyber/cyber_security/ACTION_GATE_SPECIFICATION.md",
       "text": "Types: `string`, `enum{\u2026}`, `hash` (hex digest of a named canonicalization), `timestamp` (RFC-3339 UTC), `object`, `array<T>`, `duration`.",
       "use_case": "software_engineering_recommendation_review",
       "word_len": 18
@@ -3435,7 +3435,7 @@
       "artifact_id": "nat-5dc553f317a15b6d",
       "char_len": 164,
       "source_kind": "doc",
-      "source_path": "cyber_security/PROOF_PLAN_EVALUATION.md",
+      "source_path": "Project_documentation/action_gate_cyber/cyber_security/PROOF_PLAN_EVALUATION.md",
       "text": "A slow linear takeover is invisible to `\u0394\u00b2d`, but **not necessarily invisible to the full system**. For `d_t = a + b\u00b7t`, `\u0394\u00b2d = 0` yet the following can still grow:",
       "use_case": "software_engineering_recommendation_review",
       "word_len": 29
@@ -3495,7 +3495,7 @@
       "artifact_id": "nat-602e2c008cadefda",
       "char_len": 592,
       "source_kind": "doc",
-      "source_path": "execution_proposal_engine/EXECUTION_PROPOSAL_SCHEMA.md",
+      "source_path": "Project_documentation/governance/execution_proposal_engine/EXECUTION_PROPOSAL_SCHEMA.md",
       "text": "**Falsification check.** The one way this schema fails vendor-neutrality is if a runtime cannot express its action as `{tool, operation, targets, arguments}`. The only hard case (`EXTERNAL KNOWLEDGE`) is a free-form **code executor** (AutoGen running arbitrary code): the \"action\" is opaque until executed. Handling: the adapter marks `operation: EXECUTE`, `reversibility: UNKNOWN`, and relies on a Control-Plane `SIMULATE_AND_RETRY` / dry-run to classify effects before authorizing \u2014 the action is still expressible, just at coarse granularity. This is an adapter cost, not a schema failure.",
       "use_case": "cybersecurity_advisory_review",
       "word_len": 85
@@ -3505,7 +3505,7 @@
       "artifact_id": "nat-611040d992c9180f",
       "char_len": 441,
       "source_kind": "doc",
-      "source_path": "acp/ACP_ACTIONGATE_BOUNDARY.md",
+      "source_path": "Project_documentation/control_plane/acp/ACP_ACTIONGATE_BOUNDARY.md",
       "text": "The key distinction on blast radius: ActionGate's `MAX_BLAST_RADIUS` operator evaluates a **fact supplied to it** (\"affected_count = N\") against a policy ceiling \u2014 it does not look at the cluster. ACP **derives** the operational blast radius from the **live** `CloudWorldState` (current vs desired replicas, or all replicas for a delete) using the real `SafetyBounds` fractions. Same word, two different computations at two different layers.",
       "use_case": "enterprise_policy_interpretation",
       "word_len": 63
@@ -3565,7 +3565,7 @@
       "artifact_id": "nat-6356f55f2d2dc6dd",
       "char_len": 407,
       "source_kind": "doc",
-      "source_path": "agent_runtime_v2/10_FUTURE_ROADMAP.md",
+      "source_path": "Project_documentation/agentic_framework/agent_runtime_v2/10_FUTURE_ROADMAP.md",
       "text": "- Runtime is a late-prototype single-agent, plan-then-execute loop; single CLI entry point; no CI gate; in-memory trace; two disconnected governance stacks; falsified CG signal apparatus (all FACT from the prior review). - The Control Plane (ActionGate/ACP/Context-Min) exists as real-but-shadow, cross-domain, deterministic (FACT). - No integration seam between runtime and Control Plane exists yet (FACT).",
       "use_case": "compliance_summary_review",
       "word_len": 62
@@ -3575,7 +3575,7 @@
       "artifact_id": "nat-6375d33b270e9edf",
       "char_len": 1236,
       "source_kind": "doc",
-      "source_path": "agent_runtime_v2/07_PRODUCT_POSITIONING.md",
+      "source_path": "Project_documentation/agentic_framework/agent_runtime_v2/07_PRODUCT_POSITIONING.md",
       "text": "- **Agent Runtime** \u2014 *\"The agent that proposes; the Control Plane disposes.\"* A model-agnostic runtime that turns a goal into a reasoned, reflected, tool-using workflow \u2014 and routes every consequential action through the AI Control Plane for authorization and safety. It owns intelligence and execution, never authority. - **Hybrid LLM** \u2014 *\"One attention mechanism that retrieves globally, attends locally, and scales linearly \u2014 by fusion, not stacking.\"* The long-context model substrate. - **LLM Steering Controller** \u2014 *\"Control the meaning-frame the model answers in, and audit every answer \u2014 on any model, no weight changes.\"* The generation-control + audit layer. - **Context Minimization** \u2014 *\"Remove only what the decision provably doesn't need.\"* Deterministic, authorization-preserving context reduction. - **ActionGate** \u2014 *\"Authorize one exact action, once.\"* The deterministic pre-commit authority. - **ACP** \u2014 *\"Is this safe against live state right now?\"* The deterministic operational-safety runtime, cross-domain. - **KVPro** \u2014 *\"Near-full-precision quality at 2\u00d7 KV density.\"* The KV-cache efficiency layer. - **Cloud Scaling Controller** \u2014 *\"A causal verdict for every scale-out.\"* The autoscaling safety interlock.",
       "use_case": "cybersecurity_advisory_review",
       "word_len": 165
@@ -3645,7 +3645,7 @@
       "artifact_id": "nat-6500c8c08220305e",
       "char_len": 200,
       "source_kind": "doc",
-      "source_path": "execution_proposal_engine/UNIVERSAL_RUNTIME_AUDIT.md",
+      "source_path": "Project_documentation/governance/execution_proposal_engine/UNIVERSAL_RUNTIME_AUDIT.md",
       "text": "Labels: `FACT` (Ugence/repo) \u00b7 `EXTERNAL KNOWLEDGE` (competitor framework architecture, general knowledge to a Jan-2026 cutoff \u2014 directional, not verified against current releases) \u00b7 `INTERPRETATION`.",
       "use_case": "software_engineering_recommendation_review",
       "word_len": 23
@@ -3695,7 +3695,7 @@
       "artifact_id": "nat-65ddd4a187314513",
       "char_len": 551,
       "source_kind": "doc",
-      "source_path": "acp/ACP_ACTIONGATE_BOUNDARY.md",
+      "source_path": "Project_documentation/control_plane/acp/ACP_ACTIONGATE_BOUNDARY.md",
       "text": "- **`ag_allows_acp_holds`** \u2014 a scale the gate fully authorizes (identity, RBAC, nonce, digest all valid), but the **real** `ReadinessChecker` blocks it because a scaling action happened 30 s ago (< the 120 s cooldown). ActionGate has no concept of live readiness; **only ACP catches this.** \u21d2 `HELD_BY_ACP`. - **`ag_denies_acp_safe`** \u2014 an operationally perfect scale (ready, within bounds, rollback present) that the gate **denies** (e.g. missing approver). ACP finding it \"safe\" must not, and does not, let it through. \u21d2 `BLOCKED_BY_AUTHORIZATION`.",
       "use_case": "cybersecurity_advisory_review",
       "word_len": 74
@@ -3725,7 +3725,7 @@
       "artifact_id": "nat-663354f57de3f3a6",
       "char_len": 630,
       "source_kind": "doc",
-      "source_path": "agent_runtime_v2/02_REMOVE_OWNERSHIP_AUDIT.md",
+      "source_path": "Project_documentation/agentic_framework/agent_runtime_v2/02_REMOVE_OWNERSHIP_AUDIT.md",
       "text": "**INTERPRETATION.** The dominant verdict is **KEEP** \u2014 because the runtime's real value (reasoning, memory, planning, risk pre-screen, policy simulation) is legitimately runtime-owned. The second theme is **REDESIGN**, concentrated entirely in the *authorization-shaped* modules that must demote to advisory/evidence. **MOVE TO ACP / CONTEXT MINIMIZATION is empty of code** \u2014 a `FACT`-level confirmation that the runtime never actually owned operational safety or context governance; it only must avoid *building* them. The only real deletions are a falsified signal and a duplicate schema. This is a clean, low-risk removal path.",
       "use_case": "cybersecurity_advisory_review",
       "word_len": 92
@@ -3745,7 +3745,7 @@
       "artifact_id": "nat-673c9bf5afdcdff9",
       "char_len": 317,
       "source_kind": "doc",
-      "source_path": "acp/ACP_ACTION_SELECTION_IMPLEMENTATION.md",
+      "source_path": "Project_documentation/control_plane/acp/ACP_ACTION_SELECTION_IMPLEMENTATION.md",
       "text": "Justification is from existing system semantics (`ACP_PHASE1_CALLSITE_AUDIT.md`): conflict resolution should prefer the safest viable strategy (fixing the BCVF demotion of `MUTUAL_STOP`); task allocation should prefer the closest capable available robot; deliberative should make goal progress among feasible actions.",
       "use_case": "software_engineering_recommendation_review",
       "word_len": 39
@@ -3775,7 +3775,7 @@
       "artifact_id": "nat-6865f104d6615e91",
       "char_len": 363,
       "source_kind": "doc",
-      "source_path": "agent_runtime_v2/09_COMPETITIVE_GAP_ANALYSIS.md",
+      "source_path": "Project_documentation/agentic_framework/agent_runtime_v2/09_COMPETITIVE_GAP_ANALYSIS.md",
       "text": "Every competitor bundles **agent orchestration** and **governance** into one framework. Ugence's architecture makes a bet the others don't: **separate the probabilistic runtime from a deterministic, cross-domain control plane (ActionGate + ACP + Context Minimization).** The gap analysis is really about whether that separation is a differentiator or a liability.",
       "use_case": "compliance_summary_review",
       "word_len": 50
@@ -3885,7 +3885,7 @@
       "artifact_id": "nat-6d03f80999bdcae7",
       "char_len": 187,
       "source_kind": "doc",
-      "source_path": "cyber_security/ACTION_GATE_SPECIFICATION.md",
+      "source_path": "Project_documentation/action_gate_cyber/cyber_security/ACTION_GATE_SPECIFICATION.md",
       "text": "The gate operates only on this framework-neutral object. Adapters (\u00a712) translate any vendor-specific call into it. Each field appears **exactly once** in the canonical enumeration below.",
       "use_case": "it_operations_guidance",
       "word_len": 28
@@ -3905,7 +3905,7 @@
       "artifact_id": "nat-6db6cffe66719dac",
       "char_len": 281,
       "source_kind": "doc",
-      "source_path": "agent_runtime_v2/08_ENTERPRISE_USE_CASES.md",
+      "source_path": "Project_documentation/agentic_framework/agent_runtime_v2/08_ENTERPRISE_USE_CASES.md",
       "text": "Complete enterprise workflows showing where each Ugence product participates. Each workflow follows the same spine (Deliverable 3): the **Agent Runtime** reasons and proposes; the **AI Control Plane** authorizes and safety-checks; **AI Infrastructure** makes it cheap and scalable.",
       "use_case": "cybersecurity_advisory_review",
       "word_len": 38
@@ -3935,7 +3935,7 @@
       "artifact_id": "nat-6e47af70e4e157ed",
       "char_len": 423,
       "source_kind": "doc",
-      "source_path": "cyber_security/ACTION_CANONICALIZATION_AND_HASHING_SPEC.md",
+      "source_path": "Project_documentation/action_gate_cyber/cyber_security/ACTION_CANONICALIZATION_AND_HASHING_SPEC.md",
       "text": "**Global rule.** An **absent key** and an **explicit `null`** are **different canonical inputs and produce different digests** (JCS serializes `{}` vs `{\"k\":null}` differently). No implicit defaults are inserted during hashing; defaults may exist only if the **signed schema version** defines them, and such defaults are materialized *before* canonicalization by a schema-versioned normalizer, never invented by the hasher.",
       "use_case": "software_engineering_recommendation_review",
       "word_len": 58
@@ -3975,7 +3975,7 @@
       "artifact_id": "nat-6f9cc3eeb7a966b8",
       "char_len": 456,
       "source_kind": "doc",
-      "source_path": "acp/ACP_CANONICAL_IDENTITY.md",
+      "source_path": "Project_documentation/control_plane/acp/ACP_CANONICAL_IDENTITY.md",
       "text": "- **`canonical_json`** = `json.dumps(canonicalize(value), sort_keys=True, separators=(\",\",\":\"), ensure_ascii=True, allow_nan=False)`. - **Domain separation** \u2014 the `domain` label + schema `version` are hashed into a prefix delimited by the unit-separator byte `0x1f`, so an action hash can never collide with a world-state hash even for an identical payload. Domains in use: `world_state`, `predictor_evidence`, `action_candidate`, `control_authorization`.",
       "use_case": "compliance_summary_review",
       "word_len": 55
@@ -3985,7 +3985,7 @@
       "artifact_id": "nat-6fa1372cdf38e902",
       "char_len": 798,
       "source_kind": "doc",
-      "source_path": "agent_runtime_v2/09_COMPETITIVE_GAP_ANALYSIS.md",
+      "source_path": "Project_documentation/agentic_framework/agent_runtime_v2/09_COMPETITIVE_GAP_ANALYSIS.md",
       "text": "**FACT / EXTERNAL.** 1. **Multi-agent maturity.** LangGraph, AutoGen, and OpenAI Agents SDK have real, shipped multi-agent orchestration; Ugence has none today (FACT). This is the biggest capability gap (Deliverable 5). 2. **Durable state / checkpointing.** LangGraph's checkpointer is a genuine strength; Ugence's \"replayable trace\" is overstated (FACT: analytics rollup). Gap to close early. 3. **Observability.** LangSmith is a mature, integrated tracing product; Ugence tracing is in-memory with no export (FACT). 4. **Managed hosting.** Bedrock Agents and OpenAI's hosted option remove ops burden; Ugence is a library (FACT). Enterprises may want managed. 5. **Ecosystem / adoption.** The competitors have large communities; Ugence is late-prototype (FACT: single CLI entry point, no CI gate).",
       "use_case": "it_operations_guidance",
       "word_len": 115
@@ -4005,7 +4005,7 @@
       "artifact_id": "nat-7021a1cdb9692507",
       "char_len": 701,
       "source_kind": "doc",
-      "source_path": "cyber_security/BCVF_CONCEPT_DIRECTION.md",
+      "source_path": "Project_documentation/action_gate_cyber/cyber_security/BCVF_CONCEPT_DIRECTION.md",
       "text": "The kill study (`kill_study/RESULTS_RECORD.md`) tested second-order BCVF as a primary takeover detector against a **fair, guards-equalized** LLT-Kalman + CUSUM baseline (same identity + disagreement channels; only the temporal channel differed). Held-out result on 1,024 paired adaptive-attack events: the second-order term produced **no practically meaningful security gain** (the one significant axis was a 0.13%-relative damage-weighted difference) and **significantly regressed** adaptive-attack detection and legitimate-drift friction. Net: **second-order divergence is null-to-negative as a primary detector**, consistent with the `Var(\u0394\u00b2d) = 6\u03c3\u00b2` finite-difference noise-amplification argument.",
       "use_case": "cybersecurity_advisory_review",
       "word_len": 98
@@ -4055,7 +4055,7 @@
       "artifact_id": "nat-717762eb209b6781",
       "char_len": 200,
       "source_kind": "doc",
-      "source_path": "cyber_security/BIOMETRIC_BCVF_SECURITY_REVIEW.md",
+      "source_path": "Project_documentation/action_gate_cyber/cyber_security/BIOMETRIC_BCVF_SECURITY_REVIEW.md",
       "text": "Take the reformulation over the scalar original every time. Do **not** ship it as an authenticator, and do not add more math until the threat model, the spoofing defense, and an EER measurement exist.",
       "use_case": "cybersecurity_advisory_review",
       "word_len": 34
@@ -4075,7 +4075,7 @@
       "artifact_id": "nat-718ae09ab1927e2c",
       "char_len": 213,
       "source_kind": "doc",
-      "source_path": "simulator/README.md",
+      "source_path": "Project_documentation/simulator/simulator/README.md",
       "text": "CTM+ is a **memory controller algorithm** (not a new chip) that uses coherence-based math to make smarter tier placement decisions. It applies the Symbol-U coherence frameworks (BCVF/USE/SCC) to memory management.",
       "use_case": "compliance_summary_review",
       "word_len": 34
@@ -4165,7 +4165,7 @@
       "artifact_id": "nat-7415110ebe3d0cdd",
       "char_len": 444,
       "source_kind": "doc",
-      "source_path": "agent_runtime_v2/00_AGENT_RUNTIME_V2_DESIGN_SUMMARY.md",
+      "source_path": "Project_documentation/agentic_framework/agent_runtime_v2/00_AGENT_RUNTIME_V2_DESIGN_SUMMARY.md",
       "text": "**Milestone:** design-only. No production code, no refactoring, no implementation. This folder is the complete design. **Premise (given):** the AI Control Plane (Context Minimization + ActionGate + ACP) owns governance. The Agentic Framework evolves into a **pure Agent Runtime** \u2014 the layer responsible only for *intelligence generation* and *workflow execution*. **Builds on:** the prior architecture review in `../agentic_framework_review/`.",
       "use_case": "compliance_summary_review",
       "word_len": 55
@@ -4185,7 +4185,7 @@
       "artifact_id": "nat-750d8540a3108480",
       "char_len": 693,
       "source_kind": "doc",
-      "source_path": "execution_proposal_engine/EXECUTION_PROPOSAL_SCHEMA.md",
+      "source_path": "Project_documentation/governance/execution_proposal_engine/EXECUTION_PROPOSAL_SCHEMA.md",
       "text": "**INTERPRETATION, tested against the design rules.** - It contains **no field only the Ugence runtime can produce.** `evidence.uncertainty` (Ugence's raw-entropy strength) is optional, not mandatory \u2014 a runtime without it simply omits it. - Every MANDATORY field is a property of *an action a runtime is about to take*, which every agent framework has by definition (they all \"wire a model to a tool-calling loop,\" `FACT`: `ACTIONGATE_VC_BRIEF.md:21\u201322`). - Provenance is recorded but identity-excluded, so the *same action* from OpenAI, LangGraph, or Claude Code yields the *same* `action_digest` and the *same* verdict \u2014 the property that makes it a shared standard rather than a Ugence API.",
       "use_case": "enterprise_policy_interpretation",
       "word_len": 108
@@ -4205,7 +4205,7 @@
       "artifact_id": "nat-75f0cbda1b0109d9",
       "char_len": 886,
       "source_kind": "doc",
-      "source_path": "cyber_security/INDEPENDENT_ARCHITECTURAL_VALIDATION.md",
+      "source_path": "Project_documentation/action_gate_cyber/cyber_security/INDEPENDENT_ARCHITECTURAL_VALIDATION.md",
       "text": "1. **De-biasing.** Discarded every prior conclusion and comment. Re-derived the enforced threat model from `action_gateway_isolated/` source, the SQLite/mTLS/ netns runtime, and the test/harness code \u2014 not from `README`/`THREAT_MODEL`. 2. **Fresh attack tree.** Built a new attack taxonomy from scratch (parser/ serialization/commit/quorum/supply-chain/transport classes), deliberately *not* reusing the internal `redteam.py` list, then checked each class against the actual code paths. 3. **Falsification bias.** Every claimed property is presumed false until an executable or code-provable mechanism establishes it; a mechanism that is only *asserted* in the harness counts as unproven. 4. **Scope.** The system's own stated adversary: a fully compromised agent with arbitrary code execution, confined to a network namespace + unprivileged user, reaching only the gateway Unix socket.",
       "use_case": "cybersecurity_advisory_review",
       "word_len": 127
@@ -4215,7 +4215,7 @@
       "artifact_id": "nat-764bf5707ccacda5",
       "char_len": 384,
       "source_kind": "doc",
-      "source_path": "agent_runtime_v2/10_FUTURE_ROADMAP.md",
+      "source_path": "Project_documentation/agentic_framework/agent_runtime_v2/10_FUTURE_ROADMAP.md",
       "text": "**FACT constraint honored:** every Track-B item is a *client in the runtime calling the Control Plane*; none modifies ActionGate/ACP/Context-Min. If a network transport doesn't exist yet (FACT: ActionGate transport is in-process/planned), the client targets the in-process reference until a transport ships. Because evidence can only *raise* scrutiny, opting in is monotonically safe.",
       "use_case": "compliance_summary_review",
       "word_len": 60
@@ -4235,7 +4235,7 @@
       "artifact_id": "nat-77539743e36be099",
       "char_len": 178,
       "source_kind": "doc",
-      "source_path": "trading/pinescript/README.md",
+      "source_path": "Project_documentation/trading/trading/pinescript/README.md",
       "text": "Separate pane oscillator showing: - Signal strength (-100 to +100) - Probability view - Utility function - Component breakdown (momentum, reversion, imbalance) - Confidence bands",
       "use_case": "software_engineering_recommendation_review",
       "word_len": 20
@@ -4285,7 +4285,7 @@
       "artifact_id": "nat-7815066ebcb66bb4",
       "char_len": 135,
       "source_kind": "doc",
-      "source_path": "agent_runtime_v2/05_MULTI_AGENT_READINESS.md",
+      "source_path": "Project_documentation/agentic_framework/agent_runtime_v2/05_MULTI_AGENT_READINESS.md",
       "text": "**RECOMMENDATION \u2014 build toward *hierarchical-capable*, in three staged layers, but ship *single-agent-first with multi-agent seams*.**",
       "use_case": "software_engineering_recommendation_review",
       "word_len": 18
@@ -4315,7 +4315,7 @@
       "artifact_id": "nat-788f265c62a255dd",
       "char_len": 343,
       "source_kind": "doc",
-      "source_path": "acp/ACP_CLOUD_CONSTRAINTS.md",
+      "source_path": "Project_documentation/control_plane/acp/ACP_CLOUD_CONSTRAINTS.md",
       "text": "Only constraints with a **real repository source** or an **explicit, documented authored fixture** are implemented. Constraints that would need fabricated telemetry (live latency SLOs, error-budget burn, per-node capacity) are **not** implemented \u2014 that is a limitation, recorded in `ACP_V2_RESULTS.md`, not a gap filled with invented numbers.",
       "use_case": "cybersecurity_advisory_review",
       "word_len": 48
@@ -4425,7 +4425,7 @@
       "artifact_id": "nat-7c032a536e252480",
       "char_len": 546,
       "source_kind": "doc",
-      "source_path": "execution_proposal_engine/EXECUTION_PROPOSAL_ENGINE.md",
+      "source_path": "Project_documentation/governance/execution_proposal_engine/EXECUTION_PROPOSAL_ENGINE.md",
       "text": "**Milestone:** design-first, evidence-first. No code, no production changes, no marketing. **Main question:** can the Agent Runtime evolve into a *pure Execution Proposal Engine* \u2014 owning reasoning, planning, decomposition, tool selection, memory, reflection, uncertainty estimation, and proposal generation, while authorization, operational safety, deployment decisions, and governance permanently leave it? **Method:** attempt to **disprove** the architecture first. If it survives, strengthen it with concrete corrections rather than agreeing.",
       "use_case": "cybersecurity_advisory_review",
       "word_len": 67
@@ -4435,7 +4435,7 @@
       "artifact_id": "nat-7c52c624a826febd",
       "char_len": 270,
       "source_kind": "doc",
-      "source_path": "acp/ACP_CLOUD_DOMAIN_MODEL.md",
+      "source_path": "Project_documentation/control_plane/acp/ACP_CLOUD_DOMAIN_MODEL.md",
       "text": "Canonical cloud envelopes. Code: `symbolu_robotics/autonomous_control_plane/cloud/envelopes.py`. All three reuse the **frozen** `identity.identity` + `normalize_float` unchanged, with per-type domain separation, so identities never collide across types or with robotics.",
       "use_case": "software_engineering_recommendation_review",
       "word_len": 32
@@ -4485,7 +4485,7 @@
       "artifact_id": "nat-7ddb9eba3ff0fb31",
       "char_len": 612,
       "source_kind": "doc",
-      "source_path": "cyber_security/PROOF_PLAN_EVALUATION.md",
+      "source_path": "Project_documentation/action_gate_cyber/cyber_security/PROOF_PLAN_EVALUATION.md",
       "text": "The original central claim \u2014 \"detects **abrupt or accelerating** divergence earlier while producing fewer challenges during gradual drift\" \u2014 restricts itself to the input class the second-order operator was built for. `\u0394\u00b2d \u2248 0` for any affine `d_t = a + b\u00b7t`, so a slow linear-ramp attacker is invisible to `E_A` **by construction**. The plan's \"decisive experiment\" made this worse by defining *genuine drift = gradual* and *takeover = abrupt* \u2014 the discriminating axis of the operator itself. That is tautological: it proves an acceleration detector can tell abrupt from gradual, not that the system is secure.",
       "use_case": "cybersecurity_advisory_review",
       "word_len": 93
@@ -4495,7 +4495,7 @@
       "artifact_id": "nat-7dfb2b0430abb56a",
       "char_len": 278,
       "source_kind": "doc",
-      "source_path": "acp/ACP_CLOUD_DOMAIN_MODEL.md",
+      "source_path": "Project_documentation/control_plane/acp/ACP_CLOUD_DOMAIN_MODEL.md",
       "text": "`operation \u2208 {SCALE, ROLLOUT, CONFIG_UPDATE, DELETE, ROLLBACK}`. Fields: `current_replicas`, `desired_replicas`, `manifest_digest`, `rollback_ref`, `rollout_strategy`, `max_unavailable`, `max_surge`, `timeout_s`, `metadata`, `provenance` (identity-excluded). Derived properties:",
       "use_case": "it_operations_guidance",
       "word_len": 21
@@ -4515,7 +4515,7 @@
       "artifact_id": "nat-7e7d704dc4b3f930",
       "char_len": 87,
       "source_kind": "doc",
-      "source_path": "cyber_security/ACTION_GATE_SPECIFICATION.md",
+      "source_path": "Project_documentation/action_gate_cyber/cyber_security/ACTION_GATE_SPECIFICATION.md",
       "text": "Conformance keywords **MUST / MUST NOT / SHOULD / MAY** are used in the RFC-2119 sense.",
       "use_case": "software_engineering_recommendation_review",
       "word_len": 14
@@ -4565,7 +4565,7 @@
       "artifact_id": "nat-8038a36311712bd7",
       "char_len": 1148,
       "source_kind": "doc",
-      "source_path": "cyber_security/ACTION_CANONICALIZATION_AND_HASHING_SPEC.md",
+      "source_path": "Project_documentation/action_gate_cyber/cyber_security/ACTION_CANONICALIZATION_AND_HASHING_SPEC.md",
       "text": "1. **No bare JSON numbers in any canonicalized authorization payload.** JCS serializes numbers via ECMAScript `Number` (IEEE-754 double), which is ambiguous/lossy for money, quotas, limits, thresholds, and integers beyond 2\u2075\u00b3. Therefore **every numeric value is encoded as a typed string** (\u00a74): decimal string (`\"1234.56\"`), minor-unit integer string (`\"123456\"`), or scaled integer string. A bare JSON number in a canonicalized payload is a **hard error** (`E_BARE_NUMBER`). This eliminates floating-point ambiguity by construction. 2. **No Unicode normalization at hashing time.** The canonicalizer preserves string content byte-for-byte (valid UTF-8 required); it MUST NOT silently apply NFC/NFKC. Per-field normalization requirements are declared by the signed schema and enforced at **validation** (reject non-conforming), never by rewriting during hashing (\u00a76). This prevents the canonicalizer from silently changing identifier meaning. 3. **Unsupported values rejected:** JSON numbers `NaN`/`Infinity` (impossible in JSON, rejected if injected via extension), non-finite, and any value not expressible under this profile \u2192 hard error (\u00a718).",
       "use_case": "cybersecurity_advisory_review",
       "word_len": 163
@@ -4615,7 +4615,7 @@
       "artifact_id": "nat-8288ead91b353e8c",
       "char_len": 787,
       "source_kind": "doc",
-      "source_path": "agent_runtime_v2/10_FUTURE_ROADMAP.md",
+      "source_path": "Project_documentation/agentic_framework/agent_runtime_v2/10_FUTURE_ROADMAP.md",
       "text": "1. **Track A leads.** You cannot integrate a Control Plane from a runtime that duplicates governance internally and overstates its own capabilities. Consolidation + honesty first. 2. **Track B is the strategic core.** The integration seam is where Ugence's differentiation lives (Deliverable 9). It starts as soon as the proposal schema is stable and stays opt-in/monotonically-safe throughout. 3. **Track C is opportunistic.** Infrastructure integration improves economics but is not on the critical path to the differentiated product; it lands as each sibling matures. 4. **Multi-agent is deliberately late.** It is the biggest competitive gap (Deliverable 9) but the highest-risk build; it is gated on durability + identity + Control-Plane integration so breadth never precedes depth.",
       "use_case": "compliance_summary_review",
       "word_len": 119
@@ -4635,7 +4635,7 @@
       "artifact_id": "nat-831ab4dd28abe5fb",
       "char_len": 166,
       "source_kind": "doc",
-      "source_path": "simulator/README.md",
+      "source_path": "Project_documentation/simulator/simulator/README.md",
       "text": "1. **>10% hit rate improvement** over LRU on at least one workload 2. **No >5% regression** on any workload 3. **Move rate <2x** compared to LRU (overhead acceptable)",
       "use_case": "software_engineering_recommendation_review",
       "word_len": 28
@@ -4675,7 +4675,7 @@
       "artifact_id": "nat-84a15873dc751ae8",
       "char_len": 404,
       "source_kind": "doc",
-      "source_path": "cyber_security/AGENT_ACTION_ADMISSIBILITY_MVP.md",
+      "source_path": "Project_documentation/action_gate_cyber/cyber_security/AGENT_ACTION_ADMISSIBILITY_MVP.md",
       "text": "**In scope (the production-infrastructure beachhead):** - Autonomous coding, operations (DevOps/SRE), and cloud agents. - Production tool calls issued by those agents. - Changes to: IAM/permissions, deployments, network exposure, databases, secrets, monitoring/ logging/security controls, and cloud cost/quota. - **Pre-commit** enforcement \u2014 the gate sits *before* the irreversible external-state change.",
       "use_case": "cybersecurity_advisory_review",
       "word_len": 50
@@ -4735,7 +4735,7 @@
       "artifact_id": "nat-8a2b5551de504143",
       "char_len": 572,
       "source_kind": "doc",
-      "source_path": "agent_runtime_v2/00_AGENT_RUNTIME_V2_DESIGN_SUMMARY.md",
+      "source_path": "Project_documentation/agentic_framework/agent_runtime_v2/00_AGENT_RUNTIME_V2_DESIGN_SUMMARY.md",
       "text": "- No production code changed; no refactoring; no implementation. Design only. - Every recommendation is grounded in repository evidence, labeled FACT/INTERPRETATION/RECOMMENDATION (EXTERNAL only for competitor knowledge in Deliverable 9). - No capability already provided by ActionGate, ACP, or Context Minimization is duplicated \u2014 the audit (Deliverable 2) removes the existing duplicates and the boundary (Deliverable 6) enforces one owner per responsibility. - Optimized for a coherent enterprise platform (Deliverables 7\u20138) over preserving legacy framework boundaries.",
       "use_case": "compliance_summary_review",
       "word_len": 73
@@ -4765,8 +4765,8 @@
       "artifact_id": "nat-8afcbe710fdce14b",
       "char_len": 228,
       "source_kind": "doc",
-      "source_path": "agent_runtime_v2/02_REMOVE_OWNERSHIP_AUDIT.md",
-      "text": "Labels: `FACT` (module behavior verified in the prior review's source reads) / `RECOMMENDATION` / `INTERPRETATION`. Line references are from the source reads in `agentic_framework_review/AGENTIC_FRAMEWORK_ARCHITECTURE_AUDIT.md`.",
+      "source_path": "Project_documentation/agentic_framework/agent_runtime_v2/02_REMOVE_OWNERSHIP_AUDIT.md",
+      "text": "Labels: `FACT` (module behavior verified in the prior review's source reads) / `RECOMMENDATION` / `INTERPRETATION`. Line references are from the source reads in `Project_documentation/agentic_framework/agentic_framework_review/AGENTIC_FRAMEWORK_ARCHITECTURE_AUDIT.md`.",
       "use_case": "software_engineering_recommendation_review",
       "word_len": 25
     },
@@ -4805,7 +4805,7 @@
       "artifact_id": "nat-8c419217e1cc3ae5",
       "char_len": 455,
       "source_kind": "doc",
-      "source_path": "acp/ACP_ARCHITECTURE.md",
+      "source_path": "Project_documentation/control_plane/acp/ACP_ARCHITECTURE.md",
       "text": "**Status:** Design-first. Documentation only. No production code is modified by this milestone. **Predecessor evidence:** `ROBOTICS_BCVF_IMPLEMENTATION_AUDIT.md`, `ROBOTICS_BCVF_INCREMENTAL_VALUE_RESULTS.md`, `ROBOTICS_ACTIONGATE_ARCHITECTURE_MAPPING.md`. **Design stance:** ACP is designed **as though BCVF never existed**. BCVF is not a foundation; at most it is one optional predictor-disagreement *feature* (\u00a76, and `ACP_PREDICTOR_RELIABILITY_V2.md`).",
       "use_case": "software_engineering_recommendation_review",
       "word_len": 49
@@ -4865,7 +4865,7 @@
       "artifact_id": "nat-8fa847fd4a93781e",
       "char_len": 241,
       "source_kind": "doc",
-      "source_path": "acp/ACP_CLOUD_ADAPTER_DESIGN.md",
+      "source_path": "Project_documentation/control_plane/acp/ACP_CLOUD_ADAPTER_DESIGN.md",
       "text": "`_blast_sort_key(c) = (blast_radius, is_destructive?1:0, operation)` \u2014 smallest operational blast first, destructive last, then the candidate id appended by the selector as the always-unique final tie-break. Total, deterministic, replayable.",
       "use_case": "it_operations_guidance",
       "word_len": 31
@@ -4895,7 +4895,7 @@
       "artifact_id": "nat-8fc6e146aa3dcd1a",
       "char_len": 644,
       "source_kind": "doc",
-      "source_path": "truth_assurance_pipeline/tap_e1_1_realmodel/README.md",
+      "source_path": "Project_documentation/truth_assurance_pipeline/truth_assurance_pipeline/tap_e1_1_realmodel/README.md",
       "text": "- No Anthropic API key exists here, so the LLM interpretations were produced by the **in-session agent model (`claude-opus-4-8`)** from the prompt only, and cached to `cache/agent_model_outputs.jsonl`. An LLM performed the interpretation \u2014 but **not** an independently accessed model. - The **same model authored the corpus and produced the interpretations** (author==interpreter confound), and the locked eval was **seen by the interpreter** (not double-blind). This is the largest limitation and caps the claim to architectural integration. - Corpus is synthetic and below the target size; latency is not measured; token counts are estimates.",
       "use_case": "cybersecurity_advisory_review",
       "word_len": 96
@@ -5045,7 +5045,7 @@
       "artifact_id": "nat-94dc21c096fa477f",
       "char_len": 1199,
       "source_kind": "doc",
-      "source_path": "execution_proposal_engine/EXECUTION_PROPOSAL_ENGINE.md",
+      "source_path": "Project_documentation/governance/execution_proposal_engine/EXECUTION_PROPOSAL_ENGINE.md",
       "text": "**Claim under test:** \"Everything after the Execution Proposal belongs to the AI Control Plane.\" **FACT.** The runtime's actual loop does not end at the proposal. `agent.py` runs `\u20267. Execute actions \u2192 8. Update Memory \u2192 9. Check for intervention` (`agentic/agentic_framework/agent.py:490\u2013514`), and the Agent Runtime V2 pipeline is explicitly `\u2026propose \u2192 [Control Plane] \u2192 execute \u2192 11. Observation \u2192 12. Reflection \u2192 13. Memory update \u2192 14. next step` (`../agent_runtime_v2/03_RUNTIME_PIPELINE_V2.md`). **INTERPRETATION.** The proposal boundary is real, but it is **not a terminus** \u2014 it is a *segment*. The Control Plane owns `authorize \u2192 execute`; the **execution result returns to the runtime**, which owns observation, reflection, and memory update. The stated linear diagram (`\u2026 \u2192 Execution Token \u2192 Infrastructure`, full stop) omits the return arrow. **Correction (mandatory):** the runtime is a **Proposal-and-Observation *loop* engine**, not a one-way proposal emitter. \"Everything after the proposal belongs to the Control Plane\" is false; the correct statement is \"the *authorize-and-execute segment* belongs to the Control Plane; the *observe-and-reflect return* belongs to the runtime.\"",
       "use_case": "cybersecurity_advisory_review",
       "word_len": 170
@@ -5055,7 +5055,7 @@
       "artifact_id": "nat-95445adb25d4baf7",
       "char_len": 189,
       "source_kind": "doc",
-      "source_path": "acp/ACP_CLOUD_ADAPTER_DESIGN.md",
+      "source_path": "Project_documentation/control_plane/acp/ACP_CLOUD_ADAPTER_DESIGN.md",
       "text": "Code: `symbolu_robotics/autonomous_control_plane/cloud/adapter.py` (`CloudShadowAdapter`). The adapter orchestrates one cloud decision end-to-end, reusing the **frozen ACP core unchanged**:",
       "use_case": "software_engineering_recommendation_review",
       "word_len": 22
@@ -5065,7 +5065,7 @@
       "artifact_id": "nat-95b1f44d18e1eba0",
       "char_len": 467,
       "source_kind": "doc",
-      "source_path": "acp/ACP_CANDIDATE_TRAJECTORY_BRIDGE.md",
+      "source_path": "Project_documentation/control_plane/acp/ACP_CANDIDATE_TRAJECTORY_BRIDGE.md",
       "text": "- Extracts the first `ActuatorCommand` from the real `Plan`. - A constant joint-velocity command is rolled forward by **deterministic forward Euler** (`velocity_command_to_trajectory`): `q_k = q0 + v \u00b7 (k\u00b7dt)`, `TrajectoryPoint(timestamp=k\u00b7dt, positions=q_k, velocities=v)`. This is the literal meaning of \"apply velocity v for duration T\" \u2014 not an inferred or interpolated physical value. - An `emergency_stop` command \u2192 a zero-velocity (inherently safe) trajectory.",
       "use_case": "software_engineering_recommendation_review",
       "word_len": 62
@@ -5075,7 +5075,7 @@
       "artifact_id": "nat-95c592e848b7f747",
       "char_len": 220,
       "source_kind": "doc",
-      "source_path": "cyber_security/ACTION_CANONICALIZATION_AND_HASHING_SPEC.md",
+      "source_path": "Project_documentation/action_gate_cyber/cyber_security/ACTION_CANONICALIZATION_AND_HASHING_SPEC.md",
       "text": "This document defines the exact canonical representation used for: action hashes, approval binding, policy hashes, evidence hashes, audit-record hashes, replay prevention, and modification detection. Required properties:",
       "use_case": "compliance_summary_review",
       "word_len": 27
@@ -5105,7 +5105,7 @@
       "artifact_id": "nat-966f69d3a2354d23",
       "char_len": 93,
       "source_kind": "doc",
-      "source_path": "cyber_security/GAP_REGISTER.md",
+      "source_path": "Project_documentation/action_gate_cyber/cyber_security/GAP_REGISTER.md",
       "text": "Separate **current-action** risk from **future-path** risk; keep the path term **secondary**:",
       "use_case": "software_engineering_recommendation_review",
       "word_len": 13
@@ -5145,7 +5145,7 @@
       "artifact_id": "nat-98329f97edf06ab7",
       "char_len": 420,
       "source_kind": "doc",
-      "source_path": "acp/ACP_CANONICAL_IDENTITY.md",
+      "source_path": "Project_documentation/control_plane/acp/ACP_CANONICAL_IDENTITY.md",
       "text": "- Non-finite values fail loudly at the earliest point: envelope construction (`normalize_float` in `__post_init__`) and again in `canonicalize`. - `-0.0` is normalized to `0.0` so numerically-equal values share an identity. - Floats are serialized by Python's shortest-round-trip `repr` via `json`; no fixed-precision rounding is applied to the identity itself (callers that want tolerance must quantize before hashing).",
       "use_case": "software_engineering_recommendation_review",
       "word_len": 62
@@ -5185,7 +5185,7 @@
       "artifact_id": "nat-991f869dd851416d",
       "char_len": 455,
       "source_kind": "doc",
-      "source_path": "acp/ACP_CLOUD_DOMAIN_MODEL.md",
+      "source_path": "Project_documentation/control_plane/acp/ACP_CLOUD_DOMAIN_MODEL.md",
       "text": "Deterministic operational-safety evidence for one candidate, produced by the evaluator (see `ACP_CLOUD_CONSTRAINTS.md`). `validity \u2208 {VALID, STALE, EVALUATOR_FAILED, MISSING}`; `is_usable` iff `VALID`. Carries `readiness_ok`, `readiness_status`, `capacity_margin_replicas`, `rollback_available`, `blast_radius`, `freeze_active`, `dependency_healthy`, `reason_codes`, and the `candidate_identity` + `state_version` it binds to. `note` is identity-excluded.",
       "use_case": "it_operations_guidance",
       "word_len": 42
@@ -5205,7 +5205,7 @@
       "artifact_id": "nat-9a1e2e05f16b90f7",
       "char_len": 343,
       "source_kind": "doc",
-      "source_path": "acp/ACP_CLOUD_CONSTRAINTS.md",
+      "source_path": "Project_documentation/control_plane/acp/ACP_CLOUD_CONSTRAINTS.md",
       "text": "`world is None` \u21d2 `MISSING`; `origin_state_version \u2260 world.version` \u21d2 `MISSING` (binding mismatch); `freshness_s > 30 s` or `< 0` \u21d2 `STALE`; any exception from a real `cloud_controller` evaluator \u21d2 `EVALUATOR_FAILED`. In every case the evaluator returns a **single failing HARD result**, so the candidate is inadmissible \u2014 never a silent pass.",
       "use_case": "software_engineering_recommendation_review",
       "word_len": 44
@@ -5225,7 +5225,7 @@
       "artifact_id": "nat-9a6258fefc215cb6",
       "char_len": 408,
       "source_kind": "doc",
-      "source_path": "acp/ACP_CANDIDATE_TRAJECTORY_BRIDGE.md",
+      "source_path": "Project_documentation/control_plane/acp/ACP_CANDIDATE_TRAJECTORY_BRIDGE.md",
       "text": "candidate/action id (`candidate_id`); trajectory points + timestamps (from the bridge); joint ordering (6-joint count checked); coordinate frame (`joint`, recorded in metadata); world-state identity (`origin_state_version`); planner provenance (metadata `planner_provenance`); validator config/version (recorded by the Phase-2 adapter). The candidate carries a content `identity` that binds all of the above.",
       "use_case": "software_engineering_recommendation_review",
       "word_len": 51
@@ -5275,7 +5275,7 @@
       "artifact_id": "nat-9b37bb5d3b700621",
       "char_len": 438,
       "source_kind": "doc",
-      "source_path": "cyber_security/COMBINED_ARCHITECTURE_BCVF2_USE_SCC.md",
+      "source_path": "Project_documentation/action_gate_cyber/cyber_security/COMBINED_ARCHITECTURE_BCVF2_USE_SCC.md",
       "text": "**Status:** a *testable architecture spec*, not a validated product claim. Each component carries an explicit status label (established / commodity-necessary / auxiliary-unproven / unproven-pending-test). The next phase evaluates each part with **synthetic data, fair baselines, and preregistered kill criteria** (\u00a76). This document defines the combined design and the corrected mathematics; it does **not** assert that every piece works.",
       "use_case": "software_engineering_recommendation_review",
       "word_len": 59
@@ -5285,7 +5285,7 @@
       "artifact_id": "nat-9c45a429820aff4a",
       "char_len": 106,
       "source_kind": "doc",
-      "source_path": "cyber_security/INDEPENDENT_ARCHITECTURAL_VALIDATION.md",
+      "source_path": "Project_documentation/action_gate_cyber/cyber_security/INDEPENDENT_ARCHITECTURAL_VALIDATION.md",
       "text": "New attack classes, each checked against code. **D = demonstrated from code; A = architecturally argued.**",
       "use_case": "cybersecurity_advisory_review",
       "word_len": 14
@@ -5315,7 +5315,7 @@
       "artifact_id": "nat-9dfa077fb08b1f86",
       "char_len": 169,
       "source_kind": "doc",
-      "source_path": "agent_runtime_v2/01_RUNTIME_RESPONSIBILITY_MATRIX.md",
+      "source_path": "Project_documentation/agentic_framework/agent_runtime_v2/01_RUNTIME_RESPONSIBILITY_MATRIX.md",
       "text": "This document is grounded in the prior review (`agentic_framework_review/`) and the source it cites. It defines exactly what the runtime owns and what it must never own.",
       "use_case": "software_engineering_recommendation_review",
       "word_len": 27
@@ -5325,7 +5325,7 @@
       "artifact_id": "nat-9ecdf3b393cd61e6",
       "char_len": 125,
       "source_kind": "doc",
-      "source_path": "agent_runtime_v2/06_RUNTIME_VS_CONTROL_PLANE_OWNERSHIP.md",
+      "source_path": "Project_documentation/agentic_framework/agent_runtime_v2/06_RUNTIME_VS_CONTROL_PLANE_OWNERSHIP.md",
       "text": "These are the places the current framework *does* overlap the Control Plane. Each gets a single owner and a precise cut line.",
       "use_case": "compliance_summary_review",
       "word_len": 22
@@ -5355,8 +5355,8 @@
       "artifact_id": "nat-a08774c7c36a5e52",
       "char_len": 1062,
       "source_kind": "doc",
-      "source_path": "agent_runtime_v2/07_PRODUCT_POSITIONING.md",
-      "text": "**FACT-anchored interaction points:** - **Runtime \u2192 Hybrid LLM / LLM Steering Controller.** The runtime is model-agnostic (FACT: `llm_adapters` for OpenAI/Anthropic/Mistral + `MistralCGAdapter`). It can run on Hybrid LLM (better long-context) and enrich generation with the LLM Steering Controller (frame control + the 32-D signal \u2014 now *advisory* per the falsification finding, useful as evidence not governance). - **Runtime \u2192 Control Plane.** The Execution Proposal (Deliverable 3) is the single seam. Context Minimization optionally compresses the runtime's context; ActionGate authorizes; ACP safety-checks. - **Control Plane \u2192 Infrastructure.** ACP already *consumes* the Cloud Scaling Controller as its cloud operational-safety evaluator (FACT: `acp/AI_CONTROL_PLANE_ARCHITECTURE.md` \u2014 \"ACP (frozen core + cloud_controller)\"). KVPro sits under all model inference. - **Infrastructure is beneath everything.** KVPro reduces serving cost for every model call the runtime makes; the Cloud Scaling Controller scales the serving fleet \u2014 itself governed by ACP.",
+      "source_path": "Project_documentation/agentic_framework/agent_runtime_v2/07_PRODUCT_POSITIONING.md",
+      "text": "**FACT-anchored interaction points:** - **Runtime \u2192 Hybrid LLM / LLM Steering Controller.** The runtime is model-agnostic (FACT: `llm_adapters` for OpenAI/Anthropic/Mistral + `MistralCGAdapter`). It can run on Hybrid LLM (better long-context) and enrich generation with the LLM Steering Controller (frame control + the 32-D signal \u2014 now *advisory* per the falsification finding, useful as evidence not governance). - **Runtime \u2192 Control Plane.** The Execution Proposal (Deliverable 3) is the single seam. Context Minimization optionally compresses the runtime's context; ActionGate authorizes; ACP safety-checks. - **Control Plane \u2192 Infrastructure.** ACP already *consumes* the Cloud Scaling Controller as its cloud operational-safety evaluator (FACT: `Project_documentation/control_plane/acp/AI_CONTROL_PLANE_ARCHITECTURE.md` \u2014 \"ACP (frozen core + cloud_controller)\"). KVPro sits under all model inference. - **Infrastructure is beneath everything.** KVPro reduces serving cost for every model call the runtime makes; the Cloud Scaling Controller scales the serving fleet \u2014 itself governed by ACP.",
       "use_case": "cybersecurity_advisory_review",
       "word_len": 138
     },
@@ -5385,7 +5385,7 @@
       "artifact_id": "nat-a1d8419bb116f52c",
       "char_len": 189,
       "source_kind": "doc",
-      "source_path": "trading/pinescript/README.md",
+      "source_path": "Project_documentation/trading/trading/pinescript/README.md",
       "text": "Main overlay indicator that displays: - Entry/exit signal arrows - Regime background coloring - Comprehensive signal table with probabilities and recommendations - Real-time state evolution",
       "use_case": "software_engineering_recommendation_review",
       "word_len": 23
@@ -5395,7 +5395,7 @@
       "artifact_id": "nat-a2e806a4dbb611d2",
       "char_len": 185,
       "source_kind": "doc",
-      "source_path": "acp/ACP_ACTION_SELECTION_IMPLEMENTATION.md",
+      "source_path": "Project_documentation/control_plane/acp/ACP_ACTION_SELECTION_IMPLEMENTATION.md",
       "text": "Encoded in `adapters.py` as the `sort_key`. Candidate id is appended by the selector as the always-unique final tie-break, so the order is total and the winner is unique and replayable.",
       "use_case": "software_engineering_recommendation_review",
       "word_len": 33
@@ -5425,7 +5425,7 @@
       "artifact_id": "nat-a43b4f9f39289b85",
       "char_len": 87,
       "source_kind": "doc",
-      "source_path": "cyber_security/PROOF_PLAN_EVALUATION.md",
+      "source_path": "Project_documentation/action_gate_cyber/cyber_security/PROOF_PLAN_EVALUATION.md",
       "text": "So the honest thesis is **not** \"second-order divergence detects slow takeover.\" It is:",
       "use_case": "software_engineering_recommendation_review",
       "word_len": 14
@@ -5495,7 +5495,7 @@
       "artifact_id": "nat-a7091476b835e35a",
       "char_len": 101,
       "source_kind": "doc",
-      "source_path": "cyber_security/INDEPENDENT_ARCHITECTURAL_VALIDATION.md",
+      "source_path": "Project_documentation/action_gate_cyber/cyber_security/INDEPENDENT_ARCHITECTURAL_VALIDATION.md",
       "text": "Everything else in the \"SUPPORTED\" verdict required scrutiny \u2014 and several claims did not survive it.",
       "use_case": "technical_support_review",
       "word_len": 15
@@ -5525,8 +5525,8 @@
       "artifact_id": "nat-a74d733bf633b537",
       "char_len": 545,
       "source_kind": "doc",
-      "source_path": "agent_runtime_v2/06_RUNTIME_VS_CONTROL_PLANE_OWNERSHIP.md",
-      "text": "- **Agent-behavior policy** (interaction mode, revision budget, response style, domain profile) \u2192 **Runtime** (`policy_bundle`, `domain_policy`). - **Action-authorization policy** (may this operation run, under what hard invariants) \u2192 **ActionGate** (signed policy bundle). - **FACT \u2014 same word, different objects:** the ACP corpus already flags this pattern (\"Same word, two different computations at two different layers,\" `acp/ACP_ACTIONGATE_BOUNDARY.md`). RECOMMENDATION: namespace the runtime's policy as \"behavior policy\" to prevent drift.",
+      "source_path": "Project_documentation/agentic_framework/agent_runtime_v2/06_RUNTIME_VS_CONTROL_PLANE_OWNERSHIP.md",
+      "text": "- **Agent-behavior policy** (interaction mode, revision budget, response style, domain profile) \u2192 **Runtime** (`policy_bundle`, `domain_policy`). - **Action-authorization policy** (may this operation run, under what hard invariants) \u2192 **ActionGate** (signed policy bundle). - **FACT \u2014 same word, different objects:** the ACP corpus already flags this pattern (\"Same word, two different computations at two different layers,\" `Project_documentation/control_plane/acp/ACP_ACTIONGATE_BOUNDARY.md`). RECOMMENDATION: namespace the runtime's policy as \"behavior policy\" to prevent drift.",
       "use_case": "cybersecurity_advisory_review",
       "word_len": 65
     },
@@ -5555,7 +5555,7 @@
       "artifact_id": "nat-a873f34466d85ec4",
       "char_len": 174,
       "source_kind": "doc",
-      "source_path": "cyber_security/COMBINED_ARCHITECTURE_BCVF2_USE_SCC.md",
+      "source_path": "Project_documentation/action_gate_cyber/cyber_security/COMBINED_ARCHITECTURE_BCVF2_USE_SCC.md",
       "text": "Carries forward the conclusions of `BIOMETRIC_BCVF_SECURITY_REVIEW.md`, `PROOF_PLAN_EVALUATION.md`, `kill_study/`, `BCVF_CONCEPT_DIRECTION.md`, and `USE_CONTRIBUTION_MAP.md`.",
       "use_case": "software_engineering_recommendation_review",
       "word_len": 15
@@ -5595,7 +5595,7 @@
       "artifact_id": "nat-a962ddc4de5591d6",
       "char_len": 86,
       "source_kind": "doc",
-      "source_path": "simulator/README.md",
+      "source_path": "Project_documentation/simulator/simulator/README.md",
       "text": "- `op_type`: 0=READ, 1=WRITE, 2=PREFETCH - `size`: Access size in bytes (default 4096)",
       "use_case": "software_engineering_recommendation_review",
       "word_len": 14
@@ -5625,7 +5625,7 @@
       "artifact_id": "nat-a9c5ea68cffc7013",
       "char_len": 333,
       "source_kind": "doc",
-      "source_path": "agent_runtime_v2/07_PRODUCT_POSITIONING.md",
+      "source_path": "Project_documentation/agentic_framework/agent_runtime_v2/07_PRODUCT_POSITIONING.md",
       "text": "**INTERPRETATION \u2014 the platform story in one line.** *Infrastructure makes AI cheap and fast; Specialized Systems do the applied work; the Control Plane makes the work safe and authorized.* The Agent Runtime is the demand-generator that ties the three together: it consumes models (Specialized/Infra), and it feeds the Control Plane.",
       "use_case": "cybersecurity_advisory_review",
       "word_len": 51
@@ -5655,7 +5655,7 @@
       "artifact_id": "nat-aa54deacb3ad0b74",
       "char_len": 269,
       "source_kind": "doc",
-      "source_path": "agent_runtime_v2/01_RUNTIME_RESPONSIBILITY_MATRIX.md",
+      "source_path": "Project_documentation/agentic_framework/agent_runtime_v2/01_RUNTIME_RESPONSIBILITY_MATRIX.md",
       "text": "**INTERPRETATION.** Every \"owns\" row is either an existing framework strength or an agent-runtime capability gap (identity/registry/lifecycle/checkpointing/observability-export). None of them is a governance concern. This is the correct center of gravity for a runtime.",
       "use_case": "compliance_summary_review",
       "word_len": 39
@@ -5675,7 +5675,7 @@
       "artifact_id": "nat-aabbeb9f59609115",
       "char_len": 263,
       "source_kind": "doc",
-      "source_path": "execution_proposal_engine/EXECUTION_PROPOSAL_SCHEMA.md",
+      "source_path": "Project_documentation/governance/execution_proposal_engine/EXECUTION_PROPOSAL_SCHEMA.md",
       "text": "**Design constraint (from the milestone):** design it around *every* runtime, **not** around Ugence's. It must be producible by OpenAI Agents SDK, LangGraph, CrewAI, Google ADK, AutoGen, Semantic Kernel, Claude Code, the Ugence Agent Runtime, and future runtimes.",
       "use_case": "software_engineering_recommendation_review",
       "word_len": 38
@@ -5725,7 +5725,7 @@
       "artifact_id": "nat-ab47f47de2a6f1cb",
       "char_len": 339,
       "source_kind": "doc",
-      "source_path": "agent_runtime_v2/08_ENTERPRISE_USE_CASES.md",
+      "source_path": "Project_documentation/agentic_framework/agent_runtime_v2/08_ENTERPRISE_USE_CASES.md",
       "text": "**FACT.** Manufacturing/robotics is the one domain where the *same frozen ACP core* already runs (FACT: robotics + cloud on one byte-identical core). The runtime adds the task-level intelligence above ACP's per-tick actuation safety. This is the strongest proof that runtime \u27c2 control-plane generalizes across physical and digital domains.",
       "use_case": "compliance_summary_review",
       "word_len": 52
@@ -5785,7 +5785,7 @@
       "artifact_id": "nat-ace4e6e20bba9519",
       "char_len": 242,
       "source_kind": "doc",
-      "source_path": "cyber_security/CRITICAL_TRANSITION_GOVERNANCE.md",
+      "source_path": "Project_documentation/action_gate_cyber/cyber_security/CRITICAL_TRANSITION_GOVERNANCE.md",
       "text": "- insider threats and privileged misuse, - compromised-but-authenticated privileged users, - honest mistakes and misconfiguration, - policy / compliance violations, - **AI-agent errors** (an autonomous agent making a poorly-justified change).",
       "use_case": "cybersecurity_advisory_review",
       "word_len": 28
@@ -5815,7 +5815,7 @@
       "artifact_id": "nat-adbf7a8572e34a8a",
       "char_len": 284,
       "source_kind": "doc",
-      "source_path": "cyber_security/AGENT_ACTION_ADMISSIBILITY_MVP.md",
+      "source_path": "Project_documentation/action_gate_cyber/cyber_security/AGENT_ACTION_ADMISSIBILITY_MVP.md",
       "text": "**No new mathematics claim.** This is a new *infrastructure layer*, not a new abstraction. It applies viability / invariant-preservation (control theory), reachability (attack graphs), and constraint logic (policy-as-code) to the uniform action boundary of autonomous agents. See \u00a712.",
       "use_case": "cybersecurity_advisory_review",
       "word_len": 40
@@ -5885,7 +5885,7 @@
       "artifact_id": "nat-b208c4f00683f6c1",
       "char_len": 318,
       "source_kind": "doc",
-      "source_path": "cyber_security/AGENT_ACTION_ADMISSIBILITY_MVP.md",
+      "source_path": "Project_documentation/action_gate_cyber/cyber_security/AGENT_ACTION_ADMISSIBILITY_MVP.md",
       "text": "**Evaluation discipline** is inherited from `kill_study/` (preregistration, fair baselines, paired comparison, mechanical verdict, **practical** effect thresholds `\u0394_min`, no post-hoc goalpost moves). BCVF / USE / SCC are **not** core mechanisms here; see \u00a71 and `BCVF_CONCEPT_DIRECTION.md`, `USE_CONTRIBUTION_MAP.md`.",
       "use_case": "software_engineering_recommendation_review",
       "word_len": 37
@@ -5895,7 +5895,7 @@
       "artifact_id": "nat-b235285f0b5b8916",
       "char_len": 277,
       "source_kind": "doc",
-      "source_path": "acp/ACP_ACTION_SELECTION_IMPLEMENTATION.md",
+      "source_path": "Project_documentation/control_plane/acp/ACP_ACTION_SELECTION_IMPLEMENTATION.md",
       "text": "`filter_admissible(candidates, candidate_constraints)` is shared by both selectors. A candidate is admissible iff it has \u22651 HARD result and no failed HARD result. No hard evidence \u21d2 not admissible (fail closed). The first failed HARD result is the dispositive rejection reason.",
       "use_case": "software_engineering_recommendation_review",
       "word_len": 40
@@ -5915,7 +5915,7 @@
       "artifact_id": "nat-b3d1206501d5c1ee",
       "char_len": 563,
       "source_kind": "doc",
-      "source_path": "agent_runtime_v2/03_RUNTIME_PIPELINE_V2.md",
+      "source_path": "Project_documentation/agentic_framework/agent_runtime_v2/03_RUNTIME_PIPELINE_V2.md",
       "text": "**FACT-anchored \u2014 these steps do NOT appear in the runtime and must not be added:** - No authorization decision inside the runtime (steps A\u2013C are the Control Plane; the runtime only *packages* a proposal and *consumes* a verdict). - No credential handling before step 10 \u2014 the runtime never holds a long-lived credential; ActionGate brokers a single-use one. - No operational-readiness check \u2014 the runtime has no live-cluster/robot-state model; ACP owns it. - No context-relevance/compression logic \u2014 step 3b is a *call* to Context Minimization, not runtime code.",
       "use_case": "cybersecurity_advisory_review",
       "word_len": 90
@@ -5965,7 +5965,7 @@
       "artifact_id": "nat-b5a1479872e13dc3",
       "char_len": 208,
       "source_kind": "doc",
-      "source_path": "acp/ACP_ARCHITECTURE.md",
+      "source_path": "Project_documentation/control_plane/acp/ACP_ARCHITECTURE.md",
       "text": "This document defines the control plane (Task 1) and its runtime governance (Task 6). Per-stage deterministic logic is in `ACP_RUNTIME_PIPELINE.md`; the subsystem designs are in the sibling docs listed in \u00a79.",
       "use_case": "compliance_summary_review",
       "word_len": 33
@@ -5985,7 +5985,7 @@
       "artifact_id": "nat-b67c3649af40a112",
       "char_len": 204,
       "source_kind": "doc",
-      "source_path": "trading/pinescript/README.md",
+      "source_path": "Project_documentation/trading/trading/pinescript/README.md",
       "text": "This is a Pine Script v6 conversion of the SymbolU State Evolution trading system originally built for QuantConnect. The system uses adaptive state evolution with EMA blending to generate trading signals.",
       "use_case": "software_engineering_recommendation_review",
       "word_len": 31
@@ -5995,7 +5995,7 @@
       "artifact_id": "nat-b6b2083f09cd1b3a",
       "char_len": 199,
       "source_kind": "doc",
-      "source_path": "acp/ACP_ACTION_SELECTION_IMPLEMENTATION.md",
+      "source_path": "Project_documentation/control_plane/acp/ACP_ACTION_SELECTION_IMPLEMENTATION.md",
       "text": "- `DeterministicActionSelector` (Phase 0) \u2014 scalar soft cost \u2192 margin \u2192 id. - `LexicographicActionSelector` (Phase 1) \u2014 a caller-supplied frozen total key \u2192 id. Used for all three call-site adapters.",
       "use_case": "software_engineering_recommendation_review",
       "word_len": 25
@@ -6035,7 +6035,7 @@
       "artifact_id": "nat-b7b70f67ffc41ed2",
       "char_len": 167,
       "source_kind": "doc",
-      "source_path": "trading/README.md",
+      "source_path": "Project_documentation/trading/trading/README.md",
       "text": "This framework adapts the v2.7 Deterministic State Evolution Layer for trading, using tick-based (not time-based) analysis. It's designed for QuantConnect integration.",
       "use_case": "software_engineering_recommendation_review",
       "word_len": 25
@@ -6075,7 +6075,7 @@
       "artifact_id": "nat-b87c28804247e5ba",
       "char_len": 381,
       "source_kind": "doc",
-      "source_path": "agent_runtime_v2/09_COMPETITIVE_GAP_ANALYSIS.md",
+      "source_path": "Project_documentation/agentic_framework/agent_runtime_v2/09_COMPETITIVE_GAP_ANALYSIS.md",
       "text": "**Evidence discipline.** Statements about *Ugence* are `FACT` (repo) or `RECOMMENDATION` (this design). Statements about *competitors* are `EXTERNAL` \u2014 general architectural knowledge of these frameworks as of the assistant's Jan 2026 cutoff, not repo evidence, and not verified against current releases. Treat EXTERNAL rows as directional category comparisons, not audited claims.",
       "use_case": "compliance_summary_review",
       "word_len": 50
@@ -6175,7 +6175,7 @@
       "artifact_id": "nat-bcd1e9cf42e7f06f",
       "char_len": 164,
       "source_kind": "doc",
-      "source_path": "acp/ACP_CLOUD_SHADOW_METHOD.md",
+      "source_path": "Project_documentation/control_plane/acp/ACP_CLOUD_SHADOW_METHOD.md",
       "text": "All 16 required \u00a79 scenarios are present, including the two decisive boundary cases. Times are fixed constants (no wall clock) so the corpus is fully deterministic.",
       "use_case": "software_engineering_recommendation_review",
       "word_len": 26
@@ -6205,7 +6205,7 @@
       "artifact_id": "nat-bd37d25e089c8097",
       "char_len": 126,
       "source_kind": "doc",
-      "source_path": "cyber_security/BCVF_CONCEPT_DIRECTION.md",
+      "source_path": "Project_documentation/action_gate_cyber/cyber_security/BCVF_CONCEPT_DIRECTION.md",
       "text": "**Do not** re-advance \"second-order BCVF detects takeover while tolerating drift.\" It has been fairly tested and did not hold.",
       "use_case": "software_engineering_recommendation_review",
       "word_len": 21
@@ -6265,7 +6265,7 @@
       "artifact_id": "nat-becbce9569c40d98",
       "char_len": 88,
       "source_kind": "doc",
-      "source_path": "cyber_security/BIOMETRIC_BCVF_SECURITY_REVIEW.md",
+      "source_path": "Project_documentation/action_gate_cyber/cyber_security/BIOMETRIC_BCVF_SECURITY_REVIEW.md",
       "text": "The reformulation cites two prior-work claims. Both are accurate against the repository:",
       "use_case": "software_engineering_recommendation_review",
       "word_len": 13
@@ -6275,7 +6275,7 @@
       "artifact_id": "nat-bf4fc81fff06ea2b",
       "char_len": 351,
       "source_kind": "doc",
-      "source_path": "trading/README.md",
+      "source_path": "Project_documentation/trading/trading/README.md",
       "text": "1. **Asymmetric Learning** - Learn faster from losses (\u03b1\u00d72) than gains (\u03b1\u00d70.5) 2. **Volatility Scaling** - Reduce signals in high volatility 3. **Order Flow Imbalance** - Buy/sell pressure detection 4. **Regime Detection** - Trending/ranging/crisis modes 5. **Circuit Breakers** - Halt on max drawdown 6. **Tick-based Processing** - Not time-bar based",
       "use_case": "software_engineering_recommendation_review",
       "word_len": 52
@@ -6335,7 +6335,7 @@
       "artifact_id": "nat-c0068c2cd5d1b004",
       "char_len": 330,
       "source_kind": "doc",
-      "source_path": "cyber_security/COMBINED_ARCHITECTURE_BCVF2_USE_SCC.md",
+      "source_path": "Project_documentation/action_gate_cyber/cyber_security/COMBINED_ARCHITECTURE_BCVF2_USE_SCC.md",
       "text": "- `t` timestep; `m \u2208 {1..M}` modality; `x_{m,t}` raw stream; `z_{m,t}` embedding. - `c_t` context = (task, UI state, device class, sampling profile). - `q_m(t) \u2208 [0,1]` modality quality (presence, SNR, sampling validity). - `\u03bc_u(c_t), \u03a3_u(c_t)` context-conditioned enrolled-identity prototype; `\u03bc_verified` the strong-auth anchor.",
       "use_case": "cybersecurity_advisory_review",
       "word_len": 48
@@ -6415,8 +6415,8 @@
       "artifact_id": "nat-c284f88b38007618",
       "char_len": 431,
       "source_kind": "doc",
-      "source_path": "agent_runtime_v2/03_RUNTIME_PIPELINE_V2.md",
-      "text": "**FACT \u2014 this is the ACP pipeline's own shape, read from the runtime side.** `acp/AI_CONTROL_PLANE_ARCHITECTURE.md`: `Original Context \u2192 Context Minimization \u2192 LLM reader \u2192 Proposed Action \u2192 ActionGate \u2192 ACP \u2192 Compose \u2192 (eligible) Execution`. Steps 1\u20139 above *are* the \"LLM reader \u2192 Proposed Action\" box, expanded into a real agent loop; steps A\u2013C are the Control Plane unchanged; steps 10\u201314 are the runtime consuming the verdict.",
+      "source_path": "Project_documentation/agentic_framework/agent_runtime_v2/03_RUNTIME_PIPELINE_V2.md",
+      "text": "**FACT \u2014 this is the ACP pipeline's own shape, read from the runtime side.** `Project_documentation/control_plane/acp/AI_CONTROL_PLANE_ARCHITECTURE.md`: `Original Context \u2192 Context Minimization \u2192 LLM reader \u2192 Proposed Action \u2192 ActionGate \u2192 ACP \u2192 Compose \u2192 (eligible) Execution`. Steps 1\u20139 above *are* the \"LLM reader \u2192 Proposed Action\" box, expanded into a real agent loop; steps A\u2013C are the Control Plane unchanged; steps 10\u201314 are the runtime consuming the verdict.",
       "use_case": "compliance_summary_review",
       "word_len": 64
     },
@@ -6435,7 +6435,7 @@
       "artifact_id": "nat-c2a300ca5d29c252",
       "char_len": 204,
       "source_kind": "doc",
-      "source_path": "agent_runtime_v2/10_FUTURE_ROADMAP.md",
+      "source_path": "Project_documentation/agentic_framework/agent_runtime_v2/10_FUTURE_ROADMAP.md",
       "text": "Labels: `FACT` (current state) / `RECOMMENDATION` (planned work). Sequencing rationale follows the prior review's principle: *depth before breadth, honesty before architecture, delegate before duplicate.*",
       "use_case": "software_engineering_recommendation_review",
       "word_len": 24
@@ -6475,7 +6475,7 @@
       "artifact_id": "nat-c47ddf338da424b5",
       "char_len": 1657,
       "source_kind": "doc",
-      "source_path": "cyber_security/COMBINED_ARCHITECTURE_BCVF2_USE_SCC.md",
+      "source_path": "Project_documentation/action_gate_cyber/cyber_security/COMBINED_ARCHITECTURE_BCVF2_USE_SCC.md",
       "text": "1. **Coherence \u2260 truth.** Internal self-consistency is not ground truth. Consistency signals catch *incoherence*, not confident-and-wrong. Real security requires *external* evidence (attestation, liveness, verified anchors), not just agreement. 2. **Same-latent vs different-latent.** Disagreement between two estimators of the *same* quantity is a **consistency** signal (BCVF). Combining estimates of *different* quantities (identity vs liveness) is **fusion** (SCC) \u2014 never a subtraction. 3. **Non-compensatory gating.** Security-critical evidence (attestation, liveness) are **hard conjunctive gates outside the soft sum**. No amount of behavioral coherence buys back a failed gate. Attackers optimize the cheap-to-forge axes; a sum lets them. 4. **Dependence-aware fusion.** Evidence sources sharing inputs (USE and behavioral identity share the same streams) must not be counted as independent agreement. 5. **Classical backbone.** The primary detector is LLT-Kalman + CUSUM + a guarded adaptive template. This is the fair baseline everything else must augment, not replace. 6. **Liveness/attestation is the frontier.** The unsolved threats (coherent replay, joint generative mimicry, full compromise) are defeated only by hardware attestation + unpredictable-context binding, which this stack *feeds* but does not itself provide. 7. **Score \u2260 action.** Detectors emit calibrated risk; a graduated policy chooses the action. No hard `ACCEPT iff C>\u03b8` on a single scalar. 8. **Equalized evaluation.** Every added component must beat a baseline that already has the same information/capacity. Otherwise gains are capacity or more-data, not the component.",
       "use_case": "cybersecurity_advisory_review",
       "word_len": 233
@@ -6485,7 +6485,7 @@
       "artifact_id": "nat-c4e0a4c9ed0a428d",
       "char_len": 289,
       "source_kind": "doc",
-      "source_path": "cyber_security/BIOMETRIC_BCVF_SECURITY_REVIEW.md",
+      "source_path": "Project_documentation/action_gate_cyber/cyber_security/BIOMETRIC_BCVF_SECURITY_REVIEW.md",
       "text": "**Status:** Independent technical review **Subject:** Continuous-authentication BCVF (fast/slow behavioral observers, second-order divergence) proposed as a security application of the autonomy BCVF. **Reviewer scope:** Mathematical soundness + security posture of the reformulated design.",
       "use_case": "cybersecurity_advisory_review",
       "word_len": 34
@@ -6495,7 +6495,7 @@
       "artifact_id": "nat-c4e2fab0c06a3fd0",
       "char_len": 205,
       "source_kind": "doc",
-      "source_path": "acp/ACP_CANONICAL_IDENTITY.md",
+      "source_path": "Project_documentation/control_plane/acp/ACP_CANONICAL_IDENTITY.md",
       "text": "The `version` argument is part of the hashed prefix. Bumping a schema's version deliberately invalidates all prior identities for that domain \u2014 the intended mechanism for a breaking envelope-schema change.",
       "use_case": "software_engineering_recommendation_review",
       "word_len": 31
@@ -6575,7 +6575,7 @@
       "artifact_id": "nat-c653367cdbf3c0ee",
       "char_len": 355,
       "source_kind": "doc",
-      "source_path": "cyber_security/AGENT_ACTION_ADMISSIBILITY_MVP.md",
+      "source_path": "Project_documentation/action_gate_cyber/cyber_security/AGENT_ACTION_ADMISSIBILITY_MVP.md",
       "text": "**Optional-evidence stance.** BCVF (same-latent estimator disagreement), USE (cross-modal coordination), anomaly models, and behavioral signals may **later** appear only as *optional evidence plugins* feeding the escalation decision. The gate must be fully useful with **all of them removed** \u2014 that is the architectural test, and today the answer is yes.",
       "use_case": "software_engineering_recommendation_review",
       "word_len": 51
@@ -6615,7 +6615,7 @@
       "artifact_id": "nat-c770254d492b96ae",
       "char_len": 98,
       "source_kind": "doc",
-      "source_path": "cyber_security/ACTION_CANONICALIZATION_AND_HASHING_SPEC.md",
+      "source_path": "Project_documentation/action_gate_cyber/cyber_security/ACTION_CANONICALIZATION_AND_HASHING_SPEC.md",
       "text": "Per-field treatment for the 24 canonical envelope fields (from `ACTION_GATE_SPECIFICATION.md` \u00a72):",
       "use_case": "software_engineering_recommendation_review",
       "word_len": 13
@@ -6655,7 +6655,7 @@
       "artifact_id": "nat-c998a62fad9ca2a6",
       "char_len": 86,
       "source_kind": "doc",
-      "source_path": "cyber_security/GAP_REGISTER.md",
+      "source_path": "Project_documentation/action_gate_cyber/cyber_security/GAP_REGISTER.md",
       "text": "Expected loss weights probability by consequence **and** by how hard it is to recover:",
       "use_case": "software_engineering_recommendation_review",
       "word_len": 14
@@ -6675,7 +6675,7 @@
       "artifact_id": "nat-c9dfbab462a1df20",
       "char_len": 201,
       "source_kind": "doc",
-      "source_path": "acp/ACP_ACTION_SELECTION_V2.md",
+      "source_path": "Project_documentation/control_plane/acp/ACP_ACTION_SELECTION_V2.md",
       "text": "`hard.*` are booleans derived from stage-3 `ConstraintSet` predicates evaluated on `predicted_traj` against the trusted consensus world. `soft.*` are computed only to rank *already-admissible* actions.",
       "use_case": "software_engineering_recommendation_review",
       "word_len": 26
@@ -6725,7 +6725,7 @@
       "artifact_id": "nat-ca30e3ecfd1fa35c",
       "char_len": 214,
       "source_kind": "doc",
-      "source_path": "agent_runtime_v2/04_RUNTIME_CAPABILITIES.md",
+      "source_path": "Project_documentation/agentic_framework/agent_runtime_v2/04_RUNTIME_CAPABILITIES.md",
       "text": "The capability set of Agent Runtime V2, each mapped to what exists today, what its V2 form is, and whether it is a gap. \"Exists\" claims are `FACT` from the prior review's source reads; targets are `RECOMMENDATION`.",
       "use_case": "software_engineering_recommendation_review",
       "word_len": 38
@@ -6775,7 +6775,7 @@
       "artifact_id": "nat-cb40f4c24bd5eb2c",
       "char_len": 1362,
       "source_kind": "doc",
-      "source_path": "agent_runtime_v2/07_PRODUCT_POSITIONING.md",
+      "source_path": "Project_documentation/agentic_framework/agent_runtime_v2/07_PRODUCT_POSITIONING.md",
       "text": "**FACT \u2014 each product, from its own brief:** - **Hybrid LLM** (`HYBRID_LLM_VC_BRIEF.md`): `HybridPhaseTransformer` \u2014 algorithmic *fusion* of linear + sliding-window + binding-cache attention; a long-context attention substrate. - **LLM Steering Controller** (Conscious Generation engine; `CONSCIOUS_GENERATION_LLM_VC_BRIEF.md`): a \"model-agnostic semantic-control layer for LLMs that improves answer framing, reduces semantic drift, and audits generated responses \u2014 without modifying model weights\" (C\u00d7R\u00d7S), with a deeper 32-D symbolic-generation research moat. (This subsumes the CSR/CRS steering engine.) - **Agent Runtime** (this design): governed single-agent\u2192hierarchical reasoning + workflow-execution runtime that proposes to the Control Plane. - **Context Minimization** (`CONTEXT_MINIMIZATION_VC_BRIEF.md`): deterministic authorization-preserving context compression. - **ActionGate** (`ACTIONGATE_VC_BRIEF.md`): deterministic pre-commit authorization; grants one exact action, once. - **ACP** (`acp/\u2026`): deterministic operational-safety decision runtime; cross-domain (robotics + cloud). - **KVPro** (`KVPro_VC_brief.md`): quality-safe KV-cache compression; drop-in vLLM backend path. - **Cloud Scaling Controller** (`docs/CLOUD_SCALING_CONTROLLER_VC_BRIEF.md`): read-only autoscaling safety interlock; causal HELPING/NOT_HELPING verdict per scale-out.",
       "use_case": "cybersecurity_advisory_review",
       "word_len": 157
@@ -6865,7 +6865,7 @@
       "artifact_id": "nat-cce659e1b7c3bf7d",
       "char_len": 340,
       "source_kind": "doc",
-      "source_path": "agent_runtime_v2/04_RUNTIME_CAPABILITIES.md",
+      "source_path": "Project_documentation/agentic_framework/agent_runtime_v2/04_RUNTIME_CAPABILITIES.md",
       "text": "**FACT.** The prior review confirmed these are absent (`README.md`: \"no agent-to-agent handoff, orchestration graph, or agent registry\"; trace is analytics-only). **RECOMMENDATION.** Build them \u2014 they are what separate a single-agent library from an agent-runtime platform, and every one is a *runtime* concern, not a Control-Plane concern.",
       "use_case": "compliance_summary_review",
       "word_len": 52
@@ -6885,7 +6885,7 @@
       "artifact_id": "nat-cd12caf4d7e0a844",
       "char_len": 315,
       "source_kind": "doc",
-      "source_path": "agent_runtime_v2/05_MULTI_AGENT_READINESS.md",
+      "source_path": "Project_documentation/agentic_framework/agent_runtime_v2/05_MULTI_AGENT_READINESS.md",
       "text": "**INTERPRETATION.** The runtime is not even a mature *single-agent multi-step* loop yet (it is closer to plan-then-execute). Jumping to multi-agent before the single-agent loop is durable and observable would repeat the framework's historical pattern of building breadth over depth (the falsified signal apparatus).",
       "use_case": "it_operations_guidance",
       "word_len": 50
@@ -6905,7 +6905,7 @@
       "artifact_id": "nat-cddeeb03ff841376",
       "char_len": 172,
       "source_kind": "doc",
-      "source_path": "agent_runtime_v2/09_COMPETITIVE_GAP_ANALYSIS.md",
+      "source_path": "Project_documentation/agentic_framework/agent_runtime_v2/09_COMPETITIVE_GAP_ANALYSIS.md",
       "text": "Agent Runtime V2 vs OpenAI Agents SDK, LangGraph, CrewAI, Microsoft AutoGen, Google ADK, Amazon Bedrock Agents. Architecture and capability categories only \u2014 not marketing.",
       "use_case": "software_engineering_recommendation_review",
       "word_len": 23
@@ -6965,7 +6965,7 @@
       "artifact_id": "nat-cf63eef4945c6e15",
       "char_len": 222,
       "source_kind": "doc",
-      "source_path": "acp/ACP_ACTION_SELECTION_IMPLEMENTATION.md",
+      "source_path": "Project_documentation/control_plane/acp/ACP_ACTION_SELECTION_IMPLEMENTATION.md",
       "text": "Both refuse identically: empty admissible \u2192 `NO_SAFE_ACTION`; no evidence \u2192 `REQUEST_MORE_OBSERVATION`. Neither ever ranks an inadmissible candidate (shared filter), and neither reads a BCVF score, softmax, or temperature.",
       "use_case": "software_engineering_recommendation_review",
       "word_len": 26
@@ -6995,7 +6995,7 @@
       "artifact_id": "nat-d08949f6537b8f68",
       "char_len": 156,
       "source_kind": "doc",
-      "source_path": "agent_runtime_v2/07_PRODUCT_POSITIONING.md",
+      "source_path": "Project_documentation/agentic_framework/agent_runtime_v2/07_PRODUCT_POSITIONING.md",
       "text": "Rewritten positioning under the three-family portfolio the milestone specifies, and how the products interact. Grounded in the repo briefs for each product.",
       "use_case": "software_engineering_recommendation_review",
       "word_len": 23
@@ -7035,7 +7035,7 @@
       "artifact_id": "nat-d127ff6b16f1d4d2",
       "char_len": 727,
       "source_kind": "doc",
-      "source_path": "agent_runtime_v2/07_PRODUCT_POSITIONING.md",
+      "source_path": "Project_documentation/agentic_framework/agent_runtime_v2/07_PRODUCT_POSITIONING.md",
       "text": "**FACT-anchored:** - **Not AI Infrastructure.** It is not compute/memory/attention/serving plumbing (that is KVPro / Cloud Scaling Controller). It is an applied system built *on top of* infrastructure. - **Not AI Control Plane.** The prior review established it is probabilistic, threshold-based, and its authorization parts duplicate ActionGate; reclassifying it there re-introduces the exact overlap the Control Plane forbids. - **It is a Specialized AI System** \u2014 an applied, probabilistic system that produces intelligence and executes workflows, siblings to the model + steering products (Hybrid LLM, LLM Steering Controller). Where those two make *a better model*, the Agent Runtime makes *a better agent from any model*.",
       "use_case": "cybersecurity_advisory_review",
       "word_len": 104
@@ -7065,7 +7065,7 @@
       "artifact_id": "nat-d1497a868ebc1d8a",
       "char_len": 190,
       "source_kind": "doc",
-      "source_path": "truth_assurance_pipeline/tap_e1_1_realmodel/README.md",
+      "source_path": "Project_documentation/truth_assurance_pipeline/truth_assurance_pipeline/tap_e1_1_realmodel/README.md",
       "text": "To run against a **real API**, set `ANTHROPIC_API_KEY`; `model_client.default_client` then uses `AnthropicModelClient`, records outputs to the cache, and the harness scores them identically.",
       "use_case": "software_engineering_recommendation_review",
       "word_len": 24
@@ -7105,7 +7105,7 @@
       "artifact_id": "nat-d22bd38e8a00d772",
       "char_len": 288,
       "source_kind": "doc",
-      "source_path": "simulator/README.md",
+      "source_path": "Project_documentation/simulator/simulator/README.md",
       "text": "1. **Phase Integrator**: Learns access patterns via streaming accumulator 2. **Coherence Computer**: Fast (O(1)) and slow (O(n)) coherence computation 3. **BCVF Gate**: Bidirectional verification for promotion/demotion 4. **SCC Optimizer**: Self-tunes parameters based on global coherence",
       "use_case": "software_engineering_recommendation_review",
       "word_len": 39
@@ -7145,7 +7145,7 @@
       "artifact_id": "nat-d3620d554b1c3e22",
       "char_len": 154,
       "source_kind": "doc",
-      "source_path": "cyber_security/BCVF_CONCEPT_DIRECTION.md",
+      "source_path": "Project_documentation/action_gate_cyber/cyber_security/BCVF_CONCEPT_DIRECTION.md",
       "text": "Companion artifacts: `BIOMETRIC_BCVF_SECURITY_REVIEW.md`, `PROOF_PLAN_EVALUATION.md`, `kill_study/` (preregistration + results), and the USE Phase 1 plan.",
       "use_case": "software_engineering_recommendation_review",
       "word_len": 15
@@ -7165,7 +7165,7 @@
       "artifact_id": "nat-d4a0e43309426a9a",
       "char_len": 378,
       "source_kind": "doc",
-      "source_path": "acp/ACP_CLOUD_CONSTRAINTS.md",
+      "source_path": "Project_documentation/control_plane/acp/ACP_CLOUD_CONSTRAINTS.md",
       "text": "`frac` for `BLAST_RADIUS_WITHIN_BOUND` is taken **directly from the real `SafetyConfig`** (`max_scale_out_fraction` / `max_scale_in_fraction`), not a re-authored constant. `READINESS_OK`, `REPLICA_WITHIN_LIMIT`, and the min/fraction bounds are computed by **calling the real `cloud_controller` objects** \u2014 the evaluator is a thin binding layer over them, not a reimplementation.",
       "use_case": "cybersecurity_advisory_review",
       "word_len": 44
@@ -7305,7 +7305,7 @@
       "artifact_id": "nat-d79076ee2c9875ef",
       "char_len": 380,
       "source_kind": "doc",
-      "source_path": "acp/ACP_ACTION_SELECTION_V2.md",
+      "source_path": "Project_documentation/control_plane/acp/ACP_ACTION_SELECTION_V2.md",
       "text": "Safety is non-compensatory (axiom A1): no soft optimum can buy back a violated hard constraint, because unsafe candidates are removed *before* any objective is computed. This is the single most important structural difference from the BCVF action scorer, whose additive/consistency terms let an unsafe-but- \"consistent\" action win (prior `ROBOTICS_ACTION_SELECTION_BASELINES.md`).",
       "use_case": "contract_summary_review",
       "word_len": 53
@@ -7395,7 +7395,7 @@
       "artifact_id": "nat-d9ede76fdfbd17f1",
       "char_len": 638,
       "source_kind": "doc",
-      "source_path": "acp/ACP_CANDIDATE_TRAJECTORY_BRIDGE.md",
+      "source_path": "Project_documentation/control_plane/acp/ACP_CANDIDATE_TRAJECTORY_BRIDGE.md",
       "text": "- If the planner emits a gripper command, ACP does **not** invent a joint trajectory \u2014 it reports `UNSUPPORTED_COMMAND`. - The bridge does not add dynamics, acceleration, or jerk the command does not specify (constant-velocity rollout has zero acceleration by construction) \u2014 so acceleration/jerk violations can only come from a trajectory that actually contains them (`AUTHORED_EDGE_CASE` / `RECORDED`), never from the bridge. - The bridge is explicitly AUTHORED (`candidate_bridge.py`): a demonstration of obtaining physical evidence at the deliberative call site, not a production motion planner and not a claim of real robot dynamics.",
       "use_case": "cybersecurity_advisory_review",
       "word_len": 90
@@ -7445,7 +7445,7 @@
       "artifact_id": "nat-daa4cdba0749da91",
       "char_len": 1228,
       "source_kind": "doc",
-      "source_path": "execution_proposal_engine/EXECUTION_PROPOSAL_ENGINE.md",
+      "source_path": "Project_documentation/governance/execution_proposal_engine/EXECUTION_PROPOSAL_ENGINE.md",
       "text": "**Claim under test:** every action becomes an Execution Proposal routed through Context-Min \u2192 ActionGate \u2192 ACP. **EXTERNAL KNOWLEDGE.** Real runtimes (Claude Code, coding agents) issue many rapid, read-only, low-consequence tool calls (file reads, greps, list-dirs). Routing each through a full deterministic governance round-trip adds latency and cost that would break interactive use. **FACT.** ActionGate already has a risk taxonomy where `READ_ONLY` is the lowest tier (`ToolRiskClassifier`, prior review), and its outcome set includes non-escalating ALLOW. So tiering is expressible. **INTERPRETATION.** The architecture is not disproven, but \"pure\" cannot mean \"every action pays full governance latency.\" It requires a **risk-tiered fast path**: low-consequence actions get a cheap local authorization (or a cached policy grant) while consequential actions get the full round-trip. **Correction (mandatory):** the Execution Proposal boundary is **universal in principle but risk-tiered in practice** \u2014 the *classification* of an action's consequence is a runtime pre-screen (evidence), and the Control Plane offers a proportional path. Without this, the architecture is correct but unusably slow for interactive runtimes.",
       "use_case": "cybersecurity_advisory_review",
       "word_len": 175
@@ -7495,7 +7495,7 @@
       "artifact_id": "nat-dbf206a28ddb6568",
       "char_len": 347,
       "source_kind": "doc",
-      "source_path": "acp/ACP_CANONICAL_IDENTITY.md",
+      "source_path": "Project_documentation/control_plane/acp/ACP_CANONICAL_IDENTITY.md",
       "text": "Specification of the deterministic identity used for world states, action candidates, decisions, and control authorizations (`autonomous_control_plane/identity.py`). This is a narrowly-scoped, standard-library implementation \u2014 **not** a copy of the ActionGate reference hasher; it implements only what ACP needs and documents its rules explicitly.",
       "use_case": "cybersecurity_advisory_review",
       "word_len": 45
@@ -7535,7 +7535,7 @@
       "artifact_id": "nat-dd0501247e0c7c41",
       "char_len": 129,
       "source_kind": "doc",
-      "source_path": "trading/pinescript/README.md",
+      "source_path": "Project_documentation/trading/trading/pinescript/README.md",
       "text": "Where: - `\u03b8_t` = Current state - `\u03b8*` = Target state (from current market conditions) - `\u03b1` = Learning rate (from tier selection)",
       "use_case": "software_engineering_recommendation_review",
       "word_len": 17
@@ -7565,7 +7565,7 @@
       "artifact_id": "nat-def89fd7ffa6e8aa",
       "char_len": 149,
       "source_kind": "doc",
-      "source_path": "agent_runtime_v2/04_RUNTIME_CAPABILITIES.md",
+      "source_path": "Project_documentation/agentic_framework/agent_runtime_v2/04_RUNTIME_CAPABILITIES.md",
       "text": "Design rule enforced throughout: **a capability that is really a governance concern is delegated, not built.** Only runtime capabilities appear here.",
       "use_case": "compliance_summary_review",
       "word_len": 21
@@ -7575,7 +7575,7 @@
       "artifact_id": "nat-df005353f7a111ae",
       "char_len": 276,
       "source_kind": "doc",
-      "source_path": "acp/ACP_ARCHITECTURE.md",
+      "source_path": "Project_documentation/control_plane/acp/ACP_ARCHITECTURE.md",
       "text": "ACP is **not** perception, prediction, mapping, or control law design. It consumes their outputs and governs the decision. It is the robotics analogue of a control plane in distributed systems: it does not do the work, it decides and authorizes what work is allowed to happen.",
       "use_case": "cybersecurity_advisory_review",
       "word_len": 46
@@ -7605,7 +7605,7 @@
       "artifact_id": "nat-e149105a9726a772",
       "char_len": 161,
       "source_kind": "doc",
-      "source_path": "cyber_security/AGENT_ACTION_ADMISSIBILITY_MVP.md",
+      "source_path": "Project_documentation/action_gate_cyber/cyber_security/AGENT_ACTION_ADMISSIBILITY_MVP.md",
       "text": "A framework-neutral action object `\u03c4`. The gate operates on this envelope, never on a vendor-specific call. **Required (R)** vs **Optional (O)** noted per field.",
       "use_case": "it_operations_guidance",
       "word_len": 26
@@ -7625,7 +7625,7 @@
       "artifact_id": "nat-e1b2c3149f9bbf74",
       "char_len": 442,
       "source_kind": "doc",
-      "source_path": "execution_proposal_engine/UNIVERSAL_RUNTIME_AUDIT.md",
+      "source_path": "Project_documentation/governance/execution_proposal_engine/UNIVERSAL_RUNTIME_AUDIT.md",
       "text": "**EXTERNAL KNOWLEDGE / INTERPRETATION.** Claude Code is a live agent runtime in which reasoning and execution-governance are *already architecturally separated*: the model reasons and *proposes* tool calls (Bash, Edit, Read, \u2026); a separate harness \u2014 permission modes (allow/ask/deny), hooks that can intercept and block, and an approval UX \u2014 *governs* whether each call runs. The model does not authorize its own tool calls; the harness does.",
       "use_case": "cybersecurity_advisory_review",
       "word_len": 65
@@ -7635,7 +7635,7 @@
       "artifact_id": "nat-e1cf107aa90b2e24",
       "char_len": 546,
       "source_kind": "doc",
-      "source_path": "cyber_security/INDEPENDENT_ARCHITECTURAL_VALIDATION.md",
+      "source_path": "Project_documentation/action_gate_cyber/cyber_security/INDEPENDENT_ARCHITECTURAL_VALIDATION.md",
       "text": "Genuinely enforced and independently re-verifiable: (a) the agent process runs in a fresh net namespace and separate uid, so the apiserver/broker TCP endpoints are unreachable and every private key / kubeconfig / DB is `PermissionError` (`redteam.py` probe, reproduced); (b) cross-boundary artifacts are Ed25519 with public-key-only verifiers (`crypto.py`, `authz.py`); (c) a SQLite store gives single-process durable nonce/commit claims (`replaystore.py`); (d) updates use a `resourceVersion` CAS (`broker_core.py:174-177`). These four are real.",
       "use_case": "cybersecurity_advisory_review",
       "word_len": 81
@@ -7655,8 +7655,8 @@
       "artifact_id": "nat-e2b23184ec2c5ee7",
       "char_len": 134,
       "source_kind": "doc",
-      "source_path": "agent_runtime_v2/06_RUNTIME_VS_CONTROL_PLANE_OWNERSHIP.md",
-      "text": "**RECOMMENDATION \u2014 the falsifiable test** (mirrors ACP's own \"duplicated-logic count 0\" method, FACT: `acp/RESPONSIBILITY_MATRIX.md`):",
+      "source_path": "Project_documentation/agentic_framework/agent_runtime_v2/06_RUNTIME_VS_CONTROL_PLANE_OWNERSHIP.md",
+      "text": "**RECOMMENDATION \u2014 the falsifiable test** (mirrors ACP's own \"duplicated-logic count 0\" method, FACT: `Project_documentation/control_plane/acp/RESPONSIBILITY_MATRIX.md`):",
       "use_case": "software_engineering_recommendation_review",
       "word_len": 17
     },
@@ -7755,7 +7755,7 @@
       "artifact_id": "nat-e56a0b6ac65e1fa5",
       "char_len": 223,
       "source_kind": "doc",
-      "source_path": "cyber_security/INDEPENDENT_ARCHITECTURAL_VALIDATION.md",
+      "source_path": "Project_documentation/action_gate_cyber/cyber_security/INDEPENDENT_ARCHITECTURAL_VALIDATION.md",
       "text": "This is a genuine unauthorized protected-state mutation **within** the stated threat model. The internal `A30_canary` only compares `app-config.tier` (`redteam.py`), so it would not detect the admitted malicious Deployment.",
       "use_case": "cybersecurity_advisory_review",
       "word_len": 32
@@ -7795,7 +7795,7 @@
       "artifact_id": "nat-e71737d2590d2c35",
       "char_len": 235,
       "source_kind": "doc",
-      "source_path": "cyber_security/BCVF_CONCEPT_DIRECTION.md",
+      "source_path": "Project_documentation/action_gate_cyber/cyber_security/BCVF_CONCEPT_DIRECTION.md",
       "text": "That is the same classical hybrid that beat the distinctive second-order formulation. Build it \u2014 but recognize that \"BCVF\" here is mostly a legacy label on standard machinery, and it does not, by itself, constitute a novelty or a moat.",
       "use_case": "enterprise_policy_interpretation",
       "word_len": 40
@@ -7815,7 +7815,7 @@
       "artifact_id": "nat-e73bcf361db913a1",
       "char_len": 208,
       "source_kind": "doc",
-      "source_path": "acp/ACP_ACTION_SELECTION_V2.md",
+      "source_path": "Project_documentation/control_plane/acp/ACP_ACTION_SELECTION_V2.md",
       "text": "Action Selection V2 (AS-V2) is **stages 6\u20138** of the Autonomous Control Plane: candidate generation \u2192 non-compensatory admissibility filter \u2192 deterministic selection with an explicit `NO_SAFE_ACTION` outcome.",
       "use_case": "compliance_summary_review",
       "word_len": 27
@@ -7885,7 +7885,7 @@
       "artifact_id": "nat-e8935064aae0057d",
       "char_len": 270,
       "source_kind": "doc",
-      "source_path": "acp/ACP_ACTIONGATE_BOUNDARY.md",
+      "source_path": "Project_documentation/control_plane/acp/ACP_ACTIONGATE_BOUNDARY.md",
       "text": "1. **An ActionGate denial is never overridden by ACP.** `DENY \u21d2 BLOCKED_BY_AUTHORIZATION` no matter how safe ACP found the operation. 2. **An ACP hold cannot mint authorization.** ACP is shadow-only; a permissive ACP result on a denied or pending action changes nothing.",
       "use_case": "cybersecurity_advisory_review",
       "word_len": 42
@@ -7925,7 +7925,7 @@
       "artifact_id": "nat-eae2802296550eb6",
       "char_len": 553,
       "source_kind": "doc",
-      "source_path": "cyber_security/BIOMETRIC_BCVF_SECURITY_REVIEW.md",
+      "source_path": "Project_documentation/action_gate_cyber/cyber_security/BIOMETRIC_BCVF_SECURITY_REVIEW.md",
       "text": "The reformulation is a genuine improvement over the original scalar Lagrangian, and its mathematics are sound. But it is a **control / signal-processing framework wrapped around an unvalidated, spoofable, low-SNR sensor with no stated threat model.** The parts it gets right are not the parts that decide whether the system is secure. The parts that decide security are the two terms it develops least \u2014 `E_I` and `E_Q` \u2014 and its headline feature, the second-order invariance, is a double-edged property that quietly *creates* the most important attack.",
       "use_case": "cybersecurity_advisory_review",
       "word_len": 88
@@ -7935,7 +7935,7 @@
       "artifact_id": "nat-eb23affe5ae4e691",
       "char_len": 178,
       "source_kind": "doc",
-      "source_path": "agent_runtime_v2/00_AGENT_RUNTIME_V2_DESIGN_SUMMARY.md",
+      "source_path": "Project_documentation/agentic_framework/agent_runtime_v2/00_AGENT_RUNTIME_V2_DESIGN_SUMMARY.md",
       "text": "Labels used throughout every document: `FACT` (verifiable in the repo, cited) \u00b7 `INTERPRETATION` \u00b7 `RECOMMENDATION` \u00b7 `EXTERNAL` (non-repo general knowledge, deliverable 9 only).",
       "use_case": "software_engineering_recommendation_review",
       "word_len": 21
@@ -7995,7 +7995,7 @@
       "artifact_id": "nat-ed4d1702a7798fa2",
       "char_len": 234,
       "source_kind": "doc",
-      "source_path": "acp/ACP_CLOUD_SHADOW_METHOD.md",
+      "source_path": "Project_documentation/control_plane/acp/ACP_CLOUD_SHADOW_METHOD.md",
       "text": "**ActionGate \u00d7 ACP composition:** combined-outcome distribution (`PROCEED / HELD_BY_ACP / PENDING_AUTHORIZATION / BLOCKED_BY_AUTHORIZATION`), ACP-decisive count (`HELD_BY_ACP`), authorization-blocked count, both-layers- proceed count.",
       "use_case": "cybersecurity_advisory_review",
       "word_len": 21
@@ -8025,7 +8025,7 @@
       "artifact_id": "nat-ef3a39cb7e05d1e3",
       "char_len": 333,
       "source_kind": "doc",
-      "source_path": "agent_runtime_v2/06_RUNTIME_VS_CONTROL_PLANE_OWNERSHIP.md",
+      "source_path": "Project_documentation/agentic_framework/agent_runtime_v2/06_RUNTIME_VS_CONTROL_PLANE_OWNERSHIP.md",
       "text": "- **Approval UX / routing / record** \u2192 **Runtime** (`approval`, `approval_workflow`). - **Authoritative approver-quorum decision** \u2192 **ActionGate** (`ESCALATE_TO_HUMAN` + bound approvals). - Cut line: the runtime *presents* the approval and *records* it; ActionGate *decides* whether the quorum is satisfied and only then authorizes.",
       "use_case": "cybersecurity_advisory_review",
       "word_len": 36
@@ -8075,7 +8075,7 @@
       "artifact_id": "nat-f04695e2d98e6091",
       "char_len": 360,
       "source_kind": "doc",
-      "source_path": "execution_proposal_engine/EXECUTION_PROPOSAL_ENGINE.md",
+      "source_path": "Project_documentation/governance/execution_proposal_engine/EXECUTION_PROPOSAL_ENGINE.md",
       "text": "Labels on every substantive claim: `FACT` \u00b7 `INTERPRETATION` \u00b7 `RECOMMENDATION` \u00b7 `SPECULATION` \u00b7 `EXTERNAL KNOWLEDGE`. Evidence base: the three prior milestones committed on this branch (`../agentic_framework_review/`, `../agent_runtime_v2/`, `../ai_control_plane_v3/`) and the source they cite. The vendor-neutral schema is in `EXECUTION_PROPOSAL_SCHEMA.md`.",
       "use_case": "procurement_policy_review",
       "word_len": 37
@@ -8105,7 +8105,7 @@
       "artifact_id": "nat-f16c958d8deb02b9",
       "char_len": 196,
       "source_kind": "doc",
-      "source_path": "acp/ACP_CANONICAL_IDENTITY.md",
+      "source_path": "Project_documentation/control_plane/acp/ACP_CANONICAL_IDENTITY.md",
       "text": "- **Sequences preserve order** \u2014 a trajectory reference list `[a, b]` \u2260 `[b, a]`. - **Mappings sort keys** \u2014 dict insertion order does not change identity (`test_dict_insertion_order_irrelevant`).",
       "use_case": "software_engineering_recommendation_review",
       "word_len": 22
@@ -8115,7 +8115,7 @@
       "artifact_id": "nat-f1dcce0b09214320",
       "char_len": 276,
       "source_kind": "doc",
-      "source_path": "cyber_security/BCVF_CONCEPT_DIRECTION.md",
+      "source_path": "Project_documentation/action_gate_cyber/cyber_security/BCVF_CONCEPT_DIRECTION.md",
       "text": "\"BCVF 2.0\" (context-conditioned residuals, covariance normalization, robust loss, adaptive weights, cumulative memory, directional monitoring, policy separation) is a real improvement over the original fixed-target quadratic \u2014 but each upgrade maps onto a classical component:",
       "use_case": "enterprise_policy_interpretation",
       "word_len": 36
@@ -8155,7 +8155,7 @@
       "artifact_id": "nat-f27b966dfaf95472",
       "char_len": 281,
       "source_kind": "doc",
-      "source_path": "cyber_security/GAP_REGISTER.md",
+      "source_path": "Project_documentation/action_gate_cyber/cyber_security/GAP_REGISTER.md",
       "text": "The goal-progress term is **secondary by design**: it is much harder to estimate reliably and is blind to unknown attack paths. It may *advance* interception on known kill-chains; it must never be load-bearing, and the general anomaly detector remains the backstop for the unknown.",
       "use_case": "cybersecurity_advisory_review",
       "word_len": 47
@@ -8186,7 +8186,7 @@
       "char_len": 2601,
       "source_kind": "doc",
       "source_path": "token_compression/SOURCE_FORMULA_AUDIT.md",
-      "text": "1. **Formula.** `C\u1d62 = \u03b1\u00b7S\u1d62 + \u03b2\u00b7R\u1d62 + \u03b3\u00b7(1\u2212E\u1d62) + \u03b4\u00b7P\u1d62` The entropy term enters as **`(1\u2212E\u1d62)`** \u2014 high entropy *lowers* coherence. This is settled: 4 of 4 implementations and the authoritative spec use `(1\u2212E\u1d62)`. The single `+\u03b3\u00b7E\u1d62` occurrence is a docstring typo contradicted by its own inline comments and the code that consumes it. 2. **Source file/document.** - `symbolu_robotics/formulas/scc.py:202-208` (executed); docstring `:9-16`. Weights `\u03b1,\u03b2,\u03b3,\u03b4 = 0.3,0.3,0.2,0.2` (`:91-94`). - `symbolu_extensions/image_gen/scc_image.py:364-371` (executed). - `symbolu/ontological/semantic_coherence.py:369-374` and `:894-899` (two implemented sites; mirror copy `symbolu_core/ontological/semantic_coherence.py`, identical lines). - Spec: `docs/design/COHERENCE_FORMULA_SPECIFICATION_v1.0.md:432` (+ symbol table `:435-443`). - **Typo to fix separately:** `symbolu_extensions/image_gen/config.py:203` prints `\u03b3\u00b7E\u1d62` (drops the `1\u2212`); its own attribute comment says \"inverted\" and `scc_image.py:369` computes `(1.0 \u2212 E_i)`. 3. **Exact vs reconstructed.** EXACT (implemented, multiple sites). 4. **Variable definitions** (from spec `:435-443`): `S\u1d62` semantic consistency, spec ref `1/(1+Var(h\u1d62))`; `R\u1d62` resonance with neighbors `(C[i,i\u22121]+C[i,i+1])/2`; `E\u1d62` normalized Shannon entropy `\u2212\u03a3\u2096 p\u2096 log p\u2096 / log K`; `P\u1d62` predictability `Corr(h\u1d62(t),h\u1d62(t\u22121))`. **Domain of `i` is a *model layer* (or a sensor/diffusion channel), not a text unit / sentence / clause.** 5. **Compression role (hypothesized).** Weak per-unit importance signal (retain high-coherence units) \u2014 see A4/A5 for the safer validator role. 6. **Fair baseline.** Plain embedding-similarity importance and TF-IDF/entropy ranking, at identical token budget. SCC must beat these, not just correlate. 7. **Failure modes.** (a) **Domain mismatch:** `S\u1d62,R\u1d62,P\u1d62` are defined over layer hidden-state statistics; there is no implemented mapping from \"sentence/clause\" to these quantities \u2014 that mapping is the unbuilt work. (b) **Low-coherence \u2260 droppable:** a decisive exception (\"do not deploy on Friday\") can be low-coherence yet critical, so this score must never authorize deletion. (c) **Weight ambiguity:** code defaults `0.3/0.3/0.2/0.2` differ from spec `0.30/0.25/0.25/0.20` \u2014 resolve before any calibration. 8. **Eligibility decision.** **ELIGIBLE ONLY as an auxiliary P1/P2 ranking signal, after a text-unit \u2192 (S,R,E,P) operationalization is built and preregistered. NOT eligible as a protection authority or standalone selector.** Label: `DOCUMENTED_ORIGINAL_FORMULA` (original domain) \u2192 its compression use is a hypothesis, not a proven transfer.",
+      "text": "1. **Formula.** `C\u1d62 = \u03b1\u00b7S\u1d62 + \u03b2\u00b7R\u1d62 + \u03b3\u00b7(1\u2212E\u1d62) + \u03b4\u00b7P\u1d62` The entropy term enters as **`(1\u2212E\u1d62)`** \u2014 high entropy *lowers* coherence. This is settled: 4 of 4 implementations and the authoritative spec use `(1\u2212E\u1d62)`. The single `+\u03b3\u00b7E\u1d62` occurrence is a docstring typo contradicted by its own inline comments and the code that consumes it. 2. **Source file/document.** - `symbolu_robotics/formulas/scc.py:202-208` (executed); docstring `:9-16`. Weights `\u03b1,\u03b2,\u03b3,\u03b4 = 0.3,0.3,0.2,0.2` (`:91-94`). - `symbolu_extensions/image_gen/scc_image.py:364-371` (executed). - `symbolu/ontological/semantic_coherence.py:369-374` and `:894-899` (two implemented sites; mirror copy `symbolu_core/ontological/semantic_coherence.py`, identical lines). - Spec: `Project_documentation/repository/docs/design/COHERENCE_FORMULA_SPECIFICATION_v1.0.md:432` (+ symbol table `:435-443`). - **Typo to fix separately:** `symbolu_extensions/image_gen/config.py:203` prints `\u03b3\u00b7E\u1d62` (drops the `1\u2212`); its own attribute comment says \"inverted\" and `scc_image.py:369` computes `(1.0 \u2212 E_i)`. 3. **Exact vs reconstructed.** EXACT (implemented, multiple sites). 4. **Variable definitions** (from spec `:435-443`): `S\u1d62` semantic consistency, spec ref `1/(1+Var(h\u1d62))`; `R\u1d62` resonance with neighbors `(C[i,i\u22121]+C[i,i+1])/2`; `E\u1d62` normalized Shannon entropy `\u2212\u03a3\u2096 p\u2096 log p\u2096 / log K`; `P\u1d62` predictability `Corr(h\u1d62(t),h\u1d62(t\u22121))`. **Domain of `i` is a *model layer* (or a sensor/diffusion channel), not a text unit / sentence / clause.** 5. **Compression role (hypothesized).** Weak per-unit importance signal (retain high-coherence units) \u2014 see A4/A5 for the safer validator role. 6. **Fair baseline.** Plain embedding-similarity importance and TF-IDF/entropy ranking, at identical token budget. SCC must beat these, not just correlate. 7. **Failure modes.** (a) **Domain mismatch:** `S\u1d62,R\u1d62,P\u1d62` are defined over layer hidden-state statistics; there is no implemented mapping from \"sentence/clause\" to these quantities \u2014 that mapping is the unbuilt work. (b) **Low-coherence \u2260 droppable:** a decisive exception (\"do not deploy on Friday\") can be low-coherence yet critical, so this score must never authorize deletion. (c) **Weight ambiguity:** code defaults `0.3/0.3/0.2/0.2` differ from spec `0.30/0.25/0.25/0.20` \u2014 resolve before any calibration. 8. **Eligibility decision.** **ELIGIBLE ONLY as an auxiliary P1/P2 ranking signal, after a text-unit \u2192 (S,R,E,P) operationalization is built and preregistered. NOT eligible as a protection authority or standalone selector.** Label: `DOCUMENTED_ORIGINAL_FORMULA` (original domain) \u2192 its compression use is a hypothesis, not a proven transfer.",
       "use_case": "cybersecurity_advisory_review",
       "word_len": 405
     },
@@ -8205,7 +8205,7 @@
       "artifact_id": "nat-f40c66656d44f779",
       "char_len": 1024,
       "source_kind": "doc",
-      "source_path": "agent_runtime_v2/00_AGENT_RUNTIME_V2_DESIGN_SUMMARY.md",
+      "source_path": "Project_documentation/agentic_framework/agent_runtime_v2/00_AGENT_RUNTIME_V2_DESIGN_SUMMARY.md",
       "text": "The Agent Runtime is the **proposer**: it turns a goal into a reasoned, reflected, tool-using workflow and emits a single typed **Execution Proposal** (proposed action + agent identity + risk/uncertainty evidence) to the AI Control Plane. The Control Plane decides \u2014 Context Minimization governs what the model reads, ActionGate authorizes the exact action and mints a single-use token, ACP confirms it is operationally safe against live state \u2014 and the runtime executes only what returns a token. The runtime never mints authority, never judges operational safety, never enforces deterministic policy, never governs context relevance. Those are the Control Plane's, and they already exist. Everything the runtime keeps is either an existing framework strength (planning, reasoning, reflection, memory, risk pre-screen, policy simulation) or an agent-runtime capability gap to build (agent identity, registry, lifecycle, checkpointing, observability export, multi-agent coordination) \u2014 none of which is a governance concern.",
       "use_case": "cybersecurity_advisory_review",
       "word_len": 147
@@ -8255,7 +8255,7 @@
       "artifact_id": "nat-f6564efd86c16496",
       "char_len": 91,
       "source_kind": "doc",
-      "source_path": "cyber_security/COMBINED_ARCHITECTURE_BCVF2_USE_SCC.md",
+      "source_path": "Project_documentation/action_gate_cyber/cyber_security/COMBINED_ARCHITECTURE_BCVF2_USE_SCC.md",
       "text": "Local-linear-trend Kalman per stream, state `[level, slope]`, `F=[[1,1],[0,1]]`, `H=[1,0]`:",
       "use_case": "software_engineering_recommendation_review",
       "word_len": 17
@@ -8295,7 +8295,7 @@
       "artifact_id": "nat-f6f8be951d371aa3",
       "char_len": 381,
       "source_kind": "doc",
-      "source_path": "cyber_security/BCVF_CONCEPT_DIRECTION.md",
+      "source_path": "Project_documentation/action_gate_cyber/cyber_security/BCVF_CONCEPT_DIRECTION.md",
       "text": "**Status:** converged conceptual position for the behavioral-security line, after the adversarial synthetic kill study and the BCVF-2.0 review. This document records what was refuted, what the architecture actually is, the narrow principle worth keeping under the \"BCVF\" label, and the staged program. It supersedes any framing that treats second-order divergence as the invention.",
       "use_case": "cybersecurity_advisory_review",
       "word_len": 57
@@ -8305,8 +8305,8 @@
       "artifact_id": "nat-f7284d07e330d6c0",
       "char_len": 191,
       "source_kind": "doc",
-      "source_path": "agent_runtime_v2/03_RUNTIME_PIPELINE_V2.md",
-      "text": "**RECOMMENDATION.** The runtime must handle every ActionGate/ACP outcome as a first-class branch (FACT: outcomes enumerated in `action_gate_ref/gate.py` and `acp/ACP_ACTIONGATE_BOUNDARY.md`):",
+      "source_path": "Project_documentation/agentic_framework/agent_runtime_v2/03_RUNTIME_PIPELINE_V2.md",
+      "text": "**RECOMMENDATION.** The runtime must handle every ActionGate/ACP outcome as a first-class branch (FACT: outcomes enumerated in `action_gate_ref/gate.py` and `Project_documentation/control_plane/acp/ACP_ACTIONGATE_BOUNDARY.md`):",
       "use_case": "software_engineering_recommendation_review",
       "word_len": 25
     },
@@ -8435,7 +8435,7 @@
       "artifact_id": "nat-fa2ba85aad16f139",
       "char_len": 375,
       "source_kind": "doc",
-      "source_path": "truth_assurance_pipeline/tap_e1_intent/README.md",
+      "source_path": "Project_documentation/truth_assurance_pipeline/truth_assurance_pipeline/tap_e1_intent/README.md",
       "text": "Selected config **V4**; all five preregistered gates pass on the hidden eval split; verdict **`PASS_WITH_LIMITED_CLAIM`**. See [`EXPERIMENT_REPORT.md`](../../docs/truth_assurance_pipeline/experiments/tap_e1_intent_understanding/EXPERIMENT_REPORT.md) and [`FAILURE_ANALYSIS.md`](../../docs/truth_assurance_pipeline/experiments/tap_e1_intent_understanding/FAILURE_ANALYSIS.md).",
       "use_case": "software_engineering_recommendation_review",
       "word_len": 33
@@ -8475,7 +8475,7 @@
       "artifact_id": "nat-fa7d87e5761caad4",
       "char_len": 148,
       "source_kind": "doc",
-      "source_path": "agent_runtime_v2/06_RUNTIME_VS_CONTROL_PLANE_OWNERSHIP.md",
+      "source_path": "Project_documentation/agentic_framework/agent_runtime_v2/06_RUNTIME_VS_CONTROL_PLANE_OWNERSHIP.md",
       "text": "Every responsibility has **exactly one owner**. No overlap. This is the authoritative boundary for the whole platform; Deliverables 1\u20135 defer to it.",
       "use_case": "cybersecurity_advisory_review",
       "word_len": 23
@@ -8515,7 +8515,7 @@
       "artifact_id": "nat-fcf364febe84ef93",
       "char_len": 194,
       "source_kind": "doc",
-      "source_path": "execution_proposal_engine/EXECUTION_PROPOSAL_ENGINE.md",
+      "source_path": "Project_documentation/governance/execution_proposal_engine/EXECUTION_PROPOSAL_ENGINE.md",
       "text": "I tried to break the \"pure Execution Proposal Engine\" thesis five ways before rendering a verdict. Two attempts succeeded *partially* and force corrections; three failed (the architecture held).",
       "use_case": "software_engineering_recommendation_review",
       "word_len": 28
@@ -8565,7 +8565,7 @@
       "artifact_id": "nat-ffc38c58353a3185",
       "char_len": 334,
       "source_kind": "doc",
-      "source_path": "execution_proposal_engine/UNIVERSAL_RUNTIME_AUDIT.md",
+      "source_path": "Project_documentation/governance/execution_proposal_engine/UNIVERSAL_RUNTIME_AUDIT.md",
       "text": "**Baseline `FACT`:** all these frameworks \"wire a model to a tool-calling loop\" (`ACTIONGATE_VC_BRIEF.md:21\u201322`). The schema describes the *tool call* (action), not the framework, so the question is never \"can it express an action\" (it can) but \"how much adapter work to normalize it, and can the interception point actually enforce.\"",
       "use_case": "software_engineering_recommendation_review",
       "word_len": 54

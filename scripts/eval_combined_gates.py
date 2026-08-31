@@ -21,7 +21,7 @@ Requirements:
 
 RunPod:
     The checkpoint should already exist on the RunPod volume.
-    See docs/runbooks/RUNBOOK_COMBINED_GATE_EVAL.md for full instructions.
+    See Project_documentation/repository/docs/runbooks/RUNBOOK_COMBINED_GATE_EVAL.md for full instructions.
 """
 
 from __future__ import annotations

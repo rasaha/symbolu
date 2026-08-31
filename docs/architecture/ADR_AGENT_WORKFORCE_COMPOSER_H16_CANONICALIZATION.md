@@ -4,8 +4,8 @@
 **Date:** 2026-08-03
 **Owners:** Ugence platform architecture
 **Related:**
-- [`ADR_MODEL_SELECTION_POLICY_PLACEMENT.md`](../../ADR_MODEL_SELECTION_POLICY_PLACEMENT.md) — placement pattern this ADR mirrors
-- [`docs/architecture/ADR_UGENCE_DECISION_GOVERNANCE_TERMINOLOGY_AND_BOUNDARIES.md`](ADR_UGENCE_DECISION_GOVERNANCE_TERMINOLOGY_AND_BOUNDARIES.md)
+- [`ADR_MODEL_SELECTION_POLICY_PLACEMENT.md`](../../Project_documentation/model_selection/adr/ADR_MODEL_SELECTION_POLICY_PLACEMENT.md) — placement pattern this ADR mirrors
+- [`docs/architecture/ADR_UGENCE_DECISION_GOVERNANCE_TERMINOLOGY_AND_BOUNDARIES.md`](../../Project_documentation/repository/docs/architecture/ADR_UGENCE_DECISION_GOVERNANCE_TERMINOLOGY_AND_BOUNDARIES.md)
 - The seven `AGENT_WORKFORCE_COMPOSER_*.md` documents (PR #1305, merge `0fa80fe4…`)
 - The Policy Workflow Compiler (`packages/tooling/policy-workflow-compiler/`, PR #1303, merge `96afb58a…`)
 - Audit set: [`docs/audits/agent_workforce_composer_phase0/`](../audits/agent_workforce_composer_phase0/)

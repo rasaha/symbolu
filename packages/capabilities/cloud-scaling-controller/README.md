@@ -9,7 +9,7 @@ Ugence control plane.
 
 - **Distribution:** `ugence-cloud-scaling-controller`
 - **Import namespace:** `ugence_cloud_scaling_controller`
-- **Version:** `0.1.1`
+- **Version:** `0.3.0`
 - **Authority class:** ADVISORY · **Execution capability:** NONE (no code in the wheel can apply the advice)
 - **Core dependency:** NumPy only · **Network required (core):** no · **Cloud credentials required:** no
 - **Determinism:** decision-deterministic; identity diagnostics vary before bootstrap.
@@ -48,6 +48,232 @@ $ ugence-cloud-scaling version
   human-readable explanation.
 - Offline evaluation, trace replay, and read-only shadow comparison.
 - An advisory CLI. No direct actuation.
+
+## Canonical Capacity Intelligence (Phase 1)
+
+Version 0.2.0 adds a provider-neutral **observation → normalization/projection →
+recommendation-evidence** layer *around* the unchanged controller. The rich canonical
+state does **not** change the controller's five-signal decision model — an explicit,
+deterministic projection maps only the controller's established inputs and reports
+everything else as ignored context.
+
+```text
+Provider / Monitoring Source
+        ↓
+CanonicalCapacityState          (rich, immutable, versioned, provider-neutral)
+        ↓
+Normalization / Projection      (explicit, deterministic, policy-driven)
+        ↓
+existing ScalingObservation
+        ↓
+existing CloudScalingController (unchanged decision kernel)
+        ↓
+ScalingRecommendation  +  CapacityDecisionEvidence  (immutable, sha256 content-identity)
+```
+
+```python
+from datetime import datetime, timezone
+from ugence_cloud_scaling_controller.canonical import (
+    CanonicalCapacityState, CapacitySubject, InfrastructureState, PerformanceState,
+    ReliabilityState, WorkloadState, CapacityState, Measurement, Unit,
+    NormalizationPolicy, NormalizationMethod, recommend_with_evidence,
+)
+
+state = CanonicalCapacityState(
+    subject=CapacitySubject(workload_id="checkout-api", tenant_id="acme"),
+    observed_at=datetime(2026, 8, 11, 12, 0, tzinfo=timezone.utc),
+    correlation_id="req-123", time_phase="peak",
+    infrastructure=InfrastructureState(cpu_utilization=Measurement(92.0, Unit.PERCENT),
+                                       memory_utilization=Measurement(88.0, Unit.PERCENT)),
+    performance=PerformanceState(latency_p99=Measurement(810.0, Unit.MILLISECONDS)),
+    reliability=ReliabilityState(error_rate=Measurement(0.2, Unit.RATE)),
+    workload=WorkloadState(queue_depth=Measurement(70, Unit.COUNT)),
+    capacity=CapacityState(running_replicas=4),
+)
+policy = NormalizationPolicy(
+    policy_id="default-slo-v1",
+    method_by_signal={
+        "cpu": NormalizationMethod.PERCENT_TO_RATIO,
+        "memory": NormalizationMethod.PERCENT_TO_RATIO,
+        "latency_p99": NormalizationMethod.LATENCY_MS_TO_THRESHOLD,
+        "error_rate": NormalizationMethod.RATIO_PASSTHROUGH,
+        "queue_depth": NormalizationMethod.QUEUE_TO_CAPACITY,
+    },
+    thresholds={"latency_p99": 1000.0, "queue_depth": 100.0},
+)
+rec, evidence = recommend_with_evidence(state, policy)
+print(rec.recommendation, rec.replica_delta)          # advisory recommendation (unchanged kernel)
+print(evidence.digest())                              # sha256: content identity
+print(evidence.ignored_canonical_fields)              # honest: what did NOT drive the decision
+```
+
+**Newly implemented in Phase 1:** canonical capacity-state representation; typed
+measurements + explicit units; policy-driven normalization; deterministic controller
+projection; first-class observation provenance; immutable recommendation evidence with a
+deterministic content-identity digest; a read-only observation-source boundary. See the
+[Phase-1 ADR](../../../docs/architecture/ADR_CLOUD_SCALING_CANONICAL_CAPACITY_INTELLIGENCE_PHASE1.md).
+
+**Implemented elsewhere, NOT integrated here:** the canonical Risk Authority RA-1→RA-8
+authority lifecycle (risk artifacts, scope, expiry/revocation, integrity, downstream
+enforcement) lives in separate packages. Phase 1 produces *upstream recommendation
+evidence only*; the evidence digest is a stable identity a **future, separately governed**
+integration package could reference. This package performs no risk evaluation, authority,
+or authorization.
+
+**Future / not implemented in this phase:** native AWS/Azure/GCP collectors; predictive
+forecasting; dependency-aware scaling; economic optimization; cross-cloud placement; a
+CapacityDecisionEvidence→RA integration adapter; authority-bound scaling; provider
+execution; execution receipts; effect verification; closed-loop learning.
+
+## Predictive Capacity Intelligence (Phase 2 — shadow forecasting)
+
+Version 0.3.0 adds a deterministic, provider-neutral, **shadow-only** forecasting and
+replay-evaluation layer *around* the Phase-1 canonical layer. It answers: *given the
+capacity history available at event time, what capacity pressure is likely at a future
+horizon, how uncertain is that prediction, and how well has the method performed in
+replay?* **Forecasts never feed the live controller and never actuate anything.**
+
+```text
+CanonicalCapacityState history
+        ↓  series validation + strict event-time ordering
+CanonicalCapacitySeries
+        ↓  leakage-safe input window (event_time <= cutoff, invariant-checked)
+ForecastInputWindow
+        ↓  deterministic baseline forecaster (persistence / linear trend)
+CapacityForecast          (point + empirical uncertainty  OR  typed abstention)
+        ↓  controlled service path binds window + config + output
+CapacityForecastEvidence  (immutable, sha256 content-identity digest)
+        ↓  shadow replay against strictly-later actual observations
+ForecastEvaluationRecord  + deterministic aggregate (MAE / RMSE / bias / coverage)
+```
+
+```python
+from datetime import datetime, timedelta, timezone
+from ugence_cloud_scaling_controller.canonical import (
+    CanonicalCapacityState, CapacitySubject, InfrastructureState, CapacityState,
+    Measurement, Unit, NormalizationPolicy, NormalizationMethod,
+)
+from ugence_cloud_scaling_controller.forecasting import (
+    CanonicalCapacitySeries, ForecastTarget, ForecastHorizon,
+    PersistenceForecaster, UncertaintyConfig, forecast_with_evidence,
+)
+
+subj = CapacitySubject(workload_id="checkout-api", tenant_id="acme")
+t0 = datetime(2026, 8, 11, 12, 0, tzinfo=timezone.utc)
+history = [CanonicalCapacityState(
+    subject=subj, observed_at=t0 + timedelta(seconds=60 * i),
+    infrastructure=InfrastructureState(cpu_utilization=Measurement(70.0 + i, Unit.PERCENT)),
+    capacity=CapacityState(running_replicas=4)) for i in range(8)]
+
+series = CanonicalCapacitySeries.build(history)
+policy = NormalizationPolicy(policy_id="slo-v1",
+                             method_by_signal={"cpu": NormalizationMethod.PERCENT_TO_RATIO})
+evidence = forecast_with_evidence(
+    series, ForecastTarget.CPU_UTILIZATION, series.end_event_time, ForecastHorizon.minutes(5),
+    PersistenceForecaster(), normalization_policy=policy,
+    uncertainty_config=UncertaintyConfig(min_calibration_samples=3, match_tolerance_seconds=5.0),
+)
+fc = evidence.forecast
+print(fc.status, fc.point_estimate, fc.uncertainty.available)  # forecast / point / interval?
+print(fc.advisory_only, fc.shadow_only, fc.actuation_performed) # True True False
+print(evidence.digest())                                        # sha256: content identity
+```
+
+**Value space (precisely disclosed):** forecasts are either *projected without conversion*
+(default — raw canonical target domain; `running_replicas → current_replicas`, never
+ready/desired/healthy) or *explicitly normalized* (`forecast_space=NORMALIZED` applies the
+Phase-1 `normalize_signal` authority to a ratio in `[0, 1]`); the applied space and
+normalization-policy digest are bound into the input-window and evidence digests, and no
+unit is silently converted. **Domain enforcement:** a `SignalDomain` sourced from the
+Phase-1 `unit_domain` authority is enforced on inputs and outputs (including integer
+semantics — a fractional replica forecast abstains rather than being presented as valid);
+nothing is clamped or rounded. **Baseline models:** persistence (last value) and
+deterministic linear-trend (OLS). A third baseline is deferred until replay evaluation
+justifies it. **Uncertainty:** an empirical rolling-origin residual interval (non-Gaussian;
+explicitly *unavailable* when residuals are insufficient). **Abstention** is a first-class,
+evidence-producing output
+(insufficient/stale history, excessive missingness, irregular cadence, subject/tenant
+mismatch, unsupported target/horizon, missing normalization policy, out-of-domain
+forecast, insufficient calibration, …). See the
+[Phase-2 ADR](../../../docs/architecture/ADR_CLOUD_SCALING_PREDICTIVE_CAPACITY_INTELLIGENCE_PHASE2.md).
+
+> **Maturity:** `IMPLEMENTED_AND_LOCALLY_VERIFIED` · `BASELINE_FORECASTING_IMPLEMENTED` ·
+> `PREDICTIVE_QUALITY_NOT_ESTABLISHED`. Passing tests/CI prove implementation
+> correctness, **not** forecast accuracy — the baselines have not been evaluated on
+> representative external workloads against preregistered acceptance thresholds. A
+> FORECAST is descriptive capacity intelligence: it is not a recommendation, a risk
+> evaluation, an authority, or an execution instruction.
+
+## Dependency- and Cost-aware Capacity Planning (Phase 3 — shadow recommendations)
+
+Version 0.4.0 adds a deterministic, provider-neutral, **shadow/advisory-only** capacity-action
+recommendation layer *around* the Phase-2 forecast. It answers: *given the forecast, service
+dependencies, operating constraints and cost evidence, what is the best capacity action — and
+why?* **Recommendations never feed the live controller and never execute, authorize, or verify
+an effect.**
+
+```text
+Phase-2 CapacityForecastEvidence
+   +  DependencyTopology  +  CostBook  +  OperatingConstraints  +  RecommendationPolicy
+        ↓  recommend_capacity_action  (deterministic, clock-free, fail-closed)
+   bounded candidate generation (always includes NO_CHANGE)
+        ↓  hard-constraint filtering (BEFORE scoring; non-compensatory)
+        ↓  dependency + cost evaluation, explicit policy scoring (coverage-first)
+   CapacityActionRecommendation  (selected plan + alternatives + typed rejections,
+                                  self-revalidating, sha256 content identity)
+      OR  RecommendationAbstention  (typed, first-class)
+```
+
+```python
+from ugence_cloud_scaling_controller import (
+    recommend_capacity_action, CapacityActionRecommendation,
+    DependencyTopology, DependencyEdge, DependencyKind,
+    CostBook, CostEvidence, Money, CostBasis,
+    OperatingConstraints, RecommendationPolicy,
+)
+# forecast_evidence: a Phase-2 RUNNING_REPLICAS point forecast (app may need 8 replicas)
+# current_state:     a CanonicalCapacityState with capacity.running_replicas == 6
+out = recommend_capacity_action(
+    forecast_evidence, current_state,
+    cost_book=CostBook(subject=app, entries=(
+        CostEvidence(app, Money(1000, "USD"), CostBasis.PER_REPLICA_HOUR, t_from, t_until),
+        CostEvidence(db,  Money(50,   "USD"), CostBasis.PER_CONNECTION_HOUR, t_from, t_until))),
+    constraints=OperatingConstraints(min_capacity=1, max_capacity=50),
+    policy=RecommendationPolicy(),
+    recommendation_time=now, validity_seconds=600.0,
+    topology=DependencyTopology(subject=app, as_of=now, edges=(
+        DependencyEdge(app, db, DependencyKind.CAPACITY_BOUND,
+                       downstream_current_capacity=100, required_per_upstream_unit=20.0),)),
+)
+if isinstance(out, CapacityActionRecommendation):
+    print(out.selected_plan.action_kind.value, out.reason_codes)   # e.g. coordinated (...)
+    print(out.estimated_cost_change_minor, out.currency)           # disclosed cost delta
+    print(out.digest())                                            # sha256 content identity
+```
+
+**Hard constraints vs. preferences:** hard operating limits (min/max, step, quota, cooldown, SLO
+and error-budget protection, dependency ceiling, prohibited actions, max cost increase) are
+*non-compensatory* and filter candidates **before** scoring — a cheaper plan never overcomes a
+safety/quota/validity violation. Optimization preferences (coverage, bottleneck risk, reliability
+risk, cost, change magnitude, uncertainty, hold-bias) are explicit, versioned, digest-bound
+weights; selection is coverage-first, then policy score. **NO_CHANGE** is a mandatory baseline and
+wins whenever current capacity already covers the forecast. **Cost** is exact integer minor units
+plus currency and is an optimization input, never an authorizer. **Abstention** is a first-class,
+typed output (missing/expired/abstained forecast, subject/scope mismatch, missing/stale
+topology, dependency cycle, missing dependency capacity, missing/incompatible/stale cost,
+currency mismatch, quota conflict, no feasible action, ambiguous best plan, future-data leakage,
+…). The `CapacityActionRecommendation` **embeds** its authoritative inputs and recomputes every
+feasibility/cost/score at construction and at `from_dict`, so a forged score/cost/digest or an
+unevaluated/non-winning selection is rejected. See the
+[Phase-3 ADR](../../../docs/architecture/ADR_CLOUD_SCALING_DEPENDENCY_COST_AWARE_RECOMMENDATION_PHASE3.md).
+
+> **Maturity:** `IMPLEMENTED_AND_CI_VERIFIED` · `BASELINE_RECOMMENDATION_POLICY_IMPLEMENTED` ·
+> `PREDICTIVE_QUALITY_NOT_ESTABLISHED` · `ECONOMIC_OPTIMALITY_NOT_ESTABLISHED` ·
+> `PRODUCTION_EFFECTIVENESS_NOT_ESTABLISHED` · `NOT_AUTHORIZED_FOR_EXECUTION`. Passing tests/CI
+> prove implementation correctness, **not** recommendation quality. A RECOMMENDATION is
+> descriptive capacity intelligence: it is not an authorization, a risk evaluation, an ActionGate
+> decision, or an execution instruction. Risk Authority (Phase 4), ActionGate/provider execution
+> (Phase 5), and effect verification/learning (Phase 6) are out of scope.
 
 ## What it does **not** provide
 
@@ -90,6 +316,22 @@ required for the advisory core.
 
 `Controller` is the low-level compatibility API; `CloudScalingController` is the stable
 independent-package facade.
+
+Phase 1 also exports the canonical capacity-intelligence layer (subpackage
+`ugence_cloud_scaling_controller.canonical`): `CanonicalCapacityState`, `CapacitySubject`,
+`Measurement`, `Unit`, `ObservationProvenance`, `ObservationSourceType`,
+`NormalizationPolicy`, `NormalizationMethod`, `ControllerProjection`,
+`project_to_scaling_observation`, `CapacityDecisionEvidence`, `recommend_with_evidence`,
+`CapacityObservationSource`.
+
+Phase 2 exports the shadow forecasting layer (subpackage
+`ugence_cloud_scaling_controller.forecasting`): `CanonicalCapacitySeries`,
+`SeriesConstructionPolicy`, `ForecastTarget`, `ForecastHorizon`, `ForecastInputWindow`,
+`FeatureConfig`, `build_input_window`, `BaselineForecaster`, `PersistenceForecaster`,
+`LinearTrendForecaster`, `UncertaintyConfig`, `UncertaintyMethod`, `AbstentionReason`,
+`CapacityForecast`, `AdmissionPolicy`, `CapacityForecastEvidence`, `generate_forecast`,
+`forecast_with_evidence`, `ForecastEvaluationRecord`, `AggregateEvaluation`,
+`evaluate_forecast`, `aggregate_evaluations`, `run_replay_evaluation`.
 
 ## Legacy imports
 

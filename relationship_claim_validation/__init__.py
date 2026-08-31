@@ -5,7 +5,7 @@ A NEW, self-contained research track. It is additive and imports nothing from an
 other track in this repository. It does NOT modify or depend on any resolver,
 governance, packet, corpus, benchmark, or experiment.
 
-IMPORTANT HONESTY NOTE (see docs/relationship_claim_validation/FINAL_VERDICT.md):
+IMPORTANT HONESTY NOTE (see Project_documentation/governance/docs/relationship_claim_validation/FINAL_VERDICT.md):
 The frozen substrate referenced by the experiment brief (SEEB, a resolver series
 v0.1-v0.5, a hidden relationship corpus, a frozen proposal-validation/governance/
 packet pipeline, and prior experiment locks) does NOT exist in this repository.

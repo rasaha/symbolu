@@ -1,16 +1,20 @@
-"""Ugence Model Selection — curated public API.
+"""Ugence Model Authority — curated public API.
 
-The stable surface for consumers of the canonical Model Selection product core. Every
-symbol is re-exported (same object, identity preserved) from the capability's internal
-modules, grouped by the two audited stages:
+The stable surface for consumers of the canonical capability core. Every symbol is
+re-exported (same object, identity preserved) from the capability's internal modules,
+grouped by the pipeline stages:
 
 * **Eligibility** (ExecutionGate) — deterministic, fail-closed "can this approved
   candidate execute this request?"; never ranks or picks.
-* **Selection** (ModelPolicy) — advisory, policy-bounded "which eligible candidate
-  should?"; only ever chooses from the eligible set; abstains when none qualifies.
+* **Ranking** (ModelPolicy) — advisory, policy-bounded "which eligible candidate is
+  preferred?"; only ever chooses from the eligible set; abstains when none qualifies.
+* **Authority** (ModelAuthority) — the binding external contract: "which model, if any,
+  is *authorized* to execute this request?"; wraps eligibility + ranking and issues a
+  :class:`ModelAuthorizationDecision` (ALLOW / DENY / HOLD / ESCALATE).
 
-This module adds no logic. It does not invoke models, route, retry, fail over, load
-balance, orchestrate, authorize actions, or register providers.
+Ranking remains an internal optimization mechanism; authorization is the external
+contract. This module adds no logic. It does not invoke models, route, retry, fail over,
+load balance, orchestrate, authorize actions, or register providers.
 """
 from __future__ import annotations
 
@@ -35,8 +39,20 @@ from .model import Candidate, GateConfig, Request, Signal
 # --- eligibility stage (ExecutionGate) ---------------------------------------------
 from .gate import ExecutionGate
 
-# --- selection stage (ModelPolicy) -------------------------------------------------
+# --- ranking stage (ModelPolicy) — internal optimization mechanism -----------------
 from .policy import PolicyWeights, Selection, select
+
+# --- authority stage (ModelAuthority) — binding external contract ------------------
+from .authority import (
+    AuthorityReasonCode,
+    ModelAuthority,
+    ModelAuthorityService,
+    ModelAuthorizationDecision,
+    ModelAuthorizationDisposition,
+    ModelAuthorizationPolicy,
+    ModelSelectionService,
+    ModelSelector,
+)
 
 # --- executable registry (candidate-metadata port) ---------------------------------
 from .registry import ExecStatus, ExecutableRegistry, ModelRecord
@@ -55,8 +71,13 @@ __all__ = [
     "Candidate", "GateConfig", "Request", "Signal",
     # eligibility
     "ExecutionGate",
-    # selection
+    # ranking (internal optimization mechanism)
     "PolicyWeights", "Selection", "select",
+    # authority (binding external contract)
+    "ModelAuthority", "ModelAuthorityService", "ModelAuthorizationDecision",
+    "ModelAuthorizationDisposition", "AuthorityReasonCode",
+    # deprecated Model Selection → Model Authority compatibility aliases
+    "ModelSelector", "ModelSelectionService", "ModelAuthorizationPolicy",
     # registry
     "ExecStatus", "ExecutableRegistry", "ModelRecord",
     # versioning + fingerprint

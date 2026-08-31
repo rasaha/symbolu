@@ -1,0 +1,63 @@
+{
+  "schema": "bindingslots_external_fallback/aggregate_verdict/v1",
+  "primary_verdict": "EXTERNAL_TABLE_RELIABILITY_VERIFIED_HYBRID_TRIGGER_FAILED",
+  "co_emitted": [
+    "BINDINGSLOTS_NEURAL_ROUTING_UNRESOLVED",
+    "KDA_VALIDATION_BLOCKED"
+  ],
+  "kda_readiness": "KDA_VALIDATION_BLOCKED",
+  "gates": {
+    "1_within_1pp_of_T0": false,
+    "2_rescue_ge_90pct": false,
+    "3_incorrect_fallback_le_1pct": true,
+    "4_cross_session_leakage_zero": true,
+    "5_cross_tenant_leakage_zero": true,
+    "6_expired_or_deleted_never_returned": true,
+    "7_provenance_on_every_fallback": true,
+    "8_bindingslots_byte_identical_fallback_disabled": true,
+    "9_no_model_weight_or_gradient_change": true,
+    "10_p95_latency_within_ceiling": true,
+    "reproduction_matches_committed_b0": true,
+    "all_pass": false
+  },
+  "aggregate": {
+    "n": 600,
+    "M0_accuracy": 0.20833333333333334,
+    "T0_accuracy": 1.0,
+    "F1_accuracy": 0.8416666666666667,
+    "M0_failures": 475,
+    "fallback_invocation_rate": 0.6566666666666666,
+    "rescued": 380,
+    "rescue_rate": 0.8,
+    "unnecessary_fallback": 14,
+    "unnecessary_rate": 0.03553299492385787,
+    "failure_detection_recall": 0.8,
+    "failure_detection_precision": 0.9644670050761421,
+    "false_negative_rate": 0.15833333333333333,
+    "provenance_completeness": 1.0,
+    "table_unavailable_events": 0,
+    "read_p95_latency_s": 5.763000444858335e-06,
+    "confusion": {
+      "tp": 380,
+      "fp": 14,
+      "tn": 111,
+      "fn": 95
+    },
+    "incorrect_fallback_count": 0,
+    "incorrect_fallback_rate": 0.0
+  },
+  "frozen_thresholds": {
+    "prob_min": 0.1,
+    "margin_min": 0.05,
+    "entropy_max": 1.0,
+    "calib_recall": 1.0,
+    "calib_fp_rate": 0.14166666666666666
+  },
+  "frozen_gates": {
+    "WITHIN_T0_PP": 0.01,
+    "RESCUE_MIN": 0.9,
+    "INCORRECT_FALLBACK_MAX": 0.01,
+    "P95_LATENCY_CEILING_S": 0.05
+  },
+  "scope": "system-reliability evaluation; does NOT claim to solve neural routing"
+}

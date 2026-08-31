@@ -2,7 +2,7 @@
 
 **Product:** DilChat (consumer) · **Company:** Ugence Labs · **Site:** dilchat.com
 **Status:** Design phase — this is the API design contract. No server implementation exists.
-**Canonical reference:** [`DILCHAT_DECISION_LOG.md`](./DILCHAT_DECISION_LOG.md). Where this
+**Canonical reference:** [`DILCHAT_DECISION_LOG.md`](DILCHAT_DECISION_LOG.md). Where this
 document and the decision log disagree, the decision log wins and this file is a bug.
 **Machine-readable companion:** [`openapi/dilchat.openapi.yaml`](./openapi/dilchat.openapi.yaml)
 (OpenAPI 3.1). The hand-authored OpenAPI file and this prose are two views of one contract.

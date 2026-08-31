@@ -1,0 +1,1443 @@
+{
+  "distribution": "ugence-benchmark-registry-authority",
+  "namespace": "ugence_benchmark_registry_authority",
+  "package_version": "0.2.3",
+  "milestone": "BR-2C-0",
+  "note": "Machine-readable public-contract inventory. 'Every type is constructible and canonicalizable' applies to PUBLIC DATA CONTRACTS ONLY \u2014 the twenty-two rows under 'public_data_contracts'. It does NOT apply to Protocols, enums, errors, constants, pure validation functions, frozen descriptors or abstract type declarations, each of which is listed under 'other_public_symbols' and marked with its own kind and with canonicalizable=false. No row anywhere carries a caller-supplied upstream digest field: every upstream digest in this package is a derived read-only property recomputed from the exact nested object. The 'caller_supplied_digest_fields' column lists digests of artifacts OUTSIDE this package's graph (the BR-1 identity digest, the benchmark content digest, the immutable admitted digest), which cannot be recomputed here because the objects are not held. Regenerate with tools/generate_manifests.py; tests/packaging/test_inventories.py re-derives every column from the live surface and asserts this file equals it.",
+  "public_data_contracts": [
+    {
+      "class_name": "BenchmarkPublisherSubmissionEnvelope",
+      "kind": "public_data_contract",
+      "caller_constructible": true,
+      "canonicalizable": true,
+      "digest_domain": "ugence.benchmark-registry-authority/publisher-submission-envelope/v1",
+      "carries_declared_authority_information": true,
+      "permanently_false_trust_properties": [
+        "admission_established",
+        "approval_authenticity_established",
+        "authority_verified",
+        "publisher_authenticity_established",
+        "registry_admission_established",
+        "signature_verified",
+        "trusted_resolution_established"
+      ],
+      "later_milestone_authority_issued_result": "BR-2C \u2014 publisher trust and signature verification. The audited Ed25519 verifier that could establish publisher authenticity.",
+      "fields": [
+        "coordinate",
+        "benchmark_identity_digest",
+        "benchmark_content_digest",
+        "publisher_identity",
+        "publisher_key_id",
+        "signature_profile",
+        "signing_frame_domain",
+        "signing_frame_version",
+        "detached_signature"
+      ],
+      "nested_source_of_truth_contracts": [
+        "coordinate"
+      ],
+      "derived_digest_properties": [],
+      "caller_supplied_digest_fields": [
+        "benchmark_content_digest",
+        "benchmark_identity_digest"
+      ],
+      "caller_supplied_upstream_digest_fields": [],
+      "mechanically_reachable_actor_identities": [
+        "publisher_identity"
+      ],
+      "equality_and_separation_checks": [],
+      "carries_declared_recorded_at": false,
+      "prev_event_digest_rule": "not applicable \u2014 carries no chain position",
+      "transition_represented": "none \u2014 not a lifecycle payload",
+      "required_predecessor_state": null,
+      "required_predecessor_declared_outcome": null,
+      "terminal": false
+    },
+    {
+      "class_name": "BenchmarkApprovalEnvelope",
+      "kind": "public_data_contract",
+      "caller_constructible": true,
+      "canonicalizable": true,
+      "digest_domain": "ugence.benchmark-registry-authority/approval-envelope/v1",
+      "carries_declared_authority_information": true,
+      "permanently_false_trust_properties": [
+        "admission_established",
+        "approval_authenticity_established",
+        "authority_verified",
+        "publisher_authenticity_established",
+        "registry_admission_established",
+        "signature_verified",
+        "trusted_resolution_established"
+      ],
+      "later_milestone_authority_issued_result": "BR-2C \u2014 the approval-verification boundary that could establish approval authenticity.",
+      "fields": [
+        "publisher_submission_envelope",
+        "approval_authority_identity",
+        "approval_authority_key_id",
+        "signature_profile",
+        "signing_frame_domain",
+        "signing_frame_version",
+        "declared_outcome",
+        "applicable_policy_ref",
+        "validity_from",
+        "validity_to",
+        "detached_signature"
+      ],
+      "nested_source_of_truth_contracts": [
+        "publisher_submission_envelope"
+      ],
+      "derived_digest_properties": [
+        "publisher_submission_envelope_digest"
+      ],
+      "caller_supplied_digest_fields": [],
+      "caller_supplied_upstream_digest_fields": [],
+      "mechanically_reachable_actor_identities": [
+        "approval_authority_identity",
+        "publisher_identity"
+      ],
+      "equality_and_separation_checks": [
+        "approval_authority_identity != publisher_submission_envelope.publisher_identity"
+      ],
+      "carries_declared_recorded_at": false,
+      "prev_event_digest_rule": "not applicable \u2014 carries no chain position",
+      "transition_represented": "none \u2014 not a lifecycle payload",
+      "required_predecessor_state": null,
+      "required_predecessor_declared_outcome": null,
+      "terminal": false
+    },
+    {
+      "class_name": "BenchmarkRevocationEnvelope",
+      "kind": "public_data_contract",
+      "caller_constructible": true,
+      "canonicalizable": true,
+      "digest_domain": "ugence.benchmark-registry-authority/revocation-envelope/v1",
+      "carries_declared_authority_information": true,
+      "permanently_false_trust_properties": [
+        "admission_established",
+        "approval_authenticity_established",
+        "authority_verified",
+        "publisher_authenticity_established",
+        "registry_admission_established",
+        "signature_verified",
+        "trusted_resolution_established"
+      ],
+      "later_milestone_authority_issued_result": "BR-2C \u2014 revocation signature verification under an entitled anchor.",
+      "fields": [
+        "coordinate",
+        "admitted_digest",
+        "revoker_identity",
+        "revoker_key_id",
+        "signature_profile",
+        "signing_frame_domain",
+        "signing_frame_version",
+        "declared_revocation_reason",
+        "effective_at",
+        "detached_signature"
+      ],
+      "nested_source_of_truth_contracts": [
+        "coordinate"
+      ],
+      "derived_digest_properties": [],
+      "caller_supplied_digest_fields": [
+        "admitted_digest"
+      ],
+      "caller_supplied_upstream_digest_fields": [],
+      "mechanically_reachable_actor_identities": [
+        "revoker_identity"
+      ],
+      "equality_and_separation_checks": [],
+      "carries_declared_recorded_at": false,
+      "prev_event_digest_rule": "not applicable \u2014 carries no chain position",
+      "transition_represented": "none \u2014 not a lifecycle payload",
+      "required_predecessor_state": null,
+      "required_predecessor_declared_outcome": null,
+      "terminal": false
+    },
+    {
+      "class_name": "BenchmarkSubmissionRecordPayload",
+      "kind": "public_data_contract",
+      "caller_constructible": true,
+      "canonicalizable": true,
+      "digest_domain": "ugence.benchmark-registry-authority/submission-record-payload/v1",
+      "carries_declared_authority_information": true,
+      "permanently_false_trust_properties": [
+        "approval_authenticity_established",
+        "authority_verified",
+        "publisher_authenticity_established",
+        "registry_admission_established",
+        "trusted_resolution_established"
+      ],
+      "later_milestone_authority_issued_result": "BR-2D \u2014 the authority-issued submission record appended by the durable registry authority's append-only log.",
+      "fields": [
+        "publisher_submission_envelope",
+        "declared_registry_authority_identity",
+        "declared_recorded_at"
+      ],
+      "nested_source_of_truth_contracts": [
+        "publisher_submission_envelope"
+      ],
+      "derived_digest_properties": [
+        "prev_event_digest",
+        "publisher_submission_envelope_digest"
+      ],
+      "caller_supplied_digest_fields": [],
+      "caller_supplied_upstream_digest_fields": [],
+      "mechanically_reachable_actor_identities": [
+        "declared_registry_authority_identity",
+        "publisher_identity",
+        "registry_authority_identity"
+      ],
+      "equality_and_separation_checks": [
+        "declared_registry_authority_identity != publisher_submission_envelope.publisher_identity"
+      ],
+      "carries_declared_recorded_at": true,
+      "prev_event_digest_rule": "None \u2014 the only payload permitted None",
+      "transition_represented": "initial -> SUBMITTED",
+      "required_predecessor_state": null,
+      "required_predecessor_declared_outcome": null,
+      "terminal": false
+    },
+    {
+      "class_name": "BenchmarkAdmissionDecisionPayload",
+      "kind": "public_data_contract",
+      "caller_constructible": true,
+      "canonicalizable": true,
+      "digest_domain": "ugence.benchmark-registry-authority/admission-decision-payload/v1",
+      "carries_declared_authority_information": true,
+      "permanently_false_trust_properties": [
+        "approval_authenticity_established",
+        "authority_verified",
+        "publisher_authenticity_established",
+        "registry_admission_established",
+        "trusted_resolution_established"
+      ],
+      "later_milestone_authority_issued_result": "BR-2D \u2014 BenchmarkAdmissionDecision, the authority-issued result. Reserved and undefined until BR-2D.",
+      "fields": [
+        "submission_record",
+        "approval_envelope",
+        "declared_outcome",
+        "declared_recorded_at",
+        "declared_refusal_reason"
+      ],
+      "nested_source_of_truth_contracts": [
+        "approval_envelope",
+        "submission_record"
+      ],
+      "derived_digest_properties": [
+        "approval_envelope_digest",
+        "prev_event_digest",
+        "submission_record_digest"
+      ],
+      "caller_supplied_digest_fields": [],
+      "caller_supplied_upstream_digest_fields": [],
+      "mechanically_reachable_actor_identities": [
+        "publisher_identity",
+        "registry_authority_identity"
+      ],
+      "equality_and_separation_checks": [
+        "registry_authority_identity != approval_envelope.approval_authority_identity",
+        "submission_record.publisher_submission_envelope is byte-identical and digest-identical to approval_envelope.publisher_submission_envelope",
+        "declared_refusal_reason required iff declared_outcome is REJECTED"
+      ],
+      "carries_declared_recorded_at": true,
+      "prev_event_digest_rule": "equals the independently recomputed canonical digest of submission_record",
+      "transition_represented": "SUBMITTED -> ADMITTED (declared_outcome=ADMITTED); SUBMITTED -> REJECTED (declared_outcome=REJECTED)",
+      "required_predecessor_state": "SUBMITTED",
+      "required_predecessor_declared_outcome": null,
+      "terminal": false
+    },
+    {
+      "class_name": "BenchmarkPostAdmissionRejectionEventPayload",
+      "kind": "public_data_contract",
+      "caller_constructible": true,
+      "canonicalizable": true,
+      "digest_domain": "ugence.benchmark-registry-authority/post-admission-rejection-event-payload/v1",
+      "carries_declared_authority_information": true,
+      "permanently_false_trust_properties": [
+        "approval_authenticity_established",
+        "authority_verified",
+        "publisher_authenticity_established",
+        "registry_admission_established",
+        "trusted_resolution_established"
+      ],
+      "later_milestone_authority_issued_result": "BR-2D \u2014 the authority-issued post-admission rejection event.",
+      "fields": [
+        "admission_decision",
+        "declared_refusal_reason",
+        "declared_recorded_at"
+      ],
+      "nested_source_of_truth_contracts": [
+        "admission_decision"
+      ],
+      "derived_digest_properties": [
+        "admission_decision_digest",
+        "prev_event_digest"
+      ],
+      "caller_supplied_digest_fields": [],
+      "caller_supplied_upstream_digest_fields": [],
+      "mechanically_reachable_actor_identities": [
+        "publisher_identity",
+        "registry_authority_identity"
+      ],
+      "equality_and_separation_checks": [
+        "admission_decision.declared_outcome must be ADMITTED"
+      ],
+      "carries_declared_recorded_at": true,
+      "prev_event_digest_rule": "equals the independently recomputed canonical digest of admission_decision",
+      "transition_represented": "ADMITTED -> REJECTED",
+      "required_predecessor_state": "ADMITTED",
+      "required_predecessor_declared_outcome": "ADMITTED",
+      "terminal": true
+    },
+    {
+      "class_name": "BenchmarkRegistrationEventPayload",
+      "kind": "public_data_contract",
+      "caller_constructible": true,
+      "canonicalizable": true,
+      "digest_domain": "ugence.benchmark-registry-authority/registration-event-payload/v1",
+      "carries_declared_authority_information": true,
+      "permanently_false_trust_properties": [
+        "approval_authenticity_established",
+        "authority_verified",
+        "publisher_authenticity_established",
+        "registry_admission_established",
+        "trusted_resolution_established"
+      ],
+      "later_milestone_authority_issued_result": "BR-2D \u2014 BenchmarkRegistrationEvent, the authority-issued result. Reserved and undefined until BR-2D.",
+      "fields": [
+        "admission_decision",
+        "declared_recorded_at"
+      ],
+      "nested_source_of_truth_contracts": [
+        "admission_decision"
+      ],
+      "derived_digest_properties": [
+        "admission_decision_digest",
+        "benchmark_identity_digest",
+        "prev_event_digest"
+      ],
+      "caller_supplied_digest_fields": [],
+      "caller_supplied_upstream_digest_fields": [],
+      "mechanically_reachable_actor_identities": [
+        "publisher_identity",
+        "registry_authority_identity"
+      ],
+      "equality_and_separation_checks": [
+        "admission_decision.declared_outcome must be ADMITTED"
+      ],
+      "carries_declared_recorded_at": true,
+      "prev_event_digest_rule": "equals the independently recomputed canonical digest of the ADMITTED admission_decision",
+      "transition_represented": "ADMITTED -> REGISTERED",
+      "required_predecessor_state": "ADMITTED",
+      "required_predecessor_declared_outcome": "ADMITTED",
+      "terminal": false
+    },
+    {
+      "class_name": "BenchmarkRevocationEventPayload",
+      "kind": "public_data_contract",
+      "caller_constructible": true,
+      "canonicalizable": true,
+      "digest_domain": "ugence.benchmark-registry-authority/revocation-event-payload/v1",
+      "carries_declared_authority_information": true,
+      "permanently_false_trust_properties": [
+        "approval_authenticity_established",
+        "authority_verified",
+        "publisher_authenticity_established",
+        "registry_admission_established",
+        "trusted_resolution_established"
+      ],
+      "later_milestone_authority_issued_result": "BR-2D \u2014 the authority-issued revocation event, appended only after the revoker's signature verifies under an entitled anchor.",
+      "fields": [
+        "registration_event",
+        "revocation_envelope",
+        "declared_recorded_at"
+      ],
+      "nested_source_of_truth_contracts": [
+        "registration_event",
+        "revocation_envelope"
+      ],
+      "derived_digest_properties": [
+        "prev_event_digest",
+        "registration_event_digest",
+        "revocation_envelope_digest"
+      ],
+      "caller_supplied_digest_fields": [],
+      "caller_supplied_upstream_digest_fields": [],
+      "mechanically_reachable_actor_identities": [
+        "publisher_identity",
+        "registry_authority_identity",
+        "revoker_identity"
+      ],
+      "equality_and_separation_checks": [
+        "revocation_envelope.revoker_identity != registry_authority_identity",
+        "revocation_envelope.coordinate == registration_event.coordinate",
+        "revocation_envelope.admitted_digest == registration_event.benchmark_identity_digest"
+      ],
+      "carries_declared_recorded_at": true,
+      "prev_event_digest_rule": "equals the independently recomputed canonical digest of registration_event",
+      "transition_represented": "REGISTERED -> REVOKED",
+      "required_predecessor_state": "REGISTERED",
+      "required_predecessor_declared_outcome": null,
+      "terminal": true
+    },
+    {
+      "class_name": "BenchmarkConflictRecordPayload",
+      "kind": "public_data_contract",
+      "caller_constructible": true,
+      "canonicalizable": true,
+      "digest_domain": "ugence.benchmark-registry-authority/conflict-record-payload/v1",
+      "carries_declared_authority_information": true,
+      "permanently_false_trust_properties": [
+        "approval_authenticity_established",
+        "authority_verified",
+        "publisher_authenticity_established",
+        "registry_admission_established",
+        "trusted_resolution_established"
+      ],
+      "later_milestone_authority_issued_result": "BR-2D \u2014 the authority-issued conflict record produced by the durable registry authority's compare-and-set slot claim.",
+      "fields": [
+        "submission_record",
+        "declared_refusal_reason",
+        "declared_recorded_at"
+      ],
+      "nested_source_of_truth_contracts": [
+        "submission_record"
+      ],
+      "derived_digest_properties": [
+        "prev_event_digest",
+        "submission_record_digest"
+      ],
+      "caller_supplied_digest_fields": [],
+      "caller_supplied_upstream_digest_fields": [],
+      "mechanically_reachable_actor_identities": [
+        "publisher_identity",
+        "registry_authority_identity"
+      ],
+      "equality_and_separation_checks": [],
+      "carries_declared_recorded_at": true,
+      "prev_event_digest_rule": "equals the independently recomputed canonical digest of submission_record",
+      "transition_represented": "none \u2014 outside the linear chain; records a refused attempt and appends no successor",
+      "required_predecessor_state": null,
+      "required_predecessor_declared_outcome": null,
+      "terminal": true
+    },
+    {
+      "class_name": "BenchmarkRegistrySnapshotAssertion",
+      "kind": "public_data_contract",
+      "caller_constructible": true,
+      "canonicalizable": true,
+      "digest_domain": "ugence.benchmark-registry-authority/registry-snapshot-assertion/v1",
+      "carries_declared_authority_information": false,
+      "permanently_false_trust_properties": [
+        "approval_authenticity_established",
+        "authority_verified",
+        "publisher_authenticity_established",
+        "registry_admission_established",
+        "trusted_resolution_established"
+      ],
+      "later_milestone_authority_issued_result": "BR-2D \u2014 the durable registry authority that can observe the state this contract only asserts. BR-2B holds no store and reads none.",
+      "fields": [
+        "coordinate",
+        "asserted_current_state",
+        "asserted_registration_record_presence"
+      ],
+      "nested_source_of_truth_contracts": [
+        "coordinate"
+      ],
+      "derived_digest_properties": [],
+      "caller_supplied_digest_fields": [],
+      "caller_supplied_upstream_digest_fields": [],
+      "mechanically_reachable_actor_identities": [],
+      "equality_and_separation_checks": [],
+      "carries_declared_recorded_at": false,
+      "prev_event_digest_rule": "not applicable \u2014 carries no chain position",
+      "transition_represented": "none \u2014 a caller's assertion about current state, not a move",
+      "required_predecessor_state": null,
+      "required_predecessor_declared_outcome": null,
+      "terminal": false
+    },
+    {
+      "class_name": "BenchmarkTransitionPlan",
+      "kind": "public_data_contract",
+      "caller_constructible": true,
+      "canonicalizable": true,
+      "digest_domain": "ugence.benchmark-registry-authority/transition-plan/v1",
+      "carries_declared_authority_information": false,
+      "permanently_false_trust_properties": [
+        "approval_authenticity_established",
+        "authority_verified",
+        "publisher_authenticity_established",
+        "registry_admission_established",
+        "trusted_resolution_established"
+      ],
+      "later_milestone_authority_issued_result": "BR-2D \u2014 the first phase permitted to assert that the planned transition occurred. A plan says only that it would be admissible.",
+      "fields": [
+        "snapshot",
+        "planned_to_state"
+      ],
+      "nested_source_of_truth_contracts": [],
+      "derived_digest_properties": [
+        "snapshot_digest"
+      ],
+      "caller_supplied_digest_fields": [],
+      "caller_supplied_upstream_digest_fields": [],
+      "mechanically_reachable_actor_identities": [],
+      "equality_and_separation_checks": [],
+      "carries_declared_recorded_at": false,
+      "prev_event_digest_rule": "not applicable \u2014 carries no chain position",
+      "transition_represented": "any transition the closed relation admits, as a plan only \u2014 a plan is not the transition, and BR-2B cannot perform one",
+      "required_predecessor_state": null,
+      "required_predecessor_declared_outcome": null,
+      "terminal": false
+    },
+    {
+      "class_name": "BenchmarkTransitionRefusal",
+      "kind": "public_data_contract",
+      "caller_constructible": true,
+      "canonicalizable": true,
+      "digest_domain": "ugence.benchmark-registry-authority/transition-refusal/v1",
+      "carries_declared_authority_information": true,
+      "permanently_false_trust_properties": [
+        "approval_authenticity_established",
+        "authority_verified",
+        "publisher_authenticity_established",
+        "registry_admission_established",
+        "trusted_resolution_established"
+      ],
+      "later_milestone_authority_issued_result": "BR-2D \u2014 the authority-issued refusal appended when the move is actually attempted against observed rather than asserted state.",
+      "fields": [
+        "snapshot",
+        "refused_to_state",
+        "declared_refusal_reason"
+      ],
+      "nested_source_of_truth_contracts": [],
+      "derived_digest_properties": [
+        "snapshot_digest"
+      ],
+      "caller_supplied_digest_fields": [],
+      "caller_supplied_upstream_digest_fields": [],
+      "mechanically_reachable_actor_identities": [],
+      "equality_and_separation_checks": [],
+      "carries_declared_recorded_at": false,
+      "prev_event_digest_rule": "not applicable \u2014 carries no chain position",
+      "transition_represented": "none \u2014 records a move that would not be admissible against the nested assertion",
+      "required_predecessor_state": null,
+      "required_predecessor_declared_outcome": null,
+      "terminal": true
+    },
+    {
+      "class_name": "BenchmarkResolutionRecordPayload",
+      "kind": "public_data_contract",
+      "caller_constructible": true,
+      "canonicalizable": true,
+      "digest_domain": "ugence.benchmark-registry-authority/resolution-record-payload/v1",
+      "carries_declared_authority_information": true,
+      "permanently_false_trust_properties": [
+        "active_eligibility_established",
+        "approval_authenticity_established",
+        "authority_verified",
+        "authorizes_execution",
+        "publisher_authenticity_established",
+        "registry_admission_established",
+        "trusted_resolution_established"
+      ],
+      "later_milestone_authority_issued_result": "BR-2D \u2014 BenchmarkResolution, the authority-issued result and its issuance boundary, after real verification exists. Reserved and undefined at BR-2A.",
+      "fields": [
+        "coordinate",
+        "declared_registration_state",
+        "declared_admitted_digest",
+        "declared_registry_authority_identity"
+      ],
+      "nested_source_of_truth_contracts": [
+        "coordinate"
+      ],
+      "derived_digest_properties": [],
+      "caller_supplied_digest_fields": [
+        "declared_admitted_digest"
+      ],
+      "caller_supplied_upstream_digest_fields": [],
+      "mechanically_reachable_actor_identities": [
+        "declared_registry_authority_identity"
+      ],
+      "equality_and_separation_checks": [],
+      "carries_declared_recorded_at": false,
+      "prev_event_digest_rule": "not applicable \u2014 carries no chain position",
+      "transition_represented": "none \u2014 not a lifecycle payload",
+      "required_predecessor_state": null,
+      "required_predecessor_declared_outcome": null,
+      "terminal": false
+    },
+    {
+      "class_name": "BenchmarkHistoricalRecordPayload",
+      "kind": "public_data_contract",
+      "caller_constructible": true,
+      "canonicalizable": true,
+      "digest_domain": "ugence.benchmark-registry-authority/historical-record-payload/v1",
+      "carries_declared_authority_information": true,
+      "permanently_false_trust_properties": [
+        "active_eligibility_established",
+        "approval_authenticity_established",
+        "authority_verified",
+        "authorizes_execution",
+        "publisher_authenticity_established",
+        "registry_admission_established",
+        "trusted_resolution_established"
+      ],
+      "later_milestone_authority_issued_result": "BR-2D \u2014 the authority-issued historical record returned by the read-only inspection API.",
+      "fields": [
+        "coordinate",
+        "declared_registration_state",
+        "declared_admitted_digest",
+        "declared_registry_authority_identity",
+        "as_of"
+      ],
+      "nested_source_of_truth_contracts": [
+        "coordinate"
+      ],
+      "derived_digest_properties": [],
+      "caller_supplied_digest_fields": [
+        "declared_admitted_digest"
+      ],
+      "caller_supplied_upstream_digest_fields": [],
+      "mechanically_reachable_actor_identities": [
+        "declared_registry_authority_identity"
+      ],
+      "equality_and_separation_checks": [],
+      "carries_declared_recorded_at": false,
+      "prev_event_digest_rule": "not applicable \u2014 carries no chain position",
+      "transition_represented": "none \u2014 not a lifecycle payload",
+      "required_predecessor_state": null,
+      "required_predecessor_declared_outcome": null,
+      "terminal": false
+    },
+    {
+      "class_name": "PlatformRegistryScopeExpectation",
+      "kind": "public_data_contract",
+      "caller_constructible": true,
+      "canonicalizable": true,
+      "digest_domain": "ugence.benchmark-registry-authority/platform-registry-scope-expectation/v1",
+      "carries_declared_authority_information": false,
+      "permanently_false_trust_properties": [
+        "approval_authenticity_established",
+        "authority_verified",
+        "authorization_granted",
+        "publisher_authenticity_established",
+        "registry_admission_established",
+        "trusted_resolution_established"
+      ],
+      "later_milestone_authority_issued_result": "BR-2D \u2014 the authorization check that consumes it, applied before any temporal or lifecycle check.",
+      "fields": [
+        "scope"
+      ],
+      "nested_source_of_truth_contracts": [
+        "scope"
+      ],
+      "derived_digest_properties": [],
+      "caller_supplied_digest_fields": [],
+      "caller_supplied_upstream_digest_fields": [],
+      "mechanically_reachable_actor_identities": [],
+      "equality_and_separation_checks": [
+        "scope.kind must be PLATFORM_WIDE"
+      ],
+      "carries_declared_recorded_at": false,
+      "prev_event_digest_rule": "not applicable \u2014 carries no chain position",
+      "transition_represented": "none \u2014 not a lifecycle payload",
+      "required_predecessor_state": null,
+      "required_predecessor_declared_outcome": null,
+      "terminal": false
+    },
+    {
+      "class_name": "TenantRegistryScopeExpectation",
+      "kind": "public_data_contract",
+      "caller_constructible": true,
+      "canonicalizable": true,
+      "digest_domain": "ugence.benchmark-registry-authority/tenant-registry-scope-expectation/v1",
+      "carries_declared_authority_information": false,
+      "permanently_false_trust_properties": [
+        "approval_authenticity_established",
+        "authority_verified",
+        "authorization_granted",
+        "publisher_authenticity_established",
+        "registry_admission_established",
+        "trusted_resolution_established"
+      ],
+      "later_milestone_authority_issued_result": "BR-2D \u2014 the cross-tenant non-disclosure check that consumes it.",
+      "fields": [
+        "scope"
+      ],
+      "nested_source_of_truth_contracts": [
+        "scope"
+      ],
+      "derived_digest_properties": [],
+      "caller_supplied_digest_fields": [],
+      "caller_supplied_upstream_digest_fields": [],
+      "mechanically_reachable_actor_identities": [
+        "tenant_id"
+      ],
+      "equality_and_separation_checks": [
+        "scope.kind must be TENANT"
+      ],
+      "carries_declared_recorded_at": false,
+      "prev_event_digest_rule": "not applicable \u2014 carries no chain position",
+      "transition_represented": "none \u2014 not a lifecycle payload",
+      "required_predecessor_state": null,
+      "required_predecessor_declared_outcome": null,
+      "terminal": false
+    },
+    {
+      "class_name": "BenchmarkExactResolutionRequest",
+      "kind": "public_data_contract",
+      "caller_constructible": true,
+      "canonicalizable": true,
+      "digest_domain": "ugence.benchmark-registry-authority/exact-resolution-request/v1",
+      "carries_declared_authority_information": false,
+      "permanently_false_trust_properties": [
+        "approval_authenticity_established",
+        "authority_verified",
+        "publisher_authenticity_established",
+        "registry_admission_established",
+        "trusted_resolution_established"
+      ],
+      "later_milestone_authority_issued_result": "BR-2D \u2014 the trusted exact-resolution API that consumes it.",
+      "fields": [
+        "coordinate"
+      ],
+      "nested_source_of_truth_contracts": [
+        "coordinate"
+      ],
+      "derived_digest_properties": [],
+      "caller_supplied_digest_fields": [],
+      "caller_supplied_upstream_digest_fields": [],
+      "mechanically_reachable_actor_identities": [],
+      "equality_and_separation_checks": [],
+      "carries_declared_recorded_at": false,
+      "prev_event_digest_rule": "not applicable \u2014 carries no chain position",
+      "transition_represented": "none \u2014 not a lifecycle payload",
+      "required_predecessor_state": null,
+      "required_predecessor_declared_outcome": null,
+      "terminal": false
+    },
+    {
+      "class_name": "BenchmarkHistoricalInspectionRequest",
+      "kind": "public_data_contract",
+      "caller_constructible": true,
+      "canonicalizable": true,
+      "digest_domain": "ugence.benchmark-registry-authority/historical-inspection-request/v1",
+      "carries_declared_authority_information": false,
+      "permanently_false_trust_properties": [
+        "approval_authenticity_established",
+        "authority_verified",
+        "publisher_authenticity_established",
+        "registry_admission_established",
+        "trusted_resolution_established"
+      ],
+      "later_milestone_authority_issued_result": "BR-2D \u2014 the separately named read-only historical inspection API.",
+      "fields": [
+        "coordinate",
+        "as_of"
+      ],
+      "nested_source_of_truth_contracts": [
+        "coordinate"
+      ],
+      "derived_digest_properties": [],
+      "caller_supplied_digest_fields": [],
+      "caller_supplied_upstream_digest_fields": [],
+      "mechanically_reachable_actor_identities": [],
+      "equality_and_separation_checks": [],
+      "carries_declared_recorded_at": false,
+      "prev_event_digest_rule": "not applicable \u2014 carries no chain position",
+      "transition_represented": "none \u2014 not a lifecycle payload",
+      "required_predecessor_state": null,
+      "required_predecessor_declared_outcome": null,
+      "terminal": false
+    },
+    {
+      "class_name": "BenchmarkTrustAnchorRecord",
+      "kind": "public_data_contract",
+      "caller_constructible": true,
+      "canonicalizable": true,
+      "digest_domain": "ugence.benchmark-registry-authority/trust-anchor-record/v1",
+      "carries_declared_authority_information": false,
+      "permanently_false_trust_properties": [
+        "approval_authenticity_established",
+        "authority_verified",
+        "publisher_authenticity_established",
+        "registry_admission_established",
+        "trusted_resolution_established"
+      ],
+      "later_milestone_authority_issued_result": "BR-2C (engineering half, still blocked) \u2014 the composition-root trust resolver that would actually resolve one. D-04 keeps anchor ownership with the composition root and forbids a second trust store here, so this package defines the record's shape and holds no anchor.",
+      "fields": [
+        "role",
+        "identity",
+        "key_id",
+        "signature_profile",
+        "public_key_material",
+        "validity_from",
+        "validity_to",
+        "status",
+        "revoked_at",
+        "revocation_reason"
+      ],
+      "nested_source_of_truth_contracts": [],
+      "derived_digest_properties": [
+        "anchor_record_digest"
+      ],
+      "caller_supplied_digest_fields": [],
+      "caller_supplied_upstream_digest_fields": [],
+      "mechanically_reachable_actor_identities": [],
+      "equality_and_separation_checks": [],
+      "carries_declared_recorded_at": false,
+      "prev_event_digest_rule": "not applicable \u2014 carries no chain position",
+      "transition_represented": "none \u2014 not a lifecycle payload",
+      "required_predecessor_state": null,
+      "required_predecessor_declared_outcome": null,
+      "terminal": false
+    },
+    {
+      "class_name": "BenchmarkPublisherVerifiedResult",
+      "kind": "public_data_contract",
+      "caller_constructible": true,
+      "canonicalizable": true,
+      "digest_domain": "ugence.benchmark-registry-authority/publisher-verified-result/v1",
+      "carries_declared_authority_information": false,
+      "permanently_false_trust_properties": [
+        "approval_authenticity_established",
+        "authority_verified",
+        "publisher_authenticity_established",
+        "registry_admission_established",
+        "trusted_resolution_established"
+      ],
+      "later_milestone_authority_issued_result": "BR-2C (engineering half, still blocked) \u2014 the audited Ed25519 verifier that would produce one. UNAUDITED AND NOT PRODUCTION-READY: no verifier exists, and D-32 makes an external cryptographic audit a hard precondition to any production use of the one that will.",
+      "fields": [
+        "verified_digest",
+        "signer_role",
+        "signer_identity",
+        "signer_key_id",
+        "signature_profile",
+        "anchor_record_digest",
+        "evaluated_at",
+        "outcome",
+        "refusal_reason"
+      ],
+      "nested_source_of_truth_contracts": [],
+      "derived_digest_properties": [],
+      "caller_supplied_digest_fields": [
+        "anchor_record_digest",
+        "verified_digest"
+      ],
+      "caller_supplied_upstream_digest_fields": [],
+      "mechanically_reachable_actor_identities": [],
+      "equality_and_separation_checks": [],
+      "carries_declared_recorded_at": false,
+      "prev_event_digest_rule": "not applicable \u2014 carries no chain position",
+      "transition_represented": "none \u2014 not a lifecycle payload",
+      "required_predecessor_state": null,
+      "required_predecessor_declared_outcome": null,
+      "terminal": false
+    },
+    {
+      "class_name": "BenchmarkApprovalVerifiedResult",
+      "kind": "public_data_contract",
+      "caller_constructible": true,
+      "canonicalizable": true,
+      "digest_domain": "ugence.benchmark-registry-authority/approval-verified-result/v1",
+      "carries_declared_authority_information": false,
+      "permanently_false_trust_properties": [
+        "approval_authenticity_established",
+        "authority_verified",
+        "publisher_authenticity_established",
+        "registry_admission_established",
+        "trusted_resolution_established"
+      ],
+      "later_milestone_authority_issued_result": "BR-2C (engineering half, still blocked) \u2014 the approval-verification seam that would produce one. UNAUDITED AND NOT PRODUCTION-READY.",
+      "fields": [
+        "verified_digest",
+        "signer_role",
+        "signer_identity",
+        "signer_key_id",
+        "signature_profile",
+        "anchor_record_digest",
+        "evaluated_at",
+        "outcome",
+        "refusal_reason"
+      ],
+      "nested_source_of_truth_contracts": [],
+      "derived_digest_properties": [],
+      "caller_supplied_digest_fields": [
+        "anchor_record_digest",
+        "verified_digest"
+      ],
+      "caller_supplied_upstream_digest_fields": [],
+      "mechanically_reachable_actor_identities": [],
+      "equality_and_separation_checks": [],
+      "carries_declared_recorded_at": false,
+      "prev_event_digest_rule": "not applicable \u2014 carries no chain position",
+      "transition_represented": "none \u2014 not a lifecycle payload",
+      "required_predecessor_state": null,
+      "required_predecessor_declared_outcome": null,
+      "terminal": false
+    },
+    {
+      "class_name": "BenchmarkRevocationVerifiedResult",
+      "kind": "public_data_contract",
+      "caller_constructible": true,
+      "canonicalizable": true,
+      "digest_domain": "ugence.benchmark-registry-authority/revocation-verified-result/v1",
+      "carries_declared_authority_information": false,
+      "permanently_false_trust_properties": [
+        "approval_authenticity_established",
+        "authority_verified",
+        "publisher_authenticity_established",
+        "registry_admission_established",
+        "trusted_resolution_established"
+      ],
+      "later_milestone_authority_issued_result": "BR-2C (engineering half, still blocked) \u2014 the revocation-verification seam D-26 adds, which would produce one. UNAUDITED AND NOT PRODUCTION-READY. Verifying a revoker's assertion is not appending a revocation; the revocation event itself remains BR-2D's.",
+      "fields": [
+        "verified_digest",
+        "signer_role",
+        "signer_identity",
+        "signer_key_id",
+        "signature_profile",
+        "anchor_record_digest",
+        "evaluated_at",
+        "outcome",
+        "refusal_reason"
+      ],
+      "nested_source_of_truth_contracts": [],
+      "derived_digest_properties": [],
+      "caller_supplied_digest_fields": [
+        "anchor_record_digest",
+        "verified_digest"
+      ],
+      "caller_supplied_upstream_digest_fields": [],
+      "mechanically_reachable_actor_identities": [],
+      "equality_and_separation_checks": [],
+      "carries_declared_recorded_at": false,
+      "prev_event_digest_rule": "not applicable \u2014 carries no chain position",
+      "transition_represented": "none \u2014 not a lifecycle payload",
+      "required_predecessor_state": null,
+      "required_predecessor_declared_outcome": null,
+      "terminal": false
+    }
+  ],
+  "other_public_symbols": [
+    {
+      "symbol": "BenchmarkRegistryContractError",
+      "kind": "typed_error",
+      "caller_constructible": true,
+      "canonicalizable": false
+    },
+    {
+      "symbol": "BenchmarkRegistryCanonicalizationError",
+      "kind": "typed_error",
+      "caller_constructible": true,
+      "canonicalizable": false
+    },
+    {
+      "symbol": "BenchmarkRegistryLifecycleError",
+      "kind": "typed_error",
+      "caller_constructible": true,
+      "canonicalizable": false
+    },
+    {
+      "symbol": "BenchmarkRegistryCompositionError",
+      "kind": "typed_error",
+      "caller_constructible": true,
+      "canonicalizable": false
+    },
+    {
+      "symbol": "BenchmarkRegistrationState",
+      "kind": "closed_vocabulary_enum",
+      "caller_constructible": true,
+      "canonicalizable": false
+    },
+    {
+      "symbol": "BenchmarkAdmissionOutcome",
+      "kind": "closed_vocabulary_enum",
+      "caller_constructible": true,
+      "canonicalizable": false
+    },
+    {
+      "symbol": "BenchmarkSignatureProfile",
+      "kind": "closed_vocabulary_enum",
+      "caller_constructible": true,
+      "canonicalizable": false
+    },
+    {
+      "symbol": "BenchmarkRegistryRefusalReason",
+      "kind": "closed_vocabulary_enum",
+      "caller_constructible": true,
+      "canonicalizable": false
+    },
+    {
+      "symbol": "BenchmarkRegistryFaultClass",
+      "kind": "closed_vocabulary_enum",
+      "caller_constructible": true,
+      "canonicalizable": false
+    },
+    {
+      "symbol": "BenchmarkRegistryConsistencyScope",
+      "kind": "closed_vocabulary_enum",
+      "caller_constructible": true,
+      "canonicalizable": false
+    },
+    {
+      "symbol": "BenchmarkRegistryConsistencyClaim",
+      "kind": "closed_vocabulary_enum",
+      "caller_constructible": true,
+      "canonicalizable": false
+    },
+    {
+      "symbol": "BenchmarkConfusableNormalizationPosture",
+      "kind": "closed_vocabulary_enum",
+      "caller_constructible": true,
+      "canonicalizable": false
+    },
+    {
+      "symbol": "require_exact_resolution_record_payload",
+      "kind": "pure_validation_function",
+      "caller_constructible": false,
+      "canonicalizable": false
+    },
+    {
+      "symbol": "require_exact_historical_record_payload",
+      "kind": "pure_validation_function",
+      "caller_constructible": false,
+      "canonicalizable": false
+    },
+    {
+      "symbol": "BenchmarkRegistryScopeExpectation",
+      "kind": "closed_type_alias",
+      "caller_constructible": false,
+      "canonicalizable": false,
+      "members": [
+        "PlatformRegistryScopeExpectation",
+        "TenantRegistryScopeExpectation"
+      ]
+    },
+    {
+      "symbol": "canonical_bytes",
+      "kind": "pure_validation_function",
+      "caller_constructible": false,
+      "canonicalizable": false
+    },
+    {
+      "symbol": "canonical_digest",
+      "kind": "pure_validation_function",
+      "caller_constructible": false,
+      "canonicalizable": false
+    },
+    {
+      "symbol": "canonical_domain_inventory",
+      "kind": "pure_validation_function",
+      "caller_constructible": false,
+      "canonicalizable": false
+    },
+    {
+      "symbol": "is_valid_registration_transition",
+      "kind": "pure_validation_function",
+      "caller_constructible": false,
+      "canonicalizable": false
+    },
+    {
+      "symbol": "require_valid_registration_transition",
+      "kind": "pure_validation_function",
+      "caller_constructible": false,
+      "canonicalizable": false
+    },
+    {
+      "symbol": "bound_payload_for_transition",
+      "kind": "pure_validation_function",
+      "caller_constructible": false,
+      "canonicalizable": false
+    },
+    {
+      "symbol": "require_bound_payload_for_transition",
+      "kind": "pure_validation_function",
+      "caller_constructible": false,
+      "canonicalizable": false
+    },
+    {
+      "symbol": "fault_class_for",
+      "kind": "pure_validation_function",
+      "caller_constructible": false,
+      "canonicalizable": false
+    },
+    {
+      "symbol": "BenchmarkRegistryStorePort",
+      "kind": "protocol_port",
+      "caller_constructible": false,
+      "canonicalizable": false
+    },
+    {
+      "symbol": "BenchmarkPublisherTrustDirectoryPort",
+      "kind": "protocol_port",
+      "caller_constructible": false,
+      "canonicalizable": false
+    },
+    {
+      "symbol": "BenchmarkApprovalVerifierPort",
+      "kind": "protocol_port",
+      "caller_constructible": false,
+      "canonicalizable": false
+    },
+    {
+      "symbol": "BenchmarkClockPort",
+      "kind": "protocol_port",
+      "caller_constructible": false,
+      "canonicalizable": false
+    },
+    {
+      "symbol": "BenchmarkRegistryStoreConsistencyDescriptor",
+      "kind": "frozen_descriptor",
+      "caller_constructible": true,
+      "canonicalizable": false
+    },
+    {
+      "symbol": "BENCHMARK_REGISTRY_AUTHORITY_CANONICALIZATION_VERSION",
+      "kind": "pinned_constant",
+      "caller_constructible": false,
+      "canonicalizable": false
+    },
+    {
+      "symbol": "BENCHMARK_PUBLISHER_SUBMISSION_ENVELOPE_DIGEST_DOMAIN",
+      "kind": "pinned_constant",
+      "caller_constructible": false,
+      "canonicalizable": false
+    },
+    {
+      "symbol": "BENCHMARK_APPROVAL_ENVELOPE_DIGEST_DOMAIN",
+      "kind": "pinned_constant",
+      "caller_constructible": false,
+      "canonicalizable": false
+    },
+    {
+      "symbol": "BENCHMARK_REVOCATION_ENVELOPE_DIGEST_DOMAIN",
+      "kind": "pinned_constant",
+      "caller_constructible": false,
+      "canonicalizable": false
+    },
+    {
+      "symbol": "BENCHMARK_SUBMISSION_RECORD_PAYLOAD_DIGEST_DOMAIN",
+      "kind": "pinned_constant",
+      "caller_constructible": false,
+      "canonicalizable": false
+    },
+    {
+      "symbol": "BENCHMARK_ADMISSION_DECISION_PAYLOAD_DIGEST_DOMAIN",
+      "kind": "pinned_constant",
+      "caller_constructible": false,
+      "canonicalizable": false
+    },
+    {
+      "symbol": "BENCHMARK_POST_ADMISSION_REJECTION_EVENT_PAYLOAD_DIGEST_DOMAIN",
+      "kind": "pinned_constant",
+      "caller_constructible": false,
+      "canonicalizable": false
+    },
+    {
+      "symbol": "BENCHMARK_REGISTRATION_EVENT_PAYLOAD_DIGEST_DOMAIN",
+      "kind": "pinned_constant",
+      "caller_constructible": false,
+      "canonicalizable": false
+    },
+    {
+      "symbol": "BENCHMARK_REVOCATION_EVENT_PAYLOAD_DIGEST_DOMAIN",
+      "kind": "pinned_constant",
+      "caller_constructible": false,
+      "canonicalizable": false
+    },
+    {
+      "symbol": "BENCHMARK_CONFLICT_RECORD_PAYLOAD_DIGEST_DOMAIN",
+      "kind": "pinned_constant",
+      "caller_constructible": false,
+      "canonicalizable": false
+    },
+    {
+      "symbol": "BENCHMARK_RESOLUTION_RECORD_PAYLOAD_DIGEST_DOMAIN",
+      "kind": "pinned_constant",
+      "caller_constructible": false,
+      "canonicalizable": false
+    },
+    {
+      "symbol": "BENCHMARK_HISTORICAL_RECORD_PAYLOAD_DIGEST_DOMAIN",
+      "kind": "pinned_constant",
+      "caller_constructible": false,
+      "canonicalizable": false
+    },
+    {
+      "symbol": "BENCHMARK_EXACT_RESOLUTION_REQUEST_DIGEST_DOMAIN",
+      "kind": "pinned_constant",
+      "caller_constructible": false,
+      "canonicalizable": false
+    },
+    {
+      "symbol": "BENCHMARK_HISTORICAL_INSPECTION_REQUEST_DIGEST_DOMAIN",
+      "kind": "pinned_constant",
+      "caller_constructible": false,
+      "canonicalizable": false
+    },
+    {
+      "symbol": "BENCHMARK_PLATFORM_REGISTRY_SCOPE_EXPECTATION_DIGEST_DOMAIN",
+      "kind": "pinned_constant",
+      "caller_constructible": false,
+      "canonicalizable": false
+    },
+    {
+      "symbol": "BENCHMARK_TENANT_REGISTRY_SCOPE_EXPECTATION_DIGEST_DOMAIN",
+      "kind": "pinned_constant",
+      "caller_constructible": false,
+      "canonicalizable": false
+    },
+    {
+      "symbol": "BENCHMARK_REGISTRY_AUTHORITY_DIGEST_DOMAINS",
+      "kind": "pinned_constant",
+      "caller_constructible": false,
+      "canonicalizable": false
+    },
+    {
+      "symbol": "BENCHMARK_REGISTRATION_STATE_ORDER",
+      "kind": "pinned_constant",
+      "caller_constructible": false,
+      "canonicalizable": false
+    },
+    {
+      "symbol": "BENCHMARK_TERMINAL_REGISTRATION_STATES",
+      "kind": "pinned_constant",
+      "caller_constructible": false,
+      "canonicalizable": false
+    },
+    {
+      "symbol": "BENCHMARK_BANNED_REGISTRATION_STATE_NAMES",
+      "kind": "pinned_constant",
+      "caller_constructible": false,
+      "canonicalizable": false
+    },
+    {
+      "symbol": "BENCHMARK_REGISTRATION_TRANSITIONS",
+      "kind": "pinned_constant",
+      "caller_constructible": false,
+      "canonicalizable": false
+    },
+    {
+      "symbol": "BENCHMARK_TRANSITION_PAYLOAD_BINDING",
+      "kind": "pinned_constant",
+      "caller_constructible": false,
+      "canonicalizable": false
+    },
+    {
+      "symbol": "BENCHMARK_UNBOUND_PAYLOAD_TYPES",
+      "kind": "pinned_constant",
+      "caller_constructible": false,
+      "canonicalizable": false
+    },
+    {
+      "symbol": "BENCHMARK_REGISTRY_REFUSAL_REASONS",
+      "kind": "pinned_constant",
+      "caller_constructible": false,
+      "canonicalizable": false
+    },
+    {
+      "symbol": "BENCHMARK_REGISTRY_ALL_REFUSAL_REASONS",
+      "kind": "pinned_constant",
+      "caller_constructible": false,
+      "canonicalizable": false
+    },
+    {
+      "symbol": "BENCHMARK_REGISTRY_REFUSAL_FAULT_CLASSES",
+      "kind": "pinned_constant",
+      "caller_constructible": false,
+      "canonicalizable": false
+    },
+    {
+      "symbol": "BENCHMARK_SIGNING_FRAME_VERSION",
+      "kind": "pinned_constant",
+      "caller_constructible": false,
+      "canonicalizable": false
+    },
+    {
+      "symbol": "BENCHMARK_PUBLISHER_SUBMISSION_SIGNING_FRAME_DOMAIN",
+      "kind": "pinned_constant",
+      "caller_constructible": false,
+      "canonicalizable": false
+    },
+    {
+      "symbol": "BENCHMARK_APPROVAL_SIGNING_FRAME_DOMAIN",
+      "kind": "pinned_constant",
+      "caller_constructible": false,
+      "canonicalizable": false
+    },
+    {
+      "symbol": "BENCHMARK_REVOCATION_SIGNING_FRAME_DOMAIN",
+      "kind": "pinned_constant",
+      "caller_constructible": false,
+      "canonicalizable": false
+    },
+    {
+      "symbol": "BENCHMARK_SIGNING_FRAME_SPECIFICATION",
+      "kind": "pinned_constant",
+      "caller_constructible": false,
+      "canonicalizable": false
+    },
+    {
+      "symbol": "BENCHMARK_CONFUSABLE_COMPARED_ELEMENTS",
+      "kind": "pinned_constant",
+      "caller_constructible": false,
+      "canonicalizable": false
+    },
+    {
+      "symbol": "BENCHMARK_CONFUSABLE_COMPARISON_CONTRACT",
+      "kind": "pinned_constant",
+      "caller_constructible": false,
+      "canonicalizable": false
+    },
+    {
+      "symbol": "BENCHMARK_REGISTRY_DECLARED_CONSISTENCY",
+      "kind": "pinned_constant",
+      "caller_constructible": false,
+      "canonicalizable": false
+    },
+    {
+      "symbol": "BENCHMARK_REGISTRY_DISCLAIMED_GUARANTEES",
+      "kind": "pinned_constant",
+      "caller_constructible": false,
+      "canonicalizable": false
+    },
+    {
+      "symbol": "BENCHMARK_PRODUCTION_ADAPTER_ADMISSION_REQUIREMENT",
+      "kind": "pinned_constant",
+      "caller_constructible": false,
+      "canonicalizable": false
+    },
+    {
+      "symbol": "BENCHMARK_UNVERIFIED_AUTHORITY_PROPERTIES",
+      "kind": "pinned_constant",
+      "caller_constructible": false,
+      "canonicalizable": false
+    },
+    {
+      "symbol": "BENCHMARK_RESERVED_AUTHORITY_ISSUED_TYPE_NAMES",
+      "kind": "pinned_constant",
+      "caller_constructible": false,
+      "canonicalizable": false
+    },
+    {
+      "symbol": "BenchmarkRegistrationRecordPresence",
+      "kind": "closed_vocabulary_enum",
+      "caller_constructible": true,
+      "canonicalizable": false
+    },
+    {
+      "symbol": "BenchmarkPlanningOutcome",
+      "kind": "closed_type_alias",
+      "caller_constructible": false,
+      "canonicalizable": false,
+      "members": [
+        "BenchmarkTransitionPlan",
+        "BenchmarkTransitionRefusal"
+      ]
+    },
+    {
+      "symbol": "is_byte_identical_resubmission",
+      "kind": "pure_validation_function",
+      "caller_constructible": false,
+      "canonicalizable": false
+    },
+    {
+      "symbol": "plan_transition",
+      "kind": "pure_validation_function",
+      "caller_constructible": false,
+      "canonicalizable": false
+    },
+    {
+      "symbol": "plan_submission_outcome",
+      "kind": "pure_validation_function",
+      "caller_constructible": false,
+      "canonicalizable": false
+    },
+    {
+      "symbol": "BENCHMARK_REGISTRY_SNAPSHOT_ASSERTION_DIGEST_DOMAIN",
+      "kind": "pinned_constant",
+      "caller_constructible": false,
+      "canonicalizable": false
+    },
+    {
+      "symbol": "BENCHMARK_TRANSITION_PLAN_DIGEST_DOMAIN",
+      "kind": "pinned_constant",
+      "caller_constructible": false,
+      "canonicalizable": false
+    },
+    {
+      "symbol": "BENCHMARK_TRANSITION_REFUSAL_DIGEST_DOMAIN",
+      "kind": "pinned_constant",
+      "caller_constructible": false,
+      "canonicalizable": false
+    },
+    {
+      "symbol": "BenchmarkTrustRole",
+      "kind": "closed_vocabulary_enum",
+      "caller_constructible": true,
+      "canonicalizable": false
+    },
+    {
+      "symbol": "BenchmarkTrustAnchorStatus",
+      "kind": "closed_vocabulary_enum",
+      "caller_constructible": true,
+      "canonicalizable": false
+    },
+    {
+      "symbol": "BenchmarkVerificationOutcome",
+      "kind": "closed_vocabulary_enum",
+      "caller_constructible": true,
+      "canonicalizable": false
+    },
+    {
+      "symbol": "BENCHMARK_TRUST_ANCHOR_EVALUATION_ORDER",
+      "kind": "pinned_constant",
+      "caller_constructible": false,
+      "canonicalizable": false
+    },
+    {
+      "symbol": "BENCHMARK_VERIFIED_RESULT_BOUND_FACTS",
+      "kind": "pinned_constant",
+      "caller_constructible": false,
+      "canonicalizable": false
+    },
+    {
+      "symbol": "BENCHMARK_TRUST_ANCHOR_RECORD_DIGEST_DOMAIN",
+      "kind": "pinned_constant",
+      "caller_constructible": false,
+      "canonicalizable": false
+    },
+    {
+      "symbol": "BENCHMARK_PUBLISHER_VERIFIED_RESULT_DIGEST_DOMAIN",
+      "kind": "pinned_constant",
+      "caller_constructible": false,
+      "canonicalizable": false
+    },
+    {
+      "symbol": "BENCHMARK_APPROVAL_VERIFIED_RESULT_DIGEST_DOMAIN",
+      "kind": "pinned_constant",
+      "caller_constructible": false,
+      "canonicalizable": false
+    },
+    {
+      "symbol": "BENCHMARK_REVOCATION_VERIFIED_RESULT_DIGEST_DOMAIN",
+      "kind": "pinned_constant",
+      "caller_constructible": false,
+      "canonicalizable": false
+    },
+    {
+      "symbol": "BenchmarkTrustAnchorResolution",
+      "kind": "frozen_descriptor",
+      "caller_constructible": true,
+      "canonicalizable": false
+    },
+    {
+      "symbol": "BENCHMARK_VERIFICATION_REFUSAL_REASONS",
+      "kind": "pinned_constant",
+      "caller_constructible": false,
+      "canonicalizable": false
+    }
+  ]
+}

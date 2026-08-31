@@ -3,7 +3,7 @@ Sovereign Reasoning Kernel (SRK) - State-Persistent AGI Architecture
 =====================================================================
 
 Version: 9.9.0
-Reference: docs/architecture/SOVEREIGN_REASONING_KERNEL_DESIGN.md
+Reference: Project_documentation/repository/docs/architecture/SOVEREIGN_REASONING_KERNEL_DESIGN.md
 
 The SRK implements Recursive Ontological Intelligence (ROI) by managing
 the 32D Sovereign State across transformer layers. It transforms a

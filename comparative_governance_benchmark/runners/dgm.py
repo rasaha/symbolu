@@ -59,7 +59,10 @@ def build_services(seed: str, *, control_plane=None, execution_adapter=None) -> 
     for who in (actor, "reviewer", "senior"):
         grants.add(AccessGrant(who, t, frozenset(Permission)))
     policy = EvidenceAccessPolicy(grants)
-    audit = AuditService(InMemoryAuditRepository())
+    # One time domain per replayed scenario (D1): every collaborator that stamps
+    # or compares an instant reads the scenario clock, including the ones whose
+    # own default is the wall clock.
+    audit = AuditService(InMemoryAuditRepository(), clock=clk)
     cr, ar, er = (InMemoryDecisionCaseRepository(), InMemoryActionRequestRepository(),
                   InMemoryExecutionRepository())
     val = CaseValidationService(_NeutralLinked())
@@ -69,7 +72,8 @@ def build_services(seed: str, *, control_plane=None, execution_adapter=None) -> 
         authz = ActionAuthorizationService(ar, control_plane, audit, idp, policy,
                                            id_factory=idf, clock=clk)
     if execution_adapter is not None:
-        exe = ExecutionService(er, ar, ExecutionValidationService(er, ar), execution_adapter,
+        exe = ExecutionService(er, ar, ExecutionValidationService(er, ar, clock=clk),
+                               execution_adapter,
                                audit, idp, policy, id_factory=idf, clock=clk)
         reconcile = ReconciliationService(er, execution_adapter, audit, idp, policy,
                                           id_factory=idf, clock=clk)
@@ -77,7 +81,7 @@ def build_services(seed: str, *, control_plane=None, execution_adapter=None) -> 
         cases=DecisionCaseService(cr, val, audit, idp, policy, id_factory=idf, clock=clk),
         rec=CaseRecommendationService(cr, val, audit, idp, policy, id_factory=idf, clock=clk),
         dec=CaseDecisionService(cr, val, audit, idp, policy, id_factory=idf, clock=clk),
-        acts=ActionRequestService(ar, cr, ActionRequestValidationService(ar, cr), audit, idp,
-                                  policy, id_factory=idf, clock=clk),
+        acts=ActionRequestService(ar, cr, ActionRequestValidationService(ar, cr, clock=clk),
+                                  audit, idp, policy, id_factory=idf, clock=clk),
         cer=CERBindingService(ar, cr, audit, idp, policy, id_factory=idf, clock=clk),
         authz=authz, exe=exe, reconcile=reconcile, audit=audit, actor=actor, tenant=t)

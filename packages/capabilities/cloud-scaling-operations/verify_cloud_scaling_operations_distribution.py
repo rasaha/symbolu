@@ -32,7 +32,7 @@ ADVISORY_PKG = PKG.parent / "cloud-scaling-controller"
 ARTIFACTS = PKG / "artifacts"
 DIST = "ugence-cloud-scaling-operations"
 IMPORT_NAME = "ugence_cloud_scaling_operations"
-EXPECTED_VERSION = "0.1.0"
+EXPECTED_VERSION = "0.1.2"
 BASELINE = "379a6366894fd2eead9460c29f4865fb1c3990de"
 
 FORBIDDEN_CORE = ["kubernetes", "boto3", "botocore", "azure", "google.cloud",
@@ -125,9 +125,16 @@ def main() -> int:
         work = Path(td) / "work"
         work.mkdir()
 
-        inst = _run([str(py), "-m", "pip", "install", "--quiet", "--find-links", str(dist), DIST],
-                    env=clean)
-        c.check("install_wheel_only", inst.returncode == 0,
+        # Pre-satisfy the controller's third-party runtime dependency (numpy) from the
+        # index, so the operations+controller install below can be fully hermetic
+        # (--no-index): the ugence-cloud-scaling-controller dependency MUST resolve from the
+        # explicit local wheel directory and can never fall back to a package registry.
+        prime = _run([str(py), "-m", "pip", "install", "--quiet", "numpy>=1.24.0"], env=clean)
+        c.check("prime_numpy_from_index", prime.returncode == 0,
+                prime.stderr.strip()[-200:] if prime.returncode else "")
+        inst = _run([str(py), "-m", "pip", "install", "--quiet", "--no-index",
+                     "--find-links", str(dist), DIST], env=clean)
+        c.check("install_wheel_only_hermetic", inst.returncode == 0,
                 inst.stderr.strip()[-200:] if inst.returncode else "")
         pc = _run([str(py), "-m", "pip", "check"], env=clean)
         c.check("pip_check", pc.returncode == 0, (pc.stdout + pc.stderr).strip())

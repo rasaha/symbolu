@@ -1,0 +1,7 @@
+# transient run scaffolding (evidence JSONs under results/ ARE committed; these are not)
+results/_progress/
+results_run.log
+__pycache__/
+*.pyc
+*.pt
+*.ckpt

@@ -11,7 +11,7 @@
 #   APC      — TTFT saved per cache hit + throughput on shared prefixes   [prefill saving]
 #   COST     — decode throughput ~0.13-0.67x bf16                         [disclosed]
 #
-# Prereqs (see deploy/INT4_PROTECTED_DESIGN.md §8): a deployed pod, venv-vllm
+# Prereqs (see Project_documentation/repository/deploy/INT4_PROTECTED_DESIGN.md §8): a deployed pod, venv-vllm
 # active, the kernel built, and PROTECT_MASK_PATH exported.
 #
 # Usage:

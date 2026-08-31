@@ -1,0 +1,80 @@
+{
+  "schema": "bindingslots_e1/protocol_lock/v1",
+  "result": "E1_PROTOCOL_LOCKED",
+  "determinism_ok": true,
+  "leakage_all_pass": true,
+  "dev_seeds_passing_all_primary": 3,
+  "selection_winner_matches_frozen": true,
+  "mechanical_winner": "C1",
+  "no_approval_required_remaining": true,
+  "reserved_not_run": true,
+  "burned_seeds_not_final_cohort": [
+    2028,
+    2029,
+    2030,
+    2031,
+    2032
+  ],
+  "reserved_seeds_declared": [
+    3140,
+    3141,
+    3142,
+    3143,
+    3144
+  ],
+  "frozen_gates": {
+    "G1_unseen_identity_min_addr": 0.8,
+    "G2_paraphrase_min_addr": 0.8,
+    "G3_hard_names_min_addr": 0.8,
+    "G4_same_entity_diff_attr_min_addr": 0.75,
+    "G5_recombined_min_addr": 0.8,
+    "nomatch_max_false_accept": 0.3,
+    "nomatch_min_recall": 0.7,
+    "nomatch_min_precision": 0.7,
+    "nomatch_max_confident_false_accept": 0.2,
+    "valid_max_false_reject": 0.15,
+    "min_answer_availability": 0.8,
+    "min_ordinary_retrieval_accuracy": 0.7,
+    "min_improvement_over_b0": 0.5,
+    "min_oracle_key_value_accuracy": 0.99,
+    "max_oracle_to_predicted_gap": 0.3,
+    "min_G7_stable_addr": 0.9,
+    "worst_seed_min_G1_addr": 0.7
+  },
+  "frozen_config": {
+    "D": 64,
+    "STEPS": 1200,
+    "BATCH": 48,
+    "LR": 0.001,
+    "TAU": 0.07,
+    "TRAIN_EPISODES": 1500,
+    "TRAIN_NO_MATCH_FRAC": 0.3,
+    "TRAIN_SEED_FOR_EPISODES": 7,
+    "POOL_SALT": "e1_pool_v1",
+    "RESERVED_EVAL_N_PER_SPLIT": 150,
+    "RESERVED_SEEDS_REQUIRED_TO_PASS": 4
+  },
+  "source_hashes": {
+    "task.py": "25471a88b292a5c9f42bee6a732838cbe507097ed5b26f9edfb084da298bd79d",
+    "models.py": "bb30b388baffc6f03b4877efd47a65a3b01826a91d57021b325bdf939bc703c8",
+    "engine.py": "26d752e65f5867b04f92c29ced2e4fae90fcda27f794e8ad20049d1c155534a1",
+    "gates.py": "f169e4c3dd5484422575e3e8c4ff8c2f7ac18de5bf9914bf8715c3c6c16df10d",
+    "config.py": "7196d0d7075b4d2d86b2d1073150b8817554f0fb3316153868825c178fc35101",
+    "harness.py": "30ecd01129ed812888055f87d3327e24fca8e0e5e1e5c2ab8f6b198216ca5509",
+    "leakage.py": "207328fe7730e308adaad464a186c9abab8e87fae81a93a0db44e2b46ee63947",
+    "run_dev.py": "ccb7506aab3bd1ce0169053423d71c69e7c526a4ac954549220e0a52c9de5d03",
+    "run_dev_selection.py": "d0d3cf45de76c32cc1c1cc686250cb713461dc368adeaba13610d5f06688d7b8",
+    "run_reserved.py": "64bec8029aee7aba228bb805b44ca960b2770cc13edf7b48aafbea7c5210278b",
+    "protocol_lock.py": "2f53c2a2e48a85e59c9e785d674e8b19e1b2eac491dac0fbf15a4da7eed638ca"
+  },
+  "dataset_hashes": {
+    "identity_pools": "5b806580a5359da603c058a889177dea1d0079e1d12c6fb47b0b96c50cf8abcb",
+    "pool_sizes": {
+      "train": 774,
+      "dev": 181,
+      "final": 173
+    },
+    "train_episodes": "da1c2021ad00da103dff24b7bb94f16fa74c1983eb39a6610b634076c1b963a4",
+    "dev_eval_splits": "98105f66024812be656bbabf1d8ef254c19560ed1563ebbafee862e9841bc121"
+  }
+}

@@ -23,9 +23,9 @@ _V3_FILES = [
     "agentic/hybrid_handover/resolution/experiment_v3/hybrid_resolver_v3.py",
     "agentic/hybrid_handover/resolution/experiment_v3/run_prioritization_experiment.py",
     "agentic/hybrid_handover/resolution/experiment_v3/lock_v3.py",
-    "agentic/hybrid_handover/resolution/experiment_v3/EDGE_PRIORITIZATION_PREREGISTRATION.md",
-    "agentic/hybrid_handover/resolution/experiment_v3/PRIORITY_VECTOR_SPEC.md",
-    "agentic/hybrid_handover/resolution/experiment_v3/EDGE_PRIORITY_RULEBOOK.md",
+    "Project_documentation/agentic_framework/agentic/hybrid_handover/resolution/experiment_v3/EDGE_PRIORITIZATION_PREREGISTRATION.md",
+    "Project_documentation/agentic_framework/agentic/hybrid_handover/resolution/experiment_v3/PRIORITY_VECTOR_SPEC.md",
+    "Project_documentation/agentic_framework/agentic/hybrid_handover/resolution/experiment_v3/EDGE_PRIORITY_RULEBOOK.md",
 ]
 
 _FROZEN_FILES = [

@@ -1,0 +1,74 @@
+name: bindingslots-value-path-diagnosis-ci
+
+# Torch-free CI for the BindingSlots value-path / gradient-conflict diagnosis. Validates the frozen
+# source hashes, the mechanical diagnosis classifier, the preregistration constants, and (when
+# committed) the diagnostic evidence + verdict. Does NOT retrain: the diagnostics themselves require
+# torch and are produced offline; here we only re-verify the committed artifacts.
+
+on:
+  push:
+    paths:
+      - 'experiments/bindingslots_value_path_diagnosis/**'
+      - 'docs/audits/bindingslots_value_path_diagnosis/**'
+      - '.github/workflows/bindingslots-value-path-diagnosis-ci.yml'
+  pull_request:
+    paths:
+      - 'experiments/bindingslots_value_path_diagnosis/**'
+      - '.github/workflows/bindingslots-value-path-diagnosis-ci.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  diagnosis-integrity:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: {fetch-depth: 0}
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.11'}
+
+      - name: Frozen abc.json digest (pre)
+        run: sha256sum experiments/phase_lc/results/abc.json | tee /tmp/abc_before.txt
+
+      - name: Torch-free classifier tests
+        run: python experiments/bindingslots_value_path_diagnosis/tests/test_diagnosis_classify.py
+
+      - name: Instrumentation tests (RESOURCE_BLOCKED without torch -> green)
+        run: python experiments/bindingslots_value_path_diagnosis/tests/test_instrumentation.py
+
+      - name: Integrity verifier
+        run: python experiments/bindingslots_value_path_diagnosis/verify_diagnosis.py
+
+      - name: Cohort is frozen and mechanically recovered
+        run: |
+          python - <<'PY'
+          import json, pathlib
+          base = pathlib.Path("experiments/bindingslots_value_path_diagnosis")
+          c = json.loads((base/"cohort.json").read_text())
+          assert c["frozen_before_tensor_inspection"] is True
+          assert len(c["members"]) == 12
+          assert {m["seed"] for m in c["members"]} <= {23,24,25,26,27}
+          assert {m["arm"] for m in c["members"]} == {"A+","R0","O1R","H2"}
+          print("cohort OK:", len(c["members"]), "members")
+          PY
+
+      - name: KDA stays blocked (readiness never emitted as a value)
+        run: |
+          python - <<'PY'
+          import json, pathlib
+          agg = pathlib.Path("experiments/bindingslots_value_path_diagnosis/results/aggregate_conclusion.json")
+          if agg.exists():
+              d = json.loads(agg.read_text())
+              assert d["kda_readiness"] == "KDA_VALIDATION_BLOCKED", d["kda_readiness"]
+              assert d["ready_for_kda_validation"] is False
+              assert d["primary_verdict"] != "READY_FOR_KDA_VALIDATION"
+              print("KDA remains BLOCKED; verdict:", d["primary_verdict"])
+          else:
+              print("no results yet; prereg declares KDA blocked")
+          PY
+
+      - name: Frozen abc.json digest (post, unchanged)
+        run: |
+          sha256sum experiments/phase_lc/results/abc.json | tee /tmp/abc_after.txt
+          diff /tmp/abc_before.txt /tmp/abc_after.txt && echo "abc.json unchanged"

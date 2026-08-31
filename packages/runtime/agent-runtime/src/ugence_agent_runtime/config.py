@@ -22,6 +22,7 @@ from .runtime.errors import RuntimeConfigurationError
 from .runtime.retry import RetryPolicy
 
 if TYPE_CHECKING:  # pragma: no cover - annotations only, avoids an import cycle
+    from .observability.attempts import AttemptObservationErrorReporter, AttemptObserver
     from .persistence.interfaces import (
         CheckpointStore,
         RuntimeEventStore,
@@ -48,7 +49,7 @@ class _SequentialIdGenerator:
 @dataclass(frozen=True)
 class AgentRuntimeConfig:
     runtime_id: str = "agent-runtime"
-    runtime_version: str = "0.1.2"
+    runtime_version: str = "0.7.0"
     max_concurrent_tasks: int = 1
     default_timeout: Optional[float] = None
     retry_policy: RetryPolicy = field(default_factory=RetryPolicy)
@@ -61,6 +62,26 @@ class AgentRuntimeConfig:
     event_store: Optional[RuntimeEventStore] = None
     event_sink: Optional[Callable] = None
     clock: Callable[[], float] = _default_clock
+    # Optional last-mile authority re-verification hook (RA-6 §8). When set, the
+    # runtime runs it inside ``validate_clearance`` immediately before a
+    # consequential provider invocation, re-confirming the authority the CLEAR
+    # rested on is still valid at the commit point. Neutral by contract: the
+    # runtime never inspects it, and ``None`` (default) means no behavior change.
+    authority_recheck: Optional[Callable] = None
+    # Optional neutral attempt-telemetry sink (CM-TA1). When set, the runtime notifies it
+    # once per actual provider.execute invocation — every attempt, including retries and
+    # failures — with the runtime-authoritative attempt number. Neutral by contract: the
+    # runtime never interprets provider-specific token fields, and ``None`` (default)
+    # means no behavior change. A governance HOLD/BLOCK/ESCALATE or an exact-action
+    # rejection never invokes the provider, so it produces no attempt.
+    attempt_observer: Optional["AttemptObserver"] = None
+    # Optional neutral reporter for attempt-observation FAILURES (CM-TA1 F2). When set, a
+    # raising ``attempt_observer`` is surfaced as a structured, payload-free
+    # ``AttemptObservationFailure`` instead of being swallowed silently — the runtime stays
+    # fail-open (the provider is never re-invoked and its result is never erased), but the
+    # telemetry gap is no longer invisible. ``None`` (default) preserves the prior
+    # swallow-silently behavior for callers that do not configure accounting.
+    attempt_observer_error_reporter: Optional["AttemptObservationErrorReporter"] = None
     id_generator: Callable[[], str] = field(
         default_factory=lambda: _SequentialIdGenerator("wf")
     )

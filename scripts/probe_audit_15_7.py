@@ -4,7 +4,7 @@
 Pure post-processing diagnostic implementation per the frozen
 §15.7 pre-commitment (Chunks 7a-7h).
 
-Reference: docs/design/BCVF_LLM_TRUST_ROUTING_DESIGN.md §15.7.
+Reference: Project_documentation/repository/docs/design/BCVF_LLM_TRUST_ROUTING_DESIGN.md §15.7.
 
 What this script DOES:
   Reads four on-disk artifacts (§14a.2 dumps for both benchmarks,

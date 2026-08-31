@@ -1,0 +1,430 @@
+name: cloud-scaling-policy-authenticity-ci
+
+# Scoped CI for Cloud Scaling Phase 5B-0B — policy authenticity
+# (ugence-cloud-scaling-policy-authenticity): verifying that one exact policy version was
+# authentically issued and is valid at an injected instant. A verified policy proof grants
+# nothing.
+#
+# Why this workflow exists. Phase 5B-0B merged with its suite running nowhere automated: the
+# repository's per-package workflows are path-scoped, and no existing one matches this
+# package's paths, so its properties were measured only by hand. Every guarantee the
+# package documents — the fail-closed gates, the verified/recorded partition, the frozen
+# artifact digest — is a claim that nothing checked between commits. This closes that.
+#
+# ADDITIVE and PATH-SCOPED. It does not touch, weaken or modify
+# cloud-scaling-authorization-contracts-ci, cloud-scaling-producer-attestation-ci, the Policy
+# Authority workflows or any Risk Authority workflow.
+
+on:
+  pull_request:
+    paths:
+      - "packages/integration/cloud-scaling-policy-authenticity/**"
+      - "packages/policy-authority/**"
+      - "packages/integration/cloud-scaling-authorization-contracts/**"
+      - "packages/uvi-policy-contracts/**"
+      - "docs/architecture/ADR_CLOUD_SCALING_POLICY_AUTHENTICITY_PHASE5B0B.md"
+      - "docs/architecture/ADR_CLOUD_SCALING_POLICY_AUTHENTICITY_PHASE5B0B_RATIFICATION.md"
+      # The sweep engine. A change to an operator or a detector changes what this
+      # package's guard sweep measures without touching a byte inside the package, so
+      # a filter that omits it lets the engine drift past this gate unmeasured. An
+      # audit of the guard-coverage work found a real defect of exactly that shape:
+      # a bare-name match in `_raising_helpers` let a non-guard call be inventoried
+      # and scored KILLED, and no package-scoped filter would have re-run this sweep
+      # to catch it.
+      - "scripts/cloud_scaling/guard_sweep.py"
+      - "scripts/cloud_scaling/tests/**"
+      - ".github/workflows/cloud-scaling-policy-authenticity-ci.yml"
+  push:
+    branches:
+      - "claude/phase-5b-0b-**"
+      - "claude/phase-5b-1-**"
+      - "claude/phase-5b-2-**"
+      # 5B-3 (R-8) lands on an r8-* branch. Added because the pull_request trigger above did
+      # not re-run this workflow on three successive pushes to the 5B-3 branch — it ran once,
+      # on the first commit, and never again — so the branch's most important check went
+      # absent while eleven other workflows re-ran. Whatever caused that, a branch pattern
+      # here is the mechanism this repository already relies on and does not depend on it.
+      - "claude/r8-**"
+      - "claude/setup-symbolu-monorepo-**"
+    paths:
+      - "packages/integration/cloud-scaling-policy-authenticity/**"
+      # Added with the r8 pattern: the pull_request trigger watches the Policy Authority and
+      # this one did not, so a Route-1-only change — one that edits the authority this package
+      # delegates every trust decision to — triggered nothing on a push.
+      - "packages/policy-authority/**"
+      - "scripts/cloud_scaling/guard_sweep.py"
+      - "scripts/cloud_scaling/tests/**"
+      - ".github/workflows/cloud-scaling-policy-authenticity-ci.yml"
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  # Installed in dependency order so each distribution's declared first-party requirement is
+  # already present. The monorepo's packages are not on any index, so a resolve would fail.
+  # No cryptography or PyNaCl: D-5B0B-4 ruled that policy signatures verify through the Policy
+  # Authority's own stdlib-only Ed25519, not a Trusted Evidence Authority anchor, and this
+  # package has no TEV dependency at all. numpy is the Cloud Scaling Controller's — the Phase
+  # 5A fixture chain this suite consumes builds a genuine recommendation through the real
+  # Phase-3 pipeline.
+  FIRST_PARTY: >-
+    packages/governance-contracts
+    packages/uvi-policy-contracts
+    packages/policy-authority
+    packages/risk_authority
+    packages/capabilities/cloud-scaling-controller
+    packages/integration/cloud-scaling-risk-integration
+    packages/integration/cloud-scaling-authorization-contracts
+    packages/integration/cloud-scaling-policy-authenticity
+
+jobs:
+  policy-authenticity-suite:
+    name: Phase 5B-0B policy-authenticity suite (source)
+    runs-on: ubuntu-latest
+    env:
+      # The partition ratchet reads the repository's history for its "before". A baseline it
+      # cannot resolve is a skip locally and a FAILURE here: a gate that quietly skips where
+      # it is supposed to run is not a gate. Set at job level so the full-suite run enforces
+      # it too, not only the dedicated step.
+      UGENCE_RATCHET_REQUIRED: "1"
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Resolve the partition ratchet's baseline
+        # On a pull request the authoritative "before" is the event's own base SHA. A locally
+        # computed `git merge-base HEAD <default>` is NOT equivalent and must not be the
+        # first choice: `actions/checkout` gives the pull request's *merge* commit, and the
+        # default ref moves under it, so the answer depends on when the merge ref was built.
+        #
+        # Measured on the 5B-3 pull request, which is why this step no longer looks like it
+        # did: the merge-base form resolved to the pull request's own head commit. The
+        # ratchet then compared the change against itself, found no movement, and went green
+        # on a change that promoted `policy_type`. It was caught only because an unrelated
+        # property skipped and the gate below treats a skip as a failure.
+        #
+        # The merge-base form survives as the fallback for `push` events, where there is no
+        # pull request payload. Either way the result is verified before it is used: a
+        # baseline that already contains HEAD is refused here rather than silently compared,
+        # so the failure names this step instead of surfacing as a puzzling test error.
+        # `tests/_partition_ratchet.py` refuses it a second time, in the tested code, because
+        # a guard that lives only in YAML is not covered by anything.
+        run: |
+          set -euo pipefail
+          head=$(git rev-parse HEAD)
+          base='${{ github.event.pull_request.base.sha }}'
+          source='pull request base sha'
+          if [ -z "${base}" ]; then
+            default='${{ github.event.repository.default_branch }}'
+            git fetch --no-tags origin \
+              "+refs/heads/${default}:refs/remotes/origin/ratchet-base"
+            if git merge-base --is-ancestor "${head}" refs/remotes/origin/ratchet-base; then
+              # A push ON the default branch. `merge-base HEAD default` is HEAD itself here,
+              # which is how this gate came to be vacuous on every default-branch merge before
+              # 5B-3: runs 3, 11, 15 and 19 all reported no movement because they compared the
+              # merged result against itself. The honest "before" is the commit this one landed
+              # on top of — for a merge commit, its first parent, i.e. the previous default tip.
+              #
+              # Ancestor test, not equality. This arm used to require the fetched tip to EQUAL
+              # HEAD, so it recognised a default-branch push only while the ref had not moved
+              # again. Run 33317988740 (the PR #1516 merge) measured the race: PR #1515 landed
+              # on the branch four minutes later, the fetch above saw the newer tip, the
+              # equality test missed, and the merge-base fallback resolved to HEAD itself —
+              # tripping the vacuity guard below with zero tests run, identically on re-run. A
+              # HEAD that is an ancestor of (or equal to) the default tip is ON the default
+              # branch, however far the ref has advanced since, and its honest "before" is
+              # still its own first parent.
+              base=$(git rev-parse "HEAD^1")
+              source='first parent (push on the default branch)'
+            else
+              base=$(git merge-base HEAD refs/remotes/origin/ratchet-base)
+              source="merge base with ${default}"
+            fi
+          fi
+          git rev-parse --verify "${base}^{commit}" >/dev/null
+          if git merge-base --is-ancestor "${head}" "${base}"; then
+            echo "::error::the ratchet baseline (${source}) resolved to ${base}, which already contains HEAD (${head}); comparing the change against itself reports no movement for every promotion on it, so the gate would pass vacuously"
+            exit 1
+          fi
+          echo "UGENCE_RATCHET_BASE=${base}" >> "$GITHUB_ENV"
+          echo "ratchet baseline: ${base} (${source})"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install tooling + first-party packages (editable, in dependency order)
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest numpy
+          for pkg in $FIRST_PARTY; do pip install -e "$pkg"; done
+      - name: Full suite (one run; the report below is read, not re-measured)
+        run: |
+          python -m pytest packages/integration/cloud-scaling-policy-authenticity/tests \
+            -rs --junitxml=/tmp/junit.xml
+      - name: The suite collected its properties, and none skipped silently
+        # Reads the report the run above already produced rather than running the suite a
+        # second time. Two failures are possible here and both matter more than they look.
+        #
+        # Zero collected is a failure, not a pass: pytest exits 5 for "no tests collected",
+        # so a rename or a moved path would otherwise turn this workflow green while running
+        # nothing. The floor is a floor, not an equality — adding properties must not fail it.
+        #
+        # A skip is also a failure. Several properties skip when the Phase 5A test tree is
+        # unresolvable, which is correct outside a checkout and wrong here: on a complete
+        # checkout every property must run, or this workflow is reporting on whichever ones
+        # happened to survive.
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import sys
+          import xml.etree.ElementTree as ET
+
+          MINIMUM = 275
+
+          root = ET.parse("/tmp/junit.xml").getroot()
+          suites = [root] if root.tag == "testsuite" else list(root)
+          total = sum(int(s.get("tests", 0)) for s in suites)
+          failures = sum(int(s.get("failures", 0)) + int(s.get("errors", 0)) for s in suites)
+          skipped = [
+              case.get("name", "?")
+              for suite in suites
+              for case in suite.iter("testcase")
+              if case.find("skipped") is not None
+          ]
+          print(f"collected={total} failures={failures} skipped={len(skipped)}")
+          if failures:
+              sys.exit(f"FAIL: {failures} properties failed or errored")
+          if total < MINIMUM:
+              sys.exit(
+                  f"FAIL: collected {total} properties, expected at least {MINIMUM}. A target "
+                  "that collects nothing is a failure, not a green suite."
+              )
+          if skipped:
+              sys.exit(
+                  f"FAIL: {len(skipped)} properties skipped on a complete checkout: {skipped}. "
+                  "This usually means the Phase 5A fixture chain did not resolve."
+              )
+          PY
+      - name: Digest stability — frozen digests and the partition fingerprint
+        # The pinned side: the reference artifact digest, the trust-configuration digest and
+        # the partition fingerprint all still reproduce. A pin catches an *accidental* move;
+        # it cannot catch a deliberate one, because updating the pin is as cheap as the change
+        # — which is what the ratchet step below exists for (5B-1 D-5B1-3).
+        run: |
+          python -m pytest \
+            packages/integration/cloud-scaling-policy-authenticity/tests/test_frozen_digests.py \
+            packages/integration/cloud-scaling-policy-authenticity/tests/test_digest_partition.py
+      - name: Partition ratchet — a promotion cannot ship without a profile bump
+        # Takes its "before" from the merge base resolved above, so the constants in this
+        # commit cannot answer for the commit that came before it.
+        run: |
+          python -m pytest \
+            packages/integration/cloud-scaling-policy-authenticity/tests/test_partition_ratchet.py
+      - name: Derivation gate — every verified fact is signed, gated or a pinned constant
+        # Two remediation rounds each found a verified fact that nothing established. This is
+        # the enumeration that replaced spot-checking; a new unclassified fact fails here.
+        run: |
+          python -m pytest \
+            packages/integration/cloud-scaling-policy-authenticity/tests/test_verified_fact_derivation.py \
+            packages/integration/cloud-scaling-policy-authenticity/tests/test_unattested_facts.py
+      - name: Security gates — fail-closed refusals, boundaries, no clock, typed outcomes
+        run: |
+          python -m pytest \
+            packages/integration/cloud-scaling-policy-authenticity/tests/test_adversarial.py \
+            packages/integration/cloud-scaling-policy-authenticity/tests/test_candidate_reconciliation.py \
+            packages/integration/cloud-scaling-policy-authenticity/tests/test_coordinate_gap.py \
+            packages/integration/cloud-scaling-policy-authenticity/tests/test_historical_refusal.py \
+            packages/integration/cloud-scaling-policy-authenticity/tests/test_import_boundary.py \
+            packages/integration/cloud-scaling-policy-authenticity/tests/test_production_posture.py \
+            packages/integration/cloud-scaling-policy-authenticity/tests/test_typed_outcomes.py \
+            packages/integration/cloud-scaling-policy-authenticity/tests/test_verified_artifact.py
+      - name: Phase 5A is at the version 5B-1 moved it to, with its eleven digests pinned
+        run: |
+          python -m pytest \
+            packages/integration/cloud-scaling-policy-authenticity/tests/test_phase5a_untouched.py
+
+  neighbouring-baselines:
+    name: The two authorities this package stands on remain green
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install tooling + first-party packages
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest numpy
+          for pkg in $FIRST_PARTY; do pip install -e "$pkg"; done
+      - name: Policy Authority suite
+        # 5B-0B delegates every trust decision here. Its own guarantees are only as good as
+        # this suite, and one of its tests deliberately pins an open defect in this
+        # authority's resolution contract (residual R-3).
+        run: python -m pytest packages/policy-authority
+      - name: Cloud Scaling authorization contracts (Phase 5A)
+        run: python -m pytest packages/integration/cloud-scaling-authorization-contracts/tests
+      - name: Both baselines actually collected tests
+        run: |
+          set -euo pipefail
+          for target in \
+            packages/policy-authority \
+            packages/integration/cloud-scaling-authorization-contracts/tests
+          do
+            python -m pytest "$target" --co > /tmp/c.txt 2>&1
+            count=$(grep -oE '[0-9]+ tests? collected' /tmp/c.txt | tail -1 | grep -oE '^[0-9]+')
+            if [ -z "${count:-}" ] || [ "$count" -eq 0 ]; then
+              echo "::error::$target collected zero tests"
+              tail -30 /tmp/c.txt
+              exit 1
+            fi
+            echo "$target: $count tests collected"
+          done
+
+  packaging:
+    name: Wheel and sdist build cleanly, and ship no test payload
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install build tooling
+        run: |
+          python -m pip install --upgrade pip
+          pip install build pytest numpy
+      - name: Build sdist + wheel
+        run: python -m build packages/integration/cloud-scaling-policy-authenticity
+      - name: Wheel contents — no test, fixture or conftest leakage
+        run: |
+          python - <<'PY'
+          import pathlib, re, zipfile
+          dist = pathlib.Path("packages/integration/cloud-scaling-policy-authenticity/dist")
+          wheels = sorted(dist.glob("*.whl"))
+          sdists = sorted(dist.glob("*.tar.gz"))
+          assert wheels, "no wheel was built"
+          assert sdists, "no sdist was built"
+          names = zipfile.ZipFile(wheels[-1]).namelist()
+          top = {n.split("/")[0] for n in names}
+          # The version is read from the source rather than written here, so a deliberate
+          # version bump does not fail this assertion for the wrong reason. What is asserted
+          # stays the same: the wheel's dist-info is the version the source declares, and the
+          # wheel's top level holds nothing else.
+          version = re.search(
+              r'^__version__\s*(?::[^=]*)?=\s*"([^"]+)"',
+              pathlib.Path(
+                  "packages/integration/cloud-scaling-policy-authenticity/src/ugence_cloud_scaling_policy_authenticity/version.py"
+              ).read_text(),
+              re.M,
+          ).group(1)
+          assert top <= {
+              "ugence_cloud_scaling_policy_authenticity",
+              f"ugence_cloud_scaling_policy_authenticity-{version}.dist-info",
+          }, f"unexpected top-level entries in the wheel (source version {version}): {sorted(top)}"
+          for n in names:
+              base = n.split("/")[-1]
+              assert base != "conftest.py", f"conftest leaked: {n}"
+              assert not base.startswith("test_"), f"test module leaked: {n}"
+              assert "/tests/" not in n, f"test package leaked: {n}"
+              assert base != "_policy_fixtures.py", f"fixtures leaked: {n}"
+          assert any(n.endswith("py.typed") for n in names), "py.typed missing from the wheel"
+          print(f"wheel contents OK ({len(names)} entries): {wheels[-1].name}")
+          print(f"sdist built: {sdists[-1].name}")
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cloud-scaling-policy-authenticity-dist
+          path: packages/integration/cloud-scaling-policy-authenticity/dist/*
+          if-no-files-found: warn
+
+  guard-inventory:
+    name: Guard inventory is re-derivable
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Regenerate the inventory and prove it is unchanged
+        run: |
+          python scripts/cloud_scaling/guard_sweep.py policy-authenticity --inventory-only
+          git diff --exit-code -- \
+            packages/integration/cloud-scaling-policy-authenticity/GUARD_INVENTORY.md \
+            packages/integration/cloud-scaling-policy-authenticity/guard_inventory.json \
+            packages/integration/cloud-scaling-policy-authenticity/guard_classification.json
+
+      - name: The sweep's own enforcement machinery is measured, not assumed
+        # The message-only rule was inert for this PR's whole history: the detector read a
+        # tbstyle-rendered explanation under --tb=no and matched nothing, so every mutant
+        # looked type-killed. These tests run the generated plugin itself against a suite
+        # built to fail in each shape, so a detector that stops seeing source fails here
+        # rather than silently passing every guard.
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest
+          python -m pytest scripts/cloud_scaling/tests -q
+  guard-sweep:
+    name: Gate-removal mutation sweep (shard ${{ matrix.shard }} of 8)
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4, 5, 6, 7, 8]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install tooling + first-party packages (editable)
+        run: |
+          python -m pip install --upgrade pip
+          # `pytest numpy`, exactly what this workflow's other jobs install: D-5B0B-4 ruled
+          # this package has no cryptography or PyNaCl dependency, and $FIRST_PARTY already
+          # carries the install order. A hand-written list omitted uvi-policy-contracts,
+          # which `policy-authority` requires, and failed every shard in 25 seconds.
+          pip install pytest numpy
+          for pkg in $FIRST_PARTY; do pip install -e "$pkg"; done
+      - name: Sweep this shard
+        # 115 guards against a 191s suite is six wall-clock hours in one job. Eight shards
+        # puts each at roughly three quarters of an hour.
+        env:
+          UGENCE_RATCHET_BASE: ${{ github.event.pull_request.base.sha || github.sha }}
+        run: python scripts/cloud_scaling/guard_sweep.py policy-authenticity --shard ${{ matrix.shard }}/8
+      - name: The tracked tree was not mutated
+        run: git diff --exit-code
+        if: always()
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: policy-authenticity-guard-sweep-shard-${{ matrix.shard }}
+          path: /tmp/ugence-sweep-policy-authenticity/*.json
+          if-no-files-found: warn
+
+  guard-sweep-aggregate:
+    name: Every inventoried guard produced exactly one result
+    runs-on: ubuntu-latest
+    needs: guard-sweep
+    if: always()
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: policy-authenticity-guard-sweep-shard-*
+          merge-multiple: true
+          path: shards
+      - name: Prove the sweep was total and non-overlapping
+        # Three separate claims, each measured against the real inventory rather than the
+        # shard arithmetic: every index belongs to one shard, every index produced exactly
+        # one terminal result, and every shard measured the same collected population. A
+        # shard that never ran produces no duplicate either, so absence is checked directly.
+        run: python scripts/cloud_scaling/guard_sweep.py policy-authenticity --aggregate shards --shards 8
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: policy-authenticity-guard-sweep-aggregate
+          path: packages/integration/cloud-scaling-policy-authenticity/guard_sweep_aggregate.json
+          if-no-files-found: warn

@@ -3,6 +3,534 @@
 All notable changes to the independent Agent Runtime distribution are recorded here.
 This project follows semantic versioning for the distribution.
 
+## 0.7.0 — CM-TA1 neutral provider-attempt telemetry
+
+An **additive, opt-in** observation seam that lets a neutral observer see **every actual
+`provider.execute` invocation** — success, expected failure, timeout, provider error, or raw
+exception — with the runtime-authoritative attempt number. Before this, the retry loop kept only
+a final attempt *count* and discarded the earlier failed attempts; now retried and failed attempts
+are recorded **distinctly and never collapsed** into the final attempt. **Purely additive**: no
+change to execution truth, governance ownership, the exact-action fingerprint / proposal-binding
+contract, Canonical Execution State, checkpoint schema, or recovery semantics. See
+[`docs/AGENT_RUNTIME_ATTEMPT_TELEMETRY.md`](docs/AGENT_RUNTIME_ATTEMPT_TELEMETRY.md).
+
+### Added
+- **`ProviderAttempt`** — a neutral, immutable per-invocation record (provider/operation identity,
+  workflow/instance/task/correlation identity, runtime-authoritative `attempt_number`, neutral
+  status, `ok`, `provider_invoked`, an opaque `neutral_usage` mapping, and a neutral
+  `failure_category`). It carries **no** arguments, prompts, credentials, or provider payloads.
+- **`ProviderAttemptStatus`** (`SUCCEEDED` / `FAILED` / `TIMEOUT` / `EXCEPTION`), **`AttemptContext`**,
+  the **`AttemptObserver`** protocol, and the in-memory **`RecordingAttemptObserver`** reference.
+- **`PROVIDER_USAGE_METADATA_KEY = "token_usage"`** — the neutral key under which a provider MAY
+  attach an opaque usage mapping to its `ToolResult.metadata`. The runtime **forwards it verbatim**
+  as `ProviderAttempt.neutral_usage` and **never interprets** provider-specific token fields; an
+  absent or non-mapping value is `None` (unknown, never fabricated).
+- **`AgentRuntimeConfig.attempt_observer`** — optional; `None` (default) is a strict no-op.
+
+### Guarantees preserved
+- A governance **HOLD/BLOCK/ESCALATE**, an **exact-action** clearance/integrity rejection, and a
+  **provider-not-found** produce **no** attempt — the provider was never invoked.
+- The runtime imports **no** provider SDK and interprets **no** provider token field. Observing an
+  attempt can never change the provider action; a raising observer is swallowed and never breaks
+  execution.
+
+### Audit remediation — F2: attempt-observation failure is surfaced, not silent
+A raising `attempt_observer` was previously swallowed silently. The runtime remains
+**fail-open** with respect to provider execution (a raising observer never re-executes the
+provider, never erases a successful result, and never changes retry behavior), but the loss
+is no longer invisible: the new optional `AgentRuntimeConfig.attempt_observer_error_reporter`
+receives exactly **one** structured `AttemptObservationFailure` per observer failure. The
+signal carries safe identity plus a bounded classification code (see N2 below) — never the
+exception message/args or any provider payload. A reporter that itself raises is contained and
+never masks the provider result. `None` (default) preserves the prior silent fail-open for
+callers that do not configure accounting. Added exports: `AttemptObservationFailure`,
+`AttemptObservationErrorReporter`, `RecordingObservationErrorReporter`.
+
+### Audit remediation — N2: bounded observation-failure classification
+`AttemptObservationFailure.error_type` (which carried `type(exc).__name__` and could expose an
+observer-constructed dynamically-named exception's name) is **replaced** by `error_kind`, a
+FIXED code from the closed `ObservationFailureKind` enum
+(`OBSERVER_VALUE_ERROR` / `OBSERVER_TYPE_ERROR` / `OBSERVER_LOOKUP_ERROR` / `OBSERVER_EXCEPTION`).
+Classification uses `isinstance` against a closed allowlist (`classify_observation_failure`) —
+never the exception class name/module/message/args/`repr` — so no attacker- or
+provider-controlled string can enter the telemetry. Fail-open behavior, the exactly-one-signal
+guarantee, reporter containment, and provider execution/retry semantics are unchanged. Added
+exports: `ObservationFailureKind`, `classify_observation_failure`. Corrected in place (0.7.0 is
+unreleased).
+
+**Package maturity: `IMPLEMENTED_AND_LOCALLY_OFFLINE_VERIFIED`** (upgrade to
+`IMPLEMENTED_AND_CI_VERIFIED` only after the scoped Actions run is observed green).
+
+## 0.6.0 — H22-D bounded concurrent multi-workflow execution
+
+Lets several **mutually-safe** workflows make progress **at the same time** — bounded, in-process
+concurrency over independent H22-A quanta — while preventing resource conflicts, budget overruns,
+governance bypass, duplicate consequential actions, and unsafe compensation. Additive only: no
+change to exact-action fingerprint semantics, governance ownership, Canonical Execution State,
+single-workflow recovery, or the H22-C torn-state contract. **H22-D decides which safe quanta may
+run concurrently; it never authorizes the consequential action inside a quantum** (that stays
+below H22-A, with fresh governance per quantum). See
+[`docs/AGENT_RUNTIME_H22D_CONCURRENCY.md`](docs/AGENT_RUNTIME_H22D_CONCURRENCY.md).
+
+### Added
+- **`plan_batch` on `PortfolioScheduler`** — the additive batch-selection seam over the **same**
+  smooth-weighted-round-robin (SWRR) fairness core `step()` uses. It scans eligible workflows in
+  SWRR order and asks a caller-supplied admission predicate whether each fairness winner may take
+  a slot; admitted workflows are counted as served (accrue/charge/age-reset), while a
+  resource/budget-**deferred** workflow is never charged and never age-reset, preserving its
+  starvation protection. **At `max_concurrency=1` with no constraints the committed fairness/aging
+  state is identical to a single `step()`.** New immutable `BatchPlan` / `AdmissionDecision` types.
+  `step()` is unchanged.
+- **`ConcurrentPortfolioExecutor` + `create_concurrent_executor(...)`** — the admission
+  coordinator. Each round runs **plan → execute → join → reconcile → checkpoint**: a deterministic
+  admission batch (bounded by `ConcurrencyPolicy.max_concurrent_quanta`), each admitted workflow's
+  indivisible H22-A quantum run concurrently on a pluggable **`ExecutionBackend`**
+  (`SynchronousExecutionBackend` / `ThreadPoolExecutionBackend`, proven equivalent), then
+  resource/budget/failure/compensation reconciliation at a stable batch boundary. Admission is
+  deterministic; completion order is not, and never redefines admission or the reconciliation
+  trace. Immutable `ConcurrentPortfolioStepResult` / `QuantumOutcome` / `ConcurrentStepReason`; no
+  thread/future handle is ever exposed. A single coordinator thread owns all portfolio/scheduler/
+  coordinator/trace/checkpoint mutation; workers only call `advance_workflow` for distinct
+  instances and return immutable outcomes.
+- **Logical resource claims** — `ResourceMode` (`READ`/`WRITE`/`EXCLUSIVE`/`UNKNOWN`),
+  `ResourceClaim`, `normalize_claims`, `modes_conflict`, `ResourceConflict`, and a
+  `ResourceCoordinator` with an **atomic all-or-none** reservation and fail-safe release. The only
+  compatible pair is `READ + READ`; `UNKNOWN` is fail-closed. Claims are declared before the
+  quantum (a static map or an injected resolver) and are portfolio-coordination requirements, not
+  application authority. Planned-then-reserved admission means no runtime lock chains and no
+  deadlock by design.
+- **Shared portfolio budget** — a generic named-dimension `PortfolioBudget`, per-workflow
+  `BudgetRequirement`, structured `BudgetShortfall`, and a **reserve-before-execute**
+  `BudgetCoordinator` (`limit`/`reserved`/`consumed`/`available` accounting; atomic across
+  dimensions; conservative settlement charging the reservation when a provider ran, releasing
+  otherwise; fail-closed on NaN/±Inf/negative). Two individually-affordable quanta can never
+  together oversubscribe the shared budget.
+- **Bounded compensation coordination** — `CompensationTrigger`, `CompensationSpec`,
+  `CompensationRegistration`, and an idempotent `CompensationRegistry`. A compensation is a
+  **separately-defined, separately-governed** workflow scheduled through the ordinary chain
+  (fresh governance, resources/budget) — never a direct provider call from H22-D and never an
+  exactly-once-reversal claim. Registration is exactly-once per intent, with origin lineage, and
+  survives recovery without duplication.
+- **Portfolio checkpoint schema `"2"`** — additionally carries the durable H22-D slice (budget
+  `limits` + `consumed`, compensation registrations) under a `concurrency_state` block; transient
+  resource/budget reservations are **never** persisted (a stable checkpoint boundary has
+  `reserved == 0`, validated fail-closed). A **v1** checkpoint recovers unchanged; `recover_portfolio`
+  returns the recovered `concurrency_state`. The H22-C `PORTFOLIO_RUNTIME_CHECKPOINT_DIVERGENCE`
+  fail-closed torn-state contract is preserved.
+- **H22-D orchestration events** — `CONCURRENT_BATCH_PLANNED`, `QUANTUM_ADMITTED`,
+  `QUANTUM_DEFERRED_RESOURCE` / `_BUDGET` / `_CAPACITY`, `RESOURCE_RESERVED` / `RESOURCE_RELEASED`,
+  `BUDGET_RESERVED` / `BUDGET_SETTLED`, `CONCURRENT_QUANTUM_COMPLETED`,
+  `CONCURRENT_BATCH_RECONCILED`, `COMPENSATION_REGISTERED` — enough to answer "why did A and C run
+  concurrently while B did not?" with structured evidence, emitted in deterministic admission order.
+
+### Independent-audit hardening (same phase)
+- **Runtime concurrency ceiling.** The executor bounds concurrency by
+  `min(ConcurrencyPolicy.max_concurrent_quanta, AgentRuntimeConfig.max_concurrent_tasks)`
+  (`effective_max_concurrent_quanta`) — it never exceeds the runtime's configured in-flight-task
+  limit.
+- **Undeclared ≠ empty (fail closed).** An *explicitly empty* resource claim set / budget
+  requirement permits concurrency; an *undeclared* one is unknown and handled fail-closed —
+  undeclared resources serialize conservatively (`RESOURCE_REQUIREMENT_UNAVAILABLE`) and an
+  undeclared budget requirement is refused when the portfolio budget has limits
+  (`BUDGET_REQUIREMENT_UNAVAILABLE`). Undeclared is never assumed conflict-free / zero-cost.
+- **Exception-safe admission.** Requirements are pre-resolved before any reservation or fairness
+  commit; a resolver/coordinator fault fails closed with all reservations released and **no**
+  H22-B fairness state mutated (all-or-none planning).
+- **Authoritative settlement evidence.** New additive immutable
+  `WorkflowAdvanceOutcome.provider_invoked` drives budget settlement — a governance BLOCK or
+  exact-action rejection (no provider) now *releases* rather than charges; a measured overrun
+  fails closed (`BudgetEstimateExceeded`) instead of silently clamping.
+- **Recovery reconstruction seam.** `ConcurrentPortfolioExecutor.from_recovery(...)` /
+  `create_concurrent_executor_from_recovery(...)` adopt the recovered portfolio, trace, failure
+  policy, durable consumed budget, and compensation registrations — no side effects, v1-safe.
+
+### Final edge-case corrections (same phase)
+- **One resolution per round.** The pre-resolved requirement cache is used throughout a round;
+  an injected `budget_resolver`/`claims_resolver` is never invoked a second time after admission.
+- **Audit-emission fail-safe.** If the deterministic admission audit fails *after* admission but
+  *before* any worker launches, the round fails closed: all reservations are released, no worker
+  is launched, and the H22-B fairness/service state is restored — an unexecuted batch is never
+  counted as serviced.
+- **Exact `CompensationTrigger` semantics.** `ON_WORKFLOW_FAILURE` auto-registers only when the
+  origin workflow is terminal FAILED; `ON_PORTFOLIO_FAILURE` only when the portfolio itself is
+  terminal FAILED (an isolated workflow failure is not a portfolio failure);
+  `EXPLICIT_OPERATOR_REQUEST` never auto-registers — a new idempotent
+  `ConcurrentPortfolioExecutor.request_compensation(...)` seam is the only path (no
+  provider/governance execution).
+- **Scheduling-policy recovery continuity.** `from_recovery(...)` /
+  `create_concurrent_executor_from_recovery(...)` accept `scheduling_policy` and pass it to the
+  H22-C controller, so a recovered scheduler makes the same deterministic choice it would have made
+  uninterrupted (policy is operator-supplied configuration, still never persisted).
+- **Budget dimension hardening.** `BudgetCoordinator.settle(actual=…)` fails closed
+  (`BudgetEstimateExceeded`) on measured positive usage in a dimension that had **no** reservation
+  (effective reservation zero), leaving the ledger unchanged — such usage is never silently ignored.
+
+### Explicitly out of scope (unchanged non-claims)
+No distributed cluster scheduling, distributed locking, Kubernetes/Redis/DB coordination, global
+transactions, exactly-once external effects, Runtime Assurance, model/agent selection, peer-to-peer
+agent messaging, or autonomous workflow generation. Concurrency is bounded and in-process. Not
+live-verified, pilot-validated, distributed-safe, cluster-safe, or production-ready.
+
+## 0.5.0 — H22-C durable multi-workflow orchestration
+
+Makes the H22-B portfolio/team coordinator **durable, reconstructable, auditable, and safely
+controllable** across process crash/restart, workflow failure, and operator cancellation —
+**without changing single-workflow execution truth**. Additive only: no change to exact-action
+fingerprint semantics, governance ownership, Canonical Execution State, checkpoint digest
+semantics, or single-workflow recovery. Governance stays entirely below this layer, and
+**recovery performs no workflow execution**. **This is H22-C, not full H22:** no true
+concurrency, no shared budget/resource ledger, no compensation, no runtime assurance, no
+peer-to-peer agent messaging, and no agent/model selection (those are H22-D).
+
+### Added
+- **Versioned `PortfolioCheckpoint`** (`checkpoint_version = "1"`) — a durable snapshot of
+  *orchestration* state only. It **references** each workflow's runtime checkpoint by digest via
+  `WorkflowCheckpointRef` and **never copies** it, and it never duplicates Canonical Execution
+  State. Persists exactly what deterministic reconstruction needs — `round`, and per
+  registration `registration_sequence` / `priority` / `weight` / `age` / SWRR `fair_credit`
+  (`age` and `fair_credit` drive the *next* scheduler choice, so they are mandatory), the
+  dependency edges, the failure/cancellation state, and the trace sequence anchor — and
+  deliberately recomputes derived state (dependency depth, eligibility, scheduler ordering,
+  trace history) rather than persisting it. A single SHA-256 `portfolio_digest` over a
+  deterministic canonical serialization (stable key ordering, enums by value, `allow_nan=False`
+  so NaN/±Inf fail closed) protects it; malformed / tampered / unsupported-version checkpoints
+  are rejected. The **portfolio self-recoverability invariant** validates every checkpoint with
+  the recovery validator *before* any write, so a non-recoverable checkpoint is never persisted.
+- **`PortfolioCheckpointStore`** (neutral interface) + **`InMemoryPortfolioCheckpointStore`**
+  reference implementation with a monotonic per-portfolio `generation` and optional
+  compare-and-save (`expected_generation` → `PortfolioCheckpointConflict`) for in-process
+  optimistic concurrency (not distributed consensus). No SQL/Redis/DynamoDB/filesystem/cloud
+  backend is included.
+- **`recover_portfolio(...)` + `PortfolioRecoveryResult`** — side-effect-free portfolio
+  recovery: **provider calls = 0, governance calls = 0, workflow advancement = 0, automatic
+  resume = 0**. It cross-binds each referenced runtime checkpoint (`instance_id` / `workflow_id`
+  / `correlation_id` / `checkpoint_digest`; **not** `runtime_id`/`runtime_version`, which are
+  origin provenance, so a runtime upgrade recovers), reconstructs each workflow through the
+  existing `recover_runtime` contract, rebuilds the portfolio with its `round` / `age` /
+  `fair_credit` / dependencies / failure & cancellation state, and returns
+  `requires_continuation = True`. Committed tasks never rerun; the next consequential quantum
+  obtains **fresh** governance (a historical CLEAR is never reused).
+- **`AgentRuntime.continue_workflow` / `continue_workflow(...)`** — a bounded, explicit
+  continuation seam (the bounded analogue of `resume_workflow`): re-arms a WAITING/PAUSED
+  workflow to RUNNING for one-quantum-at-a-time advancement **without draining it**, so a
+  recovered portfolio resumes deterministic interleaving under explicit operator control.
+- **`PortfolioTrace` / `PortfolioTraceEntry` / `PortfolioEventType`** — a separate append-only
+  orchestration audit trace ordered by a **logical sequence** (never wall-clock). Events carry
+  ids/digests only and never duplicate workflow execution payload or Canonical Execution State;
+  the checkpoint stores only the sequence anchor, and recovery re-seats the position so
+  post-recovery events stay strictly increasing.
+- **`PortfolioFailurePolicy`** — bounded failure propagation: `ISOLATE_WORKFLOW` (**default** —
+  most consistent with live H22-B dependency-graph isolation), `FAIL_DEPENDENTS` (cancel the
+  transitive dependent subgraph), `FAIL_PORTFOLIO` (cancel all non-terminal, terminal `FAILED`,
+  grant no further quantum). H22-C observes a failure and applies a consequence; it never
+  reinterprets *why* a workflow failed (no `BLOCK → CLEAR`, no `FAILED → COMPLETED`).
+- **`CancellationScope`** — cooperative, idempotent cancellation: `WORKFLOW_ONLY`,
+  `DEPENDENT_SUBGRAPH` (target + transitive dependents), `PORTFOLIO_ALL` (terminal `CANCELLED`).
+  Cancellation calls the runtime's own `cancel_workflow` (no threads, no process termination, no
+  direct task-status mutation), applies in deterministic registration order, and is a no-op on
+  repeat. Cancelling a WAITING/HOLD workflow is operator control, **not** a governance override.
+- **`PortfolioController`** (+ `create_portfolio_controller(...)`) — ties the H22-B scheduler to
+  the trace, failure policy, cancellation, and durable checkpointing. New terminal
+  `PortfolioStatus` values `FAILED` / `CANCELLED` (a *quiescent* portfolio stays `ACTIVE`, never
+  silently terminal).
+
+### Final audit corrections (applied on the H22-C PR)
+1. **Durable audit trace (was a merge blocker).** `PortfolioTrace` became a thin writer/view over
+   a new neutral append-only **`PortfolioEventStore`** (+ `InMemoryPortfolioEventStore`,
+   portfolio-scoped, immutable records, contiguous logical sequence, duplicate/out-of-order
+   rejected via `PortfolioTraceSequenceError`). Recovery now preserves pre-crash audit **history**,
+   not just the last sequence number.
+2. **Crash-safe checkpoint/commit-event sequencing.** The checkpoint captures the trace anchor
+   that existed *before* the `PORTFOLIO_CHECKPOINT_COMMITTED` event; recovery continues at
+   `max(checkpoint anchor, event-store last sequence) + 1`, handling both the "checkpoint saved,
+   crash before commit-event" window and the "commit-event persisted, then crash" window with no
+   gap, collision, or reuse. The two stores are documented as independent (no atomic distributed
+   transaction claimed).
+3. **Full runtime-checkpoint binding.** `WorkflowCheckpointRef` now binds **both** runtime
+   integrity domains — the base `checkpoint_digest`, the `checkpoint_version`, and the separate
+   canonical-execution-state `extension_digest` (empty for legacy v0). Recovery matches all three
+   and verifies the runtime checkpoint's own integrity, so an altered-and-resealed CES extension
+   with an unchanged base digest is rejected.
+4. **Semantic cross-binding after recovery.** `failure_state[iid]` ⇒ recovered workflow `FAILED`;
+   `cancellation_state[iid]` ⇒ `CANCELLED`; labels drawn from the permitted vocabulary; a terminal
+   `portfolio_status` ⇒ all registered workflows terminal (`FAILED` ⇒ ≥1 recorded failure);
+   registration sequences must be the contiguous range `0..len-1`. A resealed checkpoint whose
+   claim contradicts recovered runtime truth fails closed.
+5. **Failure-policy continuity.** `PortfolioRecoveryResult` exposes a typed
+   `failure_policy: PortfolioFailurePolicy`, and `PortfolioController.from_recovery(...)` adopts the
+   recovered policy by default (a `FAIL_DEPENDENTS` portfolio resumes as `FAIL_DEPENDENTS`, not the
+   constructor default `ISOLATE_WORKFLOW`).
+
+### Final correctness corrections (applied on the H22-C PR)
+1. **Real (runtime-bound) self-recoverability.** `PortfolioController.checkpoint()` now runs the
+   **same** side-effect-free `validate_portfolio_checkpoint_bound(cp, runtime)` that recovery uses
+   *before* any store write — verifying the referenced current workflow checkpoints across both
+   integrity domains and the H22-C semantic state (failure/cancellation/terminal-lifecycle)
+   against current runtime truth, not merely the structural shape. A checkpoint recovery would
+   reject can no longer be persisted; the store is left unchanged. No provider/governance/advance/
+   resume/continuation call during validation.
+2. **Genuinely immutable event records.** `InMemoryPortfolioEventStore` stores each event as a
+   canonical JSON snapshot and re-parses on read, so nested detail (e.g. cancellation `targets`,
+   `recovered_workflow_ids`) can no longer alias stored history in either direction. Non-
+   serializable (opaque) detail or NaN/±Inf fails closed (`PortfolioTraceEncodingError`).
+3. **Explicit torn cross-store state.** The runtime workflow store, portfolio checkpoint store,
+   and portfolio event store are independent — **no atomic distributed transaction is claimed**. A
+   torn state where a workflow's runtime checkpoint has advanced beyond the one the latest
+   portfolio checkpoint references is detected and **fails closed** with the diagnostic token
+   `PORTFOLIO_RUNTIME_CHECKPOINT_DIVERGENCE` (no rollback, no re-run of the committed action, no
+   silent acceptance, no fabricated state). Documented as the explicit v0.5.0 cross-store recovery
+   contract; recovery succeeds once resynchronized.
+
+### Tests
+`tests/test_portfolio_durability.py` — **68 tests** across the H22-C matrix: checkpoint roundtrip /
+digest determinism / field sensitivity / tamper + resealed-inconsistency rejection; recovery
+zero-side-effects / explicit-continuation / no-repeat / fresh-governance / canonical-state
+resolvability; SWRR (2:1 and 3:1) + aging + registration-order scheduler continuity;
+dependency / failure / cancellation continuity across recovery; **durable trace history +
+globally-monotonic sequence across recovery; both checkpoint/commit crash windows; full
+base+extension checkpoint binding + resealed-extension rejection; semantic failure/cancellation/
+lifecycle cross-bind rejection; non-contiguous-sequence rejection; failure-policy continuity**;
+the self-recoverability invariant; multiple sequential recoveries; and runtime-upgrade
+compatibility.
+
+### Verification (scoped, local)
+- `python -m pytest packages/runtime/agent-runtime/tests -q` → **246 passed, 2 skipped**.
+- `scripts/verify_isolated_install.py` → **ISOLATED INSTALL VERIFICATION: PASS** at `0.5.0`.
+- Import-boundary / governance-binding / compatibility suites green; platform-freeze **PASS**.
+
+## 0.4.0 — H22-B deterministic multi-workflow coordination
+
+Adds the coordination layer that consumes the H22-A bounded-advancement seam and decides
+**which** prepared workflow receives the next execution quantum, and **why** — the
+deterministic equivalent of a team lead over a shared workflow graph, with **no**
+concurrency. Additive only: it consumes the unchanged `advance_workflow` seam and makes no
+change to exact-action fingerprint semantics, governance ownership, canonical execution
+state, checkpoint digest semantics, or recovery behavior. Governance stays entirely below
+this layer — the scheduler selects a workflow, it never authorizes that workflow's task.
+**This is H22-B, not full H22:** no concurrency, no shared budget/resource ledger, no
+portfolio checkpoint/recovery, no failure-propagation/compensation engine, no peer-to-peer
+agent messaging, and no agent/model selection (those are H22-C / H22-D).
+
+### Added
+- **`ugence_agent_runtime.orchestration`** subpackage (re-exported from the curated
+  `ugence_agent_runtime.api`), whose dependency direction is orchestration → runtime — the
+  single-workflow runtime engine never imports it.
+- **`WorkflowPortfolio`** (+ `create_portfolio(portfolio_id)`) — a deterministic aggregate
+  of already-prepared workflow registrations. It is **orchestration state only**: it
+  references each workflow by `instance_id` and never duplicates runtime-owned
+  workflow/task state, canonical execution state, or checkpoints. Registration is explicit,
+  append-only, order-stable, and idempotent (re-registering an `instance_id` returns the
+  existing entry unchanged — registered identity is immutable); an unknown instance is
+  rejected; a `weight` must be positive and finite (NaN / ±Inf / non-positive rejected
+  fail-closed); registration runs nothing. `PortfolioWorkflowEntry` carries only
+  orchestration metadata (priority, fairness weight, registration sequence, and the mutable
+  age / `fair_credit` scheduler bookkeeping). `PortfolioStatus` = `CREATED` / `ACTIVE` /
+  `COMPLETED` (a quiescent portfolio whose workflows are all WAITING/PAUSED/dependency-blocked
+  is ACTIVE, **not** complete). **Topology is frozen once scheduling begins:** a new
+  registration or dependency is rejected in `ACTIVE`/`COMPLETED` (so the scheduler can never
+  run a workflow the portfolio does not report), and stepping an *empty* portfolio is a no-op
+  that leaves it `CREATED` and still mutable — never misleadingly `ACTIVE`.
+- **Cross-workflow dependency graph** — `DependencyGraph`, `WorkflowDependency`,
+  `DependencyType` (`REQUIRES_COMPLETION` — any terminal predecessor releases the dependent;
+  `REQUIRES_SUCCESS` — fail-closed, a non-`COMPLETED` terminal predecessor turns the
+  dependent into `BLOCKED_DEPENDENCY`), and `DependencyState`. The graph is validated
+  fail-closed: self-dependency, unknown references, and direct/indirect cycles are rejected;
+  duplicate edges are idempotent; `depth()` is the deterministic longest-path-to-root.
+  Richer types (output/milestone/review) are deliberately **not** invented — the packaged
+  runtime exposes no durable public representation for them yet (documented as H22-C+).
+- **`PortfolioScheduler`** (+ `create_portfolio_scheduler(runtime, policy=None)`) — grants
+  at most one bounded quantum per `step`, through the unchanged `advance_workflow` seam.
+  `WorkflowEligibility` classification (`ELIGIBLE`, `WAITING_DEPENDENCY`,
+  `BLOCKED_DEPENDENCY`, `WAITING_RUNTIME`, `PAUSED`, `TERMINAL`) is mapped one-to-one from
+  runtime status + dependency verdict and invokes **zero** provider and **zero** governance
+  calls. Selection uses the single stable ordering key `(effective_rank, dependency_depth,
+  -fairness_credit, registration_sequence, instance_id)` — no wall-clock, object identity,
+  dict order, thread order, or randomness. `SchedulingPolicy` carries the `aging_cap` and
+  the CRITICAL-never-ages rule. `PortfolioStepResult` is a frozen value object with a
+  structured `SelectionReason` (rank/priority/age/depth/`fairness_credit`/sequence) that
+  answers "why B instead of A?". `PortfolioStepReason` = `QUANTUM_GRANTED` /
+  `NO_ELIGIBLE_WORKFLOW` / `ALL_TERMINAL` / `EMPTY_PORTFOLIO`. A bounded
+  `run(portfolio, max_rounds)` convenience loops the single-quantum `step` until the
+  portfolio is quiescent or complete and never spins.
+- **Priority / fairness / aging (orthogonal, so they never fight)** — `WorkflowPriority`
+  (`CRITICAL` … `BACKGROUND`, lower rank preferred) + `priority_rank`. **Fairness is smooth
+  weighted round-robin (SWRR)** within the top contention tier (eligible workflows sharing
+  the best `(effective_rank, dependency_depth)`): each round every tier member's
+  `fair_credit` gains its `weight`, the maximum-credit member is selected, and it is charged
+  the tier's total weight — provably proportional to weight, smooth, deterministic, and
+  starvation-free for every positive weight (fixing the earlier `deficit += weight`/`-= 1`
+  accrual, under which a weight-2 workflow permanently outran a weight-1 one). **Aging** is
+  bounded and cross-tier only (`effective_rank = max(1, base − min(age, aging_cap))`): only
+  an eligible workflow held *below* the top tier ages; a non-selected tier member never ages
+  (SWRR already serves it), the selected workflow resets, and dependency-blocked / WAITING /
+  PAUSED / terminal workflows never age; CRITICAL is absolute and no aged class ever reaches
+  it. Priority is orchestration priority only — it never bypasses dependencies, a
+  WAITING/PAUSED runtime state, or exact-action validation.
+
+### Unchanged (explicitly)
+- The H22-A seam, exact-action proposal binding, canonical execution state, checkpoint
+  digest semantics, and side-effect-free recovery are untouched. The scheduler never caches
+  or manufactures a `CLEAR`, reinterprets a `HOLD`, downgrades a `BLOCK`, auto-resumes an
+  `ESCALATE`, mutates a proposal, or calls a provider directly — every consequential quantum
+  still crosses fresh governance inside `advance_workflow`. No concurrency (no
+  threads/asyncio/pools), no shared budget/resource ledger, no portfolio durability, no
+  compensation, no peer-to-peer messaging, no agent/model selection.
+
+### Public API
+- Added the H22-B orchestration symbols (`WorkflowPortfolio`, `PortfolioWorkflowEntry`,
+  `PortfolioStatus`, `WorkflowPriority`, `priority_rank`, `DependencyGraph`,
+  `DependencyType`, `DependencyState`, `WorkflowDependency`, `PortfolioScheduler`,
+  `SchedulingPolicy`, `PortfolioStepResult`, `PortfolioStepReason`, `SelectionReason`,
+  `WorkflowEligibility`) and the `create_portfolio` / `create_portfolio_scheduler`
+  constructors to the curated surface. Version `0.3.0` → `0.4.0` (additive).
+
+## 0.3.0 — H22-A bounded workflow advancement
+
+Adds a small, additive, deterministic seam that lets an external orchestrator create a
+workflow **without draining it to completion** and then advance it **one bounded quantum
+at a time** to a stable, checkpointed boundary. This is the compositional foundation the
+future H22 portfolio scheduler needs in order to interleave independent workflows fairly
+(`advance(A)`, `advance(B)`, `advance(A)`, …). Additive only — no change to exact-action
+fingerprint semantics, governance ownership, canonical execution state, checkpoint digest
+semantics, or recovery behavior. **This is H22-A, not full H22:** no portfolio, no
+cross-workflow dependencies, no priority/fairness/aging, no shared budget, no concurrency.
+
+### Added
+- **`AgentRuntime.prepare_workflow(...)`** (and the `prepare_workflow(runtime, …)`
+  convenience function) — create and register a workflow instance with the exact same
+  setup `start_workflow` performs (instance creation, `WORKFLOW_CREATED` /
+  `WORKFLOW_STARTED`, and the initial `RUNNING` checkpoint) but **without driving any
+  task**. No provider or governance call happens at preparation. A prepared instance
+  persists as an ordinary `RUNNING` checkpoint, so its recovery semantics are the existing
+  ones (recovered as `PAUSED`, requiring explicit continuation — never auto-run).
+- **`AgentRuntime.advance_workflow(instance_id)`** (and `advance_workflow(runtime, …)`) —
+  advance a prepared/running workflow by **one bounded quantum**: *at most one runtime task
+  transition through one stable, checkpointed boundary*. Concretely a quantum is one of:
+  one task run through the full governance→exact-action→provider→transition→checkpoint
+  chain; one finalization (`→ COMPLETED`, or all remaining work blocked `→ WAITING`); or
+  one cancellation. The chain runs **entirely within** the quantum, so the scheduler can
+  never observe or preempt a workflow between a governance `CLEAR` and the provider
+  invocation it cleared. On a non-`RUNNING` workflow it is a deterministic no-op that
+  reports why (`ALREADY_TERMINAL`, or `REQUIRES_RESUME` for a `WAITING`/`PAUSED` workflow
+  — bounded advancement never self-resolves a governance `HOLD`/`ESCALATE`).
+- **`WorkflowAdvanceOutcome`** — a frozen, read-only value object returned by
+  `advance_workflow`: `instance_id`, `workflow_id`, `status_before`/`status_after`,
+  `stop_reason`, `progressed`, `task_id`, `task_status`, `execution_state_digest`,
+  `checkpoint_digest`, and `terminal`/`waiting`/`paused` flags. It references
+  runtime-owned canonical execution state and the emitted checkpoint **by digest** rather
+  than duplicating either — the runtime remains the sole owner of execution-trajectory
+  truth. `to_dict()` provided.
+- **`WorkflowAdvanceStop`** — a stable `str` enum of the boundaries a quantum may stop at
+  (`TASK_ADVANCED`, `WORKFLOW_COMPLETED`, `WORKFLOW_FAILED`, `WORKFLOW_WAITING`,
+  `WORKFLOW_PAUSED`, `WORKFLOW_CANCELLED`, `ALREADY_TERMINAL`, `REQUIRES_RESUME`).
+
+### Changed
+- **`start_workflow` is now implemented on top of the new primitive** (`prepare_workflow`
+  followed by repeated bounded advancement until the existing stopping condition). Its
+  externally observable behavior — event stream, checkpoints, and terminal/HOLD/ESCALATE
+  results — is unchanged; a regression test asserts the event sequence is byte-identical
+  to `prepare_workflow` + drive.
+
+### Unchanged (explicitly)
+- No new event types; the existing deterministic event stream is preserved. Exact-action
+  proposal binding, canonical execution state, checkpoint digest semantics, and
+  side-effect-free recovery are all untouched. No concurrency, threads, asyncio, portfolio
+  scheduler, cross-workflow dependencies, priority/fairness, shared budget, agent
+  selection, shared reasoning memory, or Runtime Assurance were introduced.
+
+## 0.2.0 — canonical execution state
+
+Establishes the Agent Runtime as the canonical owner of **execution-trajectory
+identity**: a deterministic, versioned, integrity-protected, runtime-owned snapshot of
+what execution trajectory is being coordinated, what caused it, what immutable action
+identity is involved, and which external authority/artifact references are associated.
+Additive only — no change to exact-action fingerprint semantics, governance ownership,
+task scheduling, retries, timeout, cancellation, recovery behavior, or the digest
+semantics of existing serialized checkpoints. Not H22, not Runtime Assurance, not an AWC
+adapter beyond a minimal neutral lineage seam.
+
+### Added
+- **`CanonicalExecutionState`** (`models/execution_state.py`) — a frozen, stdlib-only
+  dataclass with deterministic canonical serialization and a SHA-256 `state_digest`
+  (excludes itself; identity-bearing changes change the digest; semantically equal
+  construction yields an identical digest). Flat, typed identity fields only — it
+  references the active proposal by `proposal_fingerprint` and never re-canonicalizes the
+  proposal's argument payload. `to_dict()`/`from_dict()`/`compute_digest()`/`sealed()`/
+  `is_intact()`.
+- **`ExecutionLineage`** — a typed, optional, neutral seam for causation / parent /
+  agent-plan / artifact *references* (never untyped metadata; never fabricated; defaults
+  to unavailable). Agent references are lineage constraints only — carrying one never
+  causes the runtime to select or re-rank an agent. Supplied at **two levels**:
+  workflow-common lineage (`start_workflow(lineage=…)`) and **per-task** lineage
+  (`start_workflow(task_lineage={task_id: …})`, stored on `TaskInstance.lineage`).
+  `overlay()` combines them so sibling tasks driven by different agents are attributed to
+  their own agent/artifacts/causation while inheriting workflow-common references — the
+  multi-agent case (Task 1 → Research, Task 2 → Risk, Task 3 → Execution).
+- **Runtime derivation** (`runtime/execution_state.py`, `build_execution_state`) — the
+  sole in-runtime author of snapshots, deriving them from config / instance / task /
+  proposal / (optional) governance evaluation. Authority-lineage fields are copied
+  verbatim from what governance returned and are `None` when governance produced nothing.
+- **Read-only access** — `AgentRuntime.execution_state(instance_id, task_id=None)` and the
+  `execution_state(runtime, …)` convenience function. No mutation API.
+- **Trajectory journal** — every snapshot the runtime records (not only the latest per
+  task) is retained by digest, so an `execution_state_digest` anchored on any earlier
+  event stays resolvable via `AgentRuntime.execution_state_by_digest` /
+  `execution_state_by_digest(runtime, …)`. The journal is persisted and restored across
+  recovery.
+- **Event anchoring** — `execution_state_digest=<digest>` added to `TASK_READY`,
+  `GOVERNANCE_EVALUATION_REQUESTED`, `GOVERNANCE_DISPOSITION_RECEIVED`, `TASK_STARTED`,
+  `PROVIDER_INVOKED`, `PROVIDER_COMPLETED`, `TASK_COMPLETED`, and `TASK_FAILED`. Digest
+  references only — the full state is never stuffed into the event stream. No new event
+  types; sequencing is unchanged.
+- **Checkpoint lineage** — `Checkpoint` gains `checkpoint_version` (`"1"`), a
+  self-verifying per-task `execution_states` section, the digest-keyed
+  `execution_state_journal`, and the typed **lineage source** (`workflow_lineage` +
+  `task_lineage`) preserved separately from historical snapshots so future snapshots after
+  recovery keep the same references — including for tasks that had not yet run. The base
+  coordination `digest` is computed over exactly the original payload, so pre-existing
+  checkpoints verify byte-identically; a checkpoint deserialized without a version tag is
+  treated as legacy `"0"` with lineage unavailable.
+- **Versioned extension integrity boundary** — a second digest, `extension_digest`, covers
+  the whole canonical-state extension (`checkpoint_version` + `execution_states` +
+  `execution_state_journal` + `workflow_lineage` + `task_lineage`). The base `digest` is
+  deliberately unchanged (legacy compatibility) and therefore does not cover the extension,
+  so `extension_digest` is what protects the **lineage source** and the snapshot-collection
+  **membership** — closing the gap where a tampered lineage source passed both the base
+  digest and per-snapshot digests. Legacy (`"0"`) checkpoints carry no extension.
+- **Strict cross-binding & consistency on recovery** — recovery rejects an unknown
+  `checkpoint_version` (fail closed, never interpret a future schema under today's rules);
+  for `"1"` it requires base digest + extension digest + cross-binding valid; for `"0"` it
+  requires the base digest and no extension data. `validate_execution_states()` enforces,
+  beyond each snapshot's own digest, that the map key equals the snapshot's own key field
+  (task id / state digest), that instance/workflow/correlation identity match the
+  checkpoint, that the referenced task exists, that the schema version is supported, that
+  every latest snapshot is resolvable in the journal (latest↔journal consistency), and that
+  the lineage source is structural (keys reference known tasks, values deserialize). An
+  inconsistent canonical state fails closed with a precise reason — never silently accepted
+  or discarded. Recovery restores the lineage source and journal
+  (`RuntimeRecoveryResult.execution_states` / `.execution_state_journal`) and never
+  fabricates missing references. **`runtime_id`/`runtime_version` on a snapshot are *origin*
+  provenance** (the runtime that created that historical state) and are intentionally NOT
+  required to equal the checkpoint writer, so recovery across a runtime upgrade — which is
+  permitted with `config_mismatch=True` — yields a mixed-version journal that still recovers
+  cleanly. Those fields stay integrity-protected by the snapshot's `state_digest` and the
+  `extension_digest`.
+- **Self-recoverability invariant** — the engine validates every checkpoint (base digest +
+  extension digest + canonical-state binding) *before* persisting it, so the runtime never
+  writes a checkpoint its own recovery validator would reject (fails closed with
+  `CheckpointError` on an internal inconsistency instead of emitting an unrecoverable
+  checkpoint).
+- **Hardening** — unsupported `state_version` fails closed (`SUPPORTED_STATE_VERSIONS`);
+  `valid_until` must be finite (NaN/Infinity rejected); digest serialization uses
+  `allow_nan=False`.
+- `ExecutionStateError`; canonical-execution-state test suite; docs
+  `AGENT_RUNTIME_CANONICAL_EXECUTION_STATE.md`.
+
+### Public API
+- Added `CanonicalExecutionState`, `ExecutionLineage`, `execution_state`, and
+  `execution_state_by_digest` to the curated surface; `start_workflow` gains optional
+  `lineage=` and `task_lineage=` arguments (additive).
+
 ## 0.1.2 — exact-action contract hardening
 
 Corrects three remaining gaps in the exact-action governance contract. Bounded

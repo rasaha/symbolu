@@ -42,3 +42,15 @@ the checkpoint (`workflow_id` match, known task ids) and fails closed on mismatc
 Recovery reads no clock and makes no network or disk call beyond the injected store.
 Given the same persisted checkpoint and definition, it always returns the same
 reconstructed instance.
+
+## Multi-workflow (portfolio) recovery (H22-C)
+
+`recover_portfolio(...)` reconstructs a whole H22-B portfolio and its scheduler
+fairness/aging/dependency/failure/cancellation state from a durable `PortfolioCheckpoint`,
+composing the **same** per-instance `recover_runtime` contract above — it adds no new external
+call. It is side-effect free (provider = 0, governance = 0, advancement = 0, auto-resume = 0),
+cross-binds each referenced runtime checkpoint by digest (without requiring writer runtime-version
+equality — origin provenance, so upgrades recover), and returns a `PortfolioRecoveryResult` that
+`requires_continuation`. A recovered mid-flight workflow is continued for bounded advancement via
+`continue_workflow` (the bounded, non-draining analogue of `resume_workflow`). See
+[`AGENT_RUNTIME_H22C_DURABILITY.md`](AGENT_RUNTIME_H22C_DURABILITY.md).

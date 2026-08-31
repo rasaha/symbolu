@@ -1,0 +1,16 @@
+{
+  "schema": "bindingslots_e1_temporal/aggregate_verdict/v1",
+  "primary_verdict": "E1_TEMPORAL_TRANSFER_PARTIAL",
+  "co_emitted": [
+    "ORIGINAL_BINDINGSLOTS_NEURAL_ROUTING_UNRESOLVED",
+    "KDA_VALIDATION_BLOCKED"
+  ],
+  "kda_readiness": "KDA_VALIDATION_BLOCKED",
+  "seeds_full_pass": 0,
+  "required_to_pass": 4,
+  "determinism_ok": true,
+  "leakage_ok": true,
+  "protocol_ok": true,
+  "t5_diagnostic_only": true,
+  "scope": "bounded structural-transfer test of the frozen C1 recipe to Temporal Event Memory; T5 predecessor/successor is diagnostic; does NOT unblock KDA"
+}

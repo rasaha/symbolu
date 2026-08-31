@@ -11,7 +11,7 @@ findings and evidence — never ``ALLOW`` / ``DENY`` / ``AUTHORIZE`` / ``BLOCK``
 consequence.
 
 Stability: every symbol below is ``PUBLIC_STABLE`` (see
-``docs/migrations/storygraph/API_INVENTORY.md``). Internal module handles
+``Project_documentation/repository/docs/migrations/storygraph/API_INVENTORY.md``). Internal module handles
 (``storygraph``, ``storyverdict``, ``providers``, ``policy`` …) remain reachable
 on the full ``ugence_storygraph`` namespace for backward compatibility but are
 intentionally **not** promoted here.

@@ -1,0 +1,416 @@
+{
+  "distribution": "ugence-policy-authority",
+  "namespace": "ugence_policy_authority",
+  "package_version": "0.1.0",
+  "curated_api_module": "ugence_policy_authority.api",
+  "authority_protocol": "ugence.policy-authority",
+  "authority_protocol_version": "v0.1",
+  "authority_protocol_id": "ugence.policy-authority/v0.1",
+  "canonicalization_version": "ugence.policy-authority/canonicalization/v1",
+  "unicode_posture": "REJECT_NON_NFC",
+  "note": "Machine-readable snapshot of the curated public API. Generated from the installed package; tests/packaging/test_public_api.py asserts equality including dataclass field ORDER and the exact value of every string constant. This is the SHARED, PLATFORM-WIDE Ugence Policy Authority (ADR docs/architecture/ADR_UGENCE_POLICY_AUTHORITY.md, P-1/P-10) \u2014 internal platform infrastructure, not a customer-facing module and not a UVI engine. UVI is its FIRST policy-family adapter (P-2), registered behind the PolicyFamilyAdapter protocol; the generic core imports and branches on no policy family. Organizational approval remains EXTERNAL (P-5): the authority verifies externally produced approval evidence through an injected boundary owned by the composition root, and the only shipped verifier is DenyAllApprovalVerifier. v0.1 REJECTS issuance of any artifact carrying a non-empty unstructured supersedes_ref (emptiness is supersedes_ref.strip()) with the stable reason SUPERSESSION_REFERENCE_UNSUPPORTED; there is no permissive supersession posture and structured successor references are deferred (P-6/P-7). Revocation is mandatory-signed, entitlement-authorized, and re-verified during resolution (P-8). Trust anchors are defensively copied and exposed read-only. The in-memory registry is reference-grade and PROCESS-LOCAL only. Constructing any public dataclass is NOT authenticity \u2014 only resolve_policy produces an authority-evaluated resolution.",
+  "constants": {
+    "AUTHORITY_PROTOCOL": "ugence.policy-authority",
+    "AUTHORITY_PROTOCOL_ID": "ugence.policy-authority/v0.1",
+    "AUTHORITY_PROTOCOL_VERSION": "v0.1",
+    "CANONICALIZATION_VERSION": "ugence.policy-authority/canonicalization/v1",
+    "GLOBAL_TENANT": "",
+    "ISSUANCE_SIGNING_DOMAIN": "ugence.policy-authority/issuance/v1",
+    "POLICY_BODY_DIGEST_DOMAIN": "ugence.policy-authority/policy-body/v1",
+    "REVOCATION_SIGNING_DOMAIN": "ugence.policy-authority/policy-revocation/v1",
+    "SIGNATURE_ALG": "ed25519",
+    "SUPERSESSION_REFERENCE_UNSUPPORTED": "SUPERSESSION_REFERENCE_UNSUPPORTED",
+    "UVI_ADAPTER_ID": "ugence.uvi.policy-family/v1"
+  },
+  "symbols": {
+    "AUTHORITY_PROTOCOL": {
+      "kind": "str_constant",
+      "value": "ugence.policy-authority"
+    },
+    "AUTHORITY_PROTOCOL_ID": {
+      "kind": "str_constant",
+      "value": "ugence.policy-authority/v0.1"
+    },
+    "AUTHORITY_PROTOCOL_VERSION": {
+      "kind": "str_constant",
+      "value": "v0.1"
+    },
+    "AdapterRegistry": {
+      "kind": "dataclass",
+      "fields": [
+        "adapters"
+      ]
+    },
+    "ApprovalEvidenceRef": {
+      "kind": "dataclass",
+      "fields": [
+        "approval_ref",
+        "approval_digest",
+        "approving_authority_id"
+      ]
+    },
+    "ApprovalVerification": {
+      "kind": "dataclass",
+      "fields": [
+        "verified",
+        "status",
+        "coordinate",
+        "policy_body_digest",
+        "approving_authority_id",
+        "approval_ref",
+        "approval_digest",
+        "verified_at",
+        "approved_from",
+        "approved_to",
+        "detail"
+      ]
+    },
+    "ApprovalVerificationStatus": {
+      "kind": "enum",
+      "values": [
+        "APPROVED",
+        "NOT_FOUND",
+        "REJECTED",
+        "EXPIRED",
+        "REVOKED",
+        "MISMATCHED",
+        "UNVERIFIED",
+        "NO_APPROVAL_AUTHORITY_CONFIGURED"
+      ]
+    },
+    "ApprovalVerifier": {
+      "kind": "class"
+    },
+    "CANONICALIZATION_VERSION": {
+      "kind": "str_constant",
+      "value": "ugence.policy-authority/canonicalization/v1"
+    },
+    "DenyAllApprovalVerifier": {
+      "kind": "class"
+    },
+    "DenyAllSignatureVerifier": {
+      "kind": "class"
+    },
+    "Ed25519PolicySigner": {
+      "kind": "class"
+    },
+    "GLOBAL_TENANT": {
+      "kind": "str_constant",
+      "value": ""
+    },
+    "HistoricalResolutionRule": {
+      "kind": "enum",
+      "values": [
+        "DENY_ALWAYS",
+        "ALLOW_BEFORE_REVOCATION"
+      ]
+    },
+    "ISSUANCE_SIGNING_DOMAIN": {
+      "kind": "str_constant",
+      "value": "ugence.policy-authority/issuance/v1"
+    },
+    "InMemoryPolicyRegistry": {
+      "kind": "class"
+    },
+    "IssuedPolicyRecord": {
+      "kind": "dataclass",
+      "fields": [
+        "record_id",
+        "coordinate",
+        "adapter_id",
+        "policy_type",
+        "policy",
+        "policy_body_digest",
+        "issuing_authority_id",
+        "key_id",
+        "signature_alg",
+        "signature",
+        "approving_authority_id",
+        "approval_ref",
+        "approval_digest",
+        "issued_at",
+        "authority_protocol",
+        "authority_protocol_version"
+      ]
+    },
+    "KeyEntitlement": {
+      "kind": "enum",
+      "values": [
+        "ISSUE_POLICY",
+        "REVOKE_POLICY"
+      ]
+    },
+    "KeyVerification": {
+      "kind": "dataclass",
+      "fields": [
+        "status",
+        "key_id",
+        "authority_id",
+        "detail"
+      ]
+    },
+    "KeyVerificationStatus": {
+      "kind": "enum",
+      "values": [
+        "VALID",
+        "UNKNOWN_KEY",
+        "REVOKED_KEY",
+        "KEY_NOT_IN_WINDOW",
+        "WRONG_AUTHORITY",
+        "WRONG_TENANT",
+        "NOT_ENTITLED",
+        "INVALID_SIGNATURE",
+        "NO_VERIFIER_CONFIGURED"
+      ]
+    },
+    "POLICY_BODY_DIGEST_DOMAIN": {
+      "kind": "str_constant",
+      "value": "ugence.policy-authority/policy-body/v1"
+    },
+    "PolicyApprovalError": {
+      "kind": "exception"
+    },
+    "PolicyArtifactDescriptor": {
+      "kind": "dataclass",
+      "fields": [
+        "adapter_id",
+        "policy_type",
+        "coordinate",
+        "declared_content_digest",
+        "canonical_projection",
+        "lifecycle_label",
+        "lifecycle_is_active",
+        "supersedes_ref",
+        "effective_from",
+        "effective_to"
+      ]
+    },
+    "PolicyAuthorityError": {
+      "kind": "exception"
+    },
+    "PolicyAuthorityRequestError": {
+      "kind": "exception"
+    },
+    "PolicyCanonicalizationError": {
+      "kind": "exception"
+    },
+    "PolicyCoordinate": {
+      "kind": "dataclass",
+      "fields": [
+        "policy_family",
+        "policy_id",
+        "version",
+        "content_digest",
+        "scope",
+        "tenant_id"
+      ]
+    },
+    "PolicyDigestMismatchError": {
+      "kind": "exception"
+    },
+    "PolicyFamilyAdapter": {
+      "kind": "class"
+    },
+    "PolicyIssuanceError": {
+      "kind": "exception"
+    },
+    "PolicyKeyRing": {
+      "kind": "class"
+    },
+    "PolicyRegistry": {
+      "kind": "class"
+    },
+    "PolicyRegistryConflictError": {
+      "kind": "exception"
+    },
+    "PolicyResolution": {
+      "kind": "dataclass",
+      "fields": [
+        "status",
+        "reason",
+        "requested_coordinate",
+        "as_of",
+        "policy",
+        "record",
+        "historical",
+        "detail",
+        "descriptor_adapter_id",
+        "descriptor_policy_type",
+        "descriptor_canonical_projection"
+      ]
+    },
+    "PolicyResolutionReason": {
+      "kind": "enum",
+      "values": [
+        "RESOLVED",
+        "TENANT_SCOPE_MISMATCH",
+        "NOT_FOUND",
+        "REFERENCE_MISMATCH",
+        "ARTIFACT_REFERENCE_MISMATCH",
+        "NO_ADAPTER_REGISTERED",
+        "ARTIFACT_NOT_CANONICALIZABLE",
+        "CONTENT_DIGEST_MISMATCH",
+        "BODY_DIGEST_MISMATCH",
+        "SIGNATURE_INVALID",
+        "KEY_UNKNOWN",
+        "KEY_REVOKED",
+        "KEY_NOT_ENTITLED",
+        "APPROVAL_PROOF_INVALID",
+        "LIFECYCLE_NOT_ACTIVE",
+        "NOT_YET_EFFECTIVE",
+        "EXPIRED",
+        "REVOKED",
+        "REVOCATION_INTEGRITY_INVALID",
+        "SUPERSESSION_REFERENCE_UNSUPPORTED"
+      ]
+    },
+    "PolicyResolutionStatus": {
+      "kind": "enum",
+      "values": [
+        "RESOLVED",
+        "UNRESOLVED"
+      ]
+    },
+    "PolicyRevocationError": {
+      "kind": "exception"
+    },
+    "PolicyRevocationReasonCode": {
+      "kind": "enum",
+      "values": [
+        "CONTENT_DEFECT",
+        "APPROVAL_WITHDRAWN",
+        "COMPLIANCE_VIOLATION",
+        "ISSUED_IN_ERROR",
+        "REPLACED",
+        "KEY_COMPROMISE",
+        "OTHER"
+      ]
+    },
+    "PolicyRevocationRecord": {
+      "kind": "dataclass",
+      "fields": [
+        "revocation_id",
+        "coordinate",
+        "reason_code",
+        "revoking_authority_id",
+        "key_id",
+        "signature_alg",
+        "signature",
+        "revoked_at",
+        "replacement_coordinate",
+        "detail",
+        "authority_protocol",
+        "authority_protocol_version"
+      ]
+    },
+    "PolicySignatureVerifier": {
+      "kind": "class"
+    },
+    "PolicySigner": {
+      "kind": "class"
+    },
+    "PolicySigningError": {
+      "kind": "exception"
+    },
+    "PolicyVerificationKey": {
+      "kind": "dataclass",
+      "fields": [
+        "key_id",
+        "verify_key",
+        "authority_id",
+        "tenant_id",
+        "not_before",
+        "not_after",
+        "revoked",
+        "signature_alg",
+        "entitlements"
+      ]
+    },
+    "REVOCATION_SIGNING_DOMAIN": {
+      "kind": "str_constant",
+      "value": "ugence.policy-authority/policy-revocation/v1"
+    },
+    "SIGNATURE_ALG": {
+      "kind": "str_constant",
+      "value": "ed25519"
+    },
+    "SUPERSESSION_REFERENCE_UNSUPPORTED": {
+      "kind": "str_constant",
+      "value": "SUPERSESSION_REFERENCE_UNSUPPORTED"
+    },
+    "SUPPORTED_UVI_POLICY_FAMILIES": {
+      "kind": "mapping_constant",
+      "keys": [
+        "DOMAIN",
+        "GEOGRAPHY",
+        "INTENDED_OUTCOME",
+        "READINESS",
+        "VALUATION"
+      ]
+    },
+    "SigningKey": {
+      "kind": "dataclass",
+      "fields": [
+        "seed"
+      ]
+    },
+    "UVI_ADAPTER_ID": {
+      "kind": "str_constant",
+      "value": "ugence.uvi.policy-family/v1"
+    },
+    "UnsupportedPolicyArtifactError": {
+      "kind": "exception"
+    },
+    "UnsupportedSupersessionError": {
+      "kind": "exception"
+    },
+    "UviPolicyFamilyAdapter": {
+      "kind": "class"
+    },
+    "VerifyKey": {
+      "kind": "dataclass",
+      "fields": [
+        "public_bytes"
+      ]
+    },
+    "canonical_bytes": {
+      "kind": "function"
+    },
+    "default_uvi_adapters": {
+      "kind": "function"
+    },
+    "framed_body_bytes": {
+      "kind": "function"
+    },
+    "framed_body_digest": {
+      "kind": "function"
+    },
+    "issuance_signing_payload": {
+      "kind": "function"
+    },
+    "issue_policy": {
+      "kind": "function"
+    },
+    "resolve_policy": {
+      "kind": "function"
+    },
+    "revocation_signing_payload": {
+      "kind": "function"
+    },
+    "revoke_policy": {
+      "kind": "function"
+    },
+    "sha256_hex": {
+      "kind": "function"
+    },
+    "to_canonical_obj": {
+      "kind": "function"
+    },
+    "uvi_coordinate": {
+      "kind": "function"
+    },
+    "verify_revocation_record": {
+      "kind": "function"
+    }
+  }
+}

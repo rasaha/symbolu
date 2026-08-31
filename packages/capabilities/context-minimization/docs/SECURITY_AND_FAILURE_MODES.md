@@ -45,3 +45,14 @@ and a stored model cannot be mutated to change a fingerprint after the fact.
 The oracle is trusted to return a deterministic, canonical, non-sensitive key. The core
 treats the key as opaque and never logs, parses, or forwards it. `equivalence_key`
 values are excluded from the result fingerprint.
+
+## Token accounting (CM-TA1)
+
+`ApiCallTokenRecord` stores **no** prompt text, credentials, secrets, or provider
+response payloads — only neutral identities, integer counts, and provenance. Every
+provider-reported token field is validated as a non-negative `int` or `None`
+(bool/float/NaN/inf/str rejected fail-closed); unknown usage is `None`, never zero.
+Duplicate `attempt_id`s with conflicting content are rejected (idempotent replay must be
+byte-identical). Record and summary fingerprints are domain-separated
+(`api-call/1`, `logical-request/1`) and read no wall clock and mint no random id, so
+deterministic replay is exact.

@@ -15,7 +15,7 @@ Optionally extended with Stage 7 signals:
   - Phase coherence:  [B, T, phase_out_dim]  (Stage 7F)
   - Experiential P_t: [B, T, d_exp]          (Stage 7C)
 
-Reference: docs/design/CONSCIOUS_GENERATION_DESIGN.md §F.12.4
+Reference: Project_documentation/repository/docs/design/CONSCIOUS_GENERATION_DESIGN.md §F.12.4
 """
 
 from dataclasses import dataclass

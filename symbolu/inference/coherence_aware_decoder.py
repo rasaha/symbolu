@@ -12,7 +12,7 @@ Invariants:
   - NEVER modifies model weights
   - Only adjusts: temperature, top_p, resample decision
 
-Reference: docs/design/CONSCIOUS_GENERATION_DESIGN.md, Appendix F §F.3
+Reference: Project_documentation/repository/docs/design/CONSCIOUS_GENERATION_DESIGN.md, Appendix F §F.3
 
 Author: Sovereign-1 Training Initiative
 Date: March 2026

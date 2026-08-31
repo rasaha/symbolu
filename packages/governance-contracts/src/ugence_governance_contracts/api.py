@@ -8,7 +8,7 @@ framework but are not part of the curated contract API.
 
 Every symbol below is ``PUBLIC_STABLE`` and matches, field-for-field and
 enum-for-enum, the frozen ``governance_providers`` contract surface it was
-extracted from (see docs/migrations/governance_contracts/PUBLIC_API_INVENTORY.md).
+extracted from (see Project_documentation/repository/docs/migrations/governance_contracts/PUBLIC_API_INVENTORY.md).
 """
 
 from __future__ import annotations
@@ -43,13 +43,32 @@ from .contracts import (
     AssertionGovernanceProvider,
     AssertionGovernanceRequest,
     AssertionGovernanceResult,
+    AssessedSystemBinding,
+    AssessmentWindow,
+    AttestationStatus,
+    AttributionStatus,
     BaseProvider,
+    BenchmarkReference,
+    ConfidenceBasis,
+    EvidenceContractError,
+    EvidenceProvenance,
+    EvidenceReference,
+    EvidenceUsageScope,
     ExecutionBusinessOutcome,
     ExecutionDispatchRequest,
     ExecutionDispatchResult,
     ExecutionObservation,
     ExternalExecutionProvider,
+    ForecastHorizon,
+    MetricClaim,
+    MetricObservation,
+    PopulationSlice,
     Provider,
+    SourceBasis,
+    SystemBindingAuthenticityStatus,
+    SystemIdentityContractError,
+    TransformationMethod,
+    VerificationStatus,
 )
 
 __all__ = [
@@ -68,4 +87,14 @@ __all__ = [
     "ActionGovernanceResult", "ActionGovernanceOutcome",
     "ExternalExecutionProvider", "ExecutionDispatchRequest",
     "ExecutionDispatchResult", "ExecutionObservation", "ExecutionBusinessOutcome",
+    # GV-2E-a neutral evidence contracts (additive)
+    "SourceBasis", "TransformationMethod", "AttestationStatus",
+    "AttributionStatus", "VerificationStatus", "EvidenceUsageScope",
+    "EvidenceContractError",
+    "EvidenceReference", "EvidenceProvenance", "BenchmarkReference",
+    "AssessmentWindow", "ForecastHorizon", "PopulationSlice", "ConfidenceBasis",
+    "MetricClaim", "MetricObservation",
+    # M-3R.3 neutral assessed-system identity (additive)
+    "AssessedSystemBinding", "SystemBindingAuthenticityStatus",
+    "SystemIdentityContractError",
 ]

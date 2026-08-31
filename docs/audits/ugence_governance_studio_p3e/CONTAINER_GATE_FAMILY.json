@@ -1,0 +1,320 @@
+{
+  "schema": "p3e-container-gate-family.v1",
+  "title": "Ratified P3E container gate family (P3E-CTR)",
+  "status": "RATIFIED",
+  "ratified_by": "rasaha",
+  "ratified_on": "2026-08-29",
+  "supersedes": {
+    "file": "this file's own PROPOSED predecessor (schema p3e-container-gate-family-proposal.v1)",
+    "note": "the proposal numbered twelve gates including four evidence steps; the ratified family renumbers, so a P3E-CTR identifier in the proposal does not necessarily denote the same gate here. Only this ratified file is authoritative."
+  },
+  "what_ratification_means": "Ratification defines requirements only. It does NOT execute any gate, mark any gate passed, or assert that any gate has ever run. Every gate below is NOT_EXECUTED.",
+  "gate_count": 13,
+  "gates": {
+    "P3E-CTR-01": {
+      "requirement": "base-images.json and every Dockerfile FROM pin equal the owner-ratified digests in BASE_IMAGE_MIRROR_DECISION.json",
+      "gate_kind": "verification",
+      "workflow_step": "ratified-pin-conformance",
+      "workflow": ".github/workflows/governance-studio-p3e-private-hosted-ci.yml",
+      "workflow_job": "container",
+      "supporting_test_or_script": [
+        "deployment/governance-studio/ci/verify_ratified_pins.py",
+        "deployment/governance-studio/tests/test_ratified_pins.py",
+        "deployment/governance-studio/tests/test_gate_identifiers.py::test_ratified_pin_conformance_holds_on_the_committed_tree"
+      ],
+      "requires_container_runtime": false,
+      "requires_registry_access": false,
+      "non_compensatory": false,
+      "evidence_required_before_passed": "this gate's step exits zero in a run whose container build succeeded from the ratified digests, with its log or uploaded artifact retained, and every mandatory evidence obligation attached to it satisfied",
+      "execution_state": "NOT_EXECUTED"
+    },
+    "P3E-CTR-02": {
+      "requirement": "each pinned base image resolves live to its pinned index digest, is pinned in the Dockerfile, and matches the declared platform",
+      "gate_kind": "verification",
+      "workflow_step": "base-image-digest-verification",
+      "workflow": ".github/workflows/governance-studio-p3e-private-hosted-ci.yml",
+      "workflow_job": "container",
+      "supporting_test_or_script": [
+        "deployment/governance-studio/ci/resolve_base_images.py"
+      ],
+      "requires_container_runtime": false,
+      "requires_registry_access": true,
+      "non_compensatory": false,
+      "evidence_required_before_passed": "this gate's step exits zero in a run whose container build succeeded from the ratified digests, with its log or uploaded artifact retained, and every mandatory evidence obligation attached to it satisfied",
+      "execution_state": "NOT_EXECUTED"
+    },
+    "P3E-CTR-03": {
+      "requirement": "the image builds from the pinned Dockerfile for linux/amd64",
+      "gate_kind": "verification",
+      "workflow_step": "container-build",
+      "workflow": ".github/workflows/governance-studio-p3e-private-hosted-ci.yml",
+      "workflow_job": "container",
+      "supporting_test_or_script": [],
+      "requires_container_runtime": true,
+      "requires_registry_access": true,
+      "non_compensatory": false,
+      "evidence_required_before_passed": "this gate's step exits zero in a run whose container build succeeded from the ratified digests, with its log or uploaded artifact retained, and every mandatory evidence obligation attached to it satisfied",
+      "execution_state": "NOT_EXECUTED"
+    },
+    "P3E-CTR-04": {
+      "requirement": "the built image runs as 10001:10001, exposes only 8443/tcp, and contains no npm, node or compiler",
+      "gate_kind": "verification",
+      "workflow_step": "image-inspection",
+      "workflow": ".github/workflows/governance-studio-p3e-private-hosted-ci.yml",
+      "workflow_job": "container",
+      "supporting_test_or_script": [
+        "deployment/governance-studio/tests/test_container_artifacts.py (static equivalent on the Dockerfile)"
+      ],
+      "requires_container_runtime": true,
+      "requires_registry_access": true,
+      "non_compensatory": false,
+      "evidence_required_before_passed": "this gate's step exits zero in a run whose container build succeeded from the ratified digests, with its log or uploaded artifact retained, and every mandatory evidence obligation attached to it satisfied",
+      "execution_state": "NOT_EXECUTED"
+    },
+    "P3E-CTR-05": {
+      "requirement": "no credential, private key or token appears in image history or per-layer content",
+      "gate_kind": "verification",
+      "workflow_step": "image-layer-secret-scan",
+      "workflow": ".github/workflows/governance-studio-p3e-private-hosted-ci.yml",
+      "workflow_job": "container",
+      "supporting_test_or_script": [
+        "deployment/governance-studio/ci/scan_image_layers.py"
+      ],
+      "requires_container_runtime": true,
+      "requires_registry_access": true,
+      "non_compensatory": false,
+      "evidence_required_before_passed": "this gate's step exits zero in a run whose container build succeeded from the ratified digests, with its log or uploaded artifact retained, and every mandatory evidence obligation attached to it satisfied",
+      "execution_state": "NOT_EXECUTED"
+    },
+    "P3E-CTR-06": {
+      "requirement": "the running container enforces uid/gid 10001:10001, NoNewPrivs, empty capability sets, a read-only root with only the approved tmpfs writable, no docker socket, and only 8443 published",
+      "gate_kind": "verification",
+      "workflow_step": "container-runtime-verification",
+      "workflow": ".github/workflows/governance-studio-p3e-private-hosted-ci.yml",
+      "workflow_job": "container",
+      "supporting_test_or_script": [
+        "deployment/governance-studio/ci/verify_container.sh (section 6, read from live /proc)",
+        "deployment/governance-studio/tests/test_container_artifacts.py"
+      ],
+      "requires_container_runtime": true,
+      "requires_registry_access": true,
+      "non_compensatory": true,
+      "evidence_required_before_passed": "this gate's step exits zero in a run whose container build succeeded from the ratified digests, with its log or uploaded artifact retained, and every mandatory evidence obligation attached to it satisfied",
+      "execution_state": "NOT_EXECUTED",
+      "script_section": "\u00a76 runtime hardening",
+      "runtime_split_note": "one of the five non-compensatory runtime gates carved out of the single container-runtime-verification step by owner ruling; passing any of the five never compensates for another failing"
+    },
+    "P3E-CTR-07": {
+      "requirement": "TLS 1.0 and 1.1 are rejected and TLS 1.2 is accepted on the container listener",
+      "gate_kind": "verification",
+      "workflow_step": "container-runtime-verification",
+      "workflow": ".github/workflows/governance-studio-p3e-private-hosted-ci.yml",
+      "workflow_job": "container",
+      "supporting_test_or_script": [
+        "deployment/governance-studio/ci/verify_container.sh (section 4)",
+        "deployment/governance-studio/tests/test_https_tls.py"
+      ],
+      "requires_container_runtime": true,
+      "requires_registry_access": true,
+      "non_compensatory": true,
+      "evidence_required_before_passed": "this gate's step exits zero in a run whose container build succeeded from the ratified digests, with its log or uploaded artifact retained, and every mandatory evidence obligation attached to it satisfied",
+      "execution_state": "NOT_EXECUTED",
+      "script_section": "\u00a74 TLS exact-version policy",
+      "runtime_split_note": "one of the five non-compensatory runtime gates carved out of the single container-runtime-verification step by owner ruling; passing any of the five never compensates for another failing"
+    },
+    "P3E-CTR-08": {
+      "requirement": "unauthenticated UI, asset and API requests are refused, valid credentials are accepted, wrong credentials are refused, the bounded failure cooldown is enforced, and no credential appears in logs",
+      "gate_kind": "verification",
+      "workflow_step": "container-runtime-verification",
+      "workflow": ".github/workflows/governance-studio-p3e-private-hosted-ci.yml",
+      "workflow_job": "container",
+      "supporting_test_or_script": [
+        "deployment/governance-studio/ci/verify_container.sh (section 8, authentication)",
+        "deployment/governance-studio/tests/test_authentication.py",
+        "deployment/governance-studio/tests/test_logging.py"
+      ],
+      "requires_container_runtime": true,
+      "requires_registry_access": true,
+      "non_compensatory": true,
+      "evidence_required_before_passed": "this gate's step exits zero in a run whose container build succeeded from the ratified digests, with its log or uploaded artifact retained, and every mandatory evidence obligation attached to it satisfied",
+      "execution_state": "NOT_EXECUTED",
+      "script_section": "\u00a78 authentication",
+      "runtime_split_note": "one of the five non-compensatory runtime gates carved out of the single container-runtime-verification step by owner ruling; passing any of the five never compensates for another failing"
+    },
+    "P3E-CTR-09": {
+      "requirement": "the packaged four-scenario demonstration completes over the container HTTPS listener, asserting response bodies and plan state rather than status codes alone",
+      "gate_kind": "verification",
+      "workflow_step": "container-runtime-verification",
+      "workflow": ".github/workflows/governance-studio-p3e-private-hosted-ci.yml",
+      "workflow_job": "container",
+      "supporting_test_or_script": [
+        "deployment/governance-studio/ci/packaged_e2e.py",
+        "deployment/governance-studio/ci/verify_container.sh (section 8, packaged E2E)",
+        "deployment/governance-studio/tests/test_packaged_e2e.py"
+      ],
+      "requires_container_runtime": true,
+      "requires_registry_access": true,
+      "non_compensatory": true,
+      "evidence_required_before_passed": "this gate's step exits zero in a run whose container build succeeded from the ratified digests, with its log or uploaded artifact retained, and every mandatory evidence obligation attached to it satisfied",
+      "execution_state": "NOT_EXECUTED",
+      "script_section": "\u00a78 packaged four-scenario E2E",
+      "runtime_split_note": "one of the five non-compensatory runtime gates carved out of the single container-runtime-verification step by owner ruling; passing any of the five never compensates for another failing"
+    },
+    "P3E-CTR-10": {
+      "requirement": "the running container has no external network egress, with the blocked attempts recorded as observation evidence",
+      "gate_kind": "verification",
+      "workflow_step": "container-runtime-verification",
+      "workflow": ".github/workflows/governance-studio-p3e-private-hosted-ci.yml",
+      "workflow_job": "container",
+      "supporting_test_or_script": [
+        "deployment/governance-studio/ci/verify_container.sh (section 7)",
+        "deployment/governance-studio/tests/test_egress.py"
+      ],
+      "requires_container_runtime": true,
+      "requires_registry_access": true,
+      "non_compensatory": true,
+      "evidence_required_before_passed": "this gate's step exits zero in a run whose container build succeeded from the ratified digests, with its log or uploaded artifact retained, and every mandatory evidence obligation attached to it satisfied",
+      "execution_state": "NOT_EXECUTED",
+      "script_section": "\u00a77 egress enforcement + observation",
+      "runtime_split_note": "one of the five non-compensatory runtime gates carved out of the single container-runtime-verification step by owner ruling; passing any of the five never compensates for another failing"
+    },
+    "P3E-CTR-11": {
+      "requirement": "the built image carries no HIGH or CRITICAL vulnerability",
+      "gate_kind": "verification",
+      "workflow_step": "container-vulnerability-scan",
+      "workflow": ".github/workflows/governance-studio-p3e-private-hosted-ci.yml",
+      "workflow_job": "container",
+      "supporting_test_or_script": [
+        "aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 (v0.36.0)"
+      ],
+      "requires_container_runtime": true,
+      "requires_registry_access": true,
+      "non_compensatory": false,
+      "evidence_required_before_passed": "this gate's step exits zero in a run whose container build succeeded from the ratified digests, with its log or uploaded artifact retained, and every mandatory evidence obligation attached to it satisfied",
+      "execution_state": "NOT_EXECUTED",
+      "supporting_test_or_script_superseded": [
+        "aquasecurity/trivy-action@0.28.0"
+      ],
+      "citation_correction_2026_08_30": "This gate cited aquasecurity/trivy-action@0.28.0 - the malformed reference that never resolved and was re-pinned in commit 3ccff09c. The family was ratified before that re-pin and the citation was not carried forward. Corrected to the immutable SHA the workflow actually uses. The gate's requirement is unchanged."
+    },
+    "P3E-CTR-12": {
+      "requirement": "the image rebuilds from a clean git archive of HEAD",
+      "gate_kind": "verification",
+      "workflow_step": "clean-checkout-reproducibility",
+      "workflow": ".github/workflows/governance-studio-p3e-private-hosted-ci.yml",
+      "workflow_job": "container",
+      "supporting_test_or_script": [],
+      "requires_container_runtime": true,
+      "requires_registry_access": true,
+      "non_compensatory": false,
+      "evidence_required_before_passed": "this gate's step exits zero in a run whose container build succeeded from the ratified digests, with its log or uploaded artifact retained, and every mandatory evidence obligation attached to it satisfied",
+      "execution_state": "NOT_EXECUTED"
+    },
+    "P3E-CTR-13": {
+      "requirement": "the container terminates before binding any network listener when its startup integrity checks fail: missing certificate, missing key, certificate/key mismatch, missing credentials, or malformed password hash",
+      "gate_kind": "verification",
+      "workflow_step": "container-runtime-verification",
+      "workflow": ".github/workflows/governance-studio-p3e-private-hosted-ci.yml",
+      "workflow_job": "container",
+      "script_section": "\u00a711 startup-failure negatives",
+      "required_cases": [
+        "missing certificate",
+        "missing key",
+        "certificate/key mismatch",
+        "missing credentials",
+        "malformed password hash"
+      ],
+      "case_requirement": "each case must terminate before network binding; a container that binds and then errors does not satisfy this gate",
+      "supporting_test_or_script": [
+        "deployment/governance-studio/ci/verify_container.sh (section 11)",
+        "deployment/governance-studio/tests/test_startup_integrity.py"
+      ],
+      "claim_distinction": {
+        "this_gate_claims": "the built, running container fails closed before binding, verified against real `docker run` invocations of the image",
+        "in_process_coverage_claims": "deployment/governance-studio/tests/test_startup_integrity.py verifies the same fail-closed properties in-process against the ASGI application, without a container",
+        "why_distinct": "in-process coverage cannot observe image packaging, entrypoint behaviour or actual port binding, so it corroborates this gate but does not discharge it"
+      },
+      "requires_container_runtime": true,
+      "requires_registry_access": true,
+      "non_compensatory": true,
+      "runtime_split_note": "sixth gate mapped to the container-runtime-verification step, appended by owner ruling without renumbering P3E-CTR-01 through P3E-CTR-12",
+      "evidence_required_before_passed": "this gate's section exits zero in a run whose container build succeeded from the ratified digests, with its log or uploaded artifact retained, and every mandatory evidence obligation attached to it satisfied",
+      "execution_state": "NOT_EXECUTED",
+      "ratified_by": "rasaha",
+      "ratified_on": "2026-08-29"
+    }
+  },
+  "evidence_obligations": {
+    "rule": "Mandatory evidence obligations are not independent verification gates. Missing mandatory evidence makes a run INCOMPLETE; it does not fail a verification gate and does not add one.",
+    "run_completion_rule": "a run is COMPLETE only when every mandatory obligation is satisfied; an incomplete run cannot be reported as a passing family run",
+    "obligations": {
+      "runtime-package-inventory": {
+        "mandatory": true,
+        "attached_to": [
+          "P3E-CTR-04"
+        ],
+        "attachment": "image inspection",
+        "produces": "deployment/governance-studio/artifacts/runtime-image-packages.txt"
+      },
+      "image-sbom": {
+        "mandatory": true,
+        "attached_to": [
+          "P3E-CTR-11"
+        ],
+        "attachment": "vulnerability scanning",
+        "produces": "deployment/governance-studio/artifacts/sbom.image.cdx.json",
+        "family_evidence_role": {
+          "role": "IMAGE_PROVENANCE",
+          "sufficiency": "CONTRIBUTORY_NOT_SUFFICIENT",
+          "establishes_provenance": false,
+          "rationale": "An SBOM inventories image contents. It does not independently establish source commit, builder identity or trusted-build provenance, so it may contribute to a provenance claim but can never satisfy one on its own.",
+          "owner_ruling": "rasaha, 2026-08-29: the earlier attachment to P3E-CTR-03 is removed and no substitute gate attachment is invented."
+        },
+        "previous_attachment_withdrawn": "P3E-CTR-03 (container build) - withdrawn by owner ruling; not replaced by another gate attachment"
+      },
+      "evidence-manifest": {
+        "mandatory": true,
+        "attached_to": "FAMILY_COMPLETION",
+        "attachment": "completion of the whole family",
+        "produces": "hashed manifest of the run's evidence artifacts"
+      },
+      "upload-evidence": {
+        "mandatory": true,
+        "attached_to": "FAMILY_COMPLETION",
+        "attachment": "completion of the whole family",
+        "produces": "retained p3e-container-evidence artifact bundle"
+      }
+    }
+  },
+  "non_compensatory_rule": {
+    "applies_to": [
+      "P3E-CTR-06",
+      "P3E-CTR-07",
+      "P3E-CTR-08",
+      "P3E-CTR-09",
+      "P3E-CTR-10",
+      "P3E-CTR-13"
+    ],
+    "statement": "these gates are non-compensatory: each must pass on its own, and success in any of them never offsets, substitutes for, or mitigates failure in another"
+  },
+  "relationship_to_the_historical_C_family": {
+    "correspondence_asserted": false,
+    "statement": "NO correspondence between any P3E-CTR identifier and any historical C identifier is asserted, implied or intended, in either direction. The families are independent. Do not map, equate or align them by position, count, ordering or name similarity.",
+    "historical_family_status": "RETIRED_SUPERSEDED, register preserved immutably",
+    "historical_gate_statuses": {
+      "C2": "DEFINED_HISTORICAL_GATE",
+      "C4": "DEFINED_HISTORICAL_GATE",
+      "C5_through_C19": "UNDEFINED_HISTORICAL_GATE",
+      "execution_state_of_all": "NOT_EXECUTED"
+    },
+    "register": "docs/audits/ugence_governance_studio_p3e/CONTAINER_GATE_DEFINITION.json"
+  },
+  "prohibited_without_further_ratification": [
+    "treating any P3E-CTR identifier as equivalent to any historical C identifier",
+    "marking any gate in either family passed",
+    "reporting a run with unsatisfied mandatory evidence obligations as complete",
+    "compensating a failed runtime gate with a passing sibling"
+  ],
+  "amendment_2026_08_29": "Owner ruling: P3E-CTR-13 (fail-closed startup integrity) appended as a thirteenth non-compensatory gate covering verify_container.sh \u00a711, which the original five-way runtime split left unassigned. Identifiers P3E-CTR-01 through P3E-CTR-12 are unchanged. The image-sbom obligation's attachment to P3E-CTR-03 is withdrawn; the SBOM stays attached to P3E-CTR-11 and carries the family-level IMAGE_PROVENANCE role marked CONTRIBUTORY_NOT_SUFFICIENT.",
+  "unassigned_residue_resolved": "the \u00a711 startup-failure negatives previously recorded as unassigned are now ratified as P3E-CTR-13"
+}

@@ -3,8 +3,19 @@ from __future__ import annotations
 
 from .agent import AgentDescriptor
 from .events import EVENT_TYPES, RuntimeEvent
+from .execution_state import (
+    STATE_VERSION,
+    CanonicalExecutionState,
+    ExecutionLineage,
+)
 from .proposal import ProposalError, TransitionProposal, compute_fingerprint
-from .results import FailureCategory, RuntimeFailure, RuntimeResult
+from .results import (
+    FailureCategory,
+    RuntimeFailure,
+    RuntimeResult,
+    WorkflowAdvanceOutcome,
+    WorkflowAdvanceStop,
+)
 from .task import (
     TERMINAL_TASK_STATUSES,
     TaskDefinition,
@@ -32,9 +43,14 @@ __all__ = [
     "TransitionProposal",
     "ProposalError",
     "compute_fingerprint",
+    "CanonicalExecutionState",
+    "ExecutionLineage",
+    "STATE_VERSION",
     "FailureCategory",
     "RuntimeFailure",
     "RuntimeResult",
+    "WorkflowAdvanceOutcome",
+    "WorkflowAdvanceStop",
     "TaskDefinition",
     "TaskInstance",
     "TaskStatus",

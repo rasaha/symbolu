@@ -1,0 +1,150 @@
+name: cloud-scaling-controller-phase3-ci
+
+# Narrowly-scoped CI for Phase 3 (Dependency- and Cost-aware Capacity Planning) of the
+# independent Cloud Scaling Controller capability package. Advisory/shadow-only and
+# offline: no live cluster, no cloud credentials, no network actuation. Phase 3 recommends;
+# it never executes, authorizes, or verifies an effect.
+
+on:
+  push:
+    paths:
+      - "packages/capabilities/cloud-scaling-controller/**"
+      - ".github/workflows/cloud-scaling-controller-phase3-ci.yml"
+  pull_request:
+    paths:
+      - "packages/capabilities/cloud-scaling-controller/**"
+      - ".github/workflows/cloud-scaling-controller-phase3-ci.yml"
+
+jobs:
+  cloud-scaling-phase3:
+    runs-on: ubuntu-latest
+    env:
+      PKG: packages/capabilities/cloud-scaling-controller
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install tooling
+        # `requests` is required by the legacy Prometheus signal tests exercised in the
+        # parity step below (the read-only ingestion adapter's optional extra); without it
+        # tests/cloud_controller/test_signals.py fails to import.
+        run: python -m pip install --upgrade pip build pytest numpy requests
+
+      - name: Phase 3 unit + adversarial suite (planning)
+        run: python -m pytest "$PKG/tests/planning" -q
+
+      - name: Phase 1 + Phase 2 regression (canonical + forecasting)
+        run: python -m pytest "$PKG/tests/canonical" "$PKG/tests/forecasting" -q
+
+      - name: Full package suite (isolation)
+        run: python -m pytest "$PKG/tests" -q
+
+      - name: Legacy controller parity regression
+        run: python -m pytest tests/cloud_controller -q
+
+      - name: Advisory-boundary + side-effect gates
+        run: python -m pytest "$PKG/tests/boundaries" "$PKG/tests/side_effects" -q
+
+      - name: Phase 3 provider-neutrality / no forbidden imports (planning)
+        run: |
+          python - <<'PY'
+          import ast, pathlib, sys
+          planning = pathlib.Path("packages/capabilities/cloud-scaling-controller/src/"
+                                  "ugence_cloud_scaling_controller/planning")
+          forbidden = {
+              "boto3", "botocore", "azure", "kubernetes", "requests", "prometheus_client",
+              "opentelemetry", "yaml", "fastapi", "uvicorn", "flask", "socket", "subprocess",
+              "threading", "multiprocessing", "risk_authority", "actiongate",
+              "governance_studio", "decision_governance", "agent_runtime", "hybrid_llm",
+              "control_plane", "cloud_scaling_operations",
+          }
+          viol = []
+          for p in planning.rglob("*.py"):
+              for node in ast.parse(p.read_text()).body:
+                  mods = []
+                  if isinstance(node, ast.Import):
+                      mods = [a.name.split(".")[0] for a in node.names]
+                  elif isinstance(node, ast.ImportFrom) and node.level == 0 and node.module:
+                      mods = [node.module.split(".")[0]]
+                  for m in mods:
+                      if m in forbidden:
+                          viol.append(f"{p}: {m}")
+          if viol:
+              print("\n".join(viol)); sys.exit(1)
+          print("phase-3 provider-neutrality scan clean")
+          PY
+
+      - name: Import-side-effect safety (no network/socket/process at import)
+        run: |
+          python - <<'PY'
+          import sys
+          sys.path.insert(0, "packages/capabilities/cloud-scaling-controller/src")
+          import socket
+          _orig = socket.socket
+          def _boom(*a, **k):
+              raise AssertionError("import created a socket")
+          socket.socket = _boom
+          try:
+              import ugence_cloud_scaling_controller.planning as _p  # noqa: F401
+          finally:
+              socket.socket = _orig
+          print("phase-3 import-side-effect safety OK")
+          PY
+
+      - name: Version / manifest single-source consistency
+        run: python -m pytest "$PKG/tests/packaging/test_single_source.py" -q
+
+      - name: Build wheel + Phase 3 installed-wheel smoke
+        run: |
+          python -m build "$PKG" -o "$PKG/dist"
+          python -m venv /tmp/csc-p3
+          /tmp/csc-p3/bin/python -m pip install --quiet --find-links "$PKG/dist" ugence-cloud-scaling-controller
+          /tmp/csc-p3/bin/python -I - <<'PY'
+          from datetime import datetime, timedelta, timezone
+          import ugence_cloud_scaling_controller as U
+          from ugence_cloud_scaling_controller import (
+              CanonicalCapacityState, CapacitySubject,
+              CanonicalCapacitySeries, ForecastTarget, ForecastHorizon,
+              PersistenceForecaster, UncertaintyConfig, forecast_with_evidence,
+              NormalizationPolicy, NormalizationMethod,
+              recommend_capacity_action, CapacityActionRecommendation,
+              CostBook, CostEvidence, Money, CostBasis, OperatingConstraints, RecommendationPolicy,
+          )
+          from ugence_cloud_scaling_controller.canonical import CapacityState
+          from ugence_cloud_scaling_controller.forecasting import UncertaintyMethod
+          assert U.__version__ == "0.4.0", U.__version__
+          app = CapacitySubject(workload_id="app", tenant_id="t1")
+          t0 = datetime(2026, 1, 1, tzinfo=timezone.utc)
+          hist = [CanonicalCapacityState(subject=app, observed_at=t0 + timedelta(seconds=60*i),
+                  capacity=CapacityState(running_replicas=8)) for i in range(4)]
+          series = CanonicalCapacitySeries.build(hist)
+          np = NormalizationPolicy(policy_id="np", method_by_signal={"cpu": NormalizationMethod.PERCENT_TO_RATIO})
+          cutoff = t0 + timedelta(seconds=180)
+          fe = forecast_with_evidence(series, ForecastTarget.RUNNING_REPLICAS, cutoff,
+                  ForecastHorizon(seconds=900.0), PersistenceForecaster(),
+                  normalization_policy=np, uncertainty_config=UncertaintyConfig(method=UncertaintyMethod.NONE))
+          st = CanonicalCapacityState(subject=app, observed_at=cutoff, capacity=CapacityState(running_replicas=6))
+          cb = CostBook(subject=app, entries=(CostEvidence(app, Money(1000, "USD"),
+                  CostBasis.PER_REPLICA_HOUR, t0 - timedelta(hours=1), t0 + timedelta(hours=10)),))
+          out = recommend_capacity_action(fe, st, cb, OperatingConstraints(min_capacity=1, max_capacity=50),
+                  RecommendationPolicy(), recommendation_time=cutoff + timedelta(seconds=10), validity_seconds=600.0)
+          assert isinstance(out, CapacityActionRecommendation), type(out)
+          d = out.to_canonical_dict()
+          assert d["advisory_only"] is True and d["actuation_performed"] is False
+          assert d["authorization_performed"] is False and d["effect_verified"] is False
+          assert CapacityActionRecommendation.from_dict(d).digest() == out.digest()
+          # imports resolve from the INSTALLED wheel, not the source tree
+          assert "site-packages" in U.__file__, U.__file__
+          print("Phase 3 installed-wheel smoke OK:", out.selected_plan.action_kind.value)
+          PY
+
+      - name: Upload Phase 3 evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cloud-scaling-controller-phase3-evidence
+          path: |
+            packages/capabilities/cloud-scaling-controller/dist/*
+          if-no-files-found: warn

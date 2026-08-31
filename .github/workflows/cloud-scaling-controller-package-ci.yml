@@ -117,13 +117,19 @@ jobs:
       - name: CLI smoke test (offline)
         run: |
           python - <<'PY'
-          import json, subprocess, sys
+          import json, pathlib, re, subprocess, sys
           src = "packages/capabilities/cloud-scaling-controller/src"
+          # Track the single source of truth (version.py) rather than a hardcoded
+          # literal, so a version bump can never silently drift this smoke check.
+          expected_version = re.search(
+              r'__version__\s*=\s*"([^"]+)"',
+              pathlib.Path(src, "ugence_cloud_scaling_controller", "version.py").read_text(),
+          ).group(1)
           def run(args, **kw):
               return subprocess.run([sys.executable, "-m", "ugence_cloud_scaling_controller.cli", *args],
                                     env={"PYTHONPATH": src, "PATH": __import__("os").environ["PATH"]},
                                     capture_output=True, text=True, **kw)
-          v = run(["version"]); assert v.returncode == 0 and "0.1.1" in v.stdout, v.stderr
+          v = run(["version"]); assert v.returncode == 0 and expected_version in v.stdout, (expected_version, v.stdout, v.stderr)
           d = run(["demo"]); assert d.returncode == 0 and '"advisory_only": true' in d.stdout, d.stderr
           e = run(["evaluate", "--input", "-"], input='{"metrics":{"cpu":0.9},"current_replicas":3}')
           assert e.returncode == 0 and '"schema_version": "1.1"' in e.stdout, e.stderr

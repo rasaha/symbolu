@@ -9,7 +9,7 @@ This module implements the Stitching Encoder for Symbol-U, providing:
 - Constraint enforcement and audit trails
 
 Specification Reference:
-    docs/architecture/STITCHING_FUSION_SPECIFICATION.md
+    Project_documentation/repository/docs/architecture/STITCHING_FUSION_SPECIFICATION.md
 
 Patent Reference:
     Claim [2]  - Relevance scoring with resonance coupling

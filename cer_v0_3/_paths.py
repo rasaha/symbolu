@@ -13,6 +13,10 @@ import sys
 _HERE = os.path.dirname(os.path.abspath(__file__))
 _REPO_ROOT = os.path.dirname(_HERE)
 _ACTIONGATE_ROOT = os.path.join(_REPO_ROOT, "cyber_security", "action_gate_reference")
-for _p in (_ACTIONGATE_ROOT, _REPO_ROOT):
+# The clean-room canonicalizer now lives in the ``ugence-jcs`` leaf distribution.
+# Adding its source root keeps a bare source checkout working without an editable
+# install. This is a path bootstrap only; it imports nothing.
+_JCS_SRC = os.path.join(_REPO_ROOT, "packages", "jcs", "src")
+for _p in (_ACTIONGATE_ROOT, _JCS_SRC, _REPO_ROOT):
     if _p not in sys.path:
         sys.path.insert(0, _p)

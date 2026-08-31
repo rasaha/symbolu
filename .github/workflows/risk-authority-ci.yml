@@ -1,0 +1,63 @@
+name: risk-authority-ci
+
+# Scoped CI for the independent ugence-risk-authority leaf package (RA-1..RA-4).
+# Runs the conformance suite (unit / contract / integration / adversarial —
+# deterministic, offline, stdlib-only), then builds the wheel and proves an
+# isolated clean-venv (--no-index) install with no third-party dependency and no
+# monorepo path. Triggered only by changes to the package or this workflow.
+
+on:
+  pull_request:
+    paths:
+      - "packages/risk_authority/**"
+      - ".github/workflows/risk-authority-ci.yml"
+  push:
+    branches:
+      - "claude/risk-authority-**"
+      - "claude/setup-symbolu-monorepo-**"
+    paths:
+      - "packages/risk_authority/**"
+      - ".github/workflows/risk-authority-ci.yml"
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  package-suite:
+    name: Risk Authority conformance suite (source)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install tooling
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest build
+      - name: Conformance suite (unit, contract, integration, adversarial)
+        run: python -m pytest packages/risk_authority/tests -q
+      - name: Deny-heavy invariant subset (explicit gate)
+        run: |
+          python -m pytest \
+            packages/risk_authority/tests/adversarial \
+            packages/risk_authority/tests/contract \
+            packages/risk_authority/tests/seam -q
+
+  isolated-install:
+    name: Wheel build + isolated single-wheel installation verification
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install build tooling
+        run: |
+          python -m pip install --upgrade pip
+          pip install build pytest
+      - name: Build wheel + sdist, install into a clean --no-index venv, run the leaf proof
+        run: python packages/risk_authority/verify_risk_authority_distribution.py

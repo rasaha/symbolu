@@ -1,0 +1,467 @@
+{
+  "curated_api_module": "ugence_cloud_scaling_producer_attestation",
+  "distribution": "ugence-cloud-scaling-producer-attestation",
+  "namespace": "ugence_cloud_scaling_producer_attestation",
+  "note": "Machine-readable snapshot of the curated public API (ugence_cloud_scaling_producer_attestation.__all__). tests/packaging/test_public_api.py asserts this file equals the live package surface; scripts/verify_isolated_install.py asserts the same for the built wheel and for a genuinely offline isolated install. Regenerate with scripts/generate_public_api.py when the curated API changes deliberately.",
+  "package_version": "0.2.0",
+  "symbols": {
+    "ANCHOR_LIFECYCLE_OUTCOMES": {
+      "kind": "frozenset",
+      "values": [
+        "ProducerAuthenticityOutcome.ANCHOR_DISABLED",
+        "ProducerAuthenticityOutcome.ANCHOR_EXPIRED",
+        "ProducerAuthenticityOutcome.ANCHOR_NOT_IN_WINDOW",
+        "ProducerAuthenticityOutcome.ANCHOR_NOT_YET_VALID",
+        "ProducerAuthenticityOutcome.ANCHOR_REVOKED"
+      ]
+    },
+    "CloudScalingProducerAttestationError": {
+      "kind": "class",
+      "methods": [
+        "add_note",
+        "with_traceback"
+      ]
+    },
+    "DIGEST_PREFIX": {
+      "kind": "constant",
+      "value": "sha256:"
+    },
+    "DenyAllTrustAnchorDirectory": {
+      "kind": "class",
+      "methods": [
+        "resolve"
+      ]
+    },
+    "Ed25519ProducerSignatureVerifier": {
+      "kind": "class",
+      "methods": [
+        "verify_producer_signature"
+      ]
+    },
+    "KNOWN_POLICY_SIGNING_PURPOSES": {
+      "kind": "frozenset",
+      "values": [
+        "cloud_scaling.policy_signing",
+        "cloud_scaling.policy_target_binding",
+        "policy_authority.policy_signing",
+        "ugence.policy-authority.policy-signing",
+        "ugence.policy_authority.policy_signing"
+      ]
+    },
+    "KeyRevocation": {
+      "fields": [
+        "effective_at",
+        "reason_ref"
+      ],
+      "kind": "dataclass"
+    },
+    "PHASE_5A_V1_SCHEMA_VERSION": {
+      "kind": "constant",
+      "value": "cloud-scaling-producer-attestation-evidence-1"
+    },
+    "PRODUCER_ATTESTATION_CAPABILITY": {
+      "kind": "constant",
+      "value": "CLOUD_SCALING_RECOMMENDATION_ATTESTATION"
+    },
+    "PRODUCER_ATTESTATION_SIGNATURE_ALGORITHM": {
+      "kind": "constant",
+      "value": "ed25519"
+    },
+    "PRODUCER_ATTESTATION_SIGNATURE_ENCODING": {
+      "kind": "constant",
+      "value": "ugence.trusted-evidence-authority/encoding/base16-lower/v1"
+    },
+    "PRODUCER_ATTESTATION_SIGNATURE_PROFILE": {
+      "kind": "constant",
+      "value": "ugence.trusted-evidence-authority/signature/ed25519-sha512-pure/v1"
+    },
+    "PRODUCER_ATTESTATION_V2_SCHEMA_VERSION": {
+      "kind": "constant",
+      "value": "ugence.cloud-scaling/producer-attestation/v2"
+    },
+    "PRODUCER_ATTESTATION_V2_SIGNING_PURPOSE": {
+      "kind": "constant",
+      "value": "cloud_scaling.recommendation_producer_attestation.v2"
+    },
+    "ProducerAttestationCanonicalFieldError": {
+      "kind": "class",
+      "methods": [
+        "add_note",
+        "with_traceback"
+      ]
+    },
+    "ProducerAttestationConfigurationError": {
+      "kind": "class",
+      "methods": [
+        "add_note",
+        "with_traceback"
+      ]
+    },
+    "ProducerAttestationContractError": {
+      "kind": "class",
+      "methods": [
+        "add_note",
+        "with_traceback"
+      ]
+    },
+    "ProducerAttestationExactTypeError": {
+      "kind": "class",
+      "methods": [
+        "add_note",
+        "with_traceback"
+      ]
+    },
+    "ProducerAttestationRefusal": {
+      "fields": [
+        "outcome",
+        "detail"
+      ],
+      "kind": "dataclass"
+    },
+    "ProducerAttestationSignerPort": {
+      "kind": "class",
+      "methods": [
+        "sign_producer_attestation"
+      ]
+    },
+    "ProducerAttestationSigningBoundaryError": {
+      "kind": "class",
+      "methods": [
+        "add_note",
+        "with_traceback"
+      ]
+    },
+    "ProducerAttestationSigningInput": {
+      "fields": [
+        "signed_input",
+        "producer_id",
+        "issuer",
+        "producer_key_id",
+        "signature_profile",
+        "issuance_token"
+      ],
+      "kind": "dataclass"
+    },
+    "ProducerAttestationV2": {
+      "fields": [
+        "producer_id",
+        "issuer",
+        "producer_key_id",
+        "tenant_id",
+        "subject_id",
+        "subject_type",
+        "recommendation_id",
+        "recommendation_digest",
+        "signature",
+        "signing_payload_digest",
+        "issued_at",
+        "signing_purpose",
+        "signature_algorithm",
+        "signature_profile",
+        "signature_encoding",
+        "schema_version"
+      ],
+      "kind": "dataclass"
+    },
+    "ProducerAttestationVerifier": {
+      "kind": "class",
+      "methods": [
+        "verify"
+      ]
+    },
+    "ProducerAuthenticityOutcome": {
+      "kind": "enum",
+      "values": [
+        "VERIFIED",
+        "ATTESTATION_ABSENT",
+        "UNSUPPORTED_EXACT_TYPE",
+        "ATTESTATION_MALFORMED",
+        "UNSUPPORTED_SCHEMA_VERSION",
+        "UNSUPPORTED_SIGNING_PURPOSE",
+        "UNSUPPORTED_PROFILE",
+        "UNSUPPORTED_ENCODING",
+        "UNSUPPORTED_ALGORITHM",
+        "RECOMMENDATION_ID_MISMATCH",
+        "RECOMMENDATION_DIGEST_MISMATCH",
+        "WRONG_TENANT",
+        "WRONG_SUBJECT",
+        "ANCHOR_UNKNOWN",
+        "WRONG_AUTHORITY",
+        "WRONG_CAPABILITY",
+        "ANCHOR_DISABLED",
+        "ANCHOR_REVOKED",
+        "ANCHOR_NOT_YET_VALID",
+        "ANCHOR_EXPIRED",
+        "ANCHOR_NOT_IN_WINDOW",
+        "PAYLOAD_MISMATCH",
+        "MALFORMED_SIGNATURE",
+        "SIGNATURE_INVALID",
+        "VERIFICATION_UNAVAILABLE",
+        "INVARIANT_VIOLATION",
+        "INDETERMINATE"
+      ]
+    },
+    "ProducerAuthenticityResult": {
+      "fields": [
+        "verified_attestation",
+        "refusal"
+      ],
+      "kind": "dataclass"
+    },
+    "ProducerSignatureVerifierPort": {
+      "kind": "class",
+      "methods": [
+        "verify_producer_signature"
+      ]
+    },
+    "REFERENCE_GRADE_RESOLVERS": {
+      "kind": "tuple"
+    },
+    "REFERENCE_GRADE_SIGNERS": {
+      "kind": "tuple"
+    },
+    "REFUSAL_OUTCOMES": {
+      "kind": "frozenset",
+      "values": [
+        "ProducerAuthenticityOutcome.ANCHOR_DISABLED",
+        "ProducerAuthenticityOutcome.ANCHOR_EXPIRED",
+        "ProducerAuthenticityOutcome.ANCHOR_NOT_IN_WINDOW",
+        "ProducerAuthenticityOutcome.ANCHOR_NOT_YET_VALID",
+        "ProducerAuthenticityOutcome.ANCHOR_REVOKED",
+        "ProducerAuthenticityOutcome.ANCHOR_UNKNOWN",
+        "ProducerAuthenticityOutcome.ATTESTATION_ABSENT",
+        "ProducerAuthenticityOutcome.ATTESTATION_MALFORMED",
+        "ProducerAuthenticityOutcome.INDETERMINATE",
+        "ProducerAuthenticityOutcome.INVARIANT_VIOLATION",
+        "ProducerAuthenticityOutcome.MALFORMED_SIGNATURE",
+        "ProducerAuthenticityOutcome.PAYLOAD_MISMATCH",
+        "ProducerAuthenticityOutcome.RECOMMENDATION_DIGEST_MISMATCH",
+        "ProducerAuthenticityOutcome.RECOMMENDATION_ID_MISMATCH",
+        "ProducerAuthenticityOutcome.SIGNATURE_INVALID",
+        "ProducerAuthenticityOutcome.UNSUPPORTED_ALGORITHM",
+        "ProducerAuthenticityOutcome.UNSUPPORTED_ENCODING",
+        "ProducerAuthenticityOutcome.UNSUPPORTED_EXACT_TYPE",
+        "ProducerAuthenticityOutcome.UNSUPPORTED_PROFILE",
+        "ProducerAuthenticityOutcome.UNSUPPORTED_SCHEMA_VERSION",
+        "ProducerAuthenticityOutcome.UNSUPPORTED_SIGNING_PURPOSE",
+        "ProducerAuthenticityOutcome.VERIFICATION_UNAVAILABLE",
+        "ProducerAuthenticityOutcome.WRONG_AUTHORITY",
+        "ProducerAuthenticityOutcome.WRONG_CAPABILITY",
+        "ProducerAuthenticityOutcome.WRONG_SUBJECT",
+        "ProducerAuthenticityOutcome.WRONG_TENANT"
+      ]
+    },
+    "ReferenceEd25519ProducerAttestationSigner": {
+      "kind": "class",
+      "methods": [
+        "sign_producer_attestation",
+        "trust_anchor"
+      ]
+    },
+    "SUBJECT_TYPE_CAPACITY_SUBJECT": {
+      "kind": "constant",
+      "value": "cloud_scaling.capacity_subject"
+    },
+    "SUPPORTED_V2_SIGNATURE_ALGORITHMS": {
+      "kind": "frozenset",
+      "values": [
+        "ed25519"
+      ]
+    },
+    "SUPPORTED_V2_SIGNING_PURPOSES": {
+      "kind": "frozenset",
+      "values": [
+        "cloud_scaling.recommendation_producer_attestation.v2"
+      ]
+    },
+    "StaticTrustAnchorDirectory": {
+      "kind": "class",
+      "methods": [
+        "resolve",
+        "with_anchor"
+      ]
+    },
+    "TrustAnchorCapability": {
+      "kind": "enum",
+      "values": [
+        "EVIDENCE_PRODUCTION",
+        "RECEIPT_ISSUANCE",
+        "CLOUD_SCALING_RECOMMENDATION_ATTESTATION"
+      ]
+    },
+    "TrustAnchorCoordinate": {
+      "fields": [
+        "authority_id",
+        "key_id",
+        "capability"
+      ],
+      "kind": "dataclass"
+    },
+    "TrustAnchorRecord": {
+      "fields": [
+        "authority_id",
+        "key_id",
+        "capability",
+        "public_key",
+        "trust_anchor_set_id",
+        "trust_anchor_set_version",
+        "signature_profile",
+        "signature_encoding",
+        "effective_from",
+        "effective_to",
+        "disabled",
+        "revocation"
+      ],
+      "kind": "dataclass"
+    },
+    "TrustAnchorResolution": {
+      "fields": [
+        "coordinate",
+        "anchor",
+        "refusal_reason"
+      ],
+      "kind": "dataclass"
+    },
+    "TrustAnchorResolverPort": {
+      "kind": "class",
+      "methods": [
+        "resolve"
+      ]
+    },
+    "VERIFICATION_PROFILE": {
+      "kind": "constant",
+      "value": "ugence.cloud-scaling/producer-authenticity/v1"
+    },
+    "VERIFICATION_PROFILE_VERSION": {
+      "kind": "constant",
+      "value": "1"
+    },
+    "VerifiedArtifactIntegrityError": {
+      "kind": "class",
+      "methods": [
+        "add_note",
+        "with_traceback"
+      ]
+    },
+    "VerifiedProducerAttestation": {
+      "fields": [
+        "candidate_digest",
+        "recommendation_id",
+        "recommendation_digest",
+        "tenant_id",
+        "subject_id",
+        "subject_type",
+        "attestation_digest",
+        "attested_producer_id",
+        "verified_issuer",
+        "verified_key_id",
+        "trust_anchor_coordinate_digest",
+        "trust_anchor_record_digest",
+        "trust_anchor_capability",
+        "signature_profile",
+        "signature_encoding",
+        "attestation_issued_at_fact",
+        "verified_as_of_fact",
+        "anchor_effective_from_fact",
+        "anchor_effective_to_fact",
+        "verification_profile",
+        "verification_profile_version",
+        "artifact_digest",
+        "construction_token"
+      ],
+      "kind": "dataclass"
+    },
+    "__version__": {
+      "kind": "constant",
+      "value": "0.2.0"
+    },
+    "anchor_coordinate_digest": {
+      "kind": "function",
+      "parameters": [
+        "coordinate"
+      ]
+    },
+    "anchor_lifecycle_outcome": {
+      "kind": "function",
+      "parameters": [
+        "anchor",
+        "as_of"
+      ]
+    },
+    "anchor_record_digest": {
+      "kind": "function",
+      "parameters": [
+        "anchor"
+      ]
+    },
+    "canonical_bytes": {
+      "kind": "function",
+      "parameters": [
+        "value"
+      ]
+    },
+    "canonical_digest": {
+      "kind": "function",
+      "parameters": [
+        "value"
+      ]
+    },
+    "is_canonical_digest": {
+      "kind": "function",
+      "parameters": [
+        "value"
+      ]
+    },
+    "mint_producer_attestation": {
+      "kind": "function",
+      "parameters": [
+        "signer",
+        "tenant_id",
+        "subject_id",
+        "recommendation_id",
+        "recommendation_digest",
+        "issued_at",
+        "subject_type",
+        "production_mode"
+      ]
+    },
+    "producer_anchor_coordinate": {
+      "kind": "function",
+      "parameters": [
+        "issuer",
+        "producer_key_id"
+      ]
+    },
+    "producer_attestation_signing_payload": {
+      "kind": "function",
+      "parameters": [
+        "producer_id",
+        "issuer",
+        "producer_key_id",
+        "tenant_id",
+        "subject_id",
+        "subject_type",
+        "recommendation_id",
+        "recommendation_digest",
+        "issued_at",
+        "signing_purpose",
+        "signature_algorithm",
+        "signature_profile",
+        "signature_encoding"
+      ]
+    },
+    "require_production_resolver": {
+      "kind": "function",
+      "parameters": [
+        "resolver"
+      ]
+    },
+    "require_verified_producer_attestation": {
+      "kind": "function",
+      "parameters": [
+        "value",
+        "name"
+      ]
+    }
+  }
+}

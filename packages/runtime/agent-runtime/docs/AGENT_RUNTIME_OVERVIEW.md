@@ -22,6 +22,12 @@ coordinated, resumable, observable execution:
 4. It **checkpoints** coordination state and can **recover** it after a restart —
    without making any external call during recovery.
 5. It emits a deterministic, replayable **event stream**.
+6. It owns the **canonical execution state** — one deterministic, versioned,
+   integrity-protected snapshot of the execution trajectory (identity, causation, action
+   fingerprint reference, authority/artifact lineage references, `state_digest`) that
+   multiple agents and future governance/assurance modules can reference. It records the
+   trajectory; it never authors policy, mints authority, or selects agents. See
+   [`AGENT_RUNTIME_CANONICAL_EXECUTION_STATE.md`](AGENT_RUNTIME_CANONICAL_EXECUTION_STATE.md).
 
 ## What the runtime is not
 

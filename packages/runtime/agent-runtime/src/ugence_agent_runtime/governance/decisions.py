@@ -14,10 +14,23 @@ or malformed evaluation as CLEAR (fail closed).
 from __future__ import annotations
 
 from enum import Enum
-from typing import Optional, Tuple
+from typing import Callable, Optional, Tuple
 
 from ..models.proposal import TransitionProposal
 from .interfaces import GovernanceDisposition, GovernanceEvaluation
+
+# A neutral pre-effect authority-recheck callable (RA-6 §8 "last-mile TOCTOU").
+# The runtime stays concrete-free: it knows nothing about Risk Authority, epochs,
+# or revocation. An external governance integration may supply a callable that,
+# immediately before the irreversible effect, re-verifies that the authority the
+# CLEAR was bound to is *still* valid (not expired, not revoked, not stale-epoch,
+# and status fresh enough). It returns ``(ok, reason_codes)`` and MUST NOT mint
+# authority or mutate state — it can only confirm or fail closed. When no callable
+# is configured, behavior is exactly as before (fully backward compatible).
+AuthorityRecheck = Callable[
+    [Optional[GovernanceEvaluation], TransitionProposal, float],
+    Tuple[bool, Tuple[str, ...]],
+]
 
 
 class RuntimeDirective(str, Enum):
@@ -71,18 +84,40 @@ CLEAR_REJECTED_NO_REFERENCE = "GOVERNANCE_CLEAR_MISSING_REFERENCE"
 CLEAR_REJECTED_EXPIRED = "GOVERNANCE_CLEAR_EXPIRED"
 CLEAR_REJECTED_MISSING_CORRELATION = "GOVERNANCE_CLEAR_MISSING_CORRELATION"
 CLEAR_REJECTED_CORRELATION = "GOVERNANCE_CLEAR_CORRELATION_MISMATCH"
+# Emitted when a configured last-mile authority recheck fails immediately before
+# the effect (RA-6 §8): the CLEAR was validly bound, but the authority it rested
+# on is no longer valid at the commit point (expired / revoked / stale epoch /
+# status too stale). Fail closed.
+CLEAR_REJECTED_AUTHORITY_STALE = "GOVERNANCE_CLEAR_AUTHORITY_STALE"
+# Emitted when the last-mile authority-recheck hook itself misbehaves — it raises,
+# or returns anything other than the exact ``(bool, reasons)`` shape (RA-6 §8,
+# audit F-1). Any such invalid recheck is normalized to a deterministic
+# fail-closed rejection: the provider is NEVER invoked on an invalid recheck, and
+# a malformed-but-truthy result can never be mistaken for "permit".
+AUTHORITY_RECHECK_ERROR = "GOVERNANCE_AUTHORITY_RECHECK_ERROR"
 
 
 def validate_clearance(
     evaluation: Optional[GovernanceEvaluation],
     proposal: TransitionProposal,
     now: float,
+    authority_recheck: "Optional[AuthorityRecheck]" = None,
 ) -> Tuple[bool, Tuple[str, ...]]:
     """Decide whether a CLEAR result may be acted on for this exact proposal.
 
     Returns ``(permitted, reason_codes)``. Fails closed: any missing, mismatched,
     unreferenced, or expired binding yields ``(False, reasons)``. This is the sole
     gate between a governance result and a provider invocation.
+
+    ``authority_recheck`` (optional, RA-6 §8) is a neutral last-mile hook run
+    ONLY after every existing binding check has passed — i.e. immediately before
+    the irreversible effect. If supplied and it returns ``(False, reasons)`` the
+    clearance is rejected fail-closed with :data:`CLEAR_REJECTED_AUTHORITY_STALE`
+    plus the hook's reasons. A hook that raises, or returns anything other than
+    the exact ``(bool, reasons)`` shape, is normalized to the same fail-closed
+    rejection carrying :data:`AUTHORITY_RECHECK_ERROR` (audit F-1) — never a
+    permit. When it is ``None`` (the default) behavior is identical to before —
+    the runtime adds no authority concept of its own.
     """
     if evaluation is None:
         return False, (CLEAR_REJECTED_MISSING,)
@@ -120,4 +155,65 @@ def validate_clearance(
 
     if reasons:
         return False, tuple(reasons)
+
+    # Last-mile authority re-verification (RA-6 §8): the CLEAR is validly bound to
+    # this exact proposal; re-confirm the underlying authority is STILL valid at
+    # the commit point. This runs last, closest to the effect, and can only fail
+    # closed — it never broadens a decision.
+    if authority_recheck is not None:
+        ok, recheck_reasons = _invoke_authority_recheck(
+            authority_recheck, evaluation, proposal, now
+        )
+        if not ok:
+            return False, (CLEAR_REJECTED_AUTHORITY_STALE,) + recheck_reasons
+
     return True, ()
+
+
+def _invoke_authority_recheck(
+    authority_recheck: "AuthorityRecheck",
+    evaluation: Optional[GovernanceEvaluation],
+    proposal: TransitionProposal,
+    now: float,
+) -> Tuple[bool, Tuple[str, ...]]:
+    """Run the last-mile authority-recheck hook inside a narrow fail-closed boundary.
+
+    Returns a normalized ``(ok, reasons)`` in which ``ok`` is strictly a ``bool``
+    and ``reasons`` a tuple of ``str``. The hook contract is ``(bool, reasons)``;
+    any exception raised by the hook, or any result that does not match that exact
+    shape, is converted to a deterministic fail-closed rejection carrying
+    :data:`AUTHORITY_RECHECK_ERROR`. Only the hook call itself is guarded — an
+    invalid recheck can only DENY, never permit, and unrelated runtime errors in
+    the surrounding clearance logic are not swallowed (RA-6 §8, audit F-1).
+    """
+
+    try:
+        result = authority_recheck(evaluation, proposal, now)
+    except Exception:
+        return False, (AUTHORITY_RECHECK_ERROR,)
+    return _normalize_recheck_result(result)
+
+
+def _normalize_recheck_result(result: object) -> Tuple[bool, Tuple[str, ...]]:
+    """Validate a recheck result's shape; anything malformed ⇒ fail-closed rejection.
+
+    Guards every malformed shape observed in the F-1 reproduction, including the
+    fail-open ones: a truthy non-bool first element (``"allow"``, ``1``) must
+    never read as "permit", and a bare ``str`` reasons value must not fragment
+    into per-character reason codes.
+    """
+
+    if not isinstance(result, (tuple, list)) or len(result) != 2:
+        return False, (AUTHORITY_RECHECK_ERROR,)
+    ok, reasons = result
+    if not isinstance(ok, bool):
+        return False, (AUTHORITY_RECHECK_ERROR,)
+    if isinstance(reasons, (str, bytes)):
+        return False, (AUTHORITY_RECHECK_ERROR,)
+    try:
+        normalized = tuple(reasons)
+    except TypeError:
+        return False, (AUTHORITY_RECHECK_ERROR,)
+    if not all(isinstance(r, str) for r in normalized):
+        return False, (AUTHORITY_RECHECK_ERROR,)
+    return ok, normalized

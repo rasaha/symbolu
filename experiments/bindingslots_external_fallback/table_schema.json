@@ -1,0 +1,13 @@
+{
+  "schema": "bindingslots_external_fallback/table_schema/v1",
+  "backend": "SQLite (stdlib sqlite3)",
+  "table": "ephemeral_memory",
+  "columns": {
+    "session_id": "TEXT", "tenant_id": "TEXT", "memory_key": "TEXT", "fact_or_entity_id": "TEXT",
+    "typed_value": "TEXT", "value_type": "TEXT", "source_event_id": "TEXT", "evidence_reference": "TEXT",
+    "version": "INTEGER", "created_at": "REAL", "expires_at": "REAL", "authorization_scope": "TEXT", "deleted": "INTEGER"
+  },
+  "primary_key": "(session_id, tenant_id, memory_key, version)",
+  "never_stores": ["model hidden states", "slot tensors", "gradients", "answer labels", "evaluation ground truth", "arbitrary unrelated prompts"],
+  "forbidden_content_guard": "write_fact refuses value_type/typed_value containing hidden_state/slot_tensor/gradient/ground_truth/answer_label"
+}

@@ -3,6 +3,14 @@
 AST-scans every module in ``ugence_governance_contracts`` and asserts it imports
 no capability, product, platform, console, provider-framework, or research
 package, and no third-party runtime dependency.
+
+This is also the **cycle proof** for the M-3R.3 assessed-system identity
+contract. ``AssessedSystemBinding`` lives here (UVI ADR §20) and is consumed by
+``ugence-agent-value-readiness``; the arrow must point one way only. Because
+every binding field is a platform-neutral primitive, this leaf needs no UVI
+policy shape, readiness enum, indicator type or assessment context to define it,
+so ``governance-contracts -> uvi-policy-contracts -> governance-contracts`` is
+structurally impossible, not merely avoided by convention.
 """
 
 from __future__ import annotations
@@ -18,6 +26,12 @@ SELF = "ugence_governance_contracts"
 _STDLIB = set(getattr(sys, "stdlib_module_names", set()))
 
 PROHIBITED = {
+    # Higher-level UVI / authority / risk packages. Listing them by name makes
+    # the cycle governance-contracts -> uvi-policy-contracts -> governance-contracts
+    # (and the readiness equivalent) a test failure rather than an import error.
+    "ugence_agent_value_readiness", "ugence_uvi_policy_contracts",
+    "ugence_policy_authority", "risk_authority", "ugence_governed_value",
+    "governed_value", "ugence_decision_authority", "ugence_risk_authority",
     "governance_providers", "decision_governance", "actiongate_provider",
     "tap_provider", "baseline_action_provider", "baseline_assertion_provider",
     "ai_hiring", "domains", "applications", "ugence_console_api",

@@ -1,7 +1,7 @@
 """Tests for the Tier-A detector + APCY model (Track B).
 
 Validates the TOOLING against the pre-registered spec
-(`docs/cloud_scaling_real_validation/TIER_A_DETECTOR_SPEC.md` §5a) on the committed
+(`Project_documentation/governance/docs/cloud_scaling_real_validation/TIER_A_DETECTOR_SPEC.md` §5a) on the committed
 synthetic schema fixture. These tests assert tool behavior; they assert **no** market
 number — the fixture is a self-test and the APCY trip-wire is expected to refuse it.
 """

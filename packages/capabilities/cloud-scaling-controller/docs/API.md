@@ -17,7 +17,7 @@ Import namespace: `ugence_cloud_scaling_controller`.
 | `ContractError` | exception | Raised on invalid input (fail-closed). |
 | `evaluate` | function | One-shot convenience: `evaluate(obs, config=None) -> ScalingRecommendation`. |
 | `SCHEMA_VERSION` | str | `"1.1"` (output schema). |
-| `__version__` | str | `"0.1.1"`. |
+| `__version__` | str | `"0.3.0"`. |
 
 ## `CloudScalingController`
 
@@ -92,3 +92,55 @@ rec = ctrl.recommend(ScalingObservation(
 ))
 print(rec.to_json(indent=2))
 ```
+
+## Canonical Capacity Intelligence (Phase 1)
+
+Subpackage `ugence_cloud_scaling_controller.canonical` — an **additive**, pure-stdlib
+observation → normalization/projection → recommendation-evidence layer built around the
+**unchanged** controller. It adds no dependency, no actuation, and no authority
+integration. The five-signal decision kernel is not modified.
+
+### Types
+
+| Name | Kind | Purpose |
+|------|------|---------|
+| `CanonicalCapacityState` | frozen dataclass | Versioned, immutable, provider-neutral rich observation (`capacity-state-1`). All categories optional (partial observations). |
+| `CapacitySubject` | frozen dataclass | Provider-neutral subject/scope identity (workload_id required; tenant/resource/environment/cluster/region/zone optional). |
+| `Measurement` / `Unit` | frozen dataclass / enum | A value paired with an explicit unit (ratio, percent, ms, seconds, count, per_second, rate, …); fail-closed validation. |
+| `ObservationProvenance` / `ObservationSourceType` | frozen dataclass / enum | First-class provenance; distinguishes `observed_at` (measurement time) from `collected_at` (record time). Missing provenance is explicit (`UNKNOWN`). |
+| `WorkloadState`, `PerformanceState`, `InfrastructureState`, `CapacityState`, `ReliabilityState`, `DeploymentState`, `EconomicsState`, `TopologyState`, `ForecastObservation` | frozen dataclasses | Optional observation categories. `economics`/`forecast` are informational and never drive a recommendation. |
+| `NormalizationPolicy` / `NormalizationMethod` / `NormalizedSignal` | frozen dataclass / enum / frozen dataclass | Explicit, policy-driven normalization (`capacity-normalization-policy-1`). Never invents a threshold; fails closed on NaN/inf, unsupported units/methods, zero/negative thresholds, out-of-range without clamping. |
+| `ControllerProjection` / `project_to_scaling_observation` | frozen dataclass / function | Deterministic projection onto the existing `ScalingObservation` (`capacity-projection-1`). Discloses projected/normalized signals, used/ignored canonical fields, missing controller signals, warnings. |
+| `CapacityDecisionEvidence` / `recommend_with_evidence` / `build_capacity_decision_evidence` | frozen dataclass / functions | Immutable recommendation evidence (`capacity-evidence-1`) with a deterministic `sha256:` content-identity digest. Built only through the controlled service path so it binds to the *real* projection and *real* recommendation (unforgeable). |
+| `CapacityObservationSource` | Protocol | Read-only observation-source boundary. `FixtureObservationSource` / `ReplayObservationSource` ship; network adapters are future/opt-in. |
+
+### Projection mapping
+
+```text
+infrastructure.cpu_utilization     -> metrics["cpu"]
+infrastructure.memory_utilization  -> metrics["memory"]
+performance.latency_p99            -> metrics["latency_p99"]   (p95 only with explicit opt-in, disclosed)
+reliability.error_rate             -> metrics["error_rate"]
+workload.queue_depth               -> metrics["queue_depth"]
+deployment.deploy_active           -> deploy_active
+reliability.restart_count          -> recent_pod_restarts
+capacity.running_replicas          -> current_replicas         (REQUIRED; never ready/healthy/desired)
+time_phase                         -> phase
+correlation_id                     -> correlation_id
+observed_at                        -> timestamp (epoch seconds)
+```
+
+`current_replicas` maps to the controller's documented *current running replica count*
+(`capacity.running_replicas`); `ready`/`healthy`/`desired` are distinct and never
+substituted — the projection fails closed if `running_replicas` is absent.
+
+### Evidence digest (identity, not authority)
+
+The `sha256:`-prefixed digest is computed over a documented, domain-separated canonical
+form (sorted keys, NFC strings, RFC3339-UTC timestamps, floats round-tripped and
+NaN/inf-rejected, nulls preserved). It **excludes** `evidence_produced_at` and the
+human-readable `controller_explanation` (which embeds the disclosed nondeterministic
+`identity_deviation` line), so it is reproducible for identical
+`(state, policy, config, controller history)`. It is a **content identity only** — not a
+signature, risk verdict, authorization, control-satisfaction claim, or execution
+permission.

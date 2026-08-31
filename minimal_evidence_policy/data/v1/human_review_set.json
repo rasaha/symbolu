@@ -1251,7 +1251,7 @@
     "human_review_required": false,
     "risk_tier": "low",
     "source_kind": "doc",
-    "source_path": "acp/ACP_EXPLAINABILITY.md",
+    "source_path": "Project_documentation/control_plane/acp/ACP_EXPLAINABILITY.md",
     "source_role": "generated_documentation",
     "synthetic": false,
     "temporal_sensitivity": "static",

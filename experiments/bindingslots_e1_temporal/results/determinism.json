@@ -1,0 +1,8 @@
+{
+  "schema": "bindingslots_e1_temporal/determinism/v1",
+  "seed": 720,
+  "hash_match": true,
+  "metrics_match": true,
+  "determinism_ok": true,
+  "e1_param_sha256": "e09cd5c648d212bfd724765dbd9fe2dd9e526c6bac1ae37d5976af23d161b0d0"
+}

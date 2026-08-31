@@ -123,7 +123,8 @@ json.dump({"schema":"runtime-egress.v1","network_mode":"internal (no external ro
  "verdict":"no external egress"}, open("/tmp/egress.json","w"), indent=2)
 print("egress evidence written")
 PY
-cp /tmp/egress.json deployment/governance-studio/artifacts/runtime-egress-report.json
+# Runtime evidence goes to the run-scoped evidence dir, never into the checkout.
+cp /tmp/egress.json "${EVIDENCE_DIR:?EVIDENCE_DIR must be set}/runtime-egress-report.json"
 echo "OK egress enforced (internal network) + observed (attempts recorded)"
 
 echo "ALL CONTAINER RUNTIME GATES PASSED"

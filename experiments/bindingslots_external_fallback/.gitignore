@@ -1,0 +1,8 @@
+results/_progress/
+*.log
+__pycache__/
+*.pyc
+*.pt
+*.ckpt
+*.db
+*.sqlite

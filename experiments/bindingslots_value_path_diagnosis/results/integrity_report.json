@@ -1,0 +1,18 @@
+{
+  "schema": "bindingslots_value_path_diagnosis/integrity_report/v1",
+  "checks": {
+    "reproduction_uses_frozen_runners_unchanged": true,
+    "all_runs_exactly_1200_optimizer_steps": true,
+    "all_reproductions_pass_exact_gate": true,
+    "diagnostic_state_hashes_unchanged": true,
+    "param_groups_complete_and_nonoverlapping": true,
+    "probes_analysis_only_never_written_to_model": true,
+    "failure_seeds_did_not_tune_thresholds": true,
+    "no_seed_replaced": true,
+    "no_post_hoc_checkpoint_selection": true,
+    "collapsed_baseline_ablations_labeled_non_informative": true,
+    "kda_validation_blocked": true,
+    "ready_for_kda_validation_emitted": false,
+    "all_pass": true
+  }
+}

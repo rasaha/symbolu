@@ -1,0 +1,13 @@
+{
+  "schema": "bindingslots_external_fallback/artifact_hashes/v1",
+  "sha256": {
+    "aggregate_verdict.json": "34a8707c6cfded3acce4c1c287571249f9926c9cca4c4b3a1adf5bed280e9fbd",
+    "calibration_results.json": "d85fb1d87c629fc336778aebc27a4c26eb23aa9987ddce0472b6f5031469fca2",
+    "fallback_confusion_matrix.json": "2ccf8328561089833f3fda563b86cabead38849b6780bffdcfe77c1051dff13d",
+    "integrity_report.json": "d4d16d37579863ae390ced8c37dd8e2f0691dda498cf7d3711692c8ba53b4680",
+    "isolation_tests.json": "9f20be96f518c218d6c9a1ca5a89a65bcc832e8687c4e048561acb4a8037ed63",
+    "latency_results.json": "532a6c5fcce7b3191be6e80a480cf586706ad57adc824a2069a52fac6781500f",
+    "per_arm_results.json": "ce19680a88e20900a367f83ad82b0c978f74332309ee58d56f617ee859deaae7",
+    "trigger_thresholds.json": "7ba1edcca7ae5023a339ea6428ea498f165b9eb01eb26f2dce1a0e4ddc5ab5af"
+  }
+}

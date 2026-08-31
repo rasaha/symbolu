@@ -1,0 +1,87 @@
+name: risk-authority-runtime-ci
+
+# Scoped CI for the RA-4.5 governance-composition integration package
+# (ugence-risk-authority-runtime). It composes the machine-authority owner
+# (ugence-risk-authority) with two additive governance inputs
+# (ugence-decision-authority, ugence-actiongate-provider) fail-closed.
+#
+# This workflow is additive and path-scoped: it does NOT touch or weaken the
+# existing risk-authority-ci (which continues to prove the RA leaf in isolation).
+# It runs the composition suite (including the deny-heavy matrix), a Risk
+# Authority baseline regression to prove reference-mode behavior is unchanged,
+# and the integration package's wheel build + isolated-install verifier.
+
+on:
+  pull_request:
+    paths:
+      - "packages/integration/risk-authority-runtime/**"
+      - "packages/risk_authority/**"
+      - "packages/capabilities/decision-authority/**"
+      - "packages/providers/actiongate/**"
+      - ".github/workflows/risk-authority-runtime-ci.yml"
+  push:
+    branches:
+      - "claude/ra45-**"
+      - "claude/setup-symbolu-monorepo-**"
+    paths:
+      - "packages/integration/risk-authority-runtime/**"
+      - ".github/workflows/risk-authority-runtime-ci.yml"
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  composition-suite:
+    name: RA-4.5 composition suite + deny matrix (source)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install tooling
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest build pydantic
+      - name: Composition suite (matrix, adversarial, restrictions, failure, invariants)
+        run: python -m pytest packages/integration/risk-authority-runtime/tests -q
+      - name: Deny-heavy composition matrix (explicit gate)
+        run: |
+          python -m pytest \
+            packages/integration/risk-authority-runtime/tests/test_composition_matrix.py \
+            packages/integration/risk-authority-runtime/tests/test_adversarial.py \
+            packages/integration/risk-authority-runtime/tests/test_invariants.py \
+            packages/integration/risk-authority-runtime/tests/test_failure_semantics.py -q
+
+  baseline-regression:
+    name: Risk Authority baseline regression (reference mode unchanged)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install tooling
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest
+      - name: Risk Authority conformance suite (must remain green + unchanged)
+        run: python -m pytest packages/risk_authority/tests -q
+
+  isolated-install:
+    name: Integration wheel build + isolated-install verification
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install build tooling
+        run: |
+          python -m pip install --upgrade pip
+          pip install build wheel pytest
+      - name: Build first-party wheels, install from declared deps, run composition proof
+        run: python packages/integration/risk-authority-runtime/scripts/verify_isolated_install.py

@@ -1,0 +1,728 @@
+{
+  "distribution": "ugence-benchmark-registry-authority",
+  "milestone": "BR-2C-0",
+  "note": "Complete inventory of every load-bearing gate, and the measured result of neutralizing each one in turn against the full suite and the author-owned adversarial probes. Production behaviour was not changed to chase a zero-survivor number; any survivor is classified as equivalent, shadowed (naming the shadowing gate), or a real gap. Regenerate by running gate_mutation_sweep.py.",
+  "gates_inventoried": 72,
+  "killed": 67,
+  "survived": 5,
+  "errored": 0,
+  "categories": {
+    "predecessor-declared_outcome": [
+      "G-01"
+    ],
+    "predecessor-state": [
+      "G-02",
+      "G-03",
+      "G-04",
+      "G-05",
+      "G-06"
+    ],
+    "terminality": [
+      "G-07",
+      "G-08",
+      "G-09",
+      "G-10"
+    ],
+    "digest-binding": [
+      "G-11",
+      "G-12",
+      "G-13",
+      "G-14",
+      "G-15",
+      "G-16",
+      "G-17",
+      "G-18",
+      "G-19",
+      "G-20"
+    ],
+    "actor-separation": [
+      "G-21",
+      "G-22",
+      "G-23",
+      "G-24",
+      "G-25"
+    ],
+    "outcome-coupling": [
+      "G-26",
+      "G-27"
+    ],
+    "encoder": [
+      "G-28",
+      "G-29",
+      "G-30",
+      "G-31",
+      "G-32"
+    ],
+    "validation": [
+      "G-33",
+      "G-34",
+      "G-35",
+      "G-36",
+      "G-37",
+      "G-48"
+    ],
+    "scope": [
+      "G-38",
+      "G-39"
+    ],
+    "transition-binding": [
+      "G-40",
+      "G-41",
+      "G-42"
+    ],
+    "vocabulary": [
+      "G-43",
+      "G-44",
+      "G-45"
+    ],
+    "no-authority": [
+      "G-46",
+      "G-47"
+    ],
+    "planning-fail-closed": [
+      "G-49",
+      "G-50"
+    ],
+    "planning-idempotence": [
+      "G-51"
+    ],
+    "planning-rejection-only": [
+      "G-52"
+    ],
+    "planning-totality": [
+      "G-53"
+    ],
+    "boundary-plan-consumption": [
+      "G-54",
+      "G-55",
+      "G-59"
+    ],
+    "boundary-return-widening": [
+      "G-56"
+    ],
+    "boundary-reserved-binding": [
+      "G-63"
+    ],
+    "boundary-annotation": [
+      "G-64",
+      "G-65"
+    ],
+    "trust-result-role-pin": [
+      "G-66"
+    ],
+    "trust-result-biconditional": [
+      "G-67",
+      "G-68"
+    ],
+    "trust-anchor-revision-binding": [
+      "G-69"
+    ],
+    "trust-anchor-lifecycle": [
+      "G-70",
+      "G-71"
+    ],
+    "trust-anchor-interval": [
+      "G-72"
+    ],
+    "trust-key-material-encoding": [
+      "G-73"
+    ],
+    "resolution-record-xor-refusal": [
+      "G-74"
+    ],
+    "resolution-admissible-refusals": [
+      "G-75"
+    ],
+    "resolution-asked-versus-answered": [
+      "G-76"
+    ],
+    "verified-result-refusal-subset": [
+      "G-77"
+    ]
+  },
+  "ledger": [
+    {
+      "gate": "G-01",
+      "category": "predecessor-declared_outcome",
+      "module": "chain.py",
+      "description": "the shared ADMITTED-predecessor gate, which both the registration event and the post-admission rejection event depend on",
+      "result": "KILLED",
+      "first_failure": "test:tests/contract/test_chain_state_machine.py::test_post_admission_rejection_refuses_a_rejected_predecessor"
+    },
+    {
+      "gate": "G-02",
+      "category": "predecessor-state",
+      "module": "chain.py",
+      "description": "the registration event's exact-type gate on its nested admission decision \u2014 the gate that fixes its predecessor STATE",
+      "result": "KILLED",
+      "first_failure": "test:tests/contract/test_chain_state_machine.py::test_no_payload_accepts_a_predecessor_of_the_wrong_exact_type[BenchmarkRegistrationEventPayload-registration_event]"
+    },
+    {
+      "gate": "G-03",
+      "category": "predecessor-state",
+      "module": "chain.py",
+      "description": "the post-admission rejection event's exact-type gate on its nested admission decision",
+      "result": "KILLED",
+      "first_failure": "test:tests/contract/test_chain_state_machine.py::test_no_payload_accepts_a_predecessor_of_the_wrong_exact_type[BenchmarkPostAdmissionRejectionEventPayload-post_admission_rejection]"
+    },
+    {
+      "gate": "G-04",
+      "category": "predecessor-state",
+      "module": "chain.py",
+      "description": "the revocation event's exact-type gate on its nested registration event \u2014 the gate that forbids a shortened chain",
+      "result": "KILLED",
+      "first_failure": "test:tests/contract/test_chain_integrity.py::test_no_alternative_shortened_chain_is_constructible"
+    },
+    {
+      "gate": "G-05",
+      "category": "predecessor-state",
+      "module": "chain.py",
+      "description": "the admission decision's exact-type gate on its nested submission record",
+      "result": "KILLED",
+      "first_failure": "test:tests/contract/test_chain_state_machine.py::test_no_payload_accepts_a_predecessor_of_the_wrong_exact_type[BenchmarkAdmissionDecisionPayload-admission_decision]"
+    },
+    {
+      "gate": "G-06",
+      "category": "predecessor-state",
+      "module": "chain.py",
+      "description": "the submission record's exact-type gate on its nested publisher envelope",
+      "result": "KILLED",
+      "first_failure": "test:tests/contract/test_chain_state_machine.py::test_no_payload_accepts_a_predecessor_of_the_wrong_exact_type[BenchmarkSubmissionRecordPayload-submission_record]"
+    },
+    {
+      "gate": "G-07",
+      "category": "terminality",
+      "module": "chain.py",
+      "description": "the admission decision's terminality report, which tells a consumer a REJECTED decision has no successor",
+      "result": "KILLED",
+      "first_failure": "test:tests/contract/test_chain_state_machine.py::test_a_rejected_admission_decision_reports_itself_terminal"
+    },
+    {
+      "gate": "G-08",
+      "category": "terminality",
+      "module": "chain.py",
+      "description": "the post-admission rejection event's terminality report",
+      "result": "KILLED",
+      "first_failure": "test:tests/contract/test_chain_state_machine.py::test_every_terminal_payload_reports_itself_terminal[BenchmarkPostAdmissionRejectionEventPayload-post_admission_rejection]"
+    },
+    {
+      "gate": "G-09",
+      "category": "terminality",
+      "module": "lifecycle.py",
+      "description": "the empty admissible-successor set for REVOKED \u2014 the terminal state's own relation entry",
+      "result": "KILLED",
+      "first_failure": "import:BenchmarkRegistryLifecycleError REVOKED is terminal but admits successors"
+    },
+    {
+      "gate": "G-10",
+      "category": "terminality",
+      "module": "lifecycle.py",
+      "description": "the empty admissible-successor set for REJECTED",
+      "result": "KILLED",
+      "first_failure": "import:BenchmarkRegistryLifecycleError REJECTED is terminal but admits successors"
+    },
+    {
+      "gate": "G-11",
+      "category": "digest-binding",
+      "module": "chain.py",
+      "description": "the admission decision's byte-identity proof across its two nested paths to the publisher envelope",
+      "result": "KILLED",
+      "first_failure": "test:tests/contract/test_chain_integrity.py::test_admission_refuses_mismatched_publisher_submissions_across_its_two_paths"
+    },
+    {
+      "gate": "G-12",
+      "category": "digest-binding",
+      "module": "chain.py",
+      "description": "the admission decision's digest-identity proof across its two nested paths",
+      "result": "SURVIVED",
+      "first_failure": ""
+    },
+    {
+      "gate": "G-13",
+      "category": "digest-binding",
+      "module": "chain.py",
+      "description": "the revocation event's admitted-digest binding to the registration chain",
+      "result": "KILLED",
+      "first_failure": "test:tests/contract/test_chain_integrity.py::test_a_revocation_envelope_naming_a_different_admitted_digest_is_refused"
+    },
+    {
+      "gate": "G-14",
+      "category": "digest-binding",
+      "module": "chain.py",
+      "description": "the revocation event's locator binding to the registration event",
+      "result": "KILLED",
+      "first_failure": "test:tests/contract/test_chain_integrity.py::test_a_revocation_envelope_for_a_different_locator_is_refused"
+    },
+    {
+      "gate": "G-15",
+      "category": "digest-binding",
+      "module": "canonical.py",
+      "description": "the exact-type identity boundary in the encoder \u2014 the check that a root or nested node IS a registered class",
+      "result": "KILLED",
+      "first_failure": "test:tests/contract/test_canonicalization.py::test_a_bare_dataclass_is_refused"
+    },
+    {
+      "gate": "G-16",
+      "category": "digest-binding",
+      "module": "canonical.py",
+      "description": "the root-canonicalizability gate that refuses a frozen BR-1 contract as a BR-2 digest root",
+      "result": "KILLED",
+      "first_failure": "test:tests/contract/test_canonicalization.py::test_a_br1_contract_is_refused_as_a_canonicalization_root"
+    },
+    {
+      "gate": "G-17",
+      "category": "digest-binding",
+      "module": "canonical.py",
+      "description": "graph revalidation of every nested node before any byte is produced",
+      "result": "KILLED",
+      "first_failure": "test:tests/contract/test_chain_state_machine.py::test_corrupting_a_predecessor_digest_input_is_caught_before_any_byte"
+    },
+    {
+      "gate": "G-18",
+      "category": "digest-binding",
+      "module": "canonical.py",
+      "description": "the trusted-class validator invocation \u2014 replacing it with the instance-resolved call an attacker could override",
+      "result": "KILLED",
+      "first_failure": "test:tests/contract/test_hostile_objects.py::test_revalidation_calls_the_trusted_exact_class_never_the_instance"
+    },
+    {
+      "gate": "G-19",
+      "category": "digest-binding",
+      "module": "canonical.py",
+      "description": "the domain-separation element in the canonical frame",
+      "result": "KILLED",
+      "first_failure": "test:tests/contract/test_canonicalization.py::test_happy_every_shipped_artifact_matches_its_pinned_byte_vector[BenchmarkPublisherSubmissionEnvelope-publisher_envelope]"
+    },
+    {
+      "gate": "G-20",
+      "category": "digest-binding",
+      "module": "canonical.py",
+      "description": "the type element in the canonical frame, which keeps two artifact classes in distinct byte spaces",
+      "result": "KILLED",
+      "first_failure": "test:tests/contract/test_canonicalization.py::test_happy_every_shipped_artifact_matches_its_pinned_byte_vector[BenchmarkPublisherSubmissionEnvelope-publisher_envelope]"
+    },
+    {
+      "gate": "G-21",
+      "category": "actor-separation",
+      "module": "_validation.py",
+      "description": "the actor-separation primitive every four-party check is built from",
+      "result": "KILLED",
+      "first_failure": "test:tests/contract/test_chain_integrity.py::test_the_registry_cannot_be_its_own_publisher"
+    },
+    {
+      "gate": "G-22",
+      "category": "actor-separation",
+      "module": "envelopes.py",
+      "description": "the approval envelope's publisher-is-not-approver check",
+      "result": "KILLED",
+      "first_failure": "test:tests/contract/test_chain_integrity.py::test_the_approver_cannot_be_the_publisher"
+    },
+    {
+      "gate": "G-23",
+      "category": "actor-separation",
+      "module": "chain.py",
+      "description": "the submission record's registry-is-not-publisher check",
+      "result": "KILLED",
+      "first_failure": "test:tests/contract/test_chain_integrity.py::test_the_registry_cannot_be_its_own_publisher"
+    },
+    {
+      "gate": "G-24",
+      "category": "actor-separation",
+      "module": "chain.py",
+      "description": "the admission decision's registry-is-not-approver check",
+      "result": "KILLED",
+      "first_failure": "test:tests/contract/test_chain_integrity.py::test_the_registry_cannot_be_the_approver"
+    },
+    {
+      "gate": "G-25",
+      "category": "actor-separation",
+      "module": "chain.py",
+      "description": "the revocation event's revoker-is-not-registry check",
+      "result": "KILLED",
+      "first_failure": "test:tests/contract/test_chain_integrity.py::test_the_revoker_cannot_impersonate_the_registry_authority"
+    },
+    {
+      "gate": "G-26",
+      "category": "outcome-coupling",
+      "module": "chain.py",
+      "description": "the rule that a REJECTED admission decision must carry a refusal reason",
+      "result": "KILLED",
+      "first_failure": "test:tests/contract/test_chain_state_machine.py::test_an_admitted_decision_carries_no_refusal_reason_and_a_rejected_one_must"
+    },
+    {
+      "gate": "G-27",
+      "category": "outcome-coupling",
+      "module": "chain.py",
+      "description": "the rule that an ADMITTED admission decision must not carry one",
+      "result": "KILLED",
+      "first_failure": "test:tests/contract/test_chain_state_machine.py::test_an_admitted_decision_carries_no_refusal_reason_and_a_rejected_one_must"
+    },
+    {
+      "gate": "G-28",
+      "category": "encoder",
+      "module": "canonical.py",
+      "description": "the float rejection",
+      "result": "SURVIVED",
+      "first_failure": ""
+    },
+    {
+      "gate": "G-29",
+      "category": "encoder",
+      "module": "canonical.py",
+      "description": "the NFC requirement in the encoder",
+      "result": "SURVIVED",
+      "first_failure": ""
+    },
+    {
+      "gate": "G-30",
+      "category": "encoder",
+      "module": "canonical.py",
+      "description": "the aware-datetime requirement in the encoder",
+      "result": "SURVIVED",
+      "first_failure": ""
+    },
+    {
+      "gate": "G-31",
+      "category": "encoder",
+      "module": "canonical.py",
+      "description": "the sealed registry's identity comparison, replaced with a dict-membership check a metaclass can forge",
+      "result": "KILLED",
+      "first_failure": "test:tests/contract/test_hostile_objects.py::test_a_hostile_object_at_every_depth_is_refused_and_never_invoked[$.registration_event-1-metaclass_forged-metaclass_forged]"
+    },
+    {
+      "gate": "G-32",
+      "category": "encoder",
+      "module": "canonical.py",
+      "description": "the seal itself \u2014 allowing the contract-type registry to be widened after package initialization",
+      "result": "KILLED",
+      "first_failure": "test:tests/contract/test_canonicalization.py::test_the_contract_type_registry_is_sealed_and_cannot_be_widened"
+    },
+    {
+      "gate": "G-33",
+      "category": "validation",
+      "module": "_validation.py",
+      "description": "the exact-type primitive, replaced with isinstance so a subclass passes",
+      "result": "KILLED",
+      "first_failure": "test:tests/contract/test_hostile_objects.py::test_a_forgery_is_refused_by_the_constructor_of_every_payload_that_nests_it[subclass_override-subclass_override]"
+    },
+    {
+      "gate": "G-34",
+      "category": "validation",
+      "module": "_validation.py",
+      "description": "the closed-enum primitive, so a bare string spelling of a member is accepted",
+      "result": "KILLED",
+      "first_failure": "test:tests/contract/test_chain_state_machine.py::test_a_bare_string_spelling_of_a_state_is_refused"
+    },
+    {
+      "gate": "G-35",
+      "category": "validation",
+      "module": "_validation.py",
+      "description": "the detached-signature encoding gate",
+      "result": "KILLED",
+      "first_failure": "test:tests/contract/test_envelopes.py::test_every_envelope_refuses_a_malformed_signature_encoding[too short-BenchmarkPublisherSubmissionEnvelope-publisher_envelope]"
+    },
+    {
+      "gate": "G-36",
+      "category": "validation",
+      "module": "_validation.py",
+      "description": "the pinned signing-frame constant gate, so a caller-chosen frame is accepted",
+      "result": "KILLED",
+      "first_failure": "test:tests/contract/test_envelopes.py::test_each_envelope_admits_only_its_own_signing_frame_domain[publisher-publisher_envelope-ugence.benchmark-registry-authority/publisher-submission-signing-frame/v1]"
+    },
+    {
+      "gate": "G-37",
+      "category": "validation",
+      "module": "_validation.py",
+      "description": "the digest single-spelling gate",
+      "result": "KILLED",
+      "first_failure": "test:tests/contract/test_read_payloads.py::test_an_uppercase_digest_is_refused_never_lowercased"
+    },
+    {
+      "gate": "G-38",
+      "category": "scope",
+      "module": "requests.py",
+      "description": "the platform scope expectation's kind gate",
+      "result": "KILLED",
+      "first_failure": "test:tests/contract/test_scope_expectations.py::test_the_platform_expectation_refuses_a_tenant_scope"
+    },
+    {
+      "gate": "G-39",
+      "category": "scope",
+      "module": "requests.py",
+      "description": "the tenant scope expectation's kind gate",
+      "result": "KILLED",
+      "first_failure": "test:tests/contract/test_scope_expectations.py::test_the_tenant_expectation_refuses_a_platform_scope"
+    },
+    {
+      "gate": "G-40",
+      "category": "transition-binding",
+      "module": "binding.py",
+      "description": "the bound-payload exact-type gate",
+      "result": "KILLED",
+      "first_failure": "test:tests/contract/test_transition_binding.py::test_no_transition_accepts_a_second_payload_type"
+    },
+    {
+      "gate": "G-41",
+      "category": "transition-binding",
+      "module": "binding.py",
+      "description": "the bound-payload required-declared_outcome gate",
+      "result": "KILLED",
+      "first_failure": "test:tests/contract/test_transition_binding.py::test_no_transition_accepts_a_second_payload_type"
+    },
+    {
+      "gate": "G-42",
+      "category": "transition-binding",
+      "module": "lifecycle.py",
+      "description": "the closed-relation membership test",
+      "result": "KILLED",
+      "first_failure": "test:tests/contract/test_chain_state_machine.py::test_the_full_five_by_five_matrix_admits_exactly_five_arrows"
+    },
+    {
+      "gate": "G-43",
+      "category": "vocabulary",
+      "module": "reasons.py",
+      "description": "the import-time guard that BR-1's frozen prefix and frozen set agree",
+      "result": "SURVIVED",
+      "first_failure": ""
+    },
+    {
+      "gate": "G-44",
+      "category": "vocabulary",
+      "module": "reasons.py",
+      "description": "the BR-1-declaration-order source of the composite prefix, replaced with the frozenset whose iteration order is a hash artifact",
+      "result": "KILLED",
+      "first_failure": "test:tests/contract/test_refusal_vocabulary.py::test_the_composite_prefix_is_br1_declaration_order_not_frozenset_order"
+    },
+    {
+      "gate": "G-45",
+      "category": "vocabulary",
+      "module": "reasons.py",
+      "description": "the fault-class exact-type gate",
+      "result": "KILLED",
+      "first_failure": "test:tests/contract/test_refusal_vocabulary.py::test_a_bare_string_spelling_of_a_br2_member_is_not_classified"
+    },
+    {
+      "gate": "G-46",
+      "category": "no-authority",
+      "module": "_authority.py",
+      "description": "the permanently-False derivation itself",
+      "result": "KILLED",
+      "first_failure": "test:tests/contract/test_envelopes.py::test_the_anchor_record_key_material_is_never_parsed"
+    },
+    {
+      "gate": "G-47",
+      "category": "no-authority",
+      "module": "_authority.py",
+      "description": "the guard that refuses to overwrite a class's own declaration of a no-authority property",
+      "result": "KILLED",
+      "first_failure": "test:tests/contract/test_no_authority.py::test_a_class_declaring_a_no_authority_property_as_a_field_fails_at_import"
+    },
+    {
+      "gate": "G-48",
+      "category": "validation",
+      "module": "envelopes.py",
+      "description": "the approval envelope's strictly-ordered validity interval gate",
+      "result": "KILLED",
+      "first_failure": "test:tests/contract/test_envelopes.py::test_the_approval_validity_interval_is_half_open_and_strictly_ordered"
+    },
+    {
+      "gate": "G-49",
+      "category": "planning-fail-closed",
+      "module": "planning.py",
+      "description": "the fail-closed refusal when an unoccupied slot is handed an occupant",
+      "result": "KILLED",
+      "first_failure": "test:tests/contract/test_planning.py::test_an_unoccupied_slot_handed_an_occupant_fails_closed"
+    },
+    {
+      "gate": "G-50",
+      "category": "planning-fail-closed",
+      "module": "planning.py",
+      "description": "the fail-closed refusal when the asserted occupant sits at another locator",
+      "result": "KILLED",
+      "first_failure": "test:tests/contract/test_planning.py::test_an_occupant_at_another_locator_fails_closed"
+    },
+    {
+      "gate": "G-51",
+      "category": "planning-idempotence",
+      "module": "planning.py",
+      "description": "the canonical-byte comparison D-06 requires for idempotence",
+      "result": "KILLED",
+      "first_failure": "test:tests/contract/test_planning.py::test_one_changed_field_makes_them_not_byte_identical"
+    },
+    {
+      "gate": "G-52",
+      "category": "planning-rejection-only",
+      "module": "planning.py",
+      "description": "the unequal-locator branch that keeps confusable handling rejection-only",
+      "result": "KILLED",
+      "first_failure": "test:tests/contract/test_planning.py::test_an_unequal_locator_routed_as_a_collision_is_rejection_only"
+    },
+    {
+      "gate": "G-53",
+      "category": "planning-totality",
+      "module": "kernel.py",
+      "description": "the ADMITTED -> REJECTED record-presence gate, through the total layer",
+      "result": "KILLED",
+      "first_failure": "test:tests/contract/test_lifecycle_kernel.py::test_post_admission_rejection_is_planned_only_while_nothing_is_registered"
+    },
+    {
+      "gate": "G-54",
+      "category": "boundary-plan-consumption",
+      "module": "api.py",
+      "description": "an EXPORTED callable accepting a plan through an alias inside Optional \u2014 the shape the substring rule walked past, now aimed at the surface the narrowed claim actually covers",
+      "result": "KILLED",
+      "first_failure": "test:tests/packaging/test_milestone_boundary.py::test_no_exported_callable_or_protocol_method_accepts_a_transition_plan"
+    },
+    {
+      "gate": "G-55",
+      "category": "boundary-plan-consumption",
+      "module": "api.py",
+      "description": "an EXPORTED callable whose plan parameter carries no annotation, so a resolved-type check contributes nothing and would pass vacuously without the annotation requirement standing beside it",
+      "result": "KILLED",
+      "first_failure": "test:tests/packaging/test_milestone_boundary.py::test_every_exported_callable_and_protocol_method_is_fully_annotated"
+    },
+    {
+      "gate": "G-56",
+      "category": "boundary-return-widening",
+      "module": "planning.py",
+      "description": "the planning-outcome alias, widened to admit a registry event \u2014 invisible to a gate that read the alias name as a string",
+      "result": "KILLED",
+      "first_failure": "test:tests/packaging/test_boundary_gates_detect.py::test_happy_the_real_planning_functions_pass_every_boundary_check"
+    },
+    {
+      "gate": "G-59",
+      "category": "boundary-plan-consumption",
+      "module": "ports.py",
+      "description": "a declared PORT method accepting a transition plan \u2014 the one way an exported-callable check alone could be walked past, since a port is the shape BR-2D is obliged to implement",
+      "result": "KILLED",
+      "first_failure": "test:tests/packaging/test_milestone_boundary.py::test_no_exported_callable_or_protocol_method_accepts_a_transition_plan"
+    },
+    {
+      "gate": "G-63",
+      "category": "boundary-reserved-binding",
+      "module": "planning.py",
+      "description": "a reserved authority-issued name bound by NewType rather than class, beside a non-plan_* callable fabricating a registry event",
+      "result": "KILLED",
+      "first_failure": "test:tests/packaging/test_milestone_boundary.py::test_the_reserved_names_are_bound_by_nothing_anywhere_under_src"
+    },
+    {
+      "gate": "G-64",
+      "category": "boundary-annotation",
+      "module": "planning.py",
+      "description": "an unannotated parameter on a plain def written in shipped source, which the closed set alone would accept once regenerated",
+      "result": "KILLED",
+      "first_failure": "test:tests/packaging/test_milestone_boundary.py::test_every_parameter_written_under_src_is_annotated_and_no_lambda_exists"
+    },
+    {
+      "gate": "G-65",
+      "category": "boundary-annotation",
+      "module": "planning.py",
+      "description": "a lambda written in shipped source, whose parameters cannot be annotated at all and whose name a dunder can disguise",
+      "result": "KILLED",
+      "first_failure": "test:tests/packaging/test_milestone_boundary.py::test_every_parameter_written_under_src_is_annotated_and_no_lambda_exists"
+    },
+    {
+      "gate": "G-66",
+      "category": "trust-result-role-pin",
+      "module": "trust.py",
+      "description": "the role pin that makes three verified-result types distinct rather than three aliases \u2014 without it a revoker result satisfies a publisher signature, the substitution D-26 and \u00a717 rule 10 forbid",
+      "result": "KILLED",
+      "first_failure": "test:tests/contract/test_trust_contracts.py::test_each_result_pins_its_own_role_and_refuses_every_other[publisher_verified_result-PUBLISHER]"
+    },
+    {
+      "gate": "G-67",
+      "category": "trust-result-biconditional",
+      "module": "trust.py",
+      "description": "the VERIFIED-carries-no-reason half of the outcome biconditional",
+      "result": "KILLED",
+      "first_failure": "test:tests/contract/test_trust_contracts.py::test_a_verified_result_carrying_a_refusal_reason_is_unconstructible[BenchmarkPublisherVerifiedResult-publisher_verified_result]"
+    },
+    {
+      "gate": "G-68",
+      "category": "trust-result-biconditional",
+      "module": "trust.py",
+      "description": "the REFUSED-must-say-why half \u2014 without it a refusal is the shapeless answer D-24 replaced the Boolean to eliminate",
+      "result": "KILLED",
+      "first_failure": "test:tests/contract/test_trust_contracts.py::test_a_reasonless_refusal_says_which_rule_it_broke[BenchmarkPublisherVerifiedResult-publisher_verified_result]"
+    },
+    {
+      "gate": "G-69",
+      "category": "trust-anchor-revision-binding",
+      "module": "trust.py",
+      "description": "the rule that a VERIFIED result binds the anchor revision it trusted; without it a verification cannot be re-checked against a revocation",
+      "result": "KILLED",
+      "first_failure": "test:tests/contract/test_trust_contracts.py::test_an_unbound_anchor_revision_says_which_rule_it_broke[BenchmarkPublisherVerifiedResult-publisher_verified_result]"
+    },
+    {
+      "gate": "G-70",
+      "category": "trust-anchor-lifecycle",
+      "module": "trust.py",
+      "description": "the REVOKED-must-carry-revoked_at gate; without it a revocation has no recorded time and the two spellings of 'was this revoked' disagree",
+      "result": "KILLED",
+      "first_failure": "test:tests/contract/test_trust_contracts.py::test_a_revoked_anchor_missing_its_time_says_which_rule_it_broke"
+    },
+    {
+      "gate": "G-71",
+      "category": "trust-anchor-lifecycle",
+      "module": "trust.py",
+      "description": "the gate refusing a revocation fact on an anchor that was not revoked",
+      "result": "KILLED",
+      "first_failure": "test:tests/contract/test_trust_contracts.py::test_a_revocation_fact_without_a_revocation_is_unconstructible[ENABLED]"
+    },
+    {
+      "gate": "G-72",
+      "category": "trust-anchor-interval",
+      "module": "trust.py",
+      "description": "the anchor's strictly-ordered validity interval gate; an interval containing no instant could never be valid at any trusted instant",
+      "result": "KILLED",
+      "first_failure": "test:tests/contract/test_trust_contracts.py::test_an_interval_containing_no_instant_is_refused_never_reordered"
+    },
+    {
+      "gate": "G-73",
+      "category": "trust-key-material-encoding",
+      "module": "_validation.py",
+      "description": "the Ed25519 public-key-material encoding check; without it an anchor carries arbitrary text where 32 bytes of key material must be, and two spellings of one anchor become two revisions of it",
+      "result": "KILLED",
+      "first_failure": "test:tests/contract/test_envelopes.py::test_the_anchor_record_key_material_is_never_parsed"
+    },
+    {
+      "gate": "G-74",
+      "category": "resolution-record-xor-refusal",
+      "module": "trust.py",
+      "description": "the exclusive-or at the heart of D-34; without it a resolution can carry both a record and a refusal, or neither, and a caller branching on whichever field it read first gets two answers from one object",
+      "result": "KILLED",
+      "first_failure": "test:tests/contract/test_trust_contracts.py::test_a_resolution_carrying_both_a_record_and_a_refusal_is_unconstructible"
+    },
+    {
+      "gate": "G-75",
+      "category": "resolution-admissible-refusals",
+      "module": "trust.py",
+      "description": "the membership gate keeping a resolution to the two conditions in which no record exists; without it the seam can refuse TRUST_ANCHOR_EXPIRED, which is a lifecycle evaluation D-25 rules it never performs and D-27 requires the verification seam to make",
+      "result": "KILLED",
+      "first_failure": "test:tests/contract/test_trust_contracts.py::test_every_other_refusal_member_is_refused_by_a_resolution[IDEMPOTENT_DUPLICATE]"
+    },
+    {
+      "gate": "G-76",
+      "category": "resolution-asked-versus-answered",
+      "module": "trust.py",
+      "description": "the triple-match gate; without it a resolver may answer a question it was not asked, and an anchor from one role namespace can be returned for a lookup in another \u2014 the cross-role substitution D-26 forbids",
+      "result": "KILLED",
+      "first_failure": "test:tests/contract/test_trust_contracts.py::test_a_resolver_may_not_answer_a_question_it_was_not_asked[role-REVOKER]"
+    },
+    {
+      "gate": "G-77",
+      "category": "verified-result-refusal-subset",
+      "module": "trust.py",
+      "description": "the membership gate keeping a REFUSED verified result to D-35's twelve; without it a result can refuse with COORDINATE_SLOT_CONFLICT or STORE_UNAVAILABLE, which are registry-state facts a subphase that ships no registry state cannot establish, or with NOT_FOUND, whose collapse D-27 places at a later external read boundary",
+      "result": "KILLED",
+      "first_failure": "test:tests/contract/test_trust_contracts.py::test_every_excluded_reason_is_refused_on_every_result_type[IDEMPOTENT_DUPLICATE-BenchmarkPublisherVerifiedResult-publisher_verified_result]"
+    }
+  ],
+  "survivor_classifications": {
+    "G-12": "SHADOWED by G-11. G-11 proves the two nested paths reach byte-identical publisher envelopes; identical bytes necessarily hash to identical digests, so with G-11 in place removing G-12 changes no observable behaviour. G-12 is retained as defence in depth: if G-11 were ever weakened to a structural comparison, G-12 would be the gate that still refused a mismatch. Killing it in isolation would require a hash collision.",
+    "G-28": "SHADOWED by construction-time validation and by G-17. No caller-constructible path can place a float in a contract field: every field is validated at construction, and graph revalidation (G-17) re-runs those validators before the encoder is reached, so a float planted by object.__setattr__ is refused before the encoder's own float branch executes. The branch is unreachable defence in depth against a future field type, not a live gate.",
+    "G-29": "SHADOWED by require_canonical_str and by G-17, for the same reason as G-28: NFC is required at construction and re-checked by revalidation, so the encoder's own NFC branch is never the first refusal.",
+    "G-30": "SHADOWED by require_aware_datetime and by G-17, for the same reason as G-28: a naive datetime is refused at construction and again by revalidation before the encoder formats it.",
+    "G-43": "EQUIVALENT while BR-1 is frozen. The guard fires only if BR-1's BenchmarkRefusalReason enum and BR1_BENCHMARK_REFUSAL_REASONS ever disagree, which cannot happen against the frozen 0.1.0 layer this package pins. Killing it would require shipping a mutated BR-1, which the freeze matrix exists to prevent and which this sweep deliberately does not do. The BR-1 freeze matrix (verify_br1_freeze_matrix.py) is the gate that would catch that drift independently."
+  }
+}

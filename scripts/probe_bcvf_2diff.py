@@ -944,7 +944,7 @@ def main() -> int:
     lines = [
         "# §13.14 Experiment — BCVF-Faithful 2nd-Difference Observable\n",
         "Reference: BCVF autonomy-domain validation, "
-        "`symbolu_robotics/bcvf_autonomous/DESIGN.md` §6.1 / §6.7 — "
+        "`Project_documentation/autonomous_robotics/symbolu_robotics/bcvf_autonomous/DESIGN.md` §6.1 / §6.7 — "
         "`S3_map_error_accel` peak as the validated 2nd-derivative "
         "observable in the robotics domain. §13.14 is the LLM "
         "analogue: 2nd difference of per-position semantic entropy "

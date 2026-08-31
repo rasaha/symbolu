@@ -39,8 +39,8 @@ _CHECK = r'''
 import importlib.util, sys
 
 import ugence_context_minimization as cm
-assert cm.__version__ == "0.1.2", cm.__version__
-assert cm.CONTRACT_VERSION == "1.0.2", cm.CONTRACT_VERSION
+assert cm.__version__ == "0.2.0", cm.__version__
+assert cm.CONTRACT_VERSION == "1.1.0", cm.CONTRACT_VERSION
 assert "site-packages" in cm.__file__, cm.__file__
 assert not any("/symbolu" in p for p in sys.path), sys.path
 
@@ -180,6 +180,53 @@ try:
 except ValueError:
     pass
 
+# 9) CM-TA1 token accounting, proven on the installed wheel (three distinct measurements)
+from ugence_context_minimization.api import (
+    prepare_api_call_measurement, reconcile_api_call_measurement,
+    aggregate_logical_request_usage, ProviderTokenUsage, AttemptStatus,
+    UsageAvailability, RequestComponents, TokenCountBasis, InMemoryTokenAccountingSink,
+    ExplicitAttemptReference,
+)
+# A: context reduction is copied from a real MinimizationResult (o, from step 2 above).
+_prep = prepare_api_call_measurement(
+    minimization_result=o, logical_request_id="lr-demo", provider_id="fake-prov",
+    request_components=RequestComponents(system_text="you are helpful",
+                                         minimized_context_tokens=o.resulting_tokens,
+                                         tool_definition_texts=("tool def blob",)),
+    model_id="demo-model",
+)
+assert _prep.context_tokens_before == o.original_tokens
+assert _prep.context_tokens_after == o.resulting_tokens
+assert _prep.minimization_run_fingerprint == o.run_fingerprint
+# B: the full-request estimate is DEFAULT_APPROXIMATE and distinct from context alone.
+assert _prep.request_estimate.basis is TokenCountBasis.DEFAULT_APPROXIMATE
+assert _prep.request_estimate.is_approximate is True
+assert _prep.request_estimate.estimated_input_tokens > _prep.context_tokens_after
+_sink = InMemoryTokenAccountingSink()
+# C: a FAILED attempt with no usage is unknown (not zero), a retry SUCCEEDS with usage.
+reconcile_api_call_measurement(_prep, attempt_id="d1", attempt_number=1,
+                               status=AttemptStatus.FAILED, sink=_sink)
+reconcile_api_call_measurement(_prep, attempt_id="d2", attempt_number=2,
+                               status=AttemptStatus.SUCCEEDED, retry_of=ExplicitAttemptReference(attempt_id="d1"),
+                               provider_usage=ProviderTokenUsage(input_tokens=2337,
+                                                                 cached_input_tokens=1500,
+                                                                 output_tokens=428),
+                               sink=_sink)
+_recs = _sink.records
+assert len(_recs) == 2
+assert _recs[0].usage_availability is UsageAvailability.UNAVAILABLE_PROVIDER_ERROR
+assert _recs[0].provider_usage is None  # unknown, never fabricated as zero
+_summ = aggregate_logical_request_usage(_recs)
+assert _summ.attempt_count == 2 and _summ.attempts_usage_unknown == 1 and _summ.complete is False
+assert _summ.provider_input_tokens == 2337 and _summ.provider_output_tokens == 428
+# malformed provider token counts fail closed on the installed wheel
+for _bad in (-1, True, 1.5, _math.nan, _math.inf, "5"):
+    try:
+        ProviderTokenUsage(input_tokens=_bad)
+        raise AssertionError("expected rejection for provider input_tokens=%r" % (_bad,))
+    except (InvalidUnitError, InvalidRequestError):
+        pass
+
 # ---- NO unrelated package importable in this clean env --------------------
 for mod in ("action_gate_ref", "action_gateway", "actiongate_context_ablation",
             "ugence_console_api", "robotics_reliability_bench", "experiments",
@@ -243,7 +290,7 @@ def main() -> int:
         _run([str(py), "-c",
               "import importlib.metadata as m; "
               "d=m.distribution('ugence-context-minimization'); "
-              "assert d.version=='0.1.2', d.version; print('metadata', d.metadata['Name'], d.version)"])
+              "assert d.version=='0.2.0', d.version; print('metadata', d.metadata['Name'], d.version)"])
 
     shutil.rmtree(findlinks, ignore_errors=True)
     print("\nISOLATED SINGLE-WHEEL CONTEXT-MINIMIZATION DISTRIBUTION VERIFIED ✔")

@@ -17,14 +17,14 @@ _V5_FILES = [
     "agentic/hybrid_handover/resolution/experiment_v5/synthetic_fixtures.py",
     "agentic/hybrid_handover/resolution/experiment_v5/run_competing_operative_experiment.py",
     "agentic/hybrid_handover/resolution/experiment_v5/lock_v5.py",
-    "agentic/hybrid_handover/resolution/experiment_v5/COMPETING_OPERATIVE_PREREGISTRATION.md",
-    "agentic/hybrid_handover/resolution/experiment_v5/COMPETING_OPERATIVE_ARCHITECTURE.md",
-    "agentic/hybrid_handover/resolution/experiment_v5/OPERATIVE_CANDIDATE_SCHEMA.md",
-    "agentic/hybrid_handover/resolution/experiment_v5/OPERATIVE_SCOPE_SPEC.md",
-    "agentic/hybrid_handover/resolution/experiment_v5/CONFLICT_PREDICATE_SPEC.md",
-    "agentic/hybrid_handover/resolution/experiment_v5/CONFLICT_CLASSIFICATION_RULEBOOK.md",
-    "agentic/hybrid_handover/resolution/experiment_v5/PRECISE_ABSTENTION_SPEC.md",
-    "agentic/hybrid_handover/resolution/experiment_v5/PACKET_CARDINALITY_BOUNDARY.md",
+    "Project_documentation/agentic_framework/agentic/hybrid_handover/resolution/experiment_v5/COMPETING_OPERATIVE_PREREGISTRATION.md",
+    "Project_documentation/agentic_framework/agentic/hybrid_handover/resolution/experiment_v5/COMPETING_OPERATIVE_ARCHITECTURE.md",
+    "Project_documentation/agentic_framework/agentic/hybrid_handover/resolution/experiment_v5/OPERATIVE_CANDIDATE_SCHEMA.md",
+    "Project_documentation/agentic_framework/agentic/hybrid_handover/resolution/experiment_v5/OPERATIVE_SCOPE_SPEC.md",
+    "Project_documentation/agentic_framework/agentic/hybrid_handover/resolution/experiment_v5/CONFLICT_PREDICATE_SPEC.md",
+    "Project_documentation/agentic_framework/agentic/hybrid_handover/resolution/experiment_v5/CONFLICT_CLASSIFICATION_RULEBOOK.md",
+    "Project_documentation/agentic_framework/agentic/hybrid_handover/resolution/experiment_v5/PRECISE_ABSTENTION_SPEC.md",
+    "Project_documentation/agentic_framework/agentic/hybrid_handover/resolution/experiment_v5/PACKET_CARDINALITY_BOUNDARY.md",
 ]
 
 _FROZEN_FILES = [

@@ -1,0 +1,179 @@
+{
+  "schema": "bindingslots_e1_temporal/t4_error_analysis/v1",
+  "method": "deterministic replay (byte-identical verified) + committed episode records; zero new training",
+  "replay_byte_identical": true,
+  "param_hash_report": {
+    "6140": {
+      "replayed": "f81e72c8e41c78d75055669c5a6adf57bdbe212b48e24553f0cb682abcc4a625",
+      "committed": "f81e72c8e41c78d75055669c5a6adf57bdbe212b48e24553f0cb682abcc4a625",
+      "byte_identical": true
+    },
+    "6141": {
+      "replayed": "71d88f557b44ae10967b43f9fdc849c7a0fa2ece5c11cc5ea908ecbb6133ebb5",
+      "committed": "71d88f557b44ae10967b43f9fdc849c7a0fa2ece5c11cc5ea908ecbb6133ebb5",
+      "byte_identical": true
+    },
+    "6142": {
+      "replayed": "17867d70e00f9c65d990ee8473ede40077f2d795b74d2522be1988c68ec645b0",
+      "committed": "17867d70e00f9c65d990ee8473ede40077f2d795b74d2522be1988c68ec645b0",
+      "byte_identical": true
+    },
+    "6143": {
+      "replayed": "cf8a07ab7bd06ea7c8c95c78f873cdb8ee472e6d80215207ef8c4c6a77d07f5b",
+      "committed": "cf8a07ab7bd06ea7c8c95c78f873cdb8ee472e6d80215207ef8c4c6a77d07f5b",
+      "byte_identical": true
+    },
+    "6144": {
+      "replayed": "3cf6afc7f551bd390b782b5a3caba69d45519aebfeaae810868e44e25cb51fe0",
+      "committed": "3cf6afc7f551bd390b782b5a3caba69d45519aebfeaae810868e44e25cb51fe0",
+      "byte_identical": true
+    }
+  },
+  "total_T4_queries": 750,
+  "total_failures": 294,
+  "failure_category_counts": {
+    "NULL_OR_ABSTAIN": 229,
+    "RIGHT_ENTITY_WRONG_OLDER_STEP": 50,
+    "WRONG_ENTITY": 15
+  },
+  "pct_right_entity_wrong_older_step": 0.17006802721088435,
+  "pct_wrong_entity": 0.05102040816326531,
+  "pct_null_abstain": 0.7789115646258503,
+  "pct_invalid_other": 0.0,
+  "correct_latest_rank_mean": 1.4946666666666666,
+  "correct_latest_rank_median": 1.0,
+  "fraction_entity_ok_latest_misselected": 0.17006802721088435,
+  "fraction_entity_retrieval_failed": 0.05102040816326531,
+  "at_step_control_recovers_target_among_failures": 0.9217687074829932,
+  "another_same_entity_record_outranked_target_frac": 0.3197278911564626,
+  "breakdown_by_events_per_entity": {
+    "2": {
+      "NULL_OR_ABSTAIN": 96,
+      "WRONG_ENTITY": 9,
+      "RIGHT_ENTITY_WRONG_OLDER_STEP": 8
+    },
+    "3": {
+      "NULL_OR_ABSTAIN": 73,
+      "RIGHT_ENTITY_WRONG_OLDER_STEP": 21,
+      "WRONG_ENTITY": 6
+    },
+    "4": {
+      "RIGHT_ENTITY_WRONG_OLDER_STEP": 21,
+      "NULL_OR_ABSTAIN": 60
+    }
+  },
+  "breakdown_by_temporal_distance": {
+    "1": {
+      "RIGHT_ENTITY_WRONG_OLDER_STEP": 30,
+      "NULL_OR_ABSTAIN": 49,
+      "WRONG_ENTITY": 3
+    },
+    "2": {
+      "NULL_OR_ABSTAIN": 35,
+      "RIGHT_ENTITY_WRONG_OLDER_STEP": 11,
+      "WRONG_ENTITY": 3
+    },
+    "3": {
+      "NULL_OR_ABSTAIN": 42,
+      "RIGHT_ENTITY_WRONG_OLDER_STEP": 6,
+      "WRONG_ENTITY": 2
+    },
+    "4": {
+      "NULL_OR_ABSTAIN": 30,
+      "WRONG_ENTITY": 3,
+      "RIGHT_ENTITY_WRONG_OLDER_STEP": 2
+    },
+    "5": {
+      "NULL_OR_ABSTAIN": 23,
+      "WRONG_ENTITY": 2
+    },
+    "6": {
+      "NULL_OR_ABSTAIN": 20,
+      "RIGHT_ENTITY_WRONG_OLDER_STEP": 1,
+      "WRONG_ENTITY": 1
+    },
+    "7": {
+      "NULL_OR_ABSTAIN": 11
+    },
+    "8": {
+      "NULL_OR_ABSTAIN": 9,
+      "WRONG_ENTITY": 1
+    },
+    "9": {
+      "NULL_OR_ABSTAIN": 3
+    },
+    "10": {
+      "NULL_OR_ABSTAIN": 1
+    },
+    "11": {
+      "NULL_OR_ABSTAIN": 3
+    },
+    "12": {
+      "NULL_OR_ABSTAIN": 2
+    },
+    "15": {
+      "NULL_OR_ABSTAIN": 1
+    }
+  },
+  "per_seed": {
+    "6140": {
+      "total_T4": 150,
+      "failures": 52,
+      "right_entity_wrong_older": 9,
+      "wrong_entity": 2,
+      "null_abstain": 41,
+      "invalid_other": 0
+    },
+    "6141": {
+      "total_T4": 150,
+      "failures": 48,
+      "right_entity_wrong_older": 9,
+      "wrong_entity": 2,
+      "null_abstain": 37,
+      "invalid_other": 0
+    },
+    "6142": {
+      "total_T4": 150,
+      "failures": 60,
+      "right_entity_wrong_older": 12,
+      "wrong_entity": 4,
+      "null_abstain": 44,
+      "invalid_other": 0
+    },
+    "6143": {
+      "total_T4": 150,
+      "failures": 69,
+      "right_entity_wrong_older": 8,
+      "wrong_entity": 4,
+      "null_abstain": 57,
+      "invalid_other": 0
+    },
+    "6144": {
+      "total_T4": 150,
+      "failures": 65,
+      "right_entity_wrong_older": 12,
+      "wrong_entity": 3,
+      "null_abstain": 50,
+      "invalid_other": 0
+    }
+  },
+  "supplementary_addressing_only_view": {
+    "note": "null-EXCLUDED addressing view (matches the T4 addressing_top1 gate); NOT part of the frozen conclusion",
+    "addressing_failures": 158,
+    "counts": {
+      "ADDR_WRONG_ENTITY": 78,
+      "ADDR_RIGHT_ENTITY_WRONG_OLDER": 80
+    },
+    "pct_right_entity_wrong_older": 0.5063291139240507,
+    "pct_wrong_entity": 0.4936708860759494,
+    "abstention_rate_over_all_T4": 0.30533333333333335
+  },
+  "conclusion": "T4_ERROR_ANALYSIS_INCONCLUSIVE",
+  "co_emitted": [
+    "ORIGINAL_BINDINGSLOTS_NEURAL_ROUTING_UNRESOLVED",
+    "KDA_VALIDATION_BLOCKED"
+  ],
+  "recommendation": "identify the minimum additional instrumentation needed; do NOT run a new experiment",
+  "t5_note": "T5 predecessor/successor performance is explicitly OUTSIDE this conclusion",
+  "existing_verdict_unchanged": "E1_TEMPORAL_TRANSFER_PARTIAL"
+}

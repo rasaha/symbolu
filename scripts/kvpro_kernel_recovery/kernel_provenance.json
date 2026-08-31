@@ -15,7 +15,7 @@
     "evidence": [
       "CTM_plus/Bench/scripts/KERNEL_6C3C_RUNBOOK.md:23",
       "INT4_PROTECTED_VC_BRIEF.md:191,222,692,1253",
-      "deploy/INT4_PROTECTED_DESIGN.md:83",
+      "Project_documentation/repository/deploy/INT4_PROTECTED_DESIGN.md:83",
       "CTM_plus/KVPolicy/INT4_PROTECTED_README.md:116"
     ],
     "status": "provenance-confirmed (documented, multiply-corroborated); public remote fetch NOT re-verified this session"

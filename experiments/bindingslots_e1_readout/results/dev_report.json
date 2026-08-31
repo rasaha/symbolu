@@ -1,0 +1,120 @@
+{
+  "added_params": {
+    "R0": 0,
+    "R1": 4160,
+    "R2": 16576,
+    "R3": 16576
+  },
+  "arms": [
+    "R0",
+    "R1",
+    "R2",
+    "R3"
+  ],
+  "budget_sufficient": true,
+  "determinism": {
+    "arm": "R2",
+    "byte_identical": true,
+    "readout_hash": "b56376ea19529feb71a89aba2e3c47006746b94f96b9e9c34a9c8c5d466a3b49",
+    "seed": 750
+  },
+  "dev_mean_T4_null_inclusive": {
+    "R0": 0.6155555645624796,
+    "R1": 0.6377777655919393,
+    "R2": 0.6155555645624796,
+    "R3": 0.704444428284963
+  },
+  "dev_mean_improvement_over_R0": {
+    "R0": 0.0,
+    "R1": 0.02222220102945971,
+    "R2": 0.0,
+    "R3": 0.08888886372248339
+  },
+  "dev_seeds": [
+    750,
+    751,
+    752
+  ],
+  "frozen_base_unchanged_all": true,
+  "leakage": {
+    "all_pass": true,
+    "eval_ids_unseen": {
+      "leaked_targets": 0,
+      "pass": true
+    },
+    "factor_scoring_no_oracle": {
+      "pass": true,
+      "problems": [],
+      "scores_signature_ok": true
+    },
+    "inherited_suite_pass": true,
+    "latest_heuristic_uninformative": {
+      "global_latest_heuristic_accuracy": 0.08,
+      "pass": true
+    },
+    "lexical_overlap_uninformative": {
+      "chance": 0.03125,
+      "lexical_overlap_accuracy": 0.03333333333333333,
+      "pass": true
+    },
+    "no_answer_in_key": {
+      "keys_with_status_token": 0,
+      "pass": true
+    },
+    "no_exact_overlap": {
+      "max_shared_tokens": 0,
+      "pass": true
+    },
+    "no_status_in_query": {
+      "pass": true,
+      "queries_with_status_token": 0
+    },
+    "no_table_import": {
+      "banned_hits": [],
+      "pass": true
+    },
+    "pools_disjoint": {
+      "dev": 134,
+      "final": 124,
+      "pass": true,
+      "train": 522
+    },
+    "readout_no_table_import": {
+      "banned_hits": [],
+      "pass": true
+    },
+    "shortcut_baselines": {
+      "ceiling": 0.15,
+      "global_latest_accuracy": 0.08,
+      "lexical_accuracy": 0.03333333333333333,
+      "pass": true
+    }
+  },
+  "leakage_all_pass": true,
+  "oracle_equivariance": {
+    "null_invariant": true,
+    "pass": true,
+    "real_equivariant": true
+  },
+  "purpose": "correctness/frozen-base/determinism/activity/distinctness/leakage/budget ONLY; no tuning",
+  "r1_r2_distinctness": {
+    "distinct": true,
+    "r1_r2_pred_disagreement": 0.23999999463558197,
+    "r2_head_attn_mean_L1": 0.5446875691413879,
+    "r2_head_param_cosine": -0.015887871384620667
+  },
+  "readout_activity": {
+    "750:R1": 496.1903729438782,
+    "750:R2": 1307.6305079460144,
+    "750:R3": 1279.4399554729462,
+    "751:R1": 499.0164489746094,
+    "751:R2": 1300.475588798523,
+    "751:R3": 1305.0900185108185,
+    "752:R1": 505.7758193016052,
+    "752:R2": 1285.049468278885,
+    "752:R3": 1275.523726940155
+  },
+  "readout_activity_ok": true,
+  "schema": "bindingslots_e1_readout/dev/v1",
+  "wall_clock_sec": 143.7
+}

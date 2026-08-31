@@ -1,0 +1,164 @@
+"""Phase 5A's state, pinned from the package that consumes it.
+
+**Superseded premise, kept deliberately.** This file was written for D-5B0B-6, which ruled
+that the policy proof travels alongside the candidate and Phase 5A stays at ``0.1.0``. 5B-1
+supersedes that: D-5B1-1 binds the policy coordinate *inside* the candidate, which moves one
+of Phase 5A's pinned digests and takes that distribution to ``0.2.0``. A version assertion is
+not a promise to avoid making the change the next phase exists to make.
+
+What survives the ruling is this file's purpose, and it is why the file is amended rather than
+deleted: a change to Phase 5A must surface **here**, in a package that depends on it, and not
+only in Phase 5A's own suite. The measurement that decided D-5B1-1 is re-asserted in Phase
+5A's ``test_frozen_digests.py``: widening the existing binding in place moves two pinned
+digests, carrying the coordinate as its own field moves one, and one is the floor for any
+option that binds it inside the candidate at all.
+"""
+
+from __future__ import annotations
+
+import pathlib
+import re
+import subprocess
+import sys
+
+import pytest
+
+from _policy_fixtures import _find_repo_root
+
+REPO = _find_repo_root()
+pytestmark = pytest.mark.skipif(
+    REPO is None, reason="no source checkout; Phase 5A's test tree is unavailable"
+)
+
+
+def _phase5a() -> pathlib.Path:
+    return REPO / "packages" / "integration" / "cloud-scaling-authorization-contracts"
+
+
+@pytest.mark.invariant
+def test_phase_5a_is_at_the_version_5b1_moved_it_to():
+    """``0.5.0`` since R-12b, which moved two of Phase 5A's frozen digests.
+
+    That is the point of pinning it here: R-12b is a change made in Phase 5A and Risk
+    Authority, and it moved a value **this** package's fixtures depend on. It surfaced here
+    first, in a consumer, which is exactly what this file exists to do.
+
+    ``0.2.0`` was 5B-1: a required field on the candidate and a moved candidate digest
+    (D-5B1-2); ``0.4.0`` was R-12.
+    """
+
+    version = (_phase5a() / "src" / "ugence_cloud_scaling_authorization_contracts" / "version.py").read_text()
+    assert '__version__ = "0.7.0"' in version
+
+
+@pytest.mark.invariant
+def test_the_policy_authority_stays_at_0_1_0():
+    init = (REPO / "packages" / "policy-authority" / "src" / "ugence_policy_authority" / "__init__.py").read_text()
+    assert '__version__ = "0.1.0"' in init
+
+
+@pytest.mark.invariant
+def test_this_package_ships_at_the_version_its_profile_change_requires():
+    """``0.6.0`` since R-12b — and the profile deliberately did **not** move with it.
+
+    R-12b is a **fixture-pin bump**: this package's verification source is untouched. Its
+    occurrence gate reads candidate facts by name, and Phase 5A re-sourcing those facts from
+    the digest-bound decision snapshot satisfies it without a line changing here. What moved
+    is the Phase 5A mirror below, and the artifact digest — but only because the *candidate*
+    digest it binds moved upstream, not because this package's artifact changed shape. The
+    partition fingerprint is untouched, so the profile stays at ``v3``.
+
+    ``0.5.0`` was 5B-3; ``0.4.0`` was 5B-2 part 2, whose profile also did not move.
+
+    The two travel together only when the *artifact* changes. 5B-1 took the package to
+    ``0.2.0`` and the profile to ``v2`` because a fact was promoted between the halves. 5B-2
+    part 1 took the package to ``0.3.0`` and left the profile alone; part 2 took it to
+    ``0.4.0`` and left it alone again. Gates 12 and 13 change which inputs produce an
+    artifact, not what an artifact contains, so the partition fingerprint and the artifact
+    digest were untouched. A profile bump there would have told a consumer their pinned
+    digest moved when it did not.
+
+    5B-3 is the other kind. It promotes ``policy_type`` and adds ``capacity_bounds_fact``,
+    so the partition, the artifact digest and the profile version all move together: package
+    ``0.5.0``, profile ``v3``. R-12b is back to the first kind: ``0.6.0``, profile still
+    ``v3``.
+
+    **R-8's reconciliation is a third kind, and it qualifies the rule above.** Gate 16 adds
+    no fact and moves no fact, so by the "gates change which inputs produce an artifact"
+    reasoning the profile would have stayed at ``v3``. It is at ``v4`` by owner ruling, and
+    the ground is that the reasoning above measures the wrong thing: a profile version says
+    what a determination *establishes*, not what shape it has. A ``VERIFIED`` artifact minted
+    with a candidate now establishes that the candidate's ceilings were reconciled against an
+    authenticated bound, which a ``v3`` artifact never established. A consumer must not read
+    the two as making the same claim.
+
+    The cost is real and is accepted, not hidden: because the profile version is inside the
+    artifact, the bump moves every artifact digest even though no fact changed. Every frozen
+    anchor below was regenerated by measurement and its superseded value pinned.
+
+    Gate 13's exact-type re-check is back to the first kind: ``0.8.0``, profile still ``v4``.
+    It changes which inputs produce an artifact — a candidate carrying a lying ``datetime``
+    subclass no longer produces one — and not what an artifact contains or establishes about
+    an input that was already exactly typed. Every frozen digest is unmoved, which is the
+    measurement that says so.
+    """
+
+    from ugence_cloud_scaling_policy_authenticity import (
+        VERIFICATION_PROFILE_VERSION,
+        __version__,
+    )
+
+    assert __version__ == "0.8.0"
+    assert VERIFICATION_PROFILE_VERSION == "v4"
+
+
+@pytest.mark.invariant
+def test_phase_5a_pins_exactly_eleven_frozen_digests():
+    """Eleven since 5B-1: the policy coordinate binding is pinned like every other stage."""
+
+    source = (_phase5a() / "tests" / "test_frozen_digests.py").read_text()
+    frozen = re.findall(r"^FROZEN_[A-Z0-9_]+ = ", source, flags=re.MULTILINE)
+    assert len(frozen) == 11
+    assert "FROZEN_POLICY_COORDINATE_BINDING_DIGEST = " in source
+
+
+@pytest.mark.invariant
+def test_the_superseded_pre_5b1_candidate_digest_is_pinned_as_a_negative_anchor():
+    """A revert to a candidate carrying no coordinate must fail, not re-baseline."""
+
+    source = (_phase5a() / "tests" / "test_frozen_digests.py").read_text()
+    assert "SUPERSEDED_PRE_5B1_CANDIDATE_DIGEST = " in source
+    assert "db72ffffc5bf4ecfe8a5f9fe187efb5e8439355e559fcc34b391cc4c9282a313" in source
+
+
+@pytest.mark.invariant
+def test_all_ten_frozen_digests_still_hold():
+    """Runs Phase 5A's own suite, in its own tree, as a subprocess. No mocking, no stubbing."""
+
+    completed = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "pytest",
+            "tests/test_frozen_digests.py",
+            "-p",
+            "no:cacheprovider",
+            "-q",
+        ],
+        cwd=str(_phase5a()),
+        capture_output=True,
+        text=True,
+    )
+    assert completed.returncode == 0, completed.stdout + completed.stderr
+
+
+@pytest.mark.adversarial
+def test_this_package_changes_no_phase_5a_or_policy_authority_file():
+    """A leaf package adds a directory. It does not reach into its dependencies' trees."""
+
+    here = pathlib.Path(__file__).resolve().parents[1]
+    assert here.name == "cloud-scaling-policy-authenticity"
+    # Nothing this distribution ships lives outside its own directory.
+    shipped = list((here / "src").rglob("*.py")) + list((here / "tests").rglob("*.py"))
+    for path in shipped:
+        assert here in path.parents

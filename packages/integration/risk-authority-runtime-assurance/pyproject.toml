@@ -1,0 +1,66 @@
+# Ugence Risk Authority Runtime Assurance — RA-7 runtime / trajectory assurance.
+#
+# This is NOT a leaf: it is the integration/control-plane package that OBSERVES
+# the Agent Runtime through the existing neutral event seam, risk-types the
+# per-workflow-instance trajectory, and — on a *material* deviation — emits a
+# neutral ``AuthorityReassessmentSignal`` into the already-built RA-6 intake.
+#
+#   RA-7 OBSERVES AND ASSESSES.  RA-6 OWNS AUTHORITY CONSEQUENCES.
+#
+# The dependency direction is one-way (spec §22):
+#
+#     risk_authority (stdlib-only leaf)            <- neutral signal + intake port
+#         ▲
+#     ugence-risk-authority-status-runtime (RA-6)  <- reassessor + sole writer
+#         ▲
+#     ugence-risk-authority-runtime-assurance (RA-7, this package)
+#
+# It deliberately does NOT depend on the Agent Runtime, any database driver,
+# framework, event bus, or telemetry transport: the Agent Runtime is observed
+# through a neutral duck-typed event contract (``.seq``/``.type``/``.detail``) so
+# no runtime dependency is added and ``agent-runtime`` never imports Risk
+# Authority. The reference evaluator / ingress / policy reader are stdlib-only and
+# stateless; production ingress / evaluator / policy providers are delegated
+# behind ports and a reference stand-in is REFUSED in production (RA-5/RA-6 F-1).
+#
+# Build:   python -m build packages/integration/risk-authority-runtime-assurance
+# Verify:  python packages/integration/risk-authority-runtime-assurance/scripts/verify_isolated_install.py
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ugence-risk-authority-runtime-assurance"
+dynamic = ["version"]
+description = "Ugence Risk Authority Runtime Assurance — RA-7 runtime/trajectory observation that can cause previously-valid machine authority to be reassessed via the RA-6 intake. Observes and assesses; never mints, widens, or mutates authority."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "Proprietary" }
+authors = [{ name = "Rakesh Mohan" }]
+keywords = ["governance", "risk", "authority", "runtime", "trajectory", "assurance", "observer", "ugence"]
+# One-way dependencies on the machine-authority owner (neutral signal types) and
+# the RA-6 status-runtime intake (reassessor + sole writer). No agent-runtime, no
+# database/framework/event-bus/telemetry-transport dependency of its own; the
+# reference observer/evaluator/ingress are stdlib-only, and production transport
+# is delegated behind the ports.
+dependencies = [
+    "ugence-risk-authority>=0.1.0",
+    "ugence-risk-authority-status-runtime>=0.1.0",
+]
+
+[project.optional-dependencies]
+test = ["pytest>=7.0"]
+
+[tool.setuptools.dynamic]
+version = { attr = "ugence_risk_authority_runtime_assurance.version.__version__" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["ugence_risk_authority_runtime_assurance*"]
+
+[tool.setuptools.package-data]
+ugence_risk_authority_runtime_assurance = ["py.typed"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"

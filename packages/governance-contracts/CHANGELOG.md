@@ -1,5 +1,182 @@
 # Changelog — ugence-governance-contracts
 
+## [0.3.1] — assessed-system binding instants canonicalize in UTC (fix)
+
+**Patch.** No public symbol, field, enum value, default or authority meaning
+changed, nothing was added to the curated API, and `CONTRACT_VERSION` (the
+**provider** contract surface) is **unchanged at `1.0.0`** — this corrects a
+defect inside an existing contract rather than changing a surface. Only the
+package `__version__` advances, to `0.3.1`. Remains a stdlib-only leaf.
+
+### Fixed — equality and digest disagreed about timezone-aware instants
+Two timezone-aware datetimes naming the **same instant** are equal in Python and
+hash alike, so two `AssessedSystemBinding` values differing only in the offset
+their `effective_from` / `effective_to` were written with are the *same* binding.
+Canonicalization did not agree: it serialized each instant with the offset it
+arrived in, so equal bindings produced **three different canonical byte
+sequences and three different digests**.
+
+That is an inconsistency in an identity fingerprint the whole platform compares
+on — a binding could fail a digest comparison against itself. Every aware
+datetime participating in canonicalization is now re-expressed in UTC
+(`astimezone(timezone.utc)`, pure arithmetic) immediately **before** the existing
+sorted-key JSON serialization, which is otherwise untouched. So
+
+| written as | canonicalizes as |
+|---|---|
+| `2026-08-17T10:00:00+00:00` | `2026-08-17 10:00:00+00:00` |
+| `2026-08-17T15:30:00+05:30` | `2026-08-17 10:00:00+00:00` |
+| `2026-08-17T06:00:00-04:00` | `2026-08-17 10:00:00+00:00` |
+
+all three yield identical canonical bytes and one digest. The invariant now
+holds unconditionally:
+
+```python
+if binding_a == binding_b:
+    assert binding_a.canonical_bytes() == binding_b.canonical_bytes()
+    assert binding_a.canonical_digest() == binding_b.canonical_digest()
+```
+
+A **genuinely different instant still changes** the bytes and the digest, down to
+the microsecond, and every non-datetime coordinate — tenant, subject, context,
+system, version, configuration, manifest — separates bindings exactly as before.
+
+### Added — `AssessedSystemBinding.canonical_bytes()`
+A method on the existing class, exposing the exact bytes `canonical_digest()`
+hashes so a consumer can verify the digest independently. **No new public
+contract symbol**: `api.__all__` is unchanged and no export was added.
+
+### Unchanged — naive datetimes are still rejected
+A value with no offset names no instant, so UTC is never assumed for it. Naive
+values are refused at construction *and* again at canonicalization, and the
+rejection is a `SystemIdentityContractError`, not a silent default.
+
+### Compatibility — honest about what moves
+Bindings already expressed in UTC keep their **exact** pre-correction canonical
+bytes and digest: normalizing a UTC instant to UTC is the identity, and merged-
+default byte and digest literals are pinned in the tests to prove no drift. A
+digest previously recorded for a binding written with a **non-UTC offset** does
+change — to the UTC-normalized value it should always have had. There is
+deliberately **no** legacy-digest fallback, dual acceptance rule, alias or
+translation layer: this is one deterministic canonicalization, not a second
+protocol.
+
+Canonicalization consults no system clock, locale or environment; an AST guard
+asserts this over the module, including that `astimezone` is never called in its
+local-timezone-inferring zero-argument form.
+
+### Hardened — the distribution verifier removes stale build output
+`verify_governance_contracts_distribution.py` now removes the package-local
+`build/` tree immediately before building, so a module deleted from source
+cannot be resurrected from `build/lib` into a fresh wheel. The removal target is
+`<resolved package root>/build` and nothing else — never a broad path, an
+environment variable or a repository-root walk — and a symlink there is refused
+rather than followed. The verifier continues to inspect the completed **wheel**,
+and now asserts it defines `AssessedSystemBinding` exactly once. A seeded
+regression test plants the duplicate definition in `build/lib`, demonstrates an
+unclean build really does ship it, then proves the hardened path does not.
+
+## [0.3.0] — neutral assessed-system identity (additive)
+
+**Additive, backward-compatible.** No existing public symbol, field, enum value,
+default, serialization or authority meaning changed. `CONTRACT_VERSION` (the
+**provider** contract surface) is **unchanged at `1.0.0`** — exactly as for the
+GV-2E-a evidence family, this is a new additive *neutral contract family* that
+does not touch the provider contract. Only the package `__version__` advances,
+to `0.3.0`. Remains a stdlib-only leaf.
+
+### Added — `contracts/system_identity.py`
+- **`AssessedSystemBinding`** — the single canonical, platform-neutral answer to
+  *which exact system, at which version, in which configuration, does this result
+  describe?* Frozen, all-scalar, digest-bound. Binds binding id, tenant, subject,
+  assessment-context id **and** its exact canonical digest, system id, system
+  version, configuration id, configuration digest, three opaque deferred
+  references, and an optional **half-open** `[effective_from, effective_to)`
+  period.
+- **`SystemBindingAuthenticityStatus`** — one member, `STRUCTURAL_UNVERIFIED`,
+  because exactly one thing is provable today.
+- **`SystemIdentityContractError`** — structural rejections, subclassing
+  `ValueError`, mirroring `EvidenceContractError`.
+
+### Why it lives here (UVI ADR §20)
+The ADR's type-by-type ownership table places `AssessedSystemBinding` in
+**governance-contracts** as a neutral seam. Keeping it here is what lets every
+engine bind the *same* system identity instead of minting a parallel one:
+`ugence-agent-value-readiness` (>= 0.4.0) **re-exports these exact objects**, so
+`readiness_api.AssessedSystemBinding is governance_api.AssessedSystemBinding` —
+one class identity, one canonical serialization, one digest. No copy, subclass,
+adapter or translation model exists anywhere.
+
+### No dependency cycle is possible
+Every binding field is a platform-neutral primitive (`str` / `datetime`). This
+leaf imports **no** UVI policy shape, readiness enum, indicator type, assessment
+context, authority or risk package, so
+`governance-contracts → uvi-policy-contracts → governance-contracts` is
+structurally impossible rather than merely avoided. Comparing a binding against
+an engine's own `AssessmentContext` is the **engine's** adapter responsibility,
+performed against these stable ids and digests. The leaf-dependency test names
+the higher-level packages explicitly so a regression fails as a test, not as an
+import error.
+
+### What a binding proves — and does not
+It proves **internal consistency and digest-bound identity**: two different
+systems, versions, configurations, tenants, subjects, contexts or manifest
+digests can never share a `canonical_digest()`, so a result bound to one binding
+is mechanically detectable when replayed under another.
+
+It proves **nothing else** — not that the named system was ever deployed, that
+`configuration_digest` was computed over the real configuration, that
+`system_manifest_ref` resolves to anything, or that any authority attested any of
+it. `authenticity_status` is a permanently `STRUCTURAL_UNVERIFIED` **property**
+and `authenticity_verified` a permanently-`False` **property**; neither is a
+settable field, and raising either requires a ratified system-binding verifier
+that no merged contract defines.
+
+### Nothing unratified was minted
+`SystemManifest`'s home is an open owner decision (UVI ADR §26.3) and the
+RA-owned `SubjectContext` is unmerged (D-14, §26.2). Neither is defined here:
+both are carried as **opaque, co-required ref + digest tokens**, so a ratified
+contract can be pointed at later with no shape change. No environment
+enumeration is invented either.
+
+## [0.2.0] — GV-2E-a neutral UVI evidence contracts (additive)
+
+**Additive, backward-compatible.** No existing public field, enum value, default,
+serialization, or authority meaning changed. `CONTRACT_VERSION` (the provider
+contract surface) is **unchanged at `1.0.0`**; only the package `__version__`
+advances to `0.2.0`. Remains a stdlib-only leaf with no dependency on any UVI leaf.
+
+### Added
+- `contracts/evidence.py`: the neutral UVI evidence vocabulary.
+  - Five **orthogonal** axes: `SourceBasis`, `TransformationMethod`,
+    `AttestationStatus`, `AttributionStatus`, `VerificationStatus` (plus
+    `EvidenceUsageScope`). No numeric ordering / no single maturity score.
+  - Immutable, digest-bound, timezone-aware references: `EvidenceReference`,
+    `EvidenceProvenance`, `BenchmarkReference`, `AssessmentWindow`,
+    `ForecastHorizon`, `PopulationSlice`, `ConfidenceBasis`.
+  - `MetricClaim` (neutral value: reported/observed/calculated/modeled) and
+    `MetricObservation` (constrained OBSERVED form, `AssessmentWindow` required,
+    `ForecastHorizon` impossible). `EvidenceContractError` for structural
+    rejections (subclasses `ValueError`).
+  - Structural invariants: CALCULATED/MODELED require input evidence (+
+    calculation/model reference); ATTESTED/ATTRIBUTED/VERIFIED require their
+    authority-produced references; SYNTHETIC is `EVALUATION_ONLY` and cannot be
+    attributed/verified; cross-tenant/cross-subject evidence mixing, duplicate
+    references, malformed digests, and invalid time windows are rejected. Caller
+    enum labels alone never satisfy the requirements.
+- Curated public surface extended in `api.py` / top-level `__init__` /
+  `public_api.json`; comprehensive `tests/contract/test_evidence_contracts.py`;
+  distribution verifier extended with an evidence smoke-check.
+
+### Non-goals (this phase)
+- No evidence authority, attribution engine, verification engine, policy
+  authority, readiness evaluator, or financial calculator; no runtime
+  authorization. `AssessedSystemBinding`/`SubjectContext` are deferred (RA-owned,
+  unmerged) and intentionally excluded. `governed-value` 0.2.0 is unchanged; its
+  compatibility mapping is documentation only.
+  *(Historical, accurate as of 0.2.0 — `AssessedSystemBinding` is **owned by this
+  package** as of 0.3.0 below, per UVI ADR §20. `SubjectContext` remains deferred.)*
+
 ## [Unreleased] — package hardening (audit follow-up, no contract change)
 
 Bounded packaging/CI/typing/documentation hardening from the live audit

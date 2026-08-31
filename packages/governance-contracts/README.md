@@ -56,6 +56,94 @@ Independent-distribution proof:
 python packages/governance-contracts/verify_governance_contracts_distribution.py
 ```
 
+## Neutral UVI evidence contracts (GV-2E-a)
+
+Additive, neutral, cross-package **evidence vocabulary** for the future Ugence
+Value Intelligence engines (Agent Value Readiness, Value Forecasting, Governed
+Value Verification). **Contracts and structural invariants only** — this is *not*
+an evidence authority, attribution engine, verification engine, policy authority,
+readiness evaluator, or financial calculator. It grants no action permission and
+mints no authority. No ROI, readiness, or authorization behavior is implemented.
+
+**Five orthogonal evidence dimensions** (never one linear maturity score):
+
+| Axis | Values |
+|---|---|
+| `SourceBasis` | `REPORTED` · `OBSERVED` · `SYNTHETIC` · `MIXED` |
+| `TransformationMethod` | `DIRECT` · `CALCULATED` · `MODELED` |
+| `AttestationStatus` | `UNATTESTED` · `ATTESTED` |
+| `AttributionStatus` | `NOT_APPLICABLE` · `NOT_ATTRIBUTED` · `PARTIALLY_ATTRIBUTED` · `ATTRIBUTED` |
+| `VerificationStatus` | `UNVERIFIED` · `VERIFICATION_FAILED` · `VERIFIED` |
+
+Guarantees: `ATTESTED` never implies `OBSERVED`, `ATTRIBUTED`, or `VERIFIED`;
+`VERIFIED` never implies `ATTRIBUTED` (and vice-versa); verification always
+concerns an exact declared claim (`verified_claim_ref`).
+
+**`MetricClaim` vs `MetricObservation`.** `MetricClaim` is the neutral value
+contract capable of representing reported, observed, calculated, and modeled
+values. `MetricObservation` is a **constrained observed form**: its source basis
+is fixed to `OBSERVED` internally (never caller-selected), an `AssessmentWindow`
+is required, a `ForecastHorizon` is structurally impossible, and constructing one
+does **not** make it attested, attributed, or verified.
+
+**Structural validation vs authority verification.** Constructors enforce
+*structure* — a caller can submit a claim, but **selecting an enum value never
+creates authority or proves evidence**. Stronger statuses are only constructible
+when the caller supplies the corresponding authority-produced references (an
+attestation reference + attester identity; an attribution assessment +
+counterfactual + causal method; a verification assessment + exact claim reference
++ verifier identity + time). Actual signature/authority verification belongs to
+later admission and authority milestones — a dataclass constructor performs no
+cryptographic or organizational verification.
+
+**Synthetic-evidence limits.** `SourceBasis.SYNTHETIC` requires
+`usage_scope = EVALUATION_ONLY` and cannot independently support an attributed or
+verified realized result.
+
+**Neutral references.** `EvidenceReference`, `EvidenceProvenance`,
+`BenchmarkReference`, `AssessmentWindow`, `ForecastHorizon`, `PopulationSlice`,
+`ConfidenceBasis` — immutable, digest-bound, timezone-aware, reusing the existing
+plain `tenant_id`/`subject_id` convention.
+
+**Assessed-system identity (M-3R.3).** `AssessedSystemBinding` **is owned by this
+package** (UVI ADR §20) and lives in `contracts/system_identity.py` alongside
+`SystemBindingAuthenticityStatus` and `SystemIdentityContractError`. It is the
+single canonical answer to *which exact system, at which version, in which
+configuration, does this result describe?* — `ugence-agent-value-readiness`
+**re-exports these exact objects** and defines no copy, subclass or parallel
+schema. Every field is a platform-neutral primitive (`str` / `datetime`), so this
+leaf needs no UVI policy shape or readiness type to define it and no dependency
+cycle is possible; comparing a binding against an engine's own assessment context
+is that engine's adapter responsibility.
+
+The binding is **structural**: `authenticity_status` is a permanently
+`STRUCTURAL_UNVERIFIED` property and `authenticity_verified` a permanently-`False`
+property, because no ratified system-binding verifier exists. The RA-owned
+canonical neutral `SubjectContext` remains a **deferred dependency** (unmerged);
+it and `SystemManifest` are **not** minted here — both are referenced by opaque,
+co-required ref + digest tokens.
+
+**Canonicalization (0.3.1).** Every timezone-aware datetime in the binding is
+normalized to UTC before serialization, so equal bindings are byte-equal:
+`2026-08-17T10:00:00+00:00`, `2026-08-17T15:30:00+05:30` and
+`2026-08-17T06:00:00-04:00` produce identical `canonical_bytes()` and one
+`canonical_digest()`. **Naive datetimes are rejected** — a value with no offset
+names no instant, and UTC is never assumed for it. A genuinely different instant
+still changes both. This fixes an equality/digest inconsistency in which equal
+bindings produced different digests; no readiness classification or authorization
+semantics changed. Digests previously recorded for a **non-UTC-offset**
+representation now resolve to their UTC-normalized value — there is no
+legacy-digest fallback or dual acceptance rule.
+
+**Compatibility.** Purely additive; `CONTRACT_VERSION` (the provider contract
+surface) is unchanged at `1.0.0`; the package version advances to `0.3.1`. The
+`governed-value` 0.2.0 kernel is unchanged; its compatibility mapping is
+**documentation only**: `EvidenceStatus.REPORTED → SourceBasis.REPORTED +
+TransformationMethod.DIRECT`; `AuthorityStatus.UNVERIFIED → AttestationStatus.UNATTESTED
++ VerificationStatus.UNVERIFIED`; current effect classification →
+`AttributionStatus.NOT_ATTRIBUTED`. This mapping is **not** wired into
+`governed-value` in this phase.
+
 ## Compatibility paths
 
 The neutral contracts previously lived in `governance_providers`. Those paths still

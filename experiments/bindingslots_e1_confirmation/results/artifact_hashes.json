@@ -1,0 +1,11 @@
+{
+  "schema": "bindingslots_e1_confirmation/artifact_hashes/v1",
+  "sha256": {
+    "aggregate_verdict.json": "749e0f337a9f87218d9750ebfdf362a3a37304666d52bdf199151004a2b60de9",
+    "conf_protocol.json": "fa23abe3b3779dd9262acad7ab90cde091bd069d33e4599d7bcc19a79d80b7e2",
+    "determinism.json": "8bc6fc79e0945d1ad8cd8975adbe79292b4ebe62548bbcc6a21a55d6c9e2ff7c",
+    "leakage_report.json": "2bb255138701dcacc630e99f003a44115d002286726c89dc6a75a9b2a50e968c",
+    "per_seed.json": "53dd46649c1face9f08f5781abfc5f97faa444c789e8626ab5db90b61bd471fe",
+    "summary.json": "089752cc7db3c336f51ed1365006a0a173cf06489b81ee60d2098a396fa076c9"
+  }
+}

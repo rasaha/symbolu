@@ -1,0 +1,66 @@
+# The Agentic Proposer strategy-permission RUNTIME — the concrete
+# StrategyPolicyResolver that turns an opaque strategy_policy_ref into one exact
+# policy version resolved through the shared Ugence Policy Authority.
+#
+# This is the runtime side; the family package is the artifact side. The split is
+# deliberate: registering the policy family with the authority should not drag a
+# runtime resolver into the importing process.
+#
+# Three first-party dependencies and no third-party runtime dependency of its own:
+#
+#   * ugence-policy-authority — reached through its public api module ONLY, for
+#     resolve_policy and the family-neutral identity types. Every ...core /
+#     ...adapters module is internal and a repository-wide scan enforces that.
+#   * ugence-agentic-proposer — for the ratified StrategyPolicyRequest /
+#     StrategyPolicyResponse shapes and the ReasoningStrategy vocabulary. The
+#     dependency direction is one-way: the proposer imports nothing new, and its
+#     own suite bars it from importing the authority at all.
+#   * ugence-agentic-proposer-strategy-permission-policy — the artifact this
+#     resolver recognizes, and the family adapter the composition helper registers.
+#
+# There is deliberately NO dependency on:
+#
+#   * the Risk Authority, ActionGate, Decision Authority or the Agent Runtime —
+#     this resolver authorizes no runtime action, and a permission boundary must
+#     never drag an execution authority in behind it.
+#   * any networking, storage, service-discovery or plugin-loading library. The
+#     reachable coordinate set is injected configuration, not something this
+#     package resolves for itself.
+#
+# Build:  python -m build packages/integration/agentic-proposer-strategy-permission-runtime
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ugence-agentic-proposer-strategy-permission-runtime"
+dynamic = ["version"]
+description = "Concrete Agentic Proposer StrategyPolicyResolver backed by the shared Ugence Policy Authority — fail-closed strategy-permission resolution."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "Proprietary" }
+authors = [{ name = "Rakesh Mohan" }]
+keywords = ["ugence", "agentic-proposer", "policy", "strategy", "permission", "resolver"]
+dependencies = [
+    "ugence-policy-authority>=0.1.0",
+    "ugence-agentic-proposer>=0.3.0",
+    "ugence-agentic-proposer-strategy-permission-policy>=0.1.0",
+]
+
+[project.optional-dependencies]
+test = ["pytest>=7.0"]
+dev = ["pytest>=7.0", "build>=1.0"]
+
+[tool.setuptools.dynamic]
+version = { attr = "ugence_agentic_proposer_strategy_permission_runtime.version.__version__" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["ugence_agentic_proposer_strategy_permission_runtime*"]
+
+[tool.setuptools.package-data]
+ugence_agentic_proposer_strategy_permission_runtime = ["py.typed"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"

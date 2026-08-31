@@ -1,0 +1,96 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ugence.ai/schemas/hiring/api_contracts.schema.json",
+  "title": "HiringDecisionAuthorityApiEnvelopes",
+  "description": "Request/response envelopes for the Hiring Decision Authority API. Every mutating call emits a correlation-/causation-linked audit event. The decision endpoint rejects any non-human principal. The recommendation response carries the Overall Fit Index RANGE label only on the policy path.",
+  "type": "object",
+  "$defs": {
+    "AuditableRequest": {
+      "type": "object",
+      "required": ["correlation_id", "actor"],
+      "properties": {
+        "correlation_id": { "type": "string" },
+        "causation_id": { "type": "string" },
+        "actor": {
+          "type": "object",
+          "required": ["actor_id", "actor_type"],
+          "properties": {
+            "actor_id": { "type": "string" },
+            "actor_type": { "type": "string", "enum": ["HUMAN", "AI", "SYSTEM", "SERVICE"] }
+          }
+        }
+      }
+    },
+    "SubmitEvidenceRequest": {
+      "allOf": [
+        { "$ref": "#/$defs/AuditableRequest" },
+        {
+          "type": "object",
+          "required": ["candidate_id", "role_id", "evidence_type", "payload_ref"],
+          "properties": {
+            "candidate_id": { "type": "string" },
+            "role_id": { "type": "string" },
+            "evidence_type": { "type": "string" },
+            "payload_ref": { "type": "string", "description": "Reference to the raw submission in the artifact store." }
+          }
+        }
+      ]
+    },
+    "EvaluateRecommendationRequest": {
+      "allOf": [
+        { "$ref": "#/$defs/AuditableRequest" },
+        {
+          "type": "object",
+          "required": ["candidate_id", "role_id"],
+          "properties": {
+            "candidate_id": { "type": "string" },
+            "role_id": { "type": "string" },
+            "contract_id": { "type": "string", "description": "Optional pin; defaults to the role's PUBLISHED HDC." }
+          }
+        }
+      ]
+    },
+    "RecordDecisionRequest": {
+      "allOf": [
+        { "$ref": "#/$defs/AuditableRequest" },
+        {
+          "type": "object",
+          "required": ["recommendation_id", "disposition", "rationale_job_related", "actor"],
+          "properties": {
+            "recommendation_id": { "type": "string" },
+            "disposition": { "type": "string", "enum": ["ADVANCE", "HOLD", "DECLINE"] },
+            "rationale_job_related": { "type": "string" },
+            "override": {
+              "type": "object",
+              "required": ["reason"],
+              "properties": { "reason": { "type": "string" } },
+              "description": "Required when disposition departs from the recommendation. Preserves (never rewrites) the recommendation."
+            },
+            "actor": {
+              "type": "object",
+              "required": ["actor_id", "actor_type"],
+              "properties": {
+                "actor_id": { "type": "string" },
+                "actor_type": { "const": "HUMAN", "description": "Enforced: a non-human principal is rejected (401/403) and audited as a security violation." }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "RecordReviewRequest": {
+      "allOf": [
+        { "$ref": "#/$defs/AuditableRequest" },
+        {
+          "type": "object",
+          "required": ["candidate_id", "checkpoint", "observations"],
+          "properties": {
+            "candidate_id": { "type": "string" },
+            "checkpoint": { "type": "string", "enum": ["ONE_MONTH", "THREE_MONTH", "SIX_MONTH", "TWELVE_MONTH"] },
+            "observations": { "type": "array", "items": { "type": "object" } }
+          }
+        }
+      ]
+    }
+  }
+}
