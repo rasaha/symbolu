@@ -60,16 +60,49 @@ jobs:
           fetch-depth: 0
       - name: Resolve the surface ratchet's baseline
         # The allowlist of public non-field members is ratcheted against history, so the
-        # "before" cannot be edited by the commit that changes the "after". Merge base with the
-        # default branch, named by the event rather than hardcoded — this repository's default
+        # "before" cannot be edited by the commit that changes the "after". The default
+        # branch is named by the event rather than hardcoded — this repository's default
         # branch is not called "main".
+        #
+        # This step used to be a single unconditional `git merge-base HEAD <default>`,
+        # with no default-branch arm and no vacuity guard. Measured on run 33317988694
+        # (the push of merge commit a24d9c6b): merge-base resolved to HEAD itself, so
+        # UGENCE_RATCHET_BASE equalled the head SHA, the ratchet compared the merge
+        # against itself, and the job went green — vacuous on every default-branch push,
+        # failing open where the partition ratchet's resolver fails closed. This is now
+        # the policy-authenticity resolver (its PR #1519 form, resilient to a concurrent
+        # merge advancing the ref mid-step), and `tests/_surface_ratchet.py` refuses a
+        # HEAD-containing baseline a second time, in the tested code, because a guard
+        # that lives only in YAML is covered by nothing.
         run: |
           set -euo pipefail
-          default='${{ github.event.repository.default_branch }}'
-          git fetch --no-tags origin "+refs/heads/${default}:refs/remotes/origin/ratchet-base"
-          base=$(git merge-base HEAD refs/remotes/origin/ratchet-base)
+          head=$(git rev-parse HEAD)
+          base='${{ github.event.pull_request.base.sha }}'
+          source='pull request base sha'
+          if [ -z "${base}" ]; then
+            default='${{ github.event.repository.default_branch }}'
+            git fetch --no-tags origin \
+              "+refs/heads/${default}:refs/remotes/origin/ratchet-base"
+            if git merge-base --is-ancestor "${head}" refs/remotes/origin/ratchet-base; then
+              # A push ON the default branch: HEAD is on that branch's history, however
+              # far the ref has advanced since (ancestor test, not equality — the
+              # equality form is exactly what PR #1515 raced in the policy-authenticity
+              # workflow). The honest "before" is the commit this one landed on top of —
+              # for a merge commit, its first parent, i.e. the previous default tip.
+              base=$(git rev-parse "HEAD^1")
+              source='first parent (push on the default branch)'
+            else
+              base=$(git merge-base HEAD refs/remotes/origin/ratchet-base)
+              source="merge base with ${default}"
+            fi
+          fi
+          git rev-parse --verify "${base}^{commit}" >/dev/null
+          if git merge-base --is-ancestor "${head}" "${base}"; then
+            echo "::error::the surface ratchet baseline (${source}) resolved to ${base}, which already contains HEAD (${head}); comparing the change against itself reports no growth for every widening on it, so the gate would pass vacuously"
+            exit 1
+          fi
           echo "UGENCE_RATCHET_BASE=${base}" >> "$GITHUB_ENV"
-          echo "surface ratchet baseline: ${base} (merge base with ${default})"
+          echo "surface ratchet baseline: ${base} (${source})"
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
