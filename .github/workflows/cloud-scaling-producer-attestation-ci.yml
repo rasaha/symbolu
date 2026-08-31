@@ -493,9 +493,9 @@ jobs:
           # The baseline population, pinned because `baseline_agrees` cannot check it at
           # n=1. A sweep whose baseline collected a different number of tests is
           # measuring a different suite, and every other check above would still pass.
-          if report["baselines"] != {"1": 460}:
+          if report["baselines"] != {"1": 461}:
               problems.append(
-                  f"baseline collected {report['baselines']}, expected {{'1': 460}}"
+                  f"baseline collected {report['baselines']}, expected {{'1': 461}}"
               )
           if report["inventory_total"] != 116:
               problems.append(f"inventory is {report['inventory_total']}, not 116")
