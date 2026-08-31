@@ -1,8 +1,8 @@
 {
   "package": "controller-planning",
   "total": 219,
-  "scored": 219,
-  "excluded": 0,
+  "scored": 218,
+  "excluded": 1,
   "classification": {
     "1": {
       "status": "SCORED",
@@ -119,7 +119,10 @@
       "condition": "key in seen"
     },
     "20": {
-      "status": "SCORED",
+      "status": "EXCLUDED",
+      "reason": "diagnostic-only",
+      "detail": "The guard chooses between two messages on a path that refuses either way: it sits inside `if key in seen:`, and neutralising it falls through to the `duplicate dependency edge` refusal on the very next line. Both are `TopologyError`, and this package's typed half is the exception class, so no input can distinguish them \u2014 a contradictory pair and a duplicate pair are refused under one contract. It is kept because 'contradictory kind' is the more useful diagnosis of the two.",
+      "evidence": "tests/planning/test_guard_coverage.py::test_a_duplicate_pair_and_a_contradictory_pair_are_both_refused_as_topology_errors",
       "module": "planning/topology.py",
       "line": 193,
       "condition": "seen[key] != edge.kind"

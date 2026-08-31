@@ -25,13 +25,15 @@ This package records no prior inventory; this is the first one.
 
 ## Classification
 
-Every guard is classified: **219 `SCORED`** — the
+Every guard is classified: **218 `SCORED`** — the
 sweep neutralises it and the suite must fail — and
-**0 `EXCLUDED`**, each with a reason from a closed vocabulary and
+**1 `EXCLUDED`**, each with a reason from a closed vocabulary and
 a test that measures the reason. A guard is never excluded because it survived; a
 survivor with no prior declaration fails the sweep.
 
-No guard in this package is excluded: every one is scored.
+| Module:line | Reason | Why | Measured by |
+|---|---|---|---|
+| `planning/topology.py:193` | `diagnostic-only` | The guard chooses between two messages on a path that refuses either way: it sits inside `if key in seen:`, and neutralising it falls through to the `duplicate dependency edge` refusal on the very next line. Both are `TopologyError`, and this package's typed half is the exception class, so no input can distinguish them — a contradictory pair and a duplicate pair are refused under one contract. It is kept because 'contradictory kind' is the more useful diagnosis of the two. | `tests/planning/test_guard_coverage.py::test_a_duplicate_pair_and_a_contradictory_pair_are_both_refused_as_topology_errors` |
 
 ## Not counted, and why
 
@@ -64,7 +66,7 @@ No guard in this package is excluded: every one is scored.
 | 17 | `planning/topology.py:187` | if | raise | SCORED | — | `not _subject_scope_compatible(edge.upstream, self.subject)` |
 | 18 | `planning/topology.py:189` | if | raise | SCORED | — | `not _subject_scope_compatible(edge.downstream, self.subject)` |
 | 19 | `planning/topology.py:192` | if | raise | SCORED | — | `key in seen` |
-| 20 | `planning/topology.py:193` | if | raise | SCORED | — | `seen[key] != edge.kind` |
+| 20 | `planning/topology.py:193` | if | raise | EXCLUDED | — | `seen[key] != edge.kind` |
 | 21 | `planning/topology.py:253` | if | raise | SCORED | — | `not isinstance(data, Mapping)` |
 | 22 | `planning/topology.py:257` | if | raise | SCORED | — | `unknown` |
 | 23 | `planning/topology.py:260` | if | raise | SCORED | — | `req not in data` |

@@ -520,7 +520,21 @@ PACKAGES = {
         record_multiplicity=False,
         uncovered_mints=(),
         recorded=(),
-        exclusions={},
+        # Written after a measured sweep, never before one.
+        exclusions={
+            ("planning/topology.py", "seen[key] != edge.kind"): (
+                "diagnostic-only",
+                "The guard chooses between two messages on a path that refuses either "
+                "way: it sits inside `if key in seen:`, and neutralising it falls "
+                "through to the `duplicate dependency edge` refusal on the very next "
+                "line. Both are `TopologyError`, and this package's typed half is the "
+                "exception class, so no input can distinguish them — a contradictory "
+                "pair and a duplicate pair are refused under one contract. It is kept "
+                "because 'contradictory kind' is the more useful diagnosis of the two.",
+                "tests/planning/test_guard_coverage.py::"
+                "test_a_duplicate_pair_and_a_contradictory_pair_are_both_refused_as_topology_errors",
+            ),
+        },
     ),
     "operations": PackageConfig(
         key="operations",
