@@ -5,6 +5,74 @@ All notable changes to this package are documented here. The surface snapshot in
 `tests/packaging/test_public_api.py`, including dataclass field order and the
 exact value of every string constant.
 
+## 0.2.0 — structured policy-version supersession (the `ACC-LC` round)
+
+The change set authorized as `ACC-LC-IA-2` (see
+`docs/architecture/ADR_UGENCE_AGENT_CONSTITUTION_LIFECYCLE_IMPLEMENTATION_AUTHORITY.md`,
+over the `ACC-LC-BASE`/`ACC-LC-1`..`ACC-LC-5` ratification). Purely additive:
+six new public names, none removed, and no existing behaviour relaxed.
+
+### Added
+
+- **A structured successor reference.**
+  `PolicyArtifactDescriptor.supersedes_coordinate` carries the exact predecessor
+  as a complete `PolicyCoordinate` — the only shape the registry can resolve,
+  since exact-match lookup is the only lookup it performs (`ACC-LC-IA-1`).
+  `None` is the default: an artifact supersedes nothing unless it says so.
+- **Supersession as part of issuance, not a separate act.** There is no
+  `supersede_policy` entry point and deliberately none: `ACC-LC-2` ruled that
+  **one** signed act both admits the successor and stops the predecessor
+  resolving. `issue_policy` gains `supersession_id` and `signature_verifier`,
+  both required exactly when a structured predecessor is declared.
+- **A third append-only store.** `PolicySupersessionRecord` (signed, naming both
+  coordinates), `append_issuance_with_supersession`, `append_supersession` and
+  `supersessions_for`. An issued record is immutable and its `lifecycle_state`
+  is signed artifact content, so nothing edits a predecessor into `SUPERSEDED`;
+  the transition is an append, on revocation's exact precedent (`ACC-LC-IA-2`).
+  The compound append is atomic: if the supersession cannot be written, the
+  issuance is rolled back, because a stored successor whose predecessor still
+  resolves is the one state this act exists to prevent.
+- **Six admissibility refusals at issuance step 4** (`ACC-LC-IA-3`), each raising
+  `PolicySupersessionError` before the digest, the approval verifier, the signer
+  and any append: self-reference, cross-tenant, cross-scope, absent predecessor,
+  already-revoked predecessor, already-superseded predecessor. Step 4 now
+  *reads* the registry; the invariant is unchanged and still proven — **nothing
+  from a rejected artifact is stored**.
+- **Resolution consults the store.** A verified supersession denies with the new
+  `PolicyResolutionReason.SUPERSEDED`, naming the successor; an unverifiable one
+  fails closed as `SUPERSESSION_INTEGRITY_INVALID` rather than being ignored,
+  exactly as its revocation counterpart does. A stored supersession is never
+  trusted merely because it is stored.
+- **Its own signing domain**
+  (`ugence.policy-authority/policy-supersession/v1`), so a supersession
+  signature can never be replayed as an issuance or a revocation.
+- **`SUPERSESSION_PREDECESSOR_INADMISSIBLE`**, the stable typed token consumers
+  branch on instead of string-matching a message.
+
+### Unchanged, deliberately
+
+- **The unstructured refusal stands.** A non-empty `supersedes_ref` string is
+  still rejected at step 4, whether or not a structured coordinate accompanies
+  it. No existing refusal is relaxed and no already-valid artifact is
+  invalidated.
+- **No new key entitlement.** The supersession record is signed by the issuing
+  key in the same act and verified against `ISSUE_POLICY`; a separate "may
+  supersede" capability could never be exercised on its own, since the only path
+  to supersession is issuing a successor.
+- **Supersession is not revocation.** Separate stores, separate concepts,
+  neither implying the other: a superseded version is replaced, not withdrawn,
+  and keeps its record.
+- **No suspension.** Deferred to its own round with its cost recorded
+  (`ACC-LC-3`); a reversible pause needs a state absent from the ratified closed
+  lifecycle set.
+- **No agent or role lifecycle authority** (`OD-C4=A`). This is the lifecycle of
+  a signed, versioned policy artifact and nothing else.
+
+`[G]` No **shipped** adapter yet produces a `supersedes_coordinate`, so no
+shipped policy family can supersede until that family opts in — a separate
+authorization. The capability is proven end to end against a synthetic family in
+`tests/authority/test_supersession.py`, which also keeps it family-neutral.
+
 ## 0.1.0 — initial release (unreleased)
 
 The shared, platform-wide **Ugence Policy Authority**, ratified in

@@ -100,6 +100,13 @@ class PolicyAuthenticityOutcome(str, Enum):
     REVOCATION_INTEGRITY_INVALID = "REVOCATION_INTEGRITY_INVALID"
     #: The stored artifact declares an unstructured supersession reference.
     SUPERSESSION_REFERENCE_UNSUPPORTED = "SUPERSESSION_REFERENCE_UNSUPPORTED"
+    #: A verified supersession applies: a successor was issued over this version, which
+    #: therefore no longer resolves. Distinct from ``REVOKED`` — the version is replaced,
+    #: not withdrawn — and kept a separate member because the mapping is injective.
+    POLICY_SUPERSEDED = "POLICY_SUPERSEDED"
+    #: A supersession record targeting this version exists but does not itself verify. On
+    #: ``REVOCATION_INTEGRITY_INVALID``'s exact precedent: neither honoured nor ignored.
+    SUPERSESSION_INTEGRITY_INVALID = "SUPERSESSION_INTEGRITY_INVALID"
 
     # --- this package's own gates, on top of a RESOLVED answer ---------------------------
     #: The answer is a historical one. A historical resolution describes the past and can
@@ -261,6 +268,10 @@ RESOLUTION_REASON_OUTCOMES: Final[dict] = {
     ),
     PolicyResolutionReason.SUPERSESSION_REFERENCE_UNSUPPORTED: (
         PolicyAuthenticityOutcome.SUPERSESSION_REFERENCE_UNSUPPORTED
+    ),
+    PolicyResolutionReason.SUPERSEDED: PolicyAuthenticityOutcome.POLICY_SUPERSEDED,
+    PolicyResolutionReason.SUPERSESSION_INTEGRITY_INVALID: (
+        PolicyAuthenticityOutcome.SUPERSESSION_INTEGRITY_INVALID
     ),
 }
 

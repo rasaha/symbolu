@@ -10,18 +10,26 @@ stage's collaborators are unreachable until the previous stage has succeeded:
 2. **adapter/family recognition** — a registered adapter must claim the artifact;
 3. **exact identity derivation** — the adapter yields the complete coordinate;
 4. **supersession admissibility** — a non-empty unstructured ``supersedes_ref``
-   is rejected here, before any collaborator is touched;
+   is rejected here, before any collaborator is touched; a **structured**
+   predecessor coordinate (`ACC-LC-IA-1`) is checked for admissibility here
+   too, which reads the registry (`ACC-LC-IA-3`);
 5. **canonical body digest and declared-digest equality**;
 6. **approval verification**;
 7. **lifecycle/effectivity at the explicit issuance instant**;
 8. **signing**;
 9. **record construction**;
-10. **atomic process-local registry append**.
+10. **atomic process-local registry append** — the successor and, when one is
+    declared, its supersession record, as one act (`ACC-LC-2`).
 
 Proven by instrumented call-count tests: a structural, family, supersession or
 digest failure never invokes the approval verifier; an approval failure never
 invokes the signer; a signing failure never mutates the registry; and the
 registry is byte-identical after a failure at *any* stage.
+
+**What step 4 may touch.** It reads the registry when a structured predecessor
+is declared — the predecessor must exist and be admissible before anything is
+signed. The guarantee is and remains that **nothing from a rejected artifact is
+stored**: reads mutate nothing, and no append happens anywhere but step 10.
 
 **Determinism.** No wall clock, no random UUID, no environment lookup, no
 network call, no hidden global state. The issuance instant is injected and read
@@ -41,12 +49,18 @@ from .errors import (
     PolicyDigestMismatchError,
     PolicyIssuanceError,
     PolicySigningError,
+    PolicySupersessionError,
     UnsupportedSupersessionError,
 )
 from .payload import issuance_signing_payload
-from .records import IssuedPolicyRecord
+from .records import IssuedPolicyRecord, PolicySupersessionRecord
 from .registry import PolicyRegistry
-from .signing import PolicySigner
+from .payload import supersession_signing_payload
+from .signing import PolicySignatureVerifier, PolicySigner
+from .supersession import (
+    require_admissible_supersession,
+    verify_supersession_record,
+)
 from .statuses import AUTHORITY_PROTOCOL, AUTHORITY_PROTOCOL_VERSION
 
 __all__ = ["issue_policy", "SUPERSESSION_REFERENCE_UNSUPPORTED"]
@@ -74,6 +88,8 @@ def issue_policy(
     adapters: AdapterRegistry,
     issued_at: datetime,
     expected_reference_tenant_id: Optional[str] = None,
+    supersession_id: Optional[str] = None,
+    signature_verifier: Optional[PolicySignatureVerifier] = None,
 ) -> IssuedPolicyRecord:
     """Issue, sign, and register one exact policy version.
 
@@ -138,6 +154,30 @@ def issue_policy(
             "complete exact policy coordinate, and guessing one would be an unsigned "
             "authority decision. Structured successor references are a separate, deferred "
             "contract milestone; nothing has been signed or registered."
+        )
+
+    # A structured predecessor (`ACC-LC-IA-1`) is admissible only if it exists
+    # and is replaceable. This reads the registry; it writes nothing, and every
+    # refusal below precedes the approval verifier, the signer and step 10.
+    predecessor: Optional[PolicyCoordinate] = descriptor.supersedes_coordinate
+    if predecessor is not None:
+        if not isinstance(supersession_id, str) or not supersession_id.strip():
+            raise PolicyAuthorityRequestError(
+                "issue_policy(supersession_id) must be a non-empty string when the "
+                "artifact declares a structured predecessor: the supersession record "
+                "is signed, and a signed record needs an identity"
+            )
+        if signature_verifier is None or not hasattr(signature_verifier, "verify"):
+            raise PolicyAuthorityRequestError(
+                "issue_policy(signature_verifier) is mandatory when the artifact "
+                "declares a structured predecessor — the superseding key's "
+                "entitlement must be proven before the record is stored"
+            )
+        require_admissible_supersession(
+            predecessor=predecessor,
+            successor=coordinate,
+            registry=registry,
+            as_of=issued_at,
         )
 
     # -- 5. Canonical body digest and declared-digest equality ------------
@@ -219,4 +259,50 @@ def issue_policy(
 
     # -- 10. Atomic process-local registry append -------------------------
     # The only mutation in the whole function, and the last thing that happens.
-    return registry.append_issuance(record)
+    if predecessor is None:
+        return registry.append_issuance(record)
+
+    # `ACC-LC-2`: one signed act admits the successor and stops the predecessor
+    # resolving. The supersession is signed by the issuing key, in this act, and
+    # its entitlement is proven before it is stored.
+    supersession_signature = signer.sign(
+        supersession_signing_payload(
+            supersession_id=supersession_id,
+            coordinate=predecessor,
+            successor_coordinate=coordinate,
+            superseding_authority_id=issuing_authority_id,
+            key_id=key_id,
+            signature_alg=signature_alg,
+            superseded_at=issued_at,
+        )
+    )
+    if not isinstance(supersession_signature, (bytes, bytearray)) or not (
+        supersession_signature
+    ):
+        raise PolicySigningError("signer returned no supersession signature material")
+
+    supersession = PolicySupersessionRecord(
+        supersession_id=supersession_id,
+        coordinate=predecessor,
+        successor_coordinate=coordinate,
+        superseding_authority_id=issuing_authority_id,
+        key_id=key_id,
+        signature_alg=signature_alg,
+        signature=bytes(supersession_signature),
+        superseded_at=issued_at,
+    )
+    verification = verify_supersession_record(
+        supersession,
+        coordinate=predecessor,
+        signature_verifier=signature_verifier,
+        as_of=issued_at,
+    )
+    if not verification.valid:
+        raise PolicySupersessionError(
+            "the issuing key is not authorized to supersede this policy: "
+            f"{verification.status.value}"
+            + (f" ({verification.detail})" if verification.detail else "")
+        )
+
+    issued, _ = registry.append_issuance_with_supersession(record, supersession)
+    return issued

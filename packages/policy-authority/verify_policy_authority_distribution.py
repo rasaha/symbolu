@@ -58,7 +58,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 import ugence_policy_authority as pa
-assert pa.__version__ == "0.1.0", pa.__version__
+assert pa.__version__ == "0.2.0", pa.__version__
 assert "site-packages" in pa.__file__, pa.__file__
 assert not any("/symbolu" in p for p in sys.path), sys.path
 ROOT = pathlib.Path(pa.__file__).resolve().parent

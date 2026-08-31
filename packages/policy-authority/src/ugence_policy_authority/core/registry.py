@@ -35,7 +35,11 @@ from typing import Optional, Protocol, runtime_checkable
 from .adapters import PolicyCoordinate
 from .canonical import canonical_bytes
 from .errors import PolicyRegistryConflictError
-from .records import IssuedPolicyRecord, PolicyRevocationRecord
+from .records import (
+    IssuedPolicyRecord,
+    PolicyRevocationRecord,
+    PolicySupersessionRecord,
+)
 
 __all__ = ["PolicyRegistry", "InMemoryPolicyRegistry"]
 
@@ -79,6 +83,24 @@ class PolicyRegistry(Protocol):
         """Revocations targeting this *exact* coordinate."""
         ...
 
+    def append_issuance_with_supersession(
+        self,
+        record: IssuedPolicyRecord,
+        supersession: PolicySupersessionRecord,
+    ) -> tuple[IssuedPolicyRecord, PolicySupersessionRecord]:
+        """Append a successor and its supersession as **one** act (`ACC-LC-2`).
+
+        Either both land or neither does. A successor that admitted itself while
+        leaving its predecessor resolvable would be two acts wearing one name.
+        """
+        ...
+
+    def supersessions_for(
+        self, coordinate: PolicyCoordinate
+    ) -> tuple[PolicySupersessionRecord, ...]:
+        """Supersessions naming this *exact* coordinate as the predecessor."""
+        ...
+
 
 class InMemoryPolicyRegistry:
     """Process-local, append-only, lock-guarded reference registry.
@@ -95,6 +117,9 @@ class InMemoryPolicyRegistry:
         self._identity_slots: dict[tuple, PolicyCoordinate] = {}
         self._revocations: dict[PolicyCoordinate, PolicyRevocationRecord] = {}
         self._revocation_bytes: dict[PolicyCoordinate, bytes] = {}
+        # `ACC-LC-IA-2`: a third append-only store, keyed by the *predecessor*.
+        self._supersessions: dict[PolicyCoordinate, PolicySupersessionRecord] = {}
+        self._supersession_bytes: dict[PolicyCoordinate, bytes] = {}
 
     # ------------------------------------------------------------------
     # Issuance
@@ -191,4 +216,79 @@ class InMemoryPolicyRegistry:
             return ()
         with self._lock:
             record = self._revocations.get(coordinate)
+        return (record,) if record is not None else ()
+
+    # ------------------------------------------------------------------
+    # Supersession (`ACC-LC-IA-2`)
+    # ------------------------------------------------------------------
+    def append_issuance_with_supersession(
+        self,
+        record: IssuedPolicyRecord,
+        supersession: PolicySupersessionRecord,
+    ) -> tuple[IssuedPolicyRecord, PolicySupersessionRecord]:
+        """Append the successor and its supersession under one lock acquisition.
+
+        The lock is re-entrant, so this reuses :meth:`append_issuance` rather
+        than duplicating its conflict rules. If the issuance append raises, the
+        supersession is never written; if the supersession append raises, the
+        issuance is rolled back, because a stored successor whose predecessor
+        still resolves is exactly the state this act exists to prevent.
+        """
+
+        if not isinstance(supersession, PolicySupersessionRecord):
+            raise PolicyRegistryConflictError(
+                "append_issuance_with_supersession requires a PolicySupersessionRecord"
+            )
+        if supersession.successor_coordinate != record.coordinate:
+            raise PolicyRegistryConflictError(
+                "the supersession record's successor must be the record being issued"
+            )
+
+        with self._lock:
+            had_issuance = record.coordinate in self._issued
+            issued = self.append_issuance(record)
+            try:
+                stored = self.append_supersession(supersession)
+            except Exception:
+                if not had_issuance:
+                    self._issued.pop(record.coordinate, None)
+                    self._issued_bytes.pop(record.coordinate, None)
+                    slot = record.coordinate.identity_slot
+                    if self._identity_slots.get(slot) == record.coordinate:
+                        self._identity_slots.pop(slot, None)
+                raise
+            return issued, stored
+
+    def append_supersession(
+        self, record: PolicySupersessionRecord
+    ) -> PolicySupersessionRecord:
+        if not isinstance(record, PolicySupersessionRecord):
+            raise PolicyRegistryConflictError(
+                "append_supersession requires a PolicySupersessionRecord"
+            )
+
+        coordinate = record.coordinate
+        encoded = canonical_bytes(record)
+
+        with self._lock:
+            existing = self._supersessions.get(coordinate)
+            if existing is not None:
+                if self._supersession_bytes[coordinate] == encoded:
+                    return existing
+                raise PolicyRegistryConflictError(
+                    f"a different supersession record already targets "
+                    f"{coordinate.policy_id}@{coordinate.version}; a version cannot be "
+                    "superseded twice by different successors"
+                )
+            self._supersessions[coordinate] = record
+            self._supersession_bytes[coordinate] = encoded
+            return record
+
+    def supersessions_for(
+        self, coordinate: PolicyCoordinate
+    ) -> tuple[PolicySupersessionRecord, ...]:
+        if not isinstance(coordinate, PolicyCoordinate):
+            return ()
+        with self._lock:
+            record = self._supersessions.get(coordinate)
         return (record,) if record is not None else ()

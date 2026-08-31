@@ -1,5 +1,44 @@
 # Changelog — ugence-cloud-scaling-policy-authenticity
 
+## 0.9.0 — carrying the authority's two supersession refusals
+
+The change authorized by `ACC-LC-IA-BASE-A1` (see
+`docs/architecture/ADR_UGENCE_AGENT_CONSTITUTION_LIFECYCLE_IMPLEMENTATION_AUTHORITY_AMENDMENT.md`).
+Additive: two new outcome members, two new mapping entries, nothing removed and
+no existing outcome re-pointed.
+
+Policy Authority `0.2.0` added `PolicyResolutionReason.SUPERSEDED` and
+`SUPERSESSION_INTEGRITY_INVALID`. This package's reason mapping is **total** over
+the authority's refusals and **injective**, so each new reason needs its own
+outcome member — which is precisely why the guards at
+`tests/test_typed_outcomes.py:26` and `:32` failed the authority's change before
+it could merge, and why they are left exactly as they are.
+
+### Added
+
+- `PolicyAuthenticityOutcome.POLICY_SUPERSEDED` — a verified supersession
+  applies: a successor was issued over this version, which therefore no longer
+  resolves. **Not** `REVOKED`: the version is replaced, not withdrawn, and the
+  two are kept distinct because collapsing them would break injectivity and lose
+  the distinction the authority draws.
+- `PolicyAuthenticityOutcome.SUPERSESSION_INTEGRITY_INVALID` — a supersession
+  record exists but does not itself verify; neither honoured nor ignored, on
+  `REVOCATION_INTEGRITY_INVALID`'s exact precedent.
+- The two corresponding `RESOLUTION_REASON_OUTCOMES` entries.
+
+### Changed
+
+- `tests/test_phase5a_untouched.py` pins the Policy Authority at `0.2.0` instead
+  of `0.1.0`. The pin **moved**; it was not deleted or loosened. A consumer that
+  stopped pinning the authority's version would destroy the tripwire that caught
+  this in the first place (`ACC-LC-IA-BASE-A1`).
+
+### Not changed
+
+- Neither temporal-outcome membership nor any existing mapping entry: a
+  superseded answer is not a temporal one, since it does not move back to
+  `VERIFIED` as the clock advances.
+
 ## [Unreleased] — `diagnostic-only` fails across a distribution boundary too
 
 *No version bump and no production behaviour change.*
