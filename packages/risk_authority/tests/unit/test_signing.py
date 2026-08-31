@@ -48,3 +48,23 @@ def test_malformed_signature_returns_false_not_raises():
     vk = SigningKey.from_seed(bytes(range(32))).verify_key
     assert vk.verify(b"msg", b"too-short") is False
     assert vk.verify(b"msg", b"\x00" * 64) is False
+
+
+def test_the_modular_inverse_agrees_with_fermat_on_every_input_including_zero():
+    """`_inv` is a contract, not an implementation: it must equal ``x ** (Q - 2) mod Q``.
+
+    The optimisation that replaced Fermat's exponentiation with extended Euclid is only
+    sound because the two agree everywhere, and they differ in exactly one place —
+    ``pow(0, -1, Q)`` raises where ``pow(0, Q - 2, Q)`` returns 0. `_xrecover` reaches
+    this with an attacker-influenced field element, so the zero case is pinned here
+    explicitly rather than left to the general sample.
+
+    Phrased against Fermat rather than against literal expected values so it survives a
+    future re-optimisation (projective coordinates, or a vetted native backend) without
+    being rewritten: whatever `_inv` becomes, this is what it has to mean.
+    """
+
+    from risk_authority.crypto.signing import _Q, _inv
+
+    for x in (0, _Q, 2 * _Q, 1, 2, 121666, _Q - 1, _Q + 1, 2 ** 200):
+        assert _inv(x) == pow(x, _Q - 2, _Q), x
