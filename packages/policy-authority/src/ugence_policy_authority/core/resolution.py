@@ -25,6 +25,8 @@ approval proof valid (when re-verified)        ``APPROVAL_PROOF_INVALID``
 no unstructured supersession declared          ``SUPERSESSION_REFERENCE_UNSUPPORTED``
 lifecycle is active                            ``LIFECYCLE_NOT_ACTIVE``
 ``as_of`` inside the half-open interval        ``NOT_YET_EFFECTIVE`` / ``EXPIRED``
+any supersession record verifies               ``SUPERSESSION_INTEGRITY_INVALID``
+no verified supersession applies               ``SUPERSEDED``
 any revocation record verifies                 ``REVOCATION_INTEGRITY_INVALID``
 no verified revocation applies                 ``REVOKED``
 =============================================  ==========================================
@@ -81,6 +83,7 @@ from .errors import (
 from .records import PolicyResolution
 from .registry import PolicyRegistry
 from .revocation import verify_revocation_record
+from .supersession import verify_supersession_record
 from .signing import PolicySignatureVerifier
 from .statuses import (
     HistoricalResolutionRule,
@@ -266,6 +269,33 @@ def resolve_policy(
         return deny(PolicyResolutionReason.NOT_YET_EFFECTIVE, "as_of precedes effective_from")
     if descriptor.effective_to is not None and as_of >= descriptor.effective_to:
         return deny(PolicyResolutionReason.EXPIRED, "as_of is at or after effective_to")
+
+    # -- policy-version supersession (`ACC-LC-IA-2`) -----------------------
+    # Checked before revocation only because the two are independent and this
+    # keeps the cheaper, unconditional denial first; neither implies the other.
+    # A superseded version is replaced, not withdrawn: it stops resolving and
+    # keeps its record. Like a revocation, a stored supersession is verified
+    # every time and never trusted merely because it is stored.
+    for supersession in registry.supersessions_for(coordinate):
+        verification = verify_supersession_record(
+            supersession,
+            coordinate=coordinate,
+            signature_verifier=signature_verifier,
+            as_of=as_of,
+        )
+        if not verification.valid:
+            return deny(
+                PolicyResolutionReason.SUPERSESSION_INTEGRITY_INVALID,
+                f"a supersession record targets this version but does not verify: "
+                f"{verification.status.value}",
+            )
+        if as_of >= supersession.superseded_at:
+            successor = supersession.successor_coordinate
+            return deny(
+                PolicyResolutionReason.SUPERSEDED,
+                f"superseded at {supersession.superseded_at.isoformat()} by "
+                f"{successor.policy_id}@{successor.version}",
+            )
 
     # -- policy-version revocation ----------------------------------------
     # Every stored revocation is verified before it is applied. An unverifiable

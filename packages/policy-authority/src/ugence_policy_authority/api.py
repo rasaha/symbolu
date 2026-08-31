@@ -50,6 +50,7 @@ from .core.errors import (
     PolicyIssuanceError,
     PolicyRegistryConflictError,
     PolicyRevocationError,
+    PolicySupersessionError,
     PolicySigningError,
     UnsupportedPolicyArtifactError,
     UnsupportedSupersessionError,
@@ -58,13 +59,24 @@ from .core.issuance import SUPERSESSION_REFERENCE_UNSUPPORTED, issue_policy
 from .core.payload import (
     ISSUANCE_SIGNING_DOMAIN,
     REVOCATION_SIGNING_DOMAIN,
+    SUPERSESSION_SIGNING_DOMAIN,
     issuance_signing_payload,
     revocation_signing_payload,
 )
-from .core.records import IssuedPolicyRecord, PolicyResolution, PolicyRevocationRecord
+from .core.records import (
+    IssuedPolicyRecord,
+    PolicyResolution,
+    PolicyRevocationRecord,
+    PolicySupersessionRecord,
+)
 from .core.registry import InMemoryPolicyRegistry, PolicyRegistry
 from .core.resolution import resolve_policy
 from .core.revocation import revoke_policy, verify_revocation_record
+from .core.supersession import (
+    SUPERSESSION_PREDECESSOR_INADMISSIBLE,
+    require_admissible_supersession,
+    verify_supersession_record,
+)
 from .core.signing import (
     SIGNATURE_ALG,
     DenyAllSignatureVerifier,
@@ -98,6 +110,8 @@ __all__ = [
     "POLICY_BODY_DIGEST_DOMAIN",
     "ISSUANCE_SIGNING_DOMAIN",
     "REVOCATION_SIGNING_DOMAIN",
+    "SUPERSESSION_SIGNING_DOMAIN",
+    "SUPERSESSION_PREDECESSOR_INADMISSIBLE",
     # Errors
     "PolicyAuthorityError",
     "PolicyAuthorityRequestError",
@@ -110,6 +124,7 @@ __all__ = [
     "PolicyIssuanceError",
     "PolicyRegistryConflictError",
     "PolicyRevocationError",
+    "PolicySupersessionError",
     "SUPERSESSION_REFERENCE_UNSUPPORTED",
     # Statuses / reasons
     "ApprovalVerificationStatus",
@@ -153,6 +168,7 @@ __all__ = [
     # Records
     "IssuedPolicyRecord",
     "PolicyRevocationRecord",
+    "PolicySupersessionRecord",
     "PolicyResolution",
     # Registry
     "PolicyRegistry",
@@ -162,6 +178,8 @@ __all__ = [
     "resolve_policy",
     "revoke_policy",
     "verify_revocation_record",
+    "require_admissible_supersession",
+    "verify_supersession_record",
     # The first policy-family adapter (UVI)
     "UVI_ADAPTER_ID",
     "SUPPORTED_UVI_POLICY_FAMILIES",

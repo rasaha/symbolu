@@ -52,9 +52,18 @@ def test_phase_5a_is_at_the_version_5b1_moved_it_to():
 
 
 @pytest.mark.invariant
-def test_the_policy_authority_stays_at_0_1_0():
+def test_the_policy_authority_stays_at_0_2_0():
+    """``0.2.0`` since the `ACC-LC` round, which added structured policy-version
+    supersession and two new ``PolicyResolutionReason`` members.
+
+    That is the point of pinning it here: the new reasons made this package's
+    total, injective reason mapping incomplete, and the failure surfaced in this
+    consumer before the authority's change could merge — which is exactly what
+    this file exists to do. The pin **moves**; it is never deleted or loosened
+    (`ACC-LC-IA-BASE-A1`)."""
+
     init = (REPO / "packages" / "policy-authority" / "src" / "ugence_policy_authority" / "__init__.py").read_text()
-    assert '__version__ = "0.1.0"' in init
+    assert '__version__ = "0.2.0"' in init
 
 
 @pytest.mark.invariant
@@ -108,7 +117,7 @@ def test_this_package_ships_at_the_version_its_profile_change_requires():
         __version__,
     )
 
-    assert __version__ == "0.8.0"
+    assert __version__ == "0.9.0"
     assert VERIFICATION_PROFILE_VERSION == "v4"
 
 
