@@ -6,6 +6,14 @@ Conformance first-slice design specification. **No implementation is performed b
 and none is authorized by it** — see §3: the implementation gate stands, and an
 authorization ruling was deliberately not part of this ballot.
 
+> **Superseded in part as to authorization (2026-08-31, `ACC-S1-IMPL=YES`).** "none is
+> authorized by it" is retained verbatim above as the record of what was true of the
+> six-item ballot this ADR records. `[R]` A **later, separate ruling the same day** —
+> recorded at §7, put over this ADR as it stood at commit
+> `b867ee8ace03226fcc9da884f5aa4042dd1317f1` — grants implementation authority under §3's
+> stated terms. The rest of the sentence stands unchanged: this ADR still performs no
+> implementation, and authorization is not implementation.
+
 **Date:** 2026-08-31.
 
 **Decision owner:** the repository owner, ruling personally in conversation on 2026-08-31.
@@ -172,7 +180,10 @@ ratifies.
 
 ---
 
-## 3. Implementation gate — nothing is authorized `[R]`
+## 3. Implementation gate — nothing is authorized by the six-item ballot `[R]`
+
+*(Recorded as ruled on the six-item ballot; the gate this section describes was
+subsequently opened by the separate `ACC-S1-IMPL` ruling — see §7, which governs.)*
 
 **No Agent Constitution code may begin.** The ballot carried no authorization line by
 design, the owner's answer contains none, and this ADR grants none. `[V]` The scoping ADR's
@@ -229,3 +240,38 @@ names, and Policy Authority at `0.1.0` with sixty-six.
 **Next steps after this ADR merges**, in the `ACC-S1-Q5` sequencing: an explicit owner
 ruling on implementation authority for the two ratified distributions (§3), and — before
 any first release — the `OD-C1=B` contract-amendment ratification round, on its own ballot.
+*(The first of these has since been ruled — §7; the amendment round remains open.)*
+
+---
+
+## 7. `ACC-S1-IMPL` — implementation authority, recorded (2026-08-31) `[R]`
+
+**Ruled: YES**, by the repository owner personally, in conversation on 2026-08-31, on a
+one-item ballot put **after** the six-item ballot §§1–2 record and **over this ADR as it
+stood at commit `b867ee8ace03226fcc9da884f5aa4042dd1317f1`**. `[V]` That commit was the
+branch head at ruling time, with a clean tree, and the substantive freeze digest reproduced
+unchanged (`d993093570bb8ee132d4ab58406a14dd8c9b774b9de2c6d7ac45d3dfd3fac036`).
+
+**Recorded exactly as ruled:** `ACC-S1-IMPL=YES`
+
+The ballot's operative text, in full: authorize implementation of the two ratified
+distributions — `ugence-agent-constitution-policy` (artifact + adapter) and
+`ugence-agent-constitution-conformance` (resolver + verifier) — exactly as the pinned
+specification's ratified surface specifies them, each as its own atomic change set with its
+§5.4 end-to-end proof obligations, and **only after this ratification ADR merges**. It
+authorizes no departure from `ACC-S1-BASE` or any register ruling, no change to Policy
+Authority or the Agentic Proposer, and not the `OD-C1=B` amendment round's change set,
+which remains separately balloted.
+
+`[R]` **What this changes, precisely.** The §3 gate is opened **as a ruling**: the first
+slice is now specified, decided and authorized to be built — the position `S2B-PF-IMPL`
+occupied for its family. `[G]` **It is not closed as a fact**: no constitution family, no
+adapter, no resolver and no conformance verifier exists, and none may be described as
+existing until the two change sets land. The merge precondition is part of the ruling: no
+implementation change set may begin ahead of this ADR reaching the default branch.
+
+`[R]` **Numbering.** `ACC-S1-IMPL` is scoped to this ADR like its §§1–2 siblings; no
+standing series number is assigned, and no prior ruling — `ACC-S1-BASE`, the register,
+`OD-C1` – `OD-C5`, or anything they carry forward — is extended, narrowed or reopened.
+This section records one authorization and nothing else; §§3–6 stand as the record of the
+ballot that preceded it, read subject to this section.
