@@ -26,7 +26,7 @@ export interface TokenProvider {
   onAuthLost: () => void | Promise<void>;
 }
 
-type Method = "GET" | "POST" | "PATCH" | "DELETE";
+type Method = "GET" | "POST" | "PATCH" | "PUT" | "DELETE";
 
 interface RequestOptions {
   method: Method;
@@ -137,5 +137,8 @@ export class HttpClient {
   }
   patch<T>(path: string, body?: unknown): Promise<T> {
     return this.request<T>({ method: "PATCH", path, body });
+  }
+  put<T>(path: string, body?: unknown): Promise<T> {
+    return this.request<T>({ method: "PUT", path, body });
   }
 }

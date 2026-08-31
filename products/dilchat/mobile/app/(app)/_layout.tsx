@@ -23,6 +23,7 @@ export default function AppLayout(): React.ReactElement {
       <Stack.Screen name="accept" options={{ title: "Accept invitation" }} />
       <Stack.Screen name="consent" options={{ title: "Before you connect" }} />
       <Stack.Screen name="paired" options={{ title: "Your connection" }} />
+      <Stack.Screen name="chat" options={{ title: "Chat" }} />
       <Stack.Screen name="privacy" options={{ title: "Privacy" }} />
       <Stack.Screen name="settings" options={{ title: "Settings" }} />
       <Stack.Screen name="compatibility" options={{ title: "Compatibility" }} />

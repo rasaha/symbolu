@@ -59,7 +59,10 @@ export default function Home(): React.ReactElement {
       />
 
       {paired ? (
-        <Button title="Your connection" testID="go-paired" onPress={() => router.push("/(app)/paired")} />
+        <>
+          <Button title="Chat" testID="go-chat" onPress={() => router.push("/(app)/chat")} />
+          <Button title="Your connection" testID="go-paired" onPress={() => router.push("/(app)/paired")} />
+        </>
       ) : (
         <>
           <Button title="Invite a partner" testID="go-invite" onPress={() => router.push("/(app)/invite")} />
