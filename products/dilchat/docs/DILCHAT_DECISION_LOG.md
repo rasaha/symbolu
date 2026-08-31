@@ -984,3 +984,16 @@ open question for Phase 3B.
 |----|----------|--------------------------|
 | OQ-CHAT-1 | Do ended couples retain a read-only export of prior messages? | **Recommend: no retained access** (parallels OQ-14). A retained-export policy, if adopted, is an explicit Phase 3B decision. |
 | OQ-CHAT-2 | Exact account-deletion semantics (hard-erase vs tombstone retention window)? | Deferred to Phase 3B safety/retention track. |
+
+---
+
+## DEC-M2 — Mobile Phase 2 (device / deep-link / lifecycle / privacy / native hardening)
+**Status:** Accepted (mobile track) · **[Technical]** · Branch `dilchat-mobile-device-pilot` (session branch `claude/dilchat-mobile-phase-2-qllgp7`) · Baseline default `c89d699c0b7b2a135b0aed14509a3bb373798413`.
+
+- **DEC-M2-1 — Native architecture = managed workflow / Continuous Native Generation.** No `ios/`/`android/` directories are committed (both `.gitignore`d); native projects are generated on demand via `expo prebuild` / EAS. Least-disruptive supported path; generated native dirs are not committed. Android generation and manifest were validated (`expo prebuild --platform android` exit 0).
+- **DEC-M2-2 — Expo toolchain repair via `ajv@^8` hoist (no SDK bump).** A direct devDependency `ajv@^8.17.1` hoists ajv v8 for `ajv-keywords` (fixing the `expo config`/`expo-doctor`/Metro-export crash) while eslint nests its own ajv v6. Expo/React/React-Native were NOT upgraded. A controlled SDK upgrade is the recommended follow-up to clear build-tooling advisories.
+- **DEC-M2-3 — Deep links carry ONE intent only.** Invitation links are versioned and pass through a strict route allowlist: only the `invitation` intent is honored; any other path/scheme/untrusted-host is ignored, never routed (no open redirect, no arbitrary internal route). Consent is never bypassed — a signed-in deep link lands on the consent screen, not the accept mutation. The invitation token is minimized: in-memory only, never persisted/logged, cleared on accept/reject/invalidate/sign-out/account-switch.
+- **DEC-M2-4 — Android permission & backup minimization.** Only `INTERNET`; template defaults (`READ/WRITE_EXTERNAL_STORAGE`, `SYSTEM_ALERT_WINDOW`, `VIBRATE`) blocked; `allowBackup=false`. Tokens remain Keystore/Keychain device-only (`WHEN_UNLOCKED_THIS_DEVICE_ONLY`).
+- **DEC-M2-5 — App-switcher privacy shield.** An opaque, accessibility-hidden cover obscures authenticated screens whenever the app is not active, so OS snapshots reveal no birth data, token, email, or pairing state. Screenshots are NOT globally disabled (usability); per-screen capture-block is a pilot candidate.
+
+**Scope guard:** Phase 2 implements NO secure chat, AI Assist, Moon receptivity, preference learning, Guna/Koota/Dosha/Parihara execution, or compatibility surface. Guna rule pack stays non-executable. Sequencing unchanged: Phase 2 → Phase 3 secure chat → Phase 4A–4D AI Assist (DEC-048). Verdict: `MOBILE_PHASE2_IMPLEMENTED_VALIDATION_PENDING`.

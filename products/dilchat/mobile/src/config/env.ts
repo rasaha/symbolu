@@ -27,3 +27,17 @@ export function getApiBaseUrl(): string {
 
 /** Request timeout (ms). */
 export const REQUEST_TIMEOUT_MS = 15000;
+
+/**
+ * HTTPS hosts allowed to carry an invitation universal/app link, sourced ONLY
+ * from Expo config (`extra.invitationLinkHosts`). Empty by default: with no host
+ * configured, HTTPS invitation links are rejected and only the app's own
+ * `dilchat://` scheme is honored. This is the anti-open-redirect allowlist — a
+ * link to any other host is never opened. Never a hardcoded production host.
+ */
+export function getTrustedInvitationLinkHosts(): string[] {
+  const extra = (Constants.expoConfig?.extra ?? {}) as Record<string, unknown>;
+  const v = extra.invitationLinkHosts;
+  if (!Array.isArray(v)) return [];
+  return v.filter((h): h is string => typeof h === "string" && h.length > 0).map((h) => h.toLowerCase());
+}

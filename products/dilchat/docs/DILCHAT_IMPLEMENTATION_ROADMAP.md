@@ -67,6 +67,18 @@
 > and [`DILCHAT_RELATIONSHIP_SIGNAL_FUSION_REQUIREMENTS.md`](DILCHAT_RELATIONSHIP_SIGNAL_FUSION_REQUIREMENTS.md).
 > No AI Assist implementation is authorized by this note; **AI Assist must not be
 > built before secure shared chat and privacy boundaries exist.**
+>
+> **Mobile track status.** Phase 1 (onboarding/auth/profile/invite/consent/pairing/
+> unpair) merged (PR #1341). **Phase 2 (device/native/deep-link/lifecycle/privacy/
+> accessibility hardening)** is implemented — Expo toolchain repaired (`expo config`
+> + Metro export green), versioned allowlisted invitation deep links through the
+> consent gate, session/lifecycle & offline resilience, app-switcher + storage +
+> cross-account privacy, accessibility, minimized Android permissions, and a
+> closed-pilot harness — with native compiled builds / emulator / iOS / physical
+> devices deferred to capable hardware (verdict
+> `MOBILE_PHASE2_IMPLEMENTED_VALIDATION_PENDING`). See
+> [`DILCHAT_MOBILE_PHASE2_IMPLEMENTATION_REPORT.md`](./DILCHAT_MOBILE_PHASE2_IMPLEMENTATION_REPORT.md).
+> **Phase 3 (secure shared chat)** remains next; AI Assist stays deferred behind it.
 
 ### 1.2 Dependency graph (Mermaid)
 
