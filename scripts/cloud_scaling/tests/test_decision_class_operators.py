@@ -372,7 +372,7 @@ def test_capacity_bounds_policy_declares_both():
 
 
 def _plugin_source() -> str:
-    match = re.search(r"_MINT_PLUGIN = '''(.*?)\n'''", SWEEP.read_text(encoding="utf-8"), re.S)
+    match = re.search(r"_MINT_PLUGIN = r'''(.*?)\n'''", SWEEP.read_text(encoding="utf-8"), re.S)
     assert match, "the mint plugin literal is no longer where the tests expect it"
     return match.group(1)
 

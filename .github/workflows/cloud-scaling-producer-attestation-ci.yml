@@ -22,6 +22,11 @@ on:
       - "packages/trusted-evidence-authority/**"
       - "packages/risk_authority/**"
       - "docs/architecture/ADR_CLOUD_SCALING_PRODUCER_AUTHENTICITY_PHASE5B0A.md"
+      # The sweep engine. A change to an operator or a detector changes what this
+      # package's guard sweep measures without touching a byte inside the package, so a
+      # filter that omits it lets the engine drift past this gate unmeasured.
+      - "scripts/cloud_scaling/guard_sweep.py"
+      - "scripts/cloud_scaling/tests/**"
       - ".github/workflows/cloud-scaling-producer-attestation-ci.yml"
   push:
     branches:
@@ -29,6 +34,8 @@ on:
       - "claude/setup-symbolu-monorepo-**"
     paths:
       - "packages/integration/cloud-scaling-producer-attestation/**"
+      - "scripts/cloud_scaling/guard_sweep.py"
+      - "scripts/cloud_scaling/tests/**"
       - ".github/workflows/cloud-scaling-producer-attestation-ci.yml"
 
 defaults:
@@ -373,7 +380,7 @@ jobs:
           if-no-files-found: warn
 
   guard-sweep:
-    name: Gate-removal mutation sweep (every inventoried `if` guard scored, none unresolved)
+    name: Gate-removal mutation sweep (shared engine — every scored site killed)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -390,16 +397,145 @@ jobs:
           pip install -e packages/integration/cloud-scaling-risk-integration
           pip install -e packages/integration/cloud-scaling-authorization-contracts
           pip install -e packages/integration/cloud-scaling-producer-attestation
-      - name: Regenerate the guard sweep and prove it is unchanged
-        # The sweep refuses to report if `git status` over `src/` differs before and after,
-        # so a run that mutated the tracked tree fails here rather than being published.
+
+      - name: The checked-in inventory is regenerated, not hand-edited
+        # Runs before the sweep: this is the cheap check that catches a guard added
+        # without a classification or removed without anyone noticing. `--inventory-only`
+        # also fails on an exclusion that names no guard, one with a reason outside the
+        # closed vocabulary, one whose key is ambiguous, and an `except` arm whose reason
+        # vocabulary has no declared collapse sentinel.
         run: |
-          python packages/integration/cloud-scaling-producer-attestation/scripts/guard_sweep.py
+          python scripts/cloud_scaling/guard_sweep.py producer-attestation --inventory-only
           git diff --exit-code -- \
-            packages/integration/cloud-scaling-producer-attestation/GUARD_SWEEP.md \
-            packages/integration/cloud-scaling-producer-attestation/guard_sweep.json
-      - name: The tracked worktree is clean after the sweep
+            packages/integration/cloud-scaling-producer-attestation/GUARD_INVENTORY.md \
+            packages/integration/cloud-scaling-producer-attestation/guard_inventory.json \
+            packages/integration/cloud-scaling-producer-attestation/guard_classification.json
+
+      - name: The sweep's own enforcement machinery is measured, not assumed
+        run: python -m pytest scripts/cloud_scaling/tests -q
+
+      - name: Sweep every site
+        # Single shard, a measured cost decision: the suite runs ~15s under
+        # UGENCE_SKIP_SLOW_PACKAGING (declared per-package in the engine's config, so a
+        # local sweep and CI run the same suite), and 116 mutants + baseline is under
+        # half an hour — the same order as the retired in-package fork's 92-guard job.
+        # Refuses a red baseline outright (exit 2) rather than scoring against it, and
+        # exits non-zero on a surviving scored guard or an unscored one.
+        run: python scripts/cloud_scaling/guard_sweep.py producer-attestation --shard 1/1
+
+      - name: The tracked tree was not mutated
+        # The sweep works in a disposable copy outside the repository. This is what proves it.
         run: git diff --exit-code
+        if: always()
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: producer-attestation-guard-sweep-shard-1
+          path: /tmp/ugence-sweep-producer-attestation/*.json
+          if-no-files-found: warn
+
+  guard-sweep-aggregate:
+    name: Every inventoried site produced exactly one result
+    runs-on: ubuntu-latest
+    needs: guard-sweep
+    if: always()
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: producer-attestation-guard-sweep-shard-*
+          merge-multiple: true
+          path: shards
+      - name: Prove the sweep was total, and block on every way it can be incomplete
+        # A single shard still has to prove totality: a job that died halfway produces no
+        # duplicate either, so absence is checked directly against the real inventory. At
+        # `--shards 1` the misassignment and baseline-agreement checks are vacuous; the
+        # step below pins the baseline population instead.
+        run: |
+          python scripts/cloud_scaling/guard_sweep.py producer-attestation \
+            --aggregate shards --shards 1
+      - name: The totals are the ones this package ratified
+        # The aggregator proves the sweep was well-formed; this asserts the *result*: the
+        # adoption ruling's bar is zero surviving SCORED, zero unscored and zero
+        # message-only kills, with exclusions allowed solely where the reason is
+        # positively shown. A change that quietly traded a killed site for an excluded
+        # one passes every check above and fails here — the closed exclusion vocabulary
+        # is not a decision CI may make on its own.
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          import sys
+
+          report = json.load(
+              open(
+                  "packages/integration/cloud-scaling-producer-attestation/"
+                  "guard_sweep_aggregate.json"
+              )
+          )
+          excluded = sorted(
+              f"{row['module']}:{row['line']}"
+              for row in report["classification"].values()
+              if row["status"] == "EXCLUDED"
+          )
+          print(
+              f"inventory={report['inventory_total']} killed={len(report['killed'])} "
+              f"survived={len(report['survived'])} unscored={len(report['unscored'])} "
+              f"excluded={len(excluded)} minting={len(report['minting_guards'])} "
+              f"message_only={len(report['message_only_kills'])} "
+              f"baselines={report['baselines']}"
+          )
+          problems = []
+          # The baseline population, pinned because `baseline_agrees` cannot check it at
+          # n=1. A sweep whose baseline collected a different number of tests is
+          # measuring a different suite, and every other check above would still pass.
+          if report["baselines"] != {"1": 460}:
+              problems.append(
+                  f"baseline collected {report['baselines']}, expected {{'1': 460}}"
+              )
+          if report["inventory_total"] != 116:
+              problems.append(f"inventory is {report['inventory_total']}, not 116")
+          if len(report["killed"]) != 101:
+              problems.append(f"{len(report['killed'])} sites killed, not 101")
+          if report["message_only_kills"]:
+              problems.append(
+                  f"message-only kills: {report['message_only_kills']}; the adoption "
+                  "ruling forbids scoring a kill attributable to prose alone"
+              )
+          # Named individually, not counted. An exclusion is a ratified statement about
+          # a specific site; a count would let one be swapped for another silently.
+          expected = [
+              "attestation.py:214",
+              "identifiers.py:264",
+              "signing.py:129",
+              "signing.py:134",
+              "signing.py:139",
+              "signing.py:142",
+              "signing.py:145",
+              "signing.py:148",
+              "trust.py:211",
+              "verification.py:265",
+              "verification.py:270",
+              "verification.py:452",
+              "verification.py:487",
+              "verified.py:262",
+              "verified.py:264",
+          ]
+          if excluded != expected:
+              problems.append(f"excluded sites are {excluded}, not {expected}")
+          if problems:
+              sys.exit("FAIL: " + "; ".join(problems))
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: producer-attestation-guard-sweep-aggregate
+          path: packages/integration/cloud-scaling-producer-attestation/guard_sweep_aggregate.json
+          if-no-files-found: warn
 
   documentation:
     name: Terminology + documentation-link validation

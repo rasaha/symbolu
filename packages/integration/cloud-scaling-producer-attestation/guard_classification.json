@@ -1,0 +1,749 @@
+{
+  "package": "producer-attestation",
+  "total": 116,
+  "scored": 101,
+  "excluded": 15,
+  "classification": {
+    "1": {
+      "status": "SCORED",
+      "module": "canonical.py",
+      "line": 85,
+      "condition": "not is_canonical_digest(value)"
+    },
+    "2": {
+      "status": "SCORED",
+      "module": "canonical.py",
+      "line": 102,
+      "condition": "type(value) is not str"
+    },
+    "3": {
+      "status": "SCORED",
+      "module": "canonical.py",
+      "line": 107,
+      "condition": "not allow_empty and value == ''"
+    },
+    "4": {
+      "status": "SCORED",
+      "module": "canonical.py",
+      "line": 109,
+      "condition": "unicodedata.normalize('NFC', value) != value"
+    },
+    "5": {
+      "status": "SCORED",
+      "module": "canonical.py",
+      "line": 121,
+      "condition": "text != text.strip()"
+    },
+    "6": {
+      "status": "SCORED",
+      "module": "canonical.py",
+      "line": 123,
+      "condition": "any((ch.isspace() and ch != ' ' for ch in text))"
+    },
+    "7": {
+      "status": "SCORED",
+      "module": "canonical.py",
+      "line": 136,
+      "condition": "type(value) is not datetime"
+    },
+    "8": {
+      "status": "SCORED",
+      "module": "canonical.py",
+      "line": 140,
+      "condition": "value.tzinfo is None or value.utcoffset() is None"
+    },
+    "9": {
+      "status": "SCORED",
+      "module": "canonical.py",
+      "line": 156,
+      "condition": "type(value) is not expected"
+    },
+    "10": {
+      "status": "SCORED",
+      "module": "identifiers.py",
+      "line": 202,
+      "condition": "PRODUCER_ATTESTATION_V2_SCHEMA_VERSION == PHASE_5A_V1_SCHEMA_VERSION"
+    },
+    "11": {
+      "status": "SCORED",
+      "module": "identifiers.py",
+      "line": 209,
+      "condition": "PRODUCER_ATTESTATION_V2_SIGNING_PURPOSE == _D4_ROUTING_PURPOSE"
+    },
+    "12": {
+      "status": "SCORED",
+      "module": "identifiers.py",
+      "line": 215,
+      "condition": "PRODUCER_ATTESTATION_V2_SIGNING_PURPOSE in KNOWN_POLICY_SIGNING_PURPOSES"
+    },
+    "13": {
+      "status": "SCORED",
+      "module": "identifiers.py",
+      "line": 221,
+      "condition": "SUPPORTED_V2_SIGNING_PURPOSES & KNOWN_POLICY_SIGNING_PURPOSES"
+    },
+    "14": {
+      "status": "SCORED",
+      "module": "identifiers.py",
+      "line": 225,
+      "condition": "_PHASE_5A_V1_SIGNING_PURPOSE in SUPPORTED_V2_SIGNING_PURPOSES"
+    },
+    "15": {
+      "status": "SCORED",
+      "module": "identifiers.py",
+      "line": 230,
+      "condition": "PRODUCER_ATTESTATION_CAPABILITY is TrustAnchorCapability.RECEIPT_ISSUANCE"
+    },
+    "16": {
+      "status": "SCORED",
+      "module": "identifiers.py",
+      "line": 235,
+      "condition": "PRODUCER_ATTESTATION_CAPABILITY is TrustAnchorCapability.EVIDENCE_PRODUCTION"
+    },
+    "17": {
+      "status": "SCORED",
+      "module": "identifiers.py",
+      "line": 244,
+      "condition": "PRODUCER_ATTESTATION_CAPABILITY is not _DEDICATED"
+    },
+    "18": {
+      "status": "SCORED",
+      "module": "identifiers.py",
+      "line": 250,
+      "condition": "PRODUCER_ATTESTATION_SIGNATURE_PROFILE != _TEV_PROFILE_V1"
+    },
+    "19": {
+      "status": "SCORED",
+      "module": "identifiers.py",
+      "line": 255,
+      "condition": "PRODUCER_ATTESTATION_SIGNATURE_ENCODING != _TEV_ENCODING_V1"
+    },
+    "20": {
+      "status": "SCORED",
+      "module": "identifiers.py",
+      "line": 257,
+      "condition": "SUBJECT_TYPE_CAPACITY_SUBJECT != _D4_SUBJECT_TYPE"
+    },
+    "21": {
+      "status": "EXCLUDED",
+      "reason": "unscorable-by-single-checkout-fixture",
+      "detail": "Deleting the module-level call disables the import-time drift check, but every condition it tests compares constants that are frozen in this checkout \u2014 several against values imported from separately versioned distributions (TEV's capability enum, Phase 5A's identifiers) under open-ended `>=` pins. The sweep fixture installs exactly one resolution, in which every separation holds, so no input reaches the call with anything to refuse. The guards *inside* the function are all scored and killed, because the suite re-runs them with drifted values.",
+      "evidence": "tests/test_guard_coverage.py::test_the_import_time_separations_hold_for_the_installed_distributions",
+      "module": "identifiers.py",
+      "line": 264,
+      "condition": "_assert_domain_separation()"
+    },
+    "22": {
+      "status": "SCORED",
+      "module": "attestation.py",
+      "line": 153,
+      "condition": "self.schema_version != PRODUCER_ATTESTATION_V2_SCHEMA_VERSION"
+    },
+    "23": {
+      "status": "SCORED",
+      "module": "attestation.py",
+      "line": 169,
+      "condition": "require_canonical_identifier(name, getattr(self, name))"
+    },
+    "24": {
+      "status": "SCORED",
+      "module": "attestation.py",
+      "line": 170,
+      "condition": "require_canonical_digest('recommendation_digest', self.recommendation_digest)"
+    },
+    "25": {
+      "status": "SCORED",
+      "module": "attestation.py",
+      "line": 172,
+      "condition": "self.subject_type != SUBJECT_TYPE_CAPACITY_SUBJECT"
+    },
+    "26": {
+      "status": "SCORED",
+      "module": "attestation.py",
+      "line": 179,
+      "condition": "purpose not in SUPPORTED_V2_SIGNING_PURPOSES"
+    },
+    "27": {
+      "status": "SCORED",
+      "module": "attestation.py",
+      "line": 190,
+      "condition": "algorithm not in SUPPORTED_V2_SIGNATURE_ALGORITHMS"
+    },
+    "28": {
+      "status": "SCORED",
+      "module": "attestation.py",
+      "line": 197,
+      "condition": "self.signature_profile != PRODUCER_ATTESTATION_SIGNATURE_PROFILE"
+    },
+    "29": {
+      "status": "SCORED",
+      "module": "attestation.py",
+      "line": 203,
+      "condition": "self.signature_encoding != PRODUCER_ATTESTATION_SIGNATURE_ENCODING"
+    },
+    "30": {
+      "status": "EXCLUDED",
+      "reason": "diagnostic-only",
+      "detail": "Named successor: the `decode_signature` call two lines below, whose `except` arm raises the same ProducerAttestationCanonicalFieldError with the same MALFORMED_SIGNATURE outcome for every non-str value. Removing this guard changes which line refuses, and nothing a caller may branch on.",
+      "evidence": "tests/test_guard_coverage.py::test_a_non_str_signature_is_refused_by_decode_with_the_same_typed_pair",
+      "module": "attestation.py",
+      "line": 214,
+      "condition": "type(self.signature) is not str"
+    },
+    "31": {
+      "status": "SCORED",
+      "module": "attestation.py",
+      "line": 229,
+      "condition": "require_canonical_digest('signing_payload_digest', self.signing_payload_digest)"
+    },
+    "32": {
+      "status": "SCORED",
+      "module": "attestation.py",
+      "line": 234,
+      "condition": "self.signing_payload_digest != expected"
+    },
+    "33": {
+      "status": "SCORED",
+      "module": "attestation.py",
+      "line": 323,
+      "condition": "not isinstance(data, Mapping)"
+    },
+    "34": {
+      "status": "SCORED",
+      "module": "attestation.py",
+      "line": 330,
+      "condition": "unknown"
+    },
+    "35": {
+      "status": "SCORED",
+      "module": "attestation.py",
+      "line": 337,
+      "condition": "missing"
+    },
+    "36": {
+      "status": "SCORED",
+      "module": "attestation.py",
+      "line": 342,
+      "condition": "isinstance(issued_at, str)"
+    },
+    "37": {
+      "status": "SCORED",
+      "module": "signing.py",
+      "line": 121,
+      "condition": "self.issuance_token is not _SIGNING_INPUT_TOKEN"
+    },
+    "38": {
+      "status": "EXCLUDED",
+      "reason": "unreachable-behind-earlier-guard",
+      "detail": "Behind the issuance-token guard at signing.py:121. mint_producer_attestation is the only route to a signing input and always passes canonical_bytes(); a caller cannot construct one at all.",
+      "evidence": "tests/test_guard_coverage.py::test_the_token_guard_precedes_every_signing_input_content_check",
+      "module": "signing.py",
+      "line": 129,
+      "condition": "type(self.signed_input) is not bytes"
+    },
+    "39": {
+      "status": "EXCLUDED",
+      "reason": "unreachable-behind-earlier-guard",
+      "detail": "Behind the issuance-token guard at signing.py:121; the minted payload is never empty, and a caller-assembled input is refused before any content check runs.",
+      "evidence": "tests/test_guard_coverage.py::test_the_token_guard_precedes_every_signing_input_content_check",
+      "module": "signing.py",
+      "line": 134,
+      "condition": "len(self.signed_input) == 0"
+    },
+    "40": {
+      "status": "EXCLUDED",
+      "reason": "unreachable-behind-earlier-guard",
+      "detail": "Behind the issuance-token guard at signing.py:121; the minting routine validates the producer id before assembling the input, so the only values that reach this call are already canonical.",
+      "evidence": "tests/test_guard_coverage.py::test_the_token_guard_precedes_every_signing_input_content_check",
+      "module": "signing.py",
+      "line": 139,
+      "condition": "require_canonical_identifier('ProducerAttestationSigningInput.producer_id', self.producer_id)"
+    },
+    "41": {
+      "status": "EXCLUDED",
+      "reason": "unreachable-behind-earlier-guard",
+      "detail": "The same construction as the producer_id call above.",
+      "evidence": "tests/test_guard_coverage.py::test_the_token_guard_precedes_every_signing_input_content_check",
+      "module": "signing.py",
+      "line": 142,
+      "condition": "require_canonical_identifier('ProducerAttestationSigningInput.issuer', self.issuer)"
+    },
+    "42": {
+      "status": "EXCLUDED",
+      "reason": "unreachable-behind-earlier-guard",
+      "detail": "The same construction as the producer_id call above.",
+      "evidence": "tests/test_guard_coverage.py::test_the_token_guard_precedes_every_signing_input_content_check",
+      "module": "signing.py",
+      "line": 145,
+      "condition": "require_canonical_identifier('ProducerAttestationSigningInput.producer_key_id', self.producer_key_id)"
+    },
+    "43": {
+      "status": "EXCLUDED",
+      "reason": "unreachable-behind-earlier-guard",
+      "detail": "Behind the issuance-token guard at signing.py:121; the minting routine passes the pinned constant, not a parameter, so there is no caller-supplied profile to get wrong.",
+      "evidence": "tests/test_guard_coverage.py::test_the_token_guard_precedes_every_signing_input_content_check",
+      "module": "signing.py",
+      "line": 148,
+      "condition": "self.signature_profile != PRODUCER_ATTESTATION_SIGNATURE_PROFILE"
+    },
+    "44": {
+      "status": "SCORED",
+      "module": "signing.py",
+      "line": 233,
+      "condition": "require_canonical_identifier('ReferenceEd25519ProducerAttestationSigner.producer_id', producer_id)"
+    },
+    "45": {
+      "status": "SCORED",
+      "module": "signing.py",
+      "line": 236,
+      "condition": "require_canonical_identifier('ReferenceEd25519ProducerAttestationSigner.issuer', issuer)"
+    },
+    "46": {
+      "status": "SCORED",
+      "module": "signing.py",
+      "line": 239,
+      "condition": "require_canonical_identifier('ReferenceEd25519ProducerAttestationSigner.producer_key_id', producer_key_id)"
+    },
+    "47": {
+      "status": "SCORED",
+      "module": "signing.py",
+      "line": 242,
+      "condition": "require_exact_type('ReferenceEd25519ProducerAttestationSigner.signing_key', signing_key, TrustedEvidenceSigningKey)"
+    },
+    "48": {
+      "status": "SCORED",
+      "module": "signing.py",
+      "line": 291,
+      "condition": "require_exact_type('ReferenceEd25519ProducerAttestationSigner.signing_input', signing_input, ProducerAttestationSigningInput)"
+    },
+    "49": {
+      "status": "SCORED",
+      "module": "signing.py",
+      "line": 296,
+      "condition": "signing_input.issuer != self._issuer"
+    },
+    "50": {
+      "status": "SCORED",
+      "module": "signing.py",
+      "line": 301,
+      "condition": "signing_input.producer_key_id != self._producer_key_id"
+    },
+    "51": {
+      "status": "SCORED",
+      "module": "signing.py",
+      "line": 306,
+      "condition": "signing_input.producer_id != self._producer_id"
+    },
+    "52": {
+      "status": "SCORED",
+      "module": "signing.py",
+      "line": 334,
+      "condition": "PRODUCER_ATTESTATION_CAPABILITY is TrustAnchorCapability.RECEIPT_ISSUANCE"
+    },
+    "53": {
+      "status": "SCORED",
+      "module": "signing.py",
+      "line": 417,
+      "condition": "signer is None"
+    },
+    "54": {
+      "status": "SCORED",
+      "module": "signing.py",
+      "line": 419,
+      "condition": "production_mode and isinstance(signer, REFERENCE_GRADE_SIGNERS)"
+    },
+    "55": {
+      "status": "SCORED",
+      "module": "signing.py",
+      "line": 439,
+      "condition": "production_mode and getattr(type(signer), 'is_reference_signer', False) is True"
+    },
+    "56": {
+      "status": "SCORED",
+      "module": "signing.py",
+      "line": 452,
+      "condition": "signer.signature_profile != PRODUCER_ATTESTATION_SIGNATURE_PROFILE"
+    },
+    "57": {
+      "status": "SCORED",
+      "module": "signing.py",
+      "line": 487,
+      "condition": "type(signature) is not str"
+    },
+    "58": {
+      "status": "SCORED",
+      "module": "trust.py",
+      "line": 131,
+      "condition": "require_exact_type('anchor_coordinate_digest.coordinate', coordinate, TrustAnchorCoordinate)"
+    },
+    "59": {
+      "status": "SCORED",
+      "module": "trust.py",
+      "line": 146,
+      "condition": "require_exact_type('anchor_record_digest.anchor', anchor, TrustAnchorRecord)"
+    },
+    "60": {
+      "status": "EXCLUDED",
+      "reason": "diagnostic-only",
+      "detail": "Named successor: `None` fails the `getattr(resolver, 'is_production_authoritative', False) is not True` check at trust.py:238, which raises the same ProducerAttestationConfigurationError with the same default outcome. Removing this guard changes the message and nothing else; it is kept because 'there is no resolver at all' is the more useful diagnosis.",
+      "evidence": "tests/test_guard_coverage.py::test_a_none_resolver_is_refused_by_the_authority_check_with_the_same_error",
+      "module": "trust.py",
+      "line": 211,
+      "condition": "resolver is None"
+    },
+    "61": {
+      "status": "SCORED",
+      "module": "trust.py",
+      "line": 218,
+      "condition": "isinstance(resolver, REFERENCE_GRADE_RESOLVERS)"
+    },
+    "62": {
+      "status": "SCORED",
+      "module": "trust.py",
+      "line": 238,
+      "condition": "getattr(resolver, 'is_production_authoritative', False) is not True"
+    },
+    "63": {
+      "status": "SCORED",
+      "module": "trust.py",
+      "line": 256,
+      "condition": "require_exact_type('anchor_verification_key.anchor', anchor, TrustAnchorRecord)"
+    },
+    "64": {
+      "status": "SCORED",
+      "module": "verified.py",
+      "line": 238,
+      "condition": "self.construction_token is not _VERIFICATION_TOKEN"
+    },
+    "65": {
+      "status": "SCORED",
+      "module": "verified.py",
+      "line": 245,
+      "condition": "self.verification_profile != VERIFICATION_PROFILE"
+    },
+    "66": {
+      "status": "SCORED",
+      "module": "verified.py",
+      "line": 249,
+      "condition": "self.verification_profile_version != VERIFICATION_PROFILE_VERSION"
+    },
+    "67": {
+      "status": "EXCLUDED",
+      "reason": "unreachable-behind-earlier-guard",
+      "detail": "Behind the construction-token guard at verified.py:238, which refuses every caller construction outright; the one minting route passes digests it computed itself. `object.__new__` fabrications bypass `__post_init__` entirely, so they reach neither this call nor the guard in front of it \u2014 they are refused by require_verified_producer_attestation at every consumption boundary, which is scored and killed.",
+      "evidence": "tests/test_guard_coverage.py::test_no_caller_construction_reaches_the_checks_behind_the_verification_token",
+      "module": "verified.py",
+      "line": 262,
+      "condition": "require_canonical_digest(name, getattr(self, name))"
+    },
+    "68": {
+      "status": "EXCLUDED",
+      "reason": "unreachable-behind-earlier-guard",
+      "detail": "The same construction as the digest calls above: behind the construction-token guard at verified.py:238, and the minting routine computes the digest it passes. The consumption-boundary recomputation of the same digest is scored and killed.",
+      "evidence": "tests/test_guard_coverage.py::test_no_caller_construction_reaches_the_checks_behind_the_verification_token",
+      "module": "verified.py",
+      "line": 264,
+      "condition": "self.artifact_digest != expected"
+    },
+    "69": {
+      "status": "SCORED",
+      "module": "verified.py",
+      "line": 362,
+      "condition": "type(value) is not VerifiedProducerAttestation"
+    },
+    "70": {
+      "status": "SCORED",
+      "module": "verified.py",
+      "line": 376,
+      "condition": "value.construction_token is not _VERIFICATION_TOKEN"
+    },
+    "71": {
+      "status": "SCORED",
+      "module": "verified.py",
+      "line": 381,
+      "condition": "value.artifact_digest not in _MINTED_DIGESTS"
+    },
+    "72": {
+      "status": "SCORED",
+      "module": "verified.py",
+      "line": 388,
+      "condition": "value.artifact_digest != value.digest()"
+    },
+    "73": {
+      "status": "SCORED",
+      "module": "verification.py",
+      "line": 168,
+      "condition": "type(self.outcome) is not _Outcome"
+    },
+    "74": {
+      "status": "SCORED",
+      "module": "verification.py",
+      "line": 173,
+      "condition": "self.outcome is _Outcome.VERIFIED"
+    },
+    "75": {
+      "status": "SCORED",
+      "module": "verification.py",
+      "line": 208,
+      "condition": "(self.verified_attestation is None) == (self.refusal is None)"
+    },
+    "76": {
+      "status": "SCORED",
+      "module": "verification.py",
+      "line": 213,
+      "condition": "self.verified_attestation is not None and type(self.verified_attestation) is not VerifiedProducerAttestation"
+    },
+    "77": {
+      "status": "SCORED",
+      "module": "verification.py",
+      "line": 220,
+      "condition": "self.verified_attestation is not None"
+    },
+    "78": {
+      "status": "SCORED",
+      "module": "verification.py",
+      "line": 225,
+      "condition": "require_verified_producer_attestation(self.verified_attestation, 'ProducerAuthenticityResult.verified_attestation')"
+    },
+    "79": {
+      "status": "SCORED",
+      "module": "verification.py",
+      "line": 229,
+      "condition": "self.refusal is not None and type(self.refusal) is not ProducerAttestationRefusal"
+    },
+    "80": {
+      "status": "EXCLUDED",
+      "reason": "diagnostic-only",
+      "detail": "Named successor: `hasattr(trust_anchor_resolver, 'resolve')` five lines below, which refuses None with the same ProducerAttestationConfigurationError and the same default outcome. Removing this guard changes the message and nothing else.",
+      "evidence": "tests/test_guard_coverage.py::test_a_none_collaborator_is_refused_with_the_same_configuration_error",
+      "module": "verification.py",
+      "line": 265,
+      "condition": "trust_anchor_resolver is None"
+    },
+    "81": {
+      "status": "EXCLUDED",
+      "reason": "diagnostic-only",
+      "detail": "The same shape as the resolver guard above: a None verifier always fails `hasattr(signature_verifier, 'verify_producer_signature')` with the same typed configuration error.",
+      "evidence": "tests/test_guard_coverage.py::test_a_none_collaborator_is_refused_with_the_same_configuration_error",
+      "module": "verification.py",
+      "line": 270,
+      "condition": "signature_verifier is None"
+    },
+    "82": {
+      "status": "SCORED",
+      "module": "verification.py",
+      "line": 275,
+      "condition": "not hasattr(trust_anchor_resolver, 'resolve')"
+    },
+    "83": {
+      "status": "SCORED",
+      "module": "verification.py",
+      "line": 280,
+      "condition": "not hasattr(signature_verifier, 'verify_producer_signature')"
+    },
+    "84": {
+      "status": "SCORED",
+      "module": "verification.py",
+      "line": 284,
+      "condition": "production_mode"
+    },
+    "85": {
+      "status": "SCORED",
+      "module": "verification.py",
+      "line": 285,
+      "condition": "require_production_resolver(trust_anchor_resolver)"
+    },
+    "86": {
+      "status": "SCORED",
+      "module": "verification.py",
+      "line": 286,
+      "condition": "getattr(signature_verifier, 'is_production_authoritative', False) is not True"
+    },
+    "87": {
+      "status": "SCORED",
+      "module": "verification.py",
+      "line": 335,
+      "condition": "except Exception: _refuse(_Outcome.VERIFICATION_UNAVAILABLE, f'verification could not reach a determination: {type(exc).__name__}')"
+    },
+    "88": {
+      "status": "SCORED",
+      "module": "verification.py",
+      "line": 351,
+      "condition": "attestation is None"
+    },
+    "89": {
+      "status": "SCORED",
+      "module": "verification.py",
+      "line": 356,
+      "condition": "type(attestation) is not ProducerAttestationV2"
+    },
+    "90": {
+      "status": "SCORED",
+      "module": "verification.py",
+      "line": 361,
+      "condition": "type(candidate) is not CapacityAuthorizationCandidate"
+    },
+    "91": {
+      "status": "SCORED",
+      "module": "verification.py",
+      "line": 366,
+      "condition": "type(as_of) is not datetime or as_of.tzinfo is None or as_of.utcoffset() is None"
+    },
+    "92": {
+      "status": "SCORED",
+      "module": "verification.py",
+      "line": 375,
+      "condition": "attestation.schema_version != PRODUCER_ATTESTATION_V2_SCHEMA_VERSION"
+    },
+    "93": {
+      "status": "SCORED",
+      "module": "verification.py",
+      "line": 380,
+      "condition": "attestation.signing_purpose not in SUPPORTED_V2_SIGNING_PURPOSES"
+    },
+    "94": {
+      "status": "SCORED",
+      "module": "verification.py",
+      "line": 385,
+      "condition": "attestation.signature_algorithm not in SUPPORTED_V2_SIGNATURE_ALGORITHMS"
+    },
+    "95": {
+      "status": "SCORED",
+      "module": "verification.py",
+      "line": 390,
+      "condition": "attestation.signature_profile != PRODUCER_ATTESTATION_SIGNATURE_PROFILE"
+    },
+    "96": {
+      "status": "SCORED",
+      "module": "verification.py",
+      "line": 395,
+      "condition": "attestation.signature_encoding != PRODUCER_ATTESTATION_SIGNATURE_ENCODING"
+    },
+    "97": {
+      "status": "SCORED",
+      "module": "verification.py",
+      "line": 404,
+      "condition": "attestation.recommendation_id != candidate.recommendation_id"
+    },
+    "98": {
+      "status": "SCORED",
+      "module": "verification.py",
+      "line": 409,
+      "condition": "attestation.recommendation_digest != candidate.recommendation_digest"
+    },
+    "99": {
+      "status": "SCORED",
+      "module": "verification.py",
+      "line": 415,
+      "condition": "attestation.tenant_id != candidate.tenant_id"
+    },
+    "100": {
+      "status": "SCORED",
+      "module": "verification.py",
+      "line": 420,
+      "condition": "attestation.subject_id != candidate.subject_id"
+    },
+    "101": {
+      "status": "SCORED",
+      "module": "verification.py",
+      "line": 425,
+      "condition": "attestation.subject_type != candidate.subject_type"
+    },
+    "102": {
+      "status": "EXCLUDED",
+      "reason": "diagnostic-only",
+      "detail": "Named successor: the payload-digest comparison on the following line, a digest over the same two byte strings, which refuses the identical inputs with the identical PAYLOAD_MISMATCH outcome. Both are additionally fronted by the reconciliation group. Deliberately kept: it is the direct byte comparison the design specifies, and it would be the only remaining check if a future edit made the digest comparison cover a different projection of the payload.",
+      "evidence": "tests/test_gate_isolation.py::test_a_stale_payload_digest_fails_the_recomputation_gate",
+      "module": "verification.py",
+      "line": 452,
+      "condition": "recomputed_bytes != attestation.signed_bytes()"
+    },
+    "103": {
+      "status": "SCORED",
+      "module": "verification.py",
+      "line": 458,
+      "condition": "canonical_digest(recomputed) != attestation.signing_payload_digest"
+    },
+    "104": {
+      "status": "SCORED",
+      "module": "verification.py",
+      "line": 470,
+      "condition": "except Exception: _refuse(_Outcome.VERIFICATION_UNAVAILABLE, f'the trust-anchor resolver raised {type(exc).__name__}')"
+    },
+    "105": {
+      "status": "SCORED",
+      "module": "verification.py",
+      "line": 475,
+      "condition": "type(resolution) is not TrustAnchorResolution"
+    },
+    "106": {
+      "status": "SCORED",
+      "module": "verification.py",
+      "line": 481,
+      "condition": "anchor is None"
+    },
+    "107": {
+      "status": "EXCLUDED",
+      "reason": "unreachable-behind-earlier-guard",
+      "detail": "TrustAnchorResolution refuses at construction to carry anything but a TrustAnchorRecord, and the resolution's own exact-type check at verification.py:475 \u2014 scored and killed \u2014 rejects a non-resolution before this line reads its anchor. This guard covers a resolver that returns a genuine resolution subverted after construction.",
+      "evidence": "tests/test_guard_coverage.py::test_a_resolution_cannot_carry_a_non_anchor_record",
+      "module": "verification.py",
+      "line": 487,
+      "condition": "type(anchor) is not TrustAnchorRecord"
+    },
+    "108": {
+      "status": "SCORED",
+      "module": "verification.py",
+      "line": 494,
+      "condition": "anchor.authority_id != attestation.issuer"
+    },
+    "109": {
+      "status": "SCORED",
+      "module": "verification.py",
+      "line": 500,
+      "condition": "anchor.key_id != attestation.producer_key_id"
+    },
+    "110": {
+      "status": "SCORED",
+      "module": "verification.py",
+      "line": 505,
+      "condition": "anchor.capability is not PRODUCER_ATTESTATION_CAPABILITY"
+    },
+    "111": {
+      "status": "SCORED",
+      "module": "verification.py",
+      "line": 514,
+      "condition": "lifecycle is not None"
+    },
+    "112": {
+      "status": "SCORED",
+      "module": "verification.py",
+      "line": 518,
+      "condition": "anchor.signature_profile != attestation.signature_profile"
+    },
+    "113": {
+      "status": "SCORED",
+      "module": "verification.py",
+      "line": 523,
+      "condition": "anchor.signature_encoding != attestation.signature_encoding"
+    },
+    "114": {
+      "status": "SCORED",
+      "module": "verification.py",
+      "line": 533,
+      "condition": "except Exception: _refuse(_Outcome.MALFORMED_SIGNATURE, 'the signature is not canonical lowercase base16 of an Ed25519 signature')"
+    },
+    "115": {
+      "status": "SCORED",
+      "module": "verification.py",
+      "line": 546,
+      "condition": "except Exception: _refuse(_Outcome.VERIFICATION_UNAVAILABLE, f'the signature verifier raised {type(exc).__name__}')"
+    },
+    "116": {
+      "status": "SCORED",
+      "module": "verification.py",
+      "line": 551,
+      "condition": "accepted is not True"
+    }
+  }
+}

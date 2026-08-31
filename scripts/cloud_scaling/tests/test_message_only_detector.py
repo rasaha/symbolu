@@ -37,9 +37,40 @@ def _plugin_source() -> str:
     """
 
     text = SWEEP.read_text(encoding="utf-8")
-    match = re.search(r"_MINT_PLUGIN = '''(.*?)\n'''", text, re.S)
+    match = re.search(r"_MINT_PLUGIN = r'''(.*?)\n'''", text, re.S)
     assert match, "the mint plugin literal is no longer where the tests expect it"
     return match.group(1)
+
+
+def test_the_plugin_literal_survives_escape_processing():
+    """The literal must be RAW, and this is what enforces it.
+
+    The plugin's detector regexes carry ``\\b`` and ``\\.``. Under a non-raw triple-quote
+    every ``\\b`` was processed into a backspace byte on the way into the copy, so
+    ``\\btype\\s*\\(``, ``\\.outcome\\b`` and ``\\.\\w*reason\\b`` never matched at
+    runtime and every statement they exist to recognise as a typed read was flagged
+    message-only — partially undoing the D-GC-7 recalibration. The tests here could not
+    see it, because they compile the pattern from the *source* text, where the escapes
+    are intact. This asserts on the literal Python actually evaluates — the content
+    ``prepare_copy`` writes.
+    """
+
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location("_sweep_for_literal", SWEEP)
+    module = importlib.util.module_from_spec(spec)
+    # Registered before exec: the sweep's dataclasses resolve their string annotations
+    # through ``sys.modules[cls.__module__]``.
+    sys.modules["_sweep_for_literal"] = module
+    try:
+        spec.loader.exec_module(module)
+        plugin = module._MINT_PLUGIN
+    finally:
+        sys.modules.pop("_sweep_for_literal", None)
+    control = set(plugin) & {chr(code) for code in range(32)} - {"\n"}
+    assert not control, f"escape processing mangled the plugin literal: {control!r}"
+    for token in (r"\btype\s*\(", r"\.outcome\b", r"\.\w*reason\b", r"\.detail\b"):
+        assert token in plugin, f"the written plugin no longer carries {token!r} verbatim"
 
 
 #: One module per shape. Each raises the *same* exception with the *same* reason, so the
