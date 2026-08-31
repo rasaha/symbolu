@@ -997,3 +997,16 @@ open question for Phase 3B.
 - **DEC-M2-5 — App-switcher privacy shield.** An opaque, accessibility-hidden cover obscures authenticated screens whenever the app is not active, so OS snapshots reveal no birth data, token, email, or pairing state. Screenshots are NOT globally disabled (usability); per-screen capture-block is a pilot candidate.
 
 **Scope guard:** Phase 2 implements NO secure chat, AI Assist, Moon receptivity, preference learning, Guna/Koota/Dosha/Parihara execution, or compatibility surface. Guna rule pack stays non-executable. Sequencing unchanged: Phase 2 → Phase 3 secure chat → Phase 4A–4D AI Assist (DEC-048). Verdict: `MOBILE_PHASE2_IMPLEMENTED_VALIDATION_PENDING`.
+
+---
+
+## DEC-3B — Phase 3B safety services (DILCHAT-D3B-1…5)
+**Status:** Accepted (owner-ratified) · **[Product/Security]** · Implemented over the merged 3B schema (`d4e5f6a7b8c9`) plus helper migration `e5f6a7b8c9d0`.
+
+- **DEC-3B-1 — Blocks are behavioral (D3B-1 = A).** While either participant has an ACTIVE block, message sends are denied in BOTH directions inside the send transaction, with one identical, generic error — the surface never discloses who blocked whom. Existing messages keep their existing visibility/retention rules; an idempotent replay of a message committed before the block still returns that message.
+- **DEC-3B-2 — Block ≠ unpair (D3B-2).** A block is a communication/safety restriction; explicit unpair remains the only relationship-lifecycle transition. Blocking changes no couple or conversation state.
+- **DEC-3B-3 — Reports stay SUBMITTED (D3B-3).** Reports are durable and idempotent on `(reporter, conversation, client_report_id)`, with atomic case + evidence + body-free case events + retention preservation. No moderation-transition surface exists and no adjudication state is fabricated; a reviewer workflow is a later explicit phase before broader production deployment.
+- **DEC-3B-4 — Schema-default rate limits are enforced (D3B-4).** Sends 30/min + 300/hr, reports 10/day, block mutations 60/hr — fixed-window PostgreSQL counters raising the canonical `RATE_LIMITED` (429), consulted only AFTER authorization succeeds (a 429 never masks a 404/403). Defaults pinned by `tests/unit/test_ratified_rate_limits.py`.
+- **DEC-3B-5 — Reporters never read evidence back (D3B-5).** The app role stays INSERT-only on evidence/cases/case events (RLS-enforced); responses carry only the reporter-visible reference and status; the description is SENSITIVE (stored on the report row only — never echoed, logged, audited, or copied). Future moderation access will be a separate privileged surface, never an extension of the reporter API.
+
+**Post-revocation reporting:** a FORMER member may file a CONVERSATION-target report within `chat_report_after_revocation_days` (30) via the bounded `app_conversation_context` SECURITY DEFINER helper (`e5f6a7b8c9d0`), with NO message evidence — revoked message access is never resurrected. Retention: pairing provisions an ACTIVE row; unpair moves ACTIVE → REVOKED_PENDING_POLICY; a report sets PRESERVED_FOR_REPORT, which is never downgraded; no purge is executed in this phase (`retention_purge_enabled=False`).
