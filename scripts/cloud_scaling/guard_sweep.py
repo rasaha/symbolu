@@ -162,6 +162,16 @@ class PackageConfig:
     #: ``risk-integration``. The opt-in discipline itself is unchanged: every other
     #: package keeps a byte-identical inventory until its own ruling says otherwise.
     record_multiplicity: bool = False
+    #: Production modules deliberately outside ``module_order``, each with a concrete
+    #: reason: ``{relative path: reason}``. Ruled with the nested-module hardening
+    #: (2026-08-31): every module ``_production_modules`` discovers must be either walked
+    #: by the inventory or excluded here — a module that is neither fails
+    #: ``undeclared_modules`` and with it the inventory run. Before this, ``module_order``
+    #: was a curated list nothing reconciled, which five flat adopters could survive by
+    #: eyeball and a 78-module nested package could not: a module added later would have
+    #: escaped the inventory silently. An exclusion here is a checkable statement — the
+    #: reason should say what was *measured* about the module, not express confidence.
+    excluded_modules: dict = field(default_factory=dict)
     #: Extra environment for every suite run of this package, baseline and mutant alike.
     #: Exists for exactly one ratified use so far: ``producer-attestation``'s packaging
     #: properties build five distributions and a virtualenv per run, and its own suite
@@ -222,6 +232,16 @@ PACKAGES = {
         ),
         refusal_calls=frozenset(),
         tuple_refusals=False,
+        # Measured at the hardening (2026-08-31): each carries zero refusal-shaped `if`
+        # guards and zero `raise` statements, so excluding it moves no decision point.
+        excluded_modules={
+            "__init__.py": "re-exports only; measured zero guards and zero raises",
+            "errors.py": "exception-class declarations; measured zero guards and zero raises",
+            "trust.py": "a one-member trust-state enum and its constant — the state that "
+                        "cannot be set has no guard to sweep; measured zero guards and "
+                        "zero raises",
+            "version.py": "the version constant; measured zero guards and zero raises",
+        },
         recorded=(
             ("canonical-65", ("reconciliation.py", "candidate.py"), 65),
             ("peripheral-28", ("attestation.py", "target.py"), 28),
@@ -304,6 +324,11 @@ PACKAGES = {
         decision_classes=frozenset({"helper-admission", "else-arm"}),
         # Fully covered: this family's only mint is ``describe``, and it is wrapped.
         uncovered_mints=(),
+        # Measured at the hardening (2026-08-31): zero guards and zero raises in each.
+        excluded_modules={
+            "__init__.py": "re-exports only; measured zero guards and zero raises",
+            "version.py": "the version constant; measured zero guards and zero raises",
+        },
         recorded=(),
         exclusions={},
     ),
@@ -375,6 +400,15 @@ PACKAGES = {
                 "its construction would change the program under test.",
             ),
         ),
+        # Measured at the hardening (2026-08-31): zero guards and zero raises in each —
+        # the fork's MODULE_ORDER never walked these four either.
+        excluded_modules={
+            "__init__.py": "re-exports only; measured zero guards and zero raises",
+            "errors.py": "exception-class declarations; measured zero guards and zero raises",
+            "outcomes.py": "the ProducerAuthenticityOutcome enum declaration; measured "
+                           "zero guards and zero raises",
+            "version.py": "the version constant; measured zero guards and zero raises",
+        },
         # The fork's GUARD_SWEEP.md carried the prior inventory (92 `if` guards) as prose;
         # this configuration's first inventory is the engine's own.
         recorded=(),
@@ -640,6 +674,12 @@ PACKAGES = {
                 "rejection and abstention outcomes — refusals, not mints.",
             ),
         ),
+        # Measured at the hardening (2026-08-31): zero guards and zero raises in each.
+        excluded_modules={
+            "__init__.py": "re-exports only; measured zero guards and zero raises",
+            "errors.py": "exception-class declarations; measured zero guards and zero raises",
+            "version.py": "the version constant; measured zero guards and zero raises",
+        },
         # No prior inventory: this is the package's first.
         recorded=(),
         # Eight, every one written *after* a measured sweep rather than predicted before
@@ -787,6 +827,12 @@ PACKAGES = {
         ),
         refusal_calls=frozenset({"_refuse", "PolicyAuthenticityRefusal"}),
         tuple_refusals=True,
+        # Measured at the hardening (2026-08-31): zero guards and zero raises in each.
+        excluded_modules={
+            "__init__.py": "re-exports only; measured zero guards and zero raises",
+            "errors.py": "exception-class declarations; measured zero guards and zero raises",
+            "version.py": "the version constant; measured zero guards and zero raises",
+        },
         recorded=(),
         exclusions={
             # --- identifiers.py: the import-time separations -----------------------------
@@ -981,44 +1027,198 @@ def _outcome_names(body, config: PackageConfig) -> list:
     return sorted(set(names))
 
 
-def _raising_helpers(config: PackageConfig) -> frozenset:
-    """Function names in this package that can raise, directly or through each other.
+def _production_modules(config: PackageConfig) -> tuple:
+    """Every production module under ``src``, discovered recursively.
 
-    Derived from the source, not hand-listed. A hand list is a second inventory to keep in
-    step with the first, and the guards it forgets are exactly the ones nobody was thinking
-    about — ``verification.py:327`` and ``verified.py:488`` are two that a raise-only
-    reading missed, each an ``if`` whose entire body is a call to an admission helper.
-
-    Transitive by fixpoint: ``require_policy_digest`` raises directly, and anything whose
-    body calls it inherits that. One level would miss the second rank.
+    Discovery, not curation: ``module_order`` says what the inventory *walks*, and this
+    says what *exists*, so the two can be reconciled (``undeclared_modules``) instead of
+    trusted. A nested layout (``planning/pipeline.py``) is a first-class citizen here —
+    the flat ``glob("*.py")`` this replaced silently ignored every subpackage, which on a
+    nested package under-counted the raising-helper set and, through it, the inventory.
     """
 
-    direct = {}
-    calls = {}
-    for path in sorted(config.src.glob("*.py")):
-        tree = ast.parse(path.read_text(encoding="utf-8"))
+    return tuple(
+        sorted(
+            str(path.relative_to(config.src)).replace(os.sep, "/")
+            for path in config.src.rglob("*.py")
+            if "__pycache__" not in path.parts
+        )
+    )
+
+
+def undeclared_modules(config: PackageConfig) -> dict:
+    """Reconcile discovery against declaration; every mismatch is a failure, not a note.
+
+    Four ways the two can disagree, each returned under its own key so the failure names
+    the fix:
+
+    * ``undeclared`` — a production module neither in ``module_order`` nor in
+      ``excluded_modules``. The load-bearing case: it is how a module added after
+      adoption fails the inventory run instead of silently escaping the sweep.
+    * ``missing`` — a ``module_order`` entry naming no file on disk (a rename or delete
+      the config did not follow).
+    * ``orphan_exclusions`` — an ``excluded_modules`` entry naming no file on disk; an
+      exclusion that outlived its module is a statement about nothing.
+    * ``double_listed`` / ``unreasoned_exclusions`` — an entry in both lists, or an
+      exclusion whose reason is empty: both make the declaration unreadable.
+    """
+
+    discovered = set(_production_modules(config))
+    ordered = set(config.module_order)
+    excluded = dict(config.excluded_modules)
+    return {
+        "undeclared": sorted(discovered - ordered - set(excluded)),
+        "missing": sorted(ordered - discovered),
+        "orphan_exclusions": sorted(set(excluded) - discovered),
+        "double_listed": sorted(ordered & set(excluded)),
+        "unreasoned_exclusions": sorted(
+            module for module, reason in excluded.items() if not str(reason).strip()
+        ),
+    }
+
+
+def _import_bindings(config: PackageConfig, module: str, node) -> dict:
+    """``{local name: (source module, original name)}`` for one package-local ImportFrom.
+
+    Resolves relative imports (``from .canonical import x``, ``from ..core.state import y``)
+    and absolute ones spelled through the distribution name. Anything external returns no
+    bindings. An alias that names a *submodule* (``from . import canonical``) is dropped:
+    calls through it are attribute calls (``canonical.require_x(...)``), and cross-module
+    attribute calls are deliberately not followed — that unnamed reach is exactly the
+    contamination channel the module-qualified analysis exists to close.
+    """
+
+    if node.level == 0:
+        dotted = node.module or ""
+        if dotted != config.dist_name and not dotted.startswith(config.dist_name + "."):
+            return {}
+        dotted = dotted[len(config.dist_name):].lstrip(".")
+    else:
+        parts = module.split("/")[:-1]
+        climb = node.level - 1
+        if climb > len(parts):
+            return {}
+        parts = parts[: len(parts) - climb]
+        dotted = ".".join(parts + (node.module.split(".") if node.module else []))
+
+    base = dotted.replace(".", "/")
+    source = None
+    for candidate in ((f"{base}.py", f"{base}/__init__.py") if base else ("__init__.py",)):
+        if (config.src / candidate).is_file():
+            source = candidate
+            break
+    if source is None:
+        return {}
+
+    package_dir = base if source.endswith("__init__.py") else None
+    bindings = {}
+    for alias in node.names:
+        if package_dir is not None:
+            inner = f"{package_dir}/{alias.name}" if package_dir else alias.name
+            if (config.src / f"{inner}.py").is_file() or (
+                config.src / inner / "__init__.py"
+            ).is_file():
+                continue  # a submodule alias, not a name binding
+        bindings[alias.asname or alias.name] = (source, alias.name)
+    return bindings
+
+
+def _helper_analysis(config: PackageConfig) -> tuple:
+    """Per module: the names that resolve, *in that module*, to a raising callable.
+
+    Derived from the source, not hand-listed, and — since the nested-module hardening —
+    keyed by **module-qualified identity** ``(module, name)`` rather than by a bare name
+    pooled across the package. Under the pooled set, a raising ``Ledger.append`` in one
+    module made ``append`` look raising in every module; here, a name reaches across a
+    module boundary only through an actual import binding (``_import_bindings``), so
+    same-named helpers in different modules can never contaminate one another.
+
+    Transitive by fixpoint over qualified nodes: ``require_policy_digest`` raises
+    directly, and anything whose body calls it — locally or through an import — inherits
+    that. One level would miss the second rank. Two defs sharing a name *within* one
+    module (a function and a same-named method) still merge; per-module granularity is
+    the ruled unit of identity, and no adopter carries that collision.
+
+    Returns ``(visible, selectable)`` — two ``{module: frozenset}`` maps over every
+    discovered production module, so helpers defined in a module outside
+    ``module_order`` (an ``errors.py``, say) still resolve for the modules that import
+    them. ``visible`` feeds the shape reading (any raising callable reachable by name in
+    that module); ``selectable`` is its narrowing to names whose target is a
+    **module-level function**, the only sites the helper-admission operator may delete —
+    see ``_helper_admission_sites`` for why a method can never qualify.
+    """
+
+    modules = _production_modules(config)
+    defs = {}
+    module_level = {}
+    imports = {}
+    direct = set()
+    edges = {}
+
+    for module in modules:
+        tree = ast.parse((config.src / module).read_text(encoding="utf-8"))
+        module_level[module] = {
+            n.name for n in tree.body if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))
+        }
+        defs[module] = set()
+        imports[module] = {}
+        for node in ast.walk(tree):
+            if isinstance(node, ast.ImportFrom):
+                imports[module].update(_import_bindings(config, module, node))
         for node in ast.walk(tree):
             if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
                 continue
-            raises = any(isinstance(inner, ast.Raise) for inner in ast.walk(node))
+            defs[module].add(node.name)
+            if any(isinstance(inner, ast.Raise) for inner in ast.walk(node)):
+                direct.add((module, node.name))
             named = set()
             for inner in ast.walk(node):
                 if isinstance(inner, ast.Call):
                     name = getattr(inner.func, "id", None) or getattr(inner.func, "attr", None)
                     if name:
                         named.add(name)
-            direct[node.name] = direct.get(node.name, False) or raises
-            calls.setdefault(node.name, set()).update(named)
+            edges.setdefault((module, node.name), set()).update(named)
 
-    raising = {name for name, raises in direct.items() if raises}
+    resolved_edges = {}
+    for (module, name), named in edges.items():
+        targets = set()
+        for callee in named:
+            if callee in defs[module]:
+                targets.add((module, callee))
+            elif callee in imports[module]:
+                source, original = imports[module][callee]
+                if original in defs.get(source, ()):
+                    targets.add((source, original))
+        resolved_edges[(module, name)] = targets
+
+    raising = set(direct)
     changed = True
     while changed:
         changed = False
-        for name, named in calls.items():
-            if name not in raising and (named & raising):
-                raising.add(name)
+        for qualified, targets in resolved_edges.items():
+            if qualified not in raising and targets & raising:
+                raising.add(qualified)
                 changed = True
-    return frozenset(raising)
+
+    visible = {}
+    selectable = {}
+    for module in modules:
+        names = {name for name in defs[module] if (module, name) in raising}
+        names |= {
+            local
+            for local, (source, original) in imports[module].items()
+            if (source, original) in raising
+        }
+        visible[module] = frozenset(names)
+        selectable[module] = frozenset(
+            {name for name in module_level[module] if (module, name) in raising}
+            | {
+                local
+                for local, (source, original) in imports[module].items()
+                if original in module_level.get(source, ()) and (source, original) in raising
+            }
+        )
+    return visible, selectable
 
 
 def _is_elif(node) -> bool:
@@ -1035,44 +1235,21 @@ def _statement_span(node) -> tuple:
     return (node.lineno, node.col_offset, node.end_lineno, node.end_col_offset)
 
 
-def _module_level_raising_helpers(config: PackageConfig, helpers: frozenset) -> frozenset:
-    """The raising set, narrowed to names actually bound as module-level functions here.
-
-    ``_raising_helpers`` keys its fixpoint on ``node.name`` alone, so it merges every
-    function *and method* in the package that shares a name. That is tolerable for the
-    shape label it was written for, and unsafe for selecting a site to delete: an audit
-    produced a working false positive on ``out.append(r)`` — a package defining a raising
-    ``Ledger.append`` puts ``append`` in the set, and ``list.append`` then matches it.
-    Deleting that call changes what the program *computes*, so the suite fails and the
-    engine scores a kill the guard never earned, inflating both halves of the ratio.
-
-    Two conditions together close it, and both are necessary. The call target must be a
-    bare ``ast.Name`` — which excludes every method call, the whole class the audit
-    demonstrated — and that name must be defined as a module-level function in one of this
-    package's own modules, which excludes a bare name that only ever names a method.
-    """
-
-    names = set()
-    for path in sorted(config.src.glob("*.py")):
-        tree = ast.parse(path.read_text(encoding="utf-8"))
-        for node in tree.body:
-            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-                if node.name in helpers:
-                    names.add(node.name)
-    return frozenset(names)
-
-
 def _helper_admission_sites(tree, module_level_helpers: frozenset) -> list:
     """Statement-level calls to a raising helper — guard-coverage ADR §4.2 (D-GC-4).
 
     The class is decidable from the AST with no judgement: an ``ast.Expr`` whose call
-    target is a bare name resolving to a module-level function in this package's
-    transitive raising set. A call whose result is *bound* is an ``ast.Assign`` and is
-    deliberately not in this class — deleting it would change what the program computes
-    rather than only what it refuses. See ``_module_level_raising_helpers`` for why a bare
-    ``ast.Name`` is required rather than any call whose name matches: an attribute call
-    such as ``out.append(r)`` is not a guard even when the package happens to define a
-    raising method of that name.
+    target is a bare name resolving, **in this module**, to a module-level raising
+    function (``_helper_analysis``'s ``selectable`` set — defined here at module level,
+    or imported here from one). A call whose result is *bound* is an ``ast.Assign`` and
+    is deliberately not in this class — deleting it would change what the program
+    computes rather than only what it refuses. A bare ``ast.Name`` is required rather
+    than any call whose name matches: an audit produced a working false positive on
+    ``out.append(r)`` — under the old package-pooled name set, a raising
+    ``Ledger.append`` anywhere made ``list.append`` match, and deleting that call changed
+    what the program *computed*, crediting a kill the guard never earned. Module-qualified
+    identity closes the pooled half of that hole; the bare-``Name`` rule closes the
+    attribute-call half.
 
     Why this is a decision point distinct from the helper's own ``if``: neutralising the
     helper's internal guard proves the check works, not that it is applied at this site.
@@ -1438,10 +1615,12 @@ def _refusal_shape_of(body, config: PackageConfig, helpers=None) -> str:
     tuple_return = False
     outcome_return = False
     helper_call = False
-    # Computed once by the caller where there is one: ``_raising_helpers`` re-parses
-    # every module in the package, and calling it per candidate node made the inventory
-    # quadratic in the size of the source.
-    helpers = _raising_helpers(config) if helpers is None else helpers
+    # The caller supplies this module's visible raising set from ``_helper_analysis`` —
+    # computed once per package, because re-deriving it per candidate node would make the
+    # inventory quadratic in the size of the source. ``None`` would silently mean "no
+    # helper is raising", so it is refused instead of defaulted.
+    if helpers is None:
+        raise ValueError("_refusal_shape_of requires the module's visible raising set")
     for statement in body:
         for inner in ast.walk(statement):
             if isinstance(inner, ast.Raise):
@@ -1571,13 +1750,14 @@ def inventory(config: PackageConfig) -> list:
     recorded_scope = {
         name: (scope, count) for name, scope, count in config.recorded
     }
-    helpers = _raising_helpers(config)
-    module_level_helpers = _module_level_raising_helpers(config, helpers)
+    visible_helpers, selectable_helpers = _helper_analysis(config)
     for module in config.module_order:
         path = config.src / module
         source = path.read_text(encoding="utf-8")
         lines = source.splitlines()
         tree = ast.parse(source, filename=str(path))
+        helpers = visible_helpers[module]
+        module_level_helpers = selectable_helpers[module]
         found = []
         for node in ast.walk(tree):
             if isinstance(node, ast.If):
@@ -1763,8 +1943,9 @@ def excluded(config: PackageConfig) -> dict:
 
     except_arms = 0
     boolean_subterms = 0
-    helpers = _raising_helpers(config)
+    visible_helpers, _ = _helper_analysis(config)
     for module in config.module_order:
+        helpers = visible_helpers[module]
         tree = ast.parse((config.src / module).read_text(encoding="utf-8"))
         for node in ast.walk(tree):
             if isinstance(node, ast.ExceptHandler):
@@ -2544,6 +2725,22 @@ def main() -> int:
     args = parser.parse_args()
 
     config = PACKAGES[args.package]
+    # Reconciled before anything else runs, inventory and sweep alike: an inventory over
+    # an incomplete module set answers a question about a different package, and a sweep
+    # against one publishes coverage nothing measured.
+    module_problems = {
+        kind: entries for kind, entries in undeclared_modules(config).items() if entries
+    }
+    if module_problems:
+        for kind, entries in sorted(module_problems.items()):
+            for entry in entries:
+                print(f"  MODULE {kind.upper().replace('_', ' ')}: {entry}", file=sys.stderr)
+        print(
+            "every discovered production module must be in module_order or in "
+            "excluded_modules with a concrete reason",
+            file=sys.stderr,
+        )
+        return 1
     guards = inventory(config)
     agreement = reconcile(config, guards)
     leftout = excluded(config)

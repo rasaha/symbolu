@@ -554,26 +554,130 @@ def test_a_method_call_is_not_a_helper_admission_site(tmp_path, monkeypatch):
 
 
 def test_the_raising_set_is_narrowed_to_module_level_functions():
-    """`append` stays in the raw raising set; it must not survive the narrowing."""
+    """Per module: `__post_init__` stays visible for the shape reading; it must never
+    be selectable for deletion."""
 
     import ast as _ast
 
-    src_dir = REPO / "packages" / "integration" / "cloud-scaling-capacity-bounds-policy"
     config = guard_sweep.PACKAGES["capacity-bounds-policy"]
-    raw = guard_sweep._raising_helpers(config)
-    narrowed = guard_sweep._module_level_raising_helpers(config, raw)
-    assert narrowed <= raw
-    # Every narrowed name really is a module-level def in this package.
-    module_level = set()
-    for path in sorted(config.src.glob("*.py")):
-        for node in _ast.parse(path.read_text(encoding="utf-8")).body:
-            if isinstance(node, (_ast.FunctionDef, _ast.AsyncFunctionDef)):
-                module_level.add(node.name)
-    assert narrowed <= module_level
-    assert "__post_init__" in raw and "__post_init__" not in narrowed, (
-        "a method that raises stays in the raw set and must not be selectable"
+    visible, selectable = guard_sweep._helper_analysis(config)
+    assert set(visible) == set(selectable) == set(guard_sweep._production_modules(config))
+    for module in guard_sweep._production_modules(config):
+        assert selectable[module] <= visible[module]
+        # Every selectable name really is a module-level def somewhere in this package.
+        module_level = set()
+        for path in sorted(config.src.glob("*.py")):
+            for node in _ast.parse(path.read_text(encoding="utf-8")).body:
+                if isinstance(node, (_ast.FunctionDef, _ast.AsyncFunctionDef)):
+                    module_level.add(node.name)
+        assert selectable[module] <= module_level
+    assert any("__post_init__" in visible[m] for m in visible), (
+        "a raising method must stay visible in its own module for the shape reading"
     )
-    assert src_dir.is_dir()
+    assert all("__post_init__" not in selectable[m] for m in selectable), (
+        "a method that raises must never be selectable for the deletion operator"
+    )
+
+
+CONTAMINATION_LEDGER = '''
+class Ledger:
+    def append(self, row):
+        raise ValueError("full")
+'''
+
+CONTAMINATION_USER = '''
+def admit(out, row):
+    if row is None:
+        raise ValueError("row required")
+    append = out.get
+    if row:
+        append(row)
+    return out
+'''
+
+
+def test_a_same_named_helper_in_another_module_does_not_contaminate(tmp_path, monkeypatch):
+    """The pooled-name hole, closed: a raising ``Ledger.append`` in one module must not
+    make the bare name ``append`` read as a raising helper in a different module.
+
+    Under the flat package-wide set it did exactly that, and on a nested package the
+    pool spans every subpackage — the measured effect on the 78-module controller was 36
+    `if` guards whose only claim to a refusal shape was a same-named def somewhere
+    unrelated. Cross-module reach is now earned only through an import binding.
+    """
+
+    src = tmp_path / "pkg" / "src" / "synthetic"
+    src.mkdir(parents=True)
+    (src / "ledger.py").write_text(CONTAMINATION_LEDGER.lstrip("\n"), encoding="utf-8")
+    (src / "user.py").write_text(CONTAMINATION_USER.lstrip("\n"), encoding="utf-8")
+    monkeypatch.setattr(guard_sweep, "REPO", tmp_path)
+    config = guard_sweep.PackageConfig(
+        key="synthetic",
+        package_dir="pkg",
+        dist_name="synthetic",
+        mint_site="",
+        module_order=("ledger.py", "user.py"),
+        refusal_calls=frozenset(),
+        tuple_refusals=False,
+        recorded=(),
+    )
+    visible, _ = guard_sweep._helper_analysis(config)
+    assert "append" in visible["ledger.py"], "raising within its own module"
+    assert "append" not in visible["user.py"], "no import binding, no reach"
+    conditions = [g.condition for g in guard_sweep.inventory(config)]
+    assert "row is None" in conditions
+    assert "row" not in conditions, (
+        "`if row: append(row)` calls a local binding, not ledger.Ledger.append; under "
+        "the pooled set it was inventoried as a raising-helper guard"
+    )
+
+
+IMPORTED_HELPER_SOURCE = '''
+def require_positive(value):
+    if value < 0:
+        raise ValueError("negative")
+    return value
+'''
+
+IMPORTED_HELPER_USER = '''
+from .checks import require_positive as _require
+
+def admit(value):
+    _require(value)
+    if value == 0:
+        _require(value)
+    return value
+'''
+
+
+def test_an_imported_helper_is_visible_and_selectable_under_its_local_alias(
+    tmp_path, monkeypatch
+):
+    """Cross-module reach through a real import binding survives the rekeying — aliased,
+    which is how every adopter actually imports its canonical helpers."""
+
+    src = tmp_path / "pkg" / "src" / "synthetic"
+    src.mkdir(parents=True)
+    (src / "checks.py").write_text(IMPORTED_HELPER_SOURCE.lstrip("\n"), encoding="utf-8")
+    (src / "user.py").write_text(IMPORTED_HELPER_USER.lstrip("\n"), encoding="utf-8")
+    monkeypatch.setattr(guard_sweep, "REPO", tmp_path)
+    config = guard_sweep.PackageConfig(
+        key="synthetic",
+        package_dir="pkg",
+        dist_name="synthetic",
+        mint_site="",
+        module_order=("checks.py", "user.py"),
+        refusal_calls=frozenset(),
+        tuple_refusals=False,
+        recorded=(),
+        decision_classes=frozenset({"helper-admission"}),
+    )
+    visible, selectable = guard_sweep._helper_analysis(config)
+    assert "_require" in visible["user.py"] and "_require" in selectable["user.py"]
+    guards = guard_sweep.inventory(config)
+    kinds = {(g.module, g.lineno): g.kind for g in guards}
+    assert kinds[("user.py", 4)] == "helper-admission", "the statement-level call"
+    assert kinds[("user.py", 5)] == "if", "the guarded call keeps its if-layer row"
 
 
 @pytest.mark.parametrize("kind", ["staticmethod", "classmethod", "plain"])
