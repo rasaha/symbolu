@@ -1,8 +1,8 @@
 {
   "package": "controller-planning",
   "total": 219,
-  "scored": 217,
-  "excluded": 2,
+  "scored": 215,
+  "excluded": 4,
   "classification": {
     "1": {
       "status": "SCORED",
@@ -509,7 +509,10 @@
       "condition": "not isinstance(self.action_kind, ActionKind)"
     },
     "84": {
-      "status": "SCORED",
+      "status": "EXCLUDED",
+      "reason": "diagnostic-only",
+      "detail": "The empty-plan guard. With it removed, the primary-count gate two lines below refuses the same empty plan with the same `CandidateError` \u2014 an empty tuple has zero 'primary' roles \u2014 and emptiness is the only condition that reaches it, so no input distinguishes the two. Kept because 'requires at least one resource change' is the honest diagnosis for the empty case.",
+      "evidence": "tests/planning/test_guard_coverage.py::test_an_empty_plan_is_refused_as_a_candidate_error",
       "module": "planning/candidates.py",
       "line": 112,
       "condition": "not self.changes"
@@ -629,7 +632,10 @@
       "condition": "not isinstance(changes_raw, (list, tuple))"
     },
     "104": {
-      "status": "SCORED",
+      "status": "EXCLUDED",
+      "reason": "diagnostic-only",
+      "detail": "`generate_candidates`' current_capacity gate. The value flows unconditionally into the NO_CHANGE plan's `ResourceChange`, whose own validation refuses every value this gate refuses \u2014 bool, non-int and negative alike \u2014 with the same `CandidateError`. required_capacity's twin gate IS scored: required never lands in a ResourceChange, so its removal admits a fractional requirement outright.",
+      "evidence": "tests/planning/test_guard_coverage.py::test_an_invalid_current_capacity_is_refused_as_a_candidate_error",
       "module": "planning/candidates.py",
       "line": 233,
       "condition": "isinstance(current_capacity, bool) or not isinstance(current_capacity, int) or current_capacity < 0"

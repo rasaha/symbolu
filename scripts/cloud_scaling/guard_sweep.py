@@ -534,6 +534,32 @@ PACKAGES = {
                 "tests/planning/test_guard_coverage.py::"
                 "test_a_none_cooldown_is_refused_as_a_constraint_error",
             ),
+            ("planning/candidates.py", "not self.changes"): (
+                "diagnostic-only",
+                "The empty-plan guard. With it removed, the primary-count gate two "
+                "lines below refuses the same empty plan with the same "
+                "`CandidateError` — an empty tuple has zero 'primary' roles — and "
+                "emptiness is the only condition that reaches it, so no input "
+                "distinguishes the two. Kept because 'requires at least one resource "
+                "change' is the honest diagnosis for the empty case.",
+                "tests/planning/test_guard_coverage.py::"
+                "test_an_empty_plan_is_refused_as_a_candidate_error",
+            ),
+            (
+                "planning/candidates.py",
+                "isinstance(current_capacity, bool) or not "
+                "isinstance(current_capacity, int) or current_capacity < 0",
+            ): (
+                "diagnostic-only",
+                "`generate_candidates`' current_capacity gate. The value flows "
+                "unconditionally into the NO_CHANGE plan's `ResourceChange`, whose own "
+                "validation refuses every value this gate refuses — bool, non-int and "
+                "negative alike — with the same `CandidateError`. required_capacity's "
+                "twin gate IS scored: required never lands in a ResourceChange, so its "
+                "removal admits a fractional requirement outright.",
+                "tests/planning/test_guard_coverage.py::"
+                "test_an_invalid_current_capacity_is_refused_as_a_candidate_error",
+            ),
             ("planning/topology.py", "seen[key] != edge.kind"): (
                 "diagnostic-only",
                 "The guard chooses between two messages on a path that refuses either "

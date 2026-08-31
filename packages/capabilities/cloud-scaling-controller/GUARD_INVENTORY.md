@@ -25,9 +25,9 @@ This package records no prior inventory; this is the first one.
 
 ## Classification
 
-Every guard is classified: **217 `SCORED`** — the
+Every guard is classified: **215 `SCORED`** — the
 sweep neutralises it and the suite must fail — and
-**2 `EXCLUDED`**, each with a reason from a closed vocabulary and
+**4 `EXCLUDED`**, each with a reason from a closed vocabulary and
 a test that measures the reason. A guard is never excluded because it survived; a
 survivor with no prior declaration fails the sweep.
 
@@ -35,6 +35,8 @@ survivor with no prior declaration fails the sweep.
 |---|---|---|---|
 | `planning/topology.py:193` | `diagnostic-only` | The guard chooses between two messages on a path that refuses either way: it sits inside `if key in seen:`, and neutralising it falls through to the `duplicate dependency edge` refusal on the very next line. Both are `TopologyError`, and this package's typed half is the exception class, so no input can distinguish them — a contradictory pair and a duplicate pair are refused under one contract. It is kept because 'contradictory kind' is the more useful diagnosis of the two. | `tests/planning/test_guard_coverage.py::test_a_duplicate_pair_and_a_contradictory_pair_are_both_refused_as_topology_errors` |
 | `planning/constraints.py:58` | `diagnostic-only` | `_finite_number`'s None branch. No call site passes `allow_none=True` — all three call it bare — so for every reachable input the branch only chooses between the 'is required' and 'must be a finite number' messages, and both raise `ConstraintError`. The `allow_none` early return it also guards is dead at every call site; a caller that introduces one re-opens this exclusion by construction, because the sweep fails on a stale exclusion that gets killed. | `tests/planning/test_guard_coverage.py::test_a_none_cooldown_is_refused_as_a_constraint_error` |
+| `planning/candidates.py:112` | `diagnostic-only` | The empty-plan guard. With it removed, the primary-count gate two lines below refuses the same empty plan with the same `CandidateError` — an empty tuple has zero 'primary' roles — and emptiness is the only condition that reaches it, so no input distinguishes the two. Kept because 'requires at least one resource change' is the honest diagnosis for the empty case. | `tests/planning/test_guard_coverage.py::test_an_empty_plan_is_refused_as_a_candidate_error` |
+| `planning/candidates.py:233` | `diagnostic-only` | `generate_candidates`' current_capacity gate. The value flows unconditionally into the NO_CHANGE plan's `ResourceChange`, whose own validation refuses every value this gate refuses — bool, non-int and negative alike — with the same `CandidateError`. required_capacity's twin gate IS scored: required never lands in a ResourceChange, so its removal admits a fractional requirement outright. | `tests/planning/test_guard_coverage.py::test_an_invalid_current_capacity_is_refused_as_a_candidate_error` |
 
 ## Not counted, and why
 
@@ -131,7 +133,7 @@ survivor with no prior declaration fails the sweep.
 | 81 | `planning/candidates.py:84` | if | raise | SCORED | — | `req not in data` |
 | 82 | `planning/candidates.py:106` | if | raise | SCORED | — | `not isinstance(self.plan_id, str) or self.plan_id == ''` |
 | 83 | `planning/candidates.py:108` | if | raise | SCORED | — | `not isinstance(self.action_kind, ActionKind)` |
-| 84 | `planning/candidates.py:112` | if | raise | SCORED | — | `not self.changes` |
+| 84 | `planning/candidates.py:112` | if | raise | EXCLUDED | — | `not self.changes` |
 | 85 | `planning/candidates.py:115` | if | raise | SCORED | — | `roles.count('primary') != 1` |
 | 86 | `planning/candidates.py:120` | if | raise | SCORED | — | `not isinstance(c, ResourceChange)` |
 | 87 | `planning/candidates.py:123` | if | raise | SCORED | — | `key in seen` |
@@ -151,7 +153,7 @@ survivor with no prior declaration fails the sweep.
 | 101 | `planning/candidates.py:182` | if | raise | SCORED | — | `unknown` |
 | 102 | `planning/candidates.py:185` | if | raise | SCORED | — | `req not in data` |
 | 103 | `planning/candidates.py:192` | if | raise | SCORED | — | `not isinstance(changes_raw, (list, tuple))` |
-| 104 | `planning/candidates.py:233` | if | raise | SCORED | — | `isinstance(current_capacity, bool) or not isinstance(current_capacity, int)…` |
+| 104 | `planning/candidates.py:233` | if | raise | EXCLUDED | — | `isinstance(current_capacity, bool) or not isinstance(current_capacity, int)…` |
 | 105 | `planning/candidates.py:235` | if | raise | SCORED | — | `isinstance(required_capacity, bool) or not isinstance(required_capacity, in…` |
 | 106 | `planning/candidates.py:237` | if | raise | SCORED | — | `allowed_step < 1` |
 | 107 | `planning/policy.py:51` | if | raise | SCORED | — | `isinstance(v, bool) or not isinstance(v, (int, float)) or (not math.isfinit…` |

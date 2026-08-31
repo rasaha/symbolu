@@ -582,3 +582,287 @@ def test_a_constraints_payload_that_is_not_a_mapping_is_refused():
 def test_a_constraints_payload_missing_a_required_field_is_refused():
     with pytest.raises(ConstraintError):
         OperatingConstraints.from_dict({})
+
+
+# ======================================================================================= #
+# candidates.py — ResourceChange
+# ======================================================================================= #
+
+from ugence_cloud_scaling_controller.planning import (  # noqa: E402
+    ActionKind,
+    CandidateActionPlan,
+    CandidateError,
+    ResourceChange,
+    generate_candidates,
+)
+
+
+def _change(**over):
+    fields = dict(
+        subject=_subject(workload_id="app"),
+        current_capacity=3,
+        proposed_capacity=4,
+        role="primary",
+    )
+    fields.update(over)
+    return ResourceChange(**fields)
+
+
+def test_a_change_subject_that_is_not_a_subject_is_refused():
+    with pytest.raises(CandidateError):
+        _change(subject="app")
+
+
+def test_a_change_role_outside_the_two_named_roles_is_refused():
+    with pytest.raises(CandidateError):
+        _change(role="observer")
+
+
+def test_a_change_payload_that_is_not_a_mapping_is_refused():
+    """Field-name-list probe; without the gate the subject parse is a TypeError."""
+
+    with pytest.raises(CandidateError):
+        ResourceChange.from_dict(["subject", "current_capacity", "proposed_capacity"])
+
+
+def _change_payload(**over):
+    payload = dict(
+        subject=_subject(workload_id="app").to_canonical_dict(),
+        current_capacity=3,
+        proposed_capacity=4,
+        role="primary",
+    )
+    payload.update(over)
+    return payload
+
+
+def test_a_change_payload_carrying_an_unknown_field_is_refused():
+    with pytest.raises(CandidateError):
+        ResourceChange.from_dict(_change_payload(velocity=1))
+
+
+def test_a_change_payload_missing_a_required_field_is_refused():
+    with pytest.raises(CandidateError):
+        ResourceChange.from_dict({})
+
+
+# ======================================================================================= #
+# candidates.py — CandidateActionPlan.__post_init__
+# ======================================================================================= #
+
+
+def _plan(**over):
+    fields = dict(
+        plan_id="p1",
+        action_kind=ActionKind.SCALE_UP,
+        changes=(_change(),),
+    )
+    fields.update(over)
+    return CandidateActionPlan(**fields)
+
+
+def test_a_plan_id_that_is_not_a_non_empty_string_is_refused():
+    with pytest.raises(CandidateError):
+        _plan(plan_id="")
+
+
+def test_an_action_kind_that_is_not_the_enum_member_is_refused():
+    """The member's own string value, on a plan shaped so every kind-specific branch
+    the mutant falls into passes: a coordinated shape satisfies the `else` arm, so with
+    the type gate removed the plan constructs successfully."""
+
+    coordinated = (
+        _change(),
+        _change(subject=_subject(workload_id="db"), role="dependency",
+                current_capacity=10, proposed_capacity=12),
+    )
+    with pytest.raises(CandidateError):
+        _plan(action_kind="coordinated", changes=coordinated)
+
+
+class _FakeChange:
+    """Carries the one attribute read before the type gate, and nothing after it."""
+
+    role = "dependency"
+
+
+def test_a_plan_change_that_is_not_a_resource_change_is_refused():
+    """The roles read happens before the type gate, so the impostor must carry `role`;
+    without the gate the subject read on it is an AttributeError, not the candidate
+    contract."""
+
+    with pytest.raises(CandidateError):
+        _plan(changes=(_change(), _FakeChange()))
+
+
+def test_a_duplicate_subject_within_one_plan_is_refused():
+    """Two changes for the same subject in an otherwise valid coordinated plan — with
+    the duplicate gate removed the plan constructs successfully."""
+
+    dup = (
+        _change(),
+        _change(role="dependency", current_capacity=5, proposed_capacity=6),
+    )
+    with pytest.raises(CandidateError):
+        _plan(action_kind=ActionKind.COORDINATED, changes=dup)
+
+
+def test_a_timing_that_is_not_a_real_number_is_refused():
+    """Without the gate, `'fast' < 0` is a TypeError."""
+
+    with pytest.raises(CandidateError):
+        _plan(timing_seconds="fast")
+
+
+def test_a_negative_timing_is_refused():
+    with pytest.raises(CandidateError):
+        _plan(timing_seconds=-1.0)
+
+
+def test_an_empty_plan_is_refused_as_a_candidate_error():
+    """Evidence for the `diagnostic-only` exclusion of the empty-changes guard: with it
+    removed, the primary-count gate refuses the same empty plan with the same class —
+    an empty tuple has zero 'primary' roles. No input reaches one without the other."""
+
+    with pytest.raises(CandidateError):
+        _plan(changes=())
+
+
+def test_a_scale_up_whose_primary_shrinks_is_refused():
+    """Delta -1 with exactly one changed resource: the direction gate is the only one
+    that can refuse it, and with it removed the plan constructs."""
+
+    with pytest.raises(CandidateError):
+        _plan(changes=(_change(proposed_capacity=2),))
+
+
+def test_a_scale_up_that_changes_more_than_the_primary_is_refused():
+    two_moved = (
+        _change(),
+        _change(subject=_subject(workload_id="db"), role="dependency",
+                current_capacity=10, proposed_capacity=12),
+    )
+    with pytest.raises(CandidateError):
+        _plan(changes=two_moved)
+
+
+def test_a_scale_down_that_changes_more_than_the_primary_is_refused():
+    two_moved = (
+        _change(proposed_capacity=2),
+        _change(subject=_subject(workload_id="db"), role="dependency",
+                current_capacity=10, proposed_capacity=12),
+    )
+    with pytest.raises(CandidateError):
+        _plan(action_kind=ActionKind.SCALE_DOWN, changes=two_moved)
+
+
+def test_a_coordinated_plan_with_a_static_primary_is_refused():
+    """Primary delta zero while two dependencies move: the zero-primary gate alone
+    refuses it, since the >=2-changes gate is satisfied."""
+
+    static_primary = (
+        _change(proposed_capacity=3),
+        _change(subject=_subject(workload_id="db"), role="dependency",
+                current_capacity=10, proposed_capacity=12),
+        _change(subject=_subject(workload_id="cache"), role="dependency",
+                current_capacity=2, proposed_capacity=3),
+    )
+    with pytest.raises(CandidateError):
+        _plan(action_kind=ActionKind.COORDINATED, changes=static_primary)
+
+
+# ======================================================================================= #
+# candidates.py — CandidateActionPlan.from_dict
+# ======================================================================================= #
+
+
+def _plan_payload(**over):
+    payload = dict(
+        plan_id="p1",
+        action_kind=ActionKind.SCALE_UP.value,
+        changes=[_change_payload()],
+    )
+    payload.update(over)
+    return payload
+
+
+def test_a_plan_payload_that_is_not_a_mapping_is_refused():
+    """The action-kind lookup on the probe list is a TypeError the surrounding
+    `except ValueError` does not translate."""
+
+    with pytest.raises(CandidateError):
+        CandidateActionPlan.from_dict(["plan_id", "action_kind", "changes"])
+
+
+def test_a_plan_payload_carrying_an_unknown_field_is_refused():
+    with pytest.raises(CandidateError):
+        CandidateActionPlan.from_dict(_plan_payload(urgency=1))
+
+
+def test_a_plan_payload_missing_a_required_field_is_refused():
+    with pytest.raises(CandidateError):
+        CandidateActionPlan.from_dict({})
+
+
+def test_a_plan_payload_whose_changes_are_not_a_sequence_is_refused():
+    """A truthy non-sequence iterating to one valid change: with the gate removed the
+    plan constructs successfully."""
+
+    with pytest.raises(CandidateError):
+        CandidateActionPlan.from_dict(
+            _plan_payload(changes=_EdgeStream(_change_payload()))
+        )
+
+
+# ======================================================================================= #
+# candidates.py — generate_candidates argument gates
+# ======================================================================================= #
+
+
+def test_an_invalid_current_capacity_is_refused_as_a_candidate_error():
+    """Evidence for the `diagnostic-only` exclusion of the current_capacity gate:
+    current flows into the NO_CHANGE plan's ResourceChange unconditionally, whose own
+    validation refuses every value this gate refuses, with the same class."""
+
+    with pytest.raises(CandidateError):
+        generate_candidates(
+            _subject(workload_id="app"),
+            current_capacity=-1,
+            required_capacity=2,
+            allowed_step=1,
+            min_capacity=0,
+            max_capacity=10,
+        )
+
+
+def test_a_negative_required_capacity_is_refused():
+    """-1 is the probe this gate alone can catch. A fractional requirement would not
+    do: the exact-requirement target (`lo <= required <= hi`) would carry it into a
+    ResourceChange, whose own validation refuses it with the same class. A negative
+    requirement is dropped by that very clamp, steps down to a valid target of 0, and
+    generates successfully with the gate removed."""
+
+    with pytest.raises(CandidateError):
+        generate_candidates(
+            _subject(workload_id="app"),
+            current_capacity=1,
+            required_capacity=-1,
+            allowed_step=1,
+            min_capacity=0,
+            max_capacity=10,
+        )
+
+
+def test_an_allowed_step_below_one_is_refused():
+    """required == current on purpose: neither stepping branch runs, so the mutant
+    returns a NO_CHANGE-only candidate set instead of looping on a zero step."""
+
+    with pytest.raises(CandidateError):
+        generate_candidates(
+            _subject(workload_id="app"),
+            current_capacity=2,
+            required_capacity=2,
+            allowed_step=0,
+            min_capacity=0,
+            max_capacity=10,
+        )
