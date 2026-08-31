@@ -30,6 +30,19 @@ _REDACT_KEYS = {
     "secret",
     "private_key",
     "pem",
+    # Production-readiness round PR-A additions: push/device tokens (DEC-3C
+    # sensitivity), report evidence/description text (DEC-3B-5), message
+    # bodies, and direct identifiers.
+    "token",
+    "push_token",
+    "device_token",
+    "expo_push_token",
+    "evidence",
+    "description",
+    "message_body",
+    "body",
+    "email",
+    "database_url",
 }
 
 

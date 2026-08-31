@@ -21,8 +21,12 @@ from __future__ import annotations
 import enum
 from functools import lru_cache
 
-from pydantic import model_validator
+from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+# The local-development default DSN. Production-like environments must supply an
+# explicit DILCHAT_DATABASE_URL — starting up against this default is refused.
+_DEV_DATABASE_URL = "postgresql+asyncpg://postgres@/dilchat_dev?host=/tmp&port=5433"
 
 
 class Environment(str, enum.Enum):
@@ -54,10 +58,13 @@ class Settings(BaseSettings):
     debug: bool = False
 
     # Database. asyncpg for PostgreSQL (primary); aiosqlite accepted for unit tests.
-    database_url: str = "postgresql+asyncpg://postgres@/dilchat_dev?host=/tmp&port=5433"
+    # repr=False: the DSN may embed credentials and must never surface through
+    # Settings repr/str (which can reach logs and tracebacks).
+    database_url: str = Field(default=_DEV_DATABASE_URL, repr=False)
 
     # Access-token signing (ES256). In dev/test an ephemeral key is generated if unset.
-    access_token_private_key_pem: str | None = None
+    # repr=False: private key material must never surface through Settings repr/str.
+    access_token_private_key_pem: str | None = Field(default=None, repr=False)
     access_token_public_key_pem: str | None = None
     access_token_ttl_seconds: int = 600  # 10 minutes
     refresh_token_ttl_seconds: int = 60 * 60 * 24 * 30  # 30 days
@@ -163,6 +170,27 @@ class Settings(BaseSettings):
             if self.access_token_private_key_pem is None:
                 raise ValueError(
                     "access_token_private_key_pem is required in production-like environments."
+                )
+            # Production-readiness fail-fast (DILCHAT-D-PR round PR-A): a
+            # staging/production process must never come up on debug output,
+            # the local-development database, or a non-PostgreSQL engine.
+            if self.debug:
+                raise ValueError(
+                    "debug=true is not permitted in production-like environments."
+                )
+            if self.database_url == _DEV_DATABASE_URL:
+                raise ValueError(
+                    "DILCHAT_DATABASE_URL must be set explicitly in production-like "
+                    "environments; the local-development default is refused."
+                )
+            if not self.database_url.startswith("postgresql+asyncpg://"):
+                raise ValueError(
+                    "database_url must use the postgresql+asyncpg engine in "
+                    "production-like environments (RLS and worker posture depend on it)."
+                )
+            if self.push_transport == "expo" and not self.expo_push_url.startswith("https://"):
+                raise ValueError(
+                    "expo_push_url must be https in production-like environments."
                 )
         return self
 

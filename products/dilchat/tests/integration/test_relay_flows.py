@@ -273,3 +273,40 @@ async def test_pruning_removes_only_old_published_rows(ctx):
         assert len(remaining) == before - 1
         # I8: the old-but-unpublished row survived.
         assert any(r.published_at is None and r.created_at <= old for r in remaining)
+
+
+class LeakyTransport:
+    """A misbehaving transport whose failure text carries free text and a token.
+
+    Round PR-A telemetry hardening: even such a transport must not get free
+    text or token material into ``last_error_code`` (stored AND logged) — the
+    relay clamps anything that is not a machine-style code.
+    """
+
+    async def send_new_message(self, tokens: list[str]) -> list[TokenResult]:
+        raise TransportError(
+            "provider said: upstream 502 for ExponentPushToken[SENTINEL_leaky_token_9d2c]"
+        )
+
+
+async def test_misbehaving_transport_error_text_never_reaches_row_or_logs(ctx, caplog, capfd):
+    a, b, _couple = await _pair(ctx.client)
+    conv = await _conversation(ctx.client, a)
+    await _register_device(ctx.client, b, "ExponentPushToken[SENTINEL_leaky_token_9d2c]")
+    await _send(ctx.client, a, conv["conversation_id"], "m1", "SENTINEL_leaky_body_9d2c")
+
+    with caplog.at_level("DEBUG", logger="ugence_dilchat.relay"):
+        await _relay(ctx, LeakyTransport()).process_batch()
+
+    rows = await _outbox_rows(ctx)
+    parked = [r for r in rows if r.last_error_code is not None]
+    assert parked, "the MESSAGE_CREATED event should have parked"
+    for row in parked:
+        # Clamped to a machine code — the free text was discarded, not truncated.
+        assert row.last_error_code == "TRANSPORT_UNAVAILABLE"
+
+    captured = capfd.readouterr()
+    for stream in (caplog.text, captured.out, captured.err):
+        assert "SENTINEL_leaky_token_9d2c" not in stream
+        assert "SENTINEL_leaky_body_9d2c" not in stream
+        assert "provider said" not in stream
