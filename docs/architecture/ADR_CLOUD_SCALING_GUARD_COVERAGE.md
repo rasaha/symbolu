@@ -577,3 +577,61 @@ go silently untested and a member removed cannot silently shrink the suite.
 
 Nothing else is decided here; in particular, no `else`-arm or nested-`if` classification
 question is reopened or resolved by this ruling.
+
+## §11. D-GC-1 widened — packages that verify and spend authority, 2026-08-31
+
+**Ruled by the owner, 2026-08-31: the doctrine's universe widens from packages that
+advise or disclaim authority to include — more importantly — packages that verify and
+spend it, and `cloud-scaling-operations` adopts first.** This is the explicit,
+§10-style extension the adoption audit required: §2's outcome-bearing criterion always
+had referents in this package, but the ADR's stated universe ("packages that disclaim
+authority") did not cover a package whose posture is CONTROLLED_EXECUTION /
+INFRASTRUCTURE_MUTATION and whose `ExecutionDenied` gates decide whether infrastructure
+is changed. Those gates are precisely outcome-bearing, and they are what this ruling
+brings under measurement.
+
+*The re-derived denominator is 55, not the audit's provisional 46* `[V: measured;
+guard_sweep.py operations --inventory-only]` — 49 `if`-layer guards, the two
+statement-level `verify_authorization(...)` authority-application sites plus the script
+entrypoint (D-GC-4), and the executor's three bound-return `except` arms (D-GC-3). The
+owner's instruction not to assume the 17 returning `except` arms qualify was applied in
+both directions: 14 of them return booleans or exit codes, never a vocabulary member,
+and stay outside the ratified class `[V: AST census]`; the executor's three
+(`executors.py:229`, `:287`, `:296`) name their `ExecutionOutcome` member in the arm
+body and return the binding, which the class definition now selects through a
+bound-return fallback that leaves every prior adopter's selection — members named in
+the return value — untouched `[V: all five prior inventories byte-identical]`.
+
+Two engine widenings carry the package's refusal shapes, both opt-in and both measured
+as no-ops for every prior adopter: `bound_refusal_calls` (a gate that binds its typed
+receipt and returns the name — `r = self._receipt(..., ExecutionOutcome.DENIED, ...);
+return r` — is a typed-refusal guard) and the D-GC-3 bound-return fallback above. The
+mint site reads literally for this package: the counter wraps the fake backend's
+`set_replicas`, so "removing this guard lets the package mint something the baseline
+refused" means *an infrastructure mutation happened that the baseline denied* — and the
+sweep measures **14** such guards across the authority and executor layers
+`[V: aggregate, minting_guards]`.
+
+**The reference-HMAC caveat is part of the record, not a footnote.** The gates are
+verified against `ReferenceAuthorityVerifier`, a deterministic HMAC for tests and local
+development that is explicitly not a production KMS; every kill proves gate
+*enforcement* — the check is applied, discriminates its typed outcome, and fails
+closed — and none proves production cryptographic strength, which belongs to the
+verifier a deployment injects. The generated `GUARD_INVENTORY.md` carries this caveat
+verbatim (`PackageConfig.inventory_note`).
+
+Measured at adoption, after closing the survivors: **55 guards, 51 killed, 0 survived,
+0 unscored, 0 message-only kills**, against a green 157-test baseline `[V: aggregate]`.
+The first sweep measured 26 killed / 29 survived — nine of the nineteen `authority.py`
+denial gates among the survivors, the §6 within-class story exactly: the pre-existing
+suite asserted "denied" and never the code, so gate removals cascaded into later
+denials no assertion could tell apart. The survivors were closed by isolating tests
+asserting the typed half (`ExecutionDenied.code`, the `ExecutionOutcome` member on the
+receipt *and* the audit event, the `GateOutcome` action, the exception class), and the
+four exclusions are the process-entrypoint layer, each on
+`outside-authority-bearing-definition` with a named evidence test. Two §7.1/§9.d-class
+prerequisites surfaced and were fixed the same way those were: the tests' conftest
+located the sibling controller by directory hops and skipped path setup when any
+installation was importable (a copy would have measured unmutated code), and a
+duplicate `test_cli.py` basename kept the suite from collecting outside the
+repository at all.

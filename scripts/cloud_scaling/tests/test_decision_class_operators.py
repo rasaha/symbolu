@@ -931,3 +931,108 @@ def test_multiplicity_is_computed_everywhere_but_disclosed_only_on_request():
         "measured off _CARRIED_INSTANTS and _OCCURRENCE_FACTS, and disclosed under the "
         "2026-08-30 ruling: each loop is one static site, 119 sites deciding 126 invariants"
     )
+
+
+BOUND_REFUSAL = '''
+class Reason:
+    DENIED = "denied"
+    FAILED = "failed"
+
+
+def _receipt(reason, detail):
+    return (reason, detail)
+
+
+def evaluate(value, mode):
+    if mode == "dry":
+        r = _receipt(Reason.DENIED, "bound refusal")
+        return r
+    if value is None:
+        raise ValueError("required")
+    return value
+'''
+
+
+def test_a_bound_refusal_call_is_a_guard_only_where_the_package_opts_in(
+    tmp_path, monkeypatch
+):
+    """The operations idiom: the gate binds its typed receipt and returns the name, so
+    the refusal call never appears as `return f(...)`. Opt-in, so every adopter that
+    predates the field keeps a byte-identical shape reading."""
+
+    src = tmp_path / "pkg" / "src" / "synthetic"
+    src.mkdir(parents=True)
+    (src / "shapes.py").write_text(BOUND_REFUSAL.lstrip("\n"), encoding="utf-8")
+    monkeypatch.setattr(guard_sweep, "REPO", tmp_path)
+
+    def config(**over):
+        fields = dict(
+            key="synthetic",
+            package_dir="pkg",
+            dist_name="synthetic",
+            mint_site="",
+            module_order=("shapes.py",),
+            refusal_calls=frozenset({"_receipt"}),
+            tuple_refusals=False,
+            recorded=(),
+        )
+        fields.update(over)
+        return guard_sweep.PackageConfig(**fields)
+
+    default = {g.lineno for g in guard_sweep.inventory(config())}
+    opted = {g.lineno for g in guard_sweep.inventory(config(bound_refusal_calls=True))}
+    dispatch = BOUND_REFUSAL.lstrip("\n").splitlines().index('    if mode == "dry":') + 1
+    assert dispatch not in default, "without the opt-in the bound idiom stays invisible"
+    assert dispatch in opted, "with it the dispatch is the typed-refusal guard it is"
+
+
+BOUND_RETURN_ARM = '''
+class Reason:
+    DENIED = "denied"
+    FAILED = "failed"
+
+
+class Refused(Exception):
+    pass
+
+
+def admit(value):
+    if value is None:
+        raise Refused("required")
+    return value
+
+
+def evaluate(value):
+    try:
+        return admit(value)
+    except Refused:
+        r = (Reason.DENIED, "bound")
+        return r
+'''
+
+
+def test_an_except_arm_returning_a_bound_rejection_is_selected(tmp_path, monkeypatch):
+    """D-GC-3's bound-return fallback: the member is named in the arm's body and the
+    return carries the binding. An arm whose member sits in the return value keeps its
+    exact prior selection, which is what preserves every earlier adopter's inventory."""
+
+    src = tmp_path / "pkg" / "src" / "synthetic"
+    src.mkdir(parents=True)
+    (src / "shapes.py").write_text(BOUND_RETURN_ARM.lstrip("\n"), encoding="utf-8")
+    monkeypatch.setattr(guard_sweep, "REPO", tmp_path)
+    config = guard_sweep.PackageConfig(
+        key="synthetic",
+        package_dir="pkg",
+        dist_name="synthetic",
+        mint_site="",
+        module_order=("shapes.py",),
+        refusal_calls=frozenset(),
+        tuple_refusals=False,
+        recorded=(),
+        decision_classes=frozenset({"except-arm"}),
+        reason_collapse_sentinels={"Reason": ("FAILED", "DENIED")},
+    )
+    arms = [g for g in guard_sweep.inventory(config) if g.kind == "except-arm"]
+    assert [g.collapse_member for g in arms] == ["DENIED"], (
+        "the member bound in the arm's body is the mutation target"
+    )
