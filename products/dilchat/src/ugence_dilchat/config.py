@@ -147,6 +147,16 @@ class Settings(BaseSettings):
     # Explicit opt-in to permit the synthetic fake provider in internal QA.
     allow_fake_in_qa: bool = False
 
+    # --- Pilot posture (DILCHAT-D-PL-1) ------------------------------------ #
+    # The ratified internal pilot runs under the `qa` posture (Swiss AGPL dev
+    # adapter, no production licensing decision yet), but the owner required it
+    # to mirror production configuration discipline anyway. `qa` is not
+    # `is_production_like`, so those guards would NOT otherwise apply — this
+    # flag makes the requirement ENFORCED rather than remembered: with it set,
+    # the production-like guards run whatever the environment label says, and
+    # the synthetic `fake` provider is refused outright.
+    pilot_mode: bool = False
+
     # ---------------------------------------------------------------------- #
     def permitted_providers(self) -> set[str]:
         """The provider ids permitted for the current environment (policy matrix)."""
@@ -156,6 +166,8 @@ class Settings(BaseSettings):
         if env is Environment.DEVELOPMENT:
             return {"fake", "swiss"}
         if env is Environment.QA:
+            if self.pilot_mode:
+                return {"swiss"}  # D-PL-1: no fake provider in a pilot, ever
             return {"swiss"} | ({"fake"} if self.allow_fake_in_qa else set())
         # staging / production: real providers only.
         return {"swiss"} if self.swiss_production_licensed else set()
@@ -193,37 +205,44 @@ class Settings(BaseSettings):
                 f"environment {self.environment.value!r}. Permitted: {allowed}. "
                 "See DEC-029 (provider/environment policy)."
             )
-        if self.environment.is_production_like:
-            if self.astrology_provider == "swiss" and not self.swiss_production_licensed:
+        if self.environment.is_production_like or self.pilot_mode:
+            # The Swiss production licensing decision is deferred by D-PL-1 for the
+            # qa-posture pilot; it remains required for staging/production.
+            if (
+                self.environment.is_production_like
+                and self.astrology_provider == "swiss"
+                and not self.swiss_production_licensed
+            ):
                 raise ValueError(
                     "Swiss Ephemeris requires swiss_production_licensed=true in "
                     "staging/production (DEC-007 licensing decision)."
                 )
+            # Fail-fast configuration discipline (round PR-A; extended to the
+            # qa-posture pilot by D-PL-1). "Strict posture" = a production-like
+            # environment OR pilot_mode: such a process must never come up on
+            # debug output, an ephemeral signing key, the local-development
+            # database, a non-PostgreSQL engine, or a cleartext push endpoint.
+            where = "production-like environments" if self.environment.is_production_like \
+                else "pilot_mode (DILCHAT-D-PL-1)"
             if self.access_token_private_key_pem is None:
                 raise ValueError(
-                    "access_token_private_key_pem is required in production-like environments."
+                    f"access_token_private_key_pem is required in {where} "
+                    "(no ephemeral signing key)."
                 )
-            # Production-readiness fail-fast (DILCHAT-D-PR round PR-A): a
-            # staging/production process must never come up on debug output,
-            # the local-development database, or a non-PostgreSQL engine.
             if self.debug:
-                raise ValueError(
-                    "debug=true is not permitted in production-like environments."
-                )
+                raise ValueError(f"debug=true is not permitted in {where}.")
             if self.database_url == _DEV_DATABASE_URL:
                 raise ValueError(
-                    "DILCHAT_DATABASE_URL must be set explicitly in production-like "
-                    "environments; the local-development default is refused."
+                    f"DILCHAT_DATABASE_URL must be set explicitly in {where}; "
+                    "the local-development default is refused."
                 )
             if not self.database_url.startswith("postgresql+asyncpg://"):
                 raise ValueError(
-                    "database_url must use the postgresql+asyncpg engine in "
-                    "production-like environments (RLS and worker posture depend on it)."
+                    f"database_url must use the postgresql+asyncpg engine in {where} "
+                    "(RLS and worker posture depend on it)."
                 )
             if self.push_transport == "expo" and not self.expo_push_url.startswith("https://"):
-                raise ValueError(
-                    "expo_push_url must be https in production-like environments."
-                )
+                raise ValueError(f"expo_push_url must be https in {where}.")
         return self
 
     def confidence_for_precision(self, precision: str) -> float:
