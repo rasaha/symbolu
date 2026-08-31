@@ -112,18 +112,38 @@ def test_every_adopter_reconciles_clean():
         assert not problems, f"{key}: {problems}"
 
 
-def test_no_excluded_adopter_module_carries_a_decision_point():
-    """The exclusions' stated reason, measured rather than trusted: an excluded module
-    with a refusal-shaped guard or a raise would make its reason false, and belongs in
-    ``module_order`` (or before the owner) instead."""
+def test_every_excluded_adopter_module_reason_still_holds():
+    """The exclusions' stated reason, measured rather than trusted — and there are two
+    kinds of reason making two different checkable claims.
+
+    A flat adopter's exclusion says "nothing here": zero refusal-shaped guards and
+    zero raises, as before. A *phased* adopter's exclusion (the controller's, ruling 3)
+    says "deferred, and here is its measured refusal surface": the module is outside
+    the phase boundary and its reason discloses the raise count. For those, the
+    checkable claim is that the disclosed count still matches the tree — a deferred
+    module that grows a refusal gains it silently unless the number is re-measured, so
+    a drifted count fails here and forces the disclosure (and the phase plan) to be
+    updated rather than trusted."""
 
     import ast
+    import re
 
     for key, config in guard_sweep.PACKAGES.items():
         visible, _ = guard_sweep._helper_analysis(config)
-        for module in config.excluded_modules:
+        for module, reason in config.excluded_modules.items():
             tree = ast.parse((config.src / module).read_text(encoding="utf-8"))
             raises = sum(1 for n in ast.walk(tree) if isinstance(n, ast.Raise))
+            deferred = re.search(
+                r"deferred to a later ratified.*carries (\d+) raise statements", reason
+            )
+            if deferred:
+                declared = int(deferred.group(1))
+                assert raises == declared, (
+                    f"{key}:{module} discloses {declared} raise statements but the "
+                    f"tree carries {raises}; the deferred surface drifted and the "
+                    "disclosure (and the phase plan) must be re-measured"
+                )
+                continue
             shaped = sum(
                 1
                 for n in ast.walk(tree)

@@ -635,3 +635,85 @@ located the sibling controller by directory hops and skipped path setup when any
 installation was importable (a copy would have measured unmutated code), and a
 duplicate `test_cli.py` basename kept the suite from collecting outside the
 repository at all.
+
+## §12. Controller phase 1 — `planning/` adopted, honestly partial, 2026-08-31
+
+Ruling 3 of 2026-08-31 ordered the Cloud Scaling Controller adopted **in phases**,
+starting with `planning/` and "report it honestly as partial controller coverage",
+each phase CI-blocking before the next. This section records phase 1.
+
+**The boundary is declared, not implied.** The `controller-planning` entry walks the
+10 `planning/` modules in the order a recommendation is built. The other 68 production
+modules are named individually in `excluded_modules`, each with the `raise` count
+measured in it at adoption (generated from the tree by `_CONTROLLER_DEFERRED`, so the
+numbers cannot drift into a claim nobody re-measured): the phase covers 205 of the
+package's 426 `raise` statements, and the generated inventory's own preamble names
+every deferred subpackage with its size and states that a green sweep here is not
+evidence about any of them. A module added outside `planning/` fails the inventory's
+completeness gate rather than escaping it.
+
+**The denominator was re-derived by measurement: 219** — 213 `if`-layer guards, 4
+helper-admission sites, 1 except-arm, 1 else-arm. The first derivation measured 218:
+the entry named the reason vocabulary by its class, but `pipeline.py` imports it as
+`RecommendationAbstentionReason as R` and writes `R.MEMBER` at all 31 of its refusal
+sites, so the engine read the module as having no typed outcome and dropped its one
+D-GC-3 arm. Naming the alias as the source names it — the documented contract of
+`reason_vocabularies` — recovered the arm. `ConstraintViolationKind` is the second
+vocabulary; `RecommendationOutcome` is deliberately absent (a `Union` type alias names
+no decision).
+
+**The first sweep measured 63 killed / 156 survived** — by far the weakest guard-level
+coverage of any adopter, and the §6 story at scale: the 493-test Phase-3 suite proves
+the pipeline *behaves*, and `topology.py:89`'s `isinstance` gate could be deleted
+outright with every test staying green. The owner ratified closing all of it. The
+survivors were closed by 153 isolating tests, each constructing an input valid in
+every respect except the one field its target guard reads, so exactly one gate can
+refuse it and the typed exception class attributes without any message assertion.
+Recurring discriminators, recorded in the tests themselves: the field-name-list probe
+for mapping gates (every later gate passes on it and the fallback is a `TypeError`);
+`inf`/`NaN`/`None` chosen per gate so the mutant either admits the value outright or
+dies on a different contract; a truthy non-sequence iterating to a fully valid payload
+for sequence gates; a second deliberate fault where a `from_dict` gate is repeated by
+a dataclass gate with the same class, moving the mutant's fallback into a different
+error type; a delegating impostor for a type gate whose plain-probe failure would be
+re-raised under the same class by an except-jacket; and perturbation of a genuine
+pipeline-built record via `dataclasses.replace`, with forgeries aimed at losing
+candidates so the selection outcome cannot mask the recompute gate under test.
+
+**16 defense-in-depth exclusions, every one measured.** The re-validation machinery in
+`recommendation.py` deliberately checks the same conditions at multiple depths, and
+this package's typed half is the exception class alone — so several guards are
+*jacketed*: for every input that reaches them mutated, a sibling gate refuses under
+the same contract. Ten are in `recommendation.py` (the empty-set, duplicate-pair,
+feasibility-interlock, NO_CHANGE-baseline, infeasible-selected, ambiguity,
+horizon-expiry, horizon-positivity, and defensive-uniqueness guards), plus
+`topology.py`'s conflicting-kind arm, `constraints.py`'s `_finite_number` None branch,
+two in `candidates.py` and one each in `policy.py` and `pipeline.py` (the ScoringError
+arm the pipeline's own typed pre-gates keep unreachable). Each carries the reason from
+the closed vocabulary — `diagnostic-only`, `unreachable-behind-earlier-guard`, or
+`equivalent-mutant` — and an evidence test that measures the jacket rather than
+asserting it. None was written before a sweep measured the guard surviving its
+isolating probe.
+
+**Measured at adoption, after closing the survivors: 219 guards, 203 killed, 0
+survived, 0 unscored, 16 excluded, 0 message-only kills**, against a green 646-test
+baseline `[V: aggregate]`. The mint site is `CapacityActionRecommendation.__post_init__`
+— a recommendation that exists is the artifact, and abstention is deliberately not a
+mint. Two §7.1/§9.d-class prerequisites surfaced and were fixed with the repository's
+own conventions: the suite did not collect outside the repository at all (three test
+basenames duplicated across subdirectories; fixed with `--import-mode=importlib` in
+the package's pyproject, as seven sibling packages already declare), and the tests'
+conftest preferred an installed distribution over the source beside it (the exact
+defect §11 fixed for operations; latent here, fixed unconditionally).
+
+**CI.** `cloud-scaling-controller-phase3-ci.yml` — already scoped to Phase 3, which
+is `planning/` — gains the shared-engine jobs: inventory regeneration (which now also
+enforces the 68-module boundary disclosure), engine tests, a four-shard sweep, and an
+aggregate pinning the totals above with the 16 exclusions named individually. The
+engine-filter floor test rises from five workflows to seven, and the raise closed a
+real gap: `cloud-scaling-risk-integration-ci.yml` had run the shared engine since its
+own adoption without ever being named in the floor.
+
+**Next phases.** `forecasting/` (102 raises) and `canonical/` (94) carry most of the
+deferred refusal surface and are the natural phase 2; each later phase re-derives its
+own denominator and meets this same bar before the boundary widens.

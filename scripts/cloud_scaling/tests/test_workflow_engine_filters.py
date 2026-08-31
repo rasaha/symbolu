@@ -86,8 +86,16 @@ SHARED_ENGINE_WORKFLOWS = sorted(
 )
 
 
-def test_the_shared_engine_is_run_by_the_five_sweeps_this_expects():
-    """A floor, not an equality: a sixth adopter must not silently go unchecked."""
+def test_the_shared_engine_is_run_by_the_seven_sweeps_this_expects():
+    """A floor, not an equality: an eighth adopter must not silently go unchecked.
+
+    Raised from five to seven with the controller planning/ phase — and the raise
+    closed a real gap the five-name floor had been carrying: `risk-integration` had
+    run the shared engine since its own adoption without ever being named here, which
+    is precisely the drift a floor exists to catch. A workflow that runs the engine
+    and is absent from this set is either a new adopter (add it) or a regression
+    (fix it); there is no third reading.
+    """
 
     names = {p.name for p in SHARED_ENGINE_WORKFLOWS}
     assert names >= {
@@ -96,6 +104,8 @@ def test_the_shared_engine_is_run_by_the_five_sweeps_this_expects():
         "cloud-scaling-capacity-bounds-policy-ci.yml",
         "cloud-scaling-producer-attestation-ci.yml",
         "cloud-scaling-operations-package-ci.yml",
+        "cloud-scaling-risk-integration-ci.yml",
+        "cloud-scaling-controller-phase3-ci.yml",
     }, f"a sweep stopped invoking the shared engine, or moved: {sorted(names)}"
 
 

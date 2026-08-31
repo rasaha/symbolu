@@ -1,0 +1,1370 @@
+{
+  "package": "controller-planning",
+  "total": 219,
+  "scored": 203,
+  "excluded": 16,
+  "classification": {
+    "1": {
+      "status": "SCORED",
+      "module": "planning/topology.py",
+      "line": 89,
+      "condition": "not isinstance(self.upstream, CapacitySubject)"
+    },
+    "2": {
+      "status": "SCORED",
+      "module": "planning/topology.py",
+      "line": 91,
+      "condition": "not isinstance(self.downstream, CapacitySubject)"
+    },
+    "3": {
+      "status": "SCORED",
+      "module": "planning/topology.py",
+      "line": 93,
+      "condition": "not isinstance(self.kind, DependencyKind)"
+    },
+    "4": {
+      "status": "SCORED",
+      "module": "planning/topology.py",
+      "line": 95,
+      "condition": "self.upstream == self.downstream"
+    },
+    "5": {
+      "status": "SCORED",
+      "module": "planning/topology.py",
+      "line": 97,
+      "condition": "self.downstream_current_capacity is not None"
+    },
+    "6": {
+      "status": "SCORED",
+      "module": "planning/topology.py",
+      "line": 99,
+      "condition": "isinstance(v, bool) or not isinstance(v, int) or v < 0"
+    },
+    "7": {
+      "status": "SCORED",
+      "module": "planning/topology.py",
+      "line": 101,
+      "condition": "self.required_per_upstream_unit is not None"
+    },
+    "8": {
+      "status": "SCORED",
+      "module": "planning/topology.py",
+      "line": 104,
+      "condition": "isinstance(v, bool) or not isinstance(v, (int, float)) or (not _math.isfinite(v)) or (v <= 0)"
+    },
+    "9": {
+      "status": "SCORED",
+      "module": "planning/topology.py",
+      "line": 106,
+      "condition": "self.kind is DependencyKind.INFORMATIONAL and (self.downstream_current_capacity is not None or self.required_per_upstream_unit is not None)"
+    },
+    "10": {
+      "status": "SCORED",
+      "module": "planning/topology.py",
+      "line": 136,
+      "condition": "not isinstance(data, Mapping)"
+    },
+    "11": {
+      "status": "SCORED",
+      "module": "planning/topology.py",
+      "line": 141,
+      "condition": "unknown"
+    },
+    "12": {
+      "status": "SCORED",
+      "module": "planning/topology.py",
+      "line": 144,
+      "condition": "req not in data"
+    },
+    "13": {
+      "status": "SCORED",
+      "module": "planning/topology.py",
+      "line": 171,
+      "condition": "not isinstance(self.subject, CapacitySubject)"
+    },
+    "14": {
+      "status": "SCORED",
+      "module": "planning/topology.py",
+      "line": 173,
+      "condition": "not isinstance(self.as_of, datetime)"
+    },
+    "15": {
+      "status": "SCORED",
+      "module": "planning/topology.py",
+      "line": 175,
+      "condition": "self.evidence_source is not None and (not isinstance(self.evidence_source, str) or self.evidence_source == '')"
+    },
+    "16": {
+      "status": "SCORED",
+      "module": "planning/topology.py",
+      "line": 183,
+      "condition": "not isinstance(edge, DependencyEdge)"
+    },
+    "17": {
+      "status": "SCORED",
+      "module": "planning/topology.py",
+      "line": 187,
+      "condition": "not _subject_scope_compatible(edge.upstream, self.subject)"
+    },
+    "18": {
+      "status": "SCORED",
+      "module": "planning/topology.py",
+      "line": 189,
+      "condition": "not _subject_scope_compatible(edge.downstream, self.subject)"
+    },
+    "19": {
+      "status": "SCORED",
+      "module": "planning/topology.py",
+      "line": 192,
+      "condition": "key in seen"
+    },
+    "20": {
+      "status": "EXCLUDED",
+      "reason": "diagnostic-only",
+      "detail": "The guard chooses between two messages on a path that refuses either way: it sits inside `if key in seen:`, and neutralising it falls through to the `duplicate dependency edge` refusal on the very next line. Both are `TopologyError`, and this package's typed half is the exception class, so no input can distinguish them \u2014 a contradictory pair and a duplicate pair are refused under one contract. It is kept because 'contradictory kind' is the more useful diagnosis of the two.",
+      "evidence": "tests/planning/test_guard_coverage.py::test_a_duplicate_pair_and_a_contradictory_pair_are_both_refused_as_topology_errors",
+      "module": "planning/topology.py",
+      "line": 193,
+      "condition": "seen[key] != edge.kind"
+    },
+    "21": {
+      "status": "SCORED",
+      "module": "planning/topology.py",
+      "line": 253,
+      "condition": "not isinstance(data, Mapping)"
+    },
+    "22": {
+      "status": "SCORED",
+      "module": "planning/topology.py",
+      "line": 257,
+      "condition": "unknown"
+    },
+    "23": {
+      "status": "SCORED",
+      "module": "planning/topology.py",
+      "line": 260,
+      "condition": "req not in data"
+    },
+    "24": {
+      "status": "SCORED",
+      "module": "planning/topology.py",
+      "line": 263,
+      "condition": "not isinstance(as_of, datetime)"
+    },
+    "25": {
+      "status": "SCORED",
+      "module": "planning/topology.py",
+      "line": 266,
+      "condition": "not isinstance(edges_raw, (list, tuple))"
+    },
+    "26": {
+      "status": "SCORED",
+      "module": "planning/cost.py",
+      "line": 60,
+      "condition": "isinstance(self.amount_minor, bool) or not isinstance(self.amount_minor, int)"
+    },
+    "27": {
+      "status": "SCORED",
+      "module": "planning/cost.py",
+      "line": 62,
+      "condition": "not isinstance(self.currency, str) or len(self.currency) != 3 or (not self.currency.isalpha())"
+    },
+    "28": {
+      "status": "SCORED",
+      "module": "planning/cost.py",
+      "line": 71,
+      "condition": "not isinstance(data, Mapping)"
+    },
+    "29": {
+      "status": "SCORED",
+      "module": "planning/cost.py",
+      "line": 74,
+      "condition": "unknown"
+    },
+    "30": {
+      "status": "SCORED",
+      "module": "planning/cost.py",
+      "line": 76,
+      "condition": "'amount_minor' not in data or 'currency' not in data"
+    },
+    "31": {
+      "status": "SCORED",
+      "module": "planning/cost.py",
+      "line": 94,
+      "condition": "not isinstance(self.subject, CapacitySubject)"
+    },
+    "32": {
+      "status": "SCORED",
+      "module": "planning/cost.py",
+      "line": 96,
+      "condition": "not isinstance(self.unit_price, Money)"
+    },
+    "33": {
+      "status": "SCORED",
+      "module": "planning/cost.py",
+      "line": 98,
+      "condition": "self.unit_price.amount_minor < 0"
+    },
+    "34": {
+      "status": "SCORED",
+      "module": "planning/cost.py",
+      "line": 100,
+      "condition": "not isinstance(self.basis, CostBasis)"
+    },
+    "35": {
+      "status": "SCORED",
+      "module": "planning/cost.py",
+      "line": 102,
+      "condition": "not isinstance(self.effective_from, datetime) or not isinstance(self.effective_until, datetime)"
+    },
+    "36": {
+      "status": "SCORED",
+      "module": "planning/cost.py",
+      "line": 104,
+      "condition": "self.effective_until < self.effective_from"
+    },
+    "37": {
+      "status": "SCORED",
+      "module": "planning/cost.py",
+      "line": 106,
+      "condition": "self.evidence_source is not None and (not isinstance(self.evidence_source, str) or self.evidence_source == '')"
+    },
+    "38": {
+      "status": "SCORED",
+      "module": "planning/cost.py",
+      "line": 137,
+      "condition": "not isinstance(data, Mapping)"
+    },
+    "39": {
+      "status": "SCORED",
+      "module": "planning/cost.py",
+      "line": 142,
+      "condition": "unknown"
+    },
+    "40": {
+      "status": "SCORED",
+      "module": "planning/cost.py",
+      "line": 145,
+      "condition": "req not in data"
+    },
+    "41": {
+      "status": "SCORED",
+      "module": "planning/cost.py",
+      "line": 147,
+      "condition": "not isinstance(data['effective_from'], datetime) or not isinstance(data['effective_until'], datetime)"
+    },
+    "42": {
+      "status": "SCORED",
+      "module": "planning/cost.py",
+      "line": 173,
+      "condition": "not isinstance(self.subject, CapacitySubject)"
+    },
+    "43": {
+      "status": "SCORED",
+      "module": "planning/cost.py",
+      "line": 180,
+      "condition": "not isinstance(entry, CostEvidence)"
+    },
+    "44": {
+      "status": "SCORED",
+      "module": "planning/cost.py",
+      "line": 182,
+      "condition": "not _subject_scope_compatible(entry.subject, self.subject)"
+    },
+    "45": {
+      "status": "SCORED",
+      "module": "planning/cost.py",
+      "line": 185,
+      "condition": "key in seen"
+    },
+    "46": {
+      "status": "SCORED",
+      "module": "planning/cost.py",
+      "line": 210,
+      "condition": "not isinstance(data, Mapping)"
+    },
+    "47": {
+      "status": "SCORED",
+      "module": "planning/cost.py",
+      "line": 214,
+      "condition": "unknown"
+    },
+    "48": {
+      "status": "SCORED",
+      "module": "planning/cost.py",
+      "line": 216,
+      "condition": "'subject' not in data"
+    },
+    "49": {
+      "status": "SCORED",
+      "module": "planning/cost.py",
+      "line": 219,
+      "condition": "not isinstance(entries_raw, (list, tuple))"
+    },
+    "50": {
+      "status": "EXCLUDED",
+      "reason": "diagnostic-only",
+      "detail": "`_finite_number`'s None branch. No call site passes `allow_none=True` \u2014 all three call it bare \u2014 so for every reachable input the branch only chooses between the 'is required' and 'must be a finite number' messages, and both raise `ConstraintError`. The `allow_none` early return it also guards is dead at every call site; a caller that introduces one re-opens this exclusion by construction, because the sweep fails on a stale exclusion that gets killed.",
+      "evidence": "tests/planning/test_guard_coverage.py::test_a_none_cooldown_is_refused_as_a_constraint_error",
+      "module": "planning/constraints.py",
+      "line": 58,
+      "condition": "v is None"
+    },
+    "51": {
+      "status": "SCORED",
+      "module": "planning/constraints.py",
+      "line": 62,
+      "condition": "isinstance(v, bool) or not isinstance(v, (int, float)) or (not math.isfinite(v))"
+    },
+    "52": {
+      "status": "SCORED",
+      "module": "planning/constraints.py",
+      "line": 89,
+      "condition": "isinstance(v, bool) or not isinstance(v, int)"
+    },
+    "53": {
+      "status": "SCORED",
+      "module": "planning/constraints.py",
+      "line": 91,
+      "condition": "self.min_capacity < 0"
+    },
+    "54": {
+      "status": "SCORED",
+      "module": "planning/constraints.py",
+      "line": 93,
+      "condition": "self.max_capacity < self.min_capacity"
+    },
+    "55": {
+      "status": "SCORED",
+      "module": "planning/constraints.py",
+      "line": 95,
+      "condition": "self.allowed_step < 1"
+    },
+    "56": {
+      "status": "SCORED",
+      "module": "planning/constraints.py",
+      "line": 97,
+      "condition": "self.regional_quota is not None"
+    },
+    "57": {
+      "status": "SCORED",
+      "module": "planning/constraints.py",
+      "line": 98,
+      "condition": "isinstance(self.regional_quota, bool) or not isinstance(self.regional_quota, int) or self.regional_quota < 0"
+    },
+    "58": {
+      "status": "SCORED",
+      "module": "planning/constraints.py",
+      "line": 100,
+      "condition": "_finite_number('cooldown_seconds', self.cooldown_seconds)"
+    },
+    "59": {
+      "status": "SCORED",
+      "module": "planning/constraints.py",
+      "line": 101,
+      "condition": "self.cooldown_seconds < 0"
+    },
+    "60": {
+      "status": "SCORED",
+      "module": "planning/constraints.py",
+      "line": 103,
+      "condition": "self.last_change_at is not None and (not isinstance(self.last_change_at, datetime))"
+    },
+    "61": {
+      "status": "SCORED",
+      "module": "planning/constraints.py",
+      "line": 105,
+      "condition": "self.forecast_validity_seconds is not None"
+    },
+    "62": {
+      "status": "SCORED",
+      "module": "planning/constraints.py",
+      "line": 106,
+      "condition": "_finite_number('forecast_validity_seconds', self.forecast_validity_seconds)"
+    },
+    "63": {
+      "status": "SCORED",
+      "module": "planning/constraints.py",
+      "line": 107,
+      "condition": "self.forecast_validity_seconds <= 0"
+    },
+    "64": {
+      "status": "SCORED",
+      "module": "planning/constraints.py",
+      "line": 110,
+      "condition": "not isinstance(getattr(self, name), bool)"
+    },
+    "65": {
+      "status": "SCORED",
+      "module": "planning/constraints.py",
+      "line": 112,
+      "condition": "not isinstance(self.dependency_capacity_ceiling, Mapping)"
+    },
+    "66": {
+      "status": "SCORED",
+      "module": "planning/constraints.py",
+      "line": 115,
+      "condition": "not isinstance(k, str) or k == ''"
+    },
+    "67": {
+      "status": "SCORED",
+      "module": "planning/constraints.py",
+      "line": 117,
+      "condition": "isinstance(v, bool) or not isinstance(v, int) or v < 0"
+    },
+    "68": {
+      "status": "SCORED",
+      "module": "planning/constraints.py",
+      "line": 123,
+      "condition": "not isinstance(a, str) or a == ''"
+    },
+    "69": {
+      "status": "SCORED",
+      "module": "planning/constraints.py",
+      "line": 125,
+      "condition": "self.max_cost_increase_minor is not None"
+    },
+    "70": {
+      "status": "SCORED",
+      "module": "planning/constraints.py",
+      "line": 126,
+      "condition": "isinstance(self.max_cost_increase_minor, bool) or not isinstance(self.max_cost_increase_minor, int) or self.max_cost_increase_minor < 0"
+    },
+    "71": {
+      "status": "SCORED",
+      "module": "planning/constraints.py",
+      "line": 128,
+      "condition": "_finite_number('safety_margin_fraction', self.safety_margin_fraction)"
+    },
+    "72": {
+      "status": "SCORED",
+      "module": "planning/constraints.py",
+      "line": 129,
+      "condition": "not 0.0 <= self.safety_margin_fraction <= 1.0"
+    },
+    "73": {
+      "status": "SCORED",
+      "module": "planning/constraints.py",
+      "line": 166,
+      "condition": "not isinstance(data, Mapping)"
+    },
+    "74": {
+      "status": "SCORED",
+      "module": "planning/constraints.py",
+      "line": 175,
+      "condition": "unknown"
+    },
+    "75": {
+      "status": "SCORED",
+      "module": "planning/constraints.py",
+      "line": 178,
+      "condition": "req not in data"
+    },
+    "76": {
+      "status": "SCORED",
+      "module": "planning/candidates.py",
+      "line": 54,
+      "condition": "not isinstance(self.subject, CapacitySubject)"
+    },
+    "77": {
+      "status": "SCORED",
+      "module": "planning/candidates.py",
+      "line": 58,
+      "condition": "isinstance(v, bool) or not isinstance(v, int) or v < 0"
+    },
+    "78": {
+      "status": "SCORED",
+      "module": "planning/candidates.py",
+      "line": 60,
+      "condition": "self.role not in ('primary', 'dependency')"
+    },
+    "79": {
+      "status": "SCORED",
+      "module": "planning/candidates.py",
+      "line": 77,
+      "condition": "not isinstance(data, Mapping)"
+    },
+    "80": {
+      "status": "SCORED",
+      "module": "planning/candidates.py",
+      "line": 81,
+      "condition": "unknown"
+    },
+    "81": {
+      "status": "SCORED",
+      "module": "planning/candidates.py",
+      "line": 84,
+      "condition": "req not in data"
+    },
+    "82": {
+      "status": "SCORED",
+      "module": "planning/candidates.py",
+      "line": 106,
+      "condition": "not isinstance(self.plan_id, str) or self.plan_id == ''"
+    },
+    "83": {
+      "status": "SCORED",
+      "module": "planning/candidates.py",
+      "line": 108,
+      "condition": "not isinstance(self.action_kind, ActionKind)"
+    },
+    "84": {
+      "status": "EXCLUDED",
+      "reason": "diagnostic-only",
+      "detail": "The empty-plan guard. With it removed, the primary-count gate two lines below refuses the same empty plan with the same `CandidateError` \u2014 an empty tuple has zero 'primary' roles \u2014 and emptiness is the only condition that reaches it, so no input distinguishes the two. Kept because 'requires at least one resource change' is the honest diagnosis for the empty case.",
+      "evidence": "tests/planning/test_guard_coverage.py::test_an_empty_plan_is_refused_as_a_candidate_error",
+      "module": "planning/candidates.py",
+      "line": 112,
+      "condition": "not self.changes"
+    },
+    "85": {
+      "status": "SCORED",
+      "module": "planning/candidates.py",
+      "line": 115,
+      "condition": "roles.count('primary') != 1"
+    },
+    "86": {
+      "status": "SCORED",
+      "module": "planning/candidates.py",
+      "line": 120,
+      "condition": "not isinstance(c, ResourceChange)"
+    },
+    "87": {
+      "status": "SCORED",
+      "module": "planning/candidates.py",
+      "line": 123,
+      "condition": "key in seen"
+    },
+    "88": {
+      "status": "SCORED",
+      "module": "planning/candidates.py",
+      "line": 126,
+      "condition": "isinstance(self.timing_seconds, bool) or not isinstance(self.timing_seconds, (int, float))"
+    },
+    "89": {
+      "status": "SCORED",
+      "module": "planning/candidates.py",
+      "line": 128,
+      "condition": "self.timing_seconds < 0"
+    },
+    "90": {
+      "status": "SCORED",
+      "module": "planning/candidates.py",
+      "line": 133,
+      "condition": "self.action_kind is ActionKind.NO_CHANGE"
+    },
+    "91": {
+      "status": "SCORED",
+      "module": "planning/candidates.py",
+      "line": 134,
+      "condition": "nonzero"
+    },
+    "92": {
+      "status": "SCORED",
+      "module": "planning/candidates.py",
+      "line": 136,
+      "condition": "self.action_kind is ActionKind.SCALE_UP"
+    },
+    "93": {
+      "status": "SCORED",
+      "module": "planning/candidates.py",
+      "line": 137,
+      "condition": "primary.delta <= 0"
+    },
+    "94": {
+      "status": "SCORED",
+      "module": "planning/candidates.py",
+      "line": 139,
+      "condition": "len(nonzero) != 1"
+    },
+    "95": {
+      "status": "SCORED",
+      "module": "planning/candidates.py",
+      "line": 141,
+      "condition": "self.action_kind is ActionKind.SCALE_DOWN"
+    },
+    "96": {
+      "status": "SCORED",
+      "module": "planning/candidates.py",
+      "line": 142,
+      "condition": "primary.delta >= 0"
+    },
+    "97": {
+      "status": "SCORED",
+      "module": "planning/candidates.py",
+      "line": 144,
+      "condition": "len(nonzero) != 1"
+    },
+    "98": {
+      "status": "SCORED",
+      "module": "planning/candidates.py",
+      "line": 147,
+      "condition": "primary.delta == 0"
+    },
+    "99": {
+      "status": "SCORED",
+      "module": "planning/candidates.py",
+      "line": 149,
+      "condition": "len(nonzero) < 2"
+    },
+    "100": {
+      "status": "SCORED",
+      "module": "planning/candidates.py",
+      "line": 178,
+      "condition": "not isinstance(data, Mapping)"
+    },
+    "101": {
+      "status": "SCORED",
+      "module": "planning/candidates.py",
+      "line": 182,
+      "condition": "unknown"
+    },
+    "102": {
+      "status": "SCORED",
+      "module": "planning/candidates.py",
+      "line": 185,
+      "condition": "req not in data"
+    },
+    "103": {
+      "status": "SCORED",
+      "module": "planning/candidates.py",
+      "line": 192,
+      "condition": "not isinstance(changes_raw, (list, tuple))"
+    },
+    "104": {
+      "status": "EXCLUDED",
+      "reason": "diagnostic-only",
+      "detail": "`generate_candidates`' current_capacity gate. The value flows unconditionally into the NO_CHANGE plan's `ResourceChange`, whose own validation refuses every value this gate refuses \u2014 bool, non-int and negative alike \u2014 with the same `CandidateError`. required_capacity's twin gate IS scored: required never lands in a ResourceChange, so its removal admits a fractional requirement outright.",
+      "evidence": "tests/planning/test_guard_coverage.py::test_an_invalid_current_capacity_is_refused_as_a_candidate_error",
+      "module": "planning/candidates.py",
+      "line": 233,
+      "condition": "isinstance(current_capacity, bool) or not isinstance(current_capacity, int) or current_capacity < 0"
+    },
+    "105": {
+      "status": "SCORED",
+      "module": "planning/candidates.py",
+      "line": 235,
+      "condition": "isinstance(required_capacity, bool) or not isinstance(required_capacity, int) or required_capacity < 0"
+    },
+    "106": {
+      "status": "SCORED",
+      "module": "planning/candidates.py",
+      "line": 237,
+      "condition": "allowed_step < 1"
+    },
+    "107": {
+      "status": "SCORED",
+      "module": "planning/policy.py",
+      "line": 51,
+      "condition": "isinstance(v, bool) or not isinstance(v, (int, float)) or (not math.isfinite(v))"
+    },
+    "108": {
+      "status": "SCORED",
+      "module": "planning/policy.py",
+      "line": 53,
+      "condition": "v < 0"
+    },
+    "109": {
+      "status": "SCORED",
+      "module": "planning/policy.py",
+      "line": 78,
+      "condition": "not isinstance(self.policy_id, str) or self.policy_id == ''"
+    },
+    "110": {
+      "status": "SCORED",
+      "module": "planning/policy.py",
+      "line": 82,
+      "condition": "_finite_nonneg(name, getattr(self, name))"
+    },
+    "111": {
+      "status": "SCORED",
+      "module": "planning/policy.py",
+      "line": 85,
+      "condition": "v > 1.0 + _TOL"
+    },
+    "112": {
+      "status": "SCORED",
+      "module": "planning/policy.py",
+      "line": 87,
+      "condition": "_finite_nonneg('tie_epsilon', self.tie_epsilon) > 1.0"
+    },
+    "113": {
+      "status": "SCORED",
+      "module": "planning/policy.py",
+      "line": 135,
+      "condition": "not isinstance(data, Mapping)"
+    },
+    "114": {
+      "status": "SCORED",
+      "module": "planning/policy.py",
+      "line": 139,
+      "condition": "unknown"
+    },
+    "115": {
+      "status": "SCORED",
+      "module": "planning/policy.py",
+      "line": 172,
+      "condition": "not isinstance(m, Mapping)"
+    },
+    "116": {
+      "status": "EXCLUDED",
+      "reason": "diagnostic-only",
+      "detail": "ScoreBreakdown's per-key unknown-feature gate. Every key-set deviation it can see \u2014 a replaced name or an added one \u2014 is also refused by the exact-cover gate below it (`set(features) != set(FEATURE_NAMES)`), and a wrong-typed value under a bogus key by the finiteness gate between them; all three raise `PolicyError`, and the class is this package's typed half. Kept because naming the offending key is the better diagnosis.",
+      "evidence": "tests/planning/test_guard_coverage.py::test_an_unknown_feature_name_is_refused_as_a_policy_error",
+      "module": "planning/policy.py",
+      "line": 175,
+      "condition": "k not in FEATURE_NAMES"
+    },
+    "117": {
+      "status": "SCORED",
+      "module": "planning/policy.py",
+      "line": 177,
+      "condition": "isinstance(v, bool) or not isinstance(v, (int, float)) or (not math.isfinite(v))"
+    },
+    "118": {
+      "status": "SCORED",
+      "module": "planning/policy.py",
+      "line": 179,
+      "condition": "set(self.features) != set(FEATURE_NAMES) or set(self.contributions) != set(FEATURE_NAMES)"
+    },
+    "119": {
+      "status": "SCORED",
+      "module": "planning/policy.py",
+      "line": 181,
+      "condition": "isinstance(self.total_score, bool) or not isinstance(self.total_score, (int, float)) or (not math.isfinite(self.total_score))"
+    },
+    "120": {
+      "status": "SCORED",
+      "module": "planning/policy.py",
+      "line": 184,
+      "condition": "abs(recomputed - self.total_score) > 1e-06"
+    },
+    "121": {
+      "status": "SCORED",
+      "module": "planning/policy.py",
+      "line": 204,
+      "condition": "not isinstance(data, Mapping)"
+    },
+    "122": {
+      "status": "SCORED",
+      "module": "planning/policy.py",
+      "line": 208,
+      "condition": "unknown"
+    },
+    "123": {
+      "status": "SCORED",
+      "module": "planning/policy.py",
+      "line": 211,
+      "condition": "req not in data"
+    },
+    "124": {
+      "status": "SCORED",
+      "module": "planning/scoring.py",
+      "line": 136,
+      "condition": "not fc.is_forecast or fc.point_estimate is None"
+    },
+    "125": {
+      "status": "SCORED",
+      "module": "planning/scoring.py",
+      "line": 138,
+      "condition": "fc.target is not PLANNING_TARGET"
+    },
+    "126": {
+      "status": "SCORED",
+      "module": "planning/scoring.py",
+      "line": 141,
+      "condition": "current_state.capacity is None or current_state.capacity.running_replicas is None"
+    },
+    "127": {
+      "status": "SCORED",
+      "module": "planning/scoring.py",
+      "line": 151,
+      "condition": "dep_edge is not None"
+    },
+    "128": {
+      "status": "SCORED",
+      "module": "planning/scoring.py",
+      "line": 152,
+      "condition": "not dep_edge.has_capacity_evidence"
+    },
+    "129": {
+      "status": "SCORED",
+      "module": "planning/scoring.py",
+      "line": 165,
+      "condition": "primary_price is None"
+    },
+    "130": {
+      "status": "SCORED",
+      "module": "planning/scoring.py",
+      "line": 198,
+      "condition": "price is None"
+    },
+    "131": {
+      "status": "SCORED",
+      "module": "planning/scoring.py",
+      "line": 251,
+      "condition": "c.max_cost_increase_minor is not None"
+    },
+    "132": {
+      "status": "SCORED",
+      "module": "planning/recommendation.py",
+      "line": 87,
+      "condition": "not isinstance(self.plan, CandidateActionPlan)"
+    },
+    "133": {
+      "status": "SCORED",
+      "module": "planning/recommendation.py",
+      "line": 89,
+      "condition": "not isinstance(self.feasible, bool)"
+    },
+    "134": {
+      "status": "SCORED",
+      "module": "planning/recommendation.py",
+      "line": 94,
+      "condition": "not isinstance(v, str) or v == ''"
+    },
+    "135": {
+      "status": "SCORED",
+      "module": "planning/recommendation.py",
+      "line": 96,
+      "condition": "isinstance(self.cost_delta_minor, bool) or not isinstance(self.cost_delta_minor, int)"
+    },
+    "136": {
+      "status": "SCORED",
+      "module": "planning/recommendation.py",
+      "line": 98,
+      "condition": "self.feasible"
+    },
+    "137": {
+      "status": "SCORED",
+      "module": "planning/recommendation.py",
+      "line": 99,
+      "condition": "self.violations"
+    },
+    "138": {
+      "status": "SCORED",
+      "module": "planning/recommendation.py",
+      "line": 101,
+      "condition": "not isinstance(self.score_breakdown, ScoreBreakdown)"
+    },
+    "139": {
+      "status": "SCORED",
+      "module": "planning/recommendation.py",
+      "line": 104,
+      "condition": "not self.violations"
+    },
+    "140": {
+      "status": "SCORED",
+      "module": "planning/recommendation.py",
+      "line": 106,
+      "condition": "self.score_breakdown is not None"
+    },
+    "141": {
+      "status": "SCORED",
+      "module": "planning/recommendation.py",
+      "line": 125,
+      "condition": "not isinstance(data, Mapping)"
+    },
+    "142": {
+      "status": "SCORED",
+      "module": "planning/recommendation.py",
+      "line": 129,
+      "condition": "unknown"
+    },
+    "143": {
+      "status": "SCORED",
+      "module": "planning/recommendation.py",
+      "line": 132,
+      "condition": "req not in data"
+    },
+    "144": {
+      "status": "SCORED",
+      "module": "planning/recommendation.py",
+      "line": 182,
+      "condition": "self.advisory_only is not True or self.shadow_only is not True"
+    },
+    "145": {
+      "status": "SCORED",
+      "module": "planning/recommendation.py",
+      "line": 184,
+      "condition": "self.actuation_performed is not False"
+    },
+    "146": {
+      "status": "SCORED",
+      "module": "planning/recommendation.py",
+      "line": 186,
+      "condition": "self.authorization_performed is not False"
+    },
+    "147": {
+      "status": "SCORED",
+      "module": "planning/recommendation.py",
+      "line": 188,
+      "condition": "self.effect_verified is not False"
+    },
+    "148": {
+      "status": "SCORED",
+      "module": "planning/recommendation.py",
+      "line": 190,
+      "condition": "self.authority_class != AUTHORITY_CLASS_ADVISORY"
+    },
+    "149": {
+      "status": "SCORED",
+      "module": "planning/recommendation.py",
+      "line": 192,
+      "condition": "self.execution_capability != EXECUTION_CAPABILITY_NONE"
+    },
+    "150": {
+      "status": "SCORED",
+      "module": "planning/recommendation.py",
+      "line": 195,
+      "condition": "not isinstance(self.recommendation_id, str) or self.recommendation_id == ''"
+    },
+    "151": {
+      "status": "SCORED",
+      "module": "planning/recommendation.py",
+      "line": 197,
+      "condition": "not isinstance(self.forecast_evidence, CapacityForecastEvidence)"
+    },
+    "152": {
+      "status": "SCORED",
+      "module": "planning/recommendation.py",
+      "line": 199,
+      "condition": "not isinstance(self.current_state, CanonicalCapacityState)"
+    },
+    "153": {
+      "status": "SCORED",
+      "module": "planning/recommendation.py",
+      "line": 201,
+      "condition": "not isinstance(self.cost_book, CostBook)"
+    },
+    "154": {
+      "status": "SCORED",
+      "module": "planning/recommendation.py",
+      "line": 203,
+      "condition": "not isinstance(self.constraints, OperatingConstraints)"
+    },
+    "155": {
+      "status": "SCORED",
+      "module": "planning/recommendation.py",
+      "line": 205,
+      "condition": "not isinstance(self.policy, RecommendationPolicy)"
+    },
+    "156": {
+      "status": "SCORED",
+      "module": "planning/recommendation.py",
+      "line": 207,
+      "condition": "self.topology is not None and (not isinstance(self.topology, DependencyTopology))"
+    },
+    "157": {
+      "status": "SCORED",
+      "module": "planning/recommendation.py",
+      "line": 209,
+      "condition": "not isinstance(self.recommendation_time, datetime)"
+    },
+    "158": {
+      "status": "SCORED",
+      "module": "planning/recommendation.py",
+      "line": 211,
+      "condition": "isinstance(self.validity_seconds, bool) or not isinstance(self.validity_seconds, (int, float)) or (not math.isfinite(self.validity_seconds)) or (self.validity_seconds <= 0)"
+    },
+    "159": {
+      "status": "EXCLUDED",
+      "reason": "diagnostic-only",
+      "detail": "The empty-set guard. The canonical set-equality gate refuses an empty evaluated set with the same `RecommendationError` \u2014 the canonical generated set is never empty, NO_CHANGE always being in it \u2014 and emptiness is the only condition that reaches this guard.",
+      "evidence": "tests/planning/test_guard_coverage.py::test_the_candidate_set_gates_behind_the_canonical_binding_are_evidenced",
+      "module": "planning/recommendation.py",
+      "line": 216,
+      "condition": "not self.evaluated_candidates"
+    },
+    "160": {
+      "status": "SCORED",
+      "module": "planning/recommendation.py",
+      "line": 219,
+      "condition": "not isinstance(ec, EvaluatedCandidate)"
+    },
+    "161": {
+      "status": "SCORED",
+      "module": "planning/recommendation.py",
+      "line": 228,
+      "condition": "fc.subject != subject"
+    },
+    "162": {
+      "status": "SCORED",
+      "module": "planning/recommendation.py",
+      "line": 230,
+      "condition": "self.cost_book.subject != subject"
+    },
+    "163": {
+      "status": "SCORED",
+      "module": "planning/recommendation.py",
+      "line": 232,
+      "condition": "self.topology is not None and self.topology.subject != subject"
+    },
+    "164": {
+      "status": "SCORED",
+      "module": "planning/recommendation.py",
+      "line": 240,
+      "condition": "cutoff > rec_time"
+    },
+    "165": {
+      "status": "EXCLUDED",
+      "reason": "unreachable-behind-earlier-guard",
+      "detail": "The forecasting layer's `ForecastHorizon` constructor is the earlier guard: it refuses a non-positive horizon with `WindowError` at construction, so no forecast the record can embed carries one. For a hand-built impostor the temporal pair around this gate leaves no admissible recommendation_time either \u2014 with a non-positive horizon, forecast_for <= cutoff, and rec_time cannot be both >= cutoff and < forecast_for.",
+      "evidence": "tests/planning/test_guard_coverage.py::test_a_non_positive_forecast_horizon_cannot_be_constructed_at_all",
+      "module": "planning/recommendation.py",
+      "line": 249,
+      "condition": "not float(fc.horizon.seconds) > 0"
+    },
+    "166": {
+      "status": "SCORED",
+      "module": "planning/recommendation.py",
+      "line": 253,
+      "condition": "forecast_for_dt != canonical_forecast_for"
+    },
+    "167": {
+      "status": "EXCLUDED",
+      "reason": "diagnostic-only",
+      "detail": "The horizon-expiry guard. With it removed, the validity-window gate refuses every input this one refuses, with the same class: validity_seconds is validated > 0, so validity_end > rec_time >= forecast_for, and forecast_for is pinned to the canonical endpoint the validity gate compares against.",
+      "evidence": "tests/planning/test_guard_coverage.py::test_a_record_timed_at_or_past_the_forecast_horizon_is_refused_either_way",
+      "module": "planning/recommendation.py",
+      "line": 258,
+      "condition": "forecast_for_dt <= rec_time"
+    },
+    "168": {
+      "status": "SCORED",
+      "module": "planning/recommendation.py",
+      "line": 261,
+      "condition": "_as_utc(self.current_state.observed_at) > rec_time"
+    },
+    "169": {
+      "status": "SCORED",
+      "module": "planning/recommendation.py",
+      "line": 264,
+      "condition": "self.topology is not None and _as_utc(self.topology.as_of) > rec_time"
+    },
+    "170": {
+      "status": "SCORED",
+      "module": "planning/recommendation.py",
+      "line": 269,
+      "condition": "not entry.is_effective_at(self.recommendation_time)"
+    },
+    "171": {
+      "status": "SCORED",
+      "module": "planning/recommendation.py",
+      "line": 272,
+      "condition": "self.constraints.forecast_validity_seconds is not None"
+    },
+    "172": {
+      "status": "SCORED",
+      "module": "planning/recommendation.py",
+      "line": 274,
+      "condition": "age > self.constraints.forecast_validity_seconds"
+    },
+    "173": {
+      "status": "SCORED",
+      "module": "planning/recommendation.py",
+      "line": 282,
+      "condition": "validity_end_dt > canonical_forecast_for"
+    },
+    "174": {
+      "status": "EXCLUDED",
+      "reason": "equivalent-mutant",
+      "detail": "Defensive check on the record's own canonical regeneration, and the source comment says so. `generate_candidates` derives each plan_id from its target and never emits two plans with one id \u2014 measured across a spread of configurations \u2014 so the two lengths are equal on every reachable path and removal changes nothing.",
+      "evidence": "tests/planning/test_guard_coverage.py::test_canonical_candidate_generation_is_unique_by_construction",
+      "module": "planning/recommendation.py",
+      "line": 310,
+      "condition": "len(canonical_by_id) != len(canonical_plans)"
+    },
+    "175": {
+      "status": "EXCLUDED",
+      "reason": "diagnostic-only",
+      "detail": "One half of a mutually jacketing pair with the recompute loop's duplicate guard: a duplicated candidate is refused by whichever of the two stands, with the same class, so neither guard's mutation is observable while the other exists. A duplicate with *different* content is refused by the set-equality gate instead, again with the same class.",
+      "evidence": "tests/planning/test_guard_coverage.py::test_the_candidate_set_gates_behind_the_canonical_binding_are_evidenced",
+      "module": "planning/recommendation.py",
+      "line": 314,
+      "condition": "ec.plan.plan_id in evaluated_by_id"
+    },
+    "176": {
+      "status": "SCORED",
+      "module": "planning/recommendation.py",
+      "line": 317,
+      "condition": "evaluated_by_id != canonical_by_id"
+    },
+    "177": {
+      "status": "EXCLUDED",
+      "reason": "diagnostic-only",
+      "detail": "The other half of the mutually jacketing duplicate pair; see the by-id guard above. With that guard standing, no duplicate survives to reach this one.",
+      "evidence": "tests/planning/test_guard_coverage.py::test_the_candidate_set_gates_behind_the_canonical_binding_are_evidenced",
+      "module": "planning/recommendation.py",
+      "line": 332,
+      "condition": "pid in seen_plan_ids"
+    },
+    "178": {
+      "status": "EXCLUDED",
+      "reason": "diagnostic-only",
+      "detail": "The feasibility-recompute guard interlocks with the violations-recompute guard and the candidate's own invariant: `feasible` is tied to the emptiness of `violations` at candidate construction, and expected feasibility is derived from expected violations \u2014 so any constructible forged flag carries a violations set the next gate refuses, with the same class. Both flip directions are measured in the evidence test.",
+      "evidence": "tests/planning/test_guard_coverage.py::test_a_forged_feasibility_flag_is_refused",
+      "module": "planning/recommendation.py",
+      "line": 341,
+      "condition": "ec.feasible != exp_feasible"
+    },
+    "179": {
+      "status": "SCORED",
+      "module": "planning/recommendation.py",
+      "line": 343,
+      "condition": "set(ec.violations) != set(exp_violations)"
+    },
+    "180": {
+      "status": "SCORED",
+      "module": "planning/recommendation.py",
+      "line": 346,
+      "condition": "ec.cost_delta_minor != exp_cost"
+    },
+    "181": {
+      "status": "SCORED",
+      "module": "planning/recommendation.py",
+      "line": 348,
+      "condition": "exp_feasible"
+    },
+    "182": {
+      "status": "SCORED",
+      "module": "planning/recommendation.py",
+      "line": 350,
+      "condition": "ec.score_breakdown is None or abs(ec.score_breakdown.total_score - exp_score.total_score) > _TOL"
+    },
+    "183": {
+      "status": "SCORED",
+      "module": "planning/recommendation.py",
+      "line": 352,
+      "condition": "ec.score_breakdown.policy_digest != self.policy.digest()"
+    },
+    "184": {
+      "status": "SCORED",
+      "module": "planning/recommendation.py",
+      "line": 355,
+      "condition": "abs(ec.score_breakdown.features[fname] - fval) > _TOL"
+    },
+    "185": {
+      "status": "EXCLUDED",
+      "reason": "unreachable-behind-earlier-guard",
+      "detail": "Canonical generation always emits the NO_CHANGE baseline, so an evaluated set without it fails the canonical set-equality gate before this baseline gate is reached.",
+      "evidence": "tests/planning/test_guard_coverage.py::test_the_candidate_set_gates_behind_the_canonical_binding_are_evidenced",
+      "module": "planning/recommendation.py",
+      "line": 360,
+      "condition": "not has_no_change"
+    },
+    "186": {
+      "status": "SCORED",
+      "module": "planning/recommendation.py",
+      "line": 362,
+      "condition": "selected is None"
+    },
+    "187": {
+      "status": "EXCLUDED",
+      "reason": "diagnostic-only",
+      "detail": "The winner-identity gate two lines below draws the winner from feasible triples only, so a selected id pointing at an infeasible candidate can never equal the winner and is refused there with the same class.",
+      "evidence": "tests/planning/test_guard_coverage.py::test_the_candidate_set_gates_behind_the_canonical_binding_are_evidenced",
+      "module": "planning/recommendation.py",
+      "line": 364,
+      "condition": "not selected.feasible"
+    },
+    "188": {
+      "status": "EXCLUDED",
+      "reason": "diagnostic-only",
+      "detail": "`select_best` answers (None, True) on a tie, and the winner-identity gate on the next line refuses None != selected_plan_id with the same class, for every ambiguous input.",
+      "evidence": "tests/planning/test_guard_coverage.py::test_an_all_tied_selection_is_refused_as_a_recommendation_error",
+      "module": "planning/recommendation.py",
+      "line": 372,
+      "condition": "ambiguous"
+    },
+    "189": {
+      "status": "SCORED",
+      "module": "planning/recommendation.py",
+      "line": 374,
+      "condition": "winner_id != self.selected_plan_id"
+    },
+    "190": {
+      "status": "SCORED",
+      "module": "planning/recommendation.py",
+      "line": 485,
+      "condition": "include_digest"
+    },
+    "191": {
+      "status": "SCORED",
+      "module": "planning/recommendation.py",
+      "line": 503,
+      "condition": "not isinstance(data, Mapping)"
+    },
+    "192": {
+      "status": "SCORED",
+      "module": "planning/recommendation.py",
+      "line": 511,
+      "condition": "missing"
+    },
+    "193": {
+      "status": "SCORED",
+      "module": "planning/recommendation.py",
+      "line": 526,
+      "condition": "surplus"
+    },
+    "194": {
+      "status": "SCORED",
+      "module": "planning/recommendation.py",
+      "line": 529,
+      "condition": "not isinstance(rec_time, datetime)"
+    },
+    "195": {
+      "status": "SCORED",
+      "module": "planning/recommendation.py",
+      "line": 576,
+      "condition": "not isinstance(data, Mapping)"
+    },
+    "196": {
+      "status": "SCORED",
+      "module": "planning/recommendation.py",
+      "line": 579,
+      "condition": "not isinstance(fcd, Mapping)"
+    },
+    "197": {
+      "status": "SCORED",
+      "module": "planning/recommendation.py",
+      "line": 672,
+      "condition": "not isinstance(self.subject, CapacitySubject)"
+    },
+    "198": {
+      "status": "SCORED",
+      "module": "planning/recommendation.py",
+      "line": 674,
+      "condition": "not isinstance(self.reason, RecommendationAbstentionReason)"
+    },
+    "199": {
+      "status": "SCORED",
+      "module": "planning/recommendation.py",
+      "line": 676,
+      "condition": "not isinstance(self.recommendation_time, datetime)"
+    },
+    "200": {
+      "status": "SCORED",
+      "module": "planning/recommendation.py",
+      "line": 678,
+      "condition": "self.advisory_only is not True or self.shadow_only is not True"
+    },
+    "201": {
+      "status": "SCORED",
+      "module": "planning/recommendation.py",
+      "line": 680,
+      "condition": "self.actuation_performed is not False"
+    },
+    "202": {
+      "status": "SCORED",
+      "module": "planning/recommendation.py",
+      "line": 682,
+      "condition": "self.authority_class != AUTHORITY_CLASS_ADVISORY"
+    },
+    "203": {
+      "status": "SCORED",
+      "module": "planning/recommendation.py",
+      "line": 684,
+      "condition": "self.execution_capability != EXECUTION_CAPABILITY_NONE"
+    },
+    "204": {
+      "status": "SCORED",
+      "module": "planning/recommendation.py",
+      "line": 711,
+      "condition": "include_digest"
+    },
+    "205": {
+      "status": "SCORED",
+      "module": "planning/recommendation.py",
+      "line": 722,
+      "condition": "not isinstance(data, Mapping)"
+    },
+    "206": {
+      "status": "SCORED",
+      "module": "planning/recommendation.py",
+      "line": 725,
+      "condition": "req not in data"
+    },
+    "207": {
+      "status": "SCORED",
+      "module": "planning/recommendation.py",
+      "line": 737,
+      "condition": "surplus"
+    },
+    "208": {
+      "status": "SCORED",
+      "module": "planning/recommendation.py",
+      "line": 740,
+      "condition": "not isinstance(rec_time, datetime)"
+    },
+    "209": {
+      "status": "SCORED",
+      "module": "planning/pipeline.py",
+      "line": 100,
+      "condition": "not isinstance(recommendation_time, datetime)"
+    },
+    "210": {
+      "status": "SCORED",
+      "module": "planning/pipeline.py",
+      "line": 103,
+      "condition": "not isinstance(policy, RecommendationPolicy)"
+    },
+    "211": {
+      "status": "SCORED",
+      "module": "planning/pipeline.py",
+      "line": 108,
+      "condition": "current_state is None"
+    },
+    "212": {
+      "status": "SCORED",
+      "module": "planning/pipeline.py",
+      "line": 117,
+      "condition": "not isinstance(current_state, CanonicalCapacityState)"
+    },
+    "213": {
+      "status": "SCORED",
+      "module": "planning/pipeline.py",
+      "line": 132,
+      "condition": "not isinstance(forecast_evidence, CapacityForecastEvidence)"
+    },
+    "214": {
+      "status": "SCORED",
+      "module": "planning/pipeline.py",
+      "line": 164,
+      "condition": "not isinstance(constraints, OperatingConstraints)"
+    },
+    "215": {
+      "status": "SCORED",
+      "module": "planning/pipeline.py",
+      "line": 180,
+      "condition": "isinstance(validity_seconds, bool) or not isinstance(validity_seconds, (int, float)) or (not math.isfinite(validity_seconds)) or (validity_seconds <= 0)"
+    },
+    "216": {
+      "status": "SCORED",
+      "module": "planning/pipeline.py",
+      "line": 200,
+      "condition": "not isinstance(cost_book, CostBook)"
+    },
+    "217": {
+      "status": "SCORED",
+      "module": "planning/pipeline.py",
+      "line": 230,
+      "condition": "not isinstance(topology, DependencyTopology)"
+    },
+    "218": {
+      "status": "EXCLUDED",
+      "reason": "unreachable-behind-earlier-guard",
+      "detail": "The pipeline's ScoringError arm around `build_context`. Every condition that makes the context build raise is abstained by the pipeline's own pre-gates before the build is reached: an abstained forecast as FORECAST_ABSTAINED, a non-planning target as UNSUPPORTED_FORECAST_TARGET, a missing point estimate as NON_FINITE_INPUT, missing capacity as MISSING_CURRENT_CAPACITY, an evidence-free dependency edge as MISSING_DEPENDENCY_CAPACITY and a missing price as MISSING_COST_EVIDENCE. The arm is the fail-closed jacket for a context build the pre-gates keep unreachable, so its reason-collapse mutation has no observer; the evidence test drives the same inputs down both paths and records the pairing.",
+      "evidence": "tests/planning/test_guard_coverage.py::test_every_scoring_failure_is_pre_gated_into_a_typed_abstention",
+      "module": "planning/pipeline.py",
+      "line": 268,
+      "condition": "except ScoringError: abcost(R.CONTRADICTORY_EVIDENCE, f'inconsistent evidence: {exc}')"
+    },
+    "219": {
+      "status": "SCORED",
+      "module": "planning/pipeline.py",
+      "line": 296,
+      "condition": "else of: violations"
+    }
+  }
+}
