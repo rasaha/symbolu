@@ -497,7 +497,9 @@ PACKAGES = {
         # Eight typed refusal classes, all defined inside `planning/` and all
         # `ValueError` subclasses, plus the typed abstention the pipeline returns
         # instead of raising.
-        refusal_calls=frozenset(),
+        refusal_calls=frozenset(
+            {"_abstain", "ab", "abf", "abc", "abcost", "_unscored"}
+        ),
         bound_refusal_calls=False,
         tuple_refusals=False,
         # Named as the *source* names them, which is the whole point of this field.
@@ -510,7 +512,13 @@ PACKAGES = {
         # deliberately absent: it is a `Union[...]` type alias, not an enum, so it names
         # no decision.
         reason_vocabularies=frozenset(
-            {"R", "ConstraintViolationKind", "AbstentionReason", "SeriesErrorReason"}
+            {
+                "R",
+                "ConstraintViolationKind",
+                "AbstentionReason",
+                "SeriesErrorReason",
+                "EvaluationStatus",
+            }
         ),
         decision_classes=frozenset({"except-arm", "helper-admission", "else-arm"}),
         # D-GC-3's operator. Exactly one `except` arm in the phase returns a vocabulary

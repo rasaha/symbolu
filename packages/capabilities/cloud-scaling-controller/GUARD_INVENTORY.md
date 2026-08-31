@@ -5,12 +5,12 @@ hand: CI regenerates this and fails on any difference.
 
 **This is a phase, not controller coverage (phase 2, ruled 2026-08-31).** This inventory is defined over `canonical/`, `forecasting/` and `planning/` — 31 of the Cloud Scaling Controller's 78 production modules, carrying 401 of its 426 `raise` statements. The remaining 47 modules are *deferred to later ratified phases*, not judged guard-free, and every one is named in this package's `excluded_modules` with its measured refusal surface. Deferred subpackages, by name: `replay/` (13 modules, 6 raises), the top-level modules (7 modules, 15 raises), `core/` (7 modules, 2 raises), `observability/` (7 modules), `signals/` (4 modules, 2 raises), `shadow/` (4 modules), `recommend/` (3 modules) and `explain/` (2 modules). A reader must not read a green sweep here as evidence about any of them. Phase 1 covered `planning/` alone at 219 guards; those 219 are unchanged here, and the widening added 275.
 
-**494 outcome-bearing guards.** A guard is a decision point whose body can
+**527 outcome-bearing guards.** A guard is a decision point whose body can
 reach a refusal. What counts as a refusal differs by package and is recorded per guard
 below: Phase 5A raises; Phase 5B also returns `_refuse(...)` at a gate and
 `(_Outcome.X, …)` from the helper that decided it. Applying one package's definition to
 another is not a stylistic choice — a raise-only reading of this package would miss
-73 of the guards below.
+106 of the guards below.
 
 Beyond the `if`/conditional-expression layer this package also inventories the
 decision classes the guard-coverage ADR ratified, each with its own operator:
@@ -25,7 +25,7 @@ This package records no prior inventory; this is the first one.
 
 ## Classification
 
-Every guard is classified: **478 `SCORED`** — the
+Every guard is classified: **511 `SCORED`** — the
 sweep neutralises it and the suite must fail — and
 **16 `EXCLUDED`**, each with a reason from a closed vocabulary and
 a test that measures the reason. A guard is never excluded because it survived; a
@@ -54,7 +54,7 @@ survivor with no prior declaration fails the sweep.
 
 * **10 `except` arms** that raise. The `if False:` operator
   cannot neutralise a handler, so they are outside this operator rather than overlooked.
-* **146 extra sub-terms** of boolean guards. `if a and b:` is
+* **150 extra sub-terms** of boolean guards. `if a and b:` is
   neutralised and scored as one guard; scoring each side independently is a different
   operator.
 
@@ -250,32 +250,32 @@ survivor with no prior declaration fails the sweep.
 | 186 | `forecasting/evidence.py:171` | if | raise | SCORED | — | `not isinstance(series, CanonicalCapacitySeries)` |
 | 187 | `forecasting/evidence.py:173` | if | raise | SCORED | — | `not isinstance(forecaster, BaselineForecaster)` |
 | 188 | `forecasting/evidence.py:175` | if | raise | SCORED | — | `not isinstance(forecast_space, ForecastValueSpace)` |
-| 189 | `forecasting/evidence.py:222` | if | raising-helper call | SCORED | — | `expected_subject is not None` |
-| 190 | `forecasting/evidence.py:223` | if | raising-helper call | SCORED | — | `series.subject.workload_id != expected_subject.workload_id` |
-| 191 | `forecasting/evidence.py:225` | if | raising-helper call | SCORED | — | `series.subject != expected_subject` |
-| 192 | `forecasting/evidence.py:228` | if | raising-helper call | SCORED | — | `not forecaster.supports_target(target)` |
-| 193 | `forecasting/evidence.py:230` | if | raising-helper call | SCORED | — | `not forecaster.supports_horizon(horizon)` |
-| 194 | `forecasting/evidence.py:232` | if | raising-helper call | SCORED | — | `normalization_policy is None` |
+| 189 | `forecasting/evidence.py:222` | if | typed-refusal call | SCORED | — | `expected_subject is not None` |
+| 190 | `forecasting/evidence.py:223` | if | typed-refusal call | SCORED | — | `series.subject.workload_id != expected_subject.workload_id` |
+| 191 | `forecasting/evidence.py:225` | if | typed-refusal call | SCORED | — | `series.subject != expected_subject` |
+| 192 | `forecasting/evidence.py:228` | if | typed-refusal call | SCORED | — | `not forecaster.supports_target(target)` |
+| 193 | `forecasting/evidence.py:230` | if | typed-refusal call | SCORED | — | `not forecaster.supports_horizon(horizon)` |
+| 194 | `forecasting/evidence.py:232` | if | typed-refusal call | SCORED | — | `normalization_policy is None` |
 | 195 | `forecasting/evidence.py:234` | if | raise | SCORED | — | `not isinstance(normalization_policy, NormalizationPolicy)` |
-| 196 | `forecasting/evidence.py:238` | if | raising-helper call | SCORED | — | `len(probe.units_present) > 1` |
-| 197 | `forecasting/evidence.py:240` | if | raising-helper call | SCORED | — | `any((not math.isfinite(v) for v in probe.values))` |
-| 198 | `forecasting/evidence.py:246` | if | raising-helper call | SCORED | — | `not domain_for(s.unit).contains(s.value)` |
-| 199 | `forecasting/evidence.py:250` | if | raising-helper call | SCORED | — | `probe.sample_count < effective_min` |
-| 200 | `forecasting/evidence.py:253` | if | raising-helper call | SCORED | — | `admission_policy.max_staleness_seconds is not None and probe.last_event_tim…` |
-| 201 | `forecasting/evidence.py:255` | if | raising-helper call | SCORED | — | `staleness > admission_policy.max_staleness_seconds` |
-| 202 | `forecasting/evidence.py:258` | if | raising-helper call | SCORED | — | `probe.missingness.missing_fraction > admission_policy.max_missing_fraction` |
-| 203 | `forecasting/evidence.py:261` | if | raising-helper call | SCORED | — | `admission_policy.require_regular_cadence and probe.cadence.irregular_gap_co…` |
-| 204 | `forecasting/evidence.py:268` | if | raising-helper call | SCORED | — | `signal is not None` |
-| 205 | `forecasting/evidence.py:269` | if | raising-helper call | SCORED | — | `normalization_policy.method_by_signal.get(signal) is None` |
+| 196 | `forecasting/evidence.py:238` | if | typed-refusal call | SCORED | — | `len(probe.units_present) > 1` |
+| 197 | `forecasting/evidence.py:240` | if | typed-refusal call | SCORED | — | `any((not math.isfinite(v) for v in probe.values))` |
+| 198 | `forecasting/evidence.py:246` | if | typed-refusal call | SCORED | — | `not domain_for(s.unit).contains(s.value)` |
+| 199 | `forecasting/evidence.py:250` | if | typed-refusal call | SCORED | — | `probe.sample_count < effective_min` |
+| 200 | `forecasting/evidence.py:253` | if | typed-refusal call | SCORED | — | `admission_policy.max_staleness_seconds is not None and probe.last_event_tim…` |
+| 201 | `forecasting/evidence.py:255` | if | typed-refusal call | SCORED | — | `staleness > admission_policy.max_staleness_seconds` |
+| 202 | `forecasting/evidence.py:258` | if | typed-refusal call | SCORED | — | `probe.missingness.missing_fraction > admission_policy.max_missing_fraction` |
+| 203 | `forecasting/evidence.py:261` | if | typed-refusal call | SCORED | — | `admission_policy.require_regular_cadence and probe.cadence.irregular_gap_co…` |
+| 204 | `forecasting/evidence.py:268` | if | typed-refusal call | SCORED | — | `signal is not None` |
+| 205 | `forecasting/evidence.py:269` | if | typed-refusal call | SCORED | — | `normalization_policy.method_by_signal.get(signal) is None` |
 | 206 | `forecasting/evidence.py:274` | helper-admission | helper-admission call | SCORED | — | `normalize_signal(signal, Measurement(s0.value, Unit(s0.unit)), normalizatio…` |
 | 207 | `forecasting/evidence.py:275` | except-arm | typed-refusal return | SCORED | — | `except (NormalizationError, ValueError): _abstain(AbstentionReason.INCONSIS…` |
-| 208 | `forecasting/evidence.py:277` | if | raising-helper call | SCORED | — | `forecast_space is ForecastValueSpace.NORMALIZED` |
+| 208 | `forecasting/evidence.py:277` | if | typed-refusal call | SCORED | — | `forecast_space is ForecastValueSpace.NORMALIZED` |
 | 209 | `forecasting/evidence.py:287` | except-arm | typed-refusal return | SCORED | — | `except NormalizationApplicabilityError: _abstain(_APPLICABILITY_REASON.get(…` |
-| 210 | `forecasting/evidence.py:292` | if | raising-helper call | SCORED | — | `point is None` |
-| 211 | `forecasting/evidence.py:294` | if | raising-helper call | SCORED | — | `not math.isfinite(point)` |
-| 212 | `forecasting/evidence.py:302` | if | raising-helper call | SCORED | — | `domain is not None and (not domain.contains(point))` |
-| 213 | `forecasting/evidence.py:303` | if | raising-helper call | SCORED | — | `not admission_policy.allow_out_of_domain` |
-| 214 | `forecasting/evidence.py:313` | if | raising-helper call | SCORED | — | `uncertainty_config.method is not UncertaintyMethod.NONE and (not uncertaint…` |
+| 210 | `forecasting/evidence.py:292` | if | typed-refusal call | SCORED | — | `point is None` |
+| 211 | `forecasting/evidence.py:294` | if | typed-refusal call | SCORED | — | `not math.isfinite(point)` |
+| 212 | `forecasting/evidence.py:302` | if | typed-refusal call | SCORED | — | `domain is not None and (not domain.contains(point))` |
+| 213 | `forecasting/evidence.py:303` | if | typed-refusal call | SCORED | — | `not admission_policy.allow_out_of_domain` |
+| 214 | `forecasting/evidence.py:313` | if | typed-refusal call | SCORED | — | `uncertainty_config.method is not UncertaintyMethod.NONE and (not uncertaint…` |
 | 215 | `forecasting/evidence.py:391` | if | raise | SCORED | — | `not isinstance(self.forecast, CapacityForecast)` |
 | 216 | `forecasting/evidence.py:393` | if | raise | SCORED | — | `self.advisory_only is not True or self.shadow_only is not True` |
 | 217 | `forecasting/evidence.py:395` | if | raise | SCORED | — | `self.actuation_performed is not False` |
@@ -325,11 +325,11 @@ survivor with no prior declaration fails the sweep.
 | 261 | `forecasting/evaluation.py:335` | if | raise | SCORED | — | `status not in (EvaluationStatus.UNMATCHED, EvaluationStatus.SUBJECT_MISMATC…` |
 | 262 | `forecasting/evaluation.py:354` | if | raise | SCORED | — | `not isinstance(evidence, CapacityForecastEvidence)` |
 | 263 | `forecasting/evaluation.py:356` | if | raise | SCORED | — | `isinstance(match_tolerance_seconds, bool) or not isinstance(match_tolerance…` |
-| 264 | `forecasting/evaluation.py:372` | if | raising-helper call | SCORED | — | `actual_state is None` |
-| 265 | `forecasting/evaluation.py:377` | if | raising-helper call | SCORED | — | `actual_state.subject != fc.subject` |
-| 266 | `forecasting/evaluation.py:383` | if | raising-helper call | SCORED | — | `sample is None` |
-| 267 | `forecasting/evaluation.py:388` | if | raising-helper call | SCORED | — | `sample.unit != fc.unit` |
-| 268 | `forecasting/evaluation.py:392` | if | raising-helper call | SCORED | — | `abs(delta) > match_tolerance_seconds` |
+| 264 | `forecasting/evaluation.py:372` | if | typed-refusal call | SCORED | — | `actual_state is None` |
+| 265 | `forecasting/evaluation.py:377` | if | typed-refusal call | SCORED | — | `actual_state.subject != fc.subject` |
+| 266 | `forecasting/evaluation.py:383` | if | typed-refusal call | SCORED | — | `sample is None` |
+| 267 | `forecasting/evaluation.py:388` | if | typed-refusal call | SCORED | — | `sample.unit != fc.unit` |
+| 268 | `forecasting/evaluation.py:392` | if | typed-refusal call | SCORED | — | `abs(delta) > match_tolerance_seconds` |
 | 269 | `forecasting/replay.py:156` | if | raise | SCORED | — | `not observations` |
 | 270 | `forecasting/replay.py:171` | if | raise | SCORED | — | `_as_utc(series.end_event_time) > _as_utc(cutoff)` |
 | 271 | `forecasting/replay.py:186` | if | raise | SCORED | — | `evidence.forecast.is_forecast` |
@@ -548,11 +548,44 @@ survivor with no prior declaration fails the sweep.
 | 484 | `planning/pipeline.py:100` | if | raise | SCORED | — | `not isinstance(recommendation_time, datetime)` |
 | 485 | `planning/pipeline.py:103` | if | raise | SCORED | — | `not isinstance(policy, RecommendationPolicy)` |
 | 486 | `planning/pipeline.py:108` | if | raise | SCORED | — | `current_state is None` |
-| 487 | `planning/pipeline.py:117` | if | raise | SCORED | — | `not isinstance(current_state, CanonicalCapacityState)` |
-| 488 | `planning/pipeline.py:132` | if | raise | SCORED | — | `not isinstance(forecast_evidence, CapacityForecastEvidence)` |
-| 489 | `planning/pipeline.py:164` | if | raise | SCORED | — | `not isinstance(constraints, OperatingConstraints)` |
-| 490 | `planning/pipeline.py:180` | if | raise | SCORED | — | `isinstance(validity_seconds, bool) or not isinstance(validity_seconds, (int…` |
-| 491 | `planning/pipeline.py:200` | if | raise | SCORED | — | `not isinstance(cost_book, CostBook)` |
-| 492 | `planning/pipeline.py:230` | if | raise | SCORED | — | `not isinstance(topology, DependencyTopology)` |
-| 493 | `planning/pipeline.py:268` | except-arm | typed-refusal return | EXCLUDED | — | `except ScoringError: abcost(R.CONTRADICTORY_EVIDENCE, f'inconsistent eviden…` |
-| 494 | `planning/pipeline.py:296` | else-arm | raising-helper call | SCORED | — | `else of: violations` |
+| 487 | `planning/pipeline.py:111` | if | typed-refusal call | SCORED | — | `isinstance(forecast_evidence, CapacityForecastEvidence)` |
+| 488 | `planning/pipeline.py:117` | if | raise | SCORED | — | `not isinstance(current_state, CanonicalCapacityState)` |
+| 489 | `planning/pipeline.py:126` | if | typed-refusal call | SCORED | — | `_as_utc(current_state.observed_at) > rec_t` |
+| 490 | `planning/pipeline.py:130` | if | typed-refusal call | SCORED | — | `forecast_evidence is None` |
+| 491 | `planning/pipeline.py:132` | if | raise | SCORED | — | `not isinstance(forecast_evidence, CapacityForecastEvidence)` |
+| 492 | `planning/pipeline.py:141` | if | typed-refusal call | SCORED | — | `fc.subject != subject` |
+| 493 | `planning/pipeline.py:143` | if | typed-refusal call | SCORED | — | `fc.is_abstained` |
+| 494 | `planning/pipeline.py:145` | if | typed-refusal call | SCORED | — | `fc.target is not PLANNING_TARGET` |
+| 495 | `planning/pipeline.py:147` | if | typed-refusal call | SCORED | — | `fc.point_estimate is None or not math.isfinite(float(fc.point_estimate))` |
+| 496 | `planning/pipeline.py:152` | if | typed-refusal call | SCORED | — | `cutoff > rec_t` |
+| 497 | `planning/pipeline.py:154` | if | typed-refusal call | SCORED | — | `forecast_for <= rec_t` |
+| 498 | `planning/pipeline.py:158` | if | typed-refusal call | SCORED | — | `current_state.capacity is None or current_state.capacity.running_replicas i…` |
+| 499 | `planning/pipeline.py:162` | if | typed-refusal call | SCORED | — | `constraints is None` |
+| 500 | `planning/pipeline.py:164` | if | raise | SCORED | — | `not isinstance(constraints, OperatingConstraints)` |
+| 501 | `planning/pipeline.py:174` | if | typed-refusal call | SCORED | — | `constraints.forecast_validity_seconds is not None` |
+| 502 | `planning/pipeline.py:176` | if | typed-refusal call | SCORED | — | `age > constraints.forecast_validity_seconds` |
+| 503 | `planning/pipeline.py:180` | if | raise | SCORED | — | `isinstance(validity_seconds, bool) or not isinstance(validity_seconds, (int…` |
+| 504 | `planning/pipeline.py:186` | if | typed-refusal call | SCORED | — | `rec_t + timedelta(seconds=float(validity_seconds)) > forecast_for` |
+| 505 | `planning/pipeline.py:190` | if | typed-refusal call | SCORED | — | `_forecast_confidence(fc) < policy.min_forecast_confidence - _TOL` |
+| 506 | `planning/pipeline.py:194` | if | typed-refusal call | SCORED | — | `constraints.regional_quota is not None and constraints.regional_quota < con…` |
+| 507 | `planning/pipeline.py:198` | if | typed-refusal call | SCORED | — | `cost_book is None` |
+| 508 | `planning/pipeline.py:200` | if | raise | SCORED | — | `not isinstance(cost_book, CostBook)` |
+| 509 | `planning/pipeline.py:202` | if | typed-refusal call | SCORED | — | `cost_book.subject != subject` |
+| 510 | `planning/pipeline.py:213` | if | typed-refusal call | SCORED | — | `primary_cost is None` |
+| 511 | `planning/pipeline.py:215` | if | typed-refusal call | SCORED | — | `primary_cost.basis is not CostBasis.PER_REPLICA_HOUR` |
+| 512 | `planning/pipeline.py:218` | if | typed-refusal call | SCORED | — | `len(currencies) > 1` |
+| 513 | `planning/pipeline.py:221` | if | typed-refusal call | SCORED | — | `not entry.is_effective_at(recommendation_time)` |
+| 514 | `planning/pipeline.py:226` | if | typed-refusal call | SCORED | — | `topology is None` |
+| 515 | `planning/pipeline.py:227` | if | typed-refusal call | SCORED | — | `require_topology` |
+| 516 | `planning/pipeline.py:230` | if | raise | SCORED | — | `not isinstance(topology, DependencyTopology)` |
+| 517 | `planning/pipeline.py:232` | if | typed-refusal call | SCORED | — | `topology.subject != subject` |
+| 518 | `planning/pipeline.py:235` | if | typed-refusal call | SCORED | — | `_as_utc(topology.as_of) > rec_t` |
+| 519 | `planning/pipeline.py:241` | if | typed-refusal call | SCORED | — | `max_topology_age_seconds is not None` |
+| 520 | `planning/pipeline.py:242` | if | typed-refusal call | SCORED | — | `(rec_t - _as_utc(topology.as_of)).total_seconds() > max_topology_age_seconds` |
+| 521 | `planning/pipeline.py:248` | if | typed-refusal call | SCORED | — | `topology.has_cycle()` |
+| 522 | `planning/pipeline.py:256` | if | typed-refusal call | SCORED | — | `not edge.has_capacity_evidence` |
+| 523 | `planning/pipeline.py:268` | except-arm | typed-refusal return | EXCLUDED | — | `except ScoringError: abcost(R.CONTRADICTORY_EVIDENCE, f'inconsistent eviden…` |
+| 524 | `planning/pipeline.py:272` | if | typed-refusal call | SCORED | — | `ctx.dependency_subject is not None and cost_book.for_subject(ctx.dependency…` |
+| 525 | `planning/pipeline.py:296` | else-arm | raising-helper call | SCORED | — | `else of: violations` |
+| 526 | `planning/pipeline.py:303` | if | typed-refusal call | SCORED | — | `not feasible` |
+| 527 | `planning/pipeline.py:310` | if | typed-refusal call | SCORED | — | `ambiguous` |
