@@ -139,10 +139,12 @@ def test_the_snapshot_carries_exactly_the_fifty_one_authorized_names():
     ``0.2.0``; S2-B authorizes **exactly five** at ``0.3.0`` — the strategy vocabulary,
     the resolver protocol, the resolver request shape, the resolver response shape and
     the replay function. **No removals, no renames**, which this asserts by requiring
-    the residue to be exactly the forty-six that came before.
+    the residue to be exactly the forty-six that came before. `ACC-AM-5` (the
+    `OD-C1=B` amendment, ``0.4.0``) authorizes **zero** names: the surface stays at
+    fifty-one, and the amendment moves field lists only.
     """
     documented = json.loads(_PUBLIC_API_JSON.read_text())
-    assert documented["package_version"] == "0.3.1"
+    assert documented["package_version"] == "0.4.0"
     assert len(documented["symbols"]) == 51
     od7_added = {"DomainEvaluationOutcome", "DomainEvaluationProvider",
                  "DomainEvaluationRequest", "DomainEvaluationResponse",

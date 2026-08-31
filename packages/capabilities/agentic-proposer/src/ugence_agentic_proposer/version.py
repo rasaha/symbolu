@@ -1,6 +1,20 @@
 """Single source of truth for the ugence-agentic-proposer distribution version.
 
-0.3.1 is a patch release: **one failure class changed, no public name added, removed
+0.4.0 is the `OD-C1=B` contract-amendment change set, authorized by
+``ACC-AM-IMPL=YES`` in
+``docs/architecture/ADR_UGENCE_AGENT_CONSTITUTION_AMENDMENT_ROUND_RATIFICATION.md``,
+on the `0.3.0` precedent for a ``P_unsigned``-moving amendment: **no public name
+added, removed or renamed** — the curated surface stays at fifty-one
+(`ACC-AM-5`) — while three required fields land: ``constitution_ref`` on the
+role-contract surface (`ACC-AM-1`) and the package-stamped
+``constitution_policy_id``/``constitution_policy_version`` pair inside
+``P_unsigned``, mirrored per G2 (`ACC-AM-2`). ``advisory_version`` stays ``"1"``
+(`ACC-AM-3`); newly built advisory digests move with the field set, as the round
+disclosed and the owner accepted. Constructions gain arguments: every role and
+advisory construction site changes, which is the breaking shape `0.3.0` took and
+the round disclosed. See ``CHANGELOG.md``.
+
+0.3.1 was a patch release: **one failure class changed, no public name added, removed
 or renamed** — the curated surface stays at fifty-one and ``public_api.json``'s
 ``symbols`` map is byte-identical to ``0.3.0``'s. It implements §10 step 7 of
 ``docs/architecture/S2B_STRATEGY_PERMISSION_POLICY_FAMILY_AND_RESOLVER_DESIGN.md``,
@@ -81,4 +95,4 @@ the four ratified constants. That surface remains exported unchanged; 0.2.0 remo
 name from it. See ``CHANGELOG.md`` for what this release implements and what remains
 deferred to a later ruling — substantive multi-candidate ranking above all.
 """
-__version__ = "0.3.1"
+__version__ = "0.4.0"

@@ -1,7 +1,7 @@
 {
   "distribution": "ugence-agentic-proposer",
   "namespace": "ugence_agentic_proposer",
-  "package_version": "0.3.1",
+  "package_version": "0.4.0",
   "note": "Machine-readable snapshot of the curated public API (ugence_agentic_proposer.__all__). Generated from the installed package; tests/test_public_api.py asserts this file equals the actual package surface. Regenerate when the curated API changes, which for this package means a ratified amendment to docs/S1_CONTRACT_AND_EQUATION_SPECIFICATION.md.",
   "symbols": {
     "ADVISORY_IDENTITY_NFC_PATHS": {
@@ -107,7 +107,8 @@
         "permitted_review_actions",
         "escalation_role_ref",
         "activation_status",
-        "strategy_policy_ref"
+        "strategy_policy_ref",
+        "constitution_ref"
       ]
     },
     "CrossContractViolationError": {
@@ -183,6 +184,8 @@
         "strategy_policy_id",
         "strategy_policy_version",
         "declared_strategy",
+        "constitution_policy_id",
+        "constitution_policy_version",
         "recommended_disposition",
         "requested_review_action",
         "requested_review_destination_role_ref",
@@ -360,7 +363,7 @@
     },
     "__version__": {
       "kind": "constant",
-      "value": "0.3.1"
+      "value": "0.4.0"
     },
     "build_advisory_candidate_set": {
       "kind": "function"

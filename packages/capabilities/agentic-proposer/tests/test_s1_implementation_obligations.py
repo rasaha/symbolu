@@ -46,7 +46,8 @@ def _full_advisory_scenario():
         permitted_candidate_dispositions=[ap.CandidateDisposition.RECOMMEND_WITHHOLD],
         permitted_review_actions=[ap.ReviewAction.ROUTE_APPROVAL_BUNDLE],
         escalation_role_ref="role-2", activation_status=ap.RoleActivationStatus.ACTIVE,
-        strategy_policy_ref=spec.STRATEGY_POLICY_REF)
+        strategy_policy_ref=spec.STRATEGY_POLICY_REF,
+        constitution_ref=spec.CONSTITUTION_REF)
     later = FIXED_INSTANT + timedelta(days=365)
     mandate = ap.WorkMandate(
         schema_version="1.0", tenant_id="tenant-1", created_at=FIXED_INSTANT,
@@ -66,6 +67,7 @@ def _full_advisory_scenario():
         normalized_fields={"vendor.name": "Acme Corp"})
     provider = spec.StubDomainEvaluationProvider()
     strategy_policy_resolver = spec.StubStrategyPolicyResolver()
+    constitution_resolution = spec.StubConstitutionResolution()
     candidate = ap.build_candidate_advisory(
         candidate_id="cand-1", identity=identity, role=role, mandate=mandate,
         context=context, observations=[observation],
@@ -93,6 +95,7 @@ def _full_advisory_scenario():
         expected_profile_version=spec.PROFILE_VERSION,
         requested_review_destination_role_ref="role-approver",
         strategy_policy_resolver=strategy_policy_resolver,
+        constitution_resolution=constitution_resolution,
         # One candidate, no parent — the member this advisory's own shape yields, so
         # ``verify_strategy_permission``'s sixth check passes on the lawful scenario.
         declared_strategy=ap.ReasoningStrategy.SINGLE_CANDIDATE_UNREVISED)
@@ -100,6 +103,7 @@ def _full_advisory_scenario():
                observation=observation, candidate=candidate, provider=provider,
                candidate_set=candidate_set, advisory=advisory,
                strategy_policy_resolver=strategy_policy_resolver,
+               constitution_resolution=constitution_resolution,
                strategy_policy=spec.strategy_policy_response())
 
 
@@ -407,6 +411,7 @@ def test_i7_6_build_proposer_advisory_raises_eligibility_mismatch_error(scenario
             expected_profile_version=spec.PROFILE_VERSION,
             requested_review_destination_role_ref=None,
             strategy_policy_resolver=scenario["strategy_policy_resolver"],
+            constitution_resolution=scenario["constitution_resolution"],
             declared_strategy=ap.ReasoningStrategy.SINGLE_CANDIDATE_UNREVISED)
     assert issubclass(ap.EligibilityMismatchError, ValueError)
 
@@ -864,6 +869,7 @@ def _revision_kwargs(scenario, **overrides):
         expected_profile_version=spec.PROFILE_VERSION,
         requested_review_destination_role_ref="role-approver",
         strategy_policy_resolver=scenario["strategy_policy_resolver"],
+        constitution_resolution=scenario["constitution_resolution"],
         # A revision binds a parent, so REVISED_ADVISORY is the member its own
         # shape yields at any candidate count (`S2B-R2-Q1=A`).
         declared_strategy=ap.ReasoningStrategy.REVISED_ADVISORY)
@@ -1116,6 +1122,7 @@ def test_build_proposer_advisory_refuses_a_forged_set_rather_than_leaking_it(sce
             expected_profile_version=spec.PROFILE_VERSION,
             requested_review_destination_role_ref="role-approver",
             strategy_policy_resolver=scenario["strategy_policy_resolver"],
+            constitution_resolution=scenario["constitution_resolution"],
             declared_strategy=ap.ReasoningStrategy.SINGLE_CANDIDATE_UNREVISED)
 
 
@@ -1171,6 +1178,7 @@ def _od6_ii_call(**overrides):
             expected_profile_version=spec.PROFILE_VERSION,
             requested_review_destination_role_ref="role-approver",
             strategy_policy_resolver=scenario["strategy_policy_resolver"],
+            constitution_resolution=scenario["constitution_resolution"],
             declared_strategy=ap.ReasoningStrategy.SINGLE_CANDIDATE_UNREVISED)
         kwargs.update(overrides)
         return ap.build_proposer_advisory(**kwargs)
@@ -1264,6 +1272,7 @@ def test_od6_ii_build_advisory_revisions_own_continuity_checks_stay_plain_valuee
             expected_profile_version=spec.PROFILE_VERSION,
             requested_review_destination_role_ref="role-approver",
             strategy_policy_resolver=scenario["strategy_policy_resolver"],
+            constitution_resolution=scenario["constitution_resolution"],
             declared_strategy=ap.ReasoningStrategy.REVISED_ADVISORY)
     assert not isinstance(excinfo.value, ap.CrossContractViolationError)
     assert not isinstance(excinfo.value, pydantic.ValidationError)

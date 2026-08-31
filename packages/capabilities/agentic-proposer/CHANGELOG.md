@@ -1,5 +1,66 @@
 # Changelog — ugence-agentic-proposer
 
+## 0.4.0 — the `OD-C1=B` contract amendment: constitution binding
+
+The Agent Constitution contract-amendment change set, authorized by
+`ACC-AM-IMPL=YES` in
+[`ADR_UGENCE_AGENT_CONSTITUTION_AMENDMENT_ROUND_RATIFICATION.md`](../../../docs/architecture/ADR_UGENCE_AGENT_CONSTITUTION_AMENDMENT_ROUND_RATIFICATION.md),
+implementing `ACC-AM-BASE` and `ACC-AM-1`..`ACC-AM-5` exactly as recorded. **No
+public name added, removed or renamed — the curated surface stays at fifty-one
+(`ACC-AM-5`).** The `0.3.0` precedent for a `P_unsigned`-moving amendment,
+followed whole.
+
+### Added
+
+- **The role-contract surface bears `constitution_ref`** (`ACC-AM-1`) — a
+  **required** C5a reference to an externally issued, signed, versioned and
+  revocable Policy Authority agent constitution, on `strategy_policy_ref`'s
+  exact precedent. A reference only: the constitution's structural bounds never
+  become role data, resolving the reference is an injected boundary outside this
+  package, and the readiness re-derivation obligation stands separately
+  (`ACC-AM-4`: re-derivation changes **nothing yet**, re-arming when clause
+  content beyond the three structural bounds is ratified).
+- **`ProposerAdvisory` binds `constitution_policy_id` and
+  `constitution_policy_version`** (`ACC-AM-2`) — required C5b `Token`s inside
+  `P_unsigned`, mirrored onto the private payload per the G2 equivalence
+  obligation, on `S2B-D6=B1`'s exact grounds: a digest-valid advisory cannot
+  have its governing constitution's identity absent, replaced or never produced,
+  which is what `OD-C1=B`'s "digest-bound to the proposals it governs" cashes
+  out to.
+- **Both advisory builders gain one keyword-only parameter,
+  `constitution_resolution`** — the injected resolved constitution the identity
+  pair is **package-stamped** from, on the `S2B-D7=A` discipline: the pair is
+  never accepted as caller parameters, the resolution's whole read shape is
+  guarded at the boundary (`S2B-PF-G=B`'s precedent), and the resolution's
+  signed `agent_constitution_ref` must equal the role's `constitution_ref`
+  **exactly** before any value is stamped — the consumer the first-slice
+  specification's §2.3 assigned to this round. The check runs in the
+  `S2B-S1-Q12=A` position, so a mis-bound constitution never reaches the
+  injected domain evaluator. Every refusal is discharged by the existing H2
+  surface: **no new exception type**, H2 stays at five classes.
+
+### Explicitly unchanged
+
+- `advisory_version` stays `"1"` (`ACC-AM-3`, the `0.3.0` precedent): the
+  digests of newly built advisories move with the field set, and the version
+  literal does not mark the shift — disclosed by the round and accepted as
+  ruled.
+- The public surface: fifty-one names, zero added (`ACC-AM-5`);
+  `public_api.json` changes only in `package_version` and field lists.
+- Policy Authority, both agent-constitution distributions, and both
+  strategy-permission distributions: not touched by this change set. (The
+  strategy-permission **runtime suite's test fixtures** gained the two new
+  construction arguments — tests only, no `src` change — an owner-granted scope
+  clarification recorded in the change set that ships this release.)
+
+### Breaking
+
+Every role-contract and advisory construction site gains arguments — the shape
+`0.3.0` took and the round disclosed. The `S1_CONTRACT_AND_EQUATION_SPECIFICATION`
+tables, the pinned test registries (cardinalities 11 → 12 and 30 → 32, the
+61-entry patterned sweeps) and the builder signatures moved in this same change
+set, which is the behaviour their wording was chosen to force.
+
 ## 0.3.1 — resolver-boundary hardening
 
 A patch release: **one failure class changed, the public surface unchanged at fifty-one

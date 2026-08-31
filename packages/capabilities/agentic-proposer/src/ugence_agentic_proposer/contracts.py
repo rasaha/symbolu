@@ -320,6 +320,22 @@ class CognitiveRoleContract(BaseModel):
     #: attribute, so it sits inside D8's existing containment bounds and adds no role
     #: lifecycle verb.
     strategy_policy_ref: Identifier
+    #: `ACC-AM-1` (the `OD-C1=B` amendment round). A **reference only** to an
+    #: externally issued, signed, versioned and revocable Policy Authority agent
+    #: constitution, on ``strategy_policy_ref``'s exact precedent. C5a: an opaque
+    #: handle minted by that issuer, carried and compared whole, never split or
+    #: normalised, and **required** — a role that names no constitution is not
+    #: constructible.
+    #:
+    #: `[R]` The role does **not** carry the constitution's bounds as role data.
+    #: Resolving this reference to a constitution is an injected boundary outside
+    #: this package, and this package implements no resolver. `[R]` This is a
+    #: reference the role bears, not a constitution-derived attribute: the
+    #: re-derivation obligation stands separately (`ACC-AM-4`: "nothing yet",
+    #: re-arming when clause content beyond the structural bounds is ratified),
+    #: and nothing here should be read as the projection anticipating the
+    #: constitution correctly.
+    constitution_ref: Identifier
 
     @field_validator("created_at", mode="after")
     @classmethod
@@ -1001,6 +1017,21 @@ class ProposerAdvisory(BaseModel):
     strategy_policy_id: Token
     strategy_policy_version: Token
     declared_strategy: ReasoningStrategy
+    #: `ACC-AM-2` (the `OD-C1=B` amendment round). The governing agent
+    #: constitution's identity and version, on `S2B-D6=B1`'s exact grounds: both
+    #: are **required, non-nullable and identity-participating** — they are inside
+    #: ``P_unsigned``, so a digest-valid advisory cannot have its governing
+    #: constitution's identity absent, replaced or never produced. That is what
+    #: `OD-C1=B`'s "digest-bound to the proposals it governs" cashes out to.
+    #:
+    #: `[R]` **Both are package-stamped** from the injected constitution
+    #: resolution and are **never** builder parameters, on `S2B-D7=A`'s exact
+    #: rationale: accepting them from a caller would let a caller label an
+    #: advisory with a constitution that did not govern it. The resolution's
+    #: signed ``agent_constitution_ref`` must equal the role's
+    #: ``constitution_ref`` before either value is stamped.
+    constitution_policy_id: Token
+    constitution_policy_version: Token
     recommended_disposition: Optional[CandidateDisposition] = None
     requested_review_action: Optional[ReviewAction] = None
     requested_review_destination_role_ref: Optional[Identifier] = None
