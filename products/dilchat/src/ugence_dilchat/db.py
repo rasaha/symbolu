@@ -12,6 +12,7 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
 import sqlalchemy as sa
+from fastapi import Request, Response
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
     AsyncSession,
@@ -19,6 +20,7 @@ from sqlalchemy.ext.asyncio import (
     create_async_engine,
 )
 from sqlalchemy.pool import StaticPool
+from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 
 from .config import Settings
 
@@ -87,12 +89,55 @@ async def set_transaction_context(
     )
 
 
-async def get_session() -> AsyncIterator[AsyncSession]:
-    """FastAPI dependency: one transaction per request."""
+class RequestTransactionMiddleware(BaseHTTPMiddleware):
+    """Own the request transaction and finalize it BEFORE the response is sent.
+
+    FastAPI runs yield-dependency teardown AFTER the response has been
+    transmitted, so a commit placed there races the client's next request: a
+    fast follow-up on another pooled connection could observe pre-commit state
+    (e.g. a just-issued refresh token "not existing", an unpair "not yet
+    happened"). ``call_next`` returns once the response is built but before it
+    reaches the transport, so committing here closes that race for every route
+    at once. Semantics are unchanged otherwise: 2xx/3xx commit, 4xx/5xx and
+    escaped exceptions roll back — exactly what the old teardown did, earlier.
+    """
+
+    async def dispatch(
+        self, request: Request, call_next: RequestResponseEndpoint
+    ) -> Response:
+        sm = get_sessionmaker()
+        async with sm() as session:
+            request.state.dilchat_db_session = session
+            try:
+                response = await call_next(request)
+            except Exception:
+                await session.rollback()
+                raise
+            if response.status_code < 400:
+                await session.commit()
+            else:
+                await session.rollback()
+            return response
+
+
+async def get_session(request: Request) -> AsyncIterator[AsyncSession]:
+    """FastAPI dependency: the per-request session/transaction.
+
+    The session is owned by ``RequestTransactionMiddleware``, which commits or
+    rolls back before the response leaves the process; this dependency only
+    hands it out and applies the default pre-auth RLS context
+    (``get_current_principal`` upgrades it to 'user'). The fallback path keeps
+    the old commit-in-teardown behaviour for an app constructed without the
+    middleware (defensive only — ``create_app`` always installs it).
+    """
+    owned = getattr(request.state, "dilchat_db_session", None)
+    if owned is not None:
+        await set_transaction_context(owned, actor_type="auth")
+        yield owned
+        return
     sm = get_sessionmaker()
     async with sm() as session:
         try:
-            # Default pre-auth context; get_current_principal upgrades it to 'user'.
             await set_transaction_context(session, actor_type="auth")
             yield session
             await session.commit()
