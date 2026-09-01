@@ -142,6 +142,7 @@ class AgentConstitutionPolicyFamilyAdapter:
             lifecycle_label=metadata.lifecycle_state,
             lifecycle_is_active=(metadata.lifecycle_state == ACTIVE_LIFECYCLE_STATE),
             supersedes_ref=metadata.supersedes_ref,
+            supersedes_coordinate=metadata.supersedes_coordinate,
             effective_from=metadata.effective_from,
             effective_to=metadata.effective_to,
         )
@@ -151,12 +152,25 @@ class AgentConstitutionPolicyFamilyAdapter:
     # ------------------------------------------------------------------
     @staticmethod
     def _canonical_projection(artifact: Any) -> dict:
-        """Project the artifact, removing exactly ``metadata.content_digest``.
+        """Project the artifact, removing exactly ``metadata.content_digest``
+        and ``metadata.supersedes_coordinate``.
 
         Canonicalization itself — NFC enforcement, naive-datetime rejection,
         ``float`` rejection, UTC normalization — happens inside
         :func:`to_canonical_obj`, so a malformed artifact is refused here rather
         than silently digested.
+
+        `ACC-SU-2` is the authority for the second exclusion: what a version
+        replaces is a claim about the **registry**, not part of the bytes it is
+        identified by. Keeping it out means every digest issued before the field
+        existed — the ratified v1 content's included — is unmoved, so `ACC-FC-2`'s
+        identity is untouched.
+
+        `[R]` Two shipped guards enforce this and must stay green **unedited**
+        (`ACC-SU-IA-2`): ``test_authority_registration`` pins this projection's
+        metadata key set closed, and ``test_artifact``'s
+        ``test_every_body_field_moves_the_digest`` pins which fields move the
+        digest — the excluded field must never be added to it.
         """
 
         body = to_canonical_obj(artifact, path="$")
@@ -167,5 +181,9 @@ class AgentConstitutionPolicyFamilyAdapter:
                 "content_digest declaration"
             )
         body = dict(body)
-        body["metadata"] = {k: v for k, v in metadata.items() if k != "content_digest"}
+        body["metadata"] = {
+            k: v
+            for k, v in metadata.items()
+            if k not in ("content_digest", "supersedes_coordinate")
+        }
         return body

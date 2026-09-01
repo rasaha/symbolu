@@ -1,5 +1,60 @@
 # Changelog — `ugence-agent-constitution-policy`
 
+## 0.2.0 — the family declares what it supersedes (the `ACC-SU` round)
+
+The change set authorized as `ACC-SU-IA-5` (see
+`docs/architecture/ADR_UGENCE_AGENT_CONSTITUTION_FAMILY_SUPERSESSION_IMPLEMENTATION_AUTHORITY.md`,
+over the `ACC-SU-BASE`/`ACC-SU-1`..`ACC-SU-5` ratification). Additive: one new
+optional field, nothing removed, **no existing digest moved**.
+
+Policy Authority `0.2.0` shipped structured supersession, but no adapter
+produced the descriptor's `supersedes_coordinate`, so no constitution could
+lawfully declare a predecessor. This closes that.
+
+### Added
+
+- **`AgentConstitutionPolicyMetadata.supersedes_coordinate`**
+  (`Optional[PolicyCoordinate]`, default `None`) — the exact predecessor, as the
+  authority's own coordinate type, which the adapter maps straight into the
+  descriptor (`ACC-SU-IA-1`). The family already imported that type to derive its
+  own coordinate, so no new dependency and no parallel identity notion.
+- **The three-leg proof** (`tests/test_supersession_opt_in.py`, `ACC-SU-3`):
+  digest invariance against a pinned literal, a v2-supersedes-v1 chain through
+  the shipped authority on ephemeral in-process keys, and the six `ACC-LC-IA-3`
+  refusals re-driven over this family.
+
+### Changed
+
+- The canonical projection now removes `metadata.supersedes_coordinate` as well
+  as `metadata.content_digest` (`ACC-SU-2`). What a version replaces is a claim
+  about the **registry**, not part of the bytes it is identified by, so every
+  digest issued before this field existed — the ratified v1 content's included —
+  is unmoved and `ACC-FC-2`'s identity is untouched.
+
+### The consequence, recorded
+
+`[G]` A constitution therefore does **not** self-attest its predecessor: the
+claim is carried by the signed `PolicySupersessionRecord` the authority writes
+(`ACC-LC-IA-2`), which is where an auditor must look for it. That is the price of
+leaving every existing digest unmoved, and it was ratified as disclosed.
+
+### Unchanged, deliberately
+
+- **No existing refusal is relaxed.** A non-empty *unstructured* `supersedes_ref`
+  is still refused by the authority, whether or not a coordinate accompanies it —
+  proven over this family.
+- **Two shipped guards were not edited**, and must not be: the projection's
+  metadata key set stays pinned closed, and the excluded field is absent from
+  `test_every_body_field_moves_the_digest`'s parametrization (`ACC-SU-IA-2`).
+  Editing either would be the tell that the exclusion had been abandoned.
+- **No agent or role lifecycle authority** (`OD-C4=A`); no disposition or
+  reserved authority term (`OD-C3=B`).
+
+`[G]` Supersession is still **unexercisable**: `ACC-LC-IA-3` refuses an absent
+predecessor and no constitution has been issued, because the `ACC-FC-5`
+deployment gates are shut. This closes a contract gap, not an operational one.
+
+
 All notable changes to this distribution.
 
 ## 0.1.0 — the Agent Constitution policy family

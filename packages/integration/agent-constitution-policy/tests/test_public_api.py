@@ -66,7 +66,7 @@ def test_documented_public_api_matches_actual():
     symbols, constants = actual_surface()
     assert documented["distribution"] == "ugence-agent-constitution-policy"
     assert documented["namespace"] == "ugence_agent_constitution_policy"
-    assert documented["package_version"] == family.__version__ == "0.1.0"
+    assert documented["package_version"] == family.__version__ == "0.2.0"
     assert documented["symbols"] == symbols
     assert documented["constants"] == constants
 
