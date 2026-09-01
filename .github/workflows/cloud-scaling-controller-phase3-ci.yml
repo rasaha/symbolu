@@ -265,16 +265,17 @@ jobs:
               )
           if report["inventory_total"] != 527:
               problems.append(f"inventory is {report['inventory_total']}, not 527")
-          if len(report["killed"]) != 502:
-              problems.append(f"{len(report['killed'])} guards killed, not 502")
+          if len(report["killed"]) != 503:
+              problems.append(f"{len(report['killed'])} guards killed, not 503")
           if report["message_only_kills"]:
               problems.append(
                   f"message-only kills: {report['message_only_kills']}; the phase "
                   "ruling forbids scoring a kill attributable to prose alone"
               )
           expected = [
-              # phase 2 (canonical/ + forecasting/) — eight measured exclusions
-              "canonical/normalization.py:197",
+              # phase 2 — eight measured exclusions (seven here, plus
+              # planning/pipeline.py:147 below, which is one of the 33 guards
+              # phase 1 never enumerated and so is NEW, not pre-existing)
               "canonical/normalization.py:200",
               "forecasting/evaluation.py:204",
               "forecasting/evidence.py:240",

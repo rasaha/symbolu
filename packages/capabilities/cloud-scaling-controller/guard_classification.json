@@ -1,8 +1,8 @@
 {
   "package": "controller-evidence-planning",
   "total": 527,
-  "scored": 502,
-  "excluded": 25,
+  "scored": 503,
+  "excluded": 24,
   "classification": {
     "1": {
       "status": "SCORED",
@@ -287,10 +287,7 @@
       "condition": "name not in policy.thresholds"
     },
     "48": {
-      "status": "EXCLUDED",
-      "reason": "unreachable-behind-earlier-guard",
-      "detail": "`normalize_signal`'s defensive threshold check, which the source itself annotates as already enforced by policy validation. Every threshold reaching the division comes from `NormalizationPolicy.thresholds`, and that dataclass refuses a non-positive entry at construction, so no reachable policy can present one here.",
-      "evidence": "tests/canonical/test_guard_coverage_canonical.py::test_a_threshold_that_is_not_strictly_positive_is_refused",
+      "status": "SCORED",
       "module": "canonical/normalization.py",
       "line": 197,
       "condition": "threshold <= 0"
@@ -1543,7 +1540,7 @@
     "254": {
       "status": "EXCLUDED",
       "reason": "equivalent-mutant",
-      "detail": "The ABSTAINED arm of the four-way status dispatch. It and the catch-all arm below it enforce an identical pair of rules \u2014 no scored/actual fields, and a reason is required \u2014 so a neutralised dispatch sends an ABSTAINED record to a fall-through that accepts and rejects exactly what it would. The two differ only in message text, and ADR SS6 forbids attributing a kill to a message substring. Kept because naming ABSTAINED makes the dispatch read as four outcomes rather than three plus a remainder.",
+      "detail": "The ABSTAINED arm of the four-way status dispatch. It and the catch-all arm below it enforce an identical pair of rules \u2014 no scored/actual fields, and a reason is required \u2014 so a neutralised dispatch sends an ABSTAINED record to a fall-through that accepts and rejects exactly what it would. The two differ only in message text, and ADR \u00a76 forbids attributing a kill to a message substring. Kept because naming ABSTAINED makes the dispatch read as four outcomes rather than three plus a remainder.",
       "evidence": "tests/forecasting/test_guard_coverage_evaluation.py::test_abstained_and_the_catch_all_arm_enforce_the_same_two_rules",
       "module": "forecasting/evaluation.py",
       "line": 204,

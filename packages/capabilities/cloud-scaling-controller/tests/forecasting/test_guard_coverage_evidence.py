@@ -49,6 +49,7 @@ from ugence_cloud_scaling_controller.forecasting import (
     forecast_from_observations,
     forecast_with_evidence,
 )
+from ugence_cloud_scaling_controller.canonical.measurement import MeasurementError
 from ugence_cloud_scaling_controller.forecasting.evidence import (
     CapacityForecastEvidence,
     ForecastServiceError,
@@ -330,14 +331,20 @@ def test_a_mapped_data_quality_failure_becomes_a_typed_abstention():
 
 def test_a_non_finite_observation_cannot_be_built_at_all():
     """Evidence for the `unreachable-behind-earlier-guard` exclusion of the non-finite
-    sweep over `probe.values`. `Measurement.__post_init__` refuses a non-finite value, and
-    the replica count is validated as an `int`, so no non-finite number can reach a probe
-    window. The comment in the source calls the guard defensive; this measures that."""
+    sweep over `probe.values`. `Measurement.__post_init__` refuses a non-finite value on
+    every unit, bounded or not, so no non-finite number can reach a probe window from a
+    measurement-backed target. The replica count is a separate path: it is validated as a
+    non-negative `int`, which cannot be NaN or infinite in the first place.
+
+    Both units are probed because the finiteness gate is JACKETED under a bounded one —
+    PERCENT refuses NaN by its range check alone — and only the unbounded unit measures
+    the gate itself. That distinction is what made this guard a message-only kill before
+    it was corrected."""
 
     for bad in (float("nan"), float("inf"), float("-inf")):
-        with pytest.raises(Exception) as exc:
-            Measurement(bad, Unit.PERCENT)
-        assert "finite" in str(exc.value)
+        for unit in (Unit.PERCENT, Unit.MILLISECONDS):
+            with pytest.raises(MeasurementError):
+                Measurement(bad, unit)
 
 
 def test_an_out_of_domain_observation_cannot_be_built_at_all():
@@ -346,15 +353,13 @@ def test_an_out_of_domain_observation_cannot_be_built_at_all():
     `Measurement` enforces at construction — bounds and integer semantics alike — so a
     raw sample that is out of its domain cannot be constructed in the first place."""
 
-    with pytest.raises(Exception) as too_high:
-        Measurement(150.0, Unit.PERCENT)          # upper bound
-    assert "100" in str(too_high.value)
-    with pytest.raises(Exception) as negative:
-        Measurement(-1.0, Unit.PERCENT)           # lower bound
-    assert "0" in str(negative.value)
-    with pytest.raises(Exception) as fractional:
-        Measurement(3.5, Unit.COUNT)              # integer semantics
-    assert "integer" in str(fractional.value)
+    for value, unit in (
+        (150.0, Unit.PERCENT),   # above the upper bound
+        (-1.0, Unit.PERCENT),    # below the lower bound
+        (3.5, Unit.COUNT),       # violates integer semantics
+    ):
+        with pytest.raises(MeasurementError):
+            Measurement(value, unit)
 
 
 def test_every_applicability_reason_has_a_mapped_abstention():

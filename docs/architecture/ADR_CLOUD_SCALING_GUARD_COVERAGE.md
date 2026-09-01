@@ -766,7 +766,15 @@ that was never right. Nothing in the sweep can detect a decision point it was ne
 told to look for; only re-deriving the refusal vocabulary against the source can.
 
 **The rule this yields: a phased adoption must re-derive `refusal_calls` from the source
-at every phase, never inherit the previous phase's set.** §12's own §12-equivalent
+at every phase, never inherit the previous phase's set.**
+
+`[G]` **That rule is prose, and nothing enforces it.** No engine test derives a refusal
+idiom set from the boundary and reconciles it against the declaration, the way
+`test_module_completeness.py::test_every_excluded_adopter_module_reason_still_holds`
+already reconciles the deferred `raise` counts. Every CI pin here is computed *from* the
+inventory, so all of them are conditional on the boundary being right — which is exactly
+the failure this section describes. Making the rule mechanical is the obvious next
+hardening and is deliberately not attempted in this phase. §12's own §12-equivalent
 lesson was the aliased-import one (`RecommendationAbstentionReason as R`); this is the
 same lesson one level up — the engine sees the names it is given, and a refusal it
 cannot name is a refusal it cannot count. Both were found by testing the candidate
@@ -780,12 +788,17 @@ named individually in `excluded_modules` with their measured `raise` counts, and
 generated inventory's preamble names every deferred subpackage and states that a green
 sweep here is not evidence about any of them.
 
-**First-sweep survival: 165 of 527, 31.3%.** That is the honest number for a surface
+**First-sweep survival: 165 of 527, 31.3%** (reported from the run, not archived — no
+first-sweep artifact is checked in, so a reader cannot re-derive this one figure). That is the honest number for a surface
 adopted without its tests having been written against a sweep — three times phase 1's
 rate over `planning/` alone, which is what a layer built for canonical correctness
 rather than for gate coverage looks like when it is first measured.
 
-**Final: 502 killed, 25 excluded, 0 survivors, 0 unscored, 0 message-only kills.**
+**Final: 503 killed, 24 excluded, 0 survivors, 0 unscored, 0 message-only kills.**
+
+Both of those figures moved after an adversarial audit of the phase-2 PR, and §13.f
+records why — a coverage phase that cannot survive an adversarial read of its own
+exclusions has not finished.
 
 ### §13.c Four survivors were weak probes, not equivalent mutants
 
@@ -808,14 +821,18 @@ to, not against the guard itself.** A gate-removal sweep is the only thing that
 distinguishes the two, which is why no exclusion in this repository may be written
 before a sweep has measured that guard surviving its isolating probe.
 
-### §13.d The eight exclusions
+### §13.d The eight new exclusions
 
-Five are `unreachable-behind-earlier-guard` and three are `equivalent-mutant`. Every one
+Phase 1 carried 16. Phase 2 adds eight — seven in `canonical/`/`forecasting/` and one,
+`planning/pipeline.py:147`, in the newly-enumerated pipeline surface — for 24. That
+`planning/` entry is **new, not pre-existing**: it is one of the 33 guards phase 1 never
+counted, so it could not have been excluded before this phase existed.
+
+Four are `unreachable-behind-earlier-guard`, three are `equivalent-mutant`, and one
+(`pipeline.py:147`) is `unreachable-behind-earlier-guard` in the pipeline. Every one
 carries an evidence test that measures the *jacket* — the thing that makes the guard
 unreachable or redundant — so the exclusion fails the day the jacket goes away:
 
-* `normalization.py:197` (`threshold <= 0`) — `NormalizationPolicy` refuses a
-  non-positive threshold at construction.
 * `normalization.py:200` (exhaustive `else`) — every declared `NormalizationMethod` has
   a dispatch arm; the evidence test asserts that, so it fails when one is added without.
 * `evidence.py:240` (non-finite sweep) and `evidence.py:246` (domain sweep) — `domain_for`
@@ -842,3 +859,46 @@ The 47 deferred modules remain deferred. Whether `signals/` should be adopted ne
 feeds canonical state, so the boundary drawn here is arguably one layer short — is a
 judgment call about boundary placement, not a fact the repository settles, and is left
 to a later ruling.
+
+### §13.f What an adversarial audit of this phase found, and why it is recorded
+
+The phase-2 PR was submitted claiming 502 killed / 25 excluded / 0 message-only kills.
+An independent read-only adversarial audit falsified two of those claims. Both are
+recorded here rather than quietly corrected, because each is a *different* way for a
+coverage phase to be wrong while every number it publishes looks right.
+
+**1. A message-only kill, produced by the evidence test written to prevent one.**
+`canonical/measurement.py:121` — the non-finite check — was killed by exactly one test,
+whose assertion was `assert "finite" in str(exc.value)`. §6 forbids attributing a kill
+to a message substring, and the engine's own detector flags it; the PR nonetheless
+claimed zero. The cause is the jacket pattern of §13.c, one level over: the probe used
+`Unit.PERCENT`, and `0.0 <= nan <= 100.0` is False, so the *range* check refuses NaN
+whether or not the finiteness gate exists. The typed half was therefore unkillable and
+only the message differed. `Unit.MILLISECONDS` is unbounded above and its only other
+check is `value < 0.0`, False for both NaN and infinity — so under that unit the gate is
+the sole refusal, and a typed assertion kills it. **The lesson is not "avoid message
+assertions"; it is that a message assertion is what a jacketed probe degrades into, and
+the message-only detector is therefore a jacket detector.**
+
+**2. An exclusion whose unreachability claim was false.** `canonical/normalization.py:197`
+(`threshold <= 0`) was excluded as `unreachable-behind-earlier-guard` on the reading that
+`NormalizationPolicy` refuses a non-positive threshold at construction. It does. But
+`__post_init__` freezes its mappings with `object.__setattr__(self, "thresholds",
+dict(self.thresholds))`, and a `dict` is not immutable — the comment above that line says
+"immutable copies" and is wrong. The dataclass is frozen against attribute rebinding, not
+against mutation of the mapping it hands out. Mutating `policy.thresholds` after
+construction reaches the division, and neutralising the guard then CLAMPS `5.0 / -1.0`
+to `0.0` under a default policy: a normalized signal reading as zero saturation, produced
+by dividing by a negative divisor. The guard is load-bearing, not defensive; it is now
+SCORED with a probe, and the totals moved to **503 killed / 24 excluded**.
+
+**The general rule: "an earlier guard validates this" is a claim about a value's whole
+lifetime, not about one instant.** Construction-time validation bounds an object when it
+is built. If any mutable structure survives construction, a later-frame guard reading
+that structure is reachable, and excluding it as unreachable is a coverage claim the code
+does not support. Every `unreachable-behind-earlier-guard` exclusion in this repository
+should be read against that test.
+
+Neither defect was found by the sweep, by CI, or by the author. Both were found by
+attacking the exclusions specifically — which is why an adversarial pass on the exclusion
+set, not merely a green aggregate, is what finishes a phase.

@@ -447,7 +447,7 @@ PACKAGES = {
             "was false when it was written. CI could not have caught this: the workflow "
             "pinned the total to 219 exactly, which is what a denominator error looks "
             "like from inside. The omission was found by testing the candidate rather "
-            "than reasoning about it, and ADR SS13 records it. Of this phase\'s 527 "
+            "than reasoning about it, and ADR §13 records it. Of this phase\'s 527 "
             "guards, 252 are the corrected `planning/` surface and 275 come from the "
             "`canonical/` and `forecasting/` widening."
         ),
@@ -560,16 +560,6 @@ PACKAGES = {
             # 527-guard sweep AFTER its isolating probe was written. Four further phase-2
             # survivors turned out to be weak probes jacketed by a sibling gate and were
             # closed by re-routing the probe, not excluded.
-            ("canonical/normalization.py", "threshold <= 0"): (
-                "unreachable-behind-earlier-guard",
-                "`normalize_signal`'s defensive threshold check, which the source "
-                "itself annotates as already enforced by policy validation. Every "
-                "threshold reaching the division comes from `NormalizationPolicy."
-                "thresholds`, and that dataclass refuses a non-positive entry at "
-                "construction, so no reachable policy can present one here.",
-                "tests/canonical/test_guard_coverage_canonical.py::"
-                "test_a_threshold_that_is_not_strictly_positive_is_refused",
-            ),
             (
                 "canonical/normalization.py",
                 "else of: method in (NormalizationMethod.LATENCY_MS_TO_THRESHOLD, "
@@ -655,7 +645,7 @@ PACKAGES = {
                 "scored/actual fields, and a reason is required — so a neutralised "
                 "dispatch sends an ABSTAINED record to a fall-through that accepts and "
                 "rejects exactly what it would. The two differ only in message text, "
-                "and ADR SS6 forbids attributing a kill to a message substring. Kept "
+                "and ADR §6 forbids attributing a kill to a message substring. Kept "
                 "because naming ABSTAINED makes the dispatch read as four outcomes "
                 "rather than three plus a remainder.",
                 "tests/forecasting/test_guard_coverage_evaluation.py::"

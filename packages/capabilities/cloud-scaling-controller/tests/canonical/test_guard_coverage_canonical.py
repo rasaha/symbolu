@@ -147,11 +147,22 @@ def test_asking_for_the_domain_of_something_that_is_not_a_unit_is_refused():
 
 def test_a_non_finite_measurement_is_refused():
     """NaN and infinity survive every arithmetic operation downstream and poison a digest;
-    this is the only place they can be stopped."""
+    this is the only place they can be stopped.
 
-    for bad in (float("nan"), float("inf"), float("-inf")):
+    The unit is MILLISECONDS, and that is the whole point of the test. Under a bounded
+    unit the finiteness gate is jacketed: `0.0 <= nan <= 100.0` is False, so PERCENT
+    refuses NaN by its range check whether or not the finiteness gate exists, and a
+    PERCENT probe leaves the gate unmeasured. MILLISECONDS is unbounded above and its
+    only other check is `value < 0.0`, which is False for both NaN and +infinity — so
+    without this gate both are ADMITTED, and a canonical state ships carrying a latency
+    of NaN. Measured, not reasoned: the PERCENT form of this test left the guard alive.
+
+    `-inf` is deliberately absent: the non-negative check refuses it independently, so it
+    cannot probe this gate either."""
+
+    for bad in (float("nan"), float("inf")):
         with pytest.raises(MeasurementError):
-            Measurement(bad, Unit.PERCENT)
+            Measurement(bad, Unit.MILLISECONDS)
 
 
 def test_a_measurement_whose_unit_is_not_a_unit_is_refused():
@@ -421,13 +432,36 @@ def test_every_normalization_method_has_a_dispatch_arm():
         assert normalize_signal("s", measurement, policy).method == method.value
 
 
-def test_a_threshold_that_is_not_strictly_positive_is_refused():
-    """Evidence for the `unreachable-behind-earlier-guard` exclusion of the defensive
-    `threshold <= 0` check inside `normalize_signal`, which the source itself annotates as
-    already enforced by policy validation. This measures that enforcement: no policy
-    carrying a zero or negative threshold can be constructed, so no such threshold can
-    reach the division."""
+def test_a_threshold_that_is_not_strictly_positive_is_refused_at_construction():
+    """The policy's own threshold gate. Constructing a policy with a non-positive
+    threshold is refused outright."""
 
     for bad in (0.0, -1.0):
         with pytest.raises(NormalizationError):
             _policy(thresholds={"queue_depth": bad})
+
+
+def test_a_threshold_made_non_positive_after_construction_is_still_refused():
+    """`normalize_signal`'s own threshold check — which the source annotates as
+    "defensive; policy validation already enforces > 0" and which an earlier revision of
+    this work excluded as unreachable on exactly that reading. **The reading was wrong,
+    and an adversarial audit falsified it.**
+
+    `NormalizationPolicy.__post_init__` freezes its mappings with
+    `object.__setattr__(self, "thresholds", dict(self.thresholds))`. A `dict` is not
+    immutable; the comment above that line says "immutable copies" and is mistaken. The
+    dataclass is frozen against attribute rebinding, not against mutation of the mapping
+    it hands out — so a caller who keeps a reference, or who mutates
+    `policy.thresholds` directly, reaches the division with a negative divisor.
+
+    Construction-time validation therefore bounds the policy at one instant, not for its
+    lifetime, and this guard is load-bearing rather than defensive. Neutralised, the
+    refusal disappears and `5.0 / -1.0 = -5.0` is CLAMPED to `0.0` under a default
+    policy: a normalized signal reading as zero saturation, produced by dividing by a
+    negative threshold. Silent, plausible, and wrong — which is the failure mode the
+    whole sweep exists to find."""
+
+    policy = _policy(thresholds={"queue_depth": 10.0})
+    policy.thresholds["queue_depth"] = -1.0   # the dataclass does not prevent this
+    with pytest.raises(NormalizationError):
+        normalize_signal("queue_depth", Measurement(5.0, Unit.COUNT), policy)
