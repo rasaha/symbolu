@@ -902,3 +902,11 @@ should be read against that test.
 Neither defect was found by the sweep, by CI, or by the author. Both were found by
 attacking the exclusions specifically — which is why an adversarial pass on the exclusion
 set, not merely a green aggregate, is what finishes a phase.
+
+**A footnote on the pins, earned in this phase.** Fixing the two defects above added one
+test, moving the suite from 812 to 813, and the first CI run after the fix failed on
+exactly that: `baseline collected 813, expected 812 per shard`. Every other assertion in
+the same block passed — inventory 527, killed 503, excluded 24, unscored 0, **message-only
+0**. That is the pin doing precisely the job §13.a says it is good at: catching drift in a
+surface whose boundary is right. It remains no help at all against a boundary that is
+wrong, which is why both statements belong in the record together.

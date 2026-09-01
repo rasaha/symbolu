@@ -259,9 +259,9 @@ jobs:
               f"baselines={report['baselines']}"
           )
           problems = []
-          if report["baselines"] != {"1": 812, "2": 812, "3": 812, "4": 812}:
+          if report["baselines"] != {"1": 813, "2": 813, "3": 813, "4": 813}:
               problems.append(
-                  f"baseline collected {report['baselines']}, expected 812 per shard"
+                  f"baseline collected {report['baselines']}, expected 813 per shard"
               )
           if report["inventory_total"] != 527:
               problems.append(f"inventory is {report['inventory_total']}, not 527")
