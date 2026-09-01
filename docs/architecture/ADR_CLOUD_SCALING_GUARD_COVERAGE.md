@@ -963,6 +963,13 @@ is. Applied to the neighbours, it turns `risk-integration` red: **10 message-onl
 (`authenticity.py` ×6, `adapter.py` ×2, `outcomes.py`, `projection.py`), because the
 aggregate refuses any (`guard_sweep.py`, the `message_only_kills` problem).
 
+`[G]` **That figure is a lower bound on the follow-up's scope, not the whole of it.**
+`risk-integration` is the only neighbour actually measured under the strengthened
+detector; the `authorization-contracts` run was terminated by its host before writing a
+result, and the remaining four adopters were never started. `authorization-contracts`
+carries 14 `pytest.raises(Exception)` sites and is the most likely of the four to carry
+further instances. The follow-up must measure every adopter before it claims a scope.
+
 Landing it here would break a passing gate on a package this phase does not otherwise
 touch, and would forfeit the adopter-isolation property the phase is audited against.
 **Owner ruling, 2026-09-01: split.** The controller's own defects are closed at the test
