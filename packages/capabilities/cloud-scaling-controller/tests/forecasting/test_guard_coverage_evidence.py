@@ -355,3 +355,43 @@ def test_an_out_of_domain_observation_cannot_be_built_at_all():
     with pytest.raises(Exception) as fractional:
         Measurement(3.5, Unit.COUNT)              # integer semantics
     assert "integer" in str(fractional.value)
+
+
+def test_every_applicability_reason_has_a_mapped_abstention():
+    """Evidence for the `equivalent-mutant` exclusion of the normalization except-arm.
+
+    The sweep's except-arm mutation rewrites the reason member the arm names — and the
+    only member named there is the `.get()` DEFAULT. That default is dead code: the map
+    is total over every reason `NormalizationApplicabilityError` is ever constructed
+    with, so the lookup always hits and the default never fires. Rewriting it therefore
+    changes nothing observable, however the arm is exercised.
+
+    Reaching the arm is not the problem — a later-sample normalization failure reaches it
+    and the test above proves so. Reaching the *default* is impossible, which is a
+    different thing, and this test is what would fail the day a fourth reason is
+    introduced without a mapped abstention."""
+
+    import ast
+    import inspect
+
+    from ugence_cloud_scaling_controller.forecasting import window as window_module
+    from ugence_cloud_scaling_controller.forecasting.evidence import _APPLICABILITY_REASON
+
+    tree = ast.parse(inspect.getsource(window_module))
+    raised = set()
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Raise) or not isinstance(node.exc, ast.Call):
+            continue
+        func = node.exc.func
+        name = getattr(func, "id", None) or getattr(func, "attr", None)
+        if name != "NormalizationApplicabilityError":
+            continue
+        for kw in node.exc.keywords:
+            if kw.arg == "reason" and isinstance(kw.value, ast.Constant):
+                raised.add(kw.value.value)
+
+    assert raised, "no NormalizationApplicabilityError reasons found to check against"
+    assert raised <= set(_APPLICABILITY_REASON), (
+        f"unmapped applicability reason(s): {sorted(raised - set(_APPLICABILITY_REASON))} "
+        "— the except-arm default is no longer dead code"
+    )
