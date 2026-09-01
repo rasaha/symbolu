@@ -924,3 +924,56 @@ the same block passed — inventory 527, killed 503, excluded 24, unscored 0, **
 0**. That is the pin doing precisely the job §13.a says it is good at: catching drift in a
 surface whose boundary is right. It remains no help at all against a boundary that is
 wrong, which is why both statements belong in the record together.
+
+### §13.g The `match=` blind spot — measured, partly closed, and deliberately not closed in the engine
+
+A second adversarial audit, of the head that fixed §13.f's two defects, found that the
+phase **still** had message-only kills and that CI could not have reported them.
+
+**The blind spot.** `_TYPE_READS` matches `pytest.raises(` unconditionally, on the
+reasoning recorded beside it: a statement that also raises-checks has asserted the
+exception class, so its failure is not attributable to prose. **That reasoning holds only
+while the class differs between the guarded and unguarded paths.** Where one module
+raises one error type with several prose messages, the class check passes under mutation
+and the `match=` regex alone fails — a message-only kill wearing a typed statement.
+
+**Two live instances in this phase, both closed here.** Both are in `forecasting/
+series.py`, both SCORED, both put into the scored set by this phase's widening, and both
+load-bearing rather than diagnostic:
+
+* `:166` collapses `CROSS_SUBJECT` into `CROSS_TENANT`. `_SERIES_ERROR_ABSTENTION` maps
+  those to **different** typed abstentions, so the collapse loses a distinction a service
+  boundary acts on.
+* `:218` silently admits two observations that share a timestamp and disagree on content
+  under `COLLAPSE_IDENTICAL`; its mutant then reports "multiple *identical* observations",
+  which is false of the input it just accepted.
+
+Six `match=` probes in `test_series.py` now assert `SeriesErrorReason` — a vocabulary this
+package's own engine entry declares in `reason_vocabularies` and which **no test in the
+suite read**. Two were sole killers; four were latent by the same mechanism.
+`test_uncertainty.py`'s `pytest.raises(Exception)` sole killer is likewise typed now:
+bare `Exception` asserts no contract, and it was the whole published evidence for the
+coverage gate.
+
+**The engine fix is measured, correct, and deliberately NOT in this phase.** Reading the
+*failure* rather than the statement source distinguishes the two cases exactly — pytest
+signals a regex-only failure with its own `AssertionError`, raised after the class already
+matched, so a `match=` test whose mutant raised nothing still scores as the typed kill it
+is. Applied to the neighbours, it turns `risk-integration` red: **10 message-only kills**
+(`authenticity.py` ×6, `adapter.py` ×2, `outcomes.py`, `projection.py`), because the
+aggregate refuses any (`guard_sweep.py`, the `message_only_kills` problem).
+
+Landing it here would break a passing gate on a package this phase does not otherwise
+touch, and would forfeit the adopter-isolation property the phase is audited against.
+**Owner ruling, 2026-09-01: split.** The controller's own defects are closed at the test
+level and hold under either detector, so this phase loses nothing by deferring; the engine
+change plus every adopter's fixes are a follow-up whose scope is now measured rather than
+guessed.
+
+`[G]` **Until that follow-up lands, `message_only_kills == 0` means "no kill matched the
+detector", not "no kill is attributable to prose."** Nineteen `match=` sites remain in
+this package's evaluation, window and replay tests. None is a sole killer — an exhaustive
+mutation of all 480 `if`-kind scored guards found only the two above — and none can be
+converted today: `EvaluationError`, `WindowError` and `ReplayError` are bare `ValueError`
+subclasses with no typed discriminator to assert. Giving them one is a production change
+a coverage phase must not make, and is part of the same follow-up.
