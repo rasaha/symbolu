@@ -713,6 +713,24 @@ PACKAGES = {
                 "tests/planning/test_guard_coverage.py::"
                 "test_an_all_tied_selection_is_refused_as_a_recommendation_error",
             ),
+            (
+                "planning/pipeline.py",
+                "fc.point_estimate is None or not math.isfinite(float(fc.point_estimate))",
+            ): (
+                "unreachable-behind-earlier-guard",
+                "Both halves are barred by contracts that fire first. `point_estimate is "
+                "None` cannot hold: `CapacityForecast.__post_init__` refuses a "
+                "FORECAST-status forecast without an estimate, and an ABSTAINED one is "
+                "caught by the `fc.is_abstained` gate four lines above. `not isfinite(...)` "
+                "cannot be reached either: the pipeline computes "
+                "`forecast_evidence.digest()` *before* this gate, and the canonical "
+                "serializer refuses to canonicalize a non-finite float, so a NaN forecast "
+                "dies there with CanonicalizationError — a different contract. The gate is "
+                "real defense in depth and is kept; the evidence test drives the NaN case "
+                "and records where it actually stops.",
+                "tests/planning/test_guard_coverage.py::"
+                "test_a_non_finite_forecast_estimate_never_reaches_the_planner",
+            ),
             ("planning/topology.py", "seen[key] != edge.kind"): (
                 "diagnostic-only",
                 "The guard chooses between two messages on a path that refuses either "
