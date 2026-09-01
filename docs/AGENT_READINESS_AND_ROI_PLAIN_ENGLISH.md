@@ -163,42 +163,101 @@ baseline.
 
 ## Worked example — a customer-support agent
 
-One agent, followed across both stages. Every governed-value figure below was
-produced by running `score_case` from
-`packages/governed-value/src/governed_value/services/scorer.py`; none is
-hand-computed.
+One agent, followed across both stages. **Every result below was produced by
+executing the packages, not by hand** — Stage 1 by calling `assess_readiness`
+with a real Policy Authority resolver, Stage 2 by calling `score_case` from
+`packages/governed-value/src/governed_value/services/scorer.py`. Verdicts, rule
+ids, reason codes, advisories and rupee figures are all transcribed from real
+output. Stage 1 carries one caveat about its verifiers, stated at the end of
+that stage.
 
 ### Stage 1 — before deployment: readiness
 
 An Indian enterprise wants to deploy a support agent that resolves refund and
-order-status tickets. Assessed against a production target, the evidence says:
+order-status tickets. Its readiness policy defines four gates:
 
-- **Intelligence** — accuracy and consistency clear the policy's mandatory gates.
-- **Capability** — tooling and integration pass, but *human-escalation readiness*
-  is an unresolved concern, judged compensable.
-- **Adoption** — coverage and utilization pass, but *regional-language coverage*
-  is an unresolved concern, also compensable.
+| Gate | Class | Compensable? |
+|---|---|---|
+| `accuracy` | `MANDATORY` | — |
+| `security` | `MANDATORY` | — |
+| `human-escalation` | `CONDITIONAL` | yes |
+| `regional-language` | `CONDITIONAL` | yes |
 
-Both concerns are `CONDITIONAL` (not `MANDATORY`), and each is covered by an
-approved, still-in-force condition — a staffed escalation desk, and a
-Hindi/Tamil rollout limited to English until coverage lands. So:
+Both mandatory gates `PASS`. Both conditional gates `FAIL`, and each is covered
+by an approved, still-in-force condition — a staffed escalation desk, and a
+rollout held to English until Hindi/Tamil coverage lands. Assessed against a
+`PRODUCTION` target, `assess_readiness` returns:
 
 ```
-classification : READY_WITH_CONDITIONS
-rule           : GV3RB_R7_READY_WITH_CONDITIONS
-reasons        : GV3RB_ALL_APPLICABLE_MANDATORY_GATES_PASSED
-                 GV3RB_CONDITIONAL_CONCERNS_COVERED_BY_ACTIVE_CONDITIONS
-advisory       : GV3RB_ADV_ADVISORY_ONLY_NOT_DEPLOYMENT_AUTHORIZATION
-                 GV3RB_ADV_READINESS_IS_LEADING_INDICATOR_ONLY
+status                 EVALUATED
+classification         READY_WITH_CONDITIONS
+rule_id                GV3RB_R7_READY_WITH_CONDITIONS
+reason_codes           GV3RB_ALL_APPLICABLE_MANDATORY_GATES_PASSED
+                       GV3RB_CONDITIONAL_CONCERNS_COVERED_BY_ACTIVE_CONDITIONS
+advisory_codes         GV3RB_ADV_ADVISORY_ONLY_NOT_DEPLOYMENT_AUTHORIZATION
+                       GV3RB_ADV_POLICY_AUTHENTICITY_NOT_VERIFIED
+                       GV3RB_ADV_GATE_STATUS_STRUCTURALLY_SUPPLIED
+                       GV3RB_ADV_EVIDENCE_CLASSIFICATION_PRESERVED
+                       GV3RB_ADV_READINESS_IS_LEADING_INDICATOR_ONLY
+                       GV3RB_ADV_CONDITION_APPROVAL_AUTHENTICITY_NOT_VERIFIED
+                       GV3RB_ADV_CONDITION_SCOPE_NOT_TENANT_BOUND
+authorizes_deployment  False
+accepted_condition_ids ('cond-english-only-rollout', 'cond-escalation-desk')
+unresolved_conditional ('human-escalation', 'regional-language')
+uncovered_conditional  ()
+trust_gap_codes        ()
+orchestrator_version   ugence.readiness-orchestration/v0.2
+formula_version        GV-3R-b.3
 ```
 
-Had either concern lacked active coverage, the verdict would be `NOT_READY`
-(rule `R5`), not a lower score. Had the same evidence been assessed against a
-`PILOT` target, it would be `PILOT_READY` — there is no
-"pilot-ready-with-conditions" tier.
+Note how many advisories a *good* result carries. Five are emitted
+unconditionally and two more whenever any condition is present: the evaluator
+states what it did **not** prove every single time, including on its best
+verdicts. `GV3RB_ADV_POLICY_AUTHENTICITY_NOT_VERIFIED` appears even though this
+run resolved its policy through a genuinely signed and registered authority —
+the evaluator speaks only for itself and never claims the orchestrator's
+verification as its own.
+
+Change one input and the verdict moves, each time by a different rule:
+
+| Change | Verdict | Rule |
+|---|---|---|
+| (as above) | `READY_WITH_CONDITIONS` | `R7` |
+| Conditions omitted | `NOT_READY` | `R5` — concerns uncovered |
+| `condition_verifier=None` | `NOT_READY` | `R5`, plus trust gaps |
+| Mandatory `accuracy` fails | `NOT_READY` | `R1` — mandatory failure |
+| All four gates pass | `DEPLOYMENT_READY` | `R8` |
+| Same evidence, `PILOT` target | `PILOT_READY` | `R6` |
+
+Two of those rows are the ones worth dwelling on.
+
+**Unconfigured means deny, not allow.** Passing `condition_verifier=None` does
+not leave the conditions merely unchecked — they are refused admission entirely,
+the concerns become uncovered, and the verdict drops to `NOT_READY` carrying
+`READINESS_ORCHESTRATION_CONDITION_VERIFIER_NOT_CONFIGURED`. An unverified
+condition compensates for nothing.
+
+**`PILOT_READY` carries the conditions with it.** Against a pilot target the
+same two covered concerns yield `PILOT_READY` plus
+`GV3RB_PILOT_SCOPE_IS_BOUNDED` — not a "pilot ready with conditions" tier,
+because none exists. The bounded pilot scope *is* the condition.
 
 **No rupee figure appears anywhere in this result.** Readiness does not predict
 savings, revenue or ROI.
+
+> **How this was produced, and its one limit.** The run above uses the real
+> `assess_readiness` entry point and a real
+> `PolicyAuthorityReadinessPolicyResolver` over a policy genuinely issued,
+> signed and registered through the shared Policy Authority — digest binding,
+> key trust and signature verification all execute
+> (`policy_resolution_status=RESOLVED`, `accepted=True`). The gate and condition
+> verifiers are `StubGateVerifier` and `StubConditionVerifier` from
+> `tests/orchestration/_orchestration_fixtures.py`, because **the package ships
+> no real ones** — evidence and TAP verification are deferred, and the absence
+> of any allow-all verifier is itself the trust boundary. So this example proves
+> the classification logic and the orchestration boundary, not that any gate
+> status was independently established. That is precisely what
+> `GV3RB_ADV_GATE_STATUS_STRUCTURALLY_SUPPLIED` is telling you.
 
 ### Stage 2 — three months later: governed value
 
