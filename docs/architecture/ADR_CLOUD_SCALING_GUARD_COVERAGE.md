@@ -802,7 +802,9 @@ exclusions has not finished.
 
 ### §13.c Four survivors were weak probes, not equivalent mutants
 
-The full sweep left 12. Eight are excluded below. The other four were tests that passed
+The full sweep left 12 of the widened surface surviving. Seven are excluded in §13.d;
+an eighth, `normalization.py:197`, was excluded and then withdrawn under audit (§13.f)
+and is now SCORED. The other four were tests that passed
 whether or not their guard existed, because each probe was routed into a *sibling* gate
 refusing the same input under the same typed contract. They are recorded because the
 mistake is systematic, not incidental — the same author wrote a correct probe for the
@@ -894,10 +896,22 @@ SCORED with a probe, and the totals moved to **503 killed / 24 excluded**.
 
 **The general rule: "an earlier guard validates this" is a claim about a value's whole
 lifetime, not about one instant.** Construction-time validation bounds an object when it
-is built. If any mutable structure survives construction, a later-frame guard reading
-that structure is reachable, and excluding it as unreachable is a coverage claim the code
-does not support. Every `unreachable-behind-earlier-guard` exclusion in this repository
-should be read against that test.
+is built; if a mutable structure survives construction, the bound does not survive with
+it. Every `unreachable-behind-earlier-guard` exclusion should be read against that test.
+
+**The rule is a prompt to measure, not a conclusion — and a re-audit falsified the
+stronger form using this ADR's own exclusion set.** A first draft of this paragraph said
+that a surviving mutable structure *makes* a later-frame guard reachable, full stop.
+`NormalizationPolicy.method_by_signal` is frozen by the same defective `dict(...)` line
+as `thresholds`, one line above it, and `normalization.py:200` reads it — yet `:200` is
+still correctly excluded, because every post-construction mutation of that mapping dies
+on an untyped `KeyError` at `_METHOD_UNITS[method]` before the dispatch is reached. Same
+defect, same shape of argument, opposite answer.
+
+So a surviving mutable structure makes an exclusion **suspect**, and suspicion is
+discharged by a probe and a sweep, never by the argument alone. That is §13.c's lesson
+restated one level up: the difference between the two exclusions is a fact about the
+code, and only measurement settles it.
 
 Neither defect was found by the sweep, by CI, or by the author. Both were found by
 attacking the exclusions specifically — which is why an adversarial pass on the exclusion

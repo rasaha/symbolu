@@ -3046,6 +3046,24 @@ def pytest_runtest_makereport(item, call):
     if call.when != "call" or call.excinfo is None:
         return
     _ANY_FAILURE.append(item.nodeid)
+
+    # The `match=` blind spot, found by an adversarial audit of the controller phase 2
+    # adoption (guard-coverage ADR §13.g). `pytest.raises(X, match="...")` matched
+    # `_TYPE_READS` unconditionally, on the reasoning that a statement which also
+    # raises-checks has asserted the class. That reasoning holds only while the class
+    # DIFFERS between the guarded and unguarded paths. When the same class is raised
+    # either way — a module with one error type and several prose messages — the class
+    # check passes under mutation and the regex alone fails, which is a message-only
+    # kill wearing a typed statement.
+    #
+    # The statement source cannot distinguish the two; the failure can. pytest signals a
+    # regex-only failure with its own AssertionError, raised *after* the class matched.
+    # Reading the failure rather than the source is exact: a `match=` test whose mutant
+    # raised nothing, or raised a different class, still scores as the typed kill it is.
+    if "Regex pattern did not match" in str(call.excinfo.value):
+        _MESSAGE_ONLY.append(item.nodeid)
+        return
+
     statement = _failing_statement(call)
     if _MESSAGE_READS.search(statement) and not _TYPE_READS.search(statement):
         _MESSAGE_ONLY.append(item.nodeid)

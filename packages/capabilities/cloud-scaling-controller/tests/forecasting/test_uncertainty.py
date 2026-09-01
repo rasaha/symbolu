@@ -16,6 +16,7 @@ from ugence_cloud_scaling_controller.forecasting import (
     compute_uncertainty,
 )
 from ugence_cloud_scaling_controller.forecasting.uncertainty import (
+    UncertaintyError,
     REASON_INSUFFICIENT_CALIBRATION,
     REASON_NOT_REQUESTED,
     rolling_origin_residuals,
@@ -69,10 +70,14 @@ def test_method_none_is_point_only_not_abstention():
 
 
 def test_coverage_must_be_in_open_unit_interval():
-    with pytest.raises(Exception):
-        UncertaintyConfig(requested_coverage=0.0)
-    with pytest.raises(Exception):
-        UncertaintyConfig(requested_coverage=1.0)
+    """`UncertaintyError`, not bare `Exception`. `pytest.raises(Exception)` asserts no
+    contract at all — it passes for a `TypeError` from a refactor as readily as for the
+    module's own refusal — and this statement is the sole killer of the coverage gate, so
+    what it asserts is the whole of that guard's published evidence."""
+
+    for bad in (0.0, 1.0):
+        with pytest.raises(UncertaintyError):
+            UncertaintyConfig(requested_coverage=bad)
 
 
 def test_config_digest_reflects_coverage():
