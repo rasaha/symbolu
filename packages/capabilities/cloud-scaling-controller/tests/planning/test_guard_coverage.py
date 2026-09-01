@@ -4,7 +4,9 @@ Written for the `planning/` phase of the shared-engine adoption (guard-coverage 
 controller phase 1). The pre-existing Phase-3 suite proves the pipeline *behaves*: it
 recommends when it should, abstains when evidence is missing, and refuses malformed
 input. What it did not prove is which gate decided. The first sweep measured 156 of 219
-guards surviving — `topology.py:89`'s `isinstance` check on an edge's upstream could be
+guards surviving (the boundary was later corrected to 252 — phase 1 had not declared the
+pipeline's abstention helpers, so 33 of its decision points were never enumerated; see
+guard-coverage ADR §13.a) — `topology.py:89`'s `isinstance` check on an edge's upstream could be
 deleted outright and all 486 tests stayed green, because nothing ever built an edge with
 a wrong-typed upstream.
 
@@ -1592,7 +1594,11 @@ def test_a_forged_feature_value_is_refused(record):
 
 
 def test_the_candidate_set_gates_behind_the_canonical_binding_are_evidenced(record):
-    """Evidence for four exclusions in the candidate-set machinery, each measured:
+    """Evidence for five exclusions in the candidate-set machinery, each measured.
+
+    Four probes cover five gates: the duplicate pair below are *mutually* jacketing, so
+    one probe measures both — neither one's mutation is observable while the other
+    stands, which is the whole reason both are excluded rather than one.
 
     - empty evaluated_candidates (`diagnostic-only`): the canonical set-equality gate
       refuses an empty set with the same class, and the canonical set is never empty;

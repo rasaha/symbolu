@@ -638,6 +638,18 @@ repository at all.
 
 ## §12. Controller phase 1 — `planning/` adopted, honestly partial, 2026-08-31
 
+> **WITHDRAWN IN PART, 2026-09-01 (see §13.a).** Two numeric claims in this section
+> were false when written and are withdrawn here so that a reader of §12 alone is not
+> misled. **The denominator "219" is withdrawn; the measured figure is 252.** **The
+> result "0 survived" is withdrawn; four guards survived at the boundary as it should
+> have been declared.** The cause was an undeclared refusal helper, not a mis-sweep:
+> `planning/pipeline.py` reaches its abstentions through `_abstain` and five bindings
+> built on it, none of which phase 1 declared in `refusal_calls`, so 33 decision points
+> were never enumerated. Everything else in this section — the boundary rationale, the
+> exclusion doctrine, the prerequisite findings — stands as written. The withdrawn
+> figures are left in place below rather than silently rewritten, because a record that
+> quietly corrects itself teaches nothing about how the error was possible.
+
 Ruling 3 of 2026-08-31 ordered the Cloud Scaling Controller adopted **in phases**,
 starting with `planning/` and "report it honestly as partial controller coverage",
 each phase CI-blocking before the next. This section records phase 1.
@@ -652,7 +664,8 @@ every deferred subpackage with its size and states that a green sweep here is no
 evidence about any of them. A module added outside `planning/` fails the inventory's
 completeness gate rather than escaping it.
 
-**The denominator was re-derived by measurement: 219** — 213 `if`-layer guards, 4
+**The denominator was re-derived by measurement: 219** *(withdrawn — the measured
+figure is 252; see §13.a)* — 213 `if`-layer guards, 4
 helper-admission sites, 1 except-arm, 1 else-arm. The first derivation measured 218:
 the entry named the reason vocabulary by its class, but `pipeline.py` imports it as
 `RecommendationAbstentionReason as R` and writes `R.MEMBER` at all 31 of its refusal
@@ -697,7 +710,10 @@ isolating probe.
 
 **Measured at adoption, after closing the survivors: 219 guards, 203 killed, 0
 survived, 0 unscored, 16 excluded, 0 message-only kills**, against a green 646-test
-baseline `[V: aggregate]`. The mint site is `CapacityActionRecommendation.__post_init__`
+baseline `[V: aggregate]`. *(Withdrawn — the "219" and the "0 survived" are both false;
+the boundary was 252 and four guards survived it. The aggregate was a true measurement
+of a surface that had been enumerated incompletely, which is precisely why "measured"
+is not the same as "complete". See §13.a.)* The mint site is `CapacityActionRecommendation.__post_init__`
 — a recommendation that exists is the artifact, and abstention is deliberately not a
 mint. Two §7.1/§9.d-class prerequisites surfaced and were fixed with the repository's
 own conventions: the suite did not collect outside the repository at all (three test
