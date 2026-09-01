@@ -25,9 +25,9 @@ This package records no prior inventory; this is the first one.
 
 ## Classification
 
-Every guard is classified: **511 `SCORED`** — the
+Every guard is classified: **510 `SCORED`** — the
 sweep neutralises it and the suite must fail — and
-**16 `EXCLUDED`**, each with a reason from a closed vocabulary and
+**17 `EXCLUDED`**, each with a reason from a closed vocabulary and
 a test that measures the reason. A guard is never excluded because it survived; a
 survivor with no prior declaration fails the sweep.
 
@@ -48,6 +48,7 @@ survivor with no prior declaration fails the sweep.
 | `planning/recommendation.py:360` | `unreachable-behind-earlier-guard` | Canonical generation always emits the NO_CHANGE baseline, so an evaluated set without it fails the canonical set-equality gate before this baseline gate is reached. | `tests/planning/test_guard_coverage.py::test_the_candidate_set_gates_behind_the_canonical_binding_are_evidenced` |
 | `planning/recommendation.py:364` | `diagnostic-only` | The winner-identity gate two lines below draws the winner from feasible triples only, so a selected id pointing at an infeasible candidate can never equal the winner and is refused there with the same class. | `tests/planning/test_guard_coverage.py::test_the_candidate_set_gates_behind_the_canonical_binding_are_evidenced` |
 | `planning/recommendation.py:372` | `diagnostic-only` | `select_best` answers (None, True) on a tie, and the winner-identity gate on the next line refuses None != selected_plan_id with the same class, for every ambiguous input. | `tests/planning/test_guard_coverage.py::test_an_all_tied_selection_is_refused_as_a_recommendation_error` |
+| `planning/pipeline.py:147` | `unreachable-behind-earlier-guard` | Both halves are barred by contracts that fire first. `point_estimate is None` cannot hold: `CapacityForecast.__post_init__` refuses a FORECAST-status forecast without an estimate, and an ABSTAINED one is caught by the `fc.is_abstained` gate four lines above. `not isfinite(...)` cannot be reached either: the pipeline computes `forecast_evidence.digest()` *before* this gate, and the canonical serializer refuses to canonicalize a non-finite float, so a NaN forecast dies there with CanonicalizationError — a different contract. The gate is real defense in depth and is kept; the evidence test drives the NaN case and records where it actually stops. | `tests/planning/test_guard_coverage.py::test_a_non_finite_forecast_estimate_never_reaches_the_planner` |
 | `planning/pipeline.py:268` | `unreachable-behind-earlier-guard` | The pipeline's ScoringError arm around `build_context`. Every condition that makes the context build raise is abstained by the pipeline's own pre-gates before the build is reached: an abstained forecast as FORECAST_ABSTAINED, a non-planning target as UNSUPPORTED_FORECAST_TARGET, a missing point estimate as NON_FINITE_INPUT, missing capacity as MISSING_CURRENT_CAPACITY, an evidence-free dependency edge as MISSING_DEPENDENCY_CAPACITY and a missing price as MISSING_COST_EVIDENCE. The arm is the fail-closed jacket for a context build the pre-gates keep unreachable, so its reason-collapse mutation has no observer; the evidence test drives the same inputs down both paths and records the pairing. | `tests/planning/test_guard_coverage.py::test_every_scoring_failure_is_pre_gated_into_a_typed_abstention` |
 
 ## Not counted, and why
@@ -556,7 +557,7 @@ survivor with no prior declaration fails the sweep.
 | 492 | `planning/pipeline.py:141` | if | typed-refusal call | SCORED | — | `fc.subject != subject` |
 | 493 | `planning/pipeline.py:143` | if | typed-refusal call | SCORED | — | `fc.is_abstained` |
 | 494 | `planning/pipeline.py:145` | if | typed-refusal call | SCORED | — | `fc.target is not PLANNING_TARGET` |
-| 495 | `planning/pipeline.py:147` | if | typed-refusal call | SCORED | — | `fc.point_estimate is None or not math.isfinite(float(fc.point_estimate))` |
+| 495 | `planning/pipeline.py:147` | if | typed-refusal call | EXCLUDED | — | `fc.point_estimate is None or not math.isfinite(float(fc.point_estimate))` |
 | 496 | `planning/pipeline.py:152` | if | typed-refusal call | SCORED | — | `cutoff > rec_t` |
 | 497 | `planning/pipeline.py:154` | if | typed-refusal call | SCORED | — | `forecast_for <= rec_t` |
 | 498 | `planning/pipeline.py:158` | if | typed-refusal call | SCORED | — | `current_state.capacity is None or current_state.capacity.running_replicas i…` |

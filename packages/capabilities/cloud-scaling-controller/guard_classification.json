@@ -1,8 +1,8 @@
 {
   "package": "controller-evidence-planning",
   "total": 527,
-  "scored": 511,
-  "excluded": 16,
+  "scored": 510,
+  "excluded": 17,
   "classification": {
     "1": {
       "status": "SCORED",
@@ -3014,7 +3014,10 @@
       "condition": "fc.target is not PLANNING_TARGET"
     },
     "495": {
-      "status": "SCORED",
+      "status": "EXCLUDED",
+      "reason": "unreachable-behind-earlier-guard",
+      "detail": "Both halves are barred by contracts that fire first. `point_estimate is None` cannot hold: `CapacityForecast.__post_init__` refuses a FORECAST-status forecast without an estimate, and an ABSTAINED one is caught by the `fc.is_abstained` gate four lines above. `not isfinite(...)` cannot be reached either: the pipeline computes `forecast_evidence.digest()` *before* this gate, and the canonical serializer refuses to canonicalize a non-finite float, so a NaN forecast dies there with CanonicalizationError \u2014 a different contract. The gate is real defense in depth and is kept; the evidence test drives the NaN case and records where it actually stops.",
+      "evidence": "tests/planning/test_guard_coverage.py::test_a_non_finite_forecast_estimate_never_reaches_the_planner",
       "module": "planning/pipeline.py",
       "line": 147,
       "condition": "fc.point_estimate is None or not math.isfinite(float(fc.point_estimate))"

@@ -1202,6 +1202,10 @@ from ugence_cloud_scaling_controller.planning import (  # noqa: E402
     score_candidate,
 )
 from ugence_cloud_scaling_controller.planning.scoring import select_best  # noqa: E402
+from ugence_cloud_scaling_controller.canonical.serialization import (  # noqa: E402
+    CanonicalizationError,
+)
+from ugence_cloud_scaling_controller.forecasting.forecast import ForecastError  # noqa: E402
 
 
 def _evaluated(**over):
@@ -1750,3 +1754,88 @@ def test_an_abstention_payload_time_that_is_not_a_datetime_is_refused():
         RecommendationAbstention.from_dict(
             {"subject": "x", "reason": "missing_forecast", "recommendation_time": "now"}
         )
+
+
+# ======================================================================================= #
+# pipeline.py — the abstention gates phase 1's boundary never inventoried
+#
+# These four survived the first phase-2 sweep. They were invisible to phase 1 because the
+# pipeline refuses by `return abf(REASON, ...)` through local abstention helpers, and that
+# phase declared no `refusal_calls` — so the engine never read those returns as refusals.
+# The typed half here is the `RecommendationAbstentionReason` member on the returned
+# abstention, never the detail string.
+# ======================================================================================= #
+
+
+def test_a_non_finite_forecast_estimate_never_reaches_the_planner():
+    """Evidence for the `unreachable-behind-earlier-guard` exclusion of pipeline.py:147.
+
+    Both halves of that guard are barred by contracts that fire first:
+
+    * `point_estimate is None` — `CapacityForecast.__post_init__` refuses a
+      FORECAST-status forecast with no estimate, and an ABSTAINED one is caught by the
+      `fc.is_abstained` gate four lines above, so no forecast reaching :147 can carry
+      `None`;
+    * `not isfinite(...)` — the pipeline computes `forecast_evidence.digest()` *before*
+      the gate, and the canonical serializer refuses to canonicalize a non-finite float.
+      A NaN forecast therefore dies at the digest with `CanonicalizationError`, a
+      different contract entirely, and never reaches the abstention.
+
+    The gate is real defense in depth and is kept; it is excluded because no input can
+    make its removal observable, which is a measured claim rather than a judgement —
+    this test drives the NaN case and records where it actually stops.
+    """
+
+    subj = H.subject()
+    fe = H.build_forecast_evidence(8, subj=subj)
+    nan_forecast = dataclasses.replace(fe.forecast, point_estimate=float("nan"))
+    nan_evidence = dataclasses.replace(fe, forecast=nan_forecast)
+    with pytest.raises(CanonicalizationError):
+        nan_evidence.digest()
+    with pytest.raises(CanonicalizationError):
+        _recommend(subj=subj, forecast_evidence=nan_evidence)
+
+    with pytest.raises(ForecastError):
+        dataclasses.replace(fe.forecast, point_estimate=None)
+
+
+def test_a_cost_book_without_the_primary_subject_abstains_as_missing_cost_evidence():
+    """The book is bound to the right subject — so the scope gate above stays quiet — but
+    carries no entry for it. Without this gate the context build would fail instead, and
+    the caller would get a contradictory-evidence abstention naming the wrong cause."""
+
+    subj = H.subject()
+    empty = _CostBook(subject=subj, entries=())
+    out = _recommend(subj=subj, cost_book=empty)
+    assert isinstance(out, RecommendationAbstention)
+    assert out.reason is RecommendationAbstentionReason.MISSING_COST_EVIDENCE
+
+
+def test_a_topology_bound_to_another_subject_abstains_as_subject_scope_mismatch():
+    """A well-formed, edge-free topology anchored to a different tenant: it passes the
+    type gate above and reaches no dependency logic, so only the binding gate can refuse
+    it — and with the gate removed the recommendation is built against a topology that
+    describes someone else's workload."""
+
+    other = H.subject(tenant_id="tenant-2")
+    topo = DependencyTopology(subject=other, as_of=H.at(120.0), edges=())
+    out = _recommend(topology=topo)
+    assert isinstance(out, RecommendationAbstention)
+    assert out.reason is RecommendationAbstentionReason.SUBJECT_SCOPE_MISMATCH
+
+
+def test_an_unpriced_coordinated_dependency_abstains_as_missing_cost_evidence():
+    """A capacity-bound dependency edge makes the context carry a dependency subject; the
+    cost book prices the primary only. The context build succeeds — it needs the primary
+    price alone — so this gate is the only thing standing between an unpriced dependency
+    and a coordinated plan priced as if it were free."""
+
+    subj = H.subject()
+    dep = H.subject(workload_id="db")
+    out = _recommend(
+        subj=subj,
+        topology=H.topology(subj=subj, dependency=dep),
+        cost_book=H.cost_book(subj=subj),
+    )
+    assert isinstance(out, RecommendationAbstention)
+    assert out.reason is RecommendationAbstentionReason.MISSING_COST_EVIDENCE
