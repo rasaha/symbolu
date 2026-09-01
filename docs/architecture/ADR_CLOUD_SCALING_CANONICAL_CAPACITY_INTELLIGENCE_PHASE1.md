@@ -174,3 +174,42 @@ Package suite + canonical suite green (`pytest tests/`), behavior-baseline parit
 unchanged, advisory distribution verifier green (wheel content scans, isolated install),
 RA/authority dependency-boundary tests green. See the PR body and
 `docs/EVIDENCE_AND_LIMITATIONS.md`.
+
+## Ratification: the scope of provider neutrality, 2026-09-01
+
+**Ratified: the provider-neutrality rule constrains the projection and the decision
+kernel. It does not constrain presentation.**
+
+The Decision above states it as *"Provider semantics terminate at observation/
+normalization. Provider labels live only in provenance; the projection has no
+`provider == "..."` branch. The decision kernel stays provider-neutral."* The
+`ObservationProvenance.provider` field docstring stated it absolutely — *"never a
+decision input"* — with no scope attached. The two readings diverge the moment any code
+outside the decision path wants the label: a report that groups by cloud, an operator
+summary, a vendor console link a customer can click to apply a recommendation by hand.
+
+The absolute reading would forbid all of those. That is not what this ADR decided and
+not what provider neutrality protects. What it protects is the property that **the same
+observation produces the same recommendation whatever cloud it came from**. Rendering
+that recommendation differently for an AWS reader than a GCP reader does not touch it.
+
+**The distinction is structural, not a matter of discipline.**
+`ScalingObservation` — the decision kernel's sole input — carries neither a subject nor a
+provenance record. There is no provider value reachable from the kernel to branch on.
+Presentation code reads `provider` from the *evidence* record, which exists only after
+the decision is made and cannot feed back into it. A `provider` branch inside the
+projection or the kernel remains a defect regardless of this ratification, and the
+projection's used/ignored/missing accounting keeps that auditable.
+
+**What changes:** the `provenance.py` module and field docstrings now state the scope.
+No code, no schema, no digest, and no behaviour moves. This is a ratification of what
+the Decision already said, not an amendment to it.
+
+**What is NOT ratified here.** This settles only who may *read* `provider`. It does not
+approve emitting console links, does not approve any specific URL construction, and does
+not decide whether such a link belongs in the controller's evidence or in the operations
+approval flow. In particular, a companion audit found that `CapacitySubject` is
+provider-neutral by design and therefore carries no account, project, subscription, or
+resource-group field — so three of the four major consoles cannot be addressed from a
+subject at all today. Filling that gap changes a digest-bearing identity schema and
+requires its own ruling.

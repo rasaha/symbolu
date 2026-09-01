@@ -5,6 +5,20 @@ is **evidence, not authority**: the controller never interprets ``source_type`` 
 ``provider`` as decision logic. The provider label exists so a later reader can trace an
 observation to its origin, not so the decision kernel can branch on it.
 
+**The scope of that rule, ratified 2026-09-01** (guard-coverage context; recorded in
+ADR_CLOUD_SCALING_CANONICAL_CAPACITY_INTELLIGENCE_PHASE1 §"Ratification: the scope of
+provider neutrality"). The prohibition binds the *projection* and the *decision kernel*:
+neither may branch on ``provider``, and the projection carries no ``provider == "..."``
+test. It does not bind presentation. Code that renders an already-made decision for a
+human — a console link, a report, an operator summary — may read ``provider`` to choose
+how to display it, because such code cannot change what was decided.
+
+That distinction is enforced structurally, not by convention:
+:class:`~..contracts.ScalingObservation`, the decision kernel's sole input, carries
+neither a subject nor a provenance record, so no provider value is reachable from the
+kernel at all. A reader who finds a ``provider`` branch inside the projection or the
+kernel has found a defect regardless of this paragraph.
+
 Two time concepts are kept distinct and must never be conflated:
 
 * ``observed_at`` — when the underlying measurement was taken (caller/source supplied).
@@ -63,8 +77,11 @@ class ObservationProvenance:
     Fields:
         source_type: Provider-neutral source kind (``UNKNOWN`` = provenance missing).
         source_id: Opaque identifier of the concrete source (e.g. a scrape target).
-        provider: Provider label (``aws``/``gcp``/``self-hosted``/…). Informational
-            only; never a decision input.
+        provider: Provider label (``aws``/``gcp``/``self-hosted``/…). Never a
+            *decision* input: the projection and the decision kernel must not branch
+            on it, and structurally cannot — ``ScalingObservation`` carries no
+            provenance. Presentation code rendering an already-made decision may read
+            it (ratified 2026-09-01; see this module's docstring).
         observed_at: When the measurement was taken (required; caller/source supplied).
         collected_at: When this record was produced (optional; distinct from observed).
         metric_window_seconds: Aggregation window of the measurement, if applicable.
