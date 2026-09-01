@@ -3046,7 +3046,6 @@ def pytest_runtest_makereport(item, call):
     if call.when != "call" or call.excinfo is None:
         return
     _ANY_FAILURE.append(item.nodeid)
-
     statement = _failing_statement(call)
     if _MESSAGE_READS.search(statement) and not _TYPE_READS.search(statement):
         _MESSAGE_ONLY.append(item.nodeid)
