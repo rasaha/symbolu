@@ -1,8 +1,8 @@
 {
   "package": "controller-evidence-planning",
   "total": 527,
-  "scored": 510,
-  "excluded": 17,
+  "scored": 502,
+  "excluded": 25,
   "classification": {
     "1": {
       "status": "SCORED",
@@ -287,13 +287,19 @@
       "condition": "name not in policy.thresholds"
     },
     "48": {
-      "status": "SCORED",
+      "status": "EXCLUDED",
+      "reason": "unreachable-behind-earlier-guard",
+      "detail": "`normalize_signal`'s defensive threshold check, which the source itself annotates as already enforced by policy validation. Every threshold reaching the division comes from `NormalizationPolicy.thresholds`, and that dataclass refuses a non-positive entry at construction, so no reachable policy can present one here.",
+      "evidence": "tests/canonical/test_guard_coverage_canonical.py::test_a_threshold_that_is_not_strictly_positive_is_refused",
       "module": "canonical/normalization.py",
       "line": 197,
       "condition": "threshold <= 0"
     },
     "49": {
-      "status": "SCORED",
+      "status": "EXCLUDED",
+      "reason": "unreachable-behind-earlier-guard",
+      "detail": "The exhaustive `else` closing the method dispatch, marked `pragma: no cover` in the source. The policy's own type gate refuses anything that is not a `NormalizationMethod`, and every declared member has an arm, so the only input that could reach the `else` is a member added without one. The evidence test asserts that exhaustiveness, so it fails the day such a member arrives.",
+      "evidence": "tests/canonical/test_guard_coverage_canonical.py::test_every_normalization_method_has_a_dispatch_arm",
       "module": "canonical/normalization.py",
       "line": 200,
       "condition": "else of: method in (NormalizationMethod.LATENCY_MS_TO_THRESHOLD, NormalizationMethod.LATENCY_S_TO_THRESHOLD, NormalizationMethod.QUEUE_TO_CAPACITY)"
@@ -1181,13 +1187,19 @@
       "condition": "len(probe.units_present) > 1"
     },
     "197": {
-      "status": "SCORED",
+      "status": "EXCLUDED",
+      "reason": "unreachable-behind-earlier-guard",
+      "detail": "The non-finite sweep over the probe window, which the source calls defensive. Every measurement-backed sample comes from a `Measurement`, whose `__post_init__` refuses NaN and infinity, and the replica count is validated as an int, so no non-finite value can reach a probe window.",
+      "evidence": "tests/forecasting/test_guard_coverage_evidence.py::test_a_non_finite_observation_cannot_be_built_at_all",
       "module": "forecasting/evidence.py",
       "line": 240,
       "condition": "any((not math.isfinite(v) for v in probe.values))"
     },
     "198": {
-      "status": "SCORED",
+      "status": "EXCLUDED",
+      "reason": "unreachable-behind-earlier-guard",
+      "detail": "The per-sample input-domain sweep. `domain_for` reads the SAME Phase-1 `unit_domain` authority that `Measurement.__post_init__` enforces at construction \u2014 bounds and integer semantics alike \u2014 so a raw sample out of its own domain cannot be built in the first place. Kept because the forecasting layer must not depend on the canonical layer continuing to enforce it; a divergence re-opens this exclusion by construction, since the sweep fails on a stale exclusion.",
+      "evidence": "tests/forecasting/test_guard_coverage_evidence.py::test_an_out_of_domain_observation_cannot_be_built_at_all",
       "module": "forecasting/evidence.py",
       "line": 246,
       "condition": "not domain_for(s.unit).contains(s.value)"
@@ -1247,13 +1259,19 @@
       "condition": "except (NormalizationError, ValueError): _abstain(AbstentionReason.INCONSISTENT_UNIT, probe)"
     },
     "208": {
-      "status": "SCORED",
+      "status": "EXCLUDED",
+      "reason": "equivalent-mutant",
+      "detail": "The early NORMALIZED abstention for a target with no normalization signal. Neutralised, the working-window build is reached instead and raises `NormalizationApplicabilityError(reason='unsupported_target')`, which the except-arm maps straight back to `UNSUPPORTED_TARGET` over the same probe window \u2014 same reason, same bound window, same record. Kept because reaching a typed abstention without constructing and discarding a window is the honest shape.",
+      "evidence": "tests/forecasting/test_guard_coverage_evidence.py::test_an_unnormalizable_target_abstains_the_same_way_through_either_path",
       "module": "forecasting/evidence.py",
       "line": 277,
       "condition": "forecast_space is ForecastValueSpace.NORMALIZED"
     },
     "209": {
-      "status": "SCORED",
+      "status": "EXCLUDED",
+      "reason": "equivalent-mutant",
+      "detail": "The arm itself is reachable and a later-sample normalization failure reaches it. What the except-arm mutation rewrites is the reason member the arm NAMES, and the only member named there is the `.get()` DEFAULT \u2014 dead code, because `_APPLICABILITY_REASON` is total over every reason `NormalizationApplicabilityError` is constructed with. Rewriting a default that never fires changes nothing observable. The evidence test parses the window module and asserts that totality.",
+      "evidence": "tests/forecasting/test_guard_coverage_evidence.py::test_every_applicability_reason_has_a_mapped_abstention",
       "module": "forecasting/evidence.py",
       "line": 287,
       "condition": "except NormalizationApplicabilityError: _abstain(_APPLICABILITY_REASON.get(exc.reason, AbstentionReason.MISSING_NORMALIZATION_POLICY), probe)"
@@ -1523,7 +1541,10 @@
       "condition": "self.reason is None"
     },
     "254": {
-      "status": "SCORED",
+      "status": "EXCLUDED",
+      "reason": "equivalent-mutant",
+      "detail": "The ABSTAINED arm of the four-way status dispatch. It and the catch-all arm below it enforce an identical pair of rules \u2014 no scored/actual fields, and a reason is required \u2014 so a neutralised dispatch sends an ABSTAINED record to a fall-through that accepts and rejects exactly what it would. The two differ only in message text, and ADR SS6 forbids attributing a kill to a message substring. Kept because naming ABSTAINED makes the dispatch read as four outcomes rather than three plus a remainder.",
+      "evidence": "tests/forecasting/test_guard_coverage_evaluation.py::test_abstained_and_the_catch_all_arm_enforce_the_same_two_rules",
       "module": "forecasting/evaluation.py",
       "line": 204,
       "condition": "self.status is EvaluationStatus.ABSTAINED"
@@ -1631,7 +1652,10 @@
       "condition": "evidence.forecast.is_forecast"
     },
     "272": {
-      "status": "SCORED",
+      "status": "EXCLUDED",
+      "reason": "unreachable-behind-earlier-guard",
+      "detail": "The replay loop's second leakage guard, which the source calls belt-and-suspenders. `_match_actual`'s own eligibility rule already skips every observation at or before the cutoff, so no candidate the loop can receive is non-future. Kept precisely because it is the redundant half of a leakage check: the evidence test measures the first half with a tolerance ten times the horizon, the only width at which a past observation could otherwise fall inside the match window.",
+      "evidence": "tests/forecasting/test_guard_coverage_forecasting.py::test_the_matcher_never_returns_an_actual_at_or_before_the_cutoff",
       "module": "forecasting/replay.py",
       "line": 191,
       "condition": "actual is not None and _as_utc(actual.observed_at) <= _as_utc(cutoff)"

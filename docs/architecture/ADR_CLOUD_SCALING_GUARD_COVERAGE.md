@@ -717,3 +717,112 @@ own adoption without ever being named in the floor.
 **Next phases.** `forecasting/` (102 raises) and `canonical/` (94) carry most of the
 deferred refusal surface and are the natural phase 2; each later phase re-derives its
 own denominator and meets this same bar before the boundary widens.
+
+## §13. Controller phase 2 — `canonical/` and `forecasting/` adopted, 2026-09-01
+
+Ruling 3 of 2026-08-31 ordered the controller adopted in phases, each CI-blocking
+before the next. Phase 1 (§12) took `planning/`. This section records phase 2, which
+widens the boundary to `canonical/` and `forecasting/` and renames the entry to
+`controller-evidence-planning`, the key naming what it now walks rather than what it
+walked first. It remains **partial** controller coverage: 31 of 78 production modules.
+
+### §13.a §12's denominator was an undercount, and CI could not have caught it
+
+Phase 1 published 219 guards and "0 scored survivors". Both figures were wrong.
+
+`planning/pipeline.py` reaches its typed abstentions through a helper, `_abstain`, and
+through five bindings built on it (`ab`, `abf`, `abc`, `abcost`). Phase 1's entry did
+not declare those names in `refusal_calls`, so the engine did not recognise their
+`return f(...)` sites as refusals and enumerated none of them. Declaring them adds **33
+guards**, all in `pipeline.py`, and they are not peripheral: they are the gates
+selecting `UNSUPPORTED_FORECAST_TARGET`, `INSUFFICIENT_FORECAST_CONFIDENCE`,
+`FUTURE_DATA_LEAKAGE`, `MISSING_CURRENT_CAPACITY` and `FORECAST_ABSTAINED` — the
+pipeline's whole abstention surface. **The corrected `planning/` figure is 252, not
+219.** Four of the 33 were genuine survivors, so §12's "0 scored survivors" was false
+when it was written, and the four are closed in this phase.
+
+The failure mode is worth naming because the gate that should have caught it is the one
+that hid it. The phase-1 workflow pins `inventory_total` to 219 exactly. A denominator
+error moves the total, so the pin fails — and the natural reading of a failing pin is
+"someone added a guard", not "the previous count was short". An exact pin is excellent
+at catching drift in a surface whose *boundary* is right and useless against a boundary
+that was never right. Nothing in the sweep can detect a decision point it was never
+told to look for; only re-deriving the refusal vocabulary against the source can.
+
+**The rule this yields: a phased adoption must re-derive `refusal_calls` from the source
+at every phase, never inherit the previous phase's set.** §12's own §12-equivalent
+lesson was the aliased-import one (`RecommendationAbstentionReason as R`); this is the
+same lesson one level up — the engine sees the names it is given, and a refusal it
+cannot name is a refusal it cannot count. Both were found by testing the candidate
+rather than reasoning about it.
+
+### §13.b The measured boundary
+
+**527 guards.** 252 are the corrected `planning/` surface; 275 come from the widening
+(`canonical/` 10 modules, `forecasting/` 11). The remaining 47 production modules stay
+named individually in `excluded_modules` with their measured `raise` counts, and the
+generated inventory's preamble names every deferred subpackage and states that a green
+sweep here is not evidence about any of them.
+
+**First-sweep survival: 165 of 527, 31.3%.** That is the honest number for a surface
+adopted without its tests having been written against a sweep — three times phase 1's
+rate over `planning/` alone, which is what a layer built for canonical correctness
+rather than for gate coverage looks like when it is first measured.
+
+**Final: 502 killed, 25 excluded, 0 survivors, 0 unscored, 0 message-only kills.**
+
+### §13.c Four survivors were weak probes, not equivalent mutants
+
+The full sweep left 12. Eight are excluded below. The other four were tests that passed
+whether or not their guard existed, because each probe was routed into a *sibling* gate
+refusing the same input under the same typed contract. They are recorded because the
+mistake is systematic, not incidental — the same author wrote a correct probe for the
+identical pattern in `canonical/state.py` and an incorrect one in `canonical/identity.py`
+in the same sitting:
+
+| Guard | Probe that failed to kill | Probe that kills |
+|---|---|---|
+| `identity.py:78` | `from_dict(["checkout"])` — dies on the unknown-field check | `from_dict(["workload_id"])` — passes both earlier checks |
+| `normalization.py:203` | non-finite with `clamp=False` — the range check refuses it too | `clamp=True` — neutralised, the overflow is clamped to a confident `1.0` |
+| `forecast.py:88` | unknown status on a forecast — the abstained arm rejects its point estimate | unknown status on an abstention — the arm accepts it |
+| `evaluation.py:335` | `unscored_record(status=EVALUATED)` — rejected one frame deeper anyway | `status=ABSTAINED` — a well-formed record nothing objects to |
+
+**The rule: a probe must be chosen against the code the neutralised guard falls through
+to, not against the guard itself.** A gate-removal sweep is the only thing that
+distinguishes the two, which is why no exclusion in this repository may be written
+before a sweep has measured that guard surviving its isolating probe.
+
+### §13.d The eight exclusions
+
+Five are `unreachable-behind-earlier-guard` and three are `equivalent-mutant`. Every one
+carries an evidence test that measures the *jacket* — the thing that makes the guard
+unreachable or redundant — so the exclusion fails the day the jacket goes away:
+
+* `normalization.py:197` (`threshold <= 0`) — `NormalizationPolicy` refuses a
+  non-positive threshold at construction.
+* `normalization.py:200` (exhaustive `else`) — every declared `NormalizationMethod` has
+  a dispatch arm; the evidence test asserts that, so it fails when one is added without.
+* `evidence.py:240` (non-finite sweep) and `evidence.py:246` (domain sweep) — `domain_for`
+  reads the *same* `unit_domain` authority `Measurement.__post_init__` enforces, so
+  neither a non-finite nor an out-of-domain sample can be constructed at all.
+* `replay.py:191` (second leakage guard) — `_match_actual`'s eligibility rule already
+  skips every observation at or before the cutoff; measured with a tolerance ten times
+  the horizon, the only width at which a past observation could otherwise match.
+* `evidence.py:277` (NORMALIZED early abstention) — the window builder it falls through
+  to produces the identical reason over the identical window.
+* `evidence.py:287` (normalization except-arm) — **the arm is reachable; the mutation
+  target is not.** The except-arm mutation rewrites the reason member the arm *names*,
+  and the only member named there is the `.get()` default — dead code, because
+  `_APPLICABILITY_REASON` is total over every reason the error carries. Reaching an arm
+  and reaching its mutation target are different questions, and a first reading
+  conflated them.
+* `evaluation.py:204` (ABSTAINED dispatch) — the ABSTAINED arm and the catch-all below
+  it enforce an identical pair of rules, differing only in message text, which §6
+  forbids attributing a kill to.
+
+### §13.e Carried forward, not decided here
+
+The 47 deferred modules remain deferred. Whether `signals/` should be adopted next — it
+feeds canonical state, so the boundary drawn here is arguably one layer short — is a
+judgment call about boundary placement, not a fact the repository settles, and is left
+to a later ruling.

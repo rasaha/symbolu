@@ -351,3 +351,24 @@ def test_an_actual_state_missing_the_forecast_target_is_unmatched_not_scored():
     rec = evaluate_forecast(ev, no_cpu, match_tolerance_seconds=TOL)
     assert rec.status is EvaluationStatus.UNMATCHED
     assert rec.actual_value is None
+
+
+def test_abstained_and_the_catch_all_arm_enforce_the_same_two_rules():
+    """Evidence for the `equivalent-mutant` exclusion of the ABSTAINED status dispatch.
+
+    The ABSTAINED arm and the catch-all arm below it enforce an identical pair of rules:
+    no scored or actual fields, and a reason is required. Neutralise the dispatch and an
+    ABSTAINED record falls through to the catch-all, which accepts and rejects exactly
+    what the ABSTAINED arm would — the two differ only in the message text, and this
+    package's guard doctrine forbids attributing a kill to a message substring.
+
+    Kept in the source because naming ABSTAINED explicitly is what makes the four-way
+    dispatch readable as four outcomes rather than three plus a remainder. This test
+    measures the jacket: both arms are driven through both rules."""
+
+    abstained, unmatched = _abstained(), _unmatched()
+    for rec in (abstained, unmatched):
+        with pytest.raises(EvaluationError):
+            dataclasses.replace(rec, actual_value=25.0)
+        with pytest.raises(EvaluationError):
+            dataclasses.replace(rec, reason=None)
