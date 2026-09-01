@@ -315,7 +315,11 @@ PACKAGES = {
         },
         recorded=(
             ("canonical-65", ("reconciliation.py", "candidate.py"), 65),
-            ("peripheral-28", ("attestation.py", "target.py"), 28),
+            # Renamed value-free, ratified ETS-16 (2026-09-01). It was "peripheral-28",
+            # which encoded its own value in its name: renaming it to "peripheral-31" at
+            # every change makes it stale again, and leaving it named -28 while it
+            # measures 31 is worse than either. The number now lives only in the pin.
+            ("peripheral-attestation-target", ("attestation.py", "target.py"), 31),
         ),
         exclusions={
             # --- identifiers.py: the D-4 drift assertions --------------------------------

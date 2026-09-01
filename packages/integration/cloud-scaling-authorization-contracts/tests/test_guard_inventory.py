@@ -5,9 +5,15 @@ A sweep reporting "every guard killed" says nothing if the inventory quietly sto
 a guard, or if the shard arithmetic dropped one.
 
 This package already records two inventories — the owner-ratified canonical 65 and the
-peripheral 28 — over narrower scopes and a narrower shape than the sweep's. Reconciling them
-here rather than in prose is the point: a count nobody can re-derive is a count nobody can
-defend.
+peripheral count over ``attestation.py`` + ``target.py`` — over narrower scopes and a
+narrower shape than the sweep's. Reconciling them here rather than in prose is the point:
+a count nobody can re-derive is a count nobody can defend.
+
+Both are **ratified numbers, not derived ones**: when a contract change moves one, the new
+value needs the owner's assent before it is re-pinned. It has happened once — ETS-15
+(2026-09-01) accepted 114 -> 118 and the peripheral 28 -> 31 for ``ExecutionTargetScope``
+schema 2, and ETS-16 renamed the peripheral inventory value-free, because a label that
+encodes its own count goes stale the moment the count moves.
 """
 
 from __future__ import annotations
@@ -45,11 +51,11 @@ def guards():
 
 
 def test_the_inventory_is_the_size_the_checked_in_report_records(guards):
-    assert len(guards) == 114
+    assert len(guards) == 118
 
 
 def test_the_two_shapes_an_audit_added_are_both_present(guards):
-    """114 is 109 plus five decision points an ``ast.If``-only reading could not see.
+    """The five decision points an ``ast.If``-only reading could not see.
 
     Pinned by condition text rather than count alone, because "five more guards" is
     satisfied by any five and these are the specific ones an audit had to measure to find.
@@ -64,9 +70,9 @@ def test_the_two_shapes_an_audit_added_are_both_present(guards):
         (g.module, g.lineno) for g in guards if g.kind == "outcome-selection"
     }
     assert selections == {
-        ("target.py", 283),
-        ("target.py", 445),
-        ("target.py", 668),
+        ("target.py", 345),
+        ("target.py", 509),
+        ("target.py", 732),
         ("attestation.py", 242),
     }
     helper_calls = {
@@ -76,16 +82,22 @@ def test_the_two_shapes_an_audit_added_are_both_present(guards):
 
 
 def test_the_recorded_65_and_28_are_re_derived_and_agree(guards):
-    """Both ratified counts, recomputed from source rather than trusted."""
+    """Both ratified counts, recomputed from source rather than trusted.
+
+    The peripheral count is 31 as of ETS-15. It gained three of the four guards schema 2
+    added — the provider-vocabulary check and the two halves of the resource-group rule —
+    while the fourth, the ``cloud_provider == "azure"`` conditional itself, falls outside
+    the recorded shape and is counted only in the 118. The two ratified numbers therefore
+    moved by different amounts, which is why each was ratified separately."""
 
     agreement = guard_sweep.reconcile(CONFIG, guards)
     assert agreement["canonical-65"]["measured"] == 65
-    assert agreement["peripheral-28"]["measured"] == 28
+    assert agreement["peripheral-attestation-target"]["measured"] == 31
     assert all(row["agrees"] for row in agreement.values())
 
 
 def test_the_sweeps_definition_is_wider_than_the_ratified_ones_and_says_so(guards):
-    """114 is not 65 + 28, and the difference is accounted for rather than waved at.
+    """118 is not 65 + 31, and the difference is accounted for rather than waved at.
 
     The ratified inventories are defined over four of the six modules and over a narrower
     shape — a ``raise`` alone in the body of its enclosing ``if``. Everything else in this
@@ -98,7 +110,7 @@ def test_the_sweeps_definition_is_wider_than_the_ratified_ones_and_says_so(guard
     wider_shape = [
         g for g in guards if g.module in ratified_scope and not g.recorded_in
     ]
-    assert len(outside_scope) + len(wider_shape) == len(guards) - 65 - 28
+    assert len(outside_scope) + len(wider_shape) == len(guards) - 65 - 31
 
 
 def test_every_guard_belongs_to_exactly_one_shard(guards):

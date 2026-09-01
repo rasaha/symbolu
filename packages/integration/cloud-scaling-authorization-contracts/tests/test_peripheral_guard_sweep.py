@@ -29,12 +29,19 @@ from _mutation_support import (
 
 # Anchors. Asserted against their condition text so a source edit that renumbers the
 # inventory fails loudly instead of silently neutralising some other guard.
+#
+# Renumbered once, at ETS-15 (2026-09-01), when schema 2 inserted three guards into this
+# inventory. The condition assertions below are what made that safe: re-derived by
+# matching each old guard's identity INCLUDING its rank among identically-worded
+# conditions, because ``type(value) is not int or value < 0`` occurs twice and a
+# first-match re-derivation moved P_BINDING_CEILING_TYPE from 28 to 10 — a different
+# guard, in a different class, that would have been silently neutralised instead.
 P_ATTESTATION_IS_DATETIME = 1
 P_ATTESTATION_IS_AWARE = 2
 P_SCOPE_SCHEMA = 11
-P_SCOPE_MAGNITUDE_CEILING = 14
-P_SCOPE_DELTA_CEILING = 15
-P_BINDING_CEILING_TYPE = 28
+P_SCOPE_MAGNITUDE_CEILING = 15
+P_SCOPE_DELTA_CEILING = 16
+P_BINDING_CEILING_TYPE = 31
 
 SCORED = (
     P_ATTESTATION_IS_DATETIME,
@@ -245,7 +252,7 @@ def test_peripheral_coverage_is_reported_honestly():
     """
 
     total = len(peripheral_guards(SRC))
-    assert total == 28, f"peripheral inventory moved to {total}"
+    assert total == 31, f"peripheral inventory moved to {total}"
     assert len(set(SCORED)) == 6
-    # 6 of 28 scored. Not exhaustive, and not described as such anywhere.
+    # 6 of 31 scored. Not exhaustive, and not described as such anywhere.
     assert len(set(SCORED)) < total

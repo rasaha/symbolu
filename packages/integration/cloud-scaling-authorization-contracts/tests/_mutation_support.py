@@ -161,6 +161,7 @@ class MutatedPackage:
         return self.module.ExecutionTargetScope(
             tenant_id=projection.tenant_id,
             account_id=C.ACCOUNT_ID,
+            cloud_provider=C.CLOUD_PROVIDER,
             environment=context.environment,
             region=context.region,
             zone=context.zone,

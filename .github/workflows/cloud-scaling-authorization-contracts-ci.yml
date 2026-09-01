@@ -275,7 +275,7 @@ jobs:
         run: python scripts/check_doc_links.py
 
   guard-inventory:
-    name: Guard inventory is re-derivable and reconciles with 65 + 28
+    name: Guard inventory is re-derivable and reconciles with both ratified counts
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

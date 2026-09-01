@@ -82,14 +82,48 @@ def test_candidate_canonical_form_has_no_authority_key(candidate):
         assert f"'{name}'" not in flat
 
 
+#: ``provider`` in the denylist below means an **authority** provider — a credential
+#: provider, an executor provider, something that grants or performs. ETS-3 introduced a
+#: *cloud* provider label, which is the opposite category: a descriptive token naming which
+#: cloud an account belongs to, carried in a scope that grants nothing and performs
+#: nothing. Exempting the two names is narrower than dropping the fragment, and narrower
+#: than exempting a prefix: a future ``CredentialProviderPort`` still fails.
+#:
+#: The exemption is by exact name, so it cannot silently widen. Adding to it is a decision,
+#: not a convenience — anything that actually provides an authority capability must fail
+#: this test no matter how it is spelled.
+_CLOUD_PROVIDER_LABEL_EXPORTS = frozenset(
+    {"CANONICAL_CLOUD_PROVIDERS", "CLOUD_PROVIDER_AZURE"}
+)
+
+
 def test_no_public_export_names_an_authority_capability():
     for name in pkg.__all__:
+        if name in _CLOUD_PROVIDER_LABEL_EXPORTS:
+            continue
         lowered = name.lower()
         for fragment in (
             "envelope", "actiongate", "credential", "executor", "execute", "authorize",
             "authorization_granted", "issuer", "broker", "provider", "clock",
         ):
             assert fragment not in lowered, f"public export {name} names {fragment}"
+
+
+def test_the_cloud_provider_exemption_covers_only_descriptive_labels():
+    """The exemption above is a hole in an authority guard, so it is itself guarded.
+
+    Every exempted name must exist, must be a plain descriptive value — a string or a
+    frozenset of strings — and must not be callable. A port, a class or a factory smuggled
+    in under a ``CLOUD_PROVIDER`` spelling fails here even though the exemption lets it past
+    the denylist."""
+
+    for name in _CLOUD_PROVIDER_LABEL_EXPORTS:
+        assert name in pkg.__all__, f"{name} is exempted but not exported"
+        value = getattr(pkg, name)
+        assert not callable(value), f"{name} is exempted but callable"
+        assert isinstance(value, (str, frozenset)), f"{name} is not a descriptive label"
+        if isinstance(value, frozenset):
+            assert all(isinstance(v, str) for v in value)
 
 
 def test_no_source_file_makes_a_forbidden_call():

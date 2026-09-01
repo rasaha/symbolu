@@ -69,7 +69,25 @@ PRODUCER_ID = "ugence.cloud-scaling-controller"
 PRODUCER_KEY_ID = "producer-attestation-key-1"
 
 RECOMMENDATION_ID = "rec-phase5a-1"
-ACCOUNT_ID = "acct-000123456789"
+#: Synthetic but format-realistic, ratified ETS-13. The former value,
+#: ``"acct-000123456789"``, was valid under no cloud at all, so no fixture ever exercised
+#: what a real account identifier looks like on any provider. These are shaped like the
+#: real thing and are *not* real: the AWS value is in the reserved 0000-prefixed range, the
+#: GCP value is project-number-shaped, and the Azure value is a nil-adjacent GUID. No
+#: fixture in this repository may carry a real customer or cloud account identifier.
+ACCOUNT_ID = "000000000042"                              # AWS: 12-digit account number
+ACCOUNT_ID_GCP = "000000000000000000317"                 # GCP: project number
+ACCOUNT_ID_AZURE = "00000000-0000-4000-8000-000000000317"  # Azure: subscription GUID
+ACCOUNT_ID_SELF_HOSTED = "cluster.control.internal"      # self-hosted: local authority
+
+#: The default provider for fixtures. AWS because it is the shortest realistic identifier
+#: and carries no resource-group obligation; the other three are exercised explicitly by
+#: the schema-2 rule tests rather than by being the silent default.
+CLOUD_PROVIDER = "aws"
+
+#: Azure only. A resource group name, not an ARN or a full ARM id: the scope carries the
+#: subscription in ``account_id`` and the group here, and an adapter composes the two.
+RESOURCE_GROUP_AZURE = "rg-capacity-nonprod"
 MAX_MAGNITUDE = 20
 MAX_DELTA = 5
 
@@ -240,6 +258,7 @@ def build_target_scope(
     projection: CapacityRiskSubjectProjection,
     *,
     account_id: str = ACCOUNT_ID,
+    cloud_provider: str = CLOUD_PROVIDER,
     max_magnitude: int = MAX_MAGNITUDE,
     max_delta: int = MAX_DELTA,
     **overrides: Any,
@@ -250,6 +269,7 @@ def build_target_scope(
     kwargs = dict(
         tenant_id=projection.tenant_id,
         account_id=account_id,
+        cloud_provider=cloud_provider,
         environment=context.environment,
         region=context.region,
         zone=context.zone,

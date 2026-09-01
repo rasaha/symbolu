@@ -76,11 +76,17 @@ FROZEN_V2_SIGNATURE = (
 #: ``candidate_digest``, and the Phase 5A candidate digest moved when the Risk Authority
 #: decision snapshot gained ``evaluated_at``. Source untouched; fixture pins only.
 FROZEN_VERIFIED_ARTIFACT_DIGEST = (
-    "sha256:fefe4884af18907fc4e304e3142c4001f4f6280edd91d5259d78fe297058de29"
+    "sha256:33b14481fe802edcdbabd5f8e05689bf1a1bf4b757ae34c07e798c9933700136"
 )
 #: The verified artifact this package produced while the decision snapshot carried no
 #: ``evaluated_at`` — i.e. while the instant Phase 5B's occurrence gate depends on was
 #: unbound. Pinned as a negative anchor on this side too, so a revert surfaces on both.
+#: Superseded by ETS-15 — the R-12b value, correct until Phase 5A schema 2 moved the
+#: candidate beneath it. This package's own artifact digest covers the candidate digest,
+#: so it moves whenever that does, without any change here.
+SUPERSEDED_PRE_ETS15_VERIFIED_ARTIFACT_DIGEST = (
+    "sha256:fefe4884af18907fc4e304e3142c4001f4f6280edd91d5259d78fe297058de29"
+)
 SUPERSEDED_PRE_R12B_VERIFIED_ARTIFACT_DIGEST = (
     "sha256:5a2a66489c00a5fef94c8fc5be231ee564786286315d6d60e75ecbc55f60d30e"
 )
@@ -104,10 +110,15 @@ FROZEN_REFUSAL_OUTCOME = O.SIGNATURE_INVALID
 # ======================================================================================= #
 
 PHASE_5A_CANDIDATE_DIGEST = (
-    "sha256:357bb3d4d660034c9abe50000986808a1e9c15fce05b4a22b6cb82836cc50e79"
+    "sha256:bbcd4ad7387d0ac8ead8d3253942123f6191cc65218bc329b67e53d9b8a2250f"
 )
 #: What the Phase 5A candidate hashed to between 5B-1 and R-12b — correct until the decision
 #: snapshot gained ``evaluated_at`` and moved ``decision_digest`` beneath the candidate.
+#: Superseded by ETS-15. A payload reproducing it carries a schema-1 scope, refused by
+#: ruling (ETS-9) rather than upgraded.
+SUPERSEDED_PRE_ETS15_PHASE_5A_CANDIDATE_DIGEST = (
+    "sha256:357bb3d4d660034c9abe50000986808a1e9c15fce05b4a22b6cb82836cc50e79"
+)
 SUPERSEDED_PRE_R12B_PHASE_5A_CANDIDATE_DIGEST = (
     "sha256:be06c65385d73f66c52dd51024c30ed7939a836369db654f381d52270f2aa906"
 )

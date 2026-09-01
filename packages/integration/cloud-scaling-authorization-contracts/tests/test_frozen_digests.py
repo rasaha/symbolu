@@ -65,15 +65,37 @@ SUPERSEDED_PRE_R12B_DECISION_DIGEST = (
 FROZEN_PRODUCER_SIGNING_PAYLOAD_DIGEST = (
     "sha256:1035d2fc2ab8f4b443f815562f9f6ad8e4ce0032633f03a12e04e691c24cf2d0"
 )
+#: **Moved by ETS-15** (schema 2). ``cloud_provider`` became a required scope field and
+#: ``resource_group`` an Azure-conditional one; canonicalization retains nulls, so the
+#: scope's canonical form changed even for a target that sets neither. This is the head of
+#: the cascade — every digest below that covers a scope moved because this one did.
 FROZEN_TARGET_SCOPE_DIGEST = (
+    "sha256:1e9ebadf0075b593b0c44cf3b1f5bcc3ae8d7642329d84958b1058254d15e6e6"
+)
+#: Superseded by ETS-15. Pinned as a negative anchor for the same reason as every other
+#: superseded value here: a payload reproducing it is a schema-1 scope, and schema 1 is
+#: refused by ruling (ETS-9), never upgraded.
+SUPERSEDED_PRE_ETS15_TARGET_SCOPE_DIGEST = (
     "sha256:b97f41c98353aaafdb9aef4fa12309b459900ce002affc206b5c3239b82c3baa"
 )
+#: **Moved by ETS-15**, and not because the binding's own field set changed — it did not.
+#: The binding covers ``target_scope_digest``, which moved above it.
 FROZEN_POLICY_BINDING_DIGEST = (
+    "sha256:29ca00f9ad28fbc27d56a96351ff2cd49378da81fce3118bb18104dbd7ff8ca0"
+)
+SUPERSEDED_PRE_ETS15_POLICY_BINDING_DIGEST = (
     "sha256:8961f6b2b78e811d556b7e43af99807eb368e65ca3b0fa7c6109aa952b5b9808"
 )
 #: The complete Policy Authority coordinate the candidate now carries (5B-1). Pinned as its
 #: own anchor: it is a new artifact in the chain, exactly as the policy binding above is.
+#: **Moved by ETS-15**, for the same reason as the binding above: it carries the scope
+#: digest too. Worth stating because the ETS audit's cascade did not list it — the audit
+#: traced scope -> binding -> candidate and missed that the V2 coordinate binds the scope
+#: independently. Measured, not predicted.
 FROZEN_POLICY_COORDINATE_BINDING_DIGEST = (
+    "sha256:4a83019d4fffd15ad55e470a83a8d86f3b7beed251c8e54f5a954531979adc2c"
+)
+SUPERSEDED_PRE_ETS15_POLICY_COORDINATE_BINDING_DIGEST = (
     "sha256:ad1d1ad9d3fa574a071e98a8638c283e19d21d744c91b6848baaa0eca6670ed8"
 )
 #: **Moved by 5B-1.** The candidate gained the required ``policy_coordinate_binding`` field,
@@ -84,7 +106,12 @@ FROZEN_POLICY_COORDINATE_BINDING_DIGEST = (
 #: **Moved again by R-12b**, this time not because the candidate's own payload changed — its
 #: field set is untouched — but because ``decision_snapshot_digest`` and ``decision_digest``,
 #: which the payload has always covered, moved beneath it. The superseded value is pinned below.
+#: **Moved again by ETS-15**, this time because three artifacts it covers moved beneath it.
 FROZEN_CANDIDATE_DIGEST = (
+    "sha256:bbcd4ad7387d0ac8ead8d3253942123f6191cc65218bc329b67e53d9b8a2250f"
+)
+#: Superseded by ETS-15 — the R-12b value, correct until schema 2.
+SUPERSEDED_PRE_ETS15_CANDIDATE_DIGEST = (
     "sha256:357bb3d4d660034c9abe50000986808a1e9c15fce05b4a22b6cb82836cc50e79"
 )
 #: Superseded by R-12b — the 5B-1 value, correct until the decision snapshot gained
@@ -250,6 +277,12 @@ def test_only_the_candidate_digest_moved_in_the_f2_remediation(frozen_chain):
 
     F-2 changed only what the *candidate* payload covers. A moved upstream digest would
     mean the remediation had reached into a frozen contract it must not touch.
+
+    Still true *of F-2*. ETS-15 later moved the scope, binding and coordinate digests for
+    an unrelated reason — schema 2 added two scope fields — which is why the constants
+    compared here are the current values rather than F-2's. The Phase 4 digests above
+    (recommendation, context, subject, request, idempotency, decision) are untouched by
+    ETS-15 by ruling (ETS-8), and asserting them here is what proves it.
     """
 
     projection, decision, attestation, scope, binding, _ = frozen_chain

@@ -55,8 +55,10 @@ PHASE_5A_NEGATIVE_ANCHOR = (
 def test_phase_5a_is_at_the_version_this_package_was_pinned_against():
     """P-1: Phase 5B-0A does not re-version Phase 5A — and pins what it reads.
 
-    ``0.5.0`` since R-12b, which re-sourced the decision instants from the digest-bound
-    decision snapshot and moved two Phase 5A frozen digests with it; ``0.4.0`` was R-12;
+    ``0.8.0`` since ETS-15, which took ``ExecutionTargetScope`` to schema 2 and moved four
+    Phase 5A frozen digests with it — the scope, the policy binding, the policy coordinate
+    and the candidate. ``0.5.0`` was R-12b, which re-sourced the decision instants from the
+    digest-bound decision snapshot; ``0.4.0`` was R-12;
     ``0.2.0`` was 5B-1, which added the required policy coordinate to the candidate. This
     package's source is unchanged by that and its own version does not move; what moves is
     the fixture chain it verifies against. The assertion stays exact rather than becoming a
@@ -64,7 +66,7 @@ def test_phase_5a_is_at_the_version_this_package_was_pinned_against():
     catching.
     """
 
-    assert p5a.__version__ == "0.7.0"
+    assert p5a.__version__ == "0.8.0"
 
 
 def test_phase_5a_exports_exactly_the_symbols_this_package_was_measured_against():
@@ -74,11 +76,19 @@ def test_phase_5a_exports_exactly_the_symbols_this_package_was_measured_against(
     ``POLICY_COORDINATE_COMPONENTS`` and ``is_policy_authority_digest``. 5B-2 part 1 adds
     ``POLICY_SCOPE_TENANT`` (R-9), and R-12 adds ``TemporalOrderingError`` — the refusal for
     carried instants that are individually valid and collectively impossible.
+
+    ETS-15 adds two, taking the count from 43 to 45: ``CANONICAL_CLOUD_PROVIDERS`` and
+    ``CLOUD_PROVIDER_AZURE``. Both are descriptive labels rather than authority
+    capabilities — the closed vocabulary schema 2 validates ``cloud_provider`` against, and
+    the token its resource-group rule reads. Named here because a count alone is satisfied
+    by any two symbols, and these are the two that were measured.
     """
 
-    assert len(p5a.__all__) == 43
+    assert len(p5a.__all__) == 45
     assert "POLICY_SCOPE_TENANT" in p5a.__all__
     assert "TemporalOrderingError" in p5a.__all__
+    assert "CANONICAL_CLOUD_PROVIDERS" in p5a.__all__
+    assert "CLOUD_PROVIDER_AZURE" in p5a.__all__
 
 
 def test_the_phase_5a_v1_signing_payload_digest_is_unchanged():
@@ -243,20 +253,25 @@ PHASE_5A_FROZEN_DIGESTS = {
     "producer_signing_payload_digest": (
         "sha256:1035d2fc2ab8f4b443f815562f9f6ad8e4ce0032633f03a12e04e691c24cf2d0"
     ),
+    # Moved by ETS-15 (Phase 5A 0.8.0, ExecutionTargetScope schema 2): the scope gained a
+    # required ``cloud_provider`` and an Azure-conditional ``resource_group``. The binding
+    # and the coordinate moved beneath it — neither changed its own field set; both cover
+    # ``target_scope_digest``. The seven above are untouched, which is the evidence that
+    # schema 2 reached no Phase 4 contract (ETS-8).
     "target_scope_digest": (
-        "sha256:b97f41c98353aaafdb9aef4fa12309b459900ce002affc206b5c3239b82c3baa"
+        "sha256:1e9ebadf0075b593b0c44cf3b1f5bcc3ae8d7642329d84958b1058254d15e6e6"
     ),
     "policy_binding_digest": (
-        "sha256:8961f6b2b78e811d556b7e43af99807eb368e65ca3b0fa7c6109aa952b5b9808"
+        "sha256:29ca00f9ad28fbc27d56a96351ff2cd49378da81fce3118bb18104dbd7ff8ca0"
     ),
     "policy_coordinate_binding_digest": (
-        "sha256:ad1d1ad9d3fa574a071e98a8638c283e19d21d744c91b6848baaa0eca6670ed8"
+        "sha256:4a83019d4fffd15ad55e470a83a8d86f3b7beed251c8e54f5a954531979adc2c"
     ),
     # Moved with it: the candidate payload has always covered ``decision_digest`` and
     # ``decision_snapshot_digest``, so the candidate digest moved beneath an unchanged
     # field set.
     "candidate_digest": (
-        "sha256:357bb3d4d660034c9abe50000986808a1e9c15fce05b4a22b6cb82836cc50e79"
+        "sha256:bbcd4ad7387d0ac8ead8d3253942123f6191cc65218bc329b67e53d9b8a2250f"
     ),
 }
 
