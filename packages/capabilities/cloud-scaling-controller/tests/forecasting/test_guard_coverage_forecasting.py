@@ -110,10 +110,13 @@ def test_a_forecast_cannot_claim_an_authority_this_package_does_not_have(overrid
 
 def test_a_status_outside_the_declared_pair_is_refused():
     """There are exactly two outcomes: a forecast or a typed abstention. Neutralised, a
-    third status reaches the branch below, takes the `else` (abstained) arm, and a record
-    labelled something a reader has never seen is treated as an abstention."""
+    third status reaches the branch below and takes the `else` (abstained) arm — so the
+    probe has to be a record that arm ACCEPTS, i.e. an abstention. Probed on a real
+    forecast the arm rejects the leftover point estimate and the guard survives its own
+    test; probed on an abstention the record builds and a status no reader has ever seen
+    ships as an abstention. Measured, not reasoned."""
 
-    fc = _forecast()
+    fc = _abstention()
     with pytest.raises(ForecastError):
         dataclasses.replace(fc, status="maybe")
 

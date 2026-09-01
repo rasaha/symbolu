@@ -315,14 +315,17 @@ def test_a_record_payload_that_is_not_a_mapping_is_refused():
 
 
 def test_the_unscored_factory_refuses_to_mint_a_scored_status():
-    """`unscored_record` exists to build the three not-scored statuses. Without the gate
-    it would mint an `EVALUATED` record with no point forecast and no derived actual —
-    and `__post_init__` would then reject it as malformed rather than as out of scope,
-    which is why the gate belongs here and not one frame deeper."""
+    """`unscored_record` exists to build the three not-scored statuses; it refuses the
+    other two. `ABSTAINED` is the probe rather than `EVALUATED` because an `EVALUATED`
+    record with no embedded actual is rejected one frame deeper anyway, so that probe
+    leaves the gate alive. An `ABSTAINED` record with no actual and a reason is perfectly
+    well-formed — nothing downstream objects — so without this gate the replay matcher
+    could mint an abstention for a forecast that never abstained, and the aggregate
+    abstention rate would count it. Measured, not reasoned."""
 
     ev = _evidence()
     with pytest.raises(EvaluationError):
-        unscored_record(ev, status=EvaluationStatus.EVALUATED, reason="nope",
+        unscored_record(ev, status=EvaluationStatus.ABSTAINED, reason="nope",
                         match_tolerance_seconds=TOL)
 
 

@@ -109,8 +109,14 @@ def test_an_optional_subject_field_that_is_not_a_string_is_refused():
 
 
 def test_a_subject_payload_that_is_not_a_mapping_is_refused():
+    """The list holds exactly the required field NAME, which is what makes it a probe: the
+    unknown-field set arithmetic and the required-field membership test both pass on it,
+    so the mapping gate is the only thing left standing between a list and a `TypeError`
+    from indexing it. A list of anything else is refused as an unknown field instead, and
+    the mutant survives — measured, not reasoned."""
+
     with pytest.raises(SubjectError):
-        CapacitySubject.from_dict(["checkout"])
+        CapacitySubject.from_dict(["workload_id"])
 
 
 def test_a_subject_payload_carrying_an_unknown_field_is_refused():
@@ -273,9 +279,15 @@ def test_a_normalized_value_that_is_not_finite_is_refused():
     """The post-arithmetic finiteness check. Reached with a threshold small enough that a
     finite queue depth divided by it overflows to infinity — every input is individually
     admissible and only the result is not, which is why the check lives after the
-    arithmetic rather than before it."""
+    arithmetic rather than before it.
 
-    tiny = _policy(thresholds={"queue_depth": 5e-324}, clamp=False)
+    Clamping is left ENABLED on purpose. With clamping disabled the range check below
+    refuses infinity too, and the guard survives its own probe; with clamping enabled,
+    neutralising it lets infinity be clamped to a confident 1.0 — a normalized signal
+    that reads as full saturation when the arithmetic in fact overflowed. Measured: the
+    clamp=False form of this test left the mutant alive."""
+
+    tiny = _policy(thresholds={"queue_depth": 5e-324})  # clamp stays ENABLED
     with pytest.raises(NormalizationError):
         normalize_signal("queue_depth", Measurement(70.0, Unit.COUNT), tiny)
 
@@ -407,3 +419,15 @@ def test_every_normalization_method_has_a_dispatch_arm():
             thresholds={"s": 1000.0},
         )
         assert normalize_signal("s", measurement, policy).method == method.value
+
+
+def test_a_threshold_that_is_not_strictly_positive_is_refused():
+    """Evidence for the `unreachable-behind-earlier-guard` exclusion of the defensive
+    `threshold <= 0` check inside `normalize_signal`, which the source itself annotates as
+    already enforced by policy validation. This measures that enforcement: no policy
+    carrying a zero or negative threshold can be constructed, so no such threshold can
+    reach the division."""
+
+    for bad in (0.0, -1.0):
+        with pytest.raises(NormalizationError):
+            _policy(thresholds={"queue_depth": bad})
