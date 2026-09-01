@@ -395,3 +395,45 @@ def test_every_applicability_reason_has_a_mapped_abstention():
         f"unmapped applicability reason(s): {sorted(raised - set(_APPLICABILITY_REASON))} "
         "— the except-arm default is no longer dead code"
     )
+
+
+def test_an_unnormalizable_target_abstains_the_same_way_through_either_path():
+    """Evidence for the `equivalent-mutant` exclusion of the NORMALIZED early abstention
+    for a target with no normalization signal.
+
+    The gate short-circuits before the working window is built. Neutralise it and the
+    window builder is reached instead — and it raises `NormalizationApplicabilityError`
+    with reason `unsupported_target`, which the except-arm maps straight back to
+    `UNSUPPORTED_TARGET` over the same probe window. Same reason, same bound window, same
+    record: no input distinguishes the two paths, so no test can kill this mutant.
+
+    Kept in the source because reaching a typed abstention without constructing and
+    discarding a window is the honest shape. This test measures the jacket by asserting
+    the sibling path produces the very reason the gate does."""
+
+    states = [
+        CanonicalCapacityState(subject=fx.subject(), observed_at=fx.at(60.0 * i),
+                               capacity=CapacityState(running_replicas=4 + i))
+        for i in range(3)
+    ]
+    s = CanonicalCapacitySeries.build(states)
+
+    # The gate's own outcome.
+    ev = forecast_with_evidence(
+        s, ForecastTarget.RUNNING_REPLICAS, s.end_event_time, H1, PersistenceForecaster(),
+        normalization_policy=NPOL, forecast_space=ForecastValueSpace.NORMALIZED,
+    )
+    assert ev.forecast.abstention_reason is AbstentionReason.UNSUPPORTED_TARGET
+
+    # The jacket: the window builder the neutralised gate would fall through to.
+    from ugence_cloud_scaling_controller.forecasting.evidence import _APPLICABILITY_REASON
+    from ugence_cloud_scaling_controller.forecasting.window import (
+        NormalizationApplicabilityError,
+        build_input_window,
+    )
+
+    with pytest.raises(NormalizationApplicabilityError) as exc:
+        build_input_window(s, ForecastTarget.RUNNING_REPLICAS, s.end_event_time, H1,
+                           normalization_policy=NPOL,
+                           forecast_space=ForecastValueSpace.NORMALIZED)
+    assert _APPLICABILITY_REASON[exc.value.reason] is AbstentionReason.UNSUPPORTED_TARGET

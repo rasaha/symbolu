@@ -435,9 +435,21 @@ PACKAGES = {
             "top-level modules (7 modules, 15 raises), `core/` (7 modules, 2 raises), "
             "`observability/` (7 modules), `signals/` (4 modules, 2 raises), `shadow/` "
             "(4 modules), `recommend/` (3 modules) and `explain/` (2 modules). A reader "
-            "must not read a green sweep here as evidence about any of them. Phase 1 "
-            "covered `planning/` alone at 219 guards; those 219 are unchanged here, and "
-            "the widening added 275."
+            "must not read a green sweep here as evidence about any of them.\n\n"
+            "**Phase 1 undercounted its own boundary.** Phase 1 covered `planning/` "
+            "alone and recorded 219 guards. That figure omitted 33 decision points in "
+            "`planning/pipeline.py`: its abstention helpers (`_abstain` and the `ab*` "
+            "bindings built on it) were not declared in `refusal_calls`, so the gates "
+            "selecting UNSUPPORTED_FORECAST_TARGET, INSUFFICIENT_FORECAST_CONFIDENCE, "
+            "FUTURE_DATA_LEAKAGE, MISSING_CURRENT_CAPACITY and FORECAST_ABSTAINED were "
+            "never enumerated. The corrected `planning/` figure is 252, and four of the "
+            "33 were genuine survivors — so phase 1's published \'0 scored survivors\' "
+            "was false when it was written. CI could not have caught this: the workflow "
+            "pinned the total to 219 exactly, which is what a denominator error looks "
+            "like from inside. The omission was found by testing the candidate rather "
+            "than reasoning about it, and ADR SS13 records it. Of this phase\'s 527 "
+            "guards, 252 are the corrected `planning/` surface and 275 come from the "
+            "`canonical/` and `forecasting/` widening."
         ),
         # `planning/` in the order a recommendation is actually built: the typed
         # abstention vocabulary first, then the evidence layers each gate reads
@@ -543,6 +555,128 @@ PACKAGES = {
         recorded=(),
         # Written after a measured sweep, never before one.
         exclusions={
+            # --- phase 2 (canonical/ + forecasting/) ------------------------------
+            # Measured, never assumed: every entry below was scored SURVIVING by a full
+            # 527-guard sweep AFTER its isolating probe was written. Four further phase-2
+            # survivors turned out to be weak probes jacketed by a sibling gate and were
+            # closed by re-routing the probe, not excluded.
+            ("canonical/normalization.py", "threshold <= 0"): (
+                "unreachable-behind-earlier-guard",
+                "`normalize_signal`'s defensive threshold check, which the source "
+                "itself annotates as already enforced by policy validation. Every "
+                "threshold reaching the division comes from `NormalizationPolicy."
+                "thresholds`, and that dataclass refuses a non-positive entry at "
+                "construction, so no reachable policy can present one here.",
+                "tests/canonical/test_guard_coverage_canonical.py::"
+                "test_a_threshold_that_is_not_strictly_positive_is_refused",
+            ),
+            (
+                "canonical/normalization.py",
+                "else of: method in (NormalizationMethod.LATENCY_MS_TO_THRESHOLD, "
+                "NormalizationMethod.LATENCY_S_TO_THRESHOLD, "
+                "NormalizationMethod.QUEUE_TO_CAPACITY)",
+            ): (
+                "unreachable-behind-earlier-guard",
+                "The exhaustive `else` closing the method dispatch, marked `pragma: no "
+                "cover` in the source. The policy's own type gate refuses anything that "
+                "is not a `NormalizationMethod`, and every declared member has an arm, "
+                "so the only input that could reach the `else` is a member added "
+                "without one. The evidence test asserts that exhaustiveness, so it "
+                "fails the day such a member arrives.",
+                "tests/canonical/test_guard_coverage_canonical.py::"
+                "test_every_normalization_method_has_a_dispatch_arm",
+            ),
+            (
+                "forecasting/evidence.py",
+                "any((not math.isfinite(v) for v in probe.values))",
+            ): (
+                "unreachable-behind-earlier-guard",
+                "The non-finite sweep over the probe window, which the source calls "
+                "defensive. Every measurement-backed sample comes from a "
+                "`Measurement`, whose `__post_init__` refuses NaN and infinity, and "
+                "the replica count is validated as an int, so no non-finite value can "
+                "reach a probe window.",
+                "tests/forecasting/test_guard_coverage_evidence.py::"
+                "test_a_non_finite_observation_cannot_be_built_at_all",
+            ),
+            (
+                "forecasting/evidence.py",
+                "not domain_for(s.unit).contains(s.value)",
+            ): (
+                "unreachable-behind-earlier-guard",
+                "The per-sample input-domain sweep. `domain_for` reads the SAME "
+                "Phase-1 `unit_domain` authority that `Measurement.__post_init__` "
+                "enforces at construction — bounds and integer semantics alike — so a "
+                "raw sample out of its own domain cannot be built in the first place. "
+                "Kept because the forecasting layer must not depend on the canonical "
+                "layer continuing to enforce it; a divergence re-opens this exclusion "
+                "by construction, since the sweep fails on a stale exclusion.",
+                "tests/forecasting/test_guard_coverage_evidence.py::"
+                "test_an_out_of_domain_observation_cannot_be_built_at_all",
+            ),
+            (
+                "forecasting/evidence.py",
+                "forecast_space is ForecastValueSpace.NORMALIZED",
+            ): (
+                "equivalent-mutant",
+                "The early NORMALIZED abstention for a target with no normalization "
+                "signal. Neutralised, the working-window build is reached instead and "
+                "raises `NormalizationApplicabilityError(reason='unsupported_target')`, "
+                "which the except-arm maps straight back to `UNSUPPORTED_TARGET` over "
+                "the same probe window — same reason, same bound window, same record. "
+                "Kept because reaching a typed abstention without constructing and "
+                "discarding a window is the honest shape.",
+                "tests/forecasting/test_guard_coverage_evidence.py::"
+                "test_an_unnormalizable_target_abstains_the_same_way_through_either_path",
+            ),
+            (
+                "forecasting/evidence.py",
+                "except NormalizationApplicabilityError: _abstain(_APPLICABILITY_REASON"
+                ".get(exc.reason, AbstentionReason.MISSING_NORMALIZATION_POLICY), probe)",
+            ): (
+                "equivalent-mutant",
+                "The arm itself is reachable and a later-sample normalization failure "
+                "reaches it. What the except-arm mutation rewrites is the reason member "
+                "the arm NAMES, and the only member named there is the `.get()` "
+                "DEFAULT — dead code, because `_APPLICABILITY_REASON` is total over "
+                "every reason `NormalizationApplicabilityError` is constructed with. "
+                "Rewriting a default that never fires changes nothing observable. The "
+                "evidence test parses the window module and asserts that totality.",
+                "tests/forecasting/test_guard_coverage_evidence.py::"
+                "test_every_applicability_reason_has_a_mapped_abstention",
+            ),
+            (
+                "forecasting/evaluation.py",
+                "self.status is EvaluationStatus.ABSTAINED",
+            ): (
+                "equivalent-mutant",
+                "The ABSTAINED arm of the four-way status dispatch. It and the "
+                "catch-all arm below it enforce an identical pair of rules — no "
+                "scored/actual fields, and a reason is required — so a neutralised "
+                "dispatch sends an ABSTAINED record to a fall-through that accepts and "
+                "rejects exactly what it would. The two differ only in message text, "
+                "and ADR SS6 forbids attributing a kill to a message substring. Kept "
+                "because naming ABSTAINED makes the dispatch read as four outcomes "
+                "rather than three plus a remainder.",
+                "tests/forecasting/test_guard_coverage_evaluation.py::"
+                "test_abstained_and_the_catch_all_arm_enforce_the_same_two_rules",
+            ),
+            (
+                "forecasting/replay.py",
+                "actual is not None and _as_utc(actual.observed_at) <= _as_utc(cutoff)",
+            ): (
+                "unreachable-behind-earlier-guard",
+                "The replay loop's second leakage guard, which the source calls "
+                "belt-and-suspenders. `_match_actual`'s own eligibility rule already "
+                "skips every observation at or before the cutoff, so no candidate the "
+                "loop can receive is non-future. Kept precisely because it is the "
+                "redundant half of a leakage check: the evidence test measures the "
+                "first half with a tolerance ten times the horizon, the only width at "
+                "which a past observation could otherwise fall inside the match window.",
+                "tests/forecasting/test_guard_coverage_forecasting.py::"
+                "test_the_matcher_never_returns_an_actual_at_or_before_the_cutoff",
+            ),
+            # --- phase 1 (planning/) ----------------------------------------------
             ("planning/constraints.py", "v is None"): (
                 "diagnostic-only",
                 "`_finite_number`'s None branch. No call site passes `allow_none=True` "
