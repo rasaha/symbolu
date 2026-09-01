@@ -27,6 +27,13 @@ for _src in (project_root / "packages" / "jcs" / "src",
              project_root / "packages" / "capabilities" / "cloud-scaling-operations" / "src",
              project_root / "packages" / "capabilities" / "llm-steering-controller" / "src",
              project_root / "packages" / "runtime" / "agent-runtime" / "src",
-             project_root / "packages" / "products" / "procurement" / "src"):
+             project_root / "packages" / "products" / "procurement" / "src",
+             # Ugence Value Intelligence: the readiness engine, its policy
+             # dependencies, and the governed-value kernel. Required by
+             # tests/test_readiness_governed_value_doc_drift.py.
+             project_root / "packages" / "uvi-policy-contracts" / "src",
+             project_root / "packages" / "policy-authority" / "src",
+             project_root / "packages" / "capabilities" / "agent-value-readiness" / "src",
+             project_root / "packages" / "governed-value" / "src"):
     if _src.is_dir() and str(_src) not in sys.path:
         sys.path.insert(0, str(_src))
