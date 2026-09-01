@@ -239,16 +239,6 @@ EXCLUSION_REASONS = frozenset(
 _CONTROLLER_DEFERRED = (
     ("__init__.py", 0),
     ("api.py", 1),
-    ("canonical/__init__.py", 0),
-    ("canonical/evidence.py", 7),
-    ("canonical/identity.py", 6),
-    ("canonical/measurement.py", 12),
-    ("canonical/normalization.py", 16),
-    ("canonical/projection.py", 3),
-    ("canonical/provenance.py", 5),
-    ("canonical/serialization.py", 3),
-    ("canonical/sources.py", 3),
-    ("canonical/state.py", 39),
     ("cli.py", 2),
     ("config.py", 0),
     ("contracts.py", 12),
@@ -262,17 +252,6 @@ _CONTROLLER_DEFERRED = (
     ("core/replay_buffer.py", 0),
     ("explain/__init__.py", 0),
     ("explain/explainer.py", 0),
-    ("forecasting/__init__.py", 0),
-    ("forecasting/abstention.py", 0),
-    ("forecasting/evaluation.py", 34),
-    ("forecasting/evidence.py", 17),
-    ("forecasting/forecast.py", 10),
-    ("forecasting/forecasters.py", 3),
-    ("forecasting/replay.py", 3),
-    ("forecasting/series.py", 13),
-    ("forecasting/targets.py", 4),
-    ("forecasting/uncertainty.py", 4),
-    ("forecasting/window.py", 14),
     ("observability/__init__.py", 0),
     ("observability/benchmark.py", 0),
     ("observability/decision_log.py", 0),
@@ -424,14 +403,15 @@ PACKAGES = {
         recorded=(),
         exclusions={},
     ),
-    "controller-planning": PackageConfig(
-        key="controller-planning",
+    "controller-evidence-planning": PackageConfig(
+        key="controller-evidence-planning",
         package_dir="packages/capabilities/cloud-scaling-controller",
         dist_name="ugence_cloud_scaling_controller",
-        # PHASE 1 OF A PHASED ADOPTION (owner ruling 3, 2026-08-31). This entry covers
-        # `planning/` only. It is NOT controller coverage, and the inventory it generates
-        # says so in its own words rather than leaving a reader to infer it from the
-        # module list.
+        # PHASE 2 OF A PHASED ADOPTION (owner ruling 3, 2026-08-31; widened 2026-09-01).
+        # This entry covers `canonical/`, `forecasting/` and `planning/` — 31 of the
+        # package's 78 production modules. It is still NOT controller coverage, and the
+        # inventory it generates says so in its own words rather than leaving a reader to
+        # infer it from the module list.
         #
         # The mint is a recommendation that exists. `CapacityActionRecommendation` is the
         # artifact this subpackage produces, and its `__post_init__` is where every
@@ -446,26 +426,64 @@ PACKAGES = {
         ),
         # Ruled disclosure (owner, 2026-08-31): partial coverage reported honestly.
         inventory_note=(
-            "**This is a phase, not controller coverage (ruled 2026-08-31).** This "
-            "inventory is defined over the `planning/` subpackage alone — 10 of the "
-            "Cloud Scaling Controller's 78 production modules, carrying 205 of its 426 "
-            "`raise` statements. The remaining 68 modules are *deferred to later "
-            "ratified phases*, not judged guard-free, and every one is named in this "
-            "package's `excluded_modules` with its measured refusal surface. Deferred "
-            "subpackages, by name: `forecasting/` (11 modules, 102 raises), "
-            "`canonical/` (10 modules, 94 raises), the top-level modules (7 modules, "
-            "15 raises), `replay/` (13 modules, 6 raises), `core/` (7 modules, 2 "
-            "raises), `signals/` (4 modules, 2 raises), `observability/` (7 modules), "
-            "`shadow/` (4 modules), `recommend/` (3 modules) and `explain/` (2 "
-            "modules). A reader must not read a green sweep here as evidence about any "
-            "of them."
+            "**This is a phase, not controller coverage (phase 2, ruled 2026-08-31).** "
+            "This inventory is defined over `canonical/`, `forecasting/` and `planning/` "
+            "— 31 of the Cloud Scaling Controller's 78 production modules, carrying 401 "
+            "of its 426 `raise` statements. The remaining 47 modules are *deferred to "
+            "later ratified phases*, not judged guard-free, and every one is named in "
+            "this package's `excluded_modules` with its measured refusal surface. "
+            "Deferred subpackages, by name: `replay/` (13 modules, 6 raises), the "
+            "top-level modules (7 modules, 15 raises), `core/` (7 modules, 2 raises), "
+            "`observability/` (7 modules), `signals/` (4 modules, 2 raises), `shadow/` "
+            "(4 modules), `recommend/` (3 modules) and `explain/` (2 modules). A reader "
+            "must not read a green sweep here as evidence about any of them.\n\n"
+            "**Phase 1 undercounted its own boundary.** Phase 1 covered `planning/` "
+            "alone and recorded 219 guards. That figure omitted 33 decision points in "
+            "`planning/pipeline.py`: its abstention helpers (`_abstain` and the `ab*` "
+            "bindings built on it) were not declared in `refusal_calls`, so the gates "
+            "selecting UNSUPPORTED_FORECAST_TARGET, INSUFFICIENT_FORECAST_CONFIDENCE, "
+            "FUTURE_DATA_LEAKAGE, MISSING_CURRENT_CAPACITY and FORECAST_ABSTAINED were "
+            "never enumerated. The corrected `planning/` figure is 252, and four of the "
+            "33 were genuine survivors — so phase 1's published \'0 scored survivors\' "
+            "was false when it was written. CI could not have caught this: the workflow "
+            "pinned the total to 219 exactly, which is what a denominator error looks "
+            "like from inside. The omission was found by testing the candidate rather "
+            "than reasoning about it, and ADR §13 records it. Of this phase\'s 527 "
+            "guards, 252 are the corrected `planning/` surface and 275 come from the "
+            "`canonical/` and `forecasting/` widening."
         ),
-        # `planning/` in the order a recommendation is actually built: the typed
+        # The three subpackages in dependency order — `canonical/` (observed state),
+        # `forecasting/` (evidence built on it), then `planning/` in the order a
+        # recommendation is actually built: the typed
         # abstention vocabulary first, then the evidence layers each gate reads
         # (topology, cost, constraints), then candidate generation, the policy and
         # scoring that rank them, the recommendation artifact itself, and the pipeline
         # entry point that ties them together.
         module_order=(
+            # canonical/ — the observed-state layer every later layer reads.
+            "canonical/__init__.py",
+            "canonical/identity.py",
+            "canonical/measurement.py",
+            "canonical/provenance.py",
+            "canonical/serialization.py",
+            "canonical/normalization.py",
+            "canonical/state.py",
+            "canonical/sources.py",
+            "canonical/projection.py",
+            "canonical/evidence.py",
+            # forecasting/ — the forecast-evidence layer built on canonical state.
+            "forecasting/__init__.py",
+            "forecasting/abstention.py",
+            "forecasting/targets.py",
+            "forecasting/series.py",
+            "forecasting/window.py",
+            "forecasting/uncertainty.py",
+            "forecasting/forecasters.py",
+            "forecasting/forecast.py",
+            "forecasting/evidence.py",
+            "forecasting/evaluation.py",
+            "forecasting/replay.py",
+            # planning/ — the recommendation built from both (phase 1).
             "planning/__init__.py",
             "planning/abstention.py",
             "planning/topology.py",
@@ -491,10 +509,14 @@ PACKAGES = {
                 for m, n in _CONTROLLER_DEFERRED
             },
         },
-        # Eight typed refusal classes, all defined inside `planning/` and all
-        # `ValueError` subclasses, plus the typed abstention the pipeline returns
-        # instead of raising.
-        refusal_calls=frozenset(),
+        # Twenty-five typed refusal classes across the three walked subpackages
+        # (`planning/` 8, `canonical/` 8, `forecasting/` 9), all `ValueError`
+        # subclasses, plus the typed abstentions the pipeline and the forecast service
+        # return instead of raising. `reason_vocabularies` below names two defined in
+        # `forecasting/`, which is why this comment cannot say "all inside `planning/`".
+        refusal_calls=frozenset(
+            {"_abstain", "ab", "abf", "abc", "abcost", "_unscored"}
+        ),
         bound_refusal_calls=False,
         tuple_refusals=False,
         # Named as the *source* names them, which is the whole point of this field.
@@ -506,7 +528,15 @@ PACKAGES = {
         # reasons a candidate fails hard-constraint filtering. `RecommendationOutcome` is
         # deliberately absent: it is a `Union[...]` type alias, not an enum, so it names
         # no decision.
-        reason_vocabularies=frozenset({"R", "ConstraintViolationKind"}),
+        reason_vocabularies=frozenset(
+            {
+                "R",
+                "ConstraintViolationKind",
+                "AbstentionReason",
+                "SeriesErrorReason",
+                "EvaluationStatus",
+            }
+        ),
         decision_classes=frozenset({"except-arm", "helper-admission", "else-arm"}),
         # D-GC-3's operator. Exactly one `except` arm in the phase returns a vocabulary
         # member — `pipeline.py`'s cost-scoring arm, which answers CONTRADICTORY_EVIDENCE
@@ -516,12 +546,136 @@ PACKAGES = {
         # `raise` sites they are.
         reason_collapse_sentinels={
             "R": ("CONTRADICTORY_EVIDENCE", "NON_FINITE_INPUT"),
+            # `forecasting/evidence.py`'s two abstaining `except` arms. INVALID_MEASUREMENT
+            # is the general answer among the reasons these arms produce — reporting a unit
+            # inconsistency or a missing normalization policy as a bare invalid measurement
+            # is §9.4's general-for-specific weakening exactly. Neither arm can already
+            # produce it (one is fixed at INCONSISTENT_UNIT, the other resolves through
+            # `_APPLICABILITY_REASON`, whose three values do not include it), so the
+            # alternate is the pair's formality rather than a live case.
+            "AbstentionReason": ("INVALID_MEASUREMENT", "FORECAST_OUTSIDE_DOMAIN"),
         },
         record_multiplicity=False,
         uncovered_mints=(),
         recorded=(),
         # Written after a measured sweep, never before one.
         exclusions={
+            # --- phase 2 (canonical/ + forecasting/) ------------------------------
+            # Measured, never assumed: every entry below was scored SURVIVING by a full
+            # 527-guard sweep AFTER its isolating probe was written. Four further phase-2
+            # survivors turned out to be weak probes jacketed by a sibling gate and were
+            # closed by re-routing the probe, not excluded.
+            (
+                "canonical/normalization.py",
+                "else of: method in (NormalizationMethod.LATENCY_MS_TO_THRESHOLD, "
+                "NormalizationMethod.LATENCY_S_TO_THRESHOLD, "
+                "NormalizationMethod.QUEUE_TO_CAPACITY)",
+            ): (
+                "unreachable-behind-earlier-guard",
+                "The exhaustive `else` closing the method dispatch, marked `pragma: no "
+                "cover` in the source. The policy's own type gate refuses anything that "
+                "is not a `NormalizationMethod`, and every declared member has an arm, "
+                "so the only input that could reach the `else` is a member added "
+                "without one. The evidence test asserts that exhaustiveness, so it "
+                "fails the day such a member arrives.",
+                "tests/canonical/test_guard_coverage_canonical.py::"
+                "test_every_normalization_method_has_a_dispatch_arm",
+            ),
+            (
+                "forecasting/evidence.py",
+                "any((not math.isfinite(v) for v in probe.values))",
+            ): (
+                "unreachable-behind-earlier-guard",
+                "The non-finite sweep over the probe window, which the source calls "
+                "defensive. Every measurement-backed sample comes from a `Measurement`, "
+                "whose `__post_init__` refuses NaN and infinity on every unit, bounded "
+                "or not. The replica count is a separate path and its jacket is NOT the "
+                "int validation this reason used to name: `CapacityState` accepts an "
+                "arbitrarily large int, and what actually stops one is `extract_sample`'s "
+                "`float(int(...))` raising `OverflowError` — an untyped crash, not a "
+                "typed refusal. The guard stays unreachable either way; the account of "
+                "why was wrong until 2026-09-01.",
+                "tests/forecasting/test_guard_coverage_evidence.py::"
+                "test_a_non_finite_observation_cannot_be_built_at_all",
+            ),
+            (
+                "forecasting/evidence.py",
+                "not domain_for(s.unit).contains(s.value)",
+            ): (
+                "unreachable-behind-earlier-guard",
+                "The per-sample input-domain sweep. `domain_for` reads the SAME "
+                "Phase-1 `unit_domain` authority that `Measurement.__post_init__` "
+                "enforces at construction — bounds and integer semantics alike — so a "
+                "raw sample out of its own domain cannot be built in the first place. "
+                "Kept because the forecasting layer must not depend on the canonical "
+                "layer continuing to enforce it; a divergence re-opens this exclusion "
+                "by construction, since the sweep fails on a stale exclusion.",
+                "tests/forecasting/test_guard_coverage_evidence.py::"
+                "test_an_out_of_domain_observation_cannot_be_built_at_all",
+            ),
+            (
+                "forecasting/evidence.py",
+                "forecast_space is ForecastValueSpace.NORMALIZED",
+            ): (
+                "equivalent-mutant",
+                "The early NORMALIZED abstention for a target with no normalization "
+                "signal. Neutralised, the working-window build is reached instead and "
+                "raises `NormalizationApplicabilityError(reason='unsupported_target')`, "
+                "which the except-arm maps straight back to `UNSUPPORTED_TARGET` over "
+                "the same probe window — same reason, same bound window, same record. "
+                "Kept because reaching a typed abstention without constructing and "
+                "discarding a window is the honest shape.",
+                "tests/forecasting/test_guard_coverage_evidence.py::"
+                "test_an_unnormalizable_target_abstains_the_same_way_through_either_path",
+            ),
+            (
+                "forecasting/evidence.py",
+                "except NormalizationApplicabilityError: _abstain(_APPLICABILITY_REASON"
+                ".get(exc.reason, AbstentionReason.MISSING_NORMALIZATION_POLICY), probe)",
+            ): (
+                "equivalent-mutant",
+                "The arm itself is reachable and a later-sample normalization failure "
+                "reaches it. What the except-arm mutation rewrites is the reason member "
+                "the arm NAMES, and the only member named there is the `.get()` "
+                "DEFAULT — dead code, because `_APPLICABILITY_REASON` is total over "
+                "every reason `NormalizationApplicabilityError` is constructed with. "
+                "Rewriting a default that never fires changes nothing observable. The "
+                "evidence test parses the window module and asserts that totality.",
+                "tests/forecasting/test_guard_coverage_evidence.py::"
+                "test_every_applicability_reason_has_a_mapped_abstention",
+            ),
+            (
+                "forecasting/evaluation.py",
+                "self.status is EvaluationStatus.ABSTAINED",
+            ): (
+                "equivalent-mutant",
+                "The ABSTAINED arm of the four-way status dispatch. It and the "
+                "catch-all arm below it enforce an identical pair of rules — no "
+                "scored/actual fields, and a reason is required — so a neutralised "
+                "dispatch sends an ABSTAINED record to a fall-through that accepts and "
+                "rejects exactly what it would. The two differ only in message text, "
+                "and ADR §6 forbids attributing a kill to a message substring. Kept "
+                "because naming ABSTAINED makes the dispatch read as four outcomes "
+                "rather than three plus a remainder.",
+                "tests/forecasting/test_guard_coverage_evaluation.py::"
+                "test_abstained_and_the_catch_all_arm_enforce_the_same_two_rules",
+            ),
+            (
+                "forecasting/replay.py",
+                "actual is not None and _as_utc(actual.observed_at) <= _as_utc(cutoff)",
+            ): (
+                "unreachable-behind-earlier-guard",
+                "The replay loop's second leakage guard, which the source calls "
+                "belt-and-suspenders. `_match_actual`'s own eligibility rule already "
+                "skips every observation at or before the cutoff, so no candidate the "
+                "loop can receive is non-future. Kept precisely because it is the "
+                "redundant half of a leakage check: the evidence test measures the "
+                "first half with a tolerance ten times the horizon, the only width at "
+                "which a past observation could otherwise fall inside the match window.",
+                "tests/forecasting/test_guard_coverage_forecasting.py::"
+                "test_the_matcher_never_returns_an_actual_at_or_before_the_cutoff",
+            ),
+            # --- phase 1 (planning/) ----------------------------------------------
             ("planning/constraints.py", "v is None"): (
                 "diagnostic-only",
                 "`_finite_number`'s None branch. No call site passes `allow_none=True` "
@@ -691,6 +845,24 @@ PACKAGES = {
                 ,
                 "tests/planning/test_guard_coverage.py::"
                 "test_an_all_tied_selection_is_refused_as_a_recommendation_error",
+            ),
+            (
+                "planning/pipeline.py",
+                "fc.point_estimate is None or not math.isfinite(float(fc.point_estimate))",
+            ): (
+                "unreachable-behind-earlier-guard",
+                "Both halves are barred by contracts that fire first. `point_estimate is "
+                "None` cannot hold: `CapacityForecast.__post_init__` refuses a "
+                "FORECAST-status forecast without an estimate, and an ABSTAINED one is "
+                "caught by the `fc.is_abstained` gate four lines above. `not isfinite(...)` "
+                "cannot be reached either: the pipeline computes "
+                "`forecast_evidence.digest()` *before* this gate, and the canonical "
+                "serializer refuses to canonicalize a non-finite float, so a NaN forecast "
+                "dies there with CanonicalizationError — a different contract. The gate is "
+                "real defense in depth and is kept; the evidence test drives the NaN case "
+                "and records where it actually stops.",
+                "tests/planning/test_guard_coverage.py::"
+                "test_a_non_finite_forecast_estimate_never_reaches_the_planner",
             ),
             ("planning/topology.py", "seen[key] != edge.kind"): (
                 "diagnostic-only",

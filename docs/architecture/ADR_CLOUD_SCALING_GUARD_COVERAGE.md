@@ -638,6 +638,25 @@ repository at all.
 
 ## §12. Controller phase 1 — `planning/` adopted, honestly partial, 2026-08-31
 
+> **WITHDRAWN IN PART, 2026-09-01 (see §13.a).** Two numeric claims in this section
+> were false when written and are withdrawn here so that a reader of §12 alone is not
+> misled. **The denominator "219" is withdrawn; the measured figure is 252.** **The
+> result "0 survived" is withdrawn; four guards survived at the boundary as it should
+> have been declared.** The cause was an undeclared refusal helper, not a mis-sweep:
+> `planning/pipeline.py` reaches its abstentions through `_abstain` and five bindings
+> built on it, none of which phase 1 declared in `refusal_calls`, so 33 decision points
+> were never enumerated. Everything else in this section — the boundary rationale, the
+> exclusion doctrine, the prerequisite findings — stands as written. The withdrawn
+> figures are left in place below rather than silently rewritten, because a record that
+> quietly corrects itself teaches nothing about how the error was possible.
+>
+> **Two further figures in this section are phase-1 values that phase 2 superseded** —
+> the 68-module boundary disclosure (now 47) and the 16 named exclusions (now 24). They
+> are marked in place below. An earlier draft of this note said "everything else in this
+> section stands as written", which was false while those two stood unmarked; a
+> withdrawal note that overstates its own completeness is the same defect it exists to
+> correct.
+
 Ruling 3 of 2026-08-31 ordered the Cloud Scaling Controller adopted **in phases**,
 starting with `planning/` and "report it honestly as partial controller coverage",
 each phase CI-blocking before the next. This section records phase 1.
@@ -652,7 +671,8 @@ every deferred subpackage with its size and states that a green sweep here is no
 evidence about any of them. A module added outside `planning/` fails the inventory's
 completeness gate rather than escaping it.
 
-**The denominator was re-derived by measurement: 219** — 213 `if`-layer guards, 4
+**The denominator was re-derived by measurement: 219** *(withdrawn — the measured
+figure is 252; see §13.a)* — 213 `if`-layer guards, 4
 helper-admission sites, 1 except-arm, 1 else-arm. The first derivation measured 218:
 the entry named the reason vocabulary by its class, but `pipeline.py` imports it as
 `RecommendationAbstentionReason as R` and writes `R.MEMBER` at all 31 of its refusal
@@ -697,7 +717,10 @@ isolating probe.
 
 **Measured at adoption, after closing the survivors: 219 guards, 203 killed, 0
 survived, 0 unscored, 16 excluded, 0 message-only kills**, against a green 646-test
-baseline `[V: aggregate]`. The mint site is `CapacityActionRecommendation.__post_init__`
+baseline `[V: aggregate]`. *(Withdrawn — the "219" and the "0 survived" are both false;
+the boundary was 252 and four guards survived it. The aggregate was a true measurement
+of a surface that had been enumerated incompletely, which is precisely why "measured"
+is not the same as "complete". See §13.a.)* The mint site is `CapacityActionRecommendation.__post_init__`
 — a recommendation that exists is the artifact, and abstention is deliberately not a
 mint. Two §7.1/§9.d-class prerequisites surfaced and were fixed with the repository's
 own conventions: the suite did not collect outside the repository at all (three test
@@ -709,7 +732,9 @@ defect §11 fixed for operations; latent here, fixed unconditionally).
 **CI.** `cloud-scaling-controller-phase3-ci.yml` — already scoped to Phase 3, which
 is `planning/` — gains the shared-engine jobs: inventory regeneration (which now also
 enforces the 68-module boundary disclosure), engine tests, a four-shard sweep, and an
-aggregate pinning the totals above with the 16 exclusions named individually. The
+aggregate pinning the totals above with the 16 exclusions named individually. *(Both
+figures are phase-1 values and were superseded by phase 2 — the disclosure now covers 47
+deferred modules and the aggregate pins 24 exclusions. See §13.)* The
 engine-filter floor test rises from five workflows to seven, and the raise closed a
 real gap: `cloud-scaling-risk-integration-ci.yml` had run the shared engine since its
 own adoption without ever being named in the floor.
@@ -717,3 +742,256 @@ own adoption without ever being named in the floor.
 **Next phases.** `forecasting/` (102 raises) and `canonical/` (94) carry most of the
 deferred refusal surface and are the natural phase 2; each later phase re-derives its
 own denominator and meets this same bar before the boundary widens.
+
+## §13. Controller phase 2 — `canonical/` and `forecasting/` adopted, 2026-09-01
+
+Ruling 3 of 2026-08-31 ordered the controller adopted in phases, each CI-blocking
+before the next. Phase 1 (§12) took `planning/`. This section records phase 2, which
+widens the boundary to `canonical/` and `forecasting/` and renames the entry to
+`controller-evidence-planning`, the key naming what it now walks rather than what it
+walked first. It remains **partial** controller coverage: 31 of 78 production modules.
+
+### §13.a §12's denominator was an undercount, and CI could not have caught it
+
+Phase 1 published 219 guards and "0 scored survivors". Both figures were wrong.
+
+`planning/pipeline.py` reaches its typed abstentions through a helper, `_abstain`, and
+through five bindings built on it (`ab`, `abf`, `abc`, `abcost`). Phase 1's entry did
+not declare those names in `refusal_calls`, so the engine did not recognise their
+`return f(...)` sites as refusals and enumerated none of them. Declaring them adds **33
+guards**, all in `pipeline.py`, and they are not peripheral: they are the gates
+selecting `UNSUPPORTED_FORECAST_TARGET`, `INSUFFICIENT_FORECAST_CONFIDENCE`,
+`FUTURE_DATA_LEAKAGE`, `MISSING_CURRENT_CAPACITY` and `FORECAST_ABSTAINED` — the
+pipeline's whole abstention surface. **The corrected `planning/` figure is 252, not
+219.** Four of the 33 were genuine survivors, so §12's "0 scored survivors" was false
+when it was written, and the four are closed in this phase.
+
+The failure mode is worth naming because the gate that should have caught it is the one
+that hid it. The phase-1 workflow pins `inventory_total` to 219 exactly. A denominator
+error moves the total, so the pin fails — and the natural reading of a failing pin is
+"someone added a guard", not "the previous count was short". An exact pin is excellent
+at catching drift in a surface whose *boundary* is right and useless against a boundary
+that was never right. Nothing in the sweep can detect a decision point it was never
+told to look for; only re-deriving the refusal vocabulary against the source can.
+
+**The rule this yields: a phased adoption must re-derive `refusal_calls` from the source
+at every phase, never inherit the previous phase's set.**
+
+`[G]` **That rule is prose, and nothing enforces it.** No engine test derives a refusal
+idiom set from the boundary and reconciles it against the declaration, the way
+`test_module_completeness.py::test_every_excluded_adopter_module_reason_still_holds`
+already reconciles the deferred `raise` counts. Every CI pin here is computed *from* the
+inventory, so all of them are conditional on the boundary being right — which is exactly
+the failure this section describes. Making the rule mechanical is the obvious next
+hardening and is deliberately not attempted in this phase. §12's own §12-equivalent
+lesson was the aliased-import one (`RecommendationAbstentionReason as R`); this is the
+same lesson one level up — the engine sees the names it is given, and a refusal it
+cannot name is a refusal it cannot count. Both were found by testing the candidate
+rather than reasoning about it.
+
+### §13.b The measured boundary
+
+**527 guards.** 252 are the corrected `planning/` surface; 275 come from the widening
+(`canonical/` 10 modules, `forecasting/` 11). The remaining 47 production modules stay
+named individually in `excluded_modules` with their measured `raise` counts, and the
+generated inventory's preamble names every deferred subpackage and states that a green
+sweep here is not evidence about any of them.
+
+**First-sweep survival: 165 of 527, 31.3%** (reported from the run, not archived — no
+first-sweep artifact is checked in, so a reader cannot re-derive this one figure). That is the honest number for a surface
+adopted without its tests having been written against a sweep — three times phase 1's
+rate over `planning/` alone, which is what a layer built for canonical correctness
+rather than for gate coverage looks like when it is first measured.
+
+**Final: 503 killed, 24 excluded, 0 survivors, 0 unscored, 0 message-only kills.**
+
+Both of those figures moved after an adversarial audit of the phase-2 PR, and §13.f
+records why — a coverage phase that cannot survive an adversarial read of its own
+exclusions has not finished.
+
+### §13.c Four survivors were weak probes, not equivalent mutants
+
+The full sweep left 12 of the widened surface surviving. Seven are excluded in §13.d;
+an eighth, `normalization.py:197`, was excluded and then withdrawn under audit (§13.f)
+and is now SCORED. The other four were tests that passed
+whether or not their guard existed, because each probe was routed into a *sibling* gate
+refusing the same input under the same typed contract. They are recorded because the
+mistake is systematic, not incidental — the same author wrote a correct probe for the
+identical pattern in `canonical/state.py` and an incorrect one in `canonical/identity.py`
+in the same sitting:
+
+| Guard | Probe that failed to kill | Probe that kills |
+|---|---|---|
+| `identity.py:78` | `from_dict(["checkout"])` — dies on the unknown-field check | `from_dict(["workload_id"])` — passes both earlier checks |
+| `normalization.py:203` | non-finite with `clamp=False` — the range check refuses it too | `clamp=True` — neutralised, the overflow is clamped to a confident `1.0` |
+| `forecast.py:88` | unknown status on a forecast — the abstained arm rejects its point estimate | unknown status on an abstention — the arm accepts it |
+| `evaluation.py:335` | `unscored_record(status=EVALUATED)` — rejected one frame deeper anyway | `status=ABSTAINED` — a well-formed record nothing objects to |
+
+**The rule: a probe must be chosen against the code the neutralised guard falls through
+to, not against the guard itself.** A gate-removal sweep is the only thing that
+distinguishes the two, which is why no exclusion in this repository may be written
+before a sweep has measured that guard surviving its isolating probe.
+
+### §13.d The eight new exclusions
+
+Phase 1 carried 16. Phase 2 adds eight — seven in `canonical/`/`forecasting/` and one,
+`planning/pipeline.py:147`, in the newly-enumerated pipeline surface — for 24. That
+`planning/` entry is **new, not pre-existing**: it is one of the 33 guards phase 1 never
+counted, so it could not have been excluded before this phase existed.
+
+Four are `unreachable-behind-earlier-guard`, three are `equivalent-mutant`, and one
+(`pipeline.py:147`) is `unreachable-behind-earlier-guard` in the pipeline. Every one
+carries an evidence test that measures the *jacket* — the thing that makes the guard
+unreachable or redundant — so the exclusion fails the day the jacket goes away:
+
+* `normalization.py:200` (exhaustive `else`) — every declared `NormalizationMethod` has
+  a dispatch arm; the evidence test asserts that, so it fails when one is added without.
+* `evidence.py:240` (non-finite sweep) and `evidence.py:246` (domain sweep) — `domain_for`
+  reads the *same* `unit_domain` authority `Measurement.__post_init__` enforces, so
+  neither a non-finite nor an out-of-domain sample can be constructed at all.
+* `replay.py:191` (second leakage guard) — `_match_actual`'s eligibility rule already
+  skips every observation at or before the cutoff; measured with a tolerance ten times
+  the horizon, the only width at which a past observation could otherwise match.
+* `evidence.py:277` (NORMALIZED early abstention) — the window builder it falls through
+  to produces the identical reason over the identical window.
+* `evidence.py:287` (normalization except-arm) — **the arm is reachable; the mutation
+  target is not.** The except-arm mutation rewrites the reason member the arm *names*,
+  and the only member named there is the `.get()` default — dead code, because
+  `_APPLICABILITY_REASON` is total over every reason the error carries. Reaching an arm
+  and reaching its mutation target are different questions, and a first reading
+  conflated them.
+* `evaluation.py:204` (ABSTAINED dispatch) — the ABSTAINED arm and the catch-all below
+  it enforce an identical pair of rules, differing only in message text, which §6
+  forbids attributing a kill to.
+
+### §13.e Carried forward, not decided here
+
+The 47 deferred modules remain deferred. Whether `signals/` should be adopted next — it
+feeds canonical state, so the boundary drawn here is arguably one layer short — is a
+judgment call about boundary placement, not a fact the repository settles, and is left
+to a later ruling.
+
+### §13.f What an adversarial audit of this phase found, and why it is recorded
+
+The phase-2 PR was submitted claiming 502 killed / 25 excluded / 0 message-only kills.
+An independent read-only adversarial audit falsified two of those claims. Both are
+recorded here rather than quietly corrected, because each is a *different* way for a
+coverage phase to be wrong while every number it publishes looks right.
+
+**1. A message-only kill, produced by the evidence test written to prevent one.**
+`canonical/measurement.py:121` — the non-finite check — was killed by exactly one test,
+whose assertion was `assert "finite" in str(exc.value)`. §6 forbids attributing a kill
+to a message substring, and the engine's own detector flags it; the PR nonetheless
+claimed zero. The cause is the jacket pattern of §13.c, one level over: the probe used
+`Unit.PERCENT`, and `0.0 <= nan <= 100.0` is False, so the *range* check refuses NaN
+whether or not the finiteness gate exists. The typed half was therefore unkillable and
+only the message differed. `Unit.MILLISECONDS` is unbounded above and its only other
+check is `value < 0.0`, False for both NaN and infinity — so under that unit the gate is
+the sole refusal, and a typed assertion kills it. **The lesson is not "avoid message
+assertions"; it is that a message assertion is what a jacketed probe degrades into, and
+the message-only detector is therefore a jacket detector.**
+
+**2. An exclusion whose unreachability claim was false.** `canonical/normalization.py:197`
+(`threshold <= 0`) was excluded as `unreachable-behind-earlier-guard` on the reading that
+`NormalizationPolicy` refuses a non-positive threshold at construction. It does. But
+`__post_init__` freezes its mappings with `object.__setattr__(self, "thresholds",
+dict(self.thresholds))`, and a `dict` is not immutable — the comment above that line says
+"immutable copies" and is wrong. The dataclass is frozen against attribute rebinding, not
+against mutation of the mapping it hands out. Mutating `policy.thresholds` after
+construction reaches the division, and neutralising the guard then CLAMPS `5.0 / -1.0`
+to `0.0` under a default policy: a normalized signal reading as zero saturation, produced
+by dividing by a negative divisor. The guard is load-bearing, not defensive; it is now
+SCORED with a probe, and the totals moved to **503 killed / 24 excluded**.
+
+**The general rule: "an earlier guard validates this" is a claim about a value's whole
+lifetime, not about one instant.** Construction-time validation bounds an object when it
+is built; if a mutable structure survives construction, the bound does not survive with
+it. Every `unreachable-behind-earlier-guard` exclusion should be read against that test.
+
+**The rule is a prompt to measure, not a conclusion — and a re-audit falsified the
+stronger form using this ADR's own exclusion set.** A first draft of this paragraph said
+that a surviving mutable structure *makes* a later-frame guard reachable, full stop.
+`NormalizationPolicy.method_by_signal` is frozen by the same defective `dict(...)` line
+as `thresholds`, one line above it, and `normalization.py:200` reads it — yet `:200` is
+still correctly excluded, because every post-construction mutation of that mapping dies
+on an untyped `KeyError` at `_METHOD_UNITS[method]` before the dispatch is reached. Same
+defect, same shape of argument, opposite answer.
+
+So a surviving mutable structure makes an exclusion **suspect**, and suspicion is
+discharged by a probe and a sweep, never by the argument alone. That is §13.c's lesson
+restated one level up: the difference between the two exclusions is a fact about the
+code, and only measurement settles it.
+
+Neither defect was found by the sweep, by CI, or by the author. Both were found by
+attacking the exclusions specifically — which is why an adversarial pass on the exclusion
+set, not merely a green aggregate, is what finishes a phase.
+
+**A footnote on the pins, earned in this phase.** Fixing the two defects above added one
+test, moving the suite from 812 to 813, and the first CI run after the fix failed on
+exactly that: `baseline collected 813, expected 812 per shard`. Every other assertion in
+the same block passed — inventory 527, killed 503, excluded 24, unscored 0, **message-only
+0**. That is the pin doing precisely the job §13.a says it is good at: catching drift in a
+surface whose boundary is right. It remains no help at all against a boundary that is
+wrong, which is why both statements belong in the record together.
+
+### §13.g The `match=` blind spot — measured, partly closed, and deliberately not closed in the engine
+
+A second adversarial audit, of the head that fixed §13.f's two defects, found that the
+phase **still** had message-only kills and that CI could not have reported them.
+
+**The blind spot.** `_TYPE_READS` matches `pytest.raises(` unconditionally, on the
+reasoning recorded beside it: a statement that also raises-checks has asserted the
+exception class, so its failure is not attributable to prose. **That reasoning holds only
+while the class differs between the guarded and unguarded paths.** Where one module
+raises one error type with several prose messages, the class check passes under mutation
+and the `match=` regex alone fails — a message-only kill wearing a typed statement.
+
+**Two live instances in this phase, both closed here.** Both are in `forecasting/
+series.py`, both SCORED, both put into the scored set by this phase's widening, and both
+load-bearing rather than diagnostic:
+
+* `:166` collapses `CROSS_SUBJECT` into `CROSS_TENANT`. `_SERIES_ERROR_ABSTENTION` maps
+  those to **different** typed abstentions, so the collapse loses a distinction a service
+  boundary acts on.
+* `:218` silently admits two observations that share a timestamp and disagree on content
+  under `COLLAPSE_IDENTICAL`; its mutant then reports "multiple *identical* observations",
+  which is false of the input it just accepted.
+
+Six `match=` probes in `test_series.py` now assert `SeriesErrorReason` — a vocabulary this
+package's own engine entry declares in `reason_vocabularies` and which **no test in the
+suite read**. Two were sole killers; four were latent by the same mechanism.
+`test_uncertainty.py`'s `pytest.raises(Exception)` sole killer is likewise typed now:
+bare `Exception` asserts no contract, and it was the whole published evidence for the
+coverage gate.
+
+**The engine fix is measured, correct, and deliberately NOT in this phase.** Reading the
+*failure* rather than the statement source distinguishes the two cases exactly — pytest
+signals a regex-only failure with its own `AssertionError`, raised after the class already
+matched, so a `match=` test whose mutant raised nothing still scores as the typed kill it
+is. Applied to the neighbours, it turns `risk-integration` red: **10 message-only kills**
+(`authenticity.py` ×6, `adapter.py` ×2, `outcomes.py`, `projection.py`), because the
+aggregate refuses any (`guard_sweep.py`, the `message_only_kills` problem).
+
+`[G]` **That figure is a lower bound on the follow-up's scope, not the whole of it.**
+`risk-integration` is the only neighbour actually measured under the strengthened
+detector; the `authorization-contracts` run was terminated by its host before writing a
+result, and the remaining four adopters were never started. `authorization-contracts`
+carries 14 `pytest.raises(Exception)` sites and is the most likely of the four to carry
+further instances. The follow-up must measure every adopter before it claims a scope.
+
+Landing it here would break a passing gate on a package this phase does not otherwise
+touch, and would forfeit the adopter-isolation property the phase is audited against.
+**Owner ruling, 2026-09-01: split.** The controller's own defects are closed at the test
+level and hold under either detector, so this phase loses nothing by deferring; the engine
+change plus every adopter's fixes are a follow-up whose scope is now measured rather than
+guessed.
+
+`[G]` **Until that follow-up lands, `message_only_kills == 0` means "no kill matched the
+detector", not "no kill is attributable to prose."** Nineteen `match=` sites remain in
+this package's evaluation, window and replay tests. None is a sole killer — an exhaustive
+mutation of all 480 `if`-kind scored guards found only the two above, and a final
+independent audit extended that to all **503** scored guards (adding the 17
+helper-admission, 5 else-arm and 1 except-arm sites) with the same result — and none can be
+converted today: `EvaluationError`, `WindowError` and `ReplayError` are bare `ValueError`
+subclasses with no typed discriminator to assert. Giving them one is a production change
+a coverage phase must not make, and is part of the same follow-up.

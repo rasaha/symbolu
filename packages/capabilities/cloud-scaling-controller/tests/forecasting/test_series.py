@@ -11,6 +11,7 @@ from ugence_cloud_scaling_controller.forecasting import (
     OrderingPolicy,
     SeriesConstructionPolicy,
     SeriesError,
+    SeriesErrorReason,
 )
 
 
@@ -33,23 +34,26 @@ def test_empty_series_rejected():
 def test_cross_subject_contamination_fails_closed():
     a = fx.cpu_state(fx.at(0), 10.0, subj=fx.subject("wl-A"))
     b = fx.cpu_state(fx.at(60), 20.0, subj=fx.subject("wl-B"))
-    with pytest.raises(SeriesError, match="cross-subject"):
+    with pytest.raises(SeriesError) as exc:
         CanonicalCapacitySeries.build([a, b])
+    assert exc.value.reason is SeriesErrorReason.CROSS_SUBJECT
 
 
 def test_cross_tenant_contamination_fails_closed():
     a = fx.cpu_state(fx.at(0), 10.0, subj=fx.subject("wl-A", tenant_id="t1"))
     b = fx.cpu_state(fx.at(60), 20.0, subj=fx.subject("wl-A", tenant_id="t2"))
-    with pytest.raises(SeriesError, match="cross-tenant"):
+    with pytest.raises(SeriesError) as exc:
         CanonicalCapacitySeries.build([a, b])
+    assert exc.value.reason is SeriesErrorReason.CROSS_TENANT
 
 
 def test_naive_timestamp_rejected_by_default():
     from datetime import datetime
     naive = datetime(2026, 1, 1, 0, 0, 0)
     s = fx.cpu_state(naive, 10.0)
-    with pytest.raises(SeriesError, match="timezone-aware"):
+    with pytest.raises(SeriesError) as exc:
         CanonicalCapacitySeries.build([s])
+    assert exc.value.reason is SeriesErrorReason.NAIVE_TIMESTAMP
 
 
 def test_naive_allowed_when_policy_opts_in():
@@ -65,8 +69,9 @@ def test_naive_allowed_when_policy_opts_in():
 def test_out_of_order_rejected_by_default():
     states = fx.cpu_series_states([10.0, 20.0, 30.0])
     shuffled = [states[2], states[0], states[1]]
-    with pytest.raises(SeriesError, match="invalid event-time order"):
+    with pytest.raises(SeriesError) as exc:
         CanonicalCapacitySeries.build(shuffled)
+    assert exc.value.reason is SeriesErrorReason.INVALID_TIME_ORDER
 
 
 def test_sort_policy_opt_in_is_disclosed():
@@ -81,8 +86,9 @@ def test_sort_policy_opt_in_is_disclosed():
 
 def test_duplicate_identical_rejected_by_default():
     s = fx.cpu_state(fx.at(0), 10.0)
-    with pytest.raises(SeriesError, match="duplicate timestamp"):
+    with pytest.raises(SeriesError) as exc:
         CanonicalCapacitySeries.build([s, s])
+    assert exc.value.reason is SeriesErrorReason.DUPLICATE_TIMESTAMP
 
 
 def test_duplicate_identical_collapsed_when_policy_opts_in():
@@ -102,8 +108,9 @@ def test_conflicting_duplicate_always_rejected_even_with_collapse_policy():
         SeriesConstructionPolicy(),
         SeriesConstructionPolicy(duplicate_timestamp=DuplicateTimestampPolicy.COLLAPSE_IDENTICAL),
     ):
-        with pytest.raises(SeriesError, match="conflicting duplicate"):
+        with pytest.raises(SeriesError) as exc:
             CanonicalCapacitySeries.build([a, b], pol)
+        assert exc.value.reason is SeriesErrorReason.CONFLICTING_DUPLICATE
 
 
 def test_digest_changes_with_content():

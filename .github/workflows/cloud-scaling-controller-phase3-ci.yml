@@ -158,7 +158,7 @@ jobs:
           if-no-files-found: warn
 
   guard-sweep:
-    name: Gate-removal mutation sweep (planning phase, shard ${{ matrix.shard }} of 4)
+    name: Gate-removal mutation sweep (evidence+planning phase, shard ${{ matrix.shard }} of 4)
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -181,12 +181,12 @@ jobs:
         # `--inventory-only` also fails on an exclusion that names no guard, one with a
         # reason outside the closed vocabulary, and a production module that is neither
         # walked by module_order nor excluded with a concrete reason — for this PHASED
-        # adoption the second half is the boundary contract: all 68 deferred controller
-        # modules are declared by name, so a module added outside `planning/` fails the
-        # inventory instead of escaping it.
+        # adoption the second half is the boundary contract: all 47 deferred controller
+        # modules are declared by name, so a module added outside the three walked
+        # subpackages fails the inventory instead of escaping it.
         if: matrix.shard == 1
         run: |
-          python scripts/cloud_scaling/guard_sweep.py controller-planning --inventory-only
+          python scripts/cloud_scaling/guard_sweep.py controller-evidence-planning --inventory-only
           git diff --exit-code -- \
             packages/capabilities/cloud-scaling-controller/GUARD_INVENTORY.md \
             packages/capabilities/cloud-scaling-controller/guard_inventory.json \
@@ -195,18 +195,18 @@ jobs:
         if: matrix.shard == 1
         run: python -m pytest scripts/cloud_scaling/tests -q
       - name: Sweep this shard
-        # 219 guards against a ~7s suite: four shards put each at roughly a quarter of
+        # 527 guards against a ~11s suite: four shards put each at roughly a quarter of
         # an hour. Refuses a red baseline outright (exit 2) rather than scoring against
         # it, and exits non-zero on a surviving scored guard or an unscored one.
-        run: python scripts/cloud_scaling/guard_sweep.py controller-planning --shard ${{ matrix.shard }}/4
+        run: python scripts/cloud_scaling/guard_sweep.py controller-evidence-planning --shard ${{ matrix.shard }}/4
       - name: The tracked tree was not mutated
         run: git diff --exit-code
         if: always()
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: controller-planning-guard-sweep-shard-${{ matrix.shard }}
-          path: /tmp/ugence-sweep-controller-planning/*.json
+          name: controller-evidence-planning-guard-sweep-shard-${{ matrix.shard }}
+          path: /tmp/ugence-sweep-controller-evidence-planning/*.json
           if-no-files-found: warn
 
   guard-sweep-aggregate:
@@ -221,16 +221,16 @@ jobs:
           python-version: "3.11"
       - uses: actions/download-artifact@v4
         with:
-          pattern: controller-planning-guard-sweep-shard-*
+          pattern: controller-evidence-planning-guard-sweep-shard-*
           merge-multiple: true
           path: shards
       - name: Prove the sweep was total, and block on every way it can be incomplete
         run: |
-          python scripts/cloud_scaling/guard_sweep.py controller-planning \
+          python scripts/cloud_scaling/guard_sweep.py controller-evidence-planning \
             --aggregate shards --shards 4
       - name: The totals are the ones this phase ratified
         # The phased-adoption ruling's bar (2026-08-31): zero surviving SCORED, zero
-        # unscored and zero message-only kills, with the 16 defense-in-depth exclusions
+        # unscored and zero message-only kills, with the 24 defense-in-depth exclusions
         # named individually — every one a guard whose mutation is jacketed by a sibling
         # gate refusing the same input under the same typed contract, measured and
         # recorded in its evidence test rather than asserted.
@@ -259,23 +259,35 @@ jobs:
               f"baselines={report['baselines']}"
           )
           problems = []
-          if report["baselines"] != {"1": 646, "2": 646, "3": 646, "4": 646}:
+          if report["baselines"] != {"1": 813, "2": 813, "3": 813, "4": 813}:
               problems.append(
-                  f"baseline collected {report['baselines']}, expected 646 per shard"
+                  f"baseline collected {report['baselines']}, expected 813 per shard"
               )
-          if report["inventory_total"] != 219:
-              problems.append(f"inventory is {report['inventory_total']}, not 219")
-          if len(report["killed"]) != 203:
-              problems.append(f"{len(report['killed'])} guards killed, not 203")
+          if report["inventory_total"] != 527:
+              problems.append(f"inventory is {report['inventory_total']}, not 527")
+          if len(report["killed"]) != 503:
+              problems.append(f"{len(report['killed'])} guards killed, not 503")
           if report["message_only_kills"]:
               problems.append(
                   f"message-only kills: {report['message_only_kills']}; the phase "
                   "ruling forbids scoring a kill attributable to prose alone"
               )
           expected = [
+              # phase 2 — eight measured exclusions (seven here, plus
+              # planning/pipeline.py:147 below, which is one of the 33 guards
+              # phase 1 never enumerated and so is NEW, not pre-existing)
+              "canonical/normalization.py:200",
+              "forecasting/evaluation.py:204",
+              "forecasting/evidence.py:240",
+              "forecasting/evidence.py:246",
+              "forecasting/evidence.py:277",
+              "forecasting/evidence.py:287",
+              "forecasting/replay.py:191",
+              # phase 1 (planning/)
               "planning/candidates.py:112",
               "planning/candidates.py:233",
               "planning/constraints.py:58",
+              "planning/pipeline.py:147",
               "planning/pipeline.py:268",
               "planning/policy.py:175",
               "planning/recommendation.py:216",
@@ -298,6 +310,6 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: controller-planning-guard-sweep-aggregate
+          name: controller-evidence-planning-guard-sweep-aggregate
           path: packages/capabilities/cloud-scaling-controller/guard_sweep_aggregate.json
           if-no-files-found: warn
