@@ -1,7 +1,7 @@
 {
   "distribution": "ugence-agent-constitution-policy",
   "namespace": "ugence_agent_constitution_policy",
-  "package_version": "0.1.0",
+  "package_version": "0.2.0",
   "policy_family": "agent_governance.agent_constitution",
   "adapter_id": "ugence.agent-constitution/v1",
   "policy_type": "AgentConstitutionPolicy",
@@ -110,6 +110,7 @@
         "lifecycle_state",
         "tenant_id",
         "supersedes_ref",
+        "supersedes_coordinate",
         "effective_from",
         "effective_to"
       ]

@@ -50,6 +50,7 @@ from datetime import datetime
 from typing import Optional, Tuple
 
 from ugence_agentic_proposer import CandidateDisposition, ReviewAction
+from ugence_policy_authority.api import PolicyCoordinate
 
 from .errors import (
     AgentConstitutionDuplicateError,
@@ -221,6 +222,20 @@ class AgentConstitutionPolicyMetadata:
     lifecycle_state: str
     tenant_id: str = ""
     supersedes_ref: str = ""
+    #: `ACC-SU-1` / `ACC-SU-IA-1`. The exact predecessor this constitution
+    #: supersedes, as the authority's own complete :class:`PolicyCoordinate` —
+    #: the only shape its registry can resolve. ``None`` is the default and the
+    #: ordinary case: a constitution supersedes nothing unless it says so.
+    #:
+    #: `[R]` **Excluded from the canonical projection** (`ACC-SU-2`), on the same
+    #: ground ``content_digest`` is: what a version replaces is a claim about the
+    #: registry, not part of the bytes it is identified by. The consequence is
+    #: deliberate and recorded — this artifact does not self-attest its
+    #: predecessor; the signed ``PolicySupersessionRecord`` the authority writes
+    #: is where that claim lives.
+    #:
+    #: This never relaxes ``supersedes_ref``, which the authority keeps refusing.
+    supersedes_coordinate: Optional[PolicyCoordinate] = None
     effective_from: Optional[datetime] = None
     effective_to: Optional[datetime] = None
 
@@ -263,6 +278,13 @@ class AgentConstitutionPolicyMetadata:
             "AgentConstitutionPolicyMetadata.supersedes_ref",
             allow_empty=True,
         )
+        if self.supersedes_coordinate is not None and not isinstance(
+            self.supersedes_coordinate, PolicyCoordinate
+        ):
+            raise AgentConstitutionFieldError(
+                "AgentConstitutionPolicyMetadata.supersedes_coordinate must be a "
+                "PolicyCoordinate — a string cannot bind an exact predecessor"
+            )
 
         # Scope and tenant are one fact, not two. A GLOBAL policy carries the
         # authority's canonical empty tenant component; a TENANT policy that named
