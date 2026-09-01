@@ -1,5 +1,31 @@
 # Changelog — ugence-cloud-scaling-producer-attestation
 
+## [Unreleased] — two frozen digests re-pinned for Phase 5A schema 2 (ETS-15)
+
+**No source change in this package, and no version bump.** Phase 5A took
+`ExecutionTargetScope` to schema 2, which moved the candidate beneath this package's own
+artifact digest.
+
+| digest | from | to |
+|---|---|---|
+| `PHASE_5A_CANDIDATE_DIGEST` | `357bb3d4…` | `bbcd4ad7…` |
+| `FROZEN_VERIFIED_ARTIFACT_DIGEST` | `fefe4884…` | `33b14481…` |
+
+`tests/data/phase5a_candidate.json` was regenerated with
+`scripts/generate_frozen_candidate.py`; its independently produced candidate digest
+matches the value measured from the built chain, which is the cross-check that the payload
+still reproduces the genuine chain rather than merely agreeing with itself.
+
+Three Phase 5A pins in `tests/test_phase5a_invariants.py` also move: the version to
+`0.8.0`, the export count to 45 (`CANONICAL_CLOUD_PROVIDERS`, `CLOUD_PROVIDER_AZURE` —
+named, because a count alone is satisfied by any two symbols), and four of the eleven
+frozen digests. **The other seven are unmoved and asserted so** — the evidence that schema
+2 reached no Phase 4 contract.
+
+Each superseded value is pinned as a negative anchor: a payload reproducing it carries a
+schema-1 scope, refused by ruling rather than upgraded.
+
+
 All notable changes to this distribution. This package follows the Cloud Scaling phase
 numbering; each entry names the phase that produced it.
 

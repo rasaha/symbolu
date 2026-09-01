@@ -17,6 +17,8 @@ import pytest
 
 from conftest import (
     ACCOUNT_ID,
+    ACCOUNT_ID_AZURE,
+    RESOURCE_GROUP_AZURE,
     PRODUCER_ID,
     RECOMMENDATION_ID,
     build_attestation,
@@ -971,3 +973,113 @@ def test_an_honest_projection_tenant_mismatch_keeps_its_semantic_reason(
     # And a matching canonical tenant continues normally.
     facts = reconcile_phase4(projection, decision)
     assert facts.tenant_id == projection.tenant_id
+
+
+# ======================================================================================= #
+# ExecutionTargetScope schema 2 — the cross-cloud vocabulary (ETS-1 … ETS-14)
+#
+# Every assertion below reads the TYPED half — the rejection reason member — and never a
+# message substring, and never `pytest.raises(X, match="...")`. A `match=` regex is the
+# only thing distinguishing a kill when the exception class is the same on both paths, and
+# the sweep's message-only detector cannot see that idiom (guard-coverage ADR §13.g). A
+# test written that way passes today and rots the moment the detector fix lands.
+# ======================================================================================= #
+
+
+#: This file already imports the reason enum as ``Reason`` and the construction
+#: error hierarchy's root as ``CandidateConstructionError``; the schema-2 tests below
+#: use the repository's fuller spellings, bound here rather than re-imported.
+RejectionReason = Reason
+Phase5AError = CandidateConstructionError
+
+
+def _scope_reason(projection, **overrides):
+    """Build a scope that must be refused, and return the typed reason it refused with."""
+
+    with pytest.raises(Phase5AError) as exc:
+        build_target_scope(projection, **overrides)
+    return exc.value.reason
+
+
+def test_a_provider_outside_the_closed_vocabulary_is_refused(projection):
+    """ETS-3. Well-formed as an identifier, and not a provider this contract knows —
+    which is why the reason is its own member rather than NON_CANONICAL_IDENTIFIER."""
+
+    assert _scope_reason(projection, cloud_provider="oracle") is (
+        RejectionReason.UNSUPPORTED_CLOUD_PROVIDER
+    )
+
+
+def test_a_scope_with_no_provider_at_all_is_refused(projection):
+    """ETS-3 again, from the other side: absence, not a wrong token.
+
+    ``MALFORMED_CANONICAL_FIELD`` rather than ``UNSUPPORTED_CLOUD_PROVIDER``, and the
+    distinction is the point: an empty string never reaches the vocabulary check, because
+    ``require_canonical_identifier`` refuses it first. The two failures are genuinely
+    different — one is a malformed field, the other a well-formed token this contract does
+    not know — and a caller triaging one must not be handed the other. Measured against
+    the validator rather than assumed: an earlier draft of this test predicted
+    ``NON_CANONICAL_IDENTIFIER`` and was wrong."""
+
+    assert _scope_reason(projection, cloud_provider="") is (
+        RejectionReason.MALFORMED_CANONICAL_FIELD
+    )
+
+
+def test_an_azure_scope_without_a_resource_group_is_refused(projection):
+    """ETS-4. An ARM resource id needs the subscription AND the group; the scope carries
+    the first in ``account_id`` and had nowhere for the second before schema 2."""
+
+    assert _scope_reason(
+        projection, cloud_provider="azure", account_id=ACCOUNT_ID_AZURE
+    ) is RejectionReason.MISSING_RESOURCE_GROUP_BINDING
+
+
+def test_a_non_azure_scope_carrying_a_resource_group_is_refused(projection):
+    """ETS-4's other half, and the reason it is must-be-absent rather than optional:
+    canonicalization retains nulls, so a stray value sits inside the digest as dead data,
+    and a digest-bound field nothing reads is a substitution surface."""
+
+    assert _scope_reason(
+        projection, cloud_provider="aws", resource_group=RESOURCE_GROUP_AZURE
+    ) is RejectionReason.RESOURCE_GROUP_NOT_APPLICABLE
+
+
+def test_a_schema_1_payload_is_refused_and_never_upgraded(projection):
+    """ETS-9. The v1 wire form has no ``cloud_provider``, and provider inference is
+    forbidden — so the payload is refused, not repaired. Two distinct refusals prove it:
+    a v1 schema tag is rejected as an unsupported version, and a v1 field set (no schema
+    tag, no provider) is rejected as a missing field. Neither path invents a provider."""
+
+    scope = build_target_scope(projection)
+    v1_payload = scope.to_canonical_dict()
+    del v1_payload["requested_delta"]
+
+    tagged = dict(v1_payload, schema_version="cloud-scaling-execution-target-scope-1")
+    with pytest.raises(Phase5AError) as tagged_exc:
+        ExecutionTargetScope.from_dict(tagged)
+    assert tagged_exc.value.reason is RejectionReason.UNSUPPORTED_SCHEMA_VERSION
+
+    untagged = {k: v for k, v in v1_payload.items()
+                if k not in ("schema_version", "cloud_provider", "resource_group")}
+    with pytest.raises(Phase5AError) as untagged_exc:
+        ExecutionTargetScope.from_dict(untagged)
+    assert untagged_exc.value.reason is RejectionReason.MALFORMED_CANONICAL_FIELD
+
+
+def test_substituting_either_half_of_the_account_identity_moves_the_scope_digest(projection):
+    """ETS-11: ``(cloud_provider, account_id)`` is the identity, so neither half alone is
+    sufficient. The same account number under a different cloud is a different target, and
+    the digest must say so — otherwise a binding made for one cloud reconciles against
+    another. Asserted on the digest rather than on a refusal, because this substitution is
+    not refused at construction: the scope is well-formed, and it is the digest that has
+    to distinguish it."""
+
+    aws = build_target_scope(projection, cloud_provider="aws", account_id=ACCOUNT_ID)
+    gcp = build_target_scope(projection, cloud_provider="gcp", account_id=ACCOUNT_ID)
+    other_account = build_target_scope(
+        projection, cloud_provider="aws", account_id="000000000099"
+    )
+    assert aws.digest() != gcp.digest()
+    assert aws.digest() != other_account.digest()
+    assert len({aws.digest(), gcp.digest(), other_account.digest()}) == 3

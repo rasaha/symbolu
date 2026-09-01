@@ -1,5 +1,106 @@
 # Changelog — ugence-cloud-scaling-authorization-contracts
 
+## [0.8.0] — ExecutionTargetScope schema 2: the cross-cloud vocabulary (ETS-1 … ETS-16)
+
+**A versioned breaking change with no compatibility path, by ruling.** Schema 1 payloads
+are refused with `UNSUPPORTED_SCHEMA_VERSION` and never inferred or upgraded (ETS-9).
+
+### Why
+
+`account_id` already carried an AWS account number, a GCP project and an Azure
+subscription — undocumented, and indistinguishable. Nothing in the chain said which cloud
+a value belonged to, so two clouds' identifiers could collide as strings, and an Azure
+target was not addressable at all: an ARM resource id needs a subscription *and* a
+resource group, and the scope carried nowhere to put the second.
+
+### Contract
+
+* **`cloud_provider`**, required, validated against a closed vocabulary
+  `{"aws", "gcp", "azure", "self-hosted"}` exported as `CANONICAL_CLOUD_PROVIDERS`.
+  `(cloud_provider, account_id)` is the governed account identity; neither half suffices
+  alone. Canonical string form and pair semantics only — per-provider grammar (12-digit
+  AWS, GCP project rules, Azure GUID) belongs to governed adapters, not here (ETS-11).
+* **`resource_group`**, required when the provider is `azure`, required to be `None`
+  otherwise (ETS-4, ETS-12). Must-be-absent rather than merely optional: canonicalization
+  retains nulls, so a stray value would sit inside the digest as dead data, and a
+  digest-bound field nothing reads is a substitution surface.
+* Three typed reasons: `UNSUPPORTED_CLOUD_PROVIDER`, `MISSING_RESOURCE_GROUP_BINDING`,
+  `RESOURCE_GROUP_NOT_APPLICABLE`. The last two are separate members because they are
+  opposite failures and a reader triaging one must not be handed the other.
+
+### Two limits, stated rather than implied
+
+**Both new fields are scope-only and reconciled against nothing.** `CapacitySubject` stays
+provider-neutral (ETS-8), so there is no projected fact to reconcile against — the shape
+ETS-6 ratified for `namespace`. Their protection is the digest binding and `account_id`'s
+presence gate, nothing more. A scope naming the wrong provider is caught only if the
+digest it is bound into is checked.
+
+**The implemented Azure rule is narrower than ETS-4's words.** ETS-4 scopes the
+requirement to "resource-level scaling targets", but the scope carries no field
+distinguishing one, and adding a discriminator was not ratified. The enforceable rule is
+therefore provider-conditional: `cloud_provider == "azure"` requires a resource group,
+every other provider forbids one. A narrower rule needs a discriminator and a further
+ruling.
+
+**`cloud_provider` keeps its name although `self-hosted` is not a cloud.** ETS-10 admitted
+the token so a Kubernetes target belonging to no cloud is buildable; renaming the field was
+not ratified and would be a second breaking change.
+
+### Digests moved
+
+| digest | from | to |
+|---|---|---|
+| `FROZEN_TARGET_SCOPE_DIGEST` | `b97f41c9…` | `1e9ebadf…` |
+| `FROZEN_POLICY_BINDING_DIGEST` | `8961f6b2…` | `29ca00f9…` |
+| `FROZEN_POLICY_COORDINATE_BINDING_DIGEST` | `ad1d1ad9…` | `4a83019d…` |
+| `FROZEN_CANDIDATE_DIGEST` | `357bb3d4…` | `bbcd4ad7…` |
+
+Only the scope's own field set changed; the binding, the coordinate and the candidate
+moved *beneath* it because each covers a digest that moved. **The coordinate was not in
+the ETS audit's predicted cascade** — that traced scope → binding → candidate, and the V2
+coordinate binds the scope independently. It was found by measurement.
+
+Unmoved, and asserted so: recommendation, context, subject, request, idempotency,
+decision, and producer-signing-payload. That is the evidence schema 2 reached no Phase 4
+contract. Each superseded value is pinned as a negative anchor.
+
+### Guard inventory
+
+The ratified counts moved and were **re-ratified, not silently re-pinned** (ETS-15):
+total 114 → 118, peripheral 28 → 31. The peripheral inventory is renamed
+`peripheral-attestation-target` (ETS-16) because a label encoding its own value goes stale
+the moment the value moves.
+
+Three of the four new guards fall inside the recorded peripheral shape; the fourth, the
+`cloud_provider == "azure"` conditional itself, does not — which is why the two ratified
+numbers moved by different amounts and were ratified separately.
+
+`tests/test_peripheral_guard_sweep.py` pins six guards by index, and the insertions
+shifted them. Re-derived by matching each old guard's identity **including its rank among
+identically-worded conditions**: `type(value) is not int or value < 0` occurs twice, and a
+first-match re-derivation moved `P_BINDING_CEILING_TYPE` from 28 to 10 — a different
+guard, in a different class, which would then have been silently neutralised while the
+suite stayed green.
+
+### Fixtures
+
+`"acct-000123456789"` was valid under no cloud at all, so no fixture exercised what a real
+account identifier looks like on any provider. Now synthetic but format-realistic
+(ETS-13): a reserved-range 12-digit AWS account, a project-number-shaped GCP value, a
+nil-adjacent Azure subscription GUID with a resource group, and a local authority for
+self-hosted. No fixture carries a real customer or cloud account identifier.
+
+### Authority exclusion
+
+`CANONICAL_CLOUD_PROVIDERS` collided with the guard forbidding any public export naming
+`provider` — meaning an *authority* provider. A cloud-provider label is the opposite
+category: descriptive, carried in a scope that grants and performs nothing. The exemption
+is by exact name and is itself guarded — a new test asserts every exempted name is a
+non-callable string or frozenset of strings, so a port or factory under a `CLOUD_PROVIDER`
+spelling still fails.
+
+
 ## [Unreleased] — the enforcement was inert, and two more exclusions were false
 
 *No version bump and no production behaviour change.* A final audit found five

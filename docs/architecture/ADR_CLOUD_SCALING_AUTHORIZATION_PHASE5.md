@@ -447,3 +447,80 @@ decision point under this section; it is a naming choice, and is not inventoried
 whose direction cannot be decided by that rule must be recorded as `[R]` and ratified
 explicitly rather than swept under whichever branch happens to be second.
 
+
+## §10. ExecutionTargetScope schema 2 — the cross-cloud vocabulary, ratified 2026-09-01
+
+Ratified as ETS-1 … ETS-16 after a read-only audit. §5's scope was account-bound but not
+*cloud*-bound, and the gap was structural rather than cosmetic.
+
+### §10.a What was wrong
+
+`account_id` was one opaque string carrying, undocumented, an AWS account number, a GCP
+project or an Azure subscription. Nothing in the chain named the cloud, so two providers'
+identifiers could collide as strings, and reconciliation never compared `account_id`
+against anything upstream — it was presence-checked and digest-bound only. Worse, an Azure
+target was **not addressable at all**: an ARM resource id needs a subscription *and* a
+resource group, and the scope had nowhere for the second.
+
+`compute_group` was considered and rejected as that home (ETS-5). It is written from
+`subject.cluster` by the projection and equality-gated against it at the candidate seam, so
+putting a resource group there either changes what the frozen Phase 4 seam means or is
+refused as a target substitution. An AKS cluster also *lives inside* a resource group, so
+one slot cannot hold both.
+
+### §10.b What was ratified
+
+`cloud_provider`, required, against the closed vocabulary
+`{"aws", "gcp", "azure", "self-hosted"}`. `(cloud_provider, account_id)` is the governed
+account identity. `resource_group`, required for Azure and required absent elsewhere.
+Schema `-2`; v1 refused, never upgraded, and provider inference forbidden.
+
+**Per-provider grammar was deliberately excluded** (ETS-11). Validating that an AWS account
+is twelve digits would put provider-specific format knowledge inside a package whose whole
+posture is provider-neutral structure, and buys nothing the pair does not.
+
+### §10.c Two limits this section states rather than implies
+
+**Neither new field is reconciled against anything.** ETS-8 keeps `CapacitySubject`
+provider-neutral, so no projected fact exists to reconcile against. Both are scope-only,
+the shape ETS-6 ratified for `namespace`. Their protection is the digest binding and
+`account_id`'s presence gate — a scope naming the wrong provider is caught only if the
+digest it is bound into is checked. That is weaker than the reconciliation §6 relies on
+elsewhere, and it is recorded here so no reader infers otherwise.
+
+**The implemented Azure rule is narrower than ETS-4's words.** ETS-4 scopes the requirement
+to "resource-level scaling targets"; the scope carries no field distinguishing one, and
+adding a discriminator was not ratified. The enforceable rule is provider-conditional.
+A narrower rule needs a discriminator field and a further ruling.
+
+**`cloud_provider` names a field whose value is sometimes not a cloud.** ETS-10 admitted
+`self-hosted` — the repository's existing spelling — so a Kubernetes target belonging to no
+cloud is buildable. Renaming the field was not ratified and would be a second breaking
+change.
+
+### §10.d The ratified guard counts moved, and were re-ratified
+
+Adding validation adds guards. The total went 114 → 118 and the peripheral inventory
+28 → 31, and **both were put back to the owner rather than re-pinned as arithmetic**
+(ETS-15). A ratified count is not a derived one: a pin computed *from* the inventory cannot
+tell you the inventory was right, which is the failure the guard-coverage ADR records at
+§13.a.
+
+The two numbers moved by *different* amounts. Three of the four new guards fall inside the
+recorded peripheral shape; the `cloud_provider == "azure"` conditional does not. Ratifying
+one would not have settled the other.
+
+The peripheral inventory is renamed `peripheral-attestation-target` (ETS-16). Its old label
+encoded its own value, so it went stale the moment the value moved — and renaming it to
+`peripheral-31` would only defer the same problem.
+
+### §10.e What the audit's predicted cascade missed
+
+The pre-implementation audit traced the digest cascade as scope → binding → candidate. The
+**policy coordinate binding also moved**: it carries the scope digest independently, and no
+prediction caught it. Five digests moved in total, including this package's downstream
+verified-artifact digest.
+
+The lesson is §13.a's, one package over: a cascade reasoned about is not a cascade
+measured, and the difference is exactly the sort of thing that looks right until something
+recomputes it.

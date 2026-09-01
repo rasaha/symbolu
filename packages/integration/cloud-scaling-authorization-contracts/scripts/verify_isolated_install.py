@@ -210,7 +210,8 @@ def make_attestation(recommendation_digest, **over):
 
 def make_scope(**over):
     kw = dict(
-        tenant_id=projection.tenant_id, account_id="acct-000123456789",
+        tenant_id=projection.tenant_id, account_id="000000000042",
+        cloud_provider="aws",
         environment=projection.context.environment, region=projection.context.region,
         zone=projection.context.zone, namespace=None,
         compute_group=projection.context.compute_group,
@@ -335,7 +336,7 @@ def build(**over):
     return p5a.build_capacity_authorization_candidate(**kw)
 
 
-other_scope = make_scope(account_id="acct-999999999999")
+other_scope = make_scope(account_id="000000000099")
 rejects("denied decision",
         lambda: build(decision=forged_decision(disposition=SubjectRiskDisposition.RISK_DENIED)))
 rejects("forged decision digest",

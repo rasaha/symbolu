@@ -2003,7 +2003,7 @@ def test_the_action_vocabulary_guard_fires_when_the_whole_chain_ratifies_a_fifth
         (
             _upstream("ugence_cloud_scaling_authorization_contracts"),
             (
-                ("version.py", '__version__ = "0.7.0"', '__version__ = "0.8.0"'),
+                ("version.py", '__version__ = "0.8.0"', '__version__ = "0.9.0"'),
                 ("identifiers.py", fifth, widened),
             ),
         ),

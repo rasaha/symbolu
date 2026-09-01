@@ -15,7 +15,7 @@ another is not a stylistic choice — a raise-only reading of this package would
 | Recorded | Defined over | Recorded count | Re-derived here | Agrees |
 |---|---|---|---|---|
 | `canonical-65` | `reconciliation.py`, `candidate.py` | 65 | 65 | yes |
-| `peripheral-28` | `attestation.py`, `target.py` | 28 | 31 | **NO** |
+| `peripheral-attestation-target` | `attestation.py`, `target.py` | 31 | 31 | yes |
 
 Both are re-derived from source here rather than trusted: a count nobody can
 reproduce is a count nobody can defend. They are defined over a *subset* of the
@@ -59,46 +59,46 @@ survivor with no prior declaration fails the sweep.
 | 9 | `identifiers.py:95` | if | raise | SCORED | — | `ours != theirs` |
 | 10 | `identifiers.py:102` | if | raise | SCORED | — | `controller_actions != CANONICAL_ACTION_TYPES` |
 | 11 | `identifiers.py:111` | if | raise | EXCLUDED | — | `PRODUCER_SIGNING_PURPOSE == PURPOSE_CAPACITY_ACTION` |
-| 12 | `target.py:105` | if | raise | SCORED | peripheral-28 | `type(value) is not int or value < 0` |
-| 13 | `target.py:180` | if | raise | SCORED | peripheral-28 | `self.schema_version != EXECUTION_TARGET_SCOPE_SCHEMA_VERSION` |
-| 14 | `target.py:188` | if | raise | SCORED | peripheral-28 | `self.account_id is None or self.account_id == ''` |
-| 15 | `target.py:198` | if | raise | SCORED | peripheral-28 | `provider not in CANONICAL_CLOUD_PROVIDERS` |
-| 16 | `target.py:206` | if | raise | SCORED | peripheral-28 | `action not in CANONICAL_ACTION_TYPES` |
+| 12 | `target.py:105` | if | raise | SCORED | peripheral-attestation-target | `type(value) is not int or value < 0` |
+| 13 | `target.py:180` | if | raise | SCORED | peripheral-attestation-target | `self.schema_version != EXECUTION_TARGET_SCOPE_SCHEMA_VERSION` |
+| 14 | `target.py:188` | if | raise | SCORED | peripheral-attestation-target | `self.account_id is None or self.account_id == ''` |
+| 15 | `target.py:198` | if | raise | SCORED | peripheral-attestation-target | `provider not in CANONICAL_CLOUD_PROVIDERS` |
+| 16 | `target.py:206` | if | raise | SCORED | peripheral-attestation-target | `action not in CANONICAL_ACTION_TYPES` |
 | 17 | `target.py:228` | if | raise | SCORED | — | `provider == CLOUD_PROVIDER_AZURE` |
-| 18 | `target.py:229` | if | raise | SCORED | peripheral-28 | `self.resource_group is None` |
-| 19 | `target.py:236` | if | raise | SCORED | peripheral-28 | `self.resource_group is not None` |
-| 20 | `target.py:245` | if | raise | SCORED | peripheral-28 | `self.requested_magnitude > self.max_permitted_magnitude` |
-| 21 | `target.py:251` | if | raise | SCORED | peripheral-28 | `self.requested_delta > self.max_permitted_delta` |
-| 22 | `target.py:330` | if | raise | SCORED | peripheral-28 | `not isinstance(data, Mapping)` |
-| 23 | `target.py:337` | if | raise | SCORED | peripheral-28 | `unknown` |
+| 18 | `target.py:229` | if | raise | SCORED | peripheral-attestation-target | `self.resource_group is None` |
+| 19 | `target.py:236` | if | raise | SCORED | peripheral-attestation-target | `self.resource_group is not None` |
+| 20 | `target.py:245` | if | raise | SCORED | peripheral-attestation-target | `self.requested_magnitude > self.max_permitted_magnitude` |
+| 21 | `target.py:251` | if | raise | SCORED | peripheral-attestation-target | `self.requested_delta > self.max_permitted_delta` |
+| 22 | `target.py:330` | if | raise | SCORED | peripheral-attestation-target | `not isinstance(data, Mapping)` |
+| 23 | `target.py:337` | if | raise | SCORED | peripheral-attestation-target | `unknown` |
 | 24 | `target.py:343` | if | raise | SCORED | — | `missing` |
 | 25 | `target.py:345` | outcome-selection | outcome selection | SCORED | — | `'account_id' in missing` |
-| 26 | `target.py:401` | if | raise | SCORED | peripheral-28 | `self.schema_version != POLICY_TARGET_BINDING_SCHEMA_VERSION` |
-| 27 | `target.py:427` | if | raise | SCORED | peripheral-28 | `type(value) is not int or value < 0` |
-| 28 | `target.py:435` | if | raise | SCORED | peripheral-28 | `self.binding_digest != expected` |
-| 29 | `target.py:500` | if | raise | SCORED | peripheral-28 | `not isinstance(data, Mapping)` |
+| 26 | `target.py:401` | if | raise | SCORED | peripheral-attestation-target | `self.schema_version != POLICY_TARGET_BINDING_SCHEMA_VERSION` |
+| 27 | `target.py:427` | if | raise | SCORED | peripheral-attestation-target | `type(value) is not int or value < 0` |
+| 28 | `target.py:435` | if | raise | SCORED | peripheral-attestation-target | `self.binding_digest != expected` |
+| 29 | `target.py:500` | if | raise | SCORED | peripheral-attestation-target | `not isinstance(data, Mapping)` |
 | 30 | `target.py:507` | if | raise | SCORED | — | `unknown` |
 | 31 | `target.py:509` | outcome-selection | outcome selection | SCORED | — | `{'trust_state', 'verified', 'trusted', 'authentic'} & unknown` |
-| 32 | `target.py:517` | if | raise | SCORED | peripheral-28 | `missing` |
-| 33 | `target.py:609` | if | raise | SCORED | peripheral-28 | `self.schema_version != POLICY_TARGET_BINDING_V2_SCHEMA_VERSION` |
-| 34 | `target.py:626` | if | raise | SCORED | peripheral-28 | `tenant != tenant.strip()` |
-| 35 | `target.py:636` | if | raise | SCORED | peripheral-28 | `self.policy_content_digest != self.policy_body_digest` |
-| 36 | `target.py:645` | if | raise | SCORED | peripheral-28 | `self.binding_digest != expected` |
-| 37 | `target.py:723` | if | raise | SCORED | peripheral-28 | `not isinstance(data, Mapping)` |
+| 32 | `target.py:517` | if | raise | SCORED | peripheral-attestation-target | `missing` |
+| 33 | `target.py:609` | if | raise | SCORED | peripheral-attestation-target | `self.schema_version != POLICY_TARGET_BINDING_V2_SCHEMA_VERSION` |
+| 34 | `target.py:626` | if | raise | SCORED | peripheral-attestation-target | `tenant != tenant.strip()` |
+| 35 | `target.py:636` | if | raise | SCORED | peripheral-attestation-target | `self.policy_content_digest != self.policy_body_digest` |
+| 36 | `target.py:645` | if | raise | SCORED | peripheral-attestation-target | `self.binding_digest != expected` |
+| 37 | `target.py:723` | if | raise | SCORED | peripheral-attestation-target | `not isinstance(data, Mapping)` |
 | 38 | `target.py:730` | if | raise | SCORED | — | `unknown` |
 | 39 | `target.py:732` | outcome-selection | outcome selection | SCORED | — | `{'trust_state', 'verified', 'trusted', 'authentic', 'resolved'} & unknown` |
-| 40 | `target.py:740` | if | raise | SCORED | peripheral-28 | `missing` |
-| 41 | `attestation.py:63` | if | raise | SCORED | peripheral-28 | `not isinstance(value, datetime)` |
-| 42 | `attestation.py:67` | if | raise | SCORED | peripheral-28 | `value.tzinfo is None or value.utcoffset() is None` |
-| 43 | `attestation.py:119` | if | raise | SCORED | peripheral-28 | `self.schema_version != PRODUCER_ATTESTATION_SCHEMA_VERSION` |
-| 44 | `attestation.py:133` | if | raise | SCORED | peripheral-28 | `algorithm not in SUPPORTED_SIGNATURE_ALGORITHMS` |
-| 45 | `attestation.py:142` | if | raise | SCORED | peripheral-28 | `purpose not in SUPPORTED_PRODUCER_SIGNING_PURPOSES` |
-| 46 | `attestation.py:155` | if | raise | SCORED | peripheral-28 | `self.signing_payload_digest != expected` |
-| 47 | `attestation.py:234` | if | raise | SCORED | peripheral-28 | `type(data) is not dict and (not isinstance(data, Mapping))` |
+| 40 | `target.py:740` | if | raise | SCORED | peripheral-attestation-target | `missing` |
+| 41 | `attestation.py:63` | if | raise | SCORED | peripheral-attestation-target | `not isinstance(value, datetime)` |
+| 42 | `attestation.py:67` | if | raise | SCORED | peripheral-attestation-target | `value.tzinfo is None or value.utcoffset() is None` |
+| 43 | `attestation.py:119` | if | raise | SCORED | peripheral-attestation-target | `self.schema_version != PRODUCER_ATTESTATION_SCHEMA_VERSION` |
+| 44 | `attestation.py:133` | if | raise | SCORED | peripheral-attestation-target | `algorithm not in SUPPORTED_SIGNATURE_ALGORITHMS` |
+| 45 | `attestation.py:142` | if | raise | SCORED | peripheral-attestation-target | `purpose not in SUPPORTED_PRODUCER_SIGNING_PURPOSES` |
+| 46 | `attestation.py:155` | if | raise | SCORED | peripheral-attestation-target | `self.signing_payload_digest != expected` |
+| 47 | `attestation.py:234` | if | raise | SCORED | peripheral-attestation-target | `type(data) is not dict and (not isinstance(data, Mapping))` |
 | 48 | `attestation.py:240` | if | raise | SCORED | — | `unknown` |
 | 49 | `attestation.py:242` | outcome-selection | outcome selection | SCORED | — | `{'trust_state', 'verified', 'trusted', 'authentic'} & unknown` |
-| 50 | `attestation.py:250` | if | raise | SCORED | peripheral-28 | `missing` |
-| 51 | `attestation.py:255` | if | raise | SCORED | peripheral-28 | `'schema_version' not in data` |
+| 50 | `attestation.py:250` | if | raise | SCORED | peripheral-attestation-target | `missing` |
+| 51 | `attestation.py:255` | if | raise | SCORED | peripheral-attestation-target | `'schema_version' not in data` |
 | 52 | `attestation.py:261` | if | raising-helper call | SCORED | — | `isinstance(issued_at, str)` |
 | 53 | `reconciliation.py:122` | if | raise | SCORED | canonical-65 | `type(value) is not int or value < 0` |
 | 54 | `reconciliation.py:144` | if | raise | SCORED | canonical-65 | `type(value) is not datetime` |

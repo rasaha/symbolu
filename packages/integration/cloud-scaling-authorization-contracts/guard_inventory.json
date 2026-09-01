@@ -11,14 +11,14 @@
       "measured": 65,
       "agrees": true
     },
-    "peripheral-28": {
+    "peripheral-attestation-target": {
       "scope": [
         "attestation.py",
         "target.py"
       ],
-      "expected": 28,
+      "expected": 31,
       "measured": 31,
-      "agrees": false
+      "agrees": true
     }
   },
   "excluded": {
@@ -143,7 +143,7 @@
       "condition": "type(value) is not int or value < 0",
       "kind": "if",
       "shape": "raise",
-      "recorded_in": "peripheral-28",
+      "recorded_in": "peripheral-attestation-target",
       "outcome": "MALFORMED_CANONICAL_FIELD"
     },
     {
@@ -153,7 +153,7 @@
       "condition": "self.schema_version != EXECUTION_TARGET_SCOPE_SCHEMA_VERSION",
       "kind": "if",
       "shape": "raise",
-      "recorded_in": "peripheral-28",
+      "recorded_in": "peripheral-attestation-target",
       "outcome": "UNSUPPORTED_SCHEMA_VERSION"
     },
     {
@@ -163,7 +163,7 @@
       "condition": "self.account_id is None or self.account_id == ''",
       "kind": "if",
       "shape": "raise",
-      "recorded_in": "peripheral-28",
+      "recorded_in": "peripheral-attestation-target",
       "outcome": "MISSING_ACCOUNT_BINDING"
     },
     {
@@ -173,7 +173,7 @@
       "condition": "provider not in CANONICAL_CLOUD_PROVIDERS",
       "kind": "if",
       "shape": "raise",
-      "recorded_in": "peripheral-28",
+      "recorded_in": "peripheral-attestation-target",
       "outcome": "UNSUPPORTED_CLOUD_PROVIDER"
     },
     {
@@ -183,7 +183,7 @@
       "condition": "action not in CANONICAL_ACTION_TYPES",
       "kind": "if",
       "shape": "raise",
-      "recorded_in": "peripheral-28",
+      "recorded_in": "peripheral-attestation-target",
       "outcome": "ACTION_SUBSTITUTION"
     },
     {
@@ -203,7 +203,7 @@
       "condition": "self.resource_group is None",
       "kind": "if",
       "shape": "raise",
-      "recorded_in": "peripheral-28",
+      "recorded_in": "peripheral-attestation-target",
       "outcome": "MISSING_RESOURCE_GROUP_BINDING"
     },
     {
@@ -213,7 +213,7 @@
       "condition": "self.resource_group is not None",
       "kind": "if",
       "shape": "raise",
-      "recorded_in": "peripheral-28",
+      "recorded_in": "peripheral-attestation-target",
       "outcome": "RESOURCE_GROUP_NOT_APPLICABLE"
     },
     {
@@ -223,7 +223,7 @@
       "condition": "self.requested_magnitude > self.max_permitted_magnitude",
       "kind": "if",
       "shape": "raise",
-      "recorded_in": "peripheral-28",
+      "recorded_in": "peripheral-attestation-target",
       "outcome": "REQUESTED_MAGNITUDE_ABOVE_MAXIMUM"
     },
     {
@@ -233,7 +233,7 @@
       "condition": "self.requested_delta > self.max_permitted_delta",
       "kind": "if",
       "shape": "raise",
-      "recorded_in": "peripheral-28",
+      "recorded_in": "peripheral-attestation-target",
       "outcome": "DELTA_ABOVE_MAXIMUM"
     },
     {
@@ -243,7 +243,7 @@
       "condition": "not isinstance(data, Mapping)",
       "kind": "if",
       "shape": "raise",
-      "recorded_in": "peripheral-28",
+      "recorded_in": "peripheral-attestation-target",
       "outcome": "UNSUPPORTED_EXACT_TYPE"
     },
     {
@@ -253,7 +253,7 @@
       "condition": "unknown",
       "kind": "if",
       "shape": "raise",
-      "recorded_in": "peripheral-28",
+      "recorded_in": "peripheral-attestation-target",
       "outcome": "UNKNOWN_FIELD"
     },
     {
@@ -283,7 +283,7 @@
       "condition": "self.schema_version != POLICY_TARGET_BINDING_SCHEMA_VERSION",
       "kind": "if",
       "shape": "raise",
-      "recorded_in": "peripheral-28",
+      "recorded_in": "peripheral-attestation-target",
       "outcome": "UNSUPPORTED_SCHEMA_VERSION"
     },
     {
@@ -293,7 +293,7 @@
       "condition": "type(value) is not int or value < 0",
       "kind": "if",
       "shape": "raise",
-      "recorded_in": "peripheral-28",
+      "recorded_in": "peripheral-attestation-target",
       "outcome": "MALFORMED_CANONICAL_FIELD"
     },
     {
@@ -303,7 +303,7 @@
       "condition": "self.binding_digest != expected",
       "kind": "if",
       "shape": "raise",
-      "recorded_in": "peripheral-28",
+      "recorded_in": "peripheral-attestation-target",
       "outcome": "MALFORMED_POLICY_TARGET_BINDING"
     },
     {
@@ -313,7 +313,7 @@
       "condition": "not isinstance(data, Mapping)",
       "kind": "if",
       "shape": "raise",
-      "recorded_in": "peripheral-28",
+      "recorded_in": "peripheral-attestation-target",
       "outcome": "UNSUPPORTED_EXACT_TYPE"
     },
     {
@@ -343,7 +343,7 @@
       "condition": "missing",
       "kind": "if",
       "shape": "raise",
-      "recorded_in": "peripheral-28",
+      "recorded_in": "peripheral-attestation-target",
       "outcome": "MALFORMED_CANONICAL_FIELD"
     },
     {
@@ -353,7 +353,7 @@
       "condition": "self.schema_version != POLICY_TARGET_BINDING_V2_SCHEMA_VERSION",
       "kind": "if",
       "shape": "raise",
-      "recorded_in": "peripheral-28",
+      "recorded_in": "peripheral-attestation-target",
       "outcome": "UNSUPPORTED_SCHEMA_VERSION"
     },
     {
@@ -363,7 +363,7 @@
       "condition": "tenant != tenant.strip()",
       "kind": "if",
       "shape": "raise",
-      "recorded_in": "peripheral-28",
+      "recorded_in": "peripheral-attestation-target",
       "outcome": "NON_CANONICAL_IDENTIFIER"
     },
     {
@@ -373,7 +373,7 @@
       "condition": "self.policy_content_digest != self.policy_body_digest",
       "kind": "if",
       "shape": "raise",
-      "recorded_in": "peripheral-28",
+      "recorded_in": "peripheral-attestation-target",
       "outcome": "MALFORMED_POLICY_COORDINATE_BINDING"
     },
     {
@@ -383,7 +383,7 @@
       "condition": "self.binding_digest != expected",
       "kind": "if",
       "shape": "raise",
-      "recorded_in": "peripheral-28",
+      "recorded_in": "peripheral-attestation-target",
       "outcome": "MALFORMED_POLICY_COORDINATE_BINDING"
     },
     {
@@ -393,7 +393,7 @@
       "condition": "not isinstance(data, Mapping)",
       "kind": "if",
       "shape": "raise",
-      "recorded_in": "peripheral-28",
+      "recorded_in": "peripheral-attestation-target",
       "outcome": "UNSUPPORTED_EXACT_TYPE"
     },
     {
@@ -423,7 +423,7 @@
       "condition": "missing",
       "kind": "if",
       "shape": "raise",
-      "recorded_in": "peripheral-28",
+      "recorded_in": "peripheral-attestation-target",
       "outcome": "MALFORMED_POLICY_COORDINATE_BINDING"
     },
     {
@@ -433,7 +433,7 @@
       "condition": "not isinstance(value, datetime)",
       "kind": "if",
       "shape": "raise",
-      "recorded_in": "peripheral-28",
+      "recorded_in": "peripheral-attestation-target",
       "outcome": "MALFORMED_CANONICAL_FIELD"
     },
     {
@@ -443,7 +443,7 @@
       "condition": "value.tzinfo is None or value.utcoffset() is None",
       "kind": "if",
       "shape": "raise",
-      "recorded_in": "peripheral-28",
+      "recorded_in": "peripheral-attestation-target",
       "outcome": "MALFORMED_CANONICAL_FIELD"
     },
     {
@@ -453,7 +453,7 @@
       "condition": "self.schema_version != PRODUCER_ATTESTATION_SCHEMA_VERSION",
       "kind": "if",
       "shape": "raise",
-      "recorded_in": "peripheral-28",
+      "recorded_in": "peripheral-attestation-target",
       "outcome": "UNSUPPORTED_SCHEMA_VERSION"
     },
     {
@@ -463,7 +463,7 @@
       "condition": "algorithm not in SUPPORTED_SIGNATURE_ALGORITHMS",
       "kind": "if",
       "shape": "raise",
-      "recorded_in": "peripheral-28",
+      "recorded_in": "peripheral-attestation-target",
       "outcome": "MALFORMED_PRODUCER_ATTESTATION"
     },
     {
@@ -473,7 +473,7 @@
       "condition": "purpose not in SUPPORTED_PRODUCER_SIGNING_PURPOSES",
       "kind": "if",
       "shape": "raise",
-      "recorded_in": "peripheral-28",
+      "recorded_in": "peripheral-attestation-target",
       "outcome": "UNSUPPORTED_SIGNING_PURPOSE"
     },
     {
@@ -483,7 +483,7 @@
       "condition": "self.signing_payload_digest != expected",
       "kind": "if",
       "shape": "raise",
-      "recorded_in": "peripheral-28",
+      "recorded_in": "peripheral-attestation-target",
       "outcome": "PRODUCER_ATTESTATION_CONTENT_MISMATCH"
     },
     {
@@ -493,7 +493,7 @@
       "condition": "type(data) is not dict and (not isinstance(data, Mapping))",
       "kind": "if",
       "shape": "raise",
-      "recorded_in": "peripheral-28",
+      "recorded_in": "peripheral-attestation-target",
       "outcome": "UNSUPPORTED_EXACT_TYPE"
     },
     {
@@ -523,7 +523,7 @@
       "condition": "missing",
       "kind": "if",
       "shape": "raise",
-      "recorded_in": "peripheral-28",
+      "recorded_in": "peripheral-attestation-target",
       "outcome": "MALFORMED_CANONICAL_FIELD"
     },
     {
@@ -533,7 +533,7 @@
       "condition": "'schema_version' not in data",
       "kind": "if",
       "shape": "raise",
-      "recorded_in": "peripheral-28",
+      "recorded_in": "peripheral-attestation-target",
       "outcome": "UNSUPPORTED_SCHEMA_VERSION"
     },
     {
