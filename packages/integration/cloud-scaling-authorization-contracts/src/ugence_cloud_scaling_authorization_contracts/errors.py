@@ -158,6 +158,16 @@ class AuthorizationCandidateRejectionReason(str, Enum):
     #: the other. Named as ``uvi-policy-contracts`` names it.
     CROSS_TENANT_POLICY_BINDING = "cross_tenant_policy_binding"
     MISSING_ACCOUNT_BINDING = "missing_account_binding"
+    #: ETS-3. The provider half of the governed account identity named a token outside the
+    #: closed vocabulary. Distinct from ``NON_CANONICAL_IDENTIFIER``, which says the string
+    #: is malformed: this one says it is well-formed and not a provider this contract knows.
+    UNSUPPORTED_CLOUD_PROVIDER = "unsupported_cloud_provider"
+    #: ETS-4, the two halves of the Azure resource-group rule. They are separate members
+    #: because they are opposite failures — one scope cannot address its target, the other
+    #: carries a digest-bound field its provider has no meaning for — and a reader triaging
+    #: one must not be handed the other.
+    MISSING_RESOURCE_GROUP_BINDING = "missing_resource_group_binding"
+    RESOURCE_GROUP_NOT_APPLICABLE = "resource_group_not_applicable"
     ACTION_SUBSTITUTION = "action_substitution"
     TARGET_SUBSTITUTION = "target_substitution"
     REQUESTED_MAGNITUDE_ABOVE_MAXIMUM = "requested_magnitude_above_maximum"

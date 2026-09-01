@@ -1,6 +1,6 @@
 {
   "package": "authorization-contracts",
-  "total": 114,
+  "total": 118,
   "reconciliation": {
     "canonical-65": {
       "scope": [
@@ -17,8 +17,8 @@
         "target.py"
       ],
       "expected": 28,
-      "measured": 28,
-      "agrees": true
+      "measured": 31,
+      "agrees": false
     }
   },
   "excluded": {
@@ -109,7 +109,7 @@
     {
       "index": 9,
       "module": "identifiers.py",
-      "line": 93,
+      "line": 95,
       "condition": "ours != theirs",
       "kind": "if",
       "shape": "raise",
@@ -119,7 +119,7 @@
     {
       "index": 10,
       "module": "identifiers.py",
-      "line": 100,
+      "line": 102,
       "condition": "controller_actions != CANONICAL_ACTION_TYPES",
       "kind": "if",
       "shape": "raise",
@@ -129,7 +129,7 @@
     {
       "index": 11,
       "module": "identifiers.py",
-      "line": 109,
+      "line": 111,
       "condition": "PRODUCER_SIGNING_PURPOSE == PURPOSE_CAPACITY_ACTION",
       "kind": "if",
       "shape": "raise",
@@ -139,7 +139,7 @@
     {
       "index": 12,
       "module": "target.py",
-      "line": 101,
+      "line": 105,
       "condition": "type(value) is not int or value < 0",
       "kind": "if",
       "shape": "raise",
@@ -149,7 +149,7 @@
     {
       "index": 13,
       "module": "target.py",
-      "line": 152,
+      "line": 180,
       "condition": "self.schema_version != EXECUTION_TARGET_SCOPE_SCHEMA_VERSION",
       "kind": "if",
       "shape": "raise",
@@ -159,7 +159,7 @@
     {
       "index": 14,
       "module": "target.py",
-      "line": 160,
+      "line": 188,
       "condition": "self.account_id is None or self.account_id == ''",
       "kind": "if",
       "shape": "raise",
@@ -169,7 +169,17 @@
     {
       "index": 15,
       "module": "target.py",
-      "line": 168,
+      "line": 198,
+      "condition": "provider not in CANONICAL_CLOUD_PROVIDERS",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "peripheral-28",
+      "outcome": "UNSUPPORTED_CLOUD_PROVIDER"
+    },
+    {
+      "index": 16,
+      "module": "target.py",
+      "line": 206,
       "condition": "action not in CANONICAL_ACTION_TYPES",
       "kind": "if",
       "shape": "raise",
@@ -177,9 +187,39 @@
       "outcome": "ACTION_SUBSTITUTION"
     },
     {
-      "index": 16,
+      "index": 17,
       "module": "target.py",
-      "line": 188,
+      "line": 228,
+      "condition": "provider == CLOUD_PROVIDER_AZURE",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": "MISSING_RESOURCE_GROUP_BINDING"
+    },
+    {
+      "index": 18,
+      "module": "target.py",
+      "line": 229,
+      "condition": "self.resource_group is None",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "peripheral-28",
+      "outcome": "MISSING_RESOURCE_GROUP_BINDING"
+    },
+    {
+      "index": 19,
+      "module": "target.py",
+      "line": 236,
+      "condition": "self.resource_group is not None",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "peripheral-28",
+      "outcome": "RESOURCE_GROUP_NOT_APPLICABLE"
+    },
+    {
+      "index": 20,
+      "module": "target.py",
+      "line": 245,
       "condition": "self.requested_magnitude > self.max_permitted_magnitude",
       "kind": "if",
       "shape": "raise",
@@ -187,9 +227,9 @@
       "outcome": "REQUESTED_MAGNITUDE_ABOVE_MAXIMUM"
     },
     {
-      "index": 17,
+      "index": 21,
       "module": "target.py",
-      "line": 194,
+      "line": 251,
       "condition": "self.requested_delta > self.max_permitted_delta",
       "kind": "if",
       "shape": "raise",
@@ -197,9 +237,9 @@
       "outcome": "DELTA_ABOVE_MAXIMUM"
     },
     {
-      "index": 18,
+      "index": 22,
       "module": "target.py",
-      "line": 268,
+      "line": 330,
       "condition": "not isinstance(data, Mapping)",
       "kind": "if",
       "shape": "raise",
@@ -207,9 +247,9 @@
       "outcome": "UNSUPPORTED_EXACT_TYPE"
     },
     {
-      "index": 19,
+      "index": 23,
       "module": "target.py",
-      "line": 275,
+      "line": 337,
       "condition": "unknown",
       "kind": "if",
       "shape": "raise",
@@ -217,9 +257,9 @@
       "outcome": "UNKNOWN_FIELD"
     },
     {
-      "index": 20,
+      "index": 24,
       "module": "target.py",
-      "line": 281,
+      "line": 343,
       "condition": "missing",
       "kind": "if",
       "shape": "raise",
@@ -227,9 +267,9 @@
       "outcome": "MALFORMED_CANONICAL_FIELD, MISSING_ACCOUNT_BINDING"
     },
     {
-      "index": 21,
+      "index": 25,
       "module": "target.py",
-      "line": 283,
+      "line": 345,
       "condition": "'account_id' in missing",
       "kind": "outcome-selection",
       "shape": "outcome selection",
@@ -237,9 +277,9 @@
       "outcome": "MALFORMED_CANONICAL_FIELD, MISSING_ACCOUNT_BINDING"
     },
     {
-      "index": 22,
+      "index": 26,
       "module": "target.py",
-      "line": 337,
+      "line": 401,
       "condition": "self.schema_version != POLICY_TARGET_BINDING_SCHEMA_VERSION",
       "kind": "if",
       "shape": "raise",
@@ -247,9 +287,9 @@
       "outcome": "UNSUPPORTED_SCHEMA_VERSION"
     },
     {
-      "index": 23,
+      "index": 27,
       "module": "target.py",
-      "line": 363,
+      "line": 427,
       "condition": "type(value) is not int or value < 0",
       "kind": "if",
       "shape": "raise",
@@ -257,9 +297,9 @@
       "outcome": "MALFORMED_CANONICAL_FIELD"
     },
     {
-      "index": 24,
+      "index": 28,
       "module": "target.py",
-      "line": 371,
+      "line": 435,
       "condition": "self.binding_digest != expected",
       "kind": "if",
       "shape": "raise",
@@ -267,9 +307,9 @@
       "outcome": "MALFORMED_POLICY_TARGET_BINDING"
     },
     {
-      "index": 25,
+      "index": 29,
       "module": "target.py",
-      "line": 436,
+      "line": 500,
       "condition": "not isinstance(data, Mapping)",
       "kind": "if",
       "shape": "raise",
@@ -277,9 +317,9 @@
       "outcome": "UNSUPPORTED_EXACT_TYPE"
     },
     {
-      "index": 26,
+      "index": 30,
       "module": "target.py",
-      "line": 443,
+      "line": 507,
       "condition": "unknown",
       "kind": "if",
       "shape": "raise",
@@ -287,9 +327,9 @@
       "outcome": "FORGED_TRUST_STATE, UNKNOWN_FIELD"
     },
     {
-      "index": 27,
+      "index": 31,
       "module": "target.py",
-      "line": 445,
+      "line": 509,
       "condition": "{'trust_state', 'verified', 'trusted', 'authentic'} & unknown",
       "kind": "outcome-selection",
       "shape": "outcome selection",
@@ -297,9 +337,9 @@
       "outcome": "FORGED_TRUST_STATE, UNKNOWN_FIELD"
     },
     {
-      "index": 28,
+      "index": 32,
       "module": "target.py",
-      "line": 453,
+      "line": 517,
       "condition": "missing",
       "kind": "if",
       "shape": "raise",
@@ -307,9 +347,9 @@
       "outcome": "MALFORMED_CANONICAL_FIELD"
     },
     {
-      "index": 29,
+      "index": 33,
       "module": "target.py",
-      "line": 545,
+      "line": 609,
       "condition": "self.schema_version != POLICY_TARGET_BINDING_V2_SCHEMA_VERSION",
       "kind": "if",
       "shape": "raise",
@@ -317,9 +357,9 @@
       "outcome": "UNSUPPORTED_SCHEMA_VERSION"
     },
     {
-      "index": 30,
+      "index": 34,
       "module": "target.py",
-      "line": 562,
+      "line": 626,
       "condition": "tenant != tenant.strip()",
       "kind": "if",
       "shape": "raise",
@@ -327,9 +367,9 @@
       "outcome": "NON_CANONICAL_IDENTIFIER"
     },
     {
-      "index": 31,
+      "index": 35,
       "module": "target.py",
-      "line": 572,
+      "line": 636,
       "condition": "self.policy_content_digest != self.policy_body_digest",
       "kind": "if",
       "shape": "raise",
@@ -337,9 +377,9 @@
       "outcome": "MALFORMED_POLICY_COORDINATE_BINDING"
     },
     {
-      "index": 32,
+      "index": 36,
       "module": "target.py",
-      "line": 581,
+      "line": 645,
       "condition": "self.binding_digest != expected",
       "kind": "if",
       "shape": "raise",
@@ -347,9 +387,9 @@
       "outcome": "MALFORMED_POLICY_COORDINATE_BINDING"
     },
     {
-      "index": 33,
+      "index": 37,
       "module": "target.py",
-      "line": 659,
+      "line": 723,
       "condition": "not isinstance(data, Mapping)",
       "kind": "if",
       "shape": "raise",
@@ -357,9 +397,9 @@
       "outcome": "UNSUPPORTED_EXACT_TYPE"
     },
     {
-      "index": 34,
+      "index": 38,
       "module": "target.py",
-      "line": 666,
+      "line": 730,
       "condition": "unknown",
       "kind": "if",
       "shape": "raise",
@@ -367,9 +407,9 @@
       "outcome": "FORGED_TRUST_STATE, UNKNOWN_FIELD"
     },
     {
-      "index": 35,
+      "index": 39,
       "module": "target.py",
-      "line": 668,
+      "line": 732,
       "condition": "{'trust_state', 'verified', 'trusted', 'authentic', 'resolved'} & unknown",
       "kind": "outcome-selection",
       "shape": "outcome selection",
@@ -377,9 +417,9 @@
       "outcome": "FORGED_TRUST_STATE, UNKNOWN_FIELD"
     },
     {
-      "index": 36,
+      "index": 40,
       "module": "target.py",
-      "line": 676,
+      "line": 740,
       "condition": "missing",
       "kind": "if",
       "shape": "raise",
@@ -387,7 +427,7 @@
       "outcome": "MALFORMED_POLICY_COORDINATE_BINDING"
     },
     {
-      "index": 37,
+      "index": 41,
       "module": "attestation.py",
       "line": 63,
       "condition": "not isinstance(value, datetime)",
@@ -397,7 +437,7 @@
       "outcome": "MALFORMED_CANONICAL_FIELD"
     },
     {
-      "index": 38,
+      "index": 42,
       "module": "attestation.py",
       "line": 67,
       "condition": "value.tzinfo is None or value.utcoffset() is None",
@@ -407,7 +447,7 @@
       "outcome": "MALFORMED_CANONICAL_FIELD"
     },
     {
-      "index": 39,
+      "index": 43,
       "module": "attestation.py",
       "line": 119,
       "condition": "self.schema_version != PRODUCER_ATTESTATION_SCHEMA_VERSION",
@@ -417,7 +457,7 @@
       "outcome": "UNSUPPORTED_SCHEMA_VERSION"
     },
     {
-      "index": 40,
+      "index": 44,
       "module": "attestation.py",
       "line": 133,
       "condition": "algorithm not in SUPPORTED_SIGNATURE_ALGORITHMS",
@@ -427,7 +467,7 @@
       "outcome": "MALFORMED_PRODUCER_ATTESTATION"
     },
     {
-      "index": 41,
+      "index": 45,
       "module": "attestation.py",
       "line": 142,
       "condition": "purpose not in SUPPORTED_PRODUCER_SIGNING_PURPOSES",
@@ -437,7 +477,7 @@
       "outcome": "UNSUPPORTED_SIGNING_PURPOSE"
     },
     {
-      "index": 42,
+      "index": 46,
       "module": "attestation.py",
       "line": 155,
       "condition": "self.signing_payload_digest != expected",
@@ -447,7 +487,7 @@
       "outcome": "PRODUCER_ATTESTATION_CONTENT_MISMATCH"
     },
     {
-      "index": 43,
+      "index": 47,
       "module": "attestation.py",
       "line": 234,
       "condition": "type(data) is not dict and (not isinstance(data, Mapping))",
@@ -457,7 +497,7 @@
       "outcome": "UNSUPPORTED_EXACT_TYPE"
     },
     {
-      "index": 44,
+      "index": 48,
       "module": "attestation.py",
       "line": 240,
       "condition": "unknown",
@@ -467,7 +507,7 @@
       "outcome": "FORGED_TRUST_STATE, UNKNOWN_FIELD"
     },
     {
-      "index": 45,
+      "index": 49,
       "module": "attestation.py",
       "line": 242,
       "condition": "{'trust_state', 'verified', 'trusted', 'authentic'} & unknown",
@@ -477,7 +517,7 @@
       "outcome": "FORGED_TRUST_STATE, UNKNOWN_FIELD"
     },
     {
-      "index": 46,
+      "index": 50,
       "module": "attestation.py",
       "line": 250,
       "condition": "missing",
@@ -487,7 +527,7 @@
       "outcome": "MALFORMED_CANONICAL_FIELD"
     },
     {
-      "index": 47,
+      "index": 51,
       "module": "attestation.py",
       "line": 255,
       "condition": "'schema_version' not in data",
@@ -497,7 +537,7 @@
       "outcome": "UNSUPPORTED_SCHEMA_VERSION"
     },
     {
-      "index": 48,
+      "index": 52,
       "module": "attestation.py",
       "line": 261,
       "condition": "isinstance(issued_at, str)",
@@ -507,7 +547,7 @@
       "outcome": ""
     },
     {
-      "index": 49,
+      "index": 53,
       "module": "reconciliation.py",
       "line": 122,
       "condition": "type(value) is not int or value < 0",
@@ -517,7 +557,7 @@
       "outcome": "PROJECTION_RECONCILIATION_FAILED"
     },
     {
-      "index": 50,
+      "index": 54,
       "module": "reconciliation.py",
       "line": 144,
       "condition": "type(value) is not datetime",
@@ -527,7 +567,7 @@
       "outcome": ""
     },
     {
-      "index": 51,
+      "index": 55,
       "module": "reconciliation.py",
       "line": 146,
       "condition": "value.tzinfo is None or value.utcoffset() is None",
@@ -537,7 +577,7 @@
       "outcome": ""
     },
     {
-      "index": 52,
+      "index": 56,
       "module": "reconciliation.py",
       "line": 185,
       "condition": "type(value) is not str",
@@ -547,7 +587,7 @@
       "outcome": "DECISION_INSTANT_NOT_BOUND"
     },
     {
-      "index": 53,
+      "index": 57,
       "module": "reconciliation.py",
       "line": 219,
       "condition": "type(projection) is not CapacityRiskSubjectProjection",
@@ -557,7 +597,7 @@
       "outcome": "UNSUPPORTED_EXACT_TYPE"
     },
     {
-      "index": 54,
+      "index": 58,
       "module": "reconciliation.py",
       "line": 225,
       "condition": "type(decision) is not SubjectRiskDecision",
@@ -567,7 +607,7 @@
       "outcome": "UNSUPPORTED_EXACT_TYPE"
     },
     {
-      "index": 55,
+      "index": 59,
       "module": "reconciliation.py",
       "line": 283,
       "condition": "validation.context_digest != p_context_digest",
@@ -577,7 +617,7 @@
       "outcome": "CONTEXT_DIGEST_MISMATCH"
     },
     {
-      "index": 56,
+      "index": 60,
       "module": "reconciliation.py",
       "line": 288,
       "condition": "validation.subject_digest != p_subject_digest",
@@ -587,7 +627,7 @@
       "outcome": "SUBJECT_DIGEST_MISMATCH"
     },
     {
-      "index": 57,
+      "index": 61,
       "module": "reconciliation.py",
       "line": 293,
       "condition": "validation.recommendation_digest != p_recommendation_digest",
@@ -597,7 +637,7 @@
       "outcome": "RECOMMENDATION_MISMATCH"
     },
     {
-      "index": 58,
+      "index": 62,
       "module": "reconciliation.py",
       "line": 298,
       "condition": "p_request.digest() != p_request_digest",
@@ -607,7 +647,7 @@
       "outcome": "REQUEST_DIGEST_MISMATCH"
     },
     {
-      "index": 59,
+      "index": 63,
       "module": "reconciliation.py",
       "line": 303,
       "condition": "p_context.digest() != p_context_digest",
@@ -617,7 +657,7 @@
       "outcome": "CONTEXT_DIGEST_MISMATCH"
     },
     {
-      "index": 60,
+      "index": 64,
       "module": "reconciliation.py",
       "line": 322,
       "condition": "require_canonical_identifier('projection.tenant_id', p_tenant) != d_tenant",
@@ -627,7 +667,7 @@
       "outcome": "TENANT_MISMATCH"
     },
     {
-      "index": 61,
+      "index": 65,
       "module": "reconciliation.py",
       "line": 331,
       "condition": "p_request_digest != d_request_digest",
@@ -637,7 +677,7 @@
       "outcome": "REQUEST_DIGEST_MISMATCH"
     },
     {
-      "index": 62,
+      "index": 66,
       "module": "reconciliation.py",
       "line": 337,
       "condition": "p_subject_digest != d_subject_digest",
@@ -647,7 +687,7 @@
       "outcome": "SUBJECT_MISMATCH"
     },
     {
-      "index": 63,
+      "index": 67,
       "module": "reconciliation.py",
       "line": 344,
       "condition": "p_request.subject_type != SUBJECT_TYPE_CAPACITY_SUBJECT",
@@ -657,7 +697,7 @@
       "outcome": "D4_IDENTIFIER_MISMATCH"
     },
     {
-      "index": 64,
+      "index": 68,
       "module": "reconciliation.py",
       "line": 350,
       "condition": "p_request.requested_purpose != PURPOSE_CAPACITY_ACTION",
@@ -667,7 +707,7 @@
       "outcome": "D4_IDENTIFIER_MISMATCH"
     },
     {
-      "index": 65,
+      "index": 69,
       "module": "reconciliation.py",
       "line": 356,
       "condition": "p_request.requested_domain != DOMAIN_CLOUD_SCALING",
@@ -677,7 +717,7 @@
       "outcome": "D4_IDENTIFIER_MISMATCH"
     },
     {
-      "index": 66,
+      "index": 70,
       "module": "reconciliation.py",
       "line": 364,
       "condition": "action_type not in CANONICAL_ACTION_TYPES",
@@ -687,7 +727,7 @@
       "outcome": "ACTION_SUBSTITUTION"
     },
     {
-      "index": 67,
+      "index": 71,
       "module": "reconciliation.py",
       "line": 371,
       "condition": "not isinstance(d_disposition, SubjectRiskDisposition)",
@@ -697,7 +737,7 @@
       "outcome": "UNSUPPORTED_EXACT_TYPE"
     },
     {
-      "index": 68,
+      "index": 72,
       "module": "reconciliation.py",
       "line": 375,
       "condition": "d_disposition not in ALLOW_FAMILY_DISPOSITIONS",
@@ -707,7 +747,7 @@
       "outcome": "DECISION_NOT_ALLOW_FAMILY"
     },
     {
-      "index": 69,
+      "index": 73,
       "module": "reconciliation.py",
       "line": 381,
       "condition": "d_risk_outcome is None",
@@ -717,7 +757,7 @@
       "outcome": "MISSING_BINDING_DECISION"
     },
     {
-      "index": 70,
+      "index": 74,
       "module": "reconciliation.py",
       "line": 388,
       "condition": "d_decision_snapshot is None",
@@ -727,7 +767,7 @@
       "outcome": "MISSING_DECISION_SNAPSHOT"
     },
     {
-      "index": 71,
+      "index": 75,
       "module": "reconciliation.py",
       "line": 393,
       "condition": "not isinstance(d_decision_snapshot, Mapping)",
@@ -737,7 +777,7 @@
       "outcome": "MISSING_DECISION_SNAPSHOT"
     },
     {
-      "index": 72,
+      "index": 76,
       "module": "reconciliation.py",
       "line": 398,
       "condition": "d_decision_digest is None",
@@ -747,7 +787,7 @@
       "outcome": "MISSING_BINDING_DECISION"
     },
     {
-      "index": 73,
+      "index": 77,
       "module": "reconciliation.py",
       "line": 407,
       "condition": "recomputed != d_decision_digest",
@@ -757,7 +797,7 @@
       "outcome": "DECISION_DIGEST_MISMATCH"
     },
     {
-      "index": 74,
+      "index": 78,
       "module": "reconciliation.py",
       "line": 414,
       "condition": "decision_id is None",
@@ -767,7 +807,7 @@
       "outcome": "MISSING_BINDING_DECISION"
     },
     {
-      "index": 75,
+      "index": 79,
       "module": "reconciliation.py",
       "line": 429,
       "condition": "snapshot_tenant != p_tenant",
@@ -777,7 +817,7 @@
       "outcome": "TENANT_MISMATCH"
     },
     {
-      "index": 76,
+      "index": 80,
       "module": "reconciliation.py",
       "line": 436,
       "condition": "snapshot_domain != DOMAIN_CLOUD_SCALING",
@@ -787,7 +827,7 @@
       "outcome": "D4_IDENTIFIER_MISMATCH"
     },
     {
-      "index": 77,
+      "index": 81,
       "module": "reconciliation.py",
       "line": 444,
       "condition": "not p_idempotency_key",
@@ -797,7 +837,7 @@
       "outcome": "IDEMPOTENCY_KEY_MISMATCH"
     },
     {
-      "index": 78,
+      "index": 82,
       "module": "reconciliation.py",
       "line": 449,
       "condition": "not d_idempotency_key",
@@ -807,7 +847,7 @@
       "outcome": "IDEMPOTENCY_KEY_MISMATCH"
     },
     {
-      "index": 79,
+      "index": 83,
       "module": "reconciliation.py",
       "line": 461,
       "condition": "p_idempotency_key != d_idempotency_key",
@@ -817,7 +857,7 @@
       "outcome": "IDEMPOTENCY_KEY_MISMATCH"
     },
     {
-      "index": 80,
+      "index": 84,
       "module": "reconciliation.py",
       "line": 468,
       "condition": "not isinstance(p_evidence_references, tuple) or not p_evidence_references",
@@ -827,7 +867,7 @@
       "outcome": "INVALID_EVIDENCE_BINDING"
     },
     {
-      "index": 81,
+      "index": 85,
       "module": "reconciliation.py",
       "line": 475,
       "condition": "tuple(p_request.evidence_references) != tuple(p_evidence_references)",
@@ -837,7 +877,7 @@
       "outcome": "INVALID_EVIDENCE_BINDING"
     },
     {
-      "index": 82,
+      "index": 86,
       "module": "reconciliation.py",
       "line": 481,
       "condition": "not evidence_snapshot_digest",
@@ -847,7 +887,7 @@
       "outcome": "INVALID_EVIDENCE_BINDING"
     },
     {
-      "index": 83,
+      "index": 87,
       "module": "reconciliation.py",
       "line": 510,
       "condition": "snapshot_evaluated_at is None",
@@ -857,7 +897,7 @@
       "outcome": "DECISION_INSTANT_NOT_BOUND"
     },
     {
-      "index": 84,
+      "index": 88,
       "module": "reconciliation.py",
       "line": 520,
       "condition": "snapshot_expires_at is None",
@@ -867,7 +907,7 @@
       "outcome": "MISSING_EXPIRY_FACT"
     },
     {
-      "index": 85,
+      "index": 89,
       "module": "reconciliation.py",
       "line": 525,
       "condition": "snapshot_issued_at is None",
@@ -877,7 +917,7 @@
       "outcome": "DECISION_INSTANT_NOT_BOUND"
     },
     {
-      "index": 86,
+      "index": 90,
       "module": "reconciliation.py",
       "line": 538,
       "condition": "d_expires_at is None",
@@ -887,7 +927,7 @@
       "outcome": "MISSING_EXPIRY_FACT"
     },
     {
-      "index": 87,
+      "index": 91,
       "module": "reconciliation.py",
       "line": 545,
       "condition": "to_canonical_obj(decision_evaluated_at) != to_canonical_obj(snapshot_evaluated_at)",
@@ -897,7 +937,7 @@
       "outcome": "DECISION_INSTANT_NOT_BOUND"
     },
     {
-      "index": 88,
+      "index": 92,
       "module": "reconciliation.py",
       "line": 560,
       "condition": "to_canonical_obj(decision_expires_at) != to_canonical_obj(bound_expires_at)",
@@ -907,7 +947,7 @@
       "outcome": "DECISION_INSTANT_NOT_BOUND"
     },
     {
-      "index": 89,
+      "index": 93,
       "module": "reconciliation.py",
       "line": 577,
       "condition": "subject_valid_from > bound_evaluated_at",
@@ -917,7 +957,7 @@
       "outcome": "DECISION_INSTANT_NOT_BOUND"
     },
     {
-      "index": 90,
+      "index": 94,
       "module": "reconciliation.py",
       "line": 584,
       "condition": "bound_evaluated_at > bound_issued_at",
@@ -927,7 +967,7 @@
       "outcome": "DECISION_INSTANT_NOT_BOUND"
     },
     {
-      "index": 91,
+      "index": 95,
       "module": "candidate.py",
       "line": 248,
       "condition": "self.schema_version != AUTHORIZATION_CANDIDATE_SCHEMA_VERSION",
@@ -937,7 +977,7 @@
       "outcome": "UNSUPPORTED_SCHEMA_VERSION"
     },
     {
-      "index": 92,
+      "index": 96,
       "module": "candidate.py",
       "line": 288,
       "condition": "type(value) is not expected",
@@ -947,7 +987,7 @@
       "outcome": "UNSUPPORTED_EXACT_TYPE"
     },
     {
-      "index": 93,
+      "index": 97,
       "module": "candidate.py",
       "line": 296,
       "condition": "self.candidate_digest != expected_digest",
@@ -957,7 +997,7 @@
       "outcome": "CANDIDATE_DIGEST_FAILURE"
     },
     {
-      "index": 94,
+      "index": 98,
       "module": "candidate.py",
       "line": 403,
       "condition": "type(value) is not datetime",
@@ -967,7 +1007,7 @@
       "outcome": "MALFORMED_CANONICAL_FIELD"
     },
     {
-      "index": 95,
+      "index": 99,
       "module": "candidate.py",
       "line": 408,
       "condition": "value.tzinfo is None or value.utcoffset() is None",
@@ -977,7 +1017,7 @@
       "outcome": "MALFORMED_CANONICAL_FIELD"
     },
     {
-      "index": 96,
+      "index": 100,
       "module": "candidate.py",
       "line": 457,
       "condition": "value is None",
@@ -987,7 +1027,7 @@
       "outcome": "MISSING_POLICY_COORDINATE_BINDING, MISSING_POLICY_TARGET_BINDING, MISSING_PRODUCER_ATTESTATION, TARGET_SUBSTITUTION"
     },
     {
-      "index": 97,
+      "index": 101,
       "module": "candidate.py",
       "line": 465,
       "condition": "type(value) is not expected",
@@ -997,7 +1037,7 @@
       "outcome": "UNSUPPORTED_EXACT_TYPE"
     },
     {
-      "index": 98,
+      "index": 102,
       "module": "candidate.py",
       "line": 516,
       "condition": "a_recommendation_digest != facts.recommendation_digest",
@@ -1007,7 +1047,7 @@
       "outcome": "PRODUCER_ATTESTATION_CONTENT_MISMATCH"
     },
     {
-      "index": 99,
+      "index": 103,
       "module": "candidate.py",
       "line": 550,
       "condition": "not subject_from <= subject_asserted <= subject_until",
@@ -1017,7 +1057,7 @@
       "outcome": "SUBJECT_TEMPORAL_ORDERING"
     },
     {
-      "index": 100,
+      "index": 104,
       "module": "candidate.py",
       "line": 558,
       "condition": "decision_at > decision_until",
@@ -1027,7 +1067,7 @@
       "outcome": "DECISION_TEMPORAL_ORDERING"
     },
     {
-      "index": 101,
+      "index": 105,
       "module": "candidate.py",
       "line": 565,
       "condition": "not subject_asserted <= attested_at <= subject_until",
@@ -1037,7 +1077,7 @@
       "outcome": "ATTESTATION_TEMPORAL_ORDERING"
     },
     {
-      "index": 102,
+      "index": 106,
       "module": "candidate.py",
       "line": 576,
       "condition": "s_tenant != facts.tenant_id",
@@ -1047,7 +1087,7 @@
       "outcome": "TENANT_MISMATCH"
     },
     {
-      "index": 103,
+      "index": 107,
       "module": "candidate.py",
       "line": 580,
       "condition": "not s_account",
@@ -1057,7 +1097,7 @@
       "outcome": "MISSING_ACCOUNT_BINDING"
     },
     {
-      "index": 104,
+      "index": 108,
       "module": "candidate.py",
       "line": 585,
       "condition": "s_action_type != facts.action_type",
@@ -1067,7 +1107,7 @@
       "outcome": "ACTION_SUBSTITUTION"
     },
     {
-      "index": 105,
+      "index": 109,
       "module": "candidate.py",
       "line": 591,
       "condition": "s_magnitude_before != facts.magnitude_before",
@@ -1077,7 +1117,7 @@
       "outcome": "TARGET_SUBSTITUTION"
     },
     {
-      "index": 106,
+      "index": 110,
       "module": "candidate.py",
       "line": 596,
       "condition": "s_requested_magnitude != facts.magnitude_after",
@@ -1087,7 +1127,7 @@
       "outcome": "TARGET_SUBSTITUTION"
     },
     {
-      "index": 107,
+      "index": 111,
       "module": "candidate.py",
       "line": 611,
       "condition": "scope_value != projected_value",
@@ -1097,7 +1137,7 @@
       "outcome": ""
     },
     {
-      "index": 108,
+      "index": 112,
       "module": "candidate.py",
       "line": 619,
       "condition": "b_target_scope_digest != s_digest",
@@ -1107,7 +1147,7 @@
       "outcome": "POLICY_TARGET_CONTENT_MISMATCH"
     },
     {
-      "index": 109,
+      "index": 113,
       "module": "candidate.py",
       "line": 624,
       "condition": "b_max_magnitude != s_max_magnitude or b_max_delta != s_max_delta",
@@ -1117,7 +1157,7 @@
       "outcome": "POLICY_TARGET_CONTENT_MISMATCH"
     },
     {
-      "index": 110,
+      "index": 114,
       "module": "candidate.py",
       "line": 649,
       "condition": "c_policy_id != b_policy_id or c_policy_version != b_policy_version",
@@ -1127,7 +1167,7 @@
       "outcome": "POLICY_COORDINATE_CONTENT_MISMATCH"
     },
     {
-      "index": 111,
+      "index": 115,
       "module": "candidate.py",
       "line": 657,
       "condition": "c_target_scope_digest != s_digest",
@@ -1137,7 +1177,7 @@
       "outcome": "POLICY_COORDINATE_CONTENT_MISMATCH"
     },
     {
-      "index": 112,
+      "index": 116,
       "module": "candidate.py",
       "line": 669,
       "condition": "c_policy_scope == POLICY_SCOPE_TENANT and c_policy_tenant_id != facts.tenant_id",
@@ -1147,7 +1187,7 @@
       "outcome": "CROSS_TENANT_POLICY_BINDING"
     },
     {
-      "index": 113,
+      "index": 117,
       "module": "candidate.py",
       "line": 682,
       "condition": "s_requested_magnitude > b_max_magnitude",
@@ -1157,7 +1197,7 @@
       "outcome": "REQUESTED_MAGNITUDE_ABOVE_MAXIMUM"
     },
     {
-      "index": 114,
+      "index": 118,
       "module": "candidate.py",
       "line": 688,
       "condition": "facts.requested_delta > b_max_delta",

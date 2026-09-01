@@ -15,7 +15,9 @@ PYPROJECT = (PROJECT / "pyproject.toml").read_text(encoding="utf-8")
 
 
 def test_version_is_the_declared_version():
-    """``0.7.0``: the temporal guards accept canonical values only, never live objects.
+    """``0.8.0``: ExecutionTargetScope schema 2 — a required ``cloud_provider`` and an
+    Azure-conditional ``resource_group`` (ETS-1…ETS-15). A versioned breaking change with
+    no compatibility path by ruling: v1 payloads are refused, never upgraded.
 
     ``0.6.0`` moved ordering off canonical strings onto parsed instants and left an
     ``isinstance`` branch that accepted a live ``datetime`` from the snapshot. Canonicalization
@@ -50,7 +52,7 @@ def test_version_is_the_declared_version():
     the same inputs now raise.
     """
 
-    assert pkg.__version__ == "0.7.0"
+    assert pkg.__version__ == "0.8.0"
 
 
 def test_distribution_and_namespace_names():

@@ -1,7 +1,7 @@
 {
   "package": "authorization-contracts",
-  "total": 114,
-  "scored": 111,
+  "total": 118,
+  "scored": 115,
   "excluded": 3,
   "classification": {
     "1": {
@@ -55,13 +55,13 @@
     "9": {
       "status": "SCORED",
       "module": "identifiers.py",
-      "line": 93,
+      "line": 95,
       "condition": "ours != theirs"
     },
     "10": {
       "status": "SCORED",
       "module": "identifiers.py",
-      "line": 100,
+      "line": 102,
       "condition": "controller_actions != CANONICAL_ACTION_TYPES"
     },
     "11": {
@@ -70,358 +70,382 @@
       "detail": "A collision assertion between two frozen literals defined in this module, in this distribution. No dependency resolution can move either, so the condition is false in every program this package can be part of and `if False:` is the same program on every path. The test below measures the inequality.",
       "evidence": "tests/test_guard_coverage.py::test_the_in_tree_drift_assertions_hold",
       "module": "identifiers.py",
-      "line": 109,
+      "line": 111,
       "condition": "PRODUCER_SIGNING_PURPOSE == PURPOSE_CAPACITY_ACTION"
     },
     "12": {
       "status": "SCORED",
       "module": "target.py",
-      "line": 101,
+      "line": 105,
       "condition": "type(value) is not int or value < 0"
     },
     "13": {
       "status": "SCORED",
       "module": "target.py",
-      "line": 152,
+      "line": 180,
       "condition": "self.schema_version != EXECUTION_TARGET_SCOPE_SCHEMA_VERSION"
     },
     "14": {
       "status": "SCORED",
       "module": "target.py",
-      "line": 160,
+      "line": 188,
       "condition": "self.account_id is None or self.account_id == ''"
     },
     "15": {
       "status": "SCORED",
       "module": "target.py",
-      "line": 168,
-      "condition": "action not in CANONICAL_ACTION_TYPES"
+      "line": 198,
+      "condition": "provider not in CANONICAL_CLOUD_PROVIDERS"
     },
     "16": {
       "status": "SCORED",
       "module": "target.py",
-      "line": 188,
-      "condition": "self.requested_magnitude > self.max_permitted_magnitude"
+      "line": 206,
+      "condition": "action not in CANONICAL_ACTION_TYPES"
     },
     "17": {
       "status": "SCORED",
       "module": "target.py",
-      "line": 194,
-      "condition": "self.requested_delta > self.max_permitted_delta"
+      "line": 228,
+      "condition": "provider == CLOUD_PROVIDER_AZURE"
     },
     "18": {
       "status": "SCORED",
       "module": "target.py",
-      "line": 268,
-      "condition": "not isinstance(data, Mapping)"
+      "line": 229,
+      "condition": "self.resource_group is None"
     },
     "19": {
       "status": "SCORED",
       "module": "target.py",
-      "line": 275,
-      "condition": "unknown"
+      "line": 236,
+      "condition": "self.resource_group is not None"
     },
     "20": {
       "status": "SCORED",
       "module": "target.py",
-      "line": 281,
-      "condition": "missing"
+      "line": 245,
+      "condition": "self.requested_magnitude > self.max_permitted_magnitude"
     },
     "21": {
       "status": "SCORED",
       "module": "target.py",
-      "line": 283,
-      "condition": "'account_id' in missing"
+      "line": 251,
+      "condition": "self.requested_delta > self.max_permitted_delta"
     },
     "22": {
       "status": "SCORED",
       "module": "target.py",
-      "line": 337,
-      "condition": "self.schema_version != POLICY_TARGET_BINDING_SCHEMA_VERSION"
+      "line": 330,
+      "condition": "not isinstance(data, Mapping)"
     },
     "23": {
       "status": "SCORED",
       "module": "target.py",
-      "line": 363,
-      "condition": "type(value) is not int or value < 0"
+      "line": 337,
+      "condition": "unknown"
     },
     "24": {
       "status": "SCORED",
       "module": "target.py",
-      "line": 371,
-      "condition": "self.binding_digest != expected"
+      "line": 343,
+      "condition": "missing"
     },
     "25": {
       "status": "SCORED",
       "module": "target.py",
-      "line": 436,
-      "condition": "not isinstance(data, Mapping)"
+      "line": 345,
+      "condition": "'account_id' in missing"
     },
     "26": {
       "status": "SCORED",
       "module": "target.py",
-      "line": 443,
-      "condition": "unknown"
+      "line": 401,
+      "condition": "self.schema_version != POLICY_TARGET_BINDING_SCHEMA_VERSION"
     },
     "27": {
       "status": "SCORED",
       "module": "target.py",
-      "line": 445,
-      "condition": "{'trust_state', 'verified', 'trusted', 'authentic'} & unknown"
+      "line": 427,
+      "condition": "type(value) is not int or value < 0"
     },
     "28": {
       "status": "SCORED",
       "module": "target.py",
-      "line": 453,
-      "condition": "missing"
+      "line": 435,
+      "condition": "self.binding_digest != expected"
     },
     "29": {
       "status": "SCORED",
       "module": "target.py",
-      "line": 545,
-      "condition": "self.schema_version != POLICY_TARGET_BINDING_V2_SCHEMA_VERSION"
+      "line": 500,
+      "condition": "not isinstance(data, Mapping)"
     },
     "30": {
       "status": "SCORED",
       "module": "target.py",
-      "line": 562,
-      "condition": "tenant != tenant.strip()"
+      "line": 507,
+      "condition": "unknown"
     },
     "31": {
       "status": "SCORED",
       "module": "target.py",
-      "line": 572,
-      "condition": "self.policy_content_digest != self.policy_body_digest"
+      "line": 509,
+      "condition": "{'trust_state', 'verified', 'trusted', 'authentic'} & unknown"
     },
     "32": {
       "status": "SCORED",
       "module": "target.py",
-      "line": 581,
-      "condition": "self.binding_digest != expected"
+      "line": 517,
+      "condition": "missing"
     },
     "33": {
       "status": "SCORED",
       "module": "target.py",
-      "line": 659,
-      "condition": "not isinstance(data, Mapping)"
+      "line": 609,
+      "condition": "self.schema_version != POLICY_TARGET_BINDING_V2_SCHEMA_VERSION"
     },
     "34": {
       "status": "SCORED",
       "module": "target.py",
-      "line": 666,
-      "condition": "unknown"
+      "line": 626,
+      "condition": "tenant != tenant.strip()"
     },
     "35": {
       "status": "SCORED",
       "module": "target.py",
-      "line": 668,
-      "condition": "{'trust_state', 'verified', 'trusted', 'authentic', 'resolved'} & unknown"
+      "line": 636,
+      "condition": "self.policy_content_digest != self.policy_body_digest"
     },
     "36": {
       "status": "SCORED",
       "module": "target.py",
-      "line": 676,
-      "condition": "missing"
+      "line": 645,
+      "condition": "self.binding_digest != expected"
     },
     "37": {
+      "status": "SCORED",
+      "module": "target.py",
+      "line": 723,
+      "condition": "not isinstance(data, Mapping)"
+    },
+    "38": {
+      "status": "SCORED",
+      "module": "target.py",
+      "line": 730,
+      "condition": "unknown"
+    },
+    "39": {
+      "status": "SCORED",
+      "module": "target.py",
+      "line": 732,
+      "condition": "{'trust_state', 'verified', 'trusted', 'authentic', 'resolved'} & unknown"
+    },
+    "40": {
+      "status": "SCORED",
+      "module": "target.py",
+      "line": 740,
+      "condition": "missing"
+    },
+    "41": {
       "status": "SCORED",
       "module": "attestation.py",
       "line": 63,
       "condition": "not isinstance(value, datetime)"
     },
-    "38": {
+    "42": {
       "status": "SCORED",
       "module": "attestation.py",
       "line": 67,
       "condition": "value.tzinfo is None or value.utcoffset() is None"
     },
-    "39": {
+    "43": {
       "status": "SCORED",
       "module": "attestation.py",
       "line": 119,
       "condition": "self.schema_version != PRODUCER_ATTESTATION_SCHEMA_VERSION"
     },
-    "40": {
+    "44": {
       "status": "SCORED",
       "module": "attestation.py",
       "line": 133,
       "condition": "algorithm not in SUPPORTED_SIGNATURE_ALGORITHMS"
     },
-    "41": {
+    "45": {
       "status": "SCORED",
       "module": "attestation.py",
       "line": 142,
       "condition": "purpose not in SUPPORTED_PRODUCER_SIGNING_PURPOSES"
     },
-    "42": {
+    "46": {
       "status": "SCORED",
       "module": "attestation.py",
       "line": 155,
       "condition": "self.signing_payload_digest != expected"
     },
-    "43": {
+    "47": {
       "status": "SCORED",
       "module": "attestation.py",
       "line": 234,
       "condition": "type(data) is not dict and (not isinstance(data, Mapping))"
     },
-    "44": {
+    "48": {
       "status": "SCORED",
       "module": "attestation.py",
       "line": 240,
       "condition": "unknown"
     },
-    "45": {
+    "49": {
       "status": "SCORED",
       "module": "attestation.py",
       "line": 242,
       "condition": "{'trust_state', 'verified', 'trusted', 'authentic'} & unknown"
     },
-    "46": {
+    "50": {
       "status": "SCORED",
       "module": "attestation.py",
       "line": 250,
       "condition": "missing"
     },
-    "47": {
+    "51": {
       "status": "SCORED",
       "module": "attestation.py",
       "line": 255,
       "condition": "'schema_version' not in data"
     },
-    "48": {
+    "52": {
       "status": "SCORED",
       "module": "attestation.py",
       "line": 261,
       "condition": "isinstance(issued_at, str)"
     },
-    "49": {
+    "53": {
       "status": "SCORED",
       "module": "reconciliation.py",
       "line": 122,
       "condition": "type(value) is not int or value < 0"
     },
-    "50": {
+    "54": {
       "status": "SCORED",
       "module": "reconciliation.py",
       "line": 144,
       "condition": "type(value) is not datetime"
     },
-    "51": {
+    "55": {
       "status": "SCORED",
       "module": "reconciliation.py",
       "line": 146,
       "condition": "value.tzinfo is None or value.utcoffset() is None"
     },
-    "52": {
+    "56": {
       "status": "SCORED",
       "module": "reconciliation.py",
       "line": 185,
       "condition": "type(value) is not str"
     },
-    "53": {
+    "57": {
       "status": "SCORED",
       "module": "reconciliation.py",
       "line": 219,
       "condition": "type(projection) is not CapacityRiskSubjectProjection"
     },
-    "54": {
+    "58": {
       "status": "SCORED",
       "module": "reconciliation.py",
       "line": 225,
       "condition": "type(decision) is not SubjectRiskDecision"
     },
-    "55": {
+    "59": {
       "status": "SCORED",
       "module": "reconciliation.py",
       "line": 283,
       "condition": "validation.context_digest != p_context_digest"
     },
-    "56": {
+    "60": {
       "status": "SCORED",
       "module": "reconciliation.py",
       "line": 288,
       "condition": "validation.subject_digest != p_subject_digest"
     },
-    "57": {
+    "61": {
       "status": "SCORED",
       "module": "reconciliation.py",
       "line": 293,
       "condition": "validation.recommendation_digest != p_recommendation_digest"
     },
-    "58": {
+    "62": {
       "status": "SCORED",
       "module": "reconciliation.py",
       "line": 298,
       "condition": "p_request.digest() != p_request_digest"
     },
-    "59": {
+    "63": {
       "status": "SCORED",
       "module": "reconciliation.py",
       "line": 303,
       "condition": "p_context.digest() != p_context_digest"
     },
-    "60": {
+    "64": {
       "status": "SCORED",
       "module": "reconciliation.py",
       "line": 322,
       "condition": "require_canonical_identifier('projection.tenant_id', p_tenant) != d_tenant"
     },
-    "61": {
+    "65": {
       "status": "SCORED",
       "module": "reconciliation.py",
       "line": 331,
       "condition": "p_request_digest != d_request_digest"
     },
-    "62": {
+    "66": {
       "status": "SCORED",
       "module": "reconciliation.py",
       "line": 337,
       "condition": "p_subject_digest != d_subject_digest"
     },
-    "63": {
+    "67": {
       "status": "SCORED",
       "module": "reconciliation.py",
       "line": 344,
       "condition": "p_request.subject_type != SUBJECT_TYPE_CAPACITY_SUBJECT"
     },
-    "64": {
+    "68": {
       "status": "SCORED",
       "module": "reconciliation.py",
       "line": 350,
       "condition": "p_request.requested_purpose != PURPOSE_CAPACITY_ACTION"
     },
-    "65": {
+    "69": {
       "status": "SCORED",
       "module": "reconciliation.py",
       "line": 356,
       "condition": "p_request.requested_domain != DOMAIN_CLOUD_SCALING"
     },
-    "66": {
+    "70": {
       "status": "SCORED",
       "module": "reconciliation.py",
       "line": 364,
       "condition": "action_type not in CANONICAL_ACTION_TYPES"
     },
-    "67": {
+    "71": {
       "status": "SCORED",
       "module": "reconciliation.py",
       "line": 371,
       "condition": "not isinstance(d_disposition, SubjectRiskDisposition)"
     },
-    "68": {
+    "72": {
       "status": "SCORED",
       "module": "reconciliation.py",
       "line": 375,
       "condition": "d_disposition not in ALLOW_FAMILY_DISPOSITIONS"
     },
-    "69": {
+    "73": {
       "status": "SCORED",
       "module": "reconciliation.py",
       "line": 381,
       "condition": "d_risk_outcome is None"
     },
-    "70": {
+    "74": {
       "status": "EXCLUDED",
       "reason": "diagnostic-only",
       "detail": "`None` is a strict subset of `not isinstance(d_decision_snapshot, Mapping)`, the guard on the next line, which raises ReconciliationError with the same MISSING_DECISION_SNAPSHOT reason. Removing this guard changes the message and nothing else. It is kept because the message is the better one for the commonest case.",
@@ -430,97 +454,97 @@
       "line": 388,
       "condition": "d_decision_snapshot is None"
     },
-    "71": {
+    "75": {
       "status": "SCORED",
       "module": "reconciliation.py",
       "line": 393,
       "condition": "not isinstance(d_decision_snapshot, Mapping)"
     },
-    "72": {
+    "76": {
       "status": "SCORED",
       "module": "reconciliation.py",
       "line": 398,
       "condition": "d_decision_digest is None"
     },
-    "73": {
+    "77": {
       "status": "SCORED",
       "module": "reconciliation.py",
       "line": 407,
       "condition": "recomputed != d_decision_digest"
     },
-    "74": {
+    "78": {
       "status": "SCORED",
       "module": "reconciliation.py",
       "line": 414,
       "condition": "decision_id is None"
     },
-    "75": {
+    "79": {
       "status": "SCORED",
       "module": "reconciliation.py",
       "line": 429,
       "condition": "snapshot_tenant != p_tenant"
     },
-    "76": {
+    "80": {
       "status": "SCORED",
       "module": "reconciliation.py",
       "line": 436,
       "condition": "snapshot_domain != DOMAIN_CLOUD_SCALING"
     },
-    "77": {
+    "81": {
       "status": "SCORED",
       "module": "reconciliation.py",
       "line": 444,
       "condition": "not p_idempotency_key"
     },
-    "78": {
+    "82": {
       "status": "SCORED",
       "module": "reconciliation.py",
       "line": 449,
       "condition": "not d_idempotency_key"
     },
-    "79": {
+    "83": {
       "status": "SCORED",
       "module": "reconciliation.py",
       "line": 461,
       "condition": "p_idempotency_key != d_idempotency_key"
     },
-    "80": {
+    "84": {
       "status": "SCORED",
       "module": "reconciliation.py",
       "line": 468,
       "condition": "not isinstance(p_evidence_references, tuple) or not p_evidence_references"
     },
-    "81": {
+    "85": {
       "status": "SCORED",
       "module": "reconciliation.py",
       "line": 475,
       "condition": "tuple(p_request.evidence_references) != tuple(p_evidence_references)"
     },
-    "82": {
+    "86": {
       "status": "SCORED",
       "module": "reconciliation.py",
       "line": 481,
       "condition": "not evidence_snapshot_digest"
     },
-    "83": {
+    "87": {
       "status": "SCORED",
       "module": "reconciliation.py",
       "line": 510,
       "condition": "snapshot_evaluated_at is None"
     },
-    "84": {
+    "88": {
       "status": "SCORED",
       "module": "reconciliation.py",
       "line": 520,
       "condition": "snapshot_expires_at is None"
     },
-    "85": {
+    "89": {
       "status": "SCORED",
       "module": "reconciliation.py",
       "line": 525,
       "condition": "snapshot_issued_at is None"
     },
-    "86": {
+    "90": {
       "status": "EXCLUDED",
       "reason": "diagnostic-only",
       "detail": "`None` is a strict subset of `not isinstance(value, datetime)` inside the `_require_datetime(\"expires_at\", ..., MISSING_EXPIRY_FACT)` call on the next line, which raises ReconciliationError with the same MISSING_EXPIRY_FACT reason. Removing this guard changes the message and nothing else.",
@@ -529,169 +553,169 @@
       "line": 538,
       "condition": "d_expires_at is None"
     },
-    "87": {
+    "91": {
       "status": "SCORED",
       "module": "reconciliation.py",
       "line": 545,
       "condition": "to_canonical_obj(decision_evaluated_at) != to_canonical_obj(snapshot_evaluated_at)"
     },
-    "88": {
+    "92": {
       "status": "SCORED",
       "module": "reconciliation.py",
       "line": 560,
       "condition": "to_canonical_obj(decision_expires_at) != to_canonical_obj(bound_expires_at)"
     },
-    "89": {
+    "93": {
       "status": "SCORED",
       "module": "reconciliation.py",
       "line": 577,
       "condition": "subject_valid_from > bound_evaluated_at"
     },
-    "90": {
+    "94": {
       "status": "SCORED",
       "module": "reconciliation.py",
       "line": 584,
       "condition": "bound_evaluated_at > bound_issued_at"
     },
-    "91": {
+    "95": {
       "status": "SCORED",
       "module": "candidate.py",
       "line": 248,
       "condition": "self.schema_version != AUTHORIZATION_CANDIDATE_SCHEMA_VERSION"
     },
-    "92": {
+    "96": {
       "status": "SCORED",
       "module": "candidate.py",
       "line": 288,
       "condition": "type(value) is not expected"
     },
-    "93": {
+    "97": {
       "status": "SCORED",
       "module": "candidate.py",
       "line": 296,
       "condition": "self.candidate_digest != expected_digest"
     },
-    "94": {
+    "98": {
       "status": "SCORED",
       "module": "candidate.py",
       "line": 403,
       "condition": "type(value) is not datetime"
     },
-    "95": {
+    "99": {
       "status": "SCORED",
       "module": "candidate.py",
       "line": 408,
       "condition": "value.tzinfo is None or value.utcoffset() is None"
     },
-    "96": {
+    "100": {
       "status": "SCORED",
       "module": "candidate.py",
       "line": 457,
       "condition": "value is None"
     },
-    "97": {
+    "101": {
       "status": "SCORED",
       "module": "candidate.py",
       "line": 465,
       "condition": "type(value) is not expected"
     },
-    "98": {
+    "102": {
       "status": "SCORED",
       "module": "candidate.py",
       "line": 516,
       "condition": "a_recommendation_digest != facts.recommendation_digest"
     },
-    "99": {
+    "103": {
       "status": "SCORED",
       "module": "candidate.py",
       "line": 550,
       "condition": "not subject_from <= subject_asserted <= subject_until"
     },
-    "100": {
+    "104": {
       "status": "SCORED",
       "module": "candidate.py",
       "line": 558,
       "condition": "decision_at > decision_until"
     },
-    "101": {
+    "105": {
       "status": "SCORED",
       "module": "candidate.py",
       "line": 565,
       "condition": "not subject_asserted <= attested_at <= subject_until"
     },
-    "102": {
+    "106": {
       "status": "SCORED",
       "module": "candidate.py",
       "line": 576,
       "condition": "s_tenant != facts.tenant_id"
     },
-    "103": {
+    "107": {
       "status": "SCORED",
       "module": "candidate.py",
       "line": 580,
       "condition": "not s_account"
     },
-    "104": {
+    "108": {
       "status": "SCORED",
       "module": "candidate.py",
       "line": 585,
       "condition": "s_action_type != facts.action_type"
     },
-    "105": {
+    "109": {
       "status": "SCORED",
       "module": "candidate.py",
       "line": 591,
       "condition": "s_magnitude_before != facts.magnitude_before"
     },
-    "106": {
+    "110": {
       "status": "SCORED",
       "module": "candidate.py",
       "line": 596,
       "condition": "s_requested_magnitude != facts.magnitude_after"
     },
-    "107": {
+    "111": {
       "status": "SCORED",
       "module": "candidate.py",
       "line": 611,
       "condition": "scope_value != projected_value"
     },
-    "108": {
+    "112": {
       "status": "SCORED",
       "module": "candidate.py",
       "line": 619,
       "condition": "b_target_scope_digest != s_digest"
     },
-    "109": {
+    "113": {
       "status": "SCORED",
       "module": "candidate.py",
       "line": 624,
       "condition": "b_max_magnitude != s_max_magnitude or b_max_delta != s_max_delta"
     },
-    "110": {
+    "114": {
       "status": "SCORED",
       "module": "candidate.py",
       "line": 649,
       "condition": "c_policy_id != b_policy_id or c_policy_version != b_policy_version"
     },
-    "111": {
+    "115": {
       "status": "SCORED",
       "module": "candidate.py",
       "line": 657,
       "condition": "c_target_scope_digest != s_digest"
     },
-    "112": {
+    "116": {
       "status": "SCORED",
       "module": "candidate.py",
       "line": 669,
       "condition": "c_policy_scope == POLICY_SCOPE_TENANT and c_policy_tenant_id != facts.tenant_id"
     },
-    "113": {
+    "117": {
       "status": "SCORED",
       "module": "candidate.py",
       "line": 682,
       "condition": "s_requested_magnitude > b_max_magnitude"
     },
-    "114": {
+    "118": {
       "status": "SCORED",
       "module": "candidate.py",
       "line": 688,

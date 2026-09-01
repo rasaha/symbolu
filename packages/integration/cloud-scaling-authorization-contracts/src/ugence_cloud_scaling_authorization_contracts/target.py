@@ -49,7 +49,11 @@ from .errors import (
     PolicyTargetBindingError,
     TargetScopeError,
 )
-from .identifiers import CANONICAL_ACTION_TYPES
+from .identifiers import (
+    CANONICAL_ACTION_TYPES,
+    CANONICAL_CLOUD_PROVIDERS,
+    CLOUD_PROVIDER_AZURE,
+)
 from .trust import PHASE_5A_TRUST_STATE, EvidenceTrustState
 
 __all__ = [
@@ -63,7 +67,7 @@ __all__ = [
     "PolicyTargetBindingReferenceV2",
 ]
 
-EXECUTION_TARGET_SCOPE_SCHEMA_VERSION: Final[str] = "cloud-scaling-execution-target-scope-1"
+EXECUTION_TARGET_SCOPE_SCHEMA_VERSION: Final[str] = "cloud-scaling-execution-target-scope-2"
 
 #: The one ``policy_scope`` value that constrains which tenant a policy may bound (R-9).
 #: Duplicated as a literal rather than imported: this package deliberately depends on no
@@ -124,6 +128,18 @@ class ExecutionTargetScope:
     tenant_id: str
     #: Required, and new to Phase 5. The Phase 4 subject has no account identity.
     account_id: str
+    #: Required, and new to Phase 5A schema 2 (ETS-3). ``account_id`` alone was ambiguous:
+    #: an AWS account number, a GCP project and an Azure subscription are all opaque
+    #: strings, nothing upstream carries provider identity, and two clouds' identifiers
+    #: can therefore collide. ``(cloud_provider, account_id)`` is the governed account
+    #: identity; neither half is sufficient alone.
+    #:
+    #: Scope-only and reconciled against nothing, like :attr:`namespace` under ETS-6 —
+    #: ``CapacitySubject`` is provider-neutral by ruling (ETS-8) so there is no projected
+    #: fact to reconcile against. Its protection is the digest binding, not agreement with
+    #: an upstream authority; a scope naming the wrong provider is caught only if the
+    #: digest it is bound into is checked.
+    cloud_provider: str
     action_type: str
     magnitude_before: int
     requested_magnitude: int
@@ -142,6 +158,18 @@ class ExecutionTargetScope:
     #: Present only where the deployment vocabulary supports it (Kubernetes-shaped
     #: targets). ``None`` for targets that have no namespace concept.
     namespace: Optional[str] = None
+    #: Azure only, and required there (ETS-4). An ARM resource id needs a subscription
+    #: *and* a resource group; ``account_id`` carries the first and nothing carried the
+    #: second, so an Azure target was not addressable at all before schema 2. Required to
+    #: be ``None`` for every other provider rather than merely optional: canonicalization
+    #: retains nulls, so a stray value would sit inside the digest as dead data, and a
+    #: digest-bound field nothing reads is a substitution surface.
+    #:
+    #: Implemented rule, stated because it is narrower than the words of ETS-4: the scope
+    #: carries no field distinguishing a resource-level target from any other, and adding
+    #: one was not ratified, so the enforceable rule is provider-conditional —
+    #: ``cloud_provider == "azure"`` requires it, every other provider forbids it.
+    resource_group: Optional[str] = None
     schema_version: str = EXECUTION_TARGET_SCOPE_SCHEMA_VERSION
 
     def __post_init__(self) -> None:
@@ -164,6 +192,16 @@ class ExecutionTargetScope:
             )
         require_canonical_identifier("account_id", self.account_id)
 
+        # The provider half of the governed account identity. Membership is the whole
+        # check: ETS-11 keeps per-provider grammar in governed adapters, not here.
+        provider = require_canonical_identifier("cloud_provider", self.cloud_provider)
+        if provider not in CANONICAL_CLOUD_PROVIDERS:
+            raise TargetScopeError(
+                f"cloud_provider {provider!r} is not in the ratified canonical vocabulary "
+                f"{sorted(CANONICAL_CLOUD_PROVIDERS)}",
+                _Reason.UNSUPPORTED_CLOUD_PROVIDER,
+            )
+
         action = require_canonical_identifier("action_type", self.action_type)
         if action not in CANONICAL_ACTION_TYPES:
             raise TargetScopeError(
@@ -180,8 +218,27 @@ class ExecutionTargetScope:
         ):
             _require_magnitude(name, getattr(self, name))
 
-        for name in ("environment", "region", "zone", "namespace", "compute_group", "resource_class"):
+        for name in ("environment", "region", "zone", "namespace", "compute_group",
+                     "resource_class", "resource_group"):
             _optional_identifier(name, getattr(self, name))
+
+        # Provider-conditional, and enforced in both directions. Absent on Azure the scope
+        # cannot name an ARM resource; present anywhere else it is dead data inside a
+        # digest, which is exactly the substitution surface this scope exists to close.
+        if provider == CLOUD_PROVIDER_AZURE:
+            if self.resource_group is None:
+                raise TargetScopeError(
+                    "resource_group is required when cloud_provider is "
+                    f"{CLOUD_PROVIDER_AZURE!r} — an ARM resource id needs both the "
+                    "subscription and the resource group",
+                    _Reason.MISSING_RESOURCE_GROUP_BINDING,
+                )
+        elif self.resource_group is not None:
+            raise TargetScopeError(
+                f"resource_group is meaningful only for {CLOUD_PROVIDER_AZURE!r} targets, "
+                f"not {provider!r}",
+                _Reason.RESOURCE_GROUP_NOT_APPLICABLE,
+            )
 
         # The bounds are enforced at construction, so a scope that exceeds its own ceiling
         # cannot exist to be handed on — the check is not merely performed downstream.
@@ -209,10 +266,12 @@ class ExecutionTargetScope:
             "schema_version": self.schema_version,
             "tenant_id": self.tenant_id,
             "account_id": self.account_id,
+            "cloud_provider": self.cloud_provider,
             "environment": self.environment,
             "region": self.region,
             "zone": self.zone,
             "namespace": self.namespace,
+            "resource_group": self.resource_group,
             "compute_group": self.compute_group,
             "resource_class": self.resource_class,
             "action_type": self.action_type,
@@ -236,10 +295,12 @@ class ExecutionTargetScope:
             "schema_version",
             "tenant_id",
             "account_id",
+            "cloud_provider",
             "environment",
             "region",
             "zone",
             "namespace",
+            "resource_group",
             "compute_group",
             "resource_class",
             "action_type",
@@ -253,6 +314,7 @@ class ExecutionTargetScope:
         {
             "tenant_id",
             "account_id",
+            "cloud_provider",
             "action_type",
             "magnitude_before",
             "requested_magnitude",
@@ -291,10 +353,12 @@ class ExecutionTargetScope:
             schema_version=data.get("schema_version", EXECUTION_TARGET_SCOPE_SCHEMA_VERSION),
             tenant_id=data["tenant_id"],
             account_id=data["account_id"],
+            cloud_provider=data["cloud_provider"],
             environment=data.get("environment"),
             region=data.get("region"),
             zone=data.get("zone"),
             namespace=data.get("namespace"),
+            resource_group=data.get("resource_group"),
             compute_group=data.get("compute_group"),
             resource_class=data.get("resource_class"),
             action_type=data["action_type"],

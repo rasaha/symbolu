@@ -41,6 +41,8 @@ __all__ = [
     "DOMAIN_CLOUD_SCALING",
     "SUBJECT_TYPE_CAPACITY_SUBJECT",
     "CANONICAL_ACTION_TYPES",
+    "CANONICAL_CLOUD_PROVIDERS",
+    "CLOUD_PROVIDER_AZURE",
     "PRODUCER_SIGNING_PURPOSE",
     "SUPPORTED_PRODUCER_SIGNING_PURPOSES",
 ]
@@ -113,3 +115,29 @@ def _assert_no_drift() -> None:
 
 
 _assert_no_drift()
+
+
+#: The closed cloud-provider vocabulary, ratified ETS-3/ETS-10 (2026-09-01). Unlike
+#: :data:`CANONICAL_ACTION_TYPES`, which Phase 5A re-exports from Phase 4C unchanged,
+#: this vocabulary is **new to Phase 5A**: Phase 4's ``CapacitySubject`` is deliberately
+#: provider-neutral and names no cloud, so there is nothing upstream to inherit.
+#:
+#: ``self-hosted`` is the repository's existing spelling (``ObservationProvenance``'s
+#: provider label), admitted under ETS-10 so a Kubernetes target that belongs to no cloud
+#: is buildable. Its presence means ``cloud_provider`` names a field whose value is
+#: sometimes not a cloud; renaming it was not ratified and would be a second breaking
+#: change, so the name stands.
+#:
+#: Membership is the whole of the check. ETS-11 ruled the pair
+#: ``(cloud_provider, account_id)`` the governed account identity and explicitly kept
+#: per-provider *grammar* out of this package: a 12-digit AWS account, a GCP project
+#: number and an Azure subscription GUID are all validated here only as canonical
+#: identifiers. Format knowledge belongs to governed adapters.
+CANONICAL_CLOUD_PROVIDERS: Final[frozenset[str]] = frozenset(
+    {"aws", "gcp", "azure", "self-hosted"}
+)
+
+#: Named rather than spelled inline: the Azure resource-group rule reads it twice, and a
+#: bare string literal in a conditional is how a vocabulary quietly grows a synonym.
+CLOUD_PROVIDER_AZURE: Final[str] = "azure"
+
