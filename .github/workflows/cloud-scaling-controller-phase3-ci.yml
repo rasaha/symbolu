@@ -181,9 +181,9 @@ jobs:
         # `--inventory-only` also fails on an exclusion that names no guard, one with a
         # reason outside the closed vocabulary, and a production module that is neither
         # walked by module_order nor excluded with a concrete reason — for this PHASED
-        # adoption the second half is the boundary contract: all 68 deferred controller
-        # modules are declared by name, so a module added outside `planning/` fails the
-        # inventory instead of escaping it.
+        # adoption the second half is the boundary contract: all 47 deferred controller
+        # modules are declared by name, so a module added outside the three walked
+        # subpackages fails the inventory instead of escaping it.
         if: matrix.shard == 1
         run: |
           python scripts/cloud_scaling/guard_sweep.py controller-evidence-planning --inventory-only
@@ -230,7 +230,7 @@ jobs:
             --aggregate shards --shards 4
       - name: The totals are the ones this phase ratified
         # The phased-adoption ruling's bar (2026-08-31): zero surviving SCORED, zero
-        # unscored and zero message-only kills, with the 16 defense-in-depth exclusions
+        # unscored and zero message-only kills, with the 24 defense-in-depth exclusions
         # named individually — every one a guard whose mutation is jacketed by a sibling
         # gate refusing the same input under the same typed contract, measured and
         # recorded in its evidence test rather than asserted.

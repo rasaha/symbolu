@@ -649,6 +649,13 @@ repository at all.
 > exclusion doctrine, the prerequisite findings — stands as written. The withdrawn
 > figures are left in place below rather than silently rewritten, because a record that
 > quietly corrects itself teaches nothing about how the error was possible.
+>
+> **Two further figures in this section are phase-1 values that phase 2 superseded** —
+> the 68-module boundary disclosure (now 47) and the 16 named exclusions (now 24). They
+> are marked in place below. An earlier draft of this note said "everything else in this
+> section stands as written", which was false while those two stood unmarked; a
+> withdrawal note that overstates its own completeness is the same defect it exists to
+> correct.
 
 Ruling 3 of 2026-08-31 ordered the Cloud Scaling Controller adopted **in phases**,
 starting with `planning/` and "report it honestly as partial controller coverage",
@@ -725,7 +732,9 @@ defect §11 fixed for operations; latent here, fixed unconditionally).
 **CI.** `cloud-scaling-controller-phase3-ci.yml` — already scoped to Phase 3, which
 is `planning/` — gains the shared-engine jobs: inventory regeneration (which now also
 enforces the 68-module boundary disclosure), engine tests, a four-shard sweep, and an
-aggregate pinning the totals above with the 16 exclusions named individually. The
+aggregate pinning the totals above with the 16 exclusions named individually. *(Both
+figures are phase-1 values and were superseded by phase 2 — the disclosure now covers 47
+deferred modules and the aggregate pins 24 exclusions. See §13.)* The
 engine-filter floor test rises from five workflows to seven, and the raise closed a
 real gap: `cloud-scaling-risk-integration-ci.yml` had run the shared engine since its
 own adoption without ever being named in the floor.
@@ -980,7 +989,9 @@ guessed.
 `[G]` **Until that follow-up lands, `message_only_kills == 0` means "no kill matched the
 detector", not "no kill is attributable to prose."** Nineteen `match=` sites remain in
 this package's evaluation, window and replay tests. None is a sole killer — an exhaustive
-mutation of all 480 `if`-kind scored guards found only the two above — and none can be
+mutation of all 480 `if`-kind scored guards found only the two above, and a final
+independent audit extended that to all **503** scored guards (adding the 17
+helper-admission, 5 else-arm and 1 except-arm sites) with the same result — and none can be
 converted today: `EvaluationError`, `WindowError` and `ReplayError` are bare `ValueError`
 subclasses with no typed discriminator to assert. Giving them one is a production change
 a coverage phase must not make, and is part of the same follow-up.

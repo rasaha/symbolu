@@ -1186,7 +1186,7 @@
     "197": {
       "status": "EXCLUDED",
       "reason": "unreachable-behind-earlier-guard",
-      "detail": "The non-finite sweep over the probe window, which the source calls defensive. Every measurement-backed sample comes from a `Measurement`, whose `__post_init__` refuses NaN and infinity, and the replica count is validated as an int, so no non-finite value can reach a probe window.",
+      "detail": "The non-finite sweep over the probe window, which the source calls defensive. Every measurement-backed sample comes from a `Measurement`, whose `__post_init__` refuses NaN and infinity on every unit, bounded or not. The replica count is a separate path and its jacket is NOT the int validation this reason used to name: `CapacityState` accepts an arbitrarily large int, and what actually stops one is `extract_sample`'s `float(int(...))` raising `OverflowError` \u2014 an untyped crash, not a typed refusal. The guard stays unreachable either way; the account of why was wrong until 2026-09-01.",
       "evidence": "tests/forecasting/test_guard_coverage_evidence.py::test_a_non_finite_observation_cannot_be_built_at_all",
       "module": "forecasting/evidence.py",
       "line": 240,

@@ -407,10 +407,11 @@ PACKAGES = {
         key="controller-evidence-planning",
         package_dir="packages/capabilities/cloud-scaling-controller",
         dist_name="ugence_cloud_scaling_controller",
-        # PHASE 1 OF A PHASED ADOPTION (owner ruling 3, 2026-08-31). This entry covers
-        # `planning/` only. It is NOT controller coverage, and the inventory it generates
-        # says so in its own words rather than leaving a reader to infer it from the
-        # module list.
+        # PHASE 2 OF A PHASED ADOPTION (owner ruling 3, 2026-08-31; widened 2026-09-01).
+        # This entry covers `canonical/`, `forecasting/` and `planning/` — 31 of the
+        # package's 78 production modules. It is still NOT controller coverage, and the
+        # inventory it generates says so in its own words rather than leaving a reader to
+        # infer it from the module list.
         #
         # The mint is a recommendation that exists. `CapacityActionRecommendation` is the
         # artifact this subpackage produces, and its `__post_init__` is where every
@@ -451,7 +452,9 @@ PACKAGES = {
             "guards, 252 are the corrected `planning/` surface and 275 come from the "
             "`canonical/` and `forecasting/` widening."
         ),
-        # `planning/` in the order a recommendation is actually built: the typed
+        # The three subpackages in dependency order — `canonical/` (observed state),
+        # `forecasting/` (evidence built on it), then `planning/` in the order a
+        # recommendation is actually built: the typed
         # abstention vocabulary first, then the evidence layers each gate reads
         # (topology, cost, constraints), then candidate generation, the policy and
         # scoring that rank them, the recommendation artifact itself, and the pipeline
@@ -506,9 +509,11 @@ PACKAGES = {
                 for m, n in _CONTROLLER_DEFERRED
             },
         },
-        # Eight typed refusal classes, all defined inside `planning/` and all
-        # `ValueError` subclasses, plus the typed abstention the pipeline returns
-        # instead of raising.
+        # Twenty-five typed refusal classes across the three walked subpackages
+        # (`planning/` 8, `canonical/` 8, `forecasting/` 9), all `ValueError`
+        # subclasses, plus the typed abstentions the pipeline and the forecast service
+        # return instead of raising. `reason_vocabularies` below names two defined in
+        # `forecasting/`, which is why this comment cannot say "all inside `planning/`".
         refusal_calls=frozenset(
             {"_abstain", "ab", "abf", "abc", "abcost", "_unscored"}
         ),
@@ -582,10 +587,14 @@ PACKAGES = {
             ): (
                 "unreachable-behind-earlier-guard",
                 "The non-finite sweep over the probe window, which the source calls "
-                "defensive. Every measurement-backed sample comes from a "
-                "`Measurement`, whose `__post_init__` refuses NaN and infinity, and "
-                "the replica count is validated as an int, so no non-finite value can "
-                "reach a probe window.",
+                "defensive. Every measurement-backed sample comes from a `Measurement`, "
+                "whose `__post_init__` refuses NaN and infinity on every unit, bounded "
+                "or not. The replica count is a separate path and its jacket is NOT the "
+                "int validation this reason used to name: `CapacityState` accepts an "
+                "arbitrarily large int, and what actually stops one is `extract_sample`'s "
+                "`float(int(...))` raising `OverflowError` — an untyped crash, not a "
+                "typed refusal. The guard stays unreachable either way; the account of "
+                "why was wrong until 2026-09-01.",
                 "tests/forecasting/test_guard_coverage_evidence.py::"
                 "test_a_non_finite_observation_cannot_be_built_at_all",
             ),

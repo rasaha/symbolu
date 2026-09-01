@@ -38,12 +38,14 @@ def test_cross_subject_contamination_fails_closed():
         CanonicalCapacitySeries.build([a, b])
     assert exc.value.reason is SeriesErrorReason.CROSS_SUBJECT
 
+
 def test_cross_tenant_contamination_fails_closed():
     a = fx.cpu_state(fx.at(0), 10.0, subj=fx.subject("wl-A", tenant_id="t1"))
     b = fx.cpu_state(fx.at(60), 20.0, subj=fx.subject("wl-A", tenant_id="t2"))
     with pytest.raises(SeriesError) as exc:
         CanonicalCapacitySeries.build([a, b])
     assert exc.value.reason is SeriesErrorReason.CROSS_TENANT
+
 
 def test_naive_timestamp_rejected_by_default():
     from datetime import datetime
@@ -52,6 +54,7 @@ def test_naive_timestamp_rejected_by_default():
     with pytest.raises(SeriesError) as exc:
         CanonicalCapacitySeries.build([s])
     assert exc.value.reason is SeriesErrorReason.NAIVE_TIMESTAMP
+
 
 def test_naive_allowed_when_policy_opts_in():
     from datetime import datetime
@@ -70,6 +73,7 @@ def test_out_of_order_rejected_by_default():
         CanonicalCapacitySeries.build(shuffled)
     assert exc.value.reason is SeriesErrorReason.INVALID_TIME_ORDER
 
+
 def test_sort_policy_opt_in_is_disclosed():
     states = fx.cpu_series_states([10.0, 20.0, 30.0])
     shuffled = [states[2], states[0], states[1]]
@@ -85,6 +89,7 @@ def test_duplicate_identical_rejected_by_default():
     with pytest.raises(SeriesError) as exc:
         CanonicalCapacitySeries.build([s, s])
     assert exc.value.reason is SeriesErrorReason.DUPLICATE_TIMESTAMP
+
 
 def test_duplicate_identical_collapsed_when_policy_opts_in():
     s = fx.cpu_state(fx.at(0), 10.0)
@@ -106,6 +111,7 @@ def test_conflicting_duplicate_always_rejected_even_with_collapse_policy():
         with pytest.raises(SeriesError) as exc:
             CanonicalCapacitySeries.build([a, b], pol)
         assert exc.value.reason is SeriesErrorReason.CONFLICTING_DUPLICATE
+
 
 def test_digest_changes_with_content():
     s1 = CanonicalCapacitySeries.build(fx.cpu_series_states([10.0, 20.0]))
