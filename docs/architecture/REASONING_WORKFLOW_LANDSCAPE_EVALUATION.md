@@ -8,7 +8,7 @@ rule and a three-layer selection architecture. Every claim in them was captured
 as a discrete item and evaluated against this repository.
 **Relationship:** companion to
 [`WORKFLOW_FIT_READINESS_SCOPING_NOTE.md`](WORKFLOW_FIT_READINESS_SCOPING_NOTE.md);
-§2 below corrects that note's §6 — its "seven workflows" statement at `:282`.
+§2 below corrects that note's §6 — its "seven workflows" statement at `:289`.
 **Evidence labels:** `[V]` verified at the cited `file:line` · `[I]` inferred or
 external, not repo-verifiable · `[R]` requires owner ratification · `[G]` gap.
 
@@ -34,11 +34,14 @@ declared inline wherever a count is stated:
    13 selection parameters, 13 mapping rows, 5 eligibility conjuncts, 1 choice
    rule, 5 variables, 1 no-evidence rule, 4 cloud-scaling scenarios, 3 layers,
    2 closing claims.
-2. **Evaluate.** 61 labelled repository checks; every item assigned a verdict
+2. **Evaluate.** One labelled repository check per item; every item assigned a verdict
    with evidence.
 3. **Re-evaluate.** Inventory↔verdict coverage 92/92 both ways; all 41 source
    table rows and 14 key prose phrases confirmed present in the capture; the
-   61-check sweep re-run with **0 differences**.
+   the sweep re-run once. **The working inventory, verdicts and sweep script are
+   not committed, so that re-run is not independently reproducible from this
+   PR**; every count stated in this document declares its pattern and scope
+   inline so that it is.
 
 ## 2. The enum is not the repertoire
 
@@ -49,14 +52,14 @@ implements, outside that enum:
 | Proposed workflow | Exists as | Evidence |
 |---|---|---|
 | **ReAct** | `iterate_loop.py` — "Iterate-Until-Done"; the base wrapper "does not feed tool results back into the model to decide the next step", and this module "feeds the observations back into the next instruction" | `[V]` `agentic/agentic_framework/iterate_loop.py:8,19` |
-| **Specialist collaboration** | `multi_agent.py` — "several governed agents can collaborate on one query" | `[V]` `agentic/agentic_framework/multi_agent.py:7` |
+| **Specialist collaboration** | `multi_agent.py` — "several governed agents can collaborate on one query" | `[V]` `agentic/agentic_framework/multi_agent.py:7-8` |
 | **Human-in-the-loop** | `human_policy.py` — human-curated deterministic verdicts over ActionGate `ALLOW / DENY / DEFER` | `[V]` `agentic/agentic_framework/human_policy.py:2,6` |
 | **Retrieval (RAG)** | infrastructure — 37 `.py` files under `agentic/`, `packages/`, `symbolu/` matching `retrieval.augmented\|\brag_\|_rag\b\|RAGEngine` case-insensitively — and `.github/workflows/core-rag-ci.yml` | `[V]` |
 | Gated tool access | `mcp_gateway.py` — "THIS IS GATED MCP ACCESS" | `[V]` `agentic/agentic_framework/mcp_gateway.py:12` |
 | Portfolio orchestration | `multi_workflow_orchestration.py` (H22) | `[V]` `agentic/agentic_framework/multi_workflow_orchestration.py:2` |
 
 **Consequence:** any statement that "the seven workflows" bound the treatment
-space — including §6 of the workflow-fit note (`:282`) — refers to the enum only. The
+space — including §6 of the workflow-fit note (`:289`) — refers to the enum only. The
 treatment space a benchmark must cover is larger, and none of these modules
 carries a `WorkflowType` value, so they are currently invisible to
 `WorkflowSelector` and to any workflow-fit provenance record `[G]`.
@@ -68,17 +71,17 @@ carries a `WorkflowType` value, so they are currently invisible to
 | W01 | Retrieval-Augmented Reasoning | **exists as infrastructure**, not a workflow | 37 files by the §2 pattern; `core-rag-ci.yml` `[V]` |
 | W02 | ReAct | **exists under another name** | `iterate_loop.py:8,19` `[V]` |
 | W03 | Plan-and-Execute | partial — Linear Chain at `DEEP`/`RECURSIVE` depth is decompose→analyze→synthesize; H22 portfolio orchestration | `adaptive_prompts.py:75-85`; `multi_workflow_orchestration.py:2` `[V]` |
-| W04 | Least-to-Most | **absent** — `MapReduce` is parallel; no sequential-dependency form | 0 hits `[V]` |
-| W05 | Self-Consistency | **absent** — the 7 files under `agentic/` and `packages/` matching `self_consistency\|SelfConsistency\|self-consistency` are ontology / digest / coherence consistency, not the reasoning method | `[V]` |
-| W06 | Graph of Thoughts | **absent** | 0 hits `[V]` |
-| W07 | Program-of-Thought / Code-Assisted | **absent** | 0 hits `[V]` |
+| W04 | Least-to-Most | **absent** — `MapReduce` is parallel; no sequential-dependency form | 0 files under `agentic/`, `packages/` matching `least_to_most\|LeastToMost\|least-to-most`; one unrelated prose "least to most" exists under `packages/capabilities/storygraph` `[V]` |
+| W05 | Self-Consistency | **absent as a reasoning workflow** — 9 files under `agentic/`, `packages/` match `self[-_ ]consistency` case-insensitively; eight concern internal consistency of definitions, and `agentic/reflective_phase_quad.py:202` lists "Self-consistency (multiple samples, agreement = quality)" as a *training source* for a quality-scoring model, not an implementation of the method | `[V]` |
+| W06 | Graph of Thoughts | **absent** | 0 files matching `graph_of_thought\|GraphOfThought` `[V]` |
+| W07 | Program-of-Thought / Code-Assisted | **absent** | 0 files matching `program_of_thought\|ProgramOfThought\|code_interpreter\|CodeAssisted` `[V]` |
 | W08 | Generator–Verifier | partial — `IterativeRefinementWorkflow` has an in-pipeline CRITIC, same model | `reasoning_workflows.py:558-624` `[V]` |
-| W09 | Hypothesis–Test | **absent** | 0 hits `[V]` |
+| W09 | Hypothesis–Test | **absent** | 0 files matching `HypothesisTest\|hypothesis_test`; unrelated prose "hypothesis tests" occurrences exist `[V]` |
 | W10 | Causal / Counterfactual | partial — evidence hooks exist (`MetricClaim.counterfactual_ref`, `.causal_method_ref`); `CAUSAL_REASONING` signal routes to `LINEAR_CHAIN` | `evidence.py:377-378`; `reasoning_workflows.py:1178-1187` `[V]` |
 | W11 | Scenario Planning | **absent** as workflow; `forecast_horizon` and `AssessmentStage.FORECAST` exist, forecast engine deferred | `evidence.py:369`; `governed-value …/enums.py:91` `[V]` |
 | W12 | Constraint / Optimization | **absent** as reasoning; constraint exists as *policy* | `packages/integration/cloud-scaling-capacity-bounds-policy` `[V]` |
-| W13 | Case-Based Reasoning | **absent** | 0 hits `[V]` |
-| W14 | Specialist Collaboration | **exists under another name** | `multi_agent.py:7`; `packages/capabilities/agent-workforce-composer` `[V]` |
+| W13 | Case-Based Reasoning | **absent** | 0 files matching `CaseBased\|case_based` `[V]` |
+| W14 | Specialist Collaboration | **exists under another name** | `multi_agent.py:7-8`; `packages/capabilities/agent-workforce-composer` `[V]` |
 | W15 | Human-in-the-Loop Deliberation | **exists** | `human_policy.py:2,6`; `HUMAN_FALLBACK_READINESS`, `ESCALATION_READINESS` `enums.py:125-135`; `cost.py:39` `[V]` |
 
 **Tally:** 3 exist, 1 as infrastructure, 3 partial, 8 absent.
@@ -87,7 +90,7 @@ carries a `WorkflowType` value, so they are currently invisible to
 Iterative Refinement with separate roles" — is right, and the separation is the
 whole point. A same-model critic is the `SELF_CRITIQUE` that S2-B Round 2
 rejected as private model behaviour `[V]`
-(`ADR_UGENCE_S2B_ROUND2_VOCABULARY_RATIFICATION.md:64-66`). A verifier in a
+(`ADR_UGENCE_S2B_ROUND2_VOCABULARY_RATIFICATION.md:64-68`). A verifier in a
 separate trust domain is what UVI ADR §23.10 permits — "Reference producers
 never self-attest/self-verify/self-approve"
 (`ADR_UGENCE_VALUE_INTELLIGENCE_GV2C_GV2E_GV3R.md:322`; ratified as a structural
@@ -120,8 +123,8 @@ Of ten, one is genuinely absent.
 | SP06 | Quantitative intensity | — | **absent** — no signal `[V]` |
 | SP07 | Conflict | `CONDITIONAL_LOGIC → DEBATE` (`reasoning_workflows.py:1178-1187`) | **partial** — a proxy; no conflict/contradiction signal `[V]` |
 | SP08 | Consequence | `DomainKind.REGULATED` loss-dominates; expected loss unbounded (`expected_loss.py:1`); `packages/risk_authority` | exists `[V]` |
-| SP09 | Reversibility | `external_actions.Reversibility` — **four states**: `REVERSIBLE`, `IRREVERSIBLE`, `COMPENSATABLE`, `UNKNOWN` (`external_actions.py:155`); field at `:328` | exists **on actions**, not on tasks `[V]` |
-| SP10 | Uncertainty | `UNCERTAINTY_RECOGNITION`, `CONFIDENCE_CALIBRATION` (`enums.py:108-118`); abstention routing (`hybrid_handover/evaluation/integrity.py:107`) | exists `[V]` |
+| SP09 | Reversibility | `external_actions.Reversibility` — **four states**: `REVERSIBLE`, `IRREVERSIBLE`, `COMPENSATABLE`, `UNKNOWN` (`external_actions.py:155-159`); field at `:328` | exists **on actions**, not on tasks `[V]` |
+| SP10 | Uncertainty | `UNCERTAINTY_RECOGNITION`, `CONFIDENCE_CALIBRATION` (`enums.py:108-118`); abstention as a recognised routing outcome — an evaluation-harness consistency check between an `expected_abstention` fixture flag and `REFUSE` routing (`hybrid_handover/evaluation/integrity.py:107`); evidence of the concept, not a routing implementation | exists `[V]` |
 | SP11 | Explanation requirement | `AUDITABILITY`, `OBSERVABILITY` (`enums.py:125-135`) | exists `[V]` |
 | SP12 | Resource budget | `INV-WF-2` `max_llm_calls` (`reasoning_workflows.py:36`); tokens via CM contracts, not wired; no time budget | **partial** `[V]` |
 | SP13 | Historical performance | `packages/benchmark-registry` — BR-1, "Contracts only; no registry" (`README.md:9`); consuming evaluation engine unassigned | **partial** `[V]` |
@@ -143,7 +146,7 @@ mean reading a property of a downstream action before the action exists `[R]`.
 | `PolicyAllowed` | Policy Authority; `agentic-proposer-strategy-permission-policy` | exists `[V]` |
 | `ToolsAvailable` | `trust/hallucinated_capability.py` — "pure set-membership + alias resolution" (`:5`), PROVISIONAL, advisory-only (`:2`); `mcp_gateway.py` | **partial** `[V]` |
 | `EvidenceCompatible` | Trusted Evidence Authority (E-1/E-2) | exists `[V]` |
-| `ArtifactShapeAllowed` | **S2-B's three ratified members, exactly** (`ADR_UGENCE_S2B_ROUND2_VOCABULARY_RATIFICATION.md:49`) | exists, 1:1 `[V]` |
+| `ArtifactShapeAllowed` | **S2-B's three ratified members, exactly** (`ADR_UGENCE_S2B_ROUND2_VOCABULARY_RATIFICATION.md:49-51`) | exists, 1:1 `[V]` |
 | `BudgetCompatible` | `INV-WF-2` (`reasoning_workflows.py:36`) | exists, calls only `[V]` |
 
 `ArtifactShapeAllowed` is the cleanest mapping in the proposal: it names a
@@ -167,7 +170,7 @@ Two problems `[V]`:
   layer 3 (§9) and does not exist.
 
 The variables fare unevenly: `τ_t` is an existing `GovernedThreshold`
-(`thresholds.py:31,41`) `[V]`; policies are the Policy Authority `[V]`; `Q(w,t)`
+(`thresholds.py:31,41-45`) `[V]`; policies are the Policy Authority `[V]`; `Q(w,t)`
 depends on the unassigned consuming evaluation engine `[G]`; benchmarks are
 definitions only `[V]`; and **no task-class contract exists** at all `[G]`.
 

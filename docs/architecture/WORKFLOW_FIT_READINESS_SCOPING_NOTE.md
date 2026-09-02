@@ -197,7 +197,7 @@ call count**.
 
 **`depth_used` is provenance, not automatically a governed resource** `[R]`. It
 is a `ReasoningDepth` ordinal — `SHALLOW`, `MODERATE`, `DEEP`, `RECURSIVE` `[V]`
-(`adaptive_prompts.py:75`) — describing *how a workflow was configured*, not a
+(`adaptive_prompts.py:75-85`) — describing *how a workflow was configured*, not a
 consumed quantity. Depth correlates with calls but is not a unit of anything;
 admitting it into the resource vector would double-count call consumption under a
 second name. It is recorded for attribution and left out of the vector unless
@@ -229,10 +229,17 @@ separate governed calculation.
 `_basic_quality` awards points for exceeding 20, 50 and 100 words and for
 containing a newline `[V]` (`reasoning_workflows.py:265-279`), and it is applied
 to **every** step by `_call_llm` (line 259). It is also **load-bearing for
-control flow**: `IterativeRefinementWorkflow` compares against
-`quality_threshold` (default `0.8`, line 558) and tracks `best_score` to decide
-whether to keep revising `[V]` (lines 594, 611, 624). Removing it would remove
-the loop's termination condition.
+control flow**, though not for termination. In `IterativeRefinementWorkflow`
+`[V]`: the loop **terminates** at line 611 when `critic_score >=
+quality_threshold` (default `0.8`, line 558), where `critic_score` is a
+regex-parsed "SCORE: n/10" from the critic's own text (`_extract_score`, lines
+640-648); `_basic_quality`, via `best_score` (lines 594, 624), decides **which
+draft is returned** and the `quality_score` the result reports. So **two**
+self-reported signals drive control flow — the critic's self-parsed score
+governs termination, the word-count heuristic governs selection. Removing
+`_basic_quality` would not stop the loop; it would leave draft selection
+undefined. *(An earlier version of this note wrongly said it supplied the
+termination condition.)*
 
 The correct treatment is **separation, not deprecation** `[R]`: the self-score
 remains an internal control signal, and is **labelled self-reported and
@@ -302,7 +309,7 @@ inspecting a single invocation.
 `WorkflowSelector` today is a **fixed categorical routing table**, not a
 validated policy: ambiguity → Tree of Thought, conditional logic → Debate,
 multi-part → MapReduce, with `LINEAR_CHAIN` as the default for no signal `[V]`
-(`reasoning_workflows.py:1228`). That table is an unvalidated justification claim
+(`reasoning_workflows.py:1178-1187`, default `:1228`). That table is an unvalidated justification claim
 for every task class it covers. Placing it under **offline benchmark validation**
 is the first empirical use of this note `[R]`.
 

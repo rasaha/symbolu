@@ -32,11 +32,13 @@ collisions force this `[V]`:
 
 - The Agent Workforce Composer already uses "workflow" for `workflow_ir.v2`, the
   compiled *planning* workflow from the policy-workflow compiler
-  (`agent-workforce-composer …/cli.py:107`). A second meaning inside a
+  (`agent-workforce-composer …/cli.py:107`; `…/compatibility.py:3` — "routes a
+  serialized compiled workflow"; the policy-workflow compiler is an optional
+  reference dependency, `…/pyproject.toml:60`). A second meaning inside a
   neighbouring contract would be a semantic and contract collision.
 - The seven-member `WorkflowType` enum names *processing*, which S2-B ruled out
   of the Proposer's declared vocabulary
-  (`ADR_UGENCE_S2B_ROUND2_VOCABULARY_RATIFICATION.md:58,64-66`).
+  (`ADR_UGENCE_S2B_ROUND2_VOCABULARY_RATIFICATION.md:58,64-68`).
 
 Candidate names, **not created here** `[R]`:
 
@@ -60,7 +62,7 @@ tokens**; the three ratified shapes are unchanged.
 **Not Agentic Proposer** `[V]`. The Proposer "proposes. It decides nothing"
 (`agentic-proposer/README.md:5`) and "performs no agent eligibility, ranking,
 team composition or permission-bound proposal: the Agent Workforce Composer owns
-those" (`:12`). It is a runtime, per-case advisory: `ProposerAdvisory` carries
+those" (`:12-13`). It is a runtime, per-case advisory: `ProposerAdvisory` carries
 `parent_advisory_digest`, `case_ref`, `agent_id`, `role_contract_id`
 (`agentic-proposer …/contracts.py:980-983`). A developer consultation before
 deployment is a different object with a different lifecycle, and it names
