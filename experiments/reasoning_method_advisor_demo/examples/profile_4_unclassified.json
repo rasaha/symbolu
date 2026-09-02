@@ -1,0 +1,14 @@
+{
+  "profile_id": "profile.demo.unclassified",
+  "domain_ref": "domain:research-notes",
+  "intended_outcome_ref": "outcome:draft",
+  "consequence_class": "RECOVERABLE",
+  "reversibility": "UNDETERMINED",
+  "evidence_requirement_refs": [],
+  "tool_requirement_refs": [],
+  "structural_characteristics": [
+    "causal_reasoning",
+    "temporal_reasoning"
+  ],
+  "population_ref": "population:exploratory"
+}

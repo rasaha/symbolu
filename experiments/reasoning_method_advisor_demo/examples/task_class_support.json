@@ -1,0 +1,22 @@
+{
+  "task_class_id": "class.support.resolve",
+  "domain_ref": "domain:support",
+  "intended_outcome_ref": "outcome:resolve",
+  "consequence_class": "RECOVERABLE",
+  "reversibility": "OUTCOME_COMPENSATABLE",
+  "evidence_requirement_refs": [],
+  "tool_requirement_refs": [],
+  "structural_characteristics": ["comparison_request", "ambiguity_detected", "creative_synthesis"],
+  "population_ref": "population:support-tickets",
+  "benchmark_set_ref": "benchmarks:support-fixture",
+  "benchmark_set_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "comparison_policy": {
+    "policy_id": "pol.demo",
+    "policy_version": "1",
+    "sufficiency_rule_id": "rule.demo.threshold",
+    "sufficiency_rule_version": "1",
+    "sufficiency_kind": "THRESHOLD_BASED",
+    "threshold": {"threshold_id": "thr.demo", "unit": "score.unit", "comparator": "GTE", "literal": "0.9"},
+    "resource_dimensions": ["LLM_CALLS"]
+  }
+}
