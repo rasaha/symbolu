@@ -3,38 +3,37 @@ implements ``call(prompt) -> str`` and holds no credential and no SDK."""
 
 from __future__ import annotations
 
-import json
-import socket
 from typing import Any, Dict, Optional
 
 from ugence_reasoning_method_governance.api import ReasoningMethodRef
 
 from ..errors import PilotError, PilotErrorCode
 from .frames import CaptureAttemptStatus, GatewayResponse, method_to_json, response_from_json
+from .transport import FrameStream, connect
 
 
 class BoundaryConnection:
-    def __init__(self, endpoint: str) -> None:
-        self._sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-        self._sock.connect(endpoint)
-        self._stream = self._sock.makefile("rwb")
+    def __init__(self, endpoint: str, *, pipes=None) -> None:
+        self._stream: FrameStream = connect(endpoint, pipes=pipes)
 
     def send(self, frame: Dict[str, Any]) -> Dict[str, Any]:
-        self._stream.write((json.dumps(frame) + "\n").encode("utf-8"))
-        self._stream.flush()
-        line = self._stream.readline()
-        if not line:
+        self._stream.write(frame)
+        reply = self._stream.read()
+        if reply is None:
             raise PilotError(PilotErrorCode.CAPTURE_INCOMPLETE, "boundary closed the connection")
-        reply = json.loads(line.decode("utf-8"))
         if not reply.get("ok", False):
             raise PilotError(PilotErrorCode(reply.get("code", "CAPTURE_INCOMPLETE")), reply.get("detail", ""))
         return reply
 
-    def close(self) -> None:
+    def shutdown(self) -> None:
         try:
-            self._stream.close()
-        finally:
-            self._sock.close()
+            self._stream.write({"kind": "SHUTDOWN"})
+            self._stream.read()
+        except Exception:
+            pass
+
+    def close(self) -> None:
+        self._stream.close()
 
 
 class GatewayStubClient:

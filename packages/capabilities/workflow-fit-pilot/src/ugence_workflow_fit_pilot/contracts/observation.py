@@ -69,13 +69,14 @@ class QualityEvaluationRecord:
     quality_aggregation: AggregationRef
     claim_digest: str
     quality_result_digest: str
+    independence_status: str
     evaluated_by: str
     evaluated_at: datetime
-    independence_status: str = INDEPENDENCE_DECLARED_UNVERIFIED
     evaluation_digest: str = ""
 
     def __post_init__(self) -> None:
-        require_nonblank(self.schema_version, "QualityEvaluationRecord.schema_version")
+        if self.schema_version != QUALITY_EVALUATION_SCHEMA_VERSION:
+            raise PilotError(PilotErrorCode.SCHEMA_VERSION_UNSUPPORTED, f"QualityEvaluationRecord.schema_version must be {QUALITY_EVALUATION_SCHEMA_VERSION}")
         require_nonblank(self.evaluation_id, "QualityEvaluationRecord.evaluation_id")
         for name in ("manifest_digest", "record_digest", "case_set_digest", "evaluator_declaration_digest", "scoring_instruction_digest", "claim_digest", "quality_result_digest"):
             require_digest(getattr(self, name), f"QualityEvaluationRecord.{name}")
@@ -112,7 +113,8 @@ class PilotObservation:
     observation_digest: str = ""
 
     def __post_init__(self) -> None:
-        require_nonblank(self.schema_version, "PilotObservation.schema_version")
+        if self.schema_version != PILOT_OBSERVATION_SCHEMA_VERSION:
+            raise PilotError(PilotErrorCode.SCHEMA_VERSION_UNSUPPORTED, f"PilotObservation.schema_version must be {PILOT_OBSERVATION_SCHEMA_VERSION}")
         require_nonblank(self.observation_id, "PilotObservation.observation_id")
         for name in ("manifest_digest", "task_class_digest", "case_set_digest", "record_digest", "quality_evaluation_digest"):
             require_digest(getattr(self, name), f"PilotObservation.{name}")

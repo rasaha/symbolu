@@ -50,6 +50,7 @@ from ugence_workflow_fit_pilot.api import (
     PilotMethodAssignment,
     PilotRole,
     PilotStudyManifest,
+    PreregistrationStatus,
     QualityEvaluatorDeclaration,
     admissible_methods,
     case_list_digest,
@@ -161,7 +162,8 @@ def manifest(*, adv="default", tc: Optional[TaskClassIdentity] = None, bm: Optio
     p = plan(tc, a, bnd)
     return PilotStudyManifest(
         PILOT_MANIFEST_SCHEMA_VERSION, manifest_id, p, a.advisory_digest if a is not None else None, a.rule_set if a is not None else None,
-        methods if methods is not None else assignments(a), bm, boundary or boundary_decl(), evaluator or evaluator_decl(bm), resource_agg, quality_agg, "owner:pilot", preregistered_at,
+        methods if methods is not None else assignments(a), bm, boundary or boundary_decl(), evaluator or evaluator_decl(bm), resource_agg, quality_agg,
+        PreregistrationStatus.DECLARED_UNVERIFIED, "RESEARCH_ONLY", "owner:pilot", preregistered_at,
     )
 
 

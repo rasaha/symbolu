@@ -4,8 +4,6 @@ issues attestations. Runs only inside the boundary process (entry.py)."""
 
 from __future__ import annotations
 
-import json
-import socket
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
@@ -17,6 +15,7 @@ from ..contracts.manifest import CaptureBoundaryDeclaration
 from ..errors import PilotError, PilotErrorCode
 from .attestation import canonical_order, issue_attestation, recompute_telemetry
 from .frames import CaptureAttemptStatus, CaptureRecord, GatewayResponse, ProviderPort, capture_to_json, method_from_json, response_to_json
+from .transport import serve as _serve
 
 
 def _text_digest(text: str) -> str:
@@ -165,23 +164,10 @@ class BoundaryServer:
         return {"ok": True, "envelope": payload(env)}
 
     # ---- transport
-    def serve(self, endpoint: str) -> None:
-        srv = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-        srv.bind(endpoint)
-        srv.listen(1)
-        try:
-            while True:
-                conn, _ = srv.accept()
-                with conn, conn.makefile("rwb") as stream:
-                    for line in stream:
-                        frame = json.loads(line.decode("utf-8"))
-                        if frame.get("kind") == "SHUTDOWN":
-                            stream.write(b'{"ok": true}\n'); stream.flush()
-                            return
-                        stream.write((json.dumps(self.handle(frame)) + "\n").encode("utf-8"))
-                        stream.flush()
-        finally:
-            srv.close()
+    def serve(self, endpoint: str, *, ready) -> None:
+        """Serve frames on the endpoint (Unix socket path or "stdio"); ``ready()`` is called once
+        the endpoint accepts frames."""
+        _serve(endpoint, self.handle, ready=ready)
 
 
 __all__ = ["BoundaryServer"]

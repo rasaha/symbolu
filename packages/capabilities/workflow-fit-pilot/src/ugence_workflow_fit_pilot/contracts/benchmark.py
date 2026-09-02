@@ -37,7 +37,8 @@ class BenchmarkManifest:
     benchmark_manifest_digest: str = ""
 
     def __post_init__(self) -> None:
-        require_nonblank(self.schema_version, "BenchmarkManifest.schema_version")
+        if self.schema_version != BENCHMARK_MANIFEST_SCHEMA_VERSION:
+            raise PilotError(PilotErrorCode.SCHEMA_VERSION_UNSUPPORTED, f"BenchmarkManifest.schema_version must be {BENCHMARK_MANIFEST_SCHEMA_VERSION}")
         if not isinstance(self.benchmark, BenchmarkReference):
             raise ContractError(ContractErrorCode.REF_BLANK_FIELD, "BenchmarkManifest.benchmark must be a BenchmarkReference")
         if not isinstance(self.case_digests, tuple) or not self.case_digests:

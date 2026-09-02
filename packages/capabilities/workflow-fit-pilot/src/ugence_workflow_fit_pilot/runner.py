@@ -9,12 +9,6 @@ caller's ``WorkflowExecutorPort`` (the research harness), never through any runt
 
 from __future__ import annotations
 
-import json
-import os
-import subprocess
-import sys
-import tempfile
-import time
 from dataclasses import dataclass
 from datetime import datetime
 from decimal import Decimal
@@ -45,6 +39,7 @@ from ._canon import digest_of, payload
 from .boundary.attestation import envelope_id_for, record_canonical_payload
 from .boundary.client import BoundaryConnection, GatewayStubClient, method_to_json
 from .boundary.frames import CaptureRecord, capture_from_json
+from .boundary.process import BoundaryProcess
 from .contracts.coverage import ChallengerCoverageReport, build_coverage_report
 from .contracts.lifecycle import LifecycleEvent, PilotConfigurationStateRecord, propose, transition
 from .contracts.manifest import PilotStudyManifest, ValidatedManifest, validate_manifest
@@ -62,7 +57,6 @@ from .errors import PilotError, PilotErrorCode
 
 QUALITY_UNIT = "score.unit"
 QUALITY_METRIC_ID = "pilot.quality.aggregated_over_cases"
-_STARTUP_POLL_SECONDS = 1 / 50  # boundary start-up wait; an operational interval, not an evidence figure
 
 
 @dataclass(frozen=True)
@@ -149,50 +143,6 @@ class PilotRunResult:
     evaluator_flags: Tuple[str, ...] = ()
 
 
-class BoundaryProcess:
-    """Starts and stops the separate boundary process (§4.1)."""
-
-    def __init__(self, manifest: PilotStudyManifest, provider_factory: str, *, env: Optional[Dict[str, str]] = None) -> None:
-        self.manifest = manifest
-        self.dir = tempfile.mkdtemp(prefix="wfp-boundary-")
-        self.endpoint = os.path.join(self.dir, "boundary.sock")
-        decl = manifest.capture_boundary
-        args = [
-            sys.executable, "-m", "ugence_workflow_fit_pilot.boundary.entry", "--endpoint", self.endpoint,
-            "--manifest-digest", manifest.manifest_digest, "--provider-factory", provider_factory,
-            "--declaration-json", json.dumps({
-                "boundary_identity": decl.boundary_identity, "boundary_version": decl.boundary_version, "process_separation_ref": decl.process_separation_ref,
-                "port_ref": decl.port_ref, "allowed_attested_fields": list(decl.allowed_attested_fields),
-            }),
-        ]
-        self.proc = subprocess.Popen(args, env=env or os.environ.copy(), stderr=subprocess.PIPE, text=True)
-        deadline = time.monotonic() + 30
-        while not os.path.exists(self.endpoint):
-            if self.proc.poll() is not None:
-                err = self.proc.stderr.read() if self.proc.stderr else ""
-                raise PilotError(PilotErrorCode.PROVIDER_FACTORY_INVALID, f"boundary process exited before serving: {err.strip()}")
-            if time.monotonic() > deadline:
-                self.proc.kill()
-                raise PilotError(PilotErrorCode.CAPTURE_INCOMPLETE, "boundary process did not start")
-            time.sleep(_STARTUP_POLL_SECONDS)
-
-    def connect(self) -> BoundaryConnection:
-        return BoundaryConnection(self.endpoint)
-
-    def stop(self) -> None:
-        try:
-            conn = BoundaryConnection(self.endpoint)
-            conn._stream.write(b'{"kind": "SHUTDOWN"}\n')
-            conn._stream.flush()
-            conn.close()
-        except Exception:
-            pass
-        try:
-            self.proc.wait(timeout=10)
-        except Exception:
-            self.proc.kill()
-
-
 def _mean(values: Sequence[Decimal]) -> str:
     return str(sum(values, Decimal(0)) / Decimal(len(values)))
 
@@ -221,6 +171,7 @@ def run_pilot(
     runs: List[MethodRun] = []
     states: List[PilotConfigurationStateRecord] = []
     latest: Dict[ReasoningMethodRef, PilotConfigurationStateRecord] = {}
+    conn = None
     try:
         conn = boundary.connect()
         for assignment in manifest.methods:
@@ -240,9 +191,10 @@ def run_pilot(
             )
             rec = transition(proposed, LifecycleEvent.OBSERVATION_VALIDATED, manifest=manifest, recorded_by=identity.requester_identity, recorded_at=now())
             states.append(rec); latest[method] = rec
-        conn.close()
     finally:
-        boundary.stop()
+        boundary.stop(conn)
+        if conn is not None:
+            conn.close()
     complete_runs = [r for r in runs if r.complete]
     request = result = None
     outcomes: Dict[ReasoningMethodRef, FitOutcome] = {}
@@ -324,7 +276,7 @@ def _run_method(conn: BoundaryConnection, manifest: PilotStudyManifest, method: 
     evaluation = QualityEvaluationRecord(
         QUALITY_EVALUATION_SCHEMA_VERSION, evaluation_id, md, method, record.record_digest, manifest.benchmark.benchmark_manifest_digest,
         manifest.evaluator.declaration_digest, manifest.evaluator.scoring_instruction_digest, manifest.quality_aggregation, claim_digest(claim), quality_result_digest(quality_result),
-        manifest.evaluator.evaluator_identity, now(),
+        manifest.evaluator.independence_status, manifest.evaluator.evaluator_identity, now(),
     )
     assignment = manifest.assignment(method)
     observation = PilotObservation(
@@ -335,4 +287,4 @@ def _run_method(conn: BoundaryConnection, manifest: PilotStudyManifest, method: 
     return MethodRun(method, True, (), captures, record, attestation, claim, quality_result, evaluation, observation, diagnostics)
 
 
-__all__ = ["PilotCase", "ExecutionOutcome", "WorkflowExecutorPort", "QualityScorerPort", "PilotIdentity", "MethodRun", "PilotRunResult", "BoundaryProcess", "run_pilot", "check_evaluator_identity", "QUALITY_UNIT", "QUALITY_METRIC_ID"]
+__all__ = ["PilotCase", "ExecutionOutcome", "WorkflowExecutorPort", "QualityScorerPort", "PilotIdentity", "MethodRun", "PilotRunResult", "run_pilot", "check_evaluator_identity", "QUALITY_UNIT", "QUALITY_METRIC_ID"]

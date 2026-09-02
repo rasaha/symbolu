@@ -14,6 +14,7 @@ from ugence_reasoning_method_governance.api import CountBasis, UsageAvailability
 from ugence_workflow_fit_pilot._canon import digest_of
 from ugence_workflow_fit_pilot.api import (
     BoundaryProcess,
+    STDIO_ENDPOINT,
     CaptureAttemptStatus,
     PilotError,
     PilotErrorCode as E,
@@ -69,6 +70,11 @@ def test_a13_issue_attestation_recomputes_and_refuses():
     refuses(E.SELF_ATTESTATION, lambda: issue_attestation(payload_ok, run.capture_records, declaration=decl, record_issuer_identity=decl.boundary_identity, requester_identity="r", envelope_id=eid))
     refuses(E.SELF_ATTESTATION, lambda: issue_attestation(payload_ok, run.capture_records, declaration=decl, record_issuer_identity="a", requester_identity=decl.boundary_identity, envelope_id=eid))
     refuses(E.ATTESTATION_MISMATCH, lambda: issue_attestation(payload_ok, run.capture_records, declaration=decl, record_issuer_identity="a", requester_identity="r", envelope_id="att:other"))
+    # attribution: another method's capture records, even with identical counts, are refused
+    other = next(r for r in res.runs if r.method.method_id == "map_reduce")
+    refuses(E.ATTESTATION_MISMATCH, lambda: issue_attestation(payload_ok, other.capture_records, declaration=decl, record_issuer_identity="a", requester_identity="r", envelope_id=eid))
+    foreign = tuple(dataclasses.replace(c, run_id="someone-elses-run", capture_fingerprint="") for c in run.capture_records)
+    refuses(E.ATTESTATION_MISMATCH, lambda: issue_attestation(payload_ok, foreign, declaration=decl, record_issuer_identity="a", requester_identity="r", envelope_id=eid))
 
 
 def test_a13a_attested_at_is_boundary_generated():
@@ -169,6 +175,36 @@ def test_a16a_gateway_round_trip_failure_and_invalid_factory():
     assert st.state.value == "INCONCLUSIVE" and st.refusal_codes == ("WORKFLOW_FAILED",)
     refuses(E.PROVIDER_FACTORY_INVALID, lambda: BoundaryProcess(m, "stub_provider:not_a_provider", env=pf.boundary_env()))
     refuses(E.PROVIDER_FACTORY_INVALID, lambda: BoundaryProcess(m, "no_such_module:make", env=pf.boundary_env()))
+
+
+def test_a16c_pipe_transport_fallback():
+    """The pipe pair (boundary stdin/stdout) serves the same frames where Unix sockets are unavailable."""
+    m = pf.manifest()
+    bp = BoundaryProcess(m, "stub_provider:make_provider", env=pf.boundary_env(), transport="pipe")
+    assert bp.endpoint == STDIO_ENDPOINT and bp.proc.pid != os.getpid()
+    conn = bp.connect()
+    try:
+        assert conn.send({"kind": "PING"})["ok"]
+        method = m.methods[0].method
+        conn.send({"kind": "RUN_BEGIN", "manifest_digest": m.manifest_digest, "run_id": "pipe-run", "method": method_to_json(method)})
+        c = m.benchmark.case_digests[0]
+        conn.send({"kind": "CASE_BEGIN", "run_id": "pipe-run", "case_digest": c})
+        reply = conn.send({"kind": "CALL", "manifest_digest": m.manifest_digest, "method_id": method.method_id, "method_version": method.method_version, "run_id": "pipe-run", "case_digest": c, "sequence": 1, "prompt": "hello [x call 1]"})
+        assert reply["response"]["status"] == "SUCCEEDED" and "ANSWER" in reply["response"]["text"]
+    finally:
+        bp.stop(conn)
+        conn.close()
+    adv = pf.advisory(m.plan.task_class)
+    from ugence_workflow_fit_pilot.runner import run_pilot as _rp
+    import ugence_workflow_fit_pilot.runner as runner_mod
+    original = runner_mod.BoundaryProcess
+    runner_mod.BoundaryProcess = lambda man, fac, env=None: original(man, fac, env=env, transport="pipe")
+    try:
+        res = _rp(m, catalog=pf.catalog(), rule_set=pf.rule_set(), advisory=adv, cases=pf.cases(), executor=pf.FakeExecutor(pf.DEFAULT_CALLS), scorer=pf.KeywordScorer(),
+                  identity=pf.IDENTITY, provider_factory="stub_provider:make_provider", now=pf.clock(), boundary_env=pf.boundary_env())
+    finally:
+        runner_mod.BoundaryProcess = original
+    assert all(r.complete and r.attestation is not None for r in res.runs)
 
 
 def test_a16b_canonical_capture_order_is_deterministic():

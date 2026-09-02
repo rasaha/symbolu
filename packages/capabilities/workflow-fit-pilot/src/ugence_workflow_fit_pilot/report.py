@@ -21,7 +21,7 @@ def _outcome_line(method_id: str, outcome: FitOutcome) -> str:
 def render(result: PilotRunResult) -> str:
     m = result.manifest
     lines: List[str] = [
-        f"RESEARCH-ONLY PILOT REPORT manifest={m.manifest_digest} preregistration_status={m.preregistration_status}",
+        f"RESEARCH-ONLY PILOT REPORT manifest={m.manifest_digest} preregistration_status={m.preregistration_status.value}",
         f"task_class={m.plan.task_class.task_class_id} ({m.plan.task_class.task_class_digest[:16]}...) benchmark_manifest={m.benchmark.benchmark_manifest_digest[:16]}... cases={m.benchmark.case_count}",
         f"evaluator={m.evaluator.evaluator_identity}@{m.evaluator.evaluator_version} kind={m.evaluator.kind.value} independence_status={m.evaluator.independence_status} calibration_blank={m.evaluator.calibration_is_blank}",
         f"capture_boundary={m.capture_boundary.boundary_identity} (process separation declared: {m.capture_boundary.process_separation_ref})",

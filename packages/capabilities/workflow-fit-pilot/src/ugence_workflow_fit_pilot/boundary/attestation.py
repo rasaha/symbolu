@@ -117,6 +117,15 @@ def issue_attestation(
     manifest_digest = capture_records[0].manifest_digest if capture_records else None
     if manifest_digest is None:
         raise PilotError(PilotErrorCode.TELEMETRY_NOT_RECOMPUTED, "no capture records")
+    # Attribution: every capture record must belong to THIS record's method and invocation.
+    method = record_payload.get("method") or {}
+    run_id = record_payload.get("invocation_id")
+    for c in capture_records:
+        if c.manifest_digest != manifest_digest or c.run_id != run_id or c.method.method_id != method.get("method_id") or c.method.method_version != method.get("method_version"):
+            raise PilotError(PilotErrorCode.ATTESTATION_MISMATCH, "capture records do not belong to this record's method and invocation")
+    telemetry_refs = record_payload["telemetry"].get("capture_refs") if isinstance(record_payload.get("telemetry"), dict) else None
+    if not telemetry_refs or telemetry_refs[0] != manifest_digest:
+        raise PilotError(PilotErrorCode.ATTESTATION_MISMATCH, "record capture_refs do not stamp the capture records' manifest")
     recomputed = payload(recompute_telemetry(manifest_digest, capture_records))
     if recomputed != record_payload["telemetry"]:
         raise PilotError(PilotErrorCode.TELEMETRY_NOT_RECOMPUTED, "record telemetry differs from the boundary's recomputation")

@@ -97,14 +97,15 @@ class PilotConfigurationStateRecord:
     predecessor_manifest_digest: Optional[str]
     successor_manifest_digest: Optional[str]
     revision_scope: Tuple[RevisionScope, ...]
+    usage_scope: str
+    approval_status: str
     recorded_by: str
     recorded_at: datetime
-    usage_scope: str = USAGE_SCOPE_RESEARCH_ONLY
-    approval_status: str = APPROVAL_STATUS_NONE
     state_digest: str = ""
 
     def __post_init__(self) -> None:
-        require_nonblank(self.schema_version, "PilotConfigurationStateRecord.schema_version")
+        if self.schema_version != PILOT_STATE_SCHEMA_VERSION:
+            raise PilotError(PilotErrorCode.SCHEMA_VERSION_UNSUPPORTED, f"PilotConfigurationStateRecord.schema_version must be {PILOT_STATE_SCHEMA_VERSION}")
         require_digest(self.manifest_digest, "PilotConfigurationStateRecord.manifest_digest")
         if not isinstance(self.method, ReasoningMethodRef):
             raise ContractError(ContractErrorCode.REF_BLANK_FIELD, "method must be a ReasoningMethodRef")
@@ -172,7 +173,7 @@ def propose(manifest: PilotStudyManifest, method: ReasoningMethodRef, *, recorde
         raise PilotError(PilotErrorCode.STATE_TRANSITION_INVALID, "a predecessor record requires the predecessor manifest")
     return PilotConfigurationStateRecord(
         PILOT_STATE_SCHEMA_VERSION, manifest.manifest_digest, method, assignment.roles, PilotConfigurationState.PROPOSED,
-        None, (), None, pred_state, pred_manifest, None, scope, recorded_by, recorded_at,
+        None, (), None, pred_state, pred_manifest, None, scope, USAGE_SCOPE_RESEARCH_ONLY, APPROVAL_STATUS_NONE, recorded_by, recorded_at,
     )
 
 
@@ -196,7 +197,8 @@ def transition(
     if st is PilotConfigurationState.REVISED:
         raise PilotError(PilotErrorCode.STATE_TRANSITION_INVALID, "a REVISED record is terminal")
     common = dict(schema_version=PILOT_STATE_SCHEMA_VERSION, manifest_digest=manifest.manifest_digest, method=predecessor.method, roles=predecessor.roles,
-                  predecessor_state_digest=predecessor.state_digest, predecessor_manifest_digest=None, recorded_by=recorded_by, recorded_at=recorded_at)
+                  predecessor_state_digest=predecessor.state_digest, predecessor_manifest_digest=None, usage_scope=USAGE_SCOPE_RESEARCH_ONLY, approval_status=APPROVAL_STATUS_NONE,
+                  recorded_by=recorded_by, recorded_at=recorded_at)
     if event is LifecycleEvent.SUPERSEDED:
         if successor_manifest is None:
             raise PilotError(PilotErrorCode.STATE_TRANSITION_INVALID, "SUPERSEDED requires the successor manifest")

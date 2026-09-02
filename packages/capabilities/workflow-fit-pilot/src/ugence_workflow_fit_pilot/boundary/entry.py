@@ -42,7 +42,12 @@ def main(argv=None) -> int:
         return 3
     decl = json.loads(args.declaration_json)
     decl["allowed_attested_fields"] = tuple(decl["allowed_attested_fields"])
-    BoundaryServer(manifest_digest=args.manifest_digest, provider=provider, declaration_fields=decl).serve(args.endpoint)
+
+    def ready() -> None:  # the runner blocks on this line; no clock or polling is needed
+        sys.stderr.write("READY\n")
+        sys.stderr.flush()
+
+    BoundaryServer(manifest_digest=args.manifest_digest, provider=provider, declaration_fields=decl).serve(args.endpoint, ready=ready)
     return 0
 
 

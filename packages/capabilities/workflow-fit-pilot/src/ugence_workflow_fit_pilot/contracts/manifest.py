@@ -28,6 +28,10 @@ from .evaluator import QualityEvaluatorDeclaration
 
 PILOT_MANIFEST_SCHEMA_VERSION = "workflow_fit_pilot.manifest.v1"
 PREREGISTRATION_DECLARED_UNVERIFIED = "DECLARED_UNVERIFIED"
+
+
+class PreregistrationStatus(str, Enum):
+    DECLARED_UNVERIFIED = "DECLARED_UNVERIFIED"   # the only value in 4A
 ATTESTABLE_TELEMETRY_FIELDS: Tuple[str, ...] = (
     "telemetry.llm_calls",
     "telemetry.token_usage.input_tokens",
@@ -97,14 +101,15 @@ class PilotStudyManifest:
     evaluator: QualityEvaluatorDeclaration
     resource_aggregation: AggregationRef
     quality_aggregation: AggregationRef
+    preregistration_status: PreregistrationStatus
+    usage_scope: str
     preregistered_by: str
     preregistered_at: datetime
-    preregistration_status: str = PREREGISTRATION_DECLARED_UNVERIFIED
-    usage_scope: str = USAGE_SCOPE_RESEARCH_ONLY
     manifest_digest: str = ""
 
     def __post_init__(self) -> None:
-        require_nonblank(self.schema_version, "PilotStudyManifest.schema_version")
+        if self.schema_version != PILOT_MANIFEST_SCHEMA_VERSION:
+            raise PilotError(PilotErrorCode.SCHEMA_VERSION_UNSUPPORTED, f"PilotStudyManifest.schema_version must be {PILOT_MANIFEST_SCHEMA_VERSION}")
         require_nonblank(self.manifest_id, "PilotStudyManifest.manifest_id")
         if not isinstance(self.plan, ResearchComparisonPlan):
             raise ContractError(ContractErrorCode.REF_BLANK_FIELD, "PilotStudyManifest.plan must be a ResearchComparisonPlan")
@@ -146,7 +151,7 @@ class PilotStudyManifest:
         declared = self.plan.task_class.comparison_policy.quality_aggregation
         if declared is not None and declared != self.quality_aggregation:
             raise PilotError(PilotErrorCode.AGGREGATION_MISMATCH, "quality_aggregation must equal the task class's declared aggregation")
-        if self.preregistration_status != PREREGISTRATION_DECLARED_UNVERIFIED:
+        if self.preregistration_status is not PreregistrationStatus.DECLARED_UNVERIFIED:
             raise ContractError(ContractErrorCode.REF_BLANK_FIELD, f"preregistration_status is fixed at {PREREGISTRATION_DECLARED_UNVERIFIED} in 4A")
         if self.usage_scope != USAGE_SCOPE_RESEARCH_ONLY:
             raise ContractError(ContractErrorCode.REF_BLANK_FIELD, f"usage_scope is fixed at {USAGE_SCOPE_RESEARCH_ONLY}")
@@ -235,6 +240,6 @@ def validate_manifest(manifest: PilotStudyManifest, *, catalog: ReasoningMethodC
 
 __all__ = [
     "PILOT_MANIFEST_SCHEMA_VERSION", "PREREGISTRATION_DECLARED_UNVERIFIED", "ATTESTABLE_TELEMETRY_FIELDS", "LLM_CALLS_FIELD",
-    "PilotRole", "sorted_roles", "PilotMethodAssignment", "CaptureBoundaryDeclaration", "PilotStudyManifest", "ValidatedManifest",
+    "PreregistrationStatus", "PilotRole", "sorted_roles", "PilotMethodAssignment", "CaptureBoundaryDeclaration", "PilotStudyManifest", "ValidatedManifest",
     "admissible_methods", "validate_manifest",
 ]

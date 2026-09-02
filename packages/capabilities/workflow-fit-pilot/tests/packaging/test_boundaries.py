@@ -22,7 +22,6 @@ FORBIDDEN = {
 ALLOWED = {"ugence_reasoning_method_governance", "ugence_readiness_comparison", "ugence_reasoning_method_advisor", "ugence_governance_contracts", "ugence_uvi_policy_contracts", "ugence_jcs",
            "__future__", "dataclasses", "datetime", "decimal", "enum", "re", "typing", "json"}
 BOUNDARY_ONLY = {"socket", "subprocess", "importlib", "argparse", "sys", "os", "tempfile"}
-RUNNER_ONLY = {"subprocess", "os", "sys", "tempfile", "time"}  # process start and the boundary-readiness wait live in runner.py
 CLOCK_NEEDLES = ("datetime.now(", "utcnow(", "date.today(", "time.time(", "monotonic(", "perf_counter(", "time_ns(")
 
 
@@ -51,10 +50,8 @@ def test_a30_import_boundary_and_single_dynamic_import():
         extra = names - ALLOWED
         if path.parent == BOUNDARY:
             assert extra <= BOUNDARY_ONLY, (path.name, extra)
-        elif path.name == "runner.py":
-            assert extra <= RUNNER_ONLY, (path.name, extra)
         else:
-            assert not extra, (path.name, extra)
+            assert not extra, (path.name, extra)  # the runner manages no process and reads no clock
         dyn += calls
     assert dyn == [("import_module", "entry.py")], dyn
 
@@ -65,8 +62,6 @@ def test_a30_clock_reads_only_in_the_boundary():
         hits = [n for n in CLOCK_NEEDLES if n in text]
         if path.parent == BOUNDARY and path.name in ("server.py", "attestation.py"):
             assert hits == ["datetime.now("], (path.name, hits)
-        elif path.name == "runner.py":
-            assert hits == ["monotonic("], (path.name, hits)  # the boundary start-up wait, not an evidence instant
         else:
             assert not hits, (path.name, hits)
 
@@ -91,6 +86,24 @@ def test_a31_no_owner_supplied_numeric_default():
     for needle in ("threshold =", "sample_size", "coverage_target", "acceptance", "tau ="):
         assert needle not in text, needle
     assert not re.search(r"(?<![\w.])0\.\d+(?![.\d])", text), "a decimal literal appears in src/"
+
+
+def test_schema_version_literals_are_enforced():
+    import dataclasses as dc
+
+    import pilot_fixtures as pf
+    from ugence_workflow_fit_pilot.api import PilotError, PilotErrorCode, PreregistrationStatus, propose
+
+    m = pf.manifest()
+    for obj, field in ((m, "schema_version"), (m.benchmark, "schema_version"), (propose(m, m.methods[0].method, recorded_by="r", recorded_at=pf.NOW), "schema_version")):
+        digest_field = next(f.name for f in dc.fields(obj) if f.name.endswith("_digest") and f.default == "")
+        with pytest.raises(PilotError) as ei:
+            dc.replace(obj, **{field: "workflow_fit_pilot.other.v9", digest_field: ""})
+        assert ei.value.code is PilotErrorCode.SCHEMA_VERSION_UNSUPPORTED
+    assert isinstance(m.preregistration_status, PreregistrationStatus)
+    # spec field order: preregistration_status and usage_scope precede preregistered_by
+    names = [f.name for f in dc.fields(type(m))]
+    assert names.index("preregistration_status") < names.index("usage_scope") < names.index("preregistered_by")
 
 
 def test_version_and_api_pins():
