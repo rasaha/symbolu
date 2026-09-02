@@ -1,7 +1,9 @@
 # Trusted Workflow-Fit Pilot (Phase 4A) — Commissioning Specification and Ballot
 
-**Status:** `[R]` — revision 4, awaiting the four-item owner ballot in §10.
-**Nothing here is implemented.** This document commissions one research-only
+**Status:** **RATIFIED — all four §10 ballot items ratified as recommended
+by the owner, 2026-09-02, including the four additional revision scopes
+(revision 4).** **Nothing here is implemented**; implementation awaits a
+separate owner instruction. This document commissions one research-only
 pilot package and one gate, and nothing else. It replaces further scoping
 notes: the four open decisions it resolves (Workflow-Fit 1 and 4, Advisor 3
 and 5) are answered together in §3–§6, because each is unusable without the
@@ -320,7 +322,7 @@ membership, roles or advice from digests alone.
 | `observation.attestation_envelope_digest` set ⇒ `attestation` supplied, its digest equal, its `record_digest == record.record_digest`, its `attester_identity == manifest.capture_boundary.boundary_identity`, its `attested_fields` a non-empty subset of `manifest.capture_boundary.allowed_attested_fields` containing `telemetry.llm_calls`, and its `capture_boundary_ref` equal to the JCS digest of `record.telemetry.capture_refs[1:]` (the ordered capture fingerprints, §4.2) | `ATTESTATION_MISMATCH` |
 | the manifest digest stamped on the record's `capture_refs` (§4.2) equals `observation.manifest_digest`; `record.captured_at` and `observation.observed_at` are not earlier than `manifest.preregistered_at` (a local chronology check, not proof) | `MANIFEST_NOT_PRIOR` |
 
-**Unresolved 3.1 — where the binding lives.**
+**3.1 (resolved by ratification, recommendation adopted) — where the binding lives.**
 
 | Option | Consequence |
 |---|---|
@@ -532,7 +534,7 @@ requester. Verification: the Trusted Evidence Authority only, under a trust
 anchor whose `TrustAnchorCapability` covers reasoning-method telemetry, which
 does not exist yet `[G]`.
 
-**Unresolved 4.1 — depth of trust in 4A.**
+**4.1 (resolved by ratification, recommendation adopted) — depth of trust in 4A.**
 
 | Option | Consequence |
 |---|---|
@@ -584,7 +586,7 @@ identity string. Every claim the evaluator produces is bound through a
 `QualityEvaluationRecord` (§3.4) whose `evidence_refs` link is checked by
 validation.
 
-**Unresolved 5.1 — the claim's `source_basis`.**
+**5.1 (resolved by ratification, recommendation adopted) — the claim's `source_basis`.**
 
 | Option | Consequence |
 |---|---|
@@ -644,7 +646,7 @@ set precision and `challengers_with_record / challengers_declared` (advisor
 note §6). `SUFFICIENT_RESOURCE_DOMINATED` is sufficient but dominated and is
 reported under its own name, never as a success.
 
-**Unresolved 6.1 — sampling kind for the first pilot.**
+**6.1 (resolved by ratification, recommendation adopted) — sampling kind for the first pilot.**
 
 | Option | Consequence |
 |---|---|
@@ -678,7 +680,7 @@ class RevisionScope(str, Enum):                 # derived by comparing predecess
     COMPARISON_PLAN = "COMPARISON_PLAN"         # plan_digest differs after masking task_class, binding and benchmark (baseline, recommended, challengers, catalog, preregistration)
     SUFFICIENCY_RULE = "SUFFICIENCY_RULE"       # the task class's sufficiency rule id or version differs
     # The four scopes below extend the owner-listed five so that every manifest coordinate is
-    # revisable; they are put to ballot item 4 as an amendment [R].
+    # revisable; ratified with ballot item 4 on 2026-09-02.
     ADVICE = "ADVICE"                           # advisory_digest or rule_set differs
     EVALUATOR = "EVALUATOR"                     # evaluator.declaration_digest differs
     CAPTURE_BOUNDARY = "CAPTURE_BOUNDARY"       # capture_boundary declaration differs
@@ -738,7 +740,7 @@ record that no permitted transition produces.
 
 **Revision scope** covers any change to the configuration, the task class,
 the benchmark manifest, the comparison plan or the sufficiency rule (the
-owner-listed five) and, subject to ballot item 4, to the advice, the
+owner-listed five) and, as ratified with ballot item 4, to the advice, the
 evaluator, the capture boundary or the aggregation references; any of these
 yields a new `manifest_digest`, a `REVISED` record on the predecessor naming
 `successor_manifest_digest` with the derived `revision_scope`, and a
@@ -770,7 +772,7 @@ success, and no Decision Authority, Constitution binding or
 `deployment_environment_ref` semantics are touched. The Slice 1
 `SUFFICIENT_PARETO_EFFICIENT` fence (ballot §8) stands.
 
-**Unresolved 6.2 — placement of the state ledger.**
+**6.2 (resolved by ratification, recommendation adopted) — placement of the state ledger.**
 
 | Option | Consequence |
 |---|---|
@@ -895,7 +897,7 @@ coverage target or acceptance figure.
 
 ---
 
-## 10. Owner ballot `[R]`
+## 10. Owner ballot — ~~`[R]`~~ **RATIFIED 2026-09-02**
 
 1. **Usage binding.** Ratify §3: a `PilotStudyManifest` (3.1-B) digested and
    validated against the full catalog and advisory before execution, binding
@@ -945,7 +947,26 @@ coverage target or acceptance figure.
    "NONE"` constant; the ledger placed in the pilot package (6.2-A); ballot
    8.2 and production approval remain open.
 
-**Definition of done for 4A** (after ratification): package
+**Ratification record (2026-09-02).** *Owner ruling, verbatim:* "Ratify
+all four as recommended, including the four additional revision scopes."
+Applied: item 1 with 3.1-B; item 2 with 4.1-B and 5.1-A; item 3 with 6.1-A;
+item 4 with 6.2-A and the nine-member `RevisionScope` (the owner-listed five
+plus `ADVICE`, `EVALUATOR`, `CAPTURE_BOUNDARY`, `AGGREGATION`). Ratified:
+Workflow-Fit decisions 1 (usage binding) and 4 (trust controls) and Advisor
+decisions 3 (pilot composition) and 5 (lifecycle), **within the research-only
+scope of 4A**; ballot 8.2 (production lifecycle placement), the Trusted
+Evidence Authority capability (4.1-C), quality-claim envelopes, benchmark
+registration and production approval remain open. Nothing numeric was
+ratified.
+
+**Authority.** Owner ratification by Rakesh Mohan, 2026-09-02, issued as an
+explicit owner instruction in Claude Code session
+`session_01VXERHvJzbb9cjZ1GyFFQLn` after revisions 2–4 applied the owner's
+corrections and two adversarial design reviews. The model analysis was
+advisory only; the owner instruction was the ratifying act. No source,
+contract, enum, experiment or test changed with this record.
+
+**Definition of done for 4A** (ratified): package
 `ugence-workflow-fit-pilot` with the §3–§6 contracts and operations, the
 boundary process, the pilot runner over the harness, every §8 row as an
 executable test, a CI gate in the Slice 1 pattern, and a wheel self-check. No
@@ -992,8 +1013,8 @@ owner-supplied numeric figure.
 | m2 | "qualified" prohibition could reject the `ADVISOR_QUALIFIED` role label | prohibition scoped to outcome lines; the role label is permitted (§6.2, A24) |
 | m3 | Transitions enforced by constructors alone | pure `transition`, `propose`, `validate_lineage` receiving predecessor record and manifests (§6.2, A24, A27, A28) |
 
-The four ballot items of §10 were revised accordingly and remain `[R]`.
-Nothing is ratified by this revision.
+The four ballot items of §10 were revised accordingly and remained `[R]`
+at this revision; nothing was ratified by it.
 
 ### Revision 4 (two follow-up reviews of revision 3, applied on owner instruction, 2026-09-02)
 
@@ -1005,7 +1026,7 @@ Nothing is ratified by this revision.
 | B4 | `quality_result_digest` unvalidated | `validate_observation` receives the `QualityResult`; `QUALITY_RESULT_MISMATCH`; claim and result digests defined as JCS digests (§3.4, A11) |
 | M5 | `validate_manifest` could not compute admissibility; no rule set or catalog-ref checks | receives the `RuleSet`; `CATALOG_MISMATCH`, `RULE_SET_MISMATCH`; advisory catalog ref checked (§3.1, A6) |
 | M6 | Manifest validation only presupposed by observation validation | `ValidatedManifest` artifact returned and required; `MANIFEST_NOT_VALIDATED` (§3.1, §3.4, A10) |
-| M7 | `RevisionScope` could not express advice, evaluator, boundary or aggregation changes | four scopes added and put to ballot item 4 as an amendment `[R]`; every manifest coordinate now covered (§6.2, A27) |
+| M7 | `RevisionScope` could not express advice, evaluator, boundary or aggregation changes | four scopes added and ratified with ballot item 4; every manifest coordinate now covered (§6.2, A27) |
 | M8 | Method-set drift across manifests unspecified | superseding applied to every predecessor method; dropped methods terminal; new methods `PROPOSED` with `predecessor_state_digest = None`; manifest-level scope; `LINEAGE_INCOMPLETE` (§6.2, A27, A28) |
 | M9 | Record transfer into the boundary unspecified | canonical JCS payload passed; digest recomputed from it; no deserialization (§4.3) |
 | M10 | Provider injection across processes undefined | `ProviderPort`, `ProviderResult`, `subprocess` start with a factory dotted path, exactly one dynamic import in the entry module; `PROVIDER_FACTORY_INVALID` (§4.1, §7, A16a, A30) |
@@ -1016,5 +1037,5 @@ Nothing is ratified by this revision.
 | m2 | Per-field token summation undefined | a field is summed only if present in every record, else `None`; attested per field (§4.3, A15) |
 | m3 | "Only client" presented as a package property | declared in `process_separation_ref`, not proven (§4.1) |
 
-The four ballot items of §10 were revised accordingly and remain `[R]`.
-Nothing is ratified by this revision.
+The four ballot items of §10 were revised accordingly and were ratified as
+recommended on 2026-09-02 (§10).
