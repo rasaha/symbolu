@@ -4,6 +4,8 @@
   "intended_outcome_ref": "outcome:resolve",
   "consequence_class": "RECOVERABLE",
   "reversibility": "OUTCOME_REVERSIBLE",
+  "evidence_requirement_refs": [],
+  "tool_requirement_refs": [],
   "structural_characteristics": [],
   "population_ref": "population:support-tickets"
 }

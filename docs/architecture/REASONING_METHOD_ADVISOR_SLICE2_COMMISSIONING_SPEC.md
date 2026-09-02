@@ -561,3 +561,14 @@ unchanged. **Authority.** Owner ratification by Rakesh Mohan, 2026-09-02,
 issued as an explicit owner instruction in Claude Code session
 `session_01VXERHvJzbb9cjZ1GyFFQLn`; the model analysis was advisory only and
 the owner instruction was the ratifying act.
+
+**Phase 3 intake ruling (owner, 2026-09-02) — RATIFIED; recorded in
+`experiments/reasoning_method_advisor_demo/README.md`.** Developers author
+the typed task profile directly (canonical JSON or a one-to-one guided form);
+the profile is `DEVELOPER_REPORTED`; no free-text classifier, LLM profiling,
+inferred signal, runtime `ComplexityDetector`, new capability or
+method-selection logic is introduced; labels may explain canonical fields but
+never alter, combine or infer values; the developer must see and explicitly
+confirm the canonical profile before submission. A future profiling helper
+is not commissioned and would live outside this package. This ruling changes
+no Slice 2 contract.

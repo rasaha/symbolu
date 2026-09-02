@@ -256,8 +256,56 @@ def test_cli_profile_path_requires_an_explicit_instant(tmp_path):
         demo.main(["--profile", str(profile)])
     buf = io.StringIO()
     with redirect_stdout(buf):
-        assert demo.main(["--profile", str(profile), "--task-class", str(demo.EXAMPLES_DIR / "task_class_support.json"), "--advised-at", "2026-09-02T12:00:00Z", "--json"]) == 0
+        assert demo.main(["--profile", str(profile), "--task-class", str(demo.EXAMPLES_DIR / "task_class_support.json"), "--advised-at", "2026-09-02T12:00:00Z", "--confirm-profile", "--json"]) == 0
     out = json.loads(buf.getvalue())
     assert out["primary"]["method_id"] == "map_reduce" and out["advisory_id"] == "demo.request:advisory"
     with pytest.raises(ValueError):
         demo.parse_instant("2026-09-02T12:00:00")
+
+
+# --------------------------------------------------------------------------- Phase 3 intake ruling
+def _profile_doc(n=1):
+    return json.loads((demo.EXAMPLES_DIR / f"profile_{n}_{'single' if n == 1 else 'multiple'}.json").read_text())
+
+
+def test_loader_is_one_to_one_with_the_contract_and_infers_nothing():
+    doc = _profile_doc()
+    profile = demo.load_profile(doc)
+    assert profile.assertion_basis == "DEVELOPER_REPORTED"
+    rendered = json.loads(demo.canonical_profile_json(profile))
+    assert {k: rendered[k] for k in doc} == doc, "the canonical profile carries the developer's values unchanged"
+    for missing in demo.PROFILE_FIELDS:
+        with pytest.raises(demo.ProfileDocumentError):
+            demo.load_profile({k: v for k, v in doc.items() if k != missing})
+    with pytest.raises(demo.ProfileDocumentError):
+        demo.load_profile({**doc, "free_text": "compare two vendors"})
+    with pytest.raises(demo.ProfileDocumentError):
+        demo.load_profile({**doc, "profile_id": 42})
+    with pytest.raises(demo.ProfileDocumentError):
+        demo.load_profile({**doc, "consequence_class": "severe"})
+    with pytest.raises(ContractError) as ei:
+        demo.load_profile({**doc, "structural_characteristics": ["needs comparison"]})
+    assert ei.value.code is ContractErrorCode.SIGNAL_TOKEN_UNKNOWN
+    text = DEMO_SRC.read_text(encoding="utf-8")
+    assert ".get(" not in text.split("def load_task_class")[0].split("def load_profile")[1], "no defaulted profile field"
+    assert "ComplexityDetector" not in text and "analyze(" not in text
+
+
+def test_cli_requires_explicit_confirmation_of_the_canonical_profile(monkeypatch):
+    calls = []
+    real = demo.advise
+    monkeypatch.setattr(demo, "advise", lambda *a, **k: (calls.append(1), real(*a, **k))[1])
+    profile = demo.EXAMPLES_DIR / "profile_1_single.json"
+    buf = io.StringIO()
+    with redirect_stdout(buf):
+        rc = demo.main(["--profile", str(profile), "--advised-at", "2026-09-02T12:00:00Z", "--json"])
+    assert rc == 3 and calls == [], "without --confirm-profile the advisor is never called"
+    shown = buf.getvalue()
+    assert "canonical profile (DEVELOPER_REPORTED)" in shown
+    echoed = json.loads(shown.split("\n", 1)[1])
+    assert echoed == json.loads(demo.canonical_profile_json(demo.load_profile(json.loads(profile.read_text()))))
+    buf = io.StringIO()
+    with redirect_stdout(buf):
+        rc = demo.main(["--profile", str(profile), "--advised-at", "2026-09-02T12:00:00Z", "--confirm-profile", "--json"])
+    assert rc == 0 and calls == [1]
+    assert json.loads(buf.getvalue())["classification"] == "UNCLASSIFIED_EXPLORATORY"

@@ -5,9 +5,19 @@ It calls the real ``ugence_reasoning_method_advisor.advise`` and reproduces
 none of its rules: the only things defined here are (a) the seven-method
 research catalog and the versioned research rule set ``rules.research.v0``
 as DATA (the same transcription the package's own test fixture carries),
-(b) JSON loaders for a developer-supplied typed task profile and an optional
-governed task-class fixture, and (c) two presentations of the advisory the
-advisor returns: machine-readable JSON and a concise explanation.
+(b) STRICT JSON loaders for a developer-supplied typed task profile and an
+optional governed task-class fixture, and (c) two presentations of the
+advisory the advisor returns: machine-readable JSON and a concise explanation.
+
+Phase 3 intake ruling (owner, 2026-09-02): developers author the typed profile
+directly, one-to-one with the ratified profile fields and structural-signal
+tokens; the profile is DEVELOPER_REPORTED; nothing here infers, combines,
+defaults or alters a value; and the developer must see and explicitly
+confirm the canonical profile before it is submitted. The loader therefore
+requires every profile field to be present with its exact type and refuses
+unknown keys, and the CLI prints the canonical profile and advises only
+when ``--confirm-profile`` is given (bundled examples are pre-confirmed
+fixtures and are echoed the same way).
 
 Presentation never changes the advisory: the JSON is a field-for-field
 rendering of the ``ReasoningMethodAdvisory`` object, the explanation is
@@ -19,7 +29,7 @@ recommendation is made anywhere here; every advisory is ``RESEARCH_ONLY`` with
 Run:
     python -m experiments.reasoning_method_advisor_demo.demo --example 1 [--json|--text|--both]
     python -m experiments.reasoning_method_advisor_demo.demo --profile profile.json \
-        [--task-class task_class.json] --advised-at 2026-09-02T12:00:00Z
+        [--task-class task_class.json] --advised-at 2026-09-02T12:00:00Z --confirm-profile
 """
 
 from __future__ import annotations
@@ -124,26 +134,61 @@ def research_rules_v0(issued_at: datetime = EXAMPLE_INSTANT) -> RuleSet:
 
 
 # --------------------------------------------------------------------------- JSON loaders
+# The canonical profile document: exactly these keys, one-to-one with TaskProfile's
+# developer-authored fields (schema_version, policy_refs, declared_by, declared_at and
+# assertion_basis are fixed by the contract, not authored here).
+PROFILE_STRING_FIELDS = ("profile_id", "domain_ref", "intended_outcome_ref", "population_ref")
+PROFILE_ENUM_FIELDS = {"consequence_class": ConsequenceClass, "reversibility": TaskReversibility}
+PROFILE_LIST_FIELDS = ("evidence_requirement_refs", "tool_requirement_refs", "structural_characteristics")
+PROFILE_FIELDS = frozenset(PROFILE_STRING_FIELDS) | frozenset(PROFILE_ENUM_FIELDS) | frozenset(PROFILE_LIST_FIELDS)
+
+
+class ProfileDocumentError(ValueError):
+    """The developer's profile document is not the canonical shape. Nothing is inferred to repair it."""
+
+
 def _str_tuple(value: Any, name: str) -> Tuple[str, ...]:
     if not isinstance(value, list) or not all(isinstance(v, str) for v in value):
-        raise ValueError(f"{name} must be a JSON array of strings")
+        raise ProfileDocumentError(f"{name} must be a JSON array of strings")
     return tuple(value)
 
 
+def _str(value: Any, name: str) -> str:
+    if not isinstance(value, str):
+        raise ProfileDocumentError(f"{name} must be a JSON string, got {type(value).__name__}")
+    return value
+
+
 def load_profile(data: Mapping[str, Any]) -> TaskProfile:
-    """A developer-supplied TYPED profile. Every coordinate is explicit; nothing is defaulted."""
+    """A developer-supplied TYPED profile. Every field must be present with its exact type;
+    unknown keys are refused; no value is defaulted, coerced, combined or inferred."""
+    if not isinstance(data, Mapping):
+        raise ProfileDocumentError("profile must be a JSON object")
+    missing = sorted(PROFILE_FIELDS - set(data))
+    unknown = sorted(set(data) - PROFILE_FIELDS)
+    if missing or unknown:
+        raise ProfileDocumentError(f"profile fields missing: {missing or '-'}; unknown: {unknown or '-'}")
+    for name, enum_cls in PROFILE_ENUM_FIELDS.items():
+        _str(data[name], name)
+        if data[name] not in {m.value for m in enum_cls}:
+            raise ProfileDocumentError(f"{name} must be one of {sorted(m.value for m in enum_cls)}")
     return TaskProfile(
         PROFILE_SCHEMA_VERSION,
-        str(data["profile_id"]),
-        str(data["domain_ref"]),
-        str(data["intended_outcome_ref"]),
+        _str(data["profile_id"], "profile_id"),
+        _str(data["domain_ref"], "domain_ref"),
+        _str(data["intended_outcome_ref"], "intended_outcome_ref"),
         ConsequenceClass(data["consequence_class"]),
         TaskReversibility(data["reversibility"]),
-        _str_tuple(data.get("evidence_requirement_refs", []), "evidence_requirement_refs"),
-        _str_tuple(data.get("tool_requirement_refs", []), "tool_requirement_refs"),
+        _str_tuple(data["evidence_requirement_refs"], "evidence_requirement_refs"),
+        _str_tuple(data["tool_requirement_refs"], "tool_requirement_refs"),
         _str_tuple(data["structural_characteristics"], "structural_characteristics"),
-        str(data["population_ref"]),
+        _str(data["population_ref"], "population_ref"),
     )
+
+
+def canonical_profile_json(profile: TaskProfile) -> str:
+    """The canonical profile as the contract holds it, shown to the developer for confirmation."""
+    return json.dumps(to_jsonable(profile), indent=2, ensure_ascii=False)
 
 
 def load_task_class(data: Mapping[str, Any]) -> TaskClassIdentity:
@@ -165,8 +210,8 @@ def load_task_class(data: Mapping[str, Any]) -> TaskClassIdentity:
     return TaskClassIdentity(
         TASK_CLASS_SCHEMA_VERSION, str(data["task_class_id"]), str(data["domain_ref"]), str(data["intended_outcome_ref"]),
         ConsequenceClass(data["consequence_class"]), TaskReversibility(data["reversibility"]),
-        _str_tuple(data.get("evidence_requirement_refs", []), "evidence_requirement_refs"),
-        _str_tuple(data.get("tool_requirement_refs", []), "tool_requirement_refs"),
+        _str_tuple(data["evidence_requirement_refs"], "evidence_requirement_refs"),
+        _str_tuple(data["tool_requirement_refs"], "tool_requirement_refs"),
         _str_tuple(data["structural_characteristics"], "structural_characteristics"),
         str(data["population_ref"]), str(data["benchmark_set_ref"]), str(data["benchmark_set_digest"]), policy,
     )
@@ -276,25 +321,34 @@ def main(argv: Optional[list] = None) -> int:
     p.add_argument("--profile", type=Path, help="developer-supplied typed task profile (JSON)")
     p.add_argument("--task-class", type=Path, help="optional governed task-class fixture (JSON)")
     p.add_argument("--advised-at", help="required with --profile: ISO 8601 instant with offset; the demo reads no clock")
+    p.add_argument("--confirm-profile", action="store_true", help="required with --profile: the developer has reviewed the canonical profile printed by a prior run and confirms it as DEVELOPER_REPORTED")
     p.add_argument("--json", action="store_true", help="print machine-readable JSON only")
     p.add_argument("--text", action="store_true", help="print the explanation only")
     args = p.parse_args(argv)
+    show_json, show_text = (True, True) if not (args.json or args.text) else (args.json, args.text)
     if args.example is not None:
+        profile_doc, task_class = load_example(args.example)
         advisory = run_example(args.example)
         heading = f"# example {args.example}: {EXAMPLES[args.example][0]}"
     elif args.profile is not None:
         if not args.advised_at:
             p.error("--advised-at is required with --profile (the demo reads no clock)")
-        profile = json.loads(args.profile.read_text(encoding="utf-8"))
+        profile_doc = json.loads(args.profile.read_text(encoding="utf-8"))
         task_class = json.loads(args.task_class.read_text(encoding="utf-8")) if args.task_class else None
-        advisory = run_demo(profile, task_class, advised_at=parse_instant(args.advised_at))
-        heading = f"# profile {args.profile}"
+        canonical = load_profile(profile_doc)
+        if not args.confirm_profile:
+            print("# canonical profile (DEVELOPER_REPORTED). Review it, then re-run with --confirm-profile to submit it to the advisor.")
+            print(canonical_profile_json(canonical))
+            return 3
+        advisory = run_demo(profile_doc, task_class, advised_at=parse_instant(args.advised_at))
+        heading = f"# profile {args.profile} (confirmed canonical profile)"
     else:
         p.error("give --example N or --profile FILE")
         return 2
-    show_json, show_text = (True, True) if not (args.json or args.text) else (args.json, args.text)
     if show_text:
         print(heading)
+        print("# canonical profile (DEVELOPER_REPORTED):")
+        print(canonical_profile_json(load_profile(profile_doc)))
         print(explain(advisory))
     if show_json:
         if show_text:
