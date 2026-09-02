@@ -36,7 +36,7 @@ collisions force this `[V]`:
   neighbouring contract would be a semantic and contract collision.
 - The seven-member `WorkflowType` enum names *processing*, which S2-B ruled out
   of the Proposer's declared vocabulary
-  (`ADR_UGENCE_S2B_ROUND2_VOCABULARY_RATIFICATION.md:64`).
+  (`ADR_UGENCE_S2B_ROUND2_VOCABULARY_RATIFICATION.md:58,64-66`).
 
 Candidate names, **not created here** `[R]`:
 
@@ -75,9 +75,14 @@ qualifying set when composing a team; it should not own the method analysis.
 
 Established `[V]`:
 
-- `packages/capabilities/agentic-proposer` and its integration packages contain
-  **zero** references to `WorkflowType`, `reasoning_workflows`,
-  `agentic_framework` or `WorkflowResult`.
+- `packages/capabilities/agentic-proposer` and its integration packages have
+  **no import of, and no dependency on**, `WorkflowType`, `reasoning_workflows`,
+  `agentic_framework` or `WorkflowResult`: under `src/` there are zero
+  references. The only mentions anywhere in those packages — `pyproject.toml`,
+  `tests/test_boundaries.py`, `tests/test_vocabulary.py`,
+  `verify_agentic_proposer_distribution.py` and `docs/S0_SCOPE.md` — are
+  **prohibitions** that forbid the dependency (a forbidden-wheel-substring list
+  and boundary tests). The disjointness is enforced, not incidental.
 - **No package** in `packages/` consumes `WorkflowResult` or `workflow_type`.
 - `agentic/` has **no `pyproject.toml`** and is imported by **zero** packages. It
   is a monorepo tree, not a distribution.
@@ -195,7 +200,7 @@ Two prohibitions:
   prediction.
 - **No scalar resource label** — "medium", "high" — **may appear without a
   governed method.** Resource comparison is Pareto over a governed vector
-  (`WORKFLOW_FIT_READINESS_SCOPING_NOTE.md:70`) `[V]`; a label is an unratified
+  (`WORKFLOW_FIT_READINESS_SCOPING_NOTE.md:73`) `[V]`; a label is an unratified
   ordering.
 
 **The initial version is rule-derived or unknown, and must say so.** The

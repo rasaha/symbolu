@@ -167,7 +167,7 @@ ratified contracts `[V]`
   `attempt_number`, `context_id`, `provider_id`, `status`, `usage_availability`
   and an optional `provider_usage`.
 
-`ugence-integration-context-minimization-token-accounting-runtime` (CM-TA1)
+`ugence-context-minimization-token-accounting-runtime` (CM-TA1)
 already wires these to the Agent Runtime's `ProviderAttempt` telemetry `[V]`.
 
 Three consequences:
@@ -191,7 +191,7 @@ usage capture is later ratified, it has **one** place to attach, not 21.
 
 **What is recorded today:** `WorkflowResult` carries `workflow_type`,
 `total_llm_calls`, `total_duration_ms` and `depth_used` `[V]`
-(`reasoning_workflows.py:135`). **No token accounting exists in the workflow
+(`reasoning_workflows.py:128-145`). **No token accounting exists in the workflow
 runtime** `[G]`, so the usable resource vector is currently **one dimension —
 call count**.
 
@@ -221,7 +221,8 @@ separate governed calculation.
 ## 4. Quality, and the self-score
 
 `τ_t` is **expressible with an existing contract**: a `GovernedThreshold` carries
-`threshold_id`, `governed_unit`, `comparator` (five operators) and either a
+`threshold_id`, `governed_unit`, `comparator` (six operators — `GTE`, `GT`, `LTE`, `LT`,
+`EQ`, `NEQ`; `uvi-policy-contracts …/enums.py:89-94`) and either a
 `literal_value` or a `benchmark_ref` `[V]`. No new threshold artifact is needed.
 
 **The workflow's own score is not evidence — and must not be deleted.**
@@ -283,6 +284,13 @@ ordering of workflows describes potential evidential exposure or resource
 profile, never maturity: a linear workflow can outperform a debate on a simple
 task.
 
+> **Amendment (after `57fa1a17`).** "The seven workflows" above means the
+> seven-member `WorkflowType` enum. `REASONING_WORKFLOW_LANDSCAPE_EVALUATION.md`
+> §2 establishes that the framework's repertoire is larger — `iterate_loop.py`,
+> `multi_agent.py`, `human_policy.py` and retrieval infrastructure implement
+> methods outside the enum — so the treatment space a benchmark must cover is
+> the repertoire, not the enum. §7's description of `WorkflowSelector` stands.
+
 ## 7. Metacognitive selection
 
 Modelled as an **upstream router**. It selects a workflow; each resulting
@@ -337,6 +345,10 @@ until that role is assigned.
 1. **Usage binding** — whether workflow token usage binds to the existing
    `ApiCallTokenRecord` / `ProviderTokenUsage` contracts rather than any new
    type, and how estimated versus provider-reported counts are kept distinct.
+   *Note (after `78220a99`):* no import path exists between `agentic/` and any
+   governed package, and none is proposed; the binding would have to travel
+   through the neutral execution record specified in
+   `REASONING_METHOD_ADVISOR_SCOPING_NOTE.md` §3.
 2. **Status vocabulary** — workflow-fit's own outcome names, avoiding collision
    with the `ReadinessClassification` tiers.
 3. **Sufficiency cap** — whether value above `τ_t` is recognised, conditioned on
