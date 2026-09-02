@@ -1,6 +1,9 @@
 # Reasoning Method Advisor — Slice 2 Commissioning Specification
 
-**Status:** bounded commissioning specification for owner ratification.
+**Status:** **RATIFIED AS AMENDED — all three §10 ballot items ratified by the
+owner, 2026-09-02, after the four amendments recorded in §11.** Slice 2 is
+commissioned as research-only work and is **not implemented**; implementation
+awaits a separate owner instruction.
 **Nothing here is implemented.** Slice 2 is a **research-only, deterministic,
 rule-derived** Reasoning Method Advisor. It commissions one package and one
 CI gate and nothing else.
@@ -20,7 +23,7 @@ rule set, which methods qualify, which are excluded, and why, without any
 prediction the system cannot support?** Slice 2 answers with a set-valued,
 labelled, digested advisory whose every claim is `RULE_DERIVED` and whose
 evidence status is always `COMPARISON_EVIDENCE_ABSENT`, and that names a
-primary only when exactly one method is uniquely supported.
+primary only when exactly one method qualifies.
 
 ---
 
@@ -32,9 +35,9 @@ primary only when exactly one method is uniquely supported.
 
 **Consumes, unchanged:** `TaskProfile`, `TaskClassIdentity`,
 `ReasoningMethodCatalog`, `ReasoningMethodCatalogRef`, `ReasoningMethodRef`,
-`ImplementationStatus`, `COMPLEXITY_SIGNAL_TOKENS` and
-`ReadinessComparisonResult` from `ugence_reasoning_method_governance.api`
-`[V]`. Slice 2 adds no field to any slice 1 contract.
+`ImplementationStatus` and `COMPLEXITY_SIGNAL_TOKENS` from
+`ugence_reasoning_method_governance.api` `[V]`. Slice 2 adds no field to any
+slice 1 contract and consumes no comparison result (§6).
 
 **Forbidden imports, enforced by the same boundary-test pattern as slice 1**
 `[V]`: `agentic`, `agentic_framework`, `reasoning_workflows`,
@@ -62,17 +65,26 @@ class ReasoningMethodAdvisoryRequest:
     schema_version: Literal["reasoning_method.advisory_request.v1"]
     request_id: str
     profile: TaskProfile                        # developer-reported; DEVELOPER_REPORTED by construction
-    task_class: Optional[TaskClassIdentity]     # the governed class when one is declared (unresolved 2.1)
+    task_class: Optional[TaskClassIdentity]     # the governed class when one is declared; None ⇒ UNCLASSIFIED (binding restriction below)
     catalog: ReasoningMethodCatalog             # the full catalog, so rules read entries; its digest is recorded
     rule_set: RuleSet                           # §4; evaluated exactly as supplied
-    comparison_results: tuple[ReadinessComparisonResult, ...] = ()   # ACCEPTED, RECORDED, NOT USED in slice 2 (§6)
     requester_identity: str = ""
+    # There is NO comparison-results field. Slice 2 never consults comparison evidence (§6).
 ```
+
+**Unclassified requests (owner ruling, binding).** A request without a
+governed `TaskClassIdentity` receives **exploratory `RULE_DERIVED` advice
+only**. The advisory marks it `classification = UNCLASSIFIED_EXPLORATORY` and
+`eligibility = INELIGIBLE_UNCLASSIFIED`: it is ineligible for benchmark
+comparison, for governed configuration binding, and for any production
+authority, and its `evidence_status` remains the explicit
+`COMPARISON_EVIDENCE_ABSENT`. A request with a governed class is marked
+`GOVERNED_TASK_CLASS` and `JOINABLE_BY_TASK_CLASS_DIGEST`; that marks
+joinability to a future comparison, not any eligibility for approval.
 
 **Refusals (constructor):** blank identifiers (`REF_BLANK_FIELD`); a
 `task_class` whose `structural_characteristics` are not a superset of the
-profile's (`PROFILE_CLASS_MISMATCH`); a `comparison_results` entry whose
-`schema_version` is not the slice 1 result literal (`UNSUPPORTED_SCHEMA_VERSION`).
+profile's (`PROFILE_CLASS_MISMATCH`).
 The request never carries a query string, a prompt, or runtime text:
 `ComplexityDetector.analyze(self, text: str)` (`adaptive_prompts.py:359`)
 `[V]` reads runtime text and is not consumed; the profile's
@@ -92,14 +104,30 @@ class AdvisoryLabel(str, Enum):                 # BENCHMARK_DERIVED is deliberat
 class NoPrimaryReason(str, Enum):
     NO_QUALIFYING_METHOD = "NO_QUALIFYING_METHOD"
     MULTIPLE_QUALIFYING_METHODS = "MULTIPLE_QUALIFYING_METHODS"
-    QUALIFYING_METHOD_NOT_UNIQUELY_SUPPORTED = "QUALIFYING_METHOD_NOT_UNIQUELY_SUPPORTED"
+
+class AdvisoryClassification(str, Enum):
+    GOVERNED_TASK_CLASS = "GOVERNED_TASK_CLASS"
+    UNCLASSIFIED_EXPLORATORY = "UNCLASSIFIED_EXPLORATORY"
+
+class AdvisoryEligibility(str, Enum):
+    JOINABLE_BY_TASK_CLASS_DIGEST = "JOINABLE_BY_TASK_CLASS_DIGEST"     # joinable to a future comparison; not an approval
+    INELIGIBLE_UNCLASSIFIED = "INELIGIBLE_UNCLASSIFIED"                 # no benchmark comparison, no configuration binding, no production authority
 
 @dataclass(frozen=True)
 class RuleOutcome:                              # one fired rule, as a reason
     rule_id: str
+    rule_version: str
     rule_kind: RuleKind                         # §4
     matched_tokens: tuple[str, ...]             # the profile coordinates the predicate matched, sorted
     rationale_ref: str
+    rationale_statement: str                    # the rule's declared inclusion/exclusion rationale, verbatim
+
+@dataclass(frozen=True)
+class QualifyingTradeOff:                       # present for every qualifying method when more than one qualifies
+    method: ReasoningMethodRef
+    distinguishing_reasons: tuple[RuleOutcome, ...]      # inclusion reasons this method has that no other qualifying method has
+    distinguishing_requirement_refs: tuple[str, ...]     # catalog requirement_refs this method has that no other qualifying method has
+    # no ordering, weight, score or preference: a trade-off is a difference, not a ranking
 
 @dataclass(frozen=True)
 class QualifyingMethod:
@@ -122,13 +150,15 @@ class ReasoningMethodAdvisory:
     task_class_digest: Optional[str]
     catalog: ReasoningMethodCatalogRef
     rule_set: RuleSetRef
+    classification: AdvisoryClassification     # GOVERNED_TASK_CLASS iff task_class_digest is not None
+    eligibility: AdvisoryEligibility            # INELIGIBLE_UNCLASSIFIED iff classification is UNCLASSIFIED_EXPLORATORY
     qualifying: tuple[QualifyingMethod, ...]    # zero, one or many; ordered by (method_id, method_version)
     excluded: tuple[ExcludedMethod, ...]        # every catalog entry not qualifying; same order
-    primary: Optional[ReasoningMethodRef]       # only when exactly one qualifies AND it is uniquely supported (§4)
-    primary_basis: Optional[Literal["UNIQUE_RULE_SUPPORT"]]
+    trade_offs: tuple[QualifyingTradeOff, ...]  # one per qualifying method iff more than one qualifies; otherwise empty
+    primary: Optional[ReasoningMethodRef]       # set iff exactly one method qualifies (§4)
+    primary_basis: Optional[Literal["SOLE_QUALIFYING_METHOD"]]
     no_primary_reason: Optional[NoPrimaryReason]  # set iff primary is None
-    evidence_status: Literal["COMPARISON_EVIDENCE_ABSENT"]   # slice 2 constant: no admitted comparison evidence exists
-    comparison_result_digests: tuple[str, ...]  # digests of any supplied results; recorded, not consulted
+    evidence_status: Literal["COMPARISON_EVIDENCE_ABSENT"]   # slice 2 constant, explicit on every advisory
     usage_scope: Literal["RESEARCH_ONLY"]
     advisor_identity: str
     advisor_version: str
@@ -140,8 +170,10 @@ class ReasoningMethodAdvisory:
 score, rank, probability, confidence, cost, latency or resource label, and a
 test over the field set of every advisory type rejects any such name (the
 slice 1 `SCALAR_LABEL_FIELD_PRESENT` pattern) `[V]`. `qualifying` is a set,
-not a ranking: its order is the catalog sort key. `primary` is never derived
-from position, count of reasons, or any weight.
+not a ranking: its order is the catalog sort key. `trade_offs` are
+differences, not preferences. `primary` is never derived from position,
+rule count, rule priority, implementation order, or any weight; it exists
+only when the qualifying set has exactly one member.
 
 ---
 
@@ -168,11 +200,13 @@ class Predicate:
 
 @dataclass(frozen=True)
 class Rule:
-    rule_id: str
+    rule_id: str                                # stable identifier; never reused for a different predicate or method set
+    rule_version: str                           # bumped on any change to predicate, method_ids or rationale
     kind: RuleKind
-    predicate: Predicate
+    predicate: Predicate                        # the declared profile (or catalog-side) predicate
     method_ids: tuple[str, ...]                 # non-empty; each must exist in the catalog at evaluation (RULE_METHOD_UNKNOWN otherwise)
-    rationale_ref: str                          # where the rule comes from; never prose alone
+    rationale_ref: str                          # where the rule comes from (a document, line range or ruling); never prose alone
+    rationale_statement: str                    # the inclusion or exclusion rationale, one sentence, carried into every RuleOutcome
 
 @dataclass(frozen=True)
 class RuleSet:
@@ -200,28 +234,38 @@ class RuleSet:
    and no exclusion reason. Methods in `A` with an exclusion reason are
    excluded with those reasons. Methods in `A` with no reason at all are
    excluded with the synthetic outcome `NO_SUPPORTING_RULE`.
-4. **Primary** is set iff `|Q| == 1` **and** the union of `method_ids` over
-   all fired `SUPPORT` rules, intersected with `A`, equals `Q`. That is,
-   exactly one method qualifies and no fired support rule named any other
-   admissible method. Otherwise `primary` is `None` with the applicable
-   `NoPrimaryReason`. Rule priority, rule count and rule order never break a
-   tie: this is the ratified advisor-specific no-forced-winner rule, with
-   OD-8 cited as precedent only.
-5. Every label is `RULE_DERIVED`; the advisory's `evidence_status` is
-   `COMPARISON_EVIDENCE_ABSENT`.
+4. **Primary** is set iff `|Q| == 1`, with `primary_basis =
+   SOLE_QUALIFYING_METHOD`. If `|Q| == 0`, `no_primary_reason =
+   NO_QUALIFYING_METHOD`. If `|Q| > 1`, the advisory returns the **complete
+   qualifying set**, every method's inclusion reasons, and one
+   `QualifyingTradeOff` per qualifying method whose distinguishing reasons
+   and requirement refs are the set differences against the other qualifying
+   methods, with `no_primary_reason = MULTIPLE_QUALIFYING_METHODS` and **no
+   primary**. Rule count, rule priority and implementation order never
+   manufacture a winner: this is the ratified advisor-specific
+   no-forced-winner rule, with OD-8 cited as precedent only.
+5. `classification` and `eligibility` are set from the presence of
+   `task_class` (§2). Every label is `RULE_DERIVED`; the advisory's
+   `evidence_status` is `COMPARISON_EVIDENCE_ABSENT`.
 
 Evaluation is a pure function of `(profile, task_class, catalog, rule_set)`.
 The same inputs yield the same `advisory_digest` across processes.
 
-**Initial rule set `rules.research.v0` `[R]`.** Provenance: a transcription of
+**Initial rule set `rules.research.v0`.** Provenance: a transcription of
 `WorkflowSelector.SIGNAL_MAP` (`reasoning_workflows.py:1177-1188`) `[V]` into
 ten `SUPPORT` rules, one per `ComplexitySignal` token, each naming the one
-method the selector maps it to, with `rationale_ref` citing that line range.
+method the selector maps it to. Each rule carries a stable `rule_id`
+(`research.signal.<token>`), `rule_version` `"0"`, its declared predicate
+(`STRUCTURAL_TOKEN_PRESENT` on that token), a `rationale_ref` citing that
+line range, and a `rationale_statement` reading "transcribed from the
+experimental WorkflowSelector mapping; provenance only". **Transcription
+supplies research provenance for where the rule came from. It is not
+evidence that the selector's routing is correct**; no study has tested that
+mapping, and the advisory's `COMPARISON_EVIDENCE_ABSENT` status says so.
 `SIGNAL_PRIORITY` (`:1191-1202`) `[V]` is **not** transcribed: it is a
 first-match tie-break, and slice 2 breaks no ties. No `EXCLUDE` rule ships in
-v0; the admissibility predicate is the only gate. v0 is research provenance,
-not a ratified mapping, and its digest is carried on every advisory so a
-later rule set cannot be confused with it.
+v0; the admissibility predicate is the only gate. v0's digest is carried on
+every advisory so a later rule set cannot be confused with it.
 
 **Unresolved 4.1 — admissibility gate.**
 
@@ -233,16 +277,11 @@ later rule set cannot be confused with it.
 
 **Recommendation: A.**
 
-**Unresolved 2.1 — is `task_class` required?**
-
-| Option | Consequence |
-|---|---|
-| A. Optional; profile-only requests permitted, `task_class_digest` `None` | usable at design time before a governed class exists; the advisory cannot be joined to any fit assessment |
-| B. Required | every advisory is joinable to comparison results by `task_class_digest`; no advice before a class is declared |
-
-**Recommendation: A for slice 2**, because the advisor is design-time and
-the class often does not yet exist; B becomes natural when ingestion (§6)
-arrives.
+**2.1 — `task_class` optional, with a binding restriction (resolved by owner
+ruling, §11).** Profile-only requests are permitted and yield exploratory
+`RULE_DERIVED` advice marked `UNCLASSIFIED_EXPLORATORY` /
+`INELIGIBLE_UNCLASSIFIED` (§2). The former options A (optional) and B
+(required) are superseded by this ruling.
 
 **Unresolved 4.2 — rule set v0 provenance.**
 
@@ -260,8 +299,9 @@ line range as `rationale_ref`.
 ## 5. Labels and prohibitions
 
 - `RULE_DERIVED` on every inclusion and exclusion.
-- `COMPARISON_EVIDENCE_ABSENT` as the advisory's `evidence_status`, always,
-  in slice 2. The advisor does not know outcomes; it says so structurally.
+- `COMPARISON_EVIDENCE_ABSENT` as the advisory's `evidence_status`, always
+  and explicitly, in slice 2, for classified and unclassified requests alike.
+  The advisor does not know outcomes; it says so structurally.
 - `BENCHMARK_DERIVED` is **not a member** of `AdvisoryLabel` in slice 2. Its
   later addition is an additive enum change under a new label-set version.
 - No numeric outcome prediction, no probability, no scalar cost or latency
@@ -270,17 +310,19 @@ line range as `rationale_ref`.
 
 ---
 
-## 6. Later ingestion without changing the request
+## 6. Comparison-result ingestion is out of scope
 
-The request already carries `comparison_results`. Slice 2 validates their
-schema version, records their `result_digest`s in
-`comparison_result_digests`, and **consults nothing in them**. A later slice
-adds, without touching the request contract: a `BENCHMARK_DERIVED` label
-member; an ingestion rule set version whose predicates may read
-`ReasoningMethodFitAssessment.outcome` for the matching `task_class_digest`;
-and additive result fields. Whether an advisory may then carry
+Slice 2 contracts carry **no comparison-results field** and the advisor
+**consults no comparison evidence**. Ingestion of `ReadinessComparisonResult`
+values is introduced only in the later benchmark-derived slice, through a
+**separately ratified contract change**: a new request schema version that
+adds the field, a `BENCHMARK_DERIVED` label member, and an ingestion rule
+set version whose predicates may read `ReasoningMethodFitAssessment.outcome`
+for a matching `task_class_digest`. Whether an advisory may then carry
 `BENCHMARK_DERIVED` on an assessment whose `usage_scope` is `RESEARCH_ONLY`
-is that slice's ruling, not this one's `[R]`.
+is that slice's ruling `[R]`. A slice 2 field-set test asserts the request
+type has no such field, so the later change is visible as a schema change,
+not a silent widening.
 
 ---
 
@@ -291,28 +333,31 @@ asserted stable across two constructions and two processes.
 
 | # | Profile (structural tokens; consequence; reversibility) | Catalog | Expected |
 |---|---|---|---|
-| P1 | `comparison_request`; RECOVERABLE; OUTCOME_REVERSIBLE | seven-member slice 1 fixture | `Q = {map_reduce}`, primary `map_reduce`, basis `UNIQUE_RULE_SUPPORT` |
-| P2 | `comparison_request`, `ambiguity_detected` | same | `Q = {map_reduce, tree_of_thought}`, no primary, `MULTIPLE_QUALIFYING_METHODS` |
+| P1 | `comparison_request`; RECOVERABLE; OUTCOME_REVERSIBLE; governed class declared | seven-member slice 1 fixture | `Q = {map_reduce}`, primary `map_reduce`, basis `SOLE_QUALIFYING_METHOD`, `GOVERNED_TASK_CLASS` / `JOINABLE_BY_TASK_CLASS_DIGEST`, `trade_offs = ()` |
+| P2 | `comparison_request`, `ambiguity_detected` | same | `Q = {map_reduce, tree_of_thought}`, no primary, `MULTIPLE_QUALIFYING_METHODS`; two `QualifyingTradeOff`s, each carrying the one inclusion reason the other lacks |
 | P3 | no tokens | same | `Q = ∅`, no primary, `NO_QUALIFYING_METHOD`; every entry excluded with `NO_SUPPORTING_RULE` |
 | P4 | `conditional_logic`, `causal_reasoning` under a rule set where one `EXCLUDE` rule removes `debate` for `SEVERE` consequence; profile SEVERE | same | `Q = {linear_chain}`; `debate` excluded with the `EXCLUDE` outcome; primary `linear_chain` |
-| P5 | `comparison_request` with a rule set adding a second `SUPPORT` rule naming `debate` on the same token | same | `Q = {map_reduce, debate}`, no primary |
+| P5 | `comparison_request` with a rule set adding a second `SUPPORT` rule naming `debate` on the same token | same | `Q = {map_reduce, debate}`, no primary; both trade-offs have empty `distinguishing_reasons` (same reason) and differ only by requirement refs, if any; adding a third rule for `debate` still yields no primary (rule count never manufactures a winner) |
 | P6 | `comparison_request`, catalog where `map_reduce` carries only `UNIT_TESTS_PRESENT` evidence | modified fixture | `map_reduce` excluded `INADMISSIBLE_IMPLEMENTATION_STATUS`; `Q = ∅` |
-| P7 | P1 with `task_class = None` | same | identical `qualifying`; `task_class_digest` `None` |
-| P8 | P1 with a supplied `ReadinessComparisonResult` | same | identical `qualifying` and labels; `comparison_result_digests` non-empty; `evidence_status` still `COMPARISON_EVIDENCE_ABSENT` |
+| P7 | P1 with `task_class = None` | same | identical `qualifying`; `task_class_digest` `None`; `UNCLASSIFIED_EXPLORATORY` / `INELIGIBLE_UNCLASSIFIED`; `evidence_status` explicitly `COMPARISON_EVIDENCE_ABSENT` |
+| P8 | field-set test over `ReasoningMethodAdvisoryRequest` and `ReasoningMethodAdvisory` | — | no field named `comparison_results`, `comparison_result_digests` or any `*comparison*` name exists |
+| P11 | P1 evaluated with the rule tuple reversed and with rules re-ordered by a different key | same | identical `advisory_digest` (order independence) |
 | P9 | P1 with `reversibility = UNDETERMINED` | same | constructs (a profile may be undetermined); same `Q` |
 | P10 | P1 twice, then with `rule_set_version` bumped | same | first two digests equal; third differs |
 | R-a | any advisory type declared with a field named `score`, `rank`, `probability`, `cost` or `latency_class` | — | refused at class definition |
 | R-b | a `Rule` naming a method absent from the catalog | — | `RULE_METHOD_UNKNOWN` at evaluation |
 | R-c | a `Predicate` of kind `STRUCTURAL_TOKEN_PRESENT` with a non-signal token | — | `SIGNAL_TOKEN_UNKNOWN` |
 | R-d | a request whose `task_class.structural_characteristics` omits a profile token | — | `PROFILE_CLASS_MISMATCH` |
-| R-e | a hand-built advisory with `primary` set and `|qualifying| ≠ 1` | — | `PRIMARY_WITHOUT_UNIQUE_SUPPORT` |
+| R-e | a hand-built advisory with `primary` set and `|qualifying| ≠ 1`, or with `trade_offs` non-empty and `|qualifying| ≤ 1` | — | `PRIMARY_WITHOUT_SOLE_QUALIFIER` |
+| R-g | a hand-built advisory with `task_class_digest` `None` and `classification = GOVERNED_TASK_CLASS`, or `UNCLASSIFIED_EXPLORATORY` with `eligibility ≠ INELIGIBLE_UNCLASSIFIED` | — | `CLASSIFICATION_INCONSISTENT` |
+| R-h | a `Rule` with blank `rule_version` or blank `rationale_statement` | — | `REF_BLANK_FIELD` |
 | R-f | `AdvisoryLabel("BENCHMARK_DERIVED")` | — | `ValueError`: not a member |
 | B | AST scan of `src/` | — | no forbidden import (§1) |
 
 Slice 2 adds these codes to a package-local `AdvisorErrorCode`:
 `PROFILE_CLASS_MISMATCH`, `RULE_METHOD_UNKNOWN`,
-`PRIMARY_WITHOUT_UNIQUE_SUPPORT`, `RULE_SET_UNSORTED`,
-`RULE_DUPLICATE_ID`; it reuses `REF_BLANK_FIELD`, `DIGEST_MALFORMED`,
+`PRIMARY_WITHOUT_SOLE_QUALIFIER`, `CLASSIFICATION_INCONSISTENT`,
+`RULE_SET_UNSORTED`, `RULE_DUPLICATE_ID`; it reuses `REF_BLANK_FIELD`, `DIGEST_MALFORMED`,
 `SIGNAL_TOKEN_UNKNOWN`, `SCALAR_LABEL_FIELD_PRESENT` and `DATETIME_NAIVE`
 from slice 1 `[V]`.
 
@@ -320,8 +365,8 @@ from slice 1 `[V]`.
 
 ## 8. Explicitly excluded from slice 2
 
-No LLM-based selection of any kind. No `BENCHMARK_DERIVED` claim. No numeric
-outcome prediction. No scalar cost, latency or resource label. No production
+No LLM-based selection of any kind. No `BENCHMARK_DERIVED` claim. No
+comparison-result ingestion. No numeric outcome prediction. No scalar cost, latency or resource label. No production
 approval, no configuration mutation, no binding change. No Agent Constitution
 binding. No attestation, verification or envelope issuance. No change to
 Agentic Proposer, Agent Workforce Composer, Agent Runtime, readiness
@@ -343,23 +388,55 @@ is importable. Every advisory carries `usage_scope = "RESEARCH_ONLY"` and
 
 ---
 
-## 10. Owner ballot `[R]`
+## 10. Owner ballot — ~~`[R]`~~ **RATIFIED AS AMENDED 2026-09-02**
 
-Ratifying all three commissions slice 2 as specified in §9, research-only.
-"Ratify as recommended" is a complete answer.
+1. **Contracts and placement — RATIFIED AS AMENDED.** *Owner ruling,
+   verbatim:* "approve the separate design-time Reasoning Method Advisor
+   capability and its dependency only on the Slice 1 governance contracts.
+   The optional-task-class restriction above is binding." Applied: §1
+   placement and dependencies; the §2–§3 contracts with `BENCHMARK_DERIVED`
+   absent from `AdvisoryLabel`; `task_class` optional with the
+   unclassified restriction of §2 as a binding rule; no comparison-results
+   field (§6).
+2. **Rules and primary selection — RATIFIED AS AMENDED.** *Owner ruling,
+   verbatim:* "approve deterministic, versioned, order-independent rule
+   evaluation. A primary is permitted only when exactly one method
+   qualifies; multiple qualifying methods produce no primary." Applied: the
+   §4 evaluation exactly, with `SOLE_QUALIFYING_METHOD` as the only primary
+   basis and trade-offs returned for multiple qualifiers; admissibility gate
+   4.1-A; initial rule set as a transcription of `SIGNAL_MAP` without
+   `SIGNAL_PRIORITY`, carrying stable identifiers, versions, declared
+   predicates and rationale, labelled research provenance and not evidence
+   of correctness (4.2-A).
+3. **Commissioning — RATIFIED AS AMENDED.** *Owner ruling, verbatim:*
+   "commission only the research-only, rule-derived Slice 2 described in the
+   amended specification. Exclude benchmark-derived advice,
+   comparison-result ingestion, LLM-based selection, configuration approval
+   and runtime integration." Applied: §8 exclusions and §9 definition of
+   done; nothing numeric ratified.
 
-1. **Contracts and placement** — `ugence-reasoning-method-advisor` as in §1;
-   the request and advisory of §2–§3 with `BENCHMARK_DERIVED` absent from
-   `AdvisoryLabel`; `task_class` optional (2.1-A); `comparison_results`
-   accepted and recorded but not consulted (§6).
-   *Options: 2.1-A / 2.1-B. Recommendation: A.*
-2. **Rules and the primary rule** — the §4 evaluation exactly: set-valued
-   qualification, primary only under unique rule support, no tie-break by
-   priority, count or order; admissibility gate 4.1-A; initial rule set as a
-   transcription of `SIGNAL_MAP` without `SIGNAL_PRIORITY`, labelled research
-   provenance (4.2-A).
-   *Options: 4.1-A/B/C, 4.2-A/B/C. Recommendations: A, A.*
-3. **Commissioning, research-only** — slice 2 scope, the §8 exclusions and
-   the §9 definition of done; nothing numeric ratified; Advisor decisions 3
-   and 5, Workflow-Fit decisions 1 and 4, and Composite ballots 2–5 remain
-   `[R]` and are not needed for slice 2.
+**Remaining open decisions, exact.** Advisor decisions 3 (pilot composition
+and sampling policy) and 5 (binding lifecycle, reassessment and post-pilot
+approval); Workflow-Fit decisions 1 (usage binding) and 4 (trust controls);
+Composite ballots 2 (measurement scale), 3 (normalization policy artifact),
+4 (attainment representation) and 5 (advisory carriage); and, within this
+specification, the later benchmark-derived slice's contract change (§6).
+None is needed for slice 2.
+
+**Authority.** Owner ratification by Rakesh Mohan, 2026-09-02, issued as an
+explicit owner instruction in Claude Code session
+`session_01VXERHvJzbb9cjZ1GyFFQLn`, which also directed the four amendments
+of §11. The model analysis was advisory only; the owner instruction was the
+ratifying act. Nothing numeric was ratified, and no source, contract, enum,
+experiment or test changed with this record.
+
+---
+
+## 11. Amendment record (owner instruction, 2026-09-02)
+
+| # | Before | After |
+|---|---|---|
+| 1 | Primary only under unique rule support (`UNIQUE_RULE_SUPPORT`; a third `NoPrimaryReason`) | Primary iff exactly one method qualifies (`SOLE_QUALIFYING_METHOD`); multiple qualifiers return the complete set, reasons and `QualifyingTradeOff`s with no primary; rule count, priority and implementation order never manufacture a winner (§3, §4, P1, P2, P5, R-e) |
+| 2 | `task_class` optional with no consequence beyond a `None` digest | Unclassified requests receive exploratory `RULE_DERIVED` advice only, marked `UNCLASSIFIED_EXPLORATORY` / `INELIGIBLE_UNCLASSIFIED`; `COMPARISON_EVIDENCE_ABSENT` explicit on every advisory (§2, §3, §5, P7, R-g) |
+| 3 | Request carried a `comparison_results` slot, recorded but unused | Slot removed from both contracts; ingestion only in the later benchmark-derived slice through a separately ratified contract change; field-set test asserts absence (§1, §2, §3, §6, §8, P8) |
+| 4 | Transcription of `WorkflowSelector` described as provenance without stating what it is not | Stated as research provenance, not evidence the routing is correct; every rule carries a stable `rule_id`, `rule_version`, declared predicate and `rationale_statement`, propagated into each `RuleOutcome` (§4, R-h) |
