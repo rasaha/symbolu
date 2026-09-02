@@ -1,7 +1,7 @@
 # Reasoning Method Governance — Contract Specification and Commissioning Ballot
 
-**Status:** implementable specification for owner ratification, **revision 3**
-(two correction passes of 2026-09-02 applied; §12 lists all nineteen corrections).
+**Status:** implementable specification for owner ratification, **revision 4**
+(three correction passes of 2026-09-02 applied; §12 lists all twenty-nine corrections).
 Nothing here is implemented and no ballot is recorded. It turns the six owner
 rulings of 2026-09-02 into contracts with exact fields, and ends with a ballot
 that, once ratified, commissions the first implementation slice as
@@ -46,17 +46,24 @@ Workflow-Fit §11.5 makes reasoning efficiency a property of the selection
 policy within the exact `AssessedSystemBinding`, so no `CapabilityDimension`
 (`agent-value-readiness …/contracts/enums.py:121`) is added `[V]`.
 
-**Stable ownership, no planned moves.**
+**Stable ownership.**
 
 | Package | Distribution / import | Owns permanently | Depends on |
 |---|---|---|---|
 | `packages/capabilities/reasoning-method-governance` | `ugence-reasoning-method-governance` / `ugence_reasoning_method_governance` | shared reasoning-method contracts: §2 catalog and refs, §3 profile, class identity and comparison policy, §4 execution record, §5 fit assessment, §6 envelope shapes, §7 port contracts, §8 research plan shape, §11 error codes | `ugence-governance-contracts`, `ugence-uvi-policy-contracts`, `ugence-jcs` |
 | `packages/capabilities/readiness-comparison` | `ugence-readiness-comparison` / `ugence_readiness_comparison` | the comparison **implementation**: the pure engine of §7, its refusal logic, its tests | the above package, `ugence-governance-contracts`, `ugence-uvi-policy-contracts` |
 
-Both packages ship in slice 1 (§9). Nothing is placed in one package for a
-later move. `readiness-comparison` is the component the composite ruling
-commissions; reasoning-method fit is its first request type, and a later
-request type for readiness attainments is additive.
+Both packages ship in slice 1 (§9). No code is placed in one package with a
+planned move to the other. One scope statement is owed for honesty: the
+comparison **port contracts** (`readiness_comparison.request.v1` and
+`.result.v1`, §7) are owned by `reasoning-method-governance` **only while
+reasoning-method fit is the engine's sole request type**. When a readiness
+attainment request type is commissioned (composite ballot 4, `[R]`), its
+port contract cannot live in a reasoning-method package; the port
+contracts' eventual home is then `governance-contracts` beside the evidence
+axes they compose, and that move is a ruling of that later ballot, not a
+slice 1 action. `readiness-comparison` is the component the composite ruling
+commissions.
 
 **Prohibited dependencies, enforced by a boundary test as `agentic-proposer`
 does** `[V]` (its `tests/test_boundaries.py` and forbidden-wheel list): neither
@@ -257,7 +264,7 @@ class ComparisonPolicy:
     policy_version: str
     sufficiency: SufficiencyRule
     required_dimensions: tuple[ResourceDimension, ...]     # non-empty, unique, sorted; ALL are required on every compared record
-    quality_aggregation: Optional[AggregationRef]          # None ⇒ exactly one governed quality result per method is required
+    quality_aggregation: Optional[AggregationRef]          # None ⇒ every QualityResult must be unaggregated; non-None ⇒ every aggregated QualityResult must carry exactly this ref
     # quality direction is DERIVED from sufficiency.threshold.comparator (§5), never declared
 
 @dataclass(frozen=True)
@@ -321,6 +328,15 @@ evidence. The **engine** (§7) refuses `THRESHOLD_ONLY_NOT_ADMITTED` unless the
 request supplies a resolved admission whose `admitted_digest` and
 `authority_result_ref` match the reference and whose issuing authority is one
 the request names as resolved. Presence of a string admits nothing.
+**In slice 1 this resolution is requester-asserted and unverified**: the
+engine is a pure function with no I/O (§7) and cannot tell a genuine
+authority result from an invented one, so the check is a consistency test
+between two requester-controlled string sets. Governed, approval-bearing use
+requires the admission and the authority to be resolved out of band by a
+party other than the requester, which the engine cannot perform; the result
+carries `authority_resolution_basis = "REQUESTER_ASSERTED"` (§7) so that a
+future consumer must change a type, not skim a paragraph, to treat it as
+more.
 
 **Unresolved 3.1 — consequence vocabulary and the high-consequence set.**
 
@@ -469,8 +485,17 @@ period or authority (§9 exclusions).
 in correction or continuation of another. It confers no authority. No
 consumer may treat a child, a leaf, or the latest record as authoritative;
 fork resolution, ordering and lineage authority are a separate ruling `[R]`
-(unresolved 4.1). The constructor refuses `parent_record_digest ==
-record_digest` (`LINEAGE_SELF_REFERENCE`), mirroring rule L-1
+(unresolved 4.1). Two limits of the lineage refusal (§7,
+`LINEAGE_UNRESOLVED`) are stated so no reader infers more: it detects only
+lineage **contained in the request**, and it checks **directly linked pairs
+only** (a record and another whose `parent_record_digest` equals its
+`record_digest`); a requester that submits a stale parent and omits the
+corrected child receives a clean result, and a grandparent with its
+grandchild but no intermediate is not detected. The refusal prevents an
+engine-made choice between records; it does not guarantee record-set
+completeness, which is a requester obligation under `RESEARCH_ONLY` and an
+authority obligation once 4.1-C exists. The constructor refuses
+`parent_record_digest == record_digest` (`LINEAGE_SELF_REFERENCE`), mirroring rule L-1
 (`packages/capabilities/agentic-proposer/src/ugence_agentic_proposer/contracts.py:1069-1077`) `[V]`.
 
 **Refusal rules (constructor, §11 codes):** `DIGEST_MALFORMED`;
@@ -565,7 +590,8 @@ class ReasoningMethodFitAssessment:
     input_record_digests: tuple[str, ...]
     evidence_status_source: Literal["RECORD_CONSTANTS_V1"]   # slice 1: OBSERVED/UNATTESTED/UNVERIFIED by construction
     usage_scope: Literal["RESEARCH_ONLY"]       # slice 1 assessments are not approval-bearing
-    assessor_identity: str
+    assessor_identity: str                      # MUST equal the producing ReadinessComparisonResult.engine_identity
+    engine_version: str                         # MUST equal the producing ReadinessComparisonResult.engine_version
     assessed_at: datetime
     reason: str
     assessment_digest: str
@@ -590,17 +616,29 @@ single `QualityResult.value` for method `m`, and `R(m)` the vector of
 1. **Refusal before assessment** (request-level, §7): `UNSUPPORTED_COMPARATOR`
    when `τ.comparator ∈ {EQ, NEQ}`; `UNIT_MISMATCH` when any
    `QualityResult.governed_unit ≠ τ.governed_unit`; `SCALE_UNSUPPORTED` when
-   a value is not a finite decimal; `AGGREGATION_UNDECLARED` when a method has
-   more than one quality claim and `P.quality_aggregation is None`, or a
-   `QualityResult` carries an `aggregation` that differs from
-   `P.quality_aggregation`.
-2. `COMPARISON_EVIDENCE_ABSENT` for a method when any holds: no
-   `QualityResult` for it; zero records for it; zero records for the
-   baseline; any input record's `task_class_digest` differs; the quality
-   claim's `input_evidence_refs` or `evidence_refs` include a record's
-   `self_reported_quality`; **any required dimension is unavailable on any
-   record of any compared method** (no fallback to fewer dimensions, ever);
-   a `THRESHOLD_ONLY_NOT_ADMITTED` refusal applies.
+   a value is not a finite decimal; `AGGREGATION_UNDECLARED` when **any**
+   supplied `QualityResult` carries an `aggregation` while
+   `P.quality_aggregation is None`, when a `QualityResult.aggregation`
+   differs from a non-`None` `P.quality_aggregation`, or when a method has
+   more than one quality claim and `P.quality_aggregation is None`. The
+   class's policy, not the adapter, therefore declares any aggregation: a
+   study whose adapter emits a `CALCULATED` claim (§9 item 5) must run under a
+   task class whose policy names that same `AggregationRef`; `CANDIDATES_EMPTY`
+   when `candidates` is empty.
+2. **Request-level absence** — every candidate is
+   `COMPARISON_EVIDENCE_ABSENT` when any holds: zero records for the
+   baseline (`BASELINE_ABSENT`); any input record's `task_class_digest`
+   differs from the request's class (`TASK_CLASS_MISMATCH`); **any required
+   dimension is unavailable on any record of any compared method**
+   (`DIMENSION_UNAVAILABLE`; no fallback to fewer dimensions, ever); a
+   `THRESHOLD_ONLY_NOT_ADMITTED` or `THRESHOLD_UNRESOLVABLE` refusal applies.
+2a. **Per-method absence** — a single candidate is
+   `COMPARISON_EVIDENCE_ABSENT`, the others unaffected, when: it has no
+   `QualityResult` (`QUALITY_RESULT_ABSENT`); it has zero records
+   (`METHOD_RECORDS_ABSENT`); its quality claim's `input_evidence_refs` or
+   `evidence_refs` name a record's `self_reported_quality`
+   (`QUALITY_CLAIM_NOT_INDEPENDENT`); it has more than one record in slice 1
+   (`RESOURCE_AGGREGATION_UNDECLARED`).
 3. `INSUFFICIENT_QUALITY` when `Q(m)` fails `τ` under its comparator.
 4. Otherwise, under `THRESHOLD_BASED`: `SUFFICIENT_RESOURCE_DOMINATED` when
    some other sufficient method `m'` has `R(m') ≤ R(m)` on every required
@@ -608,6 +646,12 @@ single `QualityResult.value` for method `m`, and `R(m)` the vector of
    **and** `Q(m')` is not worse than `Q(m)` in `dir`. Ties on every dimension
    are not domination. Each dominator is recorded with its own deltas.
 5. Otherwise `SUFFICIENT_PARETO_EFFICIENT`.
+
+**Ordering inside an assessment.** `deltas_vs_baseline` and each
+`DominationRecord.deltas` are ordered by `ResourceDimension` member order;
+`dominated_by` is ordered by `(dominator.method_id, dominator.method_version)`
+ascending. These orders are part of the contract because `assessment_digest`
+covers them.
 
 Margins and deltas are attributes, never combined. No weights exist. No
 arithmetic is performed on quality values beyond the comparator test and the
@@ -686,10 +730,22 @@ refused (`ENVELOPE_ORPHAN`). A `VerificationEnvelope` whose
 the same record is refused (`VERIFICATION_WITHOUT_ATTESTATION`): verification
 presupposes attestation, and the engine never infers one from the other. An envelope whose issuer is not in the request's
 `resolved_authorities` leaves the status unchanged and is reported in
-`ignored_envelopes`; a string in an envelope promotes nothing by itself. The
-same identity may not appear as both a record's `issuer_identity` and an
-envelope's `attester_identity` (`SELF_ATTESTATION`), applying the ratified
-no-self-attestation rule (`ADR_UGENCE_POLICY_AUTHORITY.md:184`) `[V]`.
+`ignored_envelopes`; a string in an envelope promotes nothing by itself.
+**Independence rules**, applying the ratified prohibition on producers
+self-attesting, self-verifying or self-approving
+(`ADR_UGENCE_POLICY_AUTHORITY.md:184`) `[V]`: `SELF_ATTESTATION` when an
+`AttestationEnvelope.attester_identity` equals the record's
+`issuer_identity` **or** the request's `requester_identity`;
+`SELF_VERIFICATION` when a `VerificationEnvelope.verifier_identity` equals
+the record's `issuer_identity`, the referenced envelope's
+`attester_identity`, **or** the request's `requester_identity`. Both are
+string-inequality tests over identities the request carries; in slice 1
+they exclude the obvious self-loops and nothing more, because
+`issuer_identity` is a free string (4.2-A) and `resolved_authorities` is
+requester-supplied. Authority resolution in slice 1 is therefore
+**requester-asserted and unverified**, the result says so structurally
+(`authority_resolution_basis`, §7), and no slice 1 outcome rule reads
+`EvidenceStatusView`.
 
 **Slice 1 issues no envelopes.** Every slice 1 assessment carries
 `evidence_status_source = "RECORD_CONSTANTS_V1"` and `usage_scope =
@@ -750,7 +806,7 @@ class ReadinessComparisonRequest:
     task_class: TaskClassIdentity
     catalog: ReasoningMethodCatalogRef
     baseline: ReasoningMethodRef
-    candidates: tuple[ReasoningMethodRef, ...]  # unique; baseline may appear
+    candidates: tuple[ReasoningMethodRef, ...]  # non-empty (CANDIDATES_EMPTY otherwise); unique; baseline may appear
     records: tuple[ReasoningMethodExecutionRecord, ...]
     quality_results: tuple[QualityResult, ...]  # at most one per method (5.1-A)
     quality_claims: tuple[MetricClaim, ...]     # governance-contracts evidence.py:347; one per QualityResult.claim_ref
@@ -769,11 +825,25 @@ class ReadinessComparisonResult:
     refusals: tuple[Refusal, ...]                            # request-level ⇒ every assessment is COMPARISON_EVIDENCE_ABSENT
     evidence_status: tuple[EvidenceStatusView, ...]         # one per record
     ignored_envelopes: tuple[str, ...]                       # envelope digests whose issuer was not resolved
+    authority_resolution_basis: Literal["REQUESTER_ASSERTED"]   # slice 1: resolved_authorities and resolved_admissions are the requester's assertions, unverified by the engine
     engine_identity: str
     engine_version: str
     produced_at: datetime
     result_digest: str
 ```
+
+**Output ordering, part of the contract.** `assessments` by
+`(method.method_id, method.method_version)`; `refusals` by `(code, method_id
+or "", detail)`; `evidence_status` by `record_digest`; `ignored_envelopes` by
+digest string; inside each assessment as §5 states. `result_digest` covers
+these tuples in this order, so determinism is a property of the contract, not
+of an implementation's iteration order. A bare
+`ReasoningMethodFitAssessment` outside a `ReadinessComparisonResult` is
+**not a governed object**: its `assessor_identity` and `engine_version` must
+equal the enclosing result's `engine_identity` and `engine_version`, and its
+internal invariants (outcome consistent with deltas, `dimensions_compared ==
+required_dimensions`, `quality_margin` `None` iff evidence absent) are engine
+obligations the contracts package cannot enforce on a hand-built value.
 
 **Engine obligations.** Before any other step the engine checks
 `schema_version` on the request and on every record, quality result, claim and
@@ -784,9 +854,12 @@ runtime logic. Then: a pure function of the request: no I/O, no clock
 other than `produced_at`, no normalization or unit conversion, no fetch of a
 `benchmark_ref` (an unresolvable threshold is `THRESHOLD_UNRESOLVABLE`), no
 read of `self_reported_quality`, no averaging, no fallback across dimensions,
-no inference of authority from names. Determinism: the same request bytes
-produce the same `result_digest` modulo `produced_at`, which is excluded from
-`result_digest`.
+no inference of authority from names. **Authority resolution is
+requester-asserted**: `resolved_authorities` and `resolved_admissions` are
+inputs the engine trusts only for consistency, never for truth, and every
+result states this in `authority_resolution_basis`. Determinism: the same
+request bytes produce the same `result_digest` modulo `produced_at`, which is
+excluded from `result_digest`, given the output ordering above.
 
 **Unresolved 7.1 — attainment record for readiness.** No `Attainment*` class
 exists anywhere `[V]`, and composite ballot 4 remains `[R]`. (A) the result is
@@ -822,13 +895,19 @@ class ResearchComparisonPlan:
     binding: BindingRef
     catalog: ReasoningMethodCatalogRef
     baseline: ReasoningMethodRef
-    recommended: tuple[ReasoningMethodRef, ...]  # may be empty (unresolved 8.1)
+    recommended: tuple[ReasoningMethodRef, ...]  # may be empty (unresolved 8.1); intent to exercise, never a selection (see fence below)
     challengers: ChallengerSamplingPolicy
     usage_scope: Literal["RESEARCH_ONLY"]
     preregistered_by: str
     preregistered_at: datetime
     plan_digest: str
 ```
+
+**Fence on `recommended`.** `recommended` records which methods the plan
+intends to exercise. It is not a selection, an endorsement, an eligibility
+statement, or an advisor output, and no consumer may read it as one; a study
+that confirms a recommended method has confirmed nothing about the plan's
+author. This fence is parallel to the one on `parent_record_digest` (§4).
 
 **What is deliberately not specified in this revision.**
 
@@ -883,8 +962,11 @@ there.
 5. An adapter **in `experiments/`**, not in either package, mapping the
    study's `RunRecord` to `ReasoningMethodExecutionRecord`, and its
    per-case mean to one `MetricClaim` with `transformation_method =
-   CALCULATED` and a `calculation_ref` naming the research aggregation, so
-   the existing harness produces governed inputs under `RESEARCH_ONLY`.
+   CALCULATED` and a `calculation_ref` naming the research aggregation, with
+   the study's task class declaring that same `AggregationRef` in its
+   `ComparisonPolicy.quality_aggregation` so the engine admits the claim
+   (§5 rule 1), so the existing harness produces governed inputs under
+   `RESEARCH_ONLY`.
 6. A CI workflow in the pattern of `workflow-fit-study-ci.yml`.
 
 **Explicitly excluded from slice 1:** the advisor; any Agent Runtime
@@ -911,10 +993,19 @@ Ratifying all five commissions slice 1 as specified in §9, as research-only
 work. Each item names its recommendation; "ratify as recommended" is a
 complete answer.
 
+**Co-decided pairs.** Items 2 and 4 must be decided together: 3.1-B inside
+item 2 supplies the `{MATERIAL, SEVERE}` trigger that item 4's engine rule
+evaluates, and under 3.1-C the constructor shape check has no trigger. Items
+4 and 5 must be decided together: 5.1-A (one record and one quality result
+per method) is defensible only under item 5's research-only scope, and
+ratifying it for approval-bearing work would commission an engine that admits
+one execution per method. Items 1 and 3 are independent of the rest, except
+that rejecting every option of 1.1 leaves `ExecutionTelemetry` undefined.
+
 1. **Placement and ownership** — two packages with stable ownership as in
    §1: shared contracts in `ugence-reasoning-method-governance`, the
    comparison implementation in `ugence-readiness-comparison`, both in slice
-   1, no planned moves; telemetry vocabulary mirrored and pinned by test
+   1, no code placed for a later move, the comparison port owned by the contracts package only while reasoning-method fit is its sole request type (§1); telemetry vocabulary mirrored and pinned by test
    (1.1-B); forbidden imports enforced by boundary test in both packages.
    *Options: 1.1-A / 1.1-B / 1.1-C. Recommendation: 1.1-B.*
 2. **Catalog and task-class vocabulary** — `ReasoningMethodCatalogRef` and
@@ -1047,6 +1138,13 @@ and the code that must be raised or returned.
 | R43 | C21 with a candidate that has a record but no `QualityResult` | engine `QUALITY_RESULT_ABSENT` → that candidate `COMPARISON_EVIDENCE_ABSENT` |
 | R44 | C21 whose threshold carries a `benchmark_ref` with no admitted Registry entry supplied in the request | engine `THRESHOLD_UNRESOLVABLE` → all `COMPARISON_EVIDENCE_ABSENT` |
 | R45 | C21 with a record whose `schema_version` is `"reasoning_method.execution_record.v0"` | engine `UNSUPPORTED_SCHEMA_VERSION` (request-level) |
+| R46 | C21 with `candidates=()` | engine `CANDIDATES_EMPTY` |
+| R47 | C21 with C18 (aggregated result) under C8 (`quality_aggregation=None`) | engine `AGGREGATION_UNDECLARED` |
+| R48 | C21 with C19 whose `attester_identity == requester_identity` | engine `SELF_ATTESTATION` |
+| R49 | C21 with C19 and C20 where C20's `verifier_identity` equals the record's `issuer_identity`, or C19's `attester_identity`, or `requester_identity` | engine `SELF_VERIFICATION` |
+| R50 | a `ReasoningMethodFitAssessment` built by hand with `assessor_identity` differing from the enclosing result's `engine_identity` | `ASSESSOR_ENGINE_MISMATCH` on result construction |
+| R51 | `compare(C21)` run twice with `records`, `candidates` and `quality_results` supplied in reversed input order | identical `result_digest` (output ordering is contractual) |
+| C24 | `ComparisonPolicy` (aggregated) | as C8 with `quality_aggregation = AggregationRef("research.mean", "0", calc ref)`; a request pairing it with C18 constructs and assesses |
 
 `ContractErrorCode` members: `REF_BLANK_FIELD`, `DIGEST_MALFORMED`,
 `CATALOG_DUPLICATE_ENTRY`, `CATALOG_UNSORTED`, `SIGNAL_TOKEN_UNKNOWN`,
@@ -1054,14 +1152,16 @@ and the code that must be raised or returned.
 `REVERSIBILITY_UNDETERMINED_ON_CLASS`, `ADMISSION_REF_REQUIRED`,
 `DIMENSIONS_EMPTY`, `DIMENSIONS_UNSORTED`, `TELEMETRY_INVARIANT`,
 `ARTIFACT_KIND_UNKNOWN`, `DECIMAL_UNPARSEABLE`, `DATETIME_NAIVE`,
-`LINEAGE_SELF_REFERENCE`, `EVIDENCE_AXIS_SET_BY_PRODUCER`.
+`LINEAGE_SELF_REFERENCE`, `EVIDENCE_AXIS_SET_BY_PRODUCER`,
+`ASSESSOR_ENGINE_MISMATCH`.
 `RefusalCode` members: `UNSUPPORTED_SCHEMA_VERSION`, `UNSUPPORTED_COMPARATOR`,
 `UNIT_MISMATCH`, `SCALE_UNSUPPORTED`, `AGGREGATION_UNDECLARED`,
 `RESOURCE_AGGREGATION_UNDECLARED`, `DIMENSION_UNAVAILABLE`,
 `TASK_CLASS_MISMATCH`, `BASELINE_ABSENT`, `METHOD_RECORDS_ABSENT`,
 `QUALITY_RESULT_ABSENT`, `QUALITY_CLAIM_NOT_INDEPENDENT`,
 `THRESHOLD_UNRESOLVABLE`, `THRESHOLD_ONLY_NOT_ADMITTED`, `LINEAGE_UNRESOLVED`,
-`SELF_ATTESTATION`, `VERIFICATION_WITHOUT_ATTESTATION`, `ENVELOPE_ORPHAN`.
+`SELF_ATTESTATION`, `SELF_VERIFICATION`, `VERIFICATION_WITHOUT_ATTESTATION`,
+`ENVELOPE_ORPHAN`, `CANDIDATES_EMPTY`.
 
 ---
 
@@ -1093,3 +1193,18 @@ and the code that must be raised or returned.
 | 17 | `UNSUPPORTED_SCHEMA_VERSION` had no engine clause; `VERIFICATION_WITHOUT_ATTESTATION` was an inline comment; three `RefusalCode` members had no matrix row | Explicit runtime schema-version check stated (§7); verification-presupposes-attestation promoted to a §6 rule; rows R42–R45 added (§11) |
 | 18 | `TokenUsageSnapshot` mirrored seven of `ProviderTokenUsage`'s ten fields while §9 commissioned a field pin test | All ten fields mirrored in name and order; pin test restated as field-name equality (§4, §9) |
 | 19 | §2 called the landscape's fifteen workflows the whole repertoire and option 2.1-B "the seven plus the remaining eight"; stub and query for the call counts unstated | Fifteen are *additional* to the seven (landscape `:67`, tally `:87`); option B is a twenty-two-entry catalog with its consequence restated; stub response shape and query recorded (§2, 2.1) |
+
+**Revision 4 (independent design review, 2026-09-02).**
+
+| # | Defect in revision 3 | Correction |
+|---|---|---|
+| 20 | The §9 adapter's `CALCULATED` claim was refusable by §5 rule 1 under 5.1-A and C8, making the definition of done unreachable | Any aggregated `QualityResult` requires a matching non-`None` `ComparisonPolicy.quality_aggregation`; the study's class declares it (§3, §5, §9, C24, R47) |
+| 21 | Only self-attestation was refused; the ratified rule also forbids self-verification | `SELF_ATTESTATION` widened to `requester_identity`; `SELF_VERIFICATION` added over issuer, attester and requester (§6, R48–R49) |
+| 22 | Authority resolution and admission presented as enforcement while being requester-asserted | `authority_resolution_basis: Literal["REQUESTER_ASSERTED"]` on every result; stated in §3, §6 and §7 |
+| 23 | No output tuple had a sort key, so §7's determinism obligation and R41 were unmet by contract | Ordering stated for every result and assessment tuple; `result_digest` and `assessment_digest` cover it (§5, §7, R51) |
+| 24 | `ResearchComparisonPlan.recommended` unfenced | Fence added parallel to the lineage fence (§8) |
+| 25 | Empty `candidates` undefined | Non-empty required; `CANDIDATES_EMPTY` added (§7, R46) |
+| 26 | Ballot items read as independent | Co-decided pairs stated: 2 with 4, 4 with 5 (§10) |
+| 27 | "No planned moves" overstated for the generic comparison port | Port ownership scoped to while reasoning-method fit is the sole request type; eventual home named as a later ballot's ruling (§1) |
+| 28 | A hand-built assessment carried no binding to the engine that produced it | `assessor_identity` and `engine_version` bound to the enclosing result; bare assessment declared not a governed object (§5, §7, R50) |
+| 29 | Lineage refusal's limits unstated; §5 rule 2 mixed per-method and request-level scopes | Request-contained, directly-linked-pairs-only limits stated (§4); rule 2 split into request-level and per-method clauses (§5) |
