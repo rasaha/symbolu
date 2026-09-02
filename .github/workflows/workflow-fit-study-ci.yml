@@ -1,0 +1,92 @@
+# Workflow-Fit offline validation study — research harness tests.
+#
+# experiments/workflow_fit_study is the one implementation the merged
+# docs/architecture/WORKFLOW_FIT_READINESS_SCOPING_NOTE.md (§11) says may proceed without
+# any owner ballot. It is a research harness, not a governed package: it changes no
+# contract, enum or runtime and connects nothing across the agentic/ boundary.
+#
+# A narrowly scoped job, as with readiness-governed-value-doc-drift-ci.yml: no workflow in
+# this repository runs the root `tests/` suite as a whole.
+name: Workflow-Fit Study CI
+
+on:
+  push:
+    branches: ["main", "master", "dev", "claude/**"]
+    paths:
+      - "experiments/workflow_fit_study/**"
+      - "tests/experiments/workflow_fit_study/**"
+      - "agentic/agentic_framework/reasoning_workflows.py"
+      - "agentic/agentic_framework/adaptive_prompts.py"
+      - ".github/workflows/workflow-fit-study-ci.yml"
+  pull_request:
+    branches: ["main", "master", "dev", "claude/**"]
+    paths:
+      - "experiments/workflow_fit_study/**"
+      - "tests/experiments/workflow_fit_study/**"
+      - "agentic/agentic_framework/reasoning_workflows.py"
+      - "agentic/agentic_framework/adaptive_prompts.py"
+      - ".github/workflows/workflow-fit-study-ci.yml"
+  workflow_dispatch:
+
+jobs:
+  workflow-fit-study:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Cache pip dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-workflow-fit-${{ hashFiles('requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-workflow-fit-
+            ${{ runner.os }}-pip-
+
+      # numpy is not used by the harness. agentic.agentic_framework's package __init__
+      # imports mcp_gateway -> jepa_governance -> numpy, so importing reasoning_workflows
+      # requires it transitively. No LLM key is needed; the tests use scripted clients.
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install numpy pytest
+
+      - name: Confirm the harness and workflows import
+        run: |
+          python - <<'PY'
+          import importlib
+          for name in (
+              "agentic.agentic_framework.reasoning_workflows",
+              "agentic.agentic_framework.adaptive_prompts",
+              "experiments.workflow_fit_study.study",
+          ):
+              importlib.import_module(name)
+              print(f"ok  {name}")
+          PY
+
+      - name: Run the Workflow-Fit study tests
+        # `shell: bash` is load-bearing: it runs `bash --noprofile --norc -eo pipefail`,
+        # whereas the default shell is `bash -e` WITHOUT pipefail. Piping pytest into tee
+        # under the default shell would report the exit status of `tee` — always 0.
+        shell: bash
+        run: |
+          python -m pytest tests/experiments/workflow_fit_study \
+            -v \
+            --tb=short \
+            --disable-warnings \
+            2>&1 | tee workflow-fit-study-pytest.log
+
+      - name: Upload test log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: workflow-fit-study-pytest-log
+          path: workflow-fit-study-pytest.log
+          if-no-files-found: ignore
