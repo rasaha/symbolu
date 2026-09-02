@@ -39,6 +39,8 @@ for _src in (project_root / "packages" / "jcs" / "src",
              # comparison engine. Required by both packages' tests and by
              # tests/experiments/workflow_fit_study/test_governed_adapter.py.
              project_root / "packages" / "capabilities" / "reasoning-method-governance" / "src",
-             project_root / "packages" / "capabilities" / "readiness-comparison" / "src"):
+             project_root / "packages" / "capabilities" / "readiness-comparison" / "src",
+             # Reasoning Method Advisor slice 2 (research-only).
+             project_root / "packages" / "capabilities" / "reasoning-method-advisor" / "src"):
     if _src.is_dir() and str(_src) not in sys.path:
         sys.path.insert(0, str(_src))

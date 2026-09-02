@@ -37,7 +37,11 @@ primary only when exactly one method qualifies.
 `ReasoningMethodCatalog`, `ReasoningMethodCatalogRef`, `ReasoningMethodRef`,
 `ImplementationStatus` and `COMPLEXITY_SIGNAL_TOKENS` from
 `ugence_reasoning_method_governance.api` `[V]`. Slice 2 adds no field to any
-slice 1 contract and consumes no comparison result (§6).
+slice 1 contract and consumes no comparison result (§6). Slice 2 imports
+**only public names** from other distributions: no underscore-prefixed module
+or helper of slice 1 is a dependency. Validation and canonicalization are
+package-local (`_canon`) and verified against canonicalization vectors,
+including slice 1's own settled digests (§7, row V).
 
 **Forbidden imports, enforced by the same boundary-test pattern as slice 1**
 `[V]`: `agentic`, `agentic_framework`, `reasoning_workflows`,
@@ -84,7 +88,12 @@ joinability to a future comparison, not any eligibility for approval.
 
 **Refusals (constructor):** blank identifiers (`REF_BLANK_FIELD`); a
 `task_class` whose `structural_characteristics` are not a superset of the
-profile's (`PROFILE_CLASS_MISMATCH`).
+profile's (`PROFILE_CLASS_MISMATCH`); a `catalog` carrying more than one
+`method_version` for one `method_id` (`CATALOG_METHOD_VERSION_AMBIGUOUS`,
+owner-ratified amendment, §11): rules name `method_id` only (§4), so such a
+catalog has no unambiguous evaluation and is refused. The advisor never
+selects the newest, oldest or otherwise preferred version; supporting
+multiple versions requires a separately ratified rule-reference contract.
 The request never carries a query string, a prompt, or runtime text:
 `ComplexityDetector.analyze(self, text: str)` (`adaptive_prompts.py:359`)
 `[V]` reads runtime text and is not consumed; the profile's
@@ -162,9 +171,26 @@ class ReasoningMethodAdvisory:
     usage_scope: Literal["RESEARCH_ONLY"]
     advisor_identity: str
     advisor_version: str
-    advised_at: datetime
+    advised_at: datetime                        # caller-supplied, timezone-aware; inside advisory_digest
     advisory_digest: str
 ```
+
+**Binding to the request (`validate_against_request(advisory, request)`).**
+An advisory's `request_digest`, `profile_digest`, `catalog` and `rule_set`
+must be the request's own (`DIGEST_MALFORMED` otherwise) and its
+`task_class_digest` must be exactly the request's task class digest, or
+`None` for an unclassified request (`CLASSIFICATION_INCONSISTENT` otherwise).
+The constructor invariants make an advisory self-consistent; this binding
+makes its classification a fact about the request. A hand-built advisory
+that pairs an unclassified request's digests with a fabricated
+`task_class_digest` therefore constructs but is refused against that request,
+and `advise()` applies the binding before returning.
+**Scope of the binding (owner ruling, 2026-09-02).** `validate_against_request`
+proves **consistency with a supplied request**, not authenticity, issuer
+authority or trusted provenance. Whether the request, its catalog, its rule
+set or the advisory came from an authorised issuer, and whether any of them
+is attested or verified, remain outside slice 2 (§8: no attestation,
+verification or envelope issuance).
 
 **Prohibitions carried structurally.** No field can hold a number: there is no
 score, rank, probability, confidence, cost, latency or resource label, and a
@@ -259,8 +285,13 @@ tested as such (§7, P11), not a property of tolerating unsorted input.
    `task_class` (§2). Every label is `RULE_DERIVED`; the advisory's
    `evidence_status` is `COMPARISON_EVIDENCE_ABSENT`.
 
-Evaluation is a pure function of `(profile, task_class, catalog, rule_set)`.
-The same inputs yield the same `advisory_digest` across processes. The
+Evaluation is a pure function of `(profile, task_class, catalog, rule_set,
+advised_at)`: `advise(request, *, advised_at)` takes `advised_at` as a
+**required**, timezone-aware, caller-supplied instant (`DATETIME_NAIVE`
+otherwise) and reads **no clock** itself. `advised_at` enters
+`advisory_digest`, so the same inputs at the same instant yield the same
+digest across processes and hash seeds, and a different instant yields a
+different digest (§7, P15). The
 evaluator's internal traversal order over rules, catalog entries and
 qualifying methods must not affect any output: implementations are tested by
 evaluating one admitted canonical `RuleSet` through differently ordered
@@ -366,7 +397,7 @@ asserted stable across two constructions and two processes.
 | P2 | `comparison_request`, `ambiguity_detected` | same | `Q = {map_reduce, tree_of_thought}`, no primary, `MULTIPLE_QUALIFYING_METHODS`; two `QualifyingTradeOff`s, each carrying the one inclusion reason the other lacks |
 | P3 | no tokens | same | `Q = ∅`, no primary, `NO_QUALIFYING_METHOD`; every entry excluded with `NO_SUPPORTING_RULE` |
 | P4 | `conditional_logic`, `causal_reasoning` under a rule set where one `EXCLUDE` rule removes `debate` for `SEVERE` consequence; profile SEVERE | same | `Q = {linear_chain}`; `debate` excluded with the `EXCLUDE` outcome; primary `linear_chain` |
-| P5 | `comparison_request` with a rule set adding a second `SUPPORT` rule naming `debate` on the same token | same | `Q = {map_reduce, debate}`, no primary; both trade-offs have empty `distinguishing_reasons` (same reason) and differ only by requirement refs, if any; adding a third rule for `debate` still yields no primary (rule count never manufactures a winner) |
+| P5 | `comparison_request` with the `comparison_request` rule replaced by one `SUPPORT` rule naming both `map_reduce` and `debate` (two qualifiers supported by the **same rule**) | same | `Q = {map_reduce, debate}`, no primary; both trade-offs have empty `distinguishing_reasons` (a reason is a `RuleOutcome`, identified by `rule_id`) and differ only by requirement refs, if any; adding further `SUPPORT` rules for `debate` still yields no primary (rule count never manufactures a winner). Variant: a **second** `SUPPORT` rule (its own `rule_id`) naming `debate` on the same token also yields `Q = {map_reduce, debate}` and no primary, and each trade-off then carries its own rule as a distinguishing reason: the token is shared, the rule is not |
 | P6 | `comparison_request`, catalog where `map_reduce` carries only `UNIT_TESTS_PRESENT` evidence | modified fixture | `map_reduce` excluded `INADMISSIBLE_IMPLEMENTATION_STATUS`; `Q = ∅` |
 | P7 | P1 with `task_class = None` | same | identical `qualifying`; `task_class_digest` `None`; `UNCLASSIFIED_EXPLORATORY` / `INELIGIBLE_UNCLASSIFIED`; `evidence_status` explicitly `COMPARISON_EVIDENCE_ABSENT` |
 | P8 | field-set test over `ReasoningMethodAdvisoryRequest` and `ReasoningMethodAdvisory` | — | no field named `comparison_results`, `comparison_result_digests` or any `*comparison*` name exists |
@@ -376,6 +407,7 @@ asserted stable across two constructions and two processes.
 | P14 | P5 (two qualifiers supported by the same rule) | same | both trade-offs have empty `distinguishing_reasons`; the advisory carries no preference field, ordering or label between them |
 | P9 | P1 with `reversibility = UNDETERMINED` | same | constructs (a profile may be undetermined); same `Q` |
 | P10 | P1 twice, then with `rule_set_version` bumped | same | first two digests equal; third differs |
+| P15 | P1 with `advised_at` omitted, naive, one microsecond later, and the same instant in another UTC offset | same | omitted: `TypeError` (no default, no clock read); naive: `DATETIME_NAIVE`; later instant: different `advisory_digest`; same instant, other offset: identical `advisory_digest` |
 | R-a | any advisory type declared with a field named `score`, `rank`, `probability`, `cost` or `latency_class` | — | refused at class definition |
 | R-b | a `Rule` naming a method absent from the catalog | — | `RULE_METHOD_UNKNOWN` at evaluation |
 | R-c | a `Predicate` of kind `STRUCTURAL_TOKEN_PRESENT` with a non-signal token | — | `SIGNAL_TOKEN_UNKNOWN` |
@@ -387,13 +419,17 @@ asserted stable across two constructions and two processes.
 | R-g | a hand-built advisory with `task_class_digest` `None` and `classification = GOVERNED_TASK_CLASS`, or `UNCLASSIFIED_EXPLORATORY` with `eligibility ≠ INELIGIBLE_UNCLASSIFIED` | — | `CLASSIFICATION_INCONSISTENT` |
 | R-h | a `Rule` with blank `rule_version` or blank `rationale_statement` | — | `REF_BLANK_FIELD` |
 | R-f | `AdvisoryLabel("BENCHMARK_DERIVED")` | — | `ValueError`: not a member |
-| B | AST scan of `src/` | — | no forbidden import (§1) |
+| R-l | a request whose catalog carries two `method_version`s of one `method_id` | — | `CATALOG_METHOD_VERSION_AMBIGUOUS` at request construction |
+| R-m | an unclassified request's advisory rebuilt by hand with a fabricated `task_class_digest`, `GOVERNED_TASK_CLASS` and `JOINABLE_BY_TASK_CLASS_DIGEST`; also any single altered field, a tampered `advisory_digest`, and a governed advisory presented against a different request | — | constructs, then `validate_against_request` refuses it (`CLASSIFICATION_INCONSISTENT`); single-field alterations refused at construction (`CLASSIFICATION_INCONSISTENT` / `DIGEST_MALFORMED`); wrong request refused (`DIGEST_MALFORMED`) |
+| V | package-local canonicalization against literal vectors and slice 1's settled digests (task class, catalog, rule set); AST scan for any underscore-prefixed import from another distribution | — | vectors reproduced; no private import |
+| B | AST scan of `src/` | — | no forbidden import (§1); no clock read in any module |
 
 Slice 2 adds these codes to a package-local `AdvisorErrorCode`:
 `PROFILE_CLASS_MISMATCH`, `RULE_METHOD_UNKNOWN`,
 `PRIMARY_WITHOUT_SOLE_QUALIFIER`, `CLASSIFICATION_INCONSISTENT`,
 `TRADE_OFF_CARDINALITY`, `RULE_OUTCOME_VERSION_MISMATCH`,
-`RULE_SET_UNSORTED`, `RULE_DUPLICATE_ID`; it reuses `REF_BLANK_FIELD`, `DIGEST_MALFORMED`,
+`RULE_SET_UNSORTED`, `RULE_DUPLICATE_ID`, and (audit correction, §11)
+`CATALOG_METHOD_VERSION_AMBIGUOUS`; it reuses `REF_BLANK_FIELD`, `DIGEST_MALFORMED`,
 `SIGNAL_TOKEN_UNKNOWN`, `SCALAR_LABEL_FIELD_PRESENT` and `DATETIME_NAIVE`
 from slice 1 `[V]`.
 
@@ -414,8 +450,8 @@ acceptance figure.
 
 ## 9. Definition of done
 
-Package `ugence-reasoning-method-advisor` with `advise(request) -> advisory`
-as a pure function; the §2–§4 contracts; rule set `rules.research.v0`
+Package `ugence-reasoning-method-advisor` with `advise(request, *,
+advised_at) -> advisory` as a pure function that reads no clock; the §2–§4 contracts; rule set `rules.research.v0`
 shipped as a test fixture only (not as catalog or policy content); every §7
 row as an executable test; the boundary test; a CI workflow in the slice 1
 pattern; a wheel-based distribution self-check proving no forbidden package
@@ -489,3 +525,39 @@ test. Constructor obligations on `trade_offs` cardinality, permitted empty
 differences, and `RuleOutcome.rule_version` fidelity were added (§4, §7 rows
 P11–P14, R-i, R-j, R-k). The three ballot rulings are unchanged by this
 correction.
+
+**Post-implementation audit correction (owner-directed adversarial review of
+PR #1571 at `08a71cac`, 2026-09-02).** Four defects were remediated in the
+implementation and this text was aligned; no ballot ruling changes. (1) The
+advisor imported underscore-prefixed helpers from
+`ugence_reasoning_method_governance.contracts._util`; it now uses a
+package-local canonicalizer verified against vectors and slice 1's settled
+digests (§1, row V). (2) `advise()` defaulted `advised_at` to a wall-clock
+read; `advised_at` is now required, timezone-aware and caller-supplied, and
+the evaluator reads no clock (§4, P15, B). (3) Nothing bound an advisory to
+its request, so an unclassified request's advisory could be rebuilt by hand
+as `GOVERNED_TASK_CLASS` with a fabricated `task_class_digest`;
+`validate_against_request` now binds request, profile, catalog, rule set and
+task-class digests, and `advise()` applies it (§3, R-m). (4) A catalog
+carrying two versions of one `method_id` was silently collapsed to one
+version; such a request is now refused with `CATALOG_METHOD_VERSION_AMBIGUOUS`
+(§2, R-l). Row P5 was also restated to the P14 reading (two qualifiers
+supported by the same rule) with the "second rule on the same token" case
+kept as an explicit variant; both readings evaluate under the ratified §3
+definition of a distinguishing reason, so no behaviour changed and no ruling
+was required.
+
+**Owner amendment (2026-09-02, after the audit correction).** *Owner ruling,
+verbatim:* "I ratify the Slice 2 amendment CATALOG_METHOD_VERSION_AMBIGUOUS:
+while rules target only method_id, a catalog containing multiple versions of
+that method is ambiguous and must be refused. The advisor must not select the
+newest, oldest or otherwise preferred version. Supporting multiple versions
+requires a separately ratified rule-reference contract." The owner further
+directed that `validate_against_request` be stated as proving consistency
+with a supplied request, not authenticity, issuer authority or trusted
+provenance, which remain outside Slice 2 (§3). Applied: §2 refusal, §3
+binding scope, §7 rows R-l and R-m. The three §10 ballot rulings are
+unchanged. **Authority.** Owner ratification by Rakesh Mohan, 2026-09-02,
+issued as an explicit owner instruction in Claude Code session
+`session_01VXERHvJzbb9cjZ1GyFFQLn`; the model analysis was advisory only and
+the owner instruction was the ratifying act.
