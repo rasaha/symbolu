@@ -30,6 +30,22 @@ be true first.
 | **Workflow fit** | readiness | whether that treatment reached sufficient quality at justified cost |
 | **Measurement** | an independent evaluator | quality and resource use — **the workflow never grades itself** |
 
+**What "independent" means for the evaluator.** An evaluator that is itself an
+LLM satisfies "the workflow never grades itself" only if it is **separately
+controlled** (not a step in the workflow's own pipeline), **blind to the
+workflow's self-reported score**, **benchmark-bound** (comparing against an
+exactly resolved definition), and **independently calibrated**. Another LLM call
+inside the same pipeline is not independence. `[R]`
+
+**The authority over thresholds, task classes and evaluation methods already
+exists** and is not a fifth component: `GovernedThreshold` and policy belong to
+the Policy Authority (`ADR_UGENCE_POLICY_AUTHORITY.md`;
+`uvi-policy-contracts …/thresholds.py:31`), and benchmark definitions to the
+Benchmark Registry, under the four-artifact ownership of
+`ADR_UGENCE_TRUSTED_EVIDENCE_AND_BENCHMARK_REGISTRY.md` §18 (`:754`) `[V]`. The
+four roles above sit inside that ratified ownership; none of them mints a
+threshold or a definition.
+
 S2-B's three ratified members — `SINGLE_CANDIDATE_UNREVISED`,
 `MULTI_CANDIDATE_UNREVISED`, `REVISED_ADVISORY` — are **unchanged by this note**.
 They are defined over artifact shape (candidate count, parent binding), never
@@ -92,6 +108,18 @@ Four outcomes, **reported separately and never combined** `[R]`:
 
 Low quality is **never penalised inside an efficiency score**. Mixing them would
 reproduce exactly the compensatory scoring the composite note rejects.
+
+**Outcomes carry magnitude as attributes, never as a score.** A bare outcome
+loses information a decision-maker needs: how far below `τ_t`, or by how much a
+dominating alternative was cheaper. Each outcome therefore carries the **quality
+margin** (`Q(w,t) − τ_t`) and, where a dominating alternative exists, the
+**resource deltas** per governed resource. These are reported alongside the
+outcome and are **never combined** into a single number `[R]`.
+
+**Evidence absence is not advisor abstention.** `COMPARISON_EVIDENCE_ABSENT`
+describes the *evidence state* of a fit assessment. Whether an advisor
+*correctly abstained* is a property of the advisor's behaviour, measured
+separately (advisor note §6). The two must not share a vocabulary member.
 
 **Vocabulary caution — why the last two are named as they are.**
 `ReadinessClassification` members are `NOT_ASSESSABLE`, `NOT_READY`,

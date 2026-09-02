@@ -68,10 +68,25 @@ those" (`:12-13`). It is a runtime, per-case advisory: `ProposerAdvisory` carrie
 deployment is a different object with a different lifecycle, and it names
 methods — which the Proposer may not.
 
-**Not Agent Workforce Composer, in the first version.** AWC composes and ranks
-*agents*; this capability evaluates *methods*. The `workflow_ir` collision (§1)
-makes early inclusion a contract hazard. AWC may later **consume** the advisor's
-qualifying set when composing a team; it should not own the method analysis.
+**Not Agent Workforce Composer, in the first version — by authority and
+lifecycle, not by naming.** AWC's ratified authority is over *agents*: it
+answers "how are eligible agents ranked, least-privilege permission bound is
+proposed, and what ordered fallbacks apply" over P1-eligible sets
+(`agent-workforce-composer/README.md:18` names its contracts `awc.v1`
+*preserved* and `awc.composition.v1` *additive*, over a *frozen* registry) `[V]`.
+This capability's subject is a *method*, its lifecycle is a design-time
+recommend → pilot → assess loop with no analogue in AWC, and its evidence is a
+fit assessment AWC does not produce. Making AWC's candidate sets carry methods
+would change ratified, preserved contracts — a cost the naming collision (§1)
+merely adds to.
+
+*Considered alternative, recorded not selected* `[R]`: extend AWC, reusing its
+ranking, candidate-set and fallback machinery and avoiding a new integration
+boundary. That reuse assumes the machinery is type-agnostic; the preserved
+contract versions say it is not. If the owner reopens placement, the
+justification to defeat is the authority-and-lifecycle one above, not the
+naming one. AWC may later **consume** the advisor's qualifying set when
+composing a team; it should not own the method analysis.
 
 ## 3. The runtime boundary — currently disjoint
 
@@ -122,6 +137,18 @@ any `agentic/` implementation class**. The record's evidence axes already exist:
 runtime-reported, never independently verified.** A record emitted by the same
 process that ran the method is `OBSERVED` / `UNATTESTED` / `UNVERIFIED`, exactly
 as the workflow-fit note states for telemetry.
+
+**This record is a direction, not a contract.** It is intentionally **not
+implementable without a separate ratification round**. Undecided, and left so
+here: record **identity** and digest rule; **canonicalization**; **issuer
+authority** — who may emit it and with what key; **lifecycle** — supersession
+and revocation; **version compatibility** across record versions; and
+**evidence-promotion rules** — what moves a record's status beyond
+`OBSERVED`/`UNATTESTED`/`UNVERIFIED`. The field table specifies what the record
+must be able to say, not its schema `[R]`. Of the field groups, **telemetry is
+the likeliest to be wrong**: tokens may be unavailable, latency is
+infrastructure-confounded, and the trustworthiness of runtime-produced counts is
+the open decision of the workflow-fit note.
 
 ## 4. Lifecycle
 
@@ -180,12 +207,38 @@ The evidence-absent branch uses `COMPARISON_EVIDENCE_ABSENT`, not
 `NOT_ASSESSABLE`: the latter is a `ReadinessClassification` tier
 (`agent-value-readiness …/contracts/enums.py:43`) `[V]`.
 
+**Three conditions make "identifying, not approving" defensible** `[R]`:
+
+1. **Pilot-only status must be explicit.** `AssessedSystemBinding` carries no
+   state field; it carries `deployment_environment_ref`, `effective_from` and
+   `effective_to` (`governance-contracts …/system_identity.py:288-290`) `[V]`.
+   A pilot binding can be distinguished today by its `deployment_environment_ref`
+   naming a pilot environment; a dedicated `UNDER_ASSESSMENT` state is the
+   alternative if that is judged too implicit. Either way, a binding **grants
+   nothing**: `authorizes_deployment` is a property returning `False` on both
+   readiness traces (`evaluation/trace.py:191`, `orchestration/trace.py:723`)
+   `[V]`.
+2. **Approval is a separate, authority-produced artifact.** A
+   `SUFFICIENT_PARETO_EFFICIENT` assessment makes a configuration *eligible* for
+   approval; it is not the approval. That artifact comes from an accountable
+   authority — Decision Authority for the business decision — never from the
+   assessment or the advisor.
+3. **Revision has lineage.** A failed configuration that is changed receives a
+   **new** `configuration_digest` and a **new** binding, linked to its failed
+   predecessor. The generic feedback arrow above is insufficient on its own;
+   the precedent for parent linkage is `ProposerAdvisory.parent_advisory_digest`
+   (`agentic-proposer …/contracts.py:980`) `[V]`.
+
 ## 5. Advisor output
 
 The advisor returns a **set of qualifying methods** and **may return no primary
-selection**. This applies the ratified no-forced-winner rule: under OD-8, "more
-than one qualifying candidate produces no selection"
-(`ADR_UGENCE_S2B_ROUND2_VOCABULARY_RATIFICATION.md:54`) `[V]`.
+selection**. This requires an **advisor-specific no-forced-winner rule**, to be
+ratified as its own ruling `[R]`. OD-8 — "more than one qualifying candidate
+produces no selection" (`ADR_UGENCE_S2B_ROUND2_VOCABULARY_RATIFICATION.md:54`)
+`[V]` — is cited as **precedent only**: it governs runtime candidate selection
+in the Proposer, and its authority does not extend to design-time method advice.
+Claiming that it did would be a category error. *(An earlier version of this
+note made that claim.)*
 
 **Every claim is labelled**, with one of three labels `[R]`:
 
@@ -240,19 +293,30 @@ measures `[R]`:
 | Dominated-recommendation rate | how often was a recommended method `SUFFICIENT_RESOURCE_DOMINATED`? | fit assessment |
 | Unsupported-selection rate | did the advisor name a primary without `BENCHMARK_DERIVED` support? | advisory labels |
 | Appropriate abstention rate | when evidence was absent, did it say `COMPARISON_EVIDENCE_ABSENT`? | advisory labels vs. evidence state |
+| **Set precision** | of the qualifying set, what fraction proved sufficient and undominated? | fit assessment |
+| **Recommendation-set size** | how many methods did the advisor qualify, against the catalog size? | advisory |
+| **Coverage** | what fraction of the catalog has been tested for this task class at all? | pilot record |
+| **Error severity** | when wrong, was the miss a marginal domination or a threshold failure on a consequential task? | fit assessment + task profile |
+
+**The five measures alone are gameable.** Qualifying-set success is inflated by
+recommending nearly every admissible method; set precision and
+recommendation-set size exist to catch that. **One challenger measures almost
+nothing**: it is a floor, not an evidence base for false exclusion.
 
 **False exclusion is measurable only against methods actually tested.** For the
 pilot, run:
 
 - the **governed baseline** for the task class;
 - **every recommended** method;
-- **at least one non-recommended challenger**, selected by a **declared sampling
-  rule** `[R]`.
+- **non-recommended challengers under a governed sampling policy** —
+  preregistered, risk-based or randomized, with adequate catalog coverage
+  declared in advance `[R]`. "At least one" is the minimum the owner set; it
+  is not sufficient for any claim about exclusion.
 
 **This does not measure exclusion across the entire catalog.** Untested methods
-remain unknown, and the note claims nothing about them. The challenger roughly
-increases pilot scope; that cost is a design decision, recorded here rather than
-absorbed silently.
+remain unknown, and the note claims nothing about them. Challengers increase
+pilot scope in proportion to the sampling policy; that cost is a design
+decision, recorded here rather than absorbed silently.
 
 ## 7. Recommended ordering
 
@@ -272,18 +336,34 @@ boundary and no pilot can be assessed.
 
 ## 8. Owner decisions `[R]`
 
-1. **Placement and terminology** — Reasoning Method Advisor as a new capability;
-   *method* not *workflow*; the four candidate contract names of §1.
-2. **Execution-record boundary** — the neutral record's field set and version,
-   and the adapter obligation on the experimental runtime, with no direct import
-   in either direction.
-3. **Pilot composition and challenger rule** — baseline, all recommended, at
-   least one challenger; the declared sampling rule for challengers.
-4. **Task-profile contract** — the minimal typed profile; policy-reference
-   representation for privacy and regulation.
-5. **Post-pilot binding** — whether, after evidence exists, a future
-   Constitution version binds a reasoning-method policy, and what
-   production-binding decision follows an approved fit assessment.
+1. **Placement, terminology and the advisor's own rules** — Reasoning Method
+   Advisor as a new capability, justified by authority and lifecycle (§2), with
+   the AWC-extension alternative recorded; *method* not *workflow*; the four
+   candidate contract names; and the **advisor-specific no-forced-winner rule**
+   ratified on its own, citing OD-8 as precedent only (§5).
+2. **Execution-record boundary, and the record's governance** — the neutral
+   record's field set and version; the adapter obligation with no direct import;
+   the undecided identity, canonicalization, issuer, lifecycle, compatibility
+   and promotion rules (§3); and **access, retention and disclosure rules for
+   prompts, structured artifacts and telemetry held in the record** — none of
+   which any package defines today `[G]`.
+3. **Pilot composition and the sampling policy** — governed baseline, every
+   recommended method, and challengers under a preregistered, risk-based or
+   randomized policy with declared coverage; plus the anti-gaming measures of
+   §6.
+4. **Task profile and task-class identity** — the minimal typed profile with
+   privacy and regulation as policy references; and **what defines a task
+   class, and when two tasks are comparable enough to share benchmark
+   evidence** — no task-class contract exists `[G]`.
+5. **Binding lifecycle, reassessment and post-pilot approval** — pilot-only
+   status via `deployment_environment_ref` or a new state; the separate
+   authority-produced approval artifact; revision lineage by new digest (§4);
+   **reassessment triggers** — since a binding is to an exact
+   `configuration_digest` (`system_identity.py:284`) `[V]`, any change to
+   model, prompt, tools, policy, data distribution or method version is a new
+   configuration and invalidates the prior assessment, and whether any narrower
+   rule is ever ratified is this decision; and any future Constitution
+   method-policy binding.
 
 Constants, thresholds, sampling rates, label semantics beyond the three names,
 catalog members and profile fields remain unratified with no defaults.

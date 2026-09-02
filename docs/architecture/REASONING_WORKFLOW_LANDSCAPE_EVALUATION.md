@@ -8,7 +8,7 @@ rule and a three-layer selection architecture. Every claim in them was captured
 as a discrete item and evaluated against this repository.
 **Relationship:** companion to
 [`WORKFLOW_FIT_READINESS_SCOPING_NOTE.md`](WORKFLOW_FIT_READINESS_SCOPING_NOTE.md);
-§2 below corrects that note's §6 — its "seven workflows" statement at `:289`.
+§2 below corrects that note's §6 — its "seven workflows" statement at `:317`.
 **Evidence labels:** `[V]` verified at the cited `file:line` · `[I]` inferred or
 external, not repo-verifiable · `[R]` requires owner ratification · `[G]` gap.
 
@@ -59,7 +59,7 @@ implements, outside that enum:
 | Portfolio orchestration | `multi_workflow_orchestration.py` (H22) | `[V]` `agentic/agentic_framework/multi_workflow_orchestration.py:2` |
 
 **Consequence:** any statement that "the seven workflows" bound the treatment
-space — including §6 of the workflow-fit note (`:289`) — refers to the enum only. The
+space — including §6 of the workflow-fit note (`:317`) — refers to the enum only. The
 treatment space a benchmark must cover is larger, and none of these modules
 carries a `WorkflowType` value, so they are currently invisible to
 `WorkflowSelector` and to any workflow-fit provenance record `[G]`.
