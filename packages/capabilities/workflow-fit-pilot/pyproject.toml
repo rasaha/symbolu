@@ -1,0 +1,46 @@
+# Independent distribution for the Ugence Trusted Workflow-Fit Pilot (Phase 4A).
+#
+# docs/architecture/WORKFLOW_FIT_PILOT_4A_COMMISSIONING_SPEC.md, owner-ratified 2026-09-02:
+# a RESEARCH-ONLY pilot that binds every observation to a preregistered manifest,
+# captures telemetry outside the tested workflow through a separate-process boundary,
+# recomputes and attests it, evaluates quality under a declared (unverified) evaluator,
+# runs the governed baseline, every advisor-qualified method and exhaustive challengers,
+# calls the Slice 1 comparison engine, and keeps a neutral research-only state ledger.
+#
+# No production authority, no approval, no benchmark-derived advice, no readiness
+# composite, no runtime integration, no TEV receipt adapter, no numeric owner defaults.
+#
+# Build:    python -m build packages/capabilities/workflow-fit-pilot
+# Verify:   python packages/capabilities/workflow-fit-pilot/verify_workflow_fit_pilot_distribution.py
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ugence-workflow-fit-pilot"
+# Static: tests/packaging/test_boundaries.py pins this to ugence_workflow_fit_pilot.__version__.
+version = "0.1.0"
+description = "Ugence Trusted Workflow-Fit Pilot — research-only Phase 4A pilot over the reasoning-method governance contracts, comparison engine and advisor."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "Proprietary" }
+authors = [{ name = "Rakesh Mohan" }]
+keywords = ["ugence", "workflow-fit", "pilot", "research-only"]
+dependencies = [
+    "ugence-reasoning-method-governance>=0.1.0",
+    "ugence-readiness-comparison>=0.2.0",
+    "ugence-reasoning-method-advisor>=0.1.0",
+    "ugence-governance-contracts>=0.3.1",
+    "ugence-uvi-policy-contracts>=0.1.0",
+    "ugence-jcs>=0.2.0",
+]
+
+[project.optional-dependencies]
+test = ["pytest>=7.0"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["ugence_workflow_fit_pilot*"]
+
+[tool.setuptools.package-data]
+ugence_workflow_fit_pilot = ["py.typed"]
