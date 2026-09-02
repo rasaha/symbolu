@@ -1,6 +1,6 @@
 """Boundary test (spec §1, row B): the advisor imports no runtime, no engine,
 no capability beyond its declared contract dependencies, and no network or
-LLM SDK; and performs no I/O or clock read beyond the advised_at default."""
+LLM SDK; and performs no I/O and no clock read at all (advised_at is caller-supplied)."""
 
 from __future__ import annotations
 
@@ -14,10 +14,10 @@ FORBIDDEN = {
     "agentic", "agentic_framework", "reasoning_workflows", "adaptive_prompts", "external_actions", "symbolu",
     "ugence_readiness_comparison", "ugence_agentic_proposer", "ugence_agent_workforce_composer", "ugence_agent_runtime",
     "ugence_agent_value_readiness", "governed_value", "ugence_context_minimization", "ugence_policy_authority",
-    "openai", "anthropic", "requests", "httpx", "socket", "urllib", "subprocess", "os", "random",
+    "openai", "anthropic", "requests", "httpx", "socket", "urllib", "subprocess", "os", "random", "time",
 }
 ALLOWED = {"ugence_reasoning_method_governance", "ugence_governance_contracts", "ugence_uvi_policy_contracts", "ugence_jcs",
-           "__future__", "dataclasses", "datetime", "enum", "typing"}
+           "__future__", "dataclasses", "datetime", "decimal", "enum", "re", "typing"}
 FORBIDDEN_CALLS = {"open", "input", "print", "exec", "eval", "compile", "__import__"}
 
 
@@ -48,9 +48,11 @@ def test_only_declared_imports():
     assert set(seen) <= ALLOWED, set(seen) - ALLOWED
 
 
-def test_single_clock_read_is_advised_at_default_only():
-    text = (SRC / "advisor.py").read_text(encoding="utf-8")
-    assert text.count("datetime.now(") == 1
+def test_no_clock_read_anywhere():
+    for path in SRC.rglob("*.py"):
+        text = path.read_text(encoding="utf-8")
+        for needle in ("datetime.now(", "datetime.utcnow(", "date.today(", "time.time(", "monotonic("):
+            assert needle not in text, f"{path.name} reads a clock: {needle}"
 
 
 def test_slice_1_packages_do_not_import_the_advisor():

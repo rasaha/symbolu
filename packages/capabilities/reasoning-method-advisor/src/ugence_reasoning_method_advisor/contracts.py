@@ -1,6 +1,7 @@
 """Slice 2 contracts (specification §2–§4).
 
-Digests reuse the slice 1 canonicalization helpers so an advisory's payload
+Digests use the package-local canonicalization of ``_canon`` (verified
+against vectors, including slice 1's own digests) so an advisory's payload
 discipline is identical to the governance contracts': enums by value,
 datetimes as RFC 3339 UTC, integers never present, tuples in declared order,
 ``ugence_jcs`` SHA-256 with no prefix.
@@ -33,7 +34,7 @@ from ugence_reasoning_method_governance.api import (
     TaskProfile,
     TaskReversibility,
 )
-from ugence_reasoning_method_governance.contracts._util import (
+from ._canon import (
     digest_of,
     require_digest,
     require_member,
@@ -42,7 +43,6 @@ from ugence_reasoning_method_governance.contracts._util import (
     require_tzaware,
     settle_digest,
 )
-
 from .errors import AdvisorError, AdvisorErrorCode
 
 ADVISORY_REQUEST_SCHEMA_VERSION = "reasoning_method.advisory_request.v1"
@@ -272,6 +272,14 @@ class ReasoningMethodAdvisoryRequest(_NoScalarLabels):
                 raise AdvisorError(AdvisorErrorCode.PROFILE_CLASS_MISMATCH, f"task class lacks profile token(s): {', '.join(missing)}")
         if not isinstance(self.catalog, ReasoningMethodCatalog):
             raise ContractError(ContractErrorCode.REF_BLANK_FIELD, "catalog must be a ReasoningMethodCatalog")
+        # Rules name method_id only (§4); a catalog carrying several versions of one
+        # method_id would make evaluation ambiguous, so it is refused rather than collapsed.
+        by_id: dict = {}
+        for e in self.catalog.entries:
+            by_id.setdefault(e.method_id, []).append(e.method_version)
+        ambiguous = sorted(m for m, v in by_id.items() if len(v) > 1)
+        if ambiguous:
+            raise AdvisorError(AdvisorErrorCode.CATALOG_METHOD_VERSION_AMBIGUOUS, f"catalog carries more than one version of: {', '.join(ambiguous)}")
         if not isinstance(self.rule_set, RuleSet):
             raise ContractError(ContractErrorCode.REF_BLANK_FIELD, "rule_set must be a RuleSet")
         if not isinstance(self.requester_identity, str):
@@ -456,6 +464,29 @@ def validate_against_rule_set(advisory: ReasoningMethodAdvisory, rule_set: RuleS
             raise AdvisorError(AdvisorErrorCode.RULE_OUTCOME_VERSION_MISMATCH, f"outcome {o.rule_id} carries version {o.rule_version!r}; admitted rule set has {expected!r}")
 
 
+def validate_against_request(advisory: ReasoningMethodAdvisory, request: ReasoningMethodAdvisoryRequest) -> None:
+    """Bind an advisory to the request it claims to answer.
+
+    ``request_digest``, ``profile_digest``, ``catalog`` and ``rule_set`` must be
+    the request's own (``DIGEST_MALFORMED`` otherwise), and ``task_class_digest``
+    must be exactly the request's task class digest, or ``None`` when the
+    request is unclassified (``CLASSIFICATION_INCONSISTENT`` otherwise). A
+    hand-built advisory cannot therefore present an unclassified request as
+    governed: its classification is fixed by the request, not by its own fields.
+    """
+    if not isinstance(advisory, ReasoningMethodAdvisory) or not isinstance(request, ReasoningMethodAdvisoryRequest):
+        raise TypeError("validate_against_request(advisory, request)")
+    if advisory.request_digest != request.canonical_digest():
+        raise ContractError(ContractErrorCode.DIGEST_MALFORMED, "advisory.request_digest is not the digest of this request")
+    if advisory.profile_digest != digest_of(request.profile):
+        raise ContractError(ContractErrorCode.DIGEST_MALFORMED, "advisory.profile_digest is not the digest of this request's profile")
+    if advisory.catalog != request.catalog.ref() or advisory.rule_set != request.rule_set.ref():
+        raise ContractError(ContractErrorCode.DIGEST_MALFORMED, "advisory names a catalog or rule set other than this request's")
+    expected = request.task_class.task_class_digest if request.task_class is not None else None
+    if advisory.task_class_digest != expected:
+        raise AdvisorError(AdvisorErrorCode.CLASSIFICATION_INCONSISTENT, "advisory.task_class_digest does not match this request's task class (or its absence)")
+
+
 __all__ = [
     "ADVISORY_REQUEST_SCHEMA_VERSION", "ADVISORY_SCHEMA_VERSION", "RULE_SET_SCHEMA_VERSION",
     "PRIMARY_BASIS_SOLE_QUALIFYING_METHOD", "EVIDENCE_STATUS_COMPARISON_EVIDENCE_ABSENT",
@@ -464,5 +495,5 @@ __all__ = [
     "RuleKind", "PredicateKind", "AdvisoryLabel", "NoPrimaryReason", "AdvisoryClassification", "AdvisoryEligibility",
     "Predicate", "Rule", "RuleSetRef", "RuleSet", "ReasoningMethodAdvisoryRequest",
     "RuleOutcome", "QualifyingTradeOff", "QualifyingMethod", "ExcludedMethod", "ReasoningMethodAdvisory",
-    "validate_against_rule_set",
+    "validate_against_rule_set", "validate_against_request",
 ]

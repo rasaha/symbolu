@@ -75,8 +75,8 @@ def test_p4_exclude_rule_removes_debate_for_severe():
 
 
 def test_p5_and_p14_same_reason_two_qualifiers_and_rule_count_never_wins():
-    # P14 reads P5 as "two qualifiers supported by the same rule": the comparison_request
-    # rule names both methods, so neither has a distinguishing reason.
+    # P5/P14 (as corrected, spec §11): one rule names both methods, so neither has a
+    # distinguishing reason; a reason is a RuleOutcome and is identified by rule_id.
     same_rule = rf.signal_rule("comparison_request", method_ids=("map_reduce", "debate"))
     rs = rf.research_rules_v0(replace=(same_rule,))
     adv = run(rf.request(("comparison_request",), rule_set=rs))
@@ -89,6 +89,14 @@ def test_p5_and_p14_same_reason_two_qualifiers_and_rule_count_never_wins():
     assert adv3.primary is None and q_ids(adv3) == ["debate", "map_reduce"]
     debate = next(q for q in adv3.qualifying if q.method.method_id == "debate")
     assert len(debate.inclusion_reasons) == 3
+    # P5 variant: a SECOND rule (its own rule_id) naming debate on the same token. Both
+    # qualify, no primary, and each carries its own rule as a distinguishing reason: the
+    # token is shared, the rule is not.
+    rs2 = rf.research_rules_v0(extra=(rf.signal_rule("comparison_request", "debate", suffix=".alt"),))
+    adv2 = run(rf.request(("comparison_request",), rule_set=rs2))
+    assert adv2.primary is None and q_ids(adv2) == ["debate", "map_reduce"]
+    assert [[r.rule_id for r in t.distinguishing_reasons] for t in adv2.trade_offs] == [["research.signal.comparison_request.alt"], ["research.signal.comparison_request"]]
+    assert all(t.distinguishing_reasons[0].matched_tokens == ("comparison_request",) for t in adv2.trade_offs)
 
 
 def test_p6_inadmissible_entry_is_excluded_synthetically():

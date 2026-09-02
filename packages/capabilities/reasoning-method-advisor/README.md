@@ -5,10 +5,14 @@ Slice 2 of the reasoning-method governance thread
 owner-ratified as amended 2026-09-02): a **research-only, deterministic,
 rule-derived** design-time Reasoning Method Advisor.
 
-`advise(request) -> advisory` is a pure function of the developer's
-`TaskProfile`, an optional governed `TaskClassIdentity`, the
-`ReasoningMethodCatalog` and a versioned, canonically ordered `RuleSet`, all
-from `ugence-reasoning-method-governance`. It returns the qualifying set (zero,
+`advise(request, *, advised_at) -> advisory` is a pure function of the
+developer's `TaskProfile`, an optional governed `TaskClassIdentity`, the
+`ReasoningMethodCatalog`, a versioned, canonically ordered `RuleSet` (all from
+`ugence-reasoning-method-governance`) and a caller-supplied, timezone-aware
+`advised_at`; it reads no clock. `validate_against_request` binds an advisory
+to the request it answers, so an unclassified request can never be presented
+as governed. The package imports only public names from other distributions;
+its canonicalization is package-local and verified against vectors. It returns the qualifying set (zero,
 one or many methods), every inclusion and exclusion reason, trade-offs between
 multiple qualifiers, and a primary **only when exactly one method qualifies**.
 Rule count, rule priority and traversal order never manufacture a winner.

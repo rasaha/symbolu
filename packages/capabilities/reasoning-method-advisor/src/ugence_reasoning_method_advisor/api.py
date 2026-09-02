@@ -28,6 +28,7 @@ from .contracts import (
     RuleOutcome,
     RuleSet,
     RuleSetRef,
+    validate_against_request,
     validate_against_rule_set,
 )
 from .errors import AdvisorError, AdvisorErrorCode
@@ -42,5 +43,5 @@ __all__ = [
     "RuleKind", "PredicateKind", "AdvisoryLabel", "NoPrimaryReason", "AdvisoryClassification", "AdvisoryEligibility",
     "Predicate", "Rule", "RuleSetRef", "RuleSet", "ReasoningMethodAdvisoryRequest",
     "RuleOutcome", "QualifyingTradeOff", "QualifyingMethod", "ExcludedMethod", "ReasoningMethodAdvisory",
-    "validate_against_rule_set", "AdvisorError", "AdvisorErrorCode",
+    "validate_against_rule_set", "validate_against_request", "AdvisorError", "AdvisorErrorCode",
 ]

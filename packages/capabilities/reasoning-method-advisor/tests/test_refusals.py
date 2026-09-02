@@ -26,6 +26,7 @@ from ugence_reasoning_method_advisor.api import (
     RuleOutcome,
     RuleSet,
     advise,
+    validate_against_request,
     validate_against_rule_set,
 )
 from ugence_reasoning_method_governance.api import ContractError, ContractErrorCode as C
@@ -120,6 +121,55 @@ def test_r_g_classification_inconsistent():
     refuses(A.CLASSIFICATION_INCONSISTENT, lambda: ReasoningMethodAdvisory(**kw2))
 
 
+def test_r_l_catalog_with_two_versions_of_one_method_is_refused():
+    from ugence_reasoning_method_governance.api import CATALOG_SCHEMA_VERSION, ReasoningMethodCatalog
+
+    entries = list(fx.c4_catalog().entries)
+    mr = next(e for e in entries if e.method_id == "map_reduce")
+    entries.append(dataclasses.replace(mr, method_version="2"))
+    cat = ReasoningMethodCatalog(CATALOG_SCHEMA_VERSION, "cat.rm", "1", tuple(sorted(entries, key=lambda x: x.sort_key)), "issuer:test", fx.NOW)
+    refuses(A.CATALOG_METHOD_VERSION_AMBIGUOUS, lambda: rf.request(("comparison_request",), catalog=cat))
+
+
+def test_r_m_unclassified_advisory_cannot_be_rebuilt_as_governed():
+    """A hand-built advisory with a fabricated task_class_digest constructs (its fields are
+    self-consistent) but is refused against the request it claims to answer."""
+    req = rf.request(("comparison_request",), governed=False)
+    u = advise(req, advised_at=fx.NOW)
+    kw = _kwargs(u)
+    forged = ReasoningMethodAdvisory(**{**kw, "task_class_digest": "b" * 64, "classification": AdvisoryClassification.GOVERNED_TASK_CLASS, "eligibility": AdvisoryEligibility.JOINABLE_BY_TASK_CLASS_DIGEST})
+    assert forged.classification is AdvisoryClassification.GOVERNED_TASK_CLASS
+    refuses(A.CLASSIFICATION_INCONSISTENT, lambda: validate_against_request(forged, req))
+    validate_against_request(u, req)
+    # Serialization round trip: rebuilding from the same field values reproduces the digest;
+    # any single altered field is refused as CLASSIFICATION_INCONSISTENT or DIGEST_MALFORMED.
+    assert ReasoningMethodAdvisory(**kw).advisory_digest == u.advisory_digest
+    assert ReasoningMethodAdvisory(**{**kw, "advisory_digest": u.advisory_digest}) == u
+    for patch in ({"classification": AdvisoryClassification.GOVERNED_TASK_CLASS}, {"eligibility": AdvisoryEligibility.JOINABLE_BY_TASK_CLASS_DIGEST}, {"task_class_digest": "b" * 64}):
+        refuses(A.CLASSIFICATION_INCONSISTENT, lambda: ReasoningMethodAdvisory(**{**kw, **patch}))
+    refuses(C.DIGEST_MALFORMED, lambda: ReasoningMethodAdvisory(**{**kw, "advisory_digest": "c" * 64}))
+    # A governed advisory cannot be re-bound to a different request either.
+    other = rf.request(("comparison_request",), request_id="req.other")
+    g = advise(other, advised_at=fx.NOW)
+    refuses(C.DIGEST_MALFORMED, lambda: validate_against_request(g, rf.request(("comparison_request",), request_id="req.third")))
+    refuses(A.CLASSIFICATION_INCONSISTENT, lambda: validate_against_request(ReasoningMethodAdvisory(**{**_kwargs(g), "task_class_digest": None, "classification": AdvisoryClassification.UNCLASSIFIED_EXPLORATORY, "eligibility": AdvisoryEligibility.INELIGIBLE_UNCLASSIFIED, "request_digest": other.canonical_digest()}), other))
+
+
+def test_advised_at_is_required_timezone_aware_and_enters_the_digest():
+    import datetime as dt
+
+    req = rf.request(("comparison_request",))
+    with pytest.raises(TypeError):
+        advise(req)  # no default, no clock read
+    refuses(C.DATETIME_NAIVE, lambda: advise(req, advised_at=dt.datetime(2026, 9, 2, 12, 0)))
+    a = advise(req, advised_at=fx.NOW)
+    b = advise(req, advised_at=fx.NOW + dt.timedelta(microseconds=1))
+    same_instant = advise(req, advised_at=fx.NOW.astimezone(dt.timezone(dt.timedelta(hours=5))))
+    assert a.advisory_digest != b.advisory_digest
+    assert a.advisory_digest == same_instant.advisory_digest
+    assert dataclasses.replace(a, advised_at=b.advised_at, advisory_digest="").advisory_digest == b.advisory_digest
+
+
 def test_r_h_blank_rule_version_or_rationale():
     refuses(C.REF_BLANK_FIELD, lambda: Rule("r", "", RuleKind.SUPPORT, Predicate(PredicateKind.STRUCTURAL_TOKEN_PRESENT, ("comparison_request",)), ("map_reduce",), "ref", "why"))
     refuses(C.REF_BLANK_FIELD, lambda: Rule("r", "0", RuleKind.SUPPORT, Predicate(PredicateKind.STRUCTURAL_TOKEN_PRESENT, ("comparison_request",)), ("map_reduce",), "ref", ""))
@@ -134,7 +184,7 @@ def test_r_f_benchmark_derived_is_not_a_label():
 def test_public_api_and_version_pin():
     for n in api.__all__:
         assert hasattr(api, n), n
-    assert {m.value for m in A} == {"PROFILE_CLASS_MISMATCH", "RULE_METHOD_UNKNOWN", "PRIMARY_WITHOUT_SOLE_QUALIFIER", "CLASSIFICATION_INCONSISTENT", "TRADE_OFF_CARDINALITY", "RULE_OUTCOME_VERSION_MISMATCH", "RULE_SET_UNSORTED", "RULE_DUPLICATE_ID"}
+    assert {m.value for m in A} == {"PROFILE_CLASS_MISMATCH", "RULE_METHOD_UNKNOWN", "PRIMARY_WITHOUT_SOLE_QUALIFIER", "CLASSIFICATION_INCONSISTENT", "TRADE_OFF_CARDINALITY", "RULE_OUTCOME_VERSION_MISMATCH", "RULE_SET_UNSORTED", "RULE_DUPLICATE_ID", "CATALOG_METHOD_VERSION_AMBIGUOUS"}
     import pathlib
 
     text = (pathlib.Path(__file__).resolve().parents[1] / "pyproject.toml").read_text(encoding="utf-8")

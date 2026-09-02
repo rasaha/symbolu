@@ -3,18 +3,19 @@
 A pure function of ``(profile, task_class, catalog, rule_set)``. Internal
 traversal order over rules, catalog entries and qualifying methods never
 affects any output; a test-only ``TraversalOrder`` hook lets the suite prove
-it (§7, P11). No I/O, no clock other than ``advised_at``, no numbers.
+it (§7, P11). No I/O, no clock, no numbers: ``advised_at`` is a required,
+timezone-aware, caller-supplied instant that enters ``advisory_digest``.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Callable, Dict, List, Optional, Sequence, Set, Tuple, TypeVar
 
 from ugence_reasoning_method_governance.api import USAGE_SCOPE_RESEARCH_ONLY, ReasoningMethodEntry, ReasoningMethodRef
-from ugence_reasoning_method_governance.contracts._util import digest_of
 
+from ._canon import digest_of, require_tzaware
 from .contracts import (
     ADVISORY_SCHEMA_VERSION,
     EVIDENCE_STATUS_COMPARISON_EVIDENCE_ABSENT,
@@ -32,6 +33,7 @@ from .contracts import (
     ReasoningMethodAdvisoryRequest,
     RuleKind,
     RuleOutcome,
+    validate_against_request,
     validate_against_rule_set,
 )
 from .errors import AdvisorError, AdvisorErrorCode
@@ -60,13 +62,12 @@ def _order(hook: Optional[_Order], seq: Sequence[T]) -> Sequence[T]:
 def advise(
     request: ReasoningMethodAdvisoryRequest,
     *,
-    advised_at: Optional[datetime] = None,
+    advised_at: datetime,
     _traversal: Optional[TraversalOrder] = None,
 ) -> ReasoningMethodAdvisory:
     if not isinstance(request, ReasoningMethodAdvisoryRequest):
         raise TypeError("advise() takes a ReasoningMethodAdvisoryRequest")
-    if advised_at is None:
-        advised_at = datetime.now(timezone.utc)
+    require_tzaware(advised_at, "advised_at")
     tr = _traversal or TraversalOrder()
     catalog, rule_set, profile = request.catalog, request.rule_set, request.profile
     entries: Dict[str, ReasoningMethodEntry] = {e.method_id: e for e in catalog.entries}
@@ -182,6 +183,7 @@ def advise(
         advised_at=advised_at,
     )
     validate_against_rule_set(advisory, rule_set)
+    validate_against_request(advisory, request)
     return advisory
 
 
