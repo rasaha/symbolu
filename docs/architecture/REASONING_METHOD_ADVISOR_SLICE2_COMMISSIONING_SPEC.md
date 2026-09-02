@@ -214,12 +214,23 @@ class RuleSet:
     rule_set_id: str
     rule_set_version: str
     admissibility: Predicate                    # catalog-side gate every method must pass before any rule applies (unresolved 4.1)
-    rules: tuple[Rule, ...]                     # unique rule_id; ordered by rule_id
+    rules: tuple[Rule, ...]                     # CANONICAL ORDER REQUIRED: ascending rule_id by Unicode code point; unique rule_id (see canonical-input rule)
     provenance_ref: str
     issuer_identity: str
     issued_at: datetime
     rule_set_digest: str
 ```
+
+**Canonical-input rule.** `RuleSet.rules` must be supplied in canonical
+order: ascending `rule_id`, compared by Unicode code point, with `rule_id`
+unique. A tuple not in that order is refused with `RULE_SET_UNSORTED`; a
+repeated `rule_id` is refused with `RULE_DUPLICATE_ID`. A rule set therefore
+has exactly one admitted representation, `rule_set_digest` is derived from
+that single canonical representation, and every advisory carries it in
+`rule_set`. Canonical order is a **serialization** property only: it never
+confers priority, preference or tie-breaking, and §4 step 4 reads no
+position. Order independence is therefore a property of the **evaluator**,
+tested as such (§7, P11), not a property of tolerating unsorted input.
 
 **Evaluation, exact and order-free.**
 
@@ -249,7 +260,25 @@ class RuleSet:
    `evidence_status` is `COMPARISON_EVIDENCE_ABSENT`.
 
 Evaluation is a pure function of `(profile, task_class, catalog, rule_set)`.
-The same inputs yield the same `advisory_digest` across processes.
+The same inputs yield the same `advisory_digest` across processes. The
+evaluator's internal traversal order over rules, catalog entries and
+qualifying methods must not affect any output: implementations are tested by
+evaluating one admitted canonical `RuleSet` through differently ordered
+internal traversals (§7, P11).
+
+**Constructor obligations on the advisory (every one a §7 row):**
+
+- `trade_offs` is empty when zero or one method qualifies.
+- When more than one method qualifies, `trade_offs` holds **exactly one**
+  record per qualifying method, in the same order as `qualifying`, and no
+  record for any excluded method.
+- A `QualifyingTradeOff` with empty `distinguishing_reasons` **and** empty
+  `distinguishing_requirement_refs` is permitted: it states that the method is
+  not distinguishable from the others by rule or requirement, and is never
+  presented, ordered or labelled as a preference.
+- Every `RuleOutcome.rule_version` equals the `rule_version` of the rule in
+  the admitted `RuleSet` whose `rule_id` it names; a mismatch is refused with
+  `RULE_OUTCOME_VERSION_MISMATCH`.
 
 **Initial rule set `rules.research.v0`.** Provenance: a transcription of
 `WorkflowSelector.SIGNAL_MAP` (`reasoning_workflows.py:1177-1188`) `[V]` into
@@ -341,14 +370,20 @@ asserted stable across two constructions and two processes.
 | P6 | `comparison_request`, catalog where `map_reduce` carries only `UNIT_TESTS_PRESENT` evidence | modified fixture | `map_reduce` excluded `INADMISSIBLE_IMPLEMENTATION_STATUS`; `Q = ∅` |
 | P7 | P1 with `task_class = None` | same | identical `qualifying`; `task_class_digest` `None`; `UNCLASSIFIED_EXPLORATORY` / `INELIGIBLE_UNCLASSIFIED`; `evidence_status` explicitly `COMPARISON_EVIDENCE_ABSENT` |
 | P8 | field-set test over `ReasoningMethodAdvisoryRequest` and `ReasoningMethodAdvisory` | — | no field named `comparison_results`, `comparison_result_digests` or any `*comparison*` name exists |
-| P11 | P1 evaluated with the rule tuple reversed and with rules re-ordered by a different key | same | identical `advisory_digest` (order independence) |
+| P11 | evaluator-level order independence: P1's admitted canonical `RuleSet` evaluated through three differently ordered internal traversals (rules reversed, catalog entries reversed, qualifying methods shuffled by a seeded permutation), via a test-only traversal hook | same | identical `qualifying`, `excluded`, `trade_offs`, `primary` and `advisory_digest` across all traversals |
+| P12 | P1's rules supplied in reversed order | same | `RuleSet` refused with `RULE_SET_UNSORTED`; the rule set has one admitted representation |
+| P13 | P2 (two qualifiers) | same | `trade_offs` has exactly two records, one per qualifying method, in `qualifying` order, and none for any excluded method |
+| P14 | P5 (two qualifiers supported by the same rule) | same | both trade-offs have empty `distinguishing_reasons`; the advisory carries no preference field, ordering or label between them |
 | P9 | P1 with `reversibility = UNDETERMINED` | same | constructs (a profile may be undetermined); same `Q` |
 | P10 | P1 twice, then with `rule_set_version` bumped | same | first two digests equal; third differs |
 | R-a | any advisory type declared with a field named `score`, `rank`, `probability`, `cost` or `latency_class` | — | refused at class definition |
 | R-b | a `Rule` naming a method absent from the catalog | — | `RULE_METHOD_UNKNOWN` at evaluation |
 | R-c | a `Predicate` of kind `STRUCTURAL_TOKEN_PRESENT` with a non-signal token | — | `SIGNAL_TOKEN_UNKNOWN` |
 | R-d | a request whose `task_class.structural_characteristics` omits a profile token | — | `PROFILE_CLASS_MISMATCH` |
-| R-e | a hand-built advisory with `primary` set and `|qualifying| ≠ 1`, or with `trade_offs` non-empty and `|qualifying| ≤ 1` | — | `PRIMARY_WITHOUT_SOLE_QUALIFIER` |
+| R-e | a hand-built advisory with `primary` set and `|qualifying| ≠ 1` | — | `PRIMARY_WITHOUT_SOLE_QUALIFIER` |
+| R-i | a hand-built advisory with `trade_offs` non-empty and `|qualifying| ≤ 1`, or with `|qualifying| > 1` and a trade-off count other than `|qualifying|`, or a trade-off naming an excluded method | — | `TRADE_OFF_CARDINALITY` |
+| R-j | a hand-built advisory whose `RuleOutcome.rule_version` differs from the admitted rule's version for that `rule_id` | — | `RULE_OUTCOME_VERSION_MISMATCH` |
+| R-k | a `RuleSet` with two rules sharing a `rule_id` | — | `RULE_DUPLICATE_ID` |
 | R-g | a hand-built advisory with `task_class_digest` `None` and `classification = GOVERNED_TASK_CLASS`, or `UNCLASSIFIED_EXPLORATORY` with `eligibility ≠ INELIGIBLE_UNCLASSIFIED` | — | `CLASSIFICATION_INCONSISTENT` |
 | R-h | a `Rule` with blank `rule_version` or blank `rationale_statement` | — | `REF_BLANK_FIELD` |
 | R-f | `AdvisoryLabel("BENCHMARK_DERIVED")` | — | `ValueError`: not a member |
@@ -357,6 +392,7 @@ asserted stable across two constructions and two processes.
 Slice 2 adds these codes to a package-local `AdvisorErrorCode`:
 `PROFILE_CLASS_MISMATCH`, `RULE_METHOD_UNKNOWN`,
 `PRIMARY_WITHOUT_SOLE_QUALIFIER`, `CLASSIFICATION_INCONSISTENT`,
+`TRADE_OFF_CARDINALITY`, `RULE_OUTCOME_VERSION_MISMATCH`,
 `RULE_SET_UNSORTED`, `RULE_DUPLICATE_ID`; it reuses `REF_BLANK_FIELD`, `DIGEST_MALFORMED`,
 `SIGNAL_TOKEN_UNKNOWN`, `SCALAR_LABEL_FIELD_PRESENT` and `DATETIME_NAIVE`
 from slice 1 `[V]`.
@@ -440,3 +476,16 @@ experiment or test changed with this record.
 | 2 | `task_class` optional with no consequence beyond a `None` digest | Unclassified requests receive exploratory `RULE_DERIVED` advice only, marked `UNCLASSIFIED_EXPLORATORY` / `INELIGIBLE_UNCLASSIFIED`; `COMPARISON_EVIDENCE_ABSENT` explicit on every advisory (§2, §3, §5, P7, R-g) |
 | 3 | Request carried a `comparison_results` slot, recorded but unused | Slot removed from both contracts; ingestion only in the later benchmark-derived slice through a separately ratified contract change; field-set test asserts absence (§1, §2, §3, §6, §8, P8) |
 | 4 | Transcription of `WorkflowSelector` described as provenance without stating what it is not | Stated as research provenance, not evidence the routing is correct; every rule carries a stable `rule_id`, `rule_version`, declared predicate and `rationale_statement`, propagated into each `RuleOutcome` (§4, R-h) |
+
+**Correction (owner instruction, 2026-09-02, after ratification).** The
+ratified text retained `RULE_SET_UNSORTED` while P11 supplied the same rules
+reversed and expected an identical digest, which cannot both hold. Resolved
+by the canonical-input approach: `RuleSet.rules` must be supplied in one
+stated canonical order (ascending `rule_id` by code point), unsorted or
+duplicate rules are refused, canonical order affects serialization and never
+priority, the advisory digest derives from the single canonical
+representation, and P11 is replaced by an evaluator-level traversal-order
+test. Constructor obligations on `trade_offs` cardinality, permitted empty
+differences, and `RuleOutcome.rule_version` fidelity were added (§4, §7 rows
+P11–P14, R-i, R-j, R-k). The three ballot rulings are unchanged by this
+correction.
