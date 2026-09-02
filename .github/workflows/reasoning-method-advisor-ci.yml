@@ -3,7 +3,8 @@
 #
 # Runs the advisor package's suite: the §7 profile rows P1–P14, refusal rows
 # R-a to R-k, the boundary test, the public-API and version pins, and the
-# cross-process digest-stability test. numpy is installed only so the optional
+# cross-process digest-stability test, plus the research-only developer demo suite
+# (tests/experiments/reasoning_method_advisor_demo). numpy is installed only so the optional
 # provenance pin against the experimental selector's SIGNAL_MAP can import the
 # runtime tree; the package under test never imports it.
 name: Reasoning Method Advisor CI
@@ -13,6 +14,8 @@ on:
     branches: ["main", "master", "dev", "claude/**"]
     paths:
       - "packages/capabilities/reasoning-method-advisor/**"
+      - "experiments/reasoning_method_advisor_demo/**"
+      - "tests/experiments/reasoning_method_advisor_demo/**"
       - "packages/capabilities/reasoning-method-governance/**"
       - "packages/governance-contracts/**"
       - "packages/uvi-policy-contracts/**"
@@ -24,6 +27,8 @@ on:
     branches: ["main", "master", "dev", "claude/**"]
     paths:
       - "packages/capabilities/reasoning-method-advisor/**"
+      - "experiments/reasoning_method_advisor_demo/**"
+      - "tests/experiments/reasoning_method_advisor_demo/**"
       - "packages/capabilities/reasoning-method-governance/**"
       - "packages/governance-contracts/**"
       - "packages/uvi-policy-contracts/**"
@@ -84,6 +89,7 @@ jobs:
         run: |
           python -m pytest \
             packages/capabilities/reasoning-method-advisor/tests \
+            tests/experiments/reasoning_method_advisor_demo \
             -v \
             --tb=short \
             --disable-warnings \
