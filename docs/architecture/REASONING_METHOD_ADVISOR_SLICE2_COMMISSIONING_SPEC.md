@@ -89,9 +89,11 @@ joinability to a future comparison, not any eligibility for approval.
 **Refusals (constructor):** blank identifiers (`REF_BLANK_FIELD`); a
 `task_class` whose `structural_characteristics` are not a superset of the
 profile's (`PROFILE_CLASS_MISMATCH`); a `catalog` carrying more than one
-`method_version` for one `method_id` (`CATALOG_METHOD_VERSION_AMBIGUOUS`):
-rules name `method_id` only (§4), so such a catalog has no unambiguous
-evaluation and is refused rather than collapsed to one version.
+`method_version` for one `method_id` (`CATALOG_METHOD_VERSION_AMBIGUOUS`,
+owner-ratified amendment, §11): rules name `method_id` only (§4), so such a
+catalog has no unambiguous evaluation and is refused. The advisor never
+selects the newest, oldest or otherwise preferred version; supporting
+multiple versions requires a separately ratified rule-reference contract.
 The request never carries a query string, a prompt, or runtime text:
 `ComplexityDetector.analyze(self, text: str)` (`adaptive_prompts.py:359`)
 `[V]` reads runtime text and is not consumed; the profile's
@@ -183,6 +185,12 @@ makes its classification a fact about the request. A hand-built advisory
 that pairs an unclassified request's digests with a fabricated
 `task_class_digest` therefore constructs but is refused against that request,
 and `advise()` applies the binding before returning.
+**Scope of the binding (owner ruling, 2026-09-02).** `validate_against_request`
+proves **consistency with a supplied request**, not authenticity, issuer
+authority or trusted provenance. Whether the request, its catalog, its rule
+set or the advisory came from an authorised issuer, and whether any of them
+is attested or verified, remain outside slice 2 (§8: no attestation,
+verification or envelope issuance).
 
 **Prohibitions carried structurally.** No field can hold a number: there is no
 score, rank, probability, confidence, cost, latency or resource label, and a
@@ -538,3 +546,18 @@ supported by the same rule) with the "second rule on the same token" case
 kept as an explicit variant; both readings evaluate under the ratified §3
 definition of a distinguishing reason, so no behaviour changed and no ruling
 was required.
+
+**Owner amendment (2026-09-02, after the audit correction).** *Owner ruling,
+verbatim:* "I ratify the Slice 2 amendment CATALOG_METHOD_VERSION_AMBIGUOUS:
+while rules target only method_id, a catalog containing multiple versions of
+that method is ambiguous and must be refused. The advisor must not select the
+newest, oldest or otherwise preferred version. Supporting multiple versions
+requires a separately ratified rule-reference contract." The owner further
+directed that `validate_against_request` be stated as proving consistency
+with a supplied request, not authenticity, issuer authority or trusted
+provenance, which remain outside Slice 2 (§3). Applied: §2 refusal, §3
+binding scope, §7 rows R-l and R-m. The three §10 ballot rulings are
+unchanged. **Authority.** Owner ratification by Rakesh Mohan, 2026-09-02,
+issued as an explicit owner instruction in Claude Code session
+`session_01VXERHvJzbb9cjZ1GyFFQLn`; the model analysis was advisory only and
+the owner instruction was the ratifying act.
