@@ -1,7 +1,7 @@
 # Reasoning Method Advisor — Scoping Note
 
-**Status:** scoping note; **owner decisions 2 and 4 recorded AMENDED
-2026-09-02** (§8; decisions 1, 3 and 5 remain `[R]`). **Documentation only.**
+**Status:** scoping note; **owner decision 1 recorded RATIFIED and decisions
+2 and 4 recorded AMENDED, 2026-09-02** (§8; decisions 3 and 5 remain `[R]`). **Documentation only.**
 This note connects no runtimes, adds no contract, changes no enum, and
 implements no package. Every contract named below is a **candidate**, specified for
 ratification, not created.
@@ -337,11 +337,17 @@ boundary and no pilot can be assessed.
 
 ## 8. Owner decisions `[R]`
 
-1. **Placement, terminology and the advisor's own rules** — Reasoning Method
-   Advisor as a new capability, justified by authority and lifecycle (§2), with
-   the AWC-extension alternative recorded; *method* not *workflow*; the four
-   candidate contract names; and the **advisor-specific no-forced-winner rule**
-   ratified on its own, citing OD-8 as precedent only (§5).
+1. **Placement, terminology and the advisor's own rules** — ~~`[R]`~~
+   **RATIFIED 2026-09-02.** *As proposed:* Reasoning Method Advisor as a new
+   capability, justified by authority and lifecycle (§2), with the
+   AWC-extension alternative recorded; *method* not *workflow*; the four
+   candidate contract names; and the advisor-specific no-forced-winner rule
+   ratified on its own, citing OD-8 as precedent only (§5). *Owner ruling,
+   verbatim:* "Reasoning Method Advisor is a separate design-time capability.
+   It uses reasoning method, not workflow, as its contract vocabulary. It owns
+   an advisor-specific no-forced-winner rule; OD-8 is precedent only and does
+   not supply authority. It neither extends Agentic Proposer nor Agent
+   Workforce Composer."
 2. **Execution-record boundary, and the record's governance** — ~~`[R]`~~
    **AMENDED 2026-09-02.** *As proposed:* the neutral record's field set and
    version; the adapter obligation with no direct import; the undecided
@@ -384,15 +390,17 @@ boundary and no pilot can be assessed.
 Constants, thresholds, sampling rates, label semantics beyond the three names,
 catalog members and profile fields remain unratified with no defaults.
 
-**Recommendation (post-ratification, 2026-09-02):** decision 2's boundary and
-adapter architecture is resolved AMENDED, and decision 4 is resolved AMENDED, as
-recorded above. The later execution-record contract round that decision 2 names
+**Recommendation (post-ratification, 2026-09-02):** decision 1 is resolved
+RATIFIED, decision 2's boundary and adapter architecture is resolved AMENDED,
+and decision 4 is resolved AMENDED, as recorded above. The later execution-record contract round that decision 2 names
 still gates implementation and pilots. Decisions 1, 3 and 5 remain `[R]`.
 Ratify nothing numeric. Create no contract, connect no runtime, and change no
 enum until that contract round is taken.
 
-**Ratification record (2026-09-02).** Decision 2 AMENDED; decision 4 AMENDED —
-each as recorded above. Decisions 1, 3 and 5 remain `[R]`. Decision 2's ruling
+**Ratification record (2026-09-02).** Decision 1 RATIFIED (recorded after the
+read-only post-merge audit of slice 1 at `4369089d`, PR #1569, found no
+blocking defect); decision 2 AMENDED; decision 4 AMENDED — each as recorded
+above. Decisions 3 and 5 remain `[R]`. Decision 2's ruling
 ratifies the boundary and adapter architecture only; the contract round it
 gates has not been taken.
 
