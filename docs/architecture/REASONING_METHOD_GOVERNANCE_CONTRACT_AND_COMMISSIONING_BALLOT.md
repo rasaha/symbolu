@@ -1004,13 +1004,13 @@ ratifying it for approval-bearing work would commission an engine that admits
 one execution per method. Items 1 and 3 are independent of the rest, except
 that rejecting every option of 1.1 leaves `ExecutionTelemetry` undefined.
 
-1. ****Placement and ownership — RATIFIED AS RECOMMENDED** — two packages with stable ownership as in
+1. **Placement and ownership — RATIFIED AS RECOMMENDED** — two packages with stable ownership as in
    §1: shared contracts in `ugence-reasoning-method-governance`, the
    comparison implementation in `ugence-readiness-comparison`, both in slice
    1, no code placed for a later move, the comparison port owned by the contracts package only while reasoning-method fit is its sole request type (§1); telemetry vocabulary mirrored and pinned by test
    (1.1-B); forbidden imports enforced by boundary test in both packages.
    *Options: 1.1-A / 1.1-B / 1.1-C. Recommendation: 1.1-B.*
-2. ****Catalog and task-class vocabulary — RATIFIED AS RECOMMENDED** — `ReasoningMethodCatalogRef` and
+2. **Catalog and task-class vocabulary — RATIFIED AS RECOMMENDED** — `ReasoningMethodCatalogRef` and
    `ReasoningMethodRef` as in §2 with no blank-method refs; implementation
    status derived from evidence, with the seven `WorkflowType` members at
    `EXECUTABLE_TESTED` on the cited evidence and a growth rule requiring
@@ -1019,7 +1019,7 @@ that rejecting every option of 1.1 leaves `ExecutionTelemetry` undefined.
    `TaskReversibility` distinct from action reversibility (3.2-A);
    compatibility by digest equality.
    *Options: 2.1-A/B/C, 3.1-A/B/C, 3.2-A/B/C. Recommendations: C, B, A.*
-3. ****Execution record and evidence — RATIFIED AS RECOMMENDED** — v1 record permanently at
+3. **Execution record and evidence — RATIFIED AS RECOMMENDED** — v1 record permanently at
    `OBSERVED/UNATTESTED/UNVERIFIED` as class constants; attestation and
    verification only as authority envelopes referencing `record_digest`, with
    status computed from envelopes whose issuers are resolved in the request;
@@ -1027,7 +1027,7 @@ that rejecting every option of 1.1 leaves `ExecutionTelemetry` undefined.
    two-records-in-one-lineage refused (4.1-A); free-string issuer identity
    (4.2-A); artifacts by reference only.
    *Options: 4.1-A/B/C, 4.2-A/B/C. Recommendations: A, A.*
-4. ****Comparison policy and rules — RATIFIED AS RECOMMENDED** — required dimensions declared in the
+4. **Comparison policy and rules — RATIFIED AS RECOMMENDED** — required dimensions declared in the
    class's `ComparisonPolicy`, all required on every record, no fallback;
    quality direction derived from the comparator with `EQ`/`NEQ`, unit
    mismatch and non-decimal scales refused; exactly one governed quality
@@ -1037,7 +1037,7 @@ that rejecting every option of 1.1 leaves `ExecutionTelemetry` undefined.
    admission, never by reference presence; the four-outcome derivation of §5
    exactly.
    *Options: 5.1-A/B/C. Recommendation: A.*
-5. ****Commissioning, research-only — RATIFIED AS RECOMMENDED** — slice 1 scope, exclusions and
+5. **Commissioning, research-only — RATIFIED AS RECOMMENDED** — slice 1 scope, exclusions and
    definition of done as in §9; no approval eligibility, pilot state,
    Decision Authority responsibility, revision lineage or reassessment
    trigger until Advisor decision 5 is ratified; no capture boundary required
