@@ -2,7 +2,9 @@
 
 **Status:** design note for owner review. No implementation, no package change.
 **Scope:** `packages/capabilities/agent-value-readiness`, its consumed contracts,
-and the UVI ADR (`ADR_UGENCE_VALUE_INTELLIGENCE_GV2C_GV2E_GV3R.md`).
+the UVI ADR (`ADR_UGENCE_VALUE_INTELLIGENCE_GV2C_GV2E_GV3R.md`) and the ratified
+Trusted Evidence and Benchmark Registry ADR
+(`ADR_UGENCE_TRUSTED_EVIDENCE_AND_BENCHMARK_REGISTRY.md`).
 **Evidence labels:** `[V]` verified against the repository · `[I]` inferred ·
 `[R]` requires owner ratification · `[G]` gap.
 
@@ -91,37 +93,79 @@ Alternatives, none selected here `[R]`:
 The earlier claim that the proposed pair "slots into the existing contract as-is"
 was wrong and is withdrawn.
 
-## 4. The Readiness Assessment Producer boundary
+## 4. The comparison boundary is already ratified
 
-A conceptual role, deliberately **not assigned to any existing package** `[R]`:
+An earlier draft of this note proposed a new "Readiness Assessment Producer"
+role. **That was wrong and is withdrawn.** The role already exists, ratified,
+under a different name: the **consuming evaluation engine**.
 
-| Supplies | Who |
+`ADR_UGENCE_TRUSTED_EVIDENCE_AND_BENCHMARK_REGISTRY.md` §18 separates four
+artifacts and assigns each an owner `[V]`:
+
+| Artifact | Owner |
 |---|---|
-| thresholds, comparators, normalization methods, method versions | governed policy (`GovernedThreshold`, `IntendedOutcomePolicy`) |
-| measurements | admitted evidence (`MetricClaim` and its evidence axes) |
-| dimension attainments, factor scores, coverage, any `B`/`G` | **the producer** |
-| validation and carriage of the admitted result | the readiness package, unchanged |
+| Benchmark definition — *what is measured and how comparison is interpreted* | Ugence Benchmark Registry |
+| Observed measurement | measurement systems; evidence verified by TAP |
+| **Benchmark comparison result** — *deterministic comparison of a verified observation against an exactly resolved definition* | **consuming evaluation engine** |
+| Policy decision — *whether that comparison matters* | Policy Authority (requirement), applied by the consuming engine |
 
-The producer is the component that would breach the readiness boundary if it
-lived inside it. It must also obey ADR "reference producers never self-attest"
-(`:322`): a producer's composite arrives with the same evidence axes as its
-inputs and elevates nothing.
+The same assignment is restated twice more: §7.2 row 5 puts "calculating
+benchmark results / comparisons" with the consuming evaluation engine, and §8's
+role-separation matrix row 11 names the "measurement / comparison engine" as the
+consuming evaluation engine — explicitly **not** the Registry, TAP or Policy
+Authority `[V]`. **B-12 — "The Registry computes nothing"** states that the
+Registry does not manufacture observations, calculate benchmark results, perform
+comparisons, compute readiness or calculate ROI; its outputs are definitions and
+resolutions `[V]`.
+
+**No new role may be created for this.** Introducing a second name for a
+ratified boundary would create exactly the parallel vocabulary this platform is
+built to avoid.
+
+Note what the same ADR assigns separately: §7.2 row 6 puts "computing readiness"
+with `agent-value-readiness`, and §8 row 12 names it the *readiness consumer*,
+not an evidence verifier or benchmark registrar (§19) `[V]`. Computing readiness
+and performing benchmark comparison are therefore **distinct ratified roles**.
+Which component plays the consuming evaluation engine for readiness attainments
+is unresolved here `[R]`; this note only forbids inventing a new name for it.
 
 ## 5. Normalization — appropriate to the declared scale
 
-`MetricClaim` carries `governed_unit` but **no declared measurement scale**
-(ratio / interval / ordinal). `[G]` `governance-contracts …/evidence.py:357-376`.
-`GovernedThreshold` carries one `comparator` and one `literal_value`, with **no
-reference bounds**. `[V]` `uvi-policy-contracts …/thresholds.py`.
+**The Registry stores semantics and references, and performs no normalization,
+conversion or comparison.** `BenchmarkMeasurementSemantics` records seven
+required coordinates — `intended_outcome_ref`, `metric_ref`, `unit`,
+`measurement_protocol_ref`, `population_ref`, `aggregation_semantics_ref`,
+`observation_window_ref` — and states in its own contract that no conversion,
+normalization, dimensional analysis, comparison, aggregation or evaluation
+happens there or anywhere in that package `[V]`.
+
+**Measurement scale is absent from every contract.** `MetricClaim` carries
+`governed_unit`; `BenchmarkMeasurementSemantics` carries `unit`; neither
+declares ratio / interval / ordinal / binary / categorical. `[G]`
+`governance-contracts …/evidence.py`, `benchmark-registry …/BenchmarkMeasurementSemantics`.
+
+**Direction already exists — do not duplicate it.** `GovernedThreshold.comparator`
+is a five-member `ComparisonOperator` (`GTE`, `GT`, `LTE`, `LT`, `EQ`) `[V]`
+`enums.py:83-93`. A separate `HIGHER_IS_BETTER` field would be a second encoding
+of the same fact. What `GovernedThreshold` does **not** carry is reference
+bounds: it holds `threshold_id`, `governed_unit`, `comparator`, `literal_value`
+and an optional `benchmark_ref`. `[V]` `uvi-policy-contracts …/thresholds.py`.
+
+UVI ADR §13, preserved by §18, fixes where a threshold may live: a signed
+threshold is a `PolicyThreshold` literal or a `BenchmarkReference`, **never** a
+`MetricClaim` `[V]`. Normalization policy therefore attaches to the
+policy/threshold side, not to observations.
 
 Consequences the producer must honour:
 
 - **Ratio normalization only where the scale supports it** — positive,
   ratio-scale, meaningful zero. Not universal; not the default.
-- **Strict comparators.** `GT`/`LT` must not yield full attainment at equality;
-  the pass determination stays with the upstream gate evaluator, and attainment
-  cannot exceed what that determination permits. `[V]` `ComparisonOperator`
-  has five members, `enums.py:83-93`.
+- **Strict comparators — attainment and pass/fail are separate results.**
+  A value of `0.90` against a `GT 0.90` threshold yields **attainment 1.0** and
+  **threshold status failed**. Full normalized attainment does not imply a pass,
+  and the pass determination stays with the upstream comparison, never with the
+  normalization. Any contract carrying attainment must keep the two fields
+  distinct.
 - **Zero thresholds.** A lower-is-better dimension with `t = 0` cannot be
   normalized by `t / v`. Such dimensions need governed reference bounds, which
   the current threshold contract does not carry. `[G]`
@@ -132,7 +176,39 @@ Consequences the producer must honour:
   governed minimum. No result may claim "all dimensions met" when the coverage
   rule admitted exclusions.
 
-## 6. Comparison and ranking — not defined
+## 6. Recorded recommendations — not implemented, not ratified
+
+Recorded for the ballot. None is implemented; none is a default.
+
+1. **Measurement scale belongs on `BenchmarkMeasurementSemantics`**, because it
+   describes the governed metric definition rather than an individual
+   observation. It stays descriptive metadata — the Registry still computes
+   nothing (B-12).
+2. **Normalization policy belongs on the policy/threshold side** and reuses
+   `GovernedThreshold.comparator`. Direction is not duplicated. Reference bounds
+   and ordinal mappings are method-specific and optional *according to the
+   declared measurement scale* — not universally required.
+3. **Any attainment addition should be an optional nested advisory object on the
+   existing indicator results** — not a parallel result schema and not a bare
+   scalar. It must bind: a normalized `Decimal` in `[0, 1]`; normalization
+   method id and version; policy / threshold / benchmark references;
+   coverage or applicability status; and `is_advisory=True`.
+4. **Coverage belongs in a factor / profile summary** and must expose the
+   measured and applicable populations, not a single unexplained percentage.
+5. **The singular `AdvisoryComposite` remains unchanged** until the owner
+   separately decides whether its one score represents `B`, represents `G`, or
+   whether a separately ratified profile contract is justified.
+
+### Cross-ADR consequence
+
+Recommendation 1 modifies `BenchmarkMeasurementSemantics`, a contract ratified
+under `ADR_UGENCE_TRUSTED_EVIDENCE_AND_BENCHMARK_REGISTRY.md` (B-1, §15), whose
+current form has **no optional field, no default and no partial state** `[V]`.
+**Adding measurement scale to it is a cross-ADR contract decision and requires
+an ADR amendment before any code.** It cannot be carried as an incidental field
+addition, and this note does not propose the amendment text.
+
+## 7. Comparison and ranking — not defined
 
 This note defines **no cross-tier ranking and no automated ranking**. Any future
 within-tier comparison is restricted to subjects sharing the same requested
@@ -142,7 +218,7 @@ another unratified constant. The marginal-return lever (`argmax α_F / F`) is
 **omitted from v1**: it ignores remediation cost and feasibility and can
 misdirect action.
 
-## 7. Validation order
+## 8. Validation order
 
 1. **Operational outcomes first**, per outcome class: realized utilization,
    override and rejection rates, quality, incidents. These are what a leading
@@ -155,35 +231,48 @@ misdirect action.
 Sample size, effect threshold and acceptance criteria are pre-registration
 matters, not defaults in this note.
 
-## 8. Owner decisions `[R]`
-
-1. **Contract path for `B` and `G`** — carry one, encode one, or ratify a
-   contract change (§3).
-2. **Producer host** — which component becomes the Readiness Assessment
-   Producer (§4).
-3. **Normalization artifacts** — reference bounds, measurement-scale
-   declaration, ordinal mapping, strict-comparator handling (§5).
-4. **Aggregation and exponents** — factor aggregation rule, coverage minimum,
-   and the `α, β, γ` triples per outcome class, all as versioned policy (§2.3).
-5. **Validation pre-registration** — primary operational targets, sample size,
-   effect threshold, acceptance criteria (§7).
-
 ## 9. Contract-fit table
+
+Corrected against the Benchmark Registry and governance contracts.
 
 | Quantity | Exists today | Carried unchanged | Unrepresented |
 |---|---|---|---|
 | Readiness tier, rules `R0`–`R8` | yes `[V]` | yes | — |
 | Blocking gate **set** (non-ready) | yes, five trace fields `[V]` | yes | — |
-| Lowest observed factor (ready) | no | — | needs producer output `[G]` |
+| Governed metric definition | `BenchmarkMeasurementSemantics`, 7 required coordinates `[V]` | yes | scale only |
+| Claim → definition / policy linkage | `MetricClaim.benchmark_refs`, `.policy_refs`, `.calculation_ref`, `.model_ref` `[V]` | yes | — |
+| Threshold + direction | `GovernedThreshold.comparator`, 5 operators `[V]` | yes | reference bounds |
+| Factor grouping I / C / A | `ReadinessIndicatorClass` + three catalogs `[V]` | yes | — |
+| Dimension result provenance | indicator results carry dimension, `claim`, `status`, `threshold_ref`, `benchmark_ref`, `evidence_refs`, system binding `[V]` | yes | — |
+| Policy resolution | `PolicyAuthorityReadinessPolicyResolver` `[V]` | yes | measurement policy |
 | One advisory score, versioned, `Decimal`, bounded | `AdvisoryComposite` `[V]` | yes | — |
-| Second advisory score (`B` *and* `G`) | no | — | singular slot `[V]` |
-| Dimension attainment | no | — | no field on any indicator result `[G]` |
-| Declared measurement scale | no | — | absent from `MetricClaim` `[G]` |
-| Reference bounds per threshold | no | — | absent from `GovernedThreshold` `[G]` |
-| Coverage per factor | no | — | `[G]` |
-| Producer authority / method registry | no | — | `[G]` |
+| **Declared measurement scale** | no | — | `[G]` |
+| **Governed normalization policy / reference bounds** | no | — | `[G]` |
+| **Normalized advisory attainment** | no | — | `[G]` |
+| **Coverage / factor summary** | no | — | `[G]` |
+| **More than one advisory quantity** (`B` *and* `G`) | no | — | singular slot `[V]` |
 | Ranking consumer | no | — | none exists; none defined `[V]` |
 
-**Recommendation:** ratify §2 and §4 as architecture. Ratify nothing numeric.
-Do not implement until decisions 1–3 are made; decisions 4–5 gate any method
-version beyond a stub.
+Five gaps remain, not seven new contracts. The earlier inventory understated
+what already exists and is corrected here.
+
+## 10. Owner ballots `[R]`
+
+1. **Comparison-engine assignment** — which component plays the ratified
+   consuming evaluation engine for readiness attainments (§4).
+2. **Measurement scale** — adopt recommendation 1, requiring an amendment to the
+   Benchmark Registry ADR before code (§6).
+3. **Normalization policy artifact** — reference bounds, ordinal mappings and
+   method versioning on the policy/threshold side (§6, recommendation 2).
+4. **Attainment representation** — the nested advisory object on existing
+   indicator results, its required fields, and its versioning (§6, recommendation 3).
+5. **Advisory carriage** — whether `AdvisoryComposite` carries `B`, carries `G`,
+   or a profile contract is ratified; and the coverage summary shape (§6, recommendations 4 and 5).
+
+Constants, formulas, exponents, mappings, coverage minima and statistical
+acceptance criteria remain unratified with no defaults, as in §8.
+
+**Recommendation:** ratify §2 and §4 as architecture — §4 by *binding to the
+existing ratified role*, not by creating one. Ratify nothing numeric. Ballot 2
+requires an ADR amendment before any code. Ballots 1, 3 and 4 gate
+implementation; ballot 5 gates any advisory output beyond a single score.
