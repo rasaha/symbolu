@@ -1,7 +1,9 @@
 # Workflow-Fit Readiness — Scoping Note
 
-**Status:** scoping note for owner review. No implementation, no package change,
-no contract or protocol proposal.
+**Status:** scoping note; **owner decisions 2, 3 and 5 recorded 2026-09-02**
+(§11: decision 2 RATIFIED, decision 3 RATIFIED AS AMENDED, decision 5 AMENDED;
+decisions 1 and 4 remain `[R]`). No implementation, no package change, no
+contract or protocol proposal.
 **Scope:** `agentic/agentic_framework/reasoning_workflows.py`, the S2-B strategy
 vocabulary, the readiness and governed-value contracts, and the Context
 Minimization token-accounting contracts.
@@ -384,28 +386,34 @@ until that role is assigned.
    governed package, and none is proposed; the binding would have to travel
    through the neutral execution record specified in
    `REASONING_METHOD_ADVISOR_SCOPING_NOTE.md` §3.
-2. **Status vocabulary** — ~~`[R]`~~ **RATIFIED 2026-09-02** (owner, via
-   Claude Code session `session_01VXERHvJzbb9cjZ1GyFFQLn`, PR #1566 review
-   thread). Ratified as the four names now carried by the study harness in
-   `experiments/workflow_fit_study/study.py` (`FitOutcome`):
-   `INSUFFICIENT_QUALITY`, `SUFFICIENT_RESOURCE_DOMINATED`,
-   `SUFFICIENT_PARETO_EFFICIENT`, `COMPARISON_EVIDENCE_ABSENT`. These are
-   workflow-fit's own vocabulary and do not collide with the
-   `ReadinessClassification` tiers. Ratification covers the names only; it
+2. **Status vocabulary** — ~~`[R]`~~ **RATIFIED 2026-09-02.** *Owner ruling:*
+   the workflow-fit outcome vocabulary is exactly `INSUFFICIENT_QUALITY`,
+   `SUFFICIENT_RESOURCE_DOMINATED`, `SUFFICIENT_PARETO_EFFICIENT` and
+   `COMPARISON_EVIDENCE_ABSENT`, matching the research harness
+   (`experiments/workflow_fit_study/study.py`, `FitOutcome`). These do not amend
+   or alias `ReadinessClassification`. Ratification covers the names only; it
    places them in no package, contract or enum, and the harness remains
    research tooling.
-3. **Sufficiency cap** — whether value above `τ_t` is recognised, conditioned on
-   domain and outcome class. One option to consider: let **each task class
-   declare its own sufficiency rule** — either *threshold-based*, where quality
-   above `τ_t` carries no further readiness value and the cheapest sufficient
-   workflow wins, or *improvement-valued*, where gains above `τ_t` continue to
-   count and cannot be dominated away on cost alone. §2a shows the same figures
-   resolving differently under each. No default is proposed.
+3. **Sufficiency cap** — ~~`[R]`~~ **RATIFIED AS AMENDED 2026-09-02.** *As
+   proposed:* whether value above `τ_t` is recognised, conditioned on domain and
+   outcome class, with per-task-class declaration offered as one option and no
+   default. *Owner ruling:* each governed task class declares a **versioned**
+   threshold-based or improvement-valued sufficiency rule. There is no global
+   default. **Loss-dominated or high-consequence task classes may not use
+   threshold-only sufficiency without admitted supporting evidence.** §2a shows
+   the same figures resolving differently under each rule. The research
+   harness's `SUFFICIENCY_RULE` (threshold-based, for that study only) is not a
+   task-class declaration under this ruling and confers no admitted evidence.
 4. **Trust controls** — what promotes runtime telemetry beyond
    `OBSERVED`/`UNATTESTED`/`UNVERIFIED`.
-5. **Subject ownership** — whether reasoning efficiency is an agent capability,
-   a property of the selector, or an operational property of the runtime,
-   **resolved before any catalog change is considered**.
+5. **Subject ownership** — ~~`[R]`~~ **AMENDED 2026-09-02.** *As proposed:*
+   whether reasoning efficiency is an agent capability, a property of the
+   selector, or an operational property of the runtime, resolved before any
+   catalog change. *Owner ruling:* reasoning efficiency is a property of the
+   **reasoning-method selection policy within the exact
+   `AssessedSystemBinding`**, evaluated **per governed task class**. Runtime
+   telemetry supplies evidence but does not own the judgment. **Add no
+   `CapabilityDimension` without separate ratification.**
 
 Constants, thresholds, weights, ordinal mappings, exponents, sample sizes and
 acceptance criteria remain unratified with no defaults.
@@ -416,8 +424,11 @@ any catalog work; decisions 1 and 4 gate any measurement work; the
 `WorkflowSelector` validation study in §7 can proceed under the research
 configuration in §3 and §8 without any of them.
 
-**Ratification record.** Decision 2 ratified 2026-09-02 (above). Decisions 1, 3,
-4 and 5 remain `[R]`. The §7 validation study harness and its CI were merged in
-PR #1566 under the research configuration, resolving decision 3 in the
-threshold-based direction *for that study only* (declared as `SUFFICIENCY_RULE`
-in the harness); this is not a ratification of decision 3.
+**Ratification record (2026-09-02).** Decision 2 RATIFIED; decision 3 RATIFIED
+AS AMENDED; decision 5 AMENDED — each as recorded above. Decisions 1 (usage
+binding) and 4 (trust controls) remain `[R]`. The §7 validation study harness
+and its CI were merged in PR #1566 under the research configuration before these
+rulings; its `SUFFICIENCY_RULE` is a research-only reading and is superseded, for
+any governed use, by the per-task-class rule in decision 3.
+
+**Authority.** Owner ratification by Rakesh Mohan, 2026-09-02, issued as an explicit owner instruction in Claude Code session `session_01VXERHvJzbb9cjZ1GyFFQLn` after advisory analysis in ChatGPT/Codex and Claude sessions of the same date. The model analysis was advisory only; the owner instruction was the ratifying act. Nothing numeric was ratified, and no code, contract, enum, experiment or test changed with this record.
