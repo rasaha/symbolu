@@ -160,14 +160,16 @@ def run_pilot(
     provider_factory: str,
     now: Callable[[], datetime],
     boundary_env: Optional[Dict[str, str]] = None,
+    transport: Optional[str] = None,
 ) -> PilotRunResult:
-    """``now`` is caller-supplied (tests pass a fixed instant); the runner reads no clock."""
+    """``now`` is caller-supplied (tests pass a fixed instant); the runner reads no clock.
+    ``transport`` selects the boundary channel: "unix" (default where available) or "pipe"."""
     validated = validate_manifest(manifest, catalog=catalog, rule_set=rule_set, advisory=advisory)
     evaluator_flags = check_evaluator_identity(manifest.evaluator, identity, manifest.capture_boundary.boundary_identity)
     case_digests = tuple(c.case_digest for c in cases)
     if tuple(sorted(case_digests)) != manifest.benchmark.case_digests:
         raise PilotError(PilotErrorCode.BENCHMARK_MANIFEST_MISMATCH, "supplied cases are not the benchmark manifest's case set")
-    boundary = BoundaryProcess(manifest, provider_factory, env=boundary_env)
+    boundary = BoundaryProcess(manifest, provider_factory, env=boundary_env, transport=transport)
     runs: List[MethodRun] = []
     states: List[PilotConfigurationStateRecord] = []
     latest: Dict[ReasoningMethodRef, PilotConfigurationStateRecord] = {}
