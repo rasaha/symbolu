@@ -1,8 +1,9 @@
 # Reasoning Method Advisor — Scoping Note
 
-**Status:** scoping note for owner review. **Documentation only.** This note
-connects no runtimes, adds no contract, changes no enum, and implements no
-package. Every contract named below is a **candidate**, specified for
+**Status:** scoping note; **owner decisions 2 and 4 recorded AMENDED
+2026-09-02** (§8; decisions 1, 3 and 5 remain `[R]`). **Documentation only.**
+This note connects no runtimes, adds no contract, changes no enum, and
+implements no package. Every contract named below is a **candidate**, specified for
 ratification, not created.
 **Scope:** a proposed new design-time capability, its lifecycle, its output
 contract, its evaluation, and the runtime boundary it depends on.
@@ -341,20 +342,35 @@ boundary and no pilot can be assessed.
    the AWC-extension alternative recorded; *method* not *workflow*; the four
    candidate contract names; and the **advisor-specific no-forced-winner rule**
    ratified on its own, citing OD-8 as precedent only (§5).
-2. **Execution-record boundary, and the record's governance** — the neutral
-   record's field set and version; the adapter obligation with no direct import;
-   the undecided identity, canonicalization, issuer, lifecycle, compatibility
-   and promotion rules (§3); and **access, retention and disclosure rules for
-   prompts, structured artifacts and telemetry held in the record** — none of
-   which any package defines today `[G]`.
+2. **Execution-record boundary, and the record's governance** — ~~`[R]`~~
+   **AMENDED 2026-09-02.** *As proposed:* the neutral record's field set and
+   version; the adapter obligation with no direct import; the undecided
+   identity, canonicalization, issuer, lifecycle, compatibility and promotion
+   rules (§3); and access, retention and disclosure rules for prompts,
+   structured artifacts and telemetry held in the record — none of which any
+   package defines today `[G]`. *Owner ruling:* the **neutral, versioned
+   execution-record boundary and the adapter-without-direct-import
+   architecture are ratified**. The current field table (§3) is **not an
+   implementation-ready contract**. Identity, schema version, issuer/capture
+   authority, canonicalization, lifecycle, compatibility, promotion,
+   supersession, access, retention and disclosure **require a later contract
+   ruling with no defaults**.
 3. **Pilot composition and the sampling policy** — governed baseline, every
    recommended method, and challengers under a preregistered, risk-based or
    randomized policy with declared coverage; plus the anti-gaming measures of
    §6.
-4. **Task profile and task-class identity** — the minimal typed profile with
-   privacy and regulation as policy references; and **what defines a task
-   class, and when two tasks are comparable enough to share benchmark
-   evidence** — no task-class contract exists `[G]`.
+4. **Task profile and task-class identity** — ~~`[R]`~~ **AMENDED 2026-09-02.**
+   *As proposed:* the minimal typed profile with privacy and regulation as
+   policy references; and what defines a task class, and when two tasks are
+   comparable enough to share benchmark evidence — no task-class contract
+   exists `[G]`. *Owner ruling:* a **typed, versioned task profile and
+   task-class identity are ratified**. Task-class identity binds **domain,
+   intended outcome, consequence, reversibility, evidence/tool requirements,
+   structural characteristics, applicable population or distribution,
+   benchmark set, threshold and sufficiency-rule version**. Evidence may be
+   shared **only when those governed coordinates are compatible**; otherwise
+   comparison evidence is absent (`COMPARISON_EVIDENCE_ABSENT`). The contract
+   carrying this identity is not created by this ruling.
 5. **Binding lifecycle, reassessment and post-pilot approval** — pilot-only
    status via `deployment_environment_ref` or a new state; the separate
    authority-produced approval artifact; revision lineage by new digest (§4);
@@ -368,6 +384,16 @@ boundary and no pilot can be assessed.
 Constants, thresholds, sampling rates, label semantics beyond the three names,
 catalog members and profile fields remain unratified with no defaults.
 
-**Recommendation:** ratify §1, §2, §4 and §5 as architecture. Ratify nothing
-numeric. Create no contract, connect no runtime, and change no enum until
-decision 2 is taken — it gates every later step.
+**Recommendation (post-ratification, 2026-09-02):** decision 2's boundary and
+adapter architecture is resolved AMENDED, and decision 4 is resolved AMENDED, as
+recorded above. The later execution-record contract round that decision 2 names
+still gates implementation and pilots. Decisions 1, 3 and 5 remain `[R]`.
+Ratify nothing numeric. Create no contract, connect no runtime, and change no
+enum until that contract round is taken.
+
+**Ratification record (2026-09-02).** Decision 2 AMENDED; decision 4 AMENDED —
+each as recorded above. Decisions 1, 3 and 5 remain `[R]`. Decision 2's ruling
+ratifies the boundary and adapter architecture only; the contract round it
+gates has not been taken.
+
+**Authority.** Owner ratification by Rakesh Mohan, 2026-09-02, issued as an explicit owner instruction in Claude Code session `session_01VXERHvJzbb9cjZ1GyFFQLn` after advisory analysis in ChatGPT/Codex and Claude sessions of the same date. The model analysis was advisory only; the owner instruction was the ratifying act. Nothing numeric was ratified, and no code, contract, enum, experiment or test changed with this record.

@@ -1,6 +1,7 @@
 # Readiness Advisory Composite — Design Note
 
-**Status:** design note for owner review. No implementation, no package change.
+**Status:** design note; **owner ballot 1 recorded AMENDED 2026-09-02** (§10;
+ballots 2–5 remain `[R]`). No implementation, no package change.
 **Scope:** `packages/capabilities/agent-value-readiness`, its consumed contracts,
 the UVI ADR (`ADR_UGENCE_VALUE_INTELLIGENCE_GV2C_GV2E_GV3R.md`) and the ratified
 Trusted Evidence and Benchmark Registry ADR
@@ -258,8 +259,17 @@ what already exists and is corrected here.
 
 ## 10. Owner ballots `[R]`
 
-1. **Comparison-engine assignment** — which component plays the ratified
-   consuming evaluation engine for readiness attainments (§4).
+1. **Comparison-engine assignment** — ~~`[R]`~~ **AMENDED 2026-09-02.** *As
+   proposed:* which component plays the ratified consuming evaluation engine
+   for readiness attainments (§4), with the recommendation to bind to the
+   existing role rather than create one. *Owner ruling:* the
+   consuming-evaluation-engine responsibility is assigned to a **separately
+   commissioned readiness-comparison component upstream of
+   `agent-value-readiness`**, not to the current readiness evaluator itself. It
+   performs deterministic comparison and emits comparison/attainment records;
+   readiness consumes them. **This assigns responsibility but authorizes no
+   package, contract or implementation.** The ratified role (§4) is bound, not
+   renamed; the component that plays it is new.
 2. **Measurement scale** — adopt recommendation 1, requiring an amendment to the
    Benchmark Registry ADR before code (§6).
 3. **Normalization policy artifact** — reference bounds, ordinal mappings and
@@ -272,7 +282,16 @@ what already exists and is corrected here.
 Constants, formulas, exponents, mappings, coverage minima and statistical
 acceptance criteria remain unratified with no defaults, as in §8.
 
-**Recommendation:** ratify §2 and §4 as architecture — §4 by *binding to the
-existing ratified role*, not by creating one. Ratify nothing numeric. Ballot 2
-requires an ADR amendment before any code. Ballots 1, 3 and 4 gate
-implementation; ballot 5 gates any advisory output beyond a single score.
+**Recommendation (post-ratification, 2026-09-02):** ballot 1 is resolved
+AMENDED as recorded above; commissioning and contract ratification for the new
+readiness-comparison component still block implementation. Ballots 2–5 remain
+`[R]`. Ratify nothing numeric. Ballot 2 requires an ADR amendment before any
+code. Ballots 3 and 4 gate implementation; ballot 5 gates any advisory output
+beyond a single score.
+
+**Ratification record (2026-09-02).** Ballot 1 AMENDED as recorded above.
+Ballots 2, 3, 4 and 5 remain `[R]`. The ruling departs from the §4
+recommendation on *which component* plays the role while preserving the
+role itself.
+
+**Authority.** Owner ratification by Rakesh Mohan, 2026-09-02, issued as an explicit owner instruction in Claude Code session `session_01VXERHvJzbb9cjZ1GyFFQLn` after advisory analysis in ChatGPT/Codex and Claude sessions of the same date. The model analysis was advisory only; the owner instruction was the ratifying act. Nothing numeric was ratified, and no code, contract, enum, experiment or test changed with this record.
