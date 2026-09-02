@@ -41,7 +41,23 @@ Only **structured intermediate artifacts** are ever admissible — candidates,
 parent-bound revisions, decisions, summaries. **Private reasoning traces are
 never required and never admitted.**
 
-## 2. The two failure modes, kept separate
+**The inference runs one way only.** A workflow must **never be inferred from an
+observed artifact shape.** A model may privately run Tree of Thought and reveal a
+single answer; its observable output is still `SINGLE_CANDIDATE_UNREVISED`, and
+**no claim about processing may be made from that artifact**. Workflow identity
+is admissible only as declared provenance from the execution record — never
+reconstructed from what the advisory looks like. Shape constrains what may be
+declared; it never reveals what happened.
+
+**Two boundaries this note does not touch.** The existing gate-based readiness
+classification — rules `R0`–`R8`, `EVALUATOR_FORMULA_VERSION` `GV-3R-b.3` — is
+**unchanged**; workflow fit never reads it, writes it, or influences a tier.
+And workflow fit is **non-financial**: it deals in quality and counted resources,
+never money, and **never enters ROI**. Monetary consequences of reasoning spend
+belong to `governed-value`'s post-deployment `CostToServe`, which is a different
+stage with different evidence rules.
+
+## 2. The four outcomes
 
 For workflow `w` on task class `t`, with independently measured quality `Q(w,t)`
 and governed sufficiency threshold `τ_t`:
@@ -58,22 +74,80 @@ Over-reasoning         :  w meets τ_t, but some admissible v also meets τ_t
 resource function would let one resource trade against another by fiat; none is
 proposed here `[R]`.
 
-The two outcomes are **reported separately and never combined**:
+Four outcomes, **reported separately and never combined** `[R]`:
 
 | Outcome | Meaning |
 |---|---|
-| `INSUFFICIENT_QUALITY` | `Q(w,t) < τ_t` |
-| `SUFFICIENT_RESOURCE_DOMINATED` | meets `τ_t`, dominated on resources |
+| `INSUFFICIENT_QUALITY` | `Q(w,t) < τ_t` — under-reasoning |
+| `SUFFICIENT_RESOURCE_DOMINATED` | meets `τ_t`, but a tested admissible alternative also met it using no more of any governed resource and less of at least one — over-reasoning |
+| `SUFFICIENT_PARETO_EFFICIENT` | meets `τ_t` and no tested alternative dominates it — the **pass** state |
+| `COMPARISON_EVIDENCE_ABSENT` | required quality, telemetry, threshold or alternative-run evidence is missing, so **no fit judgement is made** |
+
+> **Correction.** The first draft of this note (`941f74b9`) defined only the two
+> failure modes and **named no success outcome**, so a workflow that met its
+> threshold and was dominated by nothing had no result to be assigned. That was a
+> defect, not a presentation choice: an assessment that can only report failures
+> is not an assessment. `SUFFICIENT_PARETO_EFFICIENT` and
+> `COMPARISON_EVIDENCE_ABSENT` complete the set.
 
 Low quality is **never penalised inside an efficiency score**. Mixing them would
 reproduce exactly the compensatory scoring the composite note rejects.
 
-**Vocabulary caution.** `NOT_ASSESSABLE` is a `ReadinessClassification` **tier**
-produced by evaluator rules `R0`/`R2`/`R3` `[V]`
-(`contracts/enums.py:43`). Workflow-fit must **not** reuse that name for
-"comparison evidence absent"; it needs its own status vocabulary, following the
-repository's precedent of one status enum per concern
-(`ReadinessInputVerificationStatus`, `ReadinessIndicatorAdmissionStatus`) `[R]`.
+**Vocabulary caution — why the last two are named as they are.**
+`ReadinessClassification` members are `NOT_ASSESSABLE`, `NOT_READY`,
+`PILOT_READY`, `READY_WITH_CONDITIONS`, `DEPLOYMENT_READY` `[V]`
+(`contracts/enums.py:43-47`). Workflow-fit must **not** reuse any of them — in
+particular `NOT_ASSESSABLE`, the tier produced by evaluator rules
+`R0`/`R2`/`R3`, must not be borrowed for "comparison evidence absent", hence
+`COMPARISON_EVIDENCE_ABSENT`. All four names above are unused anywhere in
+`packages/` or `agentic/` `[V]`, following the repository's precedent of one
+status enum per concern (`ReadinessInputVerificationStatus`,
+`ReadinessIndicatorAdmissionStatus`). The names are illustrative and unratified
+`[R]`.
+
+## 2a. A worked example
+
+**Illustrative figures only — not measurements.** No such benchmark has been
+run; the numbers exist to show the shape of the judgement `[I]`.
+
+Suppose policy sets `τ_t = 90%` quality for customer-support answers.
+
+**Easy task — "how do I reset my password?"**
+
+| Workflow | Quality | Calls | Meets `τ_t`? |
+|---|---|---|---|
+| Linear Chain | 92% | 1 | yes |
+| Tree of Thought | 94% | 4 | yes |
+| Debate | 95% | 5 | yes |
+
+All three clear the threshold. Linear Chain met it using fewer calls than either
+alternative, so on this evidence Debate and Tree of Thought are
+`SUFFICIENT_RESOURCE_DOMINATED` — **over-reasoning**. The extra quality is real
+but was not required. Linear Chain is `SUFFICIENT_PARETO_EFFICIENT`.
+
+**Consequential task — a disputed insurance claim**
+
+| Workflow | Quality | Calls | Meets `τ_t`? |
+|---|---|---|---|
+| Linear Chain | 72% | 1 | no |
+| Tree of Thought | 91% | 4 | yes |
+| Debate | 93% | 5 | yes |
+
+Linear Chain is `INSUFFICIENT_QUALITY` — **under-reasoning**. Its cheapness is
+irrelevant, because cost is only compared among workflows that already meet the
+threshold. Tree of Thought met `τ_t` using fewer calls than Debate, so Debate is
+dominated **on a threshold-only reading**.
+
+**That last conclusion is exactly what decision 3 governs.** If this task class
+declares that quality above `τ_t` retains value — as §6 argues it must where loss
+dominates — then Debate's 93% is not waste and it is not dominated. The same
+figures yield different verdicts under different, governed sufficiency rules.
+Neither reading is a default `[R]`.
+
+Note what the example does **not** show: that Debate is more intelligent than
+Linear Chain. Linear Chain was the right choice in the first case and the wrong
+one in the second. **Fit is a property of the pairing, not a ranking of
+workflows.**
 
 ## 3. Resources — the contracts already exist
 
@@ -116,9 +190,18 @@ performs the sole `llm.call(prompt)` at line 250, enforces the `max_calls` budge
 usage capture is later ratified, it has **one** place to attach, not 21.
 
 **What is recorded today:** `WorkflowResult` carries `workflow_type`,
-`total_llm_calls`, `total_duration_ms` and `depth_used`. **No token accounting
-exists in the workflow runtime** `[G]`, so the usable resource vector is
-currently **one dimension — call count**.
+`total_llm_calls`, `total_duration_ms` and `depth_used` `[V]`
+(`reasoning_workflows.py:135`). **No token accounting exists in the workflow
+runtime** `[G]`, so the usable resource vector is currently **one dimension —
+call count**.
+
+**`depth_used` is provenance, not automatically a governed resource** `[R]`. It
+is a `ReasoningDepth` ordinal — `SHALLOW`, `MODERATE`, `DEEP`, `RECURSIVE` `[V]`
+(`adaptive_prompts.py:75`) — describing *how a workflow was configured*, not a
+consumed quantity. Depth correlates with calls but is not a unit of anything;
+admitting it into the resource vector would double-count call consumption under a
+second name. It is recorded for attribution and left out of the vector unless
+ratified otherwise.
 
 **Calls and tokens correlate**, so Pareto domination will often be **silent**:
 many workflow pairs are incomparable, and over-reasoning may go undetected.
@@ -154,6 +237,12 @@ The correct treatment is **separation, not deprecation** `[R]`: the self-score
 remains an internal control signal, and is **labelled self-reported and
 advisory**. It may never enter a `MetricClaim` as quality evidence. `Q(w,t)` must
 come from an independent evaluator.
+
+**One legitimate research use.** The self-score may be studied as the **object**
+of a calibration measurement — does a workflow's own confidence track independent
+judgement? — which is a question about `CONFIDENCE_CALIBRATION`, an existing
+`IntelligenceDimension` `[V]`. Being measured is the opposite of being trusted:
+the score is the *subject under test*, never the evidence.
 
 ## 5. What runtime telemetry is, on the existing axes
 
@@ -251,7 +340,12 @@ until that role is assigned.
 2. **Status vocabulary** — workflow-fit's own outcome names, avoiding collision
    with the `ReadinessClassification` tiers.
 3. **Sufficiency cap** — whether value above `τ_t` is recognised, conditioned on
-   domain and outcome class.
+   domain and outcome class. One option to consider: let **each task class
+   declare its own sufficiency rule** — either *threshold-based*, where quality
+   above `τ_t` carries no further readiness value and the cheapest sufficient
+   workflow wins, or *improvement-valued*, where gains above `τ_t` continue to
+   count and cannot be dominated away on cost alone. §2a shows the same figures
+   resolving differently under each. No default is proposed.
 4. **Trust controls** — what promotes runtime telemetry beyond
    `OBSERVED`/`UNATTESTED`/`UNVERIFIED`.
 5. **Subject ownership** — whether reasoning efficiency is an agent capability,
