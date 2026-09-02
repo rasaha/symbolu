@@ -1,7 +1,7 @@
 # Reasoning Method Governance — Contract Specification and Commissioning Ballot
 
-**Status:** implementable specification for owner ratification, **revision 2**
-(correction pass of 2026-09-02 applied; §12 lists the twelve corrections).
+**Status:** implementable specification for owner ratification, **revision 3**
+(two correction passes of 2026-09-02 applied; §12 lists all nineteen corrections).
 Nothing here is implemented and no ballot is recorded. It turns the six owner
 rulings of 2026-09-02 into contracts with exact fields, and ends with a ballot
 that, once ratified, commissions the first implementation slice as
@@ -86,7 +86,10 @@ mirror-and-pin pattern (`agentic-proposer/tests/s1_specification_mirror.py`) `[V
 
 The catalog is the governed repertoire. It is **not** the seven-member
 `WorkflowType` enum (`reasoning_workflows.py:78-86`) `[V]`; the landscape
-evaluation's fifteen-method repertoire is the wider vocabulary.
+evaluation names **fifteen additional** workflows beyond those seven
+(`REASONING_WORKFLOW_LANDSCAPE_EVALUATION.md:67`, tally at `:87`: 3 exist, 1
+as infrastructure, 3 partial, 8 absent) `[V]`, so the wider vocabulary is
+twenty-two methods.
 
 ```python
 CATALOG_SCHEMA_VERSION = "reasoning_method.catalog.v1"
@@ -161,20 +164,32 @@ a test over the field set, per the advisor note §5 prohibitions),
 (`reasoning_workflows.py:291,396,523,657,774,898,1011`), all seven are
 registered by `WorkflowRegistry._register_defaults` (`:1243` onward), all
 seven ran `execute` to a `WorkflowResult` with a stub `LLMClient` in this
-session (runtime-reported and harness-observed call counts agreed: 4, 5, 2, 4,
-6, 4, 6), and all seven are exercised in
+session, and all seven are exercised in
 `agentic/agentic_framework/tests/test_reasoning_workflows.py` `[V]`. Under the
-derivation rule every member is `EXECUTABLE_TESTED`. **Correction:** revision 1
-of this document said three of the seven were implemented; that figure was the
-landscape evaluation's count over the fifteen-method repertoire, not the enum.
-Evidence, not a prior note, sets the status.
+derivation rule every member is `EXECUTABLE_TESTED`.
+
+*Reproduction of the stub execution.* Query: `"Compare A and B, then decide."`
+with empty context. Stub `call` returns, for every prompt, a fixed text of one
+paragraph of more than twenty words followed by the lines `SCORE: 9/10`,
+`Option A`, `Option B`, `Sub-question: what?` and `Final: done.`. Runtime-reported
+and harness-observed call counts agreed for every member at 4, 5, 2, 4, 6, 4,
+6 in enum order. Two counts are input-dependent by construction:
+`MapReduceWorkflow` calls once per parsed sub-problem, and
+`MetacognitiveWorkflow` delegates, so its count is that of the workflow it
+selects for the query. A different stub or query yields different counts for
+those two; the claim that every member executes does not depend on the counts.
+
+**Correction:** revision 1 of this document said three of the seven were
+implemented; that figure was the landscape evaluation's "3 exist" tally over
+its fifteen additional workflows, not the enum. Evidence, not a prior note,
+sets the status.
 
 **Unresolved 2.1 — initial catalog membership.**
 
 | Option | Consequence |
 |---|---|
 | A. The seven `WorkflowType` members, each with the four evidence kinds cited above | every entry is executable; advisor vocabulary equals the runtime enum; the repertoire beyond the enum is not yet nameable |
-| B. The seven plus the landscape's remaining eight with `NO_IMPLEMENTATION_EVIDENCE` | complete vocabulary; eight entries no pilot can test, inflating every coverage denominator |
+| B. The seven plus the landscape's fifteen additional workflows, a twenty-two-entry catalog, each of the fifteen carrying whatever evidence the landscape tally supports (three with class evidence, one infrastructure-only, three partial, eight with none) | complete vocabulary; at least eight entries no pilot can test, inflating every coverage denominator; the seven partial or infrastructure entries need their evidence re-gathered under §2's kinds before any status derives |
 | C. The seven now, with a ratified rule that an entry may be added only with at least `CONCRETE_CLASS_REGISTERED` evidence | executable-only catalog that can grow; the rule itself needs ratifying |
 
 **Recommendation: C.** Coverage (advisor note §6) is measured against catalog
@@ -277,8 +292,21 @@ class TaskClassIdentity:
     benchmark_set_ref: str
     benchmark_set_digest: str
     comparison_policy: ComparisonPolicy
-    task_class_digest: str                     # jcs digest over the ten coordinates + comparison_policy (policy_id, policy_version, sufficiency.rule_id, sufficiency.rule_version)
+    task_class_digest: str                     # jcs digest over the ten coordinates + the ENTIRE comparison_policy (see below)
 ```
+
+**Digest payload rule.** `task_class_digest` is computed over every field of
+`TaskClassIdentity` except the digest itself, with `comparison_policy`
+serialized in full: its identifiers, `required_dimensions`,
+`quality_aggregation`, and the whole `SufficiencyRule` including the
+`GovernedThreshold`'s `comparator`, `governed_unit`, `literal_value` and
+`benchmark_ref`. Advisor §8.4 binds *threshold* as a coordinate, and
+`compatible()` below is digest equality; leaving threshold content outside the
+digest would let two classes with identical policy identifiers but different
+thresholds share evidence. Identifier-only hashing was rejected for that
+reason. A threshold change therefore always yields a new `task_class_digest`;
+whether it must also bump `policy_version` is a governance convention, not a
+contract rule, and is left to the issuing authority.
 
 **Compatibility predicate.** `compatible(a, b)` is `a.task_class_digest ==
 b.task_class_digest`. Evidence is shared only under equality; otherwise the
@@ -298,7 +326,7 @@ the request names as resolved. Presence of a string admits nothing.
 
 | Option | Consequence |
 |---|---|
-| A. Reuse `GateCategory`-style tokens from `uvi-policy-contracts` (`enums.py:~101`) | existing vocabulary, but it classifies gates, not consequences |
+| A. Reuse `GateCategory`-style tokens from `uvi-policy-contracts` (`packages/uvi-policy-contracts/src/ugence_uvi_policy_contracts/contracts/enums.py:97`) | existing vocabulary, but it classifies gates, not consequences |
 | B. `ConsequenceClass` as above with `{MATERIAL, SEVERE}` as the high-consequence set | explicit and testable; four new tokens to ratify |
 | C. Policy-referenced `consequence_policy_ref` resolved by Policy Authority | no new enum; the shape check cannot run at construction |
 
@@ -372,6 +400,10 @@ class TokenUsageSnapshot:                       # mirrors ProviderTokenUsage fie
     reasoning_tokens: Optional[int] = None
     total_tokens: Optional[int] = None
     provider_request_id: Optional[str] = None
+    usage_schema: Optional[str] = None
+    adapter_id: Optional[str] = None
+    adapter_version: Optional[str] = None
+    # all ten ProviderTokenUsage fields, same names and order; the pin test asserts field-name equality
 
 @dataclass(frozen=True)
 class ExecutionTelemetry:
@@ -428,13 +460,18 @@ with a v1 digest; enums by value, datetimes as RFC 3339 UTC, tuples in
 declared order. Two records with the same payload are the same record.
 
 **Lifecycle.** Append-only; a record is never mutated or deleted in v1.
+**Supersession** (one record replacing another's standing) and **retention**
+(how long a record or its referenced artifacts are kept, and by whom) are
+named by Advisor §8.2 as requiring a contract ruling; v1 defines neither. A
+v1 record has no standing to supersede, and this document sets no retention
+period or authority (§9 exclusions).
 `parent_record_digest` records **lineage only**: that this record was produced
 in correction or continuation of another. It confers no authority. No
 consumer may treat a child, a leaf, or the latest record as authoritative;
 fork resolution, ordering and lineage authority are a separate ruling `[R]`
 (unresolved 4.1). The constructor refuses `parent_record_digest ==
 record_digest` (`LINEAGE_SELF_REFERENCE`), mirroring rule L-1
-(`contracts.py:1069-1077`) `[V]`.
+(`packages/capabilities/agentic-proposer/src/ugence_agentic_proposer/contracts.py:1069-1077`) `[V]`.
 
 **Refusal rules (constructor, §11 codes):** `DIGEST_MALFORMED`;
 `ARTIFACT_KIND_UNKNOWN`; `TELEMETRY_INVARIANT` (the invariants above);
@@ -513,6 +550,7 @@ class ReasoningMethodFitAssessment:
     task_class_ref: str
     task_class_digest: str
     binding_digest: str
+    selection_policy_ref: str                   # the reasoning-method selection policy in force within the binding; opaque; "" when the research plan named methods directly
     method: ReasoningMethodRef
     baseline: ReasoningMethodRef
     outcome: FitOutcome
@@ -532,6 +570,17 @@ class ReasoningMethodFitAssessment:
     reason: str
     assessment_digest: str
 ```
+
+**Subject of the assessment, and the ruling's subject.** Workflow-Fit §11.5
+locates reasoning efficiency in the reasoning-method **selection policy**
+within the exact binding, per task class. A `ReasoningMethodFitAssessment`
+assesses one **method** the policy (or a research plan) selected. Per-method
+assessments are therefore **inputs**, not the ruling's judgment: the judgment
+about a selection policy is formed later over the set of assessments sharing
+`(task_class_digest, binding_digest, selection_policy_ref)`, and the contract
+carrying that judgment is not specified here `[R]`. `selection_policy_ref` is
+carried on every assessment so that grouping is possible without re-deriving
+it; no slice 1 contract interprets it.
 
 **Outcome rules, exact.** Let `P` be the class's `comparison_policy`, `τ`
 its `threshold`, `dir` the direction derived from `τ.comparator`, `Q(m)` the
@@ -632,7 +681,10 @@ class EvidenceStatusView:                       # computed by the engine from re
 ```
 
 **Rules.** An envelope whose `record_digest` matches no supplied record is
-refused (`ENVELOPE_ORPHAN`). An envelope whose issuer is not in the request's
+refused (`ENVELOPE_ORPHAN`). A `VerificationEnvelope` whose
+`attestation_envelope_digest` matches no supplied `AttestationEnvelope` for
+the same record is refused (`VERIFICATION_WITHOUT_ATTESTATION`): verification
+presupposes attestation, and the engine never infers one from the other. An envelope whose issuer is not in the request's
 `resolved_authorities` leaves the status unchanged and is reported in
 `ignored_envelopes`; a string in an envelope promotes nothing by itself. The
 same identity may not appear as both a record's `issuer_identity` and an
@@ -723,7 +775,12 @@ class ReadinessComparisonResult:
     result_digest: str
 ```
 
-**Engine obligations.** A pure function of the request: no I/O, no clock
+**Engine obligations.** Before any other step the engine checks
+`schema_version` on the request and on every record, quality result, claim and
+envelope it contains against the literals it supports, and refuses the whole
+request with `UNSUPPORTED_SCHEMA_VERSION` on any mismatch; a `Literal`
+annotation is documentation, not enforcement, so this check is explicit
+runtime logic. Then: a pure function of the request: no I/O, no clock
 other than `produced_at`, no normalization or unit conversion, no fetch of a
 `benchmark_ref` (an unresolvable threshold is `THRESHOLD_UNRESOLVABLE`), no
 read of `self_reported_quality`, no averaging, no fallback across dimensions,
@@ -814,8 +871,10 @@ there.
    result` as a pure function implementing §5 and §7 exactly, its refusal
    logic, and its tests, including the four-outcome fixtures and the mutation
    checks proven in PR #1566 re-expressed against the contracts.
-3. Vocabulary-pin tests: `CountBasis`, `UsageAvailabilityToken` and
-   `TokenUsageSnapshot` fields against `context-minimization`;
+3. Vocabulary-pin tests: `CountBasis` and `UsageAvailabilityToken` members
+   against `TokenCountBasis` and `UsageAvailability`, and `TokenUsageSnapshot`
+   field names in order against `ProviderTokenUsage`, all in
+   `context-minimization`;
    `structural_characteristics` and `declared_signals` against
    `ComplexitySignal` values; each under a test-only import, with the
    boundary test forbidding the runtime import in both packages.
@@ -831,7 +890,9 @@ there.
 **Explicitly excluded from slice 1:** the advisor; any Agent Runtime
 `LLMClient` or capture boundary; issuing any `AttestationEnvelope` or
 `VerificationEnvelope`; any approval, eligibility, pilot-state, revision or
-reassessment contract; any `agent-value-readiness` change; catalog content
+reassessment contract; any supersession or retention rule for execution
+records or their artifacts, both deferred to the later record-governance
+contract ruling that Advisor §8.2 names; any `agent-value-readiness` change; catalog content
 beyond a test fixture built from the seven-member evidence in §2; any
 Constitution binding; any numeric threshold, coverage figure, sampling rate
 or acceptance criterion.
@@ -982,6 +1043,10 @@ and the code that must be raised or returned.
 | R39 | C21 two sufficient methods with equal `LLM_CALLS` | both `SUFFICIENT_PARETO_EFFICIENT`; `dominated_by` empty (ties are not domination) |
 | R40 | C21 under `IMPROVEMENT_VALUED`, cheaper method with worse quality in derived direction | no domination; both `SUFFICIENT_PARETO_EFFICIENT` |
 | R41 | any object constructed twice from equal inputs | equal digests; any field change ⇒ different digest |
+| R42 | C21 with a candidate that has a `QualityResult` but no record | engine `METHOD_RECORDS_ABSENT` → that candidate `COMPARISON_EVIDENCE_ABSENT` |
+| R43 | C21 with a candidate that has a record but no `QualityResult` | engine `QUALITY_RESULT_ABSENT` → that candidate `COMPARISON_EVIDENCE_ABSENT` |
+| R44 | C21 whose threshold carries a `benchmark_ref` with no admitted Registry entry supplied in the request | engine `THRESHOLD_UNRESOLVABLE` → all `COMPARISON_EVIDENCE_ABSENT` |
+| R45 | C21 with a record whose `schema_version` is `"reasoning_method.execution_record.v0"` | engine `UNSUPPORTED_SCHEMA_VERSION` (request-level) |
 
 `ContractErrorCode` members: `REF_BLANK_FIELD`, `DIGEST_MALFORMED`,
 `CATALOG_DUPLICATE_ENTRY`, `CATALOG_UNSORTED`, `SIGNAL_TOKEN_UNKNOWN`,
@@ -1016,3 +1081,15 @@ and the code that must be raised or returned.
 | 10 | "Three of seven implemented" | All seven re-evaluated: concrete class, registered, stub-executed, unit-tested; status evidence-derived (§2) |
 | 11 | Task reversibility mirrored from `external_actions.Reversibility` | Governed `TaskReversibility` vocabulary, distinct from action reversibility (§3, 3.2) |
 | 12 | High-consequence refusal satisfied by a non-blank reference | Constructor checks shape only; engine requires a `ResolvedAdmission` matching the rule's `EvidenceAdmissionRef` (§3, §7, R10, R30–R31) |
+
+**Revision 3 (independent factual review, 2026-09-02).**
+
+| # | Defect in revision 2 | Correction |
+|---|---|---|
+| 13 | `GateCategory` cited at `enums.py:~101`; L-1 citation unqualified among many `contracts.py` files | Cited at `:97` with full path; L-1 citation carries its package path (§3.1, §4) |
+| 14 | `task_class_digest` hashed policy identifiers only, leaving threshold content outside the compatibility predicate | Digest payload rule: the entire `comparison_policy` including the `GovernedThreshold` is hashed; rationale stated (§3) |
+| 15 | Supersession and retention, both named by Advisor §8.2, unaddressed | Stated as undefined in v1 (§4) and added to §9's exclusions with the deferring ruling named |
+| 16 | Per-method assessment subject unreconciled with §11.5's selection-policy subject | Clause added: per-method assessments are inputs to a later selection-policy judgment; `selection_policy_ref` carried on every assessment; the judgment contract is `[R]` (§5) |
+| 17 | `UNSUPPORTED_SCHEMA_VERSION` had no engine clause; `VERIFICATION_WITHOUT_ATTESTATION` was an inline comment; three `RefusalCode` members had no matrix row | Explicit runtime schema-version check stated (§7); verification-presupposes-attestation promoted to a §6 rule; rows R42–R45 added (§11) |
+| 18 | `TokenUsageSnapshot` mirrored seven of `ProviderTokenUsage`'s ten fields while §9 commissioned a field pin test | All ten fields mirrored in name and order; pin test restated as field-name equality (§4, §9) |
+| 19 | §2 called the landscape's fifteen workflows the whole repertoire and option 2.1-B "the seven plus the remaining eight"; stub and query for the call counts unstated | Fifteen are *additional* to the seven (landscape `:67`, tally `:87`); option B is a twenty-two-entry catalog with its consequence restated; stub response shape and query recorded (§2, 2.1) |
