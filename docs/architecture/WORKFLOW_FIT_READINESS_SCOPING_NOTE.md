@@ -384,8 +384,16 @@ until that role is assigned.
    governed package, and none is proposed; the binding would have to travel
    through the neutral execution record specified in
    `REASONING_METHOD_ADVISOR_SCOPING_NOTE.md` §3.
-2. **Status vocabulary** — workflow-fit's own outcome names, avoiding collision
-   with the `ReadinessClassification` tiers.
+2. **Status vocabulary** — ~~`[R]`~~ **RATIFIED 2026-09-02** (owner, via
+   Claude Code session `session_01VXERHvJzbb9cjZ1GyFFQLn`, PR #1566 review
+   thread). Ratified as the four names now carried by the study harness in
+   `experiments/workflow_fit_study/study.py` (`FitOutcome`):
+   `INSUFFICIENT_QUALITY`, `SUFFICIENT_RESOURCE_DOMINATED`,
+   `SUFFICIENT_PARETO_EFFICIENT`, `COMPARISON_EVIDENCE_ABSENT`. These are
+   workflow-fit's own vocabulary and do not collide with the
+   `ReadinessClassification` tiers. Ratification covers the names only; it
+   places them in no package, contract or enum, and the harness remains
+   research tooling.
 3. **Sufficiency cap** — whether value above `τ_t` is recognised, conditioned on
    domain and outcome class. One option to consider: let **each task class
    declare its own sufficiency rule** — either *threshold-based*, where quality
@@ -407,3 +415,9 @@ numeric, change no contract, and add no enum or protocol member. Decision 5 gate
 any catalog work; decisions 1 and 4 gate any measurement work; the
 `WorkflowSelector` validation study in §7 can proceed under the research
 configuration in §3 and §8 without any of them.
+
+**Ratification record.** Decision 2 ratified 2026-09-02 (above). Decisions 1, 3,
+4 and 5 remain `[R]`. The §7 validation study harness and its CI were merged in
+PR #1566 under the research configuration, resolving decision 3 in the
+threshold-based direction *for that study only* (declared as `SUFFICIENCY_RULE`
+in the harness); this is not a ratification of decision 3.
