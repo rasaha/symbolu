@@ -83,7 +83,7 @@ as two governed quantities.
 Alternatives, none selected here `[R]`:
 
 - **Carry one.** Emit `G` (or `B`) as the sole composite in v1; report the other
-  only in the producer's own record.
+  only in the consuming evaluation engine's own record.
 - **Encode both in one method.** A method whose single `score` is defined as the
   lexicographic pair — legal under the contract but opaque, and it hides `B`.
 - **Contract change.** A tuple- or map-valued advisory slot. This is a change to
@@ -156,7 +156,7 @@ threshold is a `PolicyThreshold` literal or a `BenchmarkReference`, **never** a
 `MetricClaim` `[V]`. Normalization policy therefore attaches to the
 policy/threshold side, not to observations.
 
-Consequences the producer must honour:
+Consequences the consuming evaluation engine must honour:
 
 - **Ratio normalization only where the scale supports it** — positive,
   ratio-scale, meaningful zero. Not universal; not the default.
