@@ -1,0 +1,9 @@
+{
+  "profile_id": "profile.demo.multiple",
+  "domain_ref": "domain:support",
+  "intended_outcome_ref": "outcome:resolve",
+  "consequence_class": "RECOVERABLE",
+  "reversibility": "OUTCOME_REVERSIBLE",
+  "structural_characteristics": ["comparison_request", "ambiguity_detected", "creative_synthesis"],
+  "population_ref": "population:support-tickets"
+}
