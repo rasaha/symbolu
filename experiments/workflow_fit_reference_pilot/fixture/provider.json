@@ -1,0 +1,4 @@
+{
+  "provider_factory": "experiments.workflow_fit_reference_pilot.synthetic_provider:make_provider",
+  "provider_ref": "provider:synthetic-canned-answers"
+}

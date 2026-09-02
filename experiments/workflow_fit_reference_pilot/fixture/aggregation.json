@@ -1,0 +1,4 @@
+{
+  "resource_aggregation": {"aggregation_method_id": "pilot.sum_over_cases", "aggregation_method_version": "0", "calculation_ref": "calc:workflow_fit_pilot.sum_calls_over_case_set.v0"},
+  "quality_aggregation": {"aggregation_method_id": "research.mean", "aggregation_method_version": "0", "calculation_ref": "calc:experiments.workflow_fit_study.mean_over_cases.v0"}
+}

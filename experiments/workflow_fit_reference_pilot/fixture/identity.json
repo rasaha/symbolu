@@ -1,0 +1,7 @@
+{
+  "tenant_id": "tenant:research",
+  "subject_id": "subject:reference-pilot-synthetic",
+  "record_issuer_identity": "adapter:reference-pilot-runner",
+  "requester_identity": "requester:reference-pilot",
+  "model_ref": "model:synthetic-canned-answers"
+}
