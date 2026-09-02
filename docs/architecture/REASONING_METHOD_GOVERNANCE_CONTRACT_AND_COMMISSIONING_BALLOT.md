@@ -434,7 +434,7 @@ consumer may treat a child, a leaf, or the latest record as authoritative;
 fork resolution, ordering and lineage authority are a separate ruling `[R]`
 (unresolved 4.1). The constructor refuses `parent_record_digest ==
 record_digest` (`LINEAGE_SELF_REFERENCE`), mirroring rule L-1
-(`contracts.py:1071-1077`) `[V]`.
+(`contracts.py:1069-1077`) `[V]`.
 
 **Refusal rules (constructor, §11 codes):** `DIGEST_MALFORMED`;
 `ARTIFACT_KIND_UNKNOWN`; `TELEMETRY_INVARIANT` (the invariants above);
