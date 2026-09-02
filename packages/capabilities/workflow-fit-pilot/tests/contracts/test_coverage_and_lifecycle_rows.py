@@ -198,6 +198,12 @@ def test_a27_a28_revision_lineage_one_way_derived_scope_and_drift():
     ev = next(x for x in res.states if x.state is S.EVALUATED and x.fit_outcome is FitOutcome.SUFFICIENT_RESOURCE_DOMINATED)
     lied = dataclasses.replace(ev, fit_outcome=FitOutcome.SUFFICIENT_PARETO_EFFICIENT, state_digest="")
     refuses(E.STATE_TRANSITION_INVALID, lambda: validate_lineage([x for x in res.states if x is not ev] + [lied], [m], [res.result]))
+    # a GENUINE result from another manifest (different binding), same method and outcome, is not this manifest's
+    other = pf.manifest(adv=adv, bnd=pf.binding("c" * 64))
+    res_other = run_pilot(other, catalog=pf.catalog(), rule_set=pf.rule_set(), advisory=adv, cases=pf.cases(), executor=pf.FakeExecutor(pf.DEFAULT_CALLS), scorer=pf.KeywordScorer(),
+                          identity=pf.IDENTITY, provider_factory="stub_provider:make_provider", now=pf.clock(), boundary_env=pf.boundary_env())
+    cross = dataclasses.replace(ev, result_digest=res_other.result.result_digest, state_digest="")
+    refuses(E.STATE_TRANSITION_INVALID, lambda: validate_lineage([x for x in res.states if x is not ev] + [cross], [m], [res.result, res_other.result]))
 
 
 def test_a29_state_record_constants_and_no_approval_field():

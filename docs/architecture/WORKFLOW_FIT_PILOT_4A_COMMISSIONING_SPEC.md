@@ -746,7 +746,10 @@ predecessor record and the relevant manifests, and by
 `validate_lineage(records, manifests, results)`, which replays a chain,
 refuses a record that no permitted transition produces, and refuses an
 `EVALUATED` or `INCONCLUSIVE` record whose named engine result is not
-supplied or does not give that method the recorded outcome and refusals.
+supplied, does not belong to that record's manifest (the runner names the
+manifest digest in the engine request id, and every assessment must carry the
+manifest's task-class and binding digests), or does not give that method the
+recorded outcome and refusals.
 `WORKFLOW_FAILED` is the pilot refusal recorded when the tested workflow
 itself raises after a captured provider failure: the run ends incomplete.
 
@@ -1071,3 +1074,9 @@ implementation needs because an incomplete run validates no observation;
 `WORKFLOW_FAILED` is named (§6.2, A14). (3) When the baseline's run is
 incomplete the engine is still called so complete methods do not remain
 `UNDER_TEST` (A14). No ballot ruling changes.
+
+**Post-implementation audit correction (third review of PR #1575 at
+`8de1e431`, 2026-09-02).** A genuine engine result from another manifest with
+the same method and outcome was accepted by `validate_lineage`; results are
+now bound to their manifest through the engine request id and each
+assessment's task-class and binding digests (§6.2, A28).

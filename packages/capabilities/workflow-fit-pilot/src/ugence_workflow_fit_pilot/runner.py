@@ -41,7 +41,7 @@ from .boundary.client import BoundaryConnection, GatewayStubClient, method_to_js
 from .boundary.frames import CaptureRecord, capture_from_json
 from .boundary.process import BoundaryProcess
 from .contracts.coverage import ChallengerCoverageReport, build_coverage_report
-from .contracts.lifecycle import LifecycleEvent, PilotConfigurationStateRecord, propose, transition
+from .contracts.lifecycle import LifecycleEvent, PilotConfigurationStateRecord, comparison_request_id, propose, transition
 from .contracts.manifest import PilotStudyManifest, ValidatedManifest, validate_manifest
 from .contracts.observation import (
     PILOT_OBSERVATION_SCHEMA_VERSION,
@@ -201,7 +201,7 @@ def run_pilot(
     baseline = manifest.plan.baseline
     if complete_runs:  # the engine decides; an absent baseline is its request-level refusal, never the runner's silence
         request = ReadinessComparisonRequest(
-            schema_version=COMPARISON_REQUEST_SCHEMA_VERSION, request_id=f"{manifest.manifest_id}:comparison", task_class=manifest.plan.task_class,
+            schema_version=COMPARISON_REQUEST_SCHEMA_VERSION, request_id=comparison_request_id(manifest.manifest_digest), task_class=manifest.plan.task_class,
             catalog=catalog.ref(), baseline=baseline, candidates=tuple(r.method for r in complete_runs),
             records=tuple(r.record for r in complete_runs), quality_results=tuple(r.quality_result for r in complete_runs), quality_claims=tuple(r.quality_claim for r in complete_runs),
             attestation_envelopes=tuple(r.attestation for r in complete_runs if r.attestation is not None),

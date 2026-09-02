@@ -51,6 +51,12 @@ class LifecycleEvent(str, Enum):
 _ASSESSED = frozenset({FitOutcome.INSUFFICIENT_QUALITY, FitOutcome.SUFFICIENT_RESOURCE_DOMINATED, FitOutcome.SUFFICIENT_PARETO_EFFICIENT})
 
 
+def comparison_request_id(manifest_digest: str) -> str:
+    """The request id the runner gives the engine request for a manifest; results are bound
+    to their manifest through it."""
+    return f"pilot:{manifest_digest}:comparison"
+
+
 def derive_revision_scope(predecessor: PilotStudyManifest, successor: PilotStudyManifest) -> Tuple[RevisionScope, ...]:
     """Pure. Every manifest coordinate is covered by some scope."""
     a, b = predecessor, successor
@@ -261,6 +267,14 @@ def validate_lineage(records: Iterable[PilotConfigurationStateRecord], manifests
             res = ress.get(r.result_digest)
             if res is None:
                 raise PilotError(PilotErrorCode.LINEAGE_INCOMPLETE, f"{r.state.value} record names an unsupplied engine result")
+            man = mans[r.manifest_digest]
+            # The result must be THIS manifest's: the runner names the manifest in the request id, and
+            # every assessment carries the task class and binding the manifest preregistered.
+            if res.request_id != comparison_request_id(man.manifest_digest):
+                raise PilotError(PilotErrorCode.STATE_TRANSITION_INVALID, "engine result does not belong to this manifest")
+            for a in res.assessments:
+                if a.task_class_digest != man.plan.task_class.task_class_digest or a.binding_digest != man.plan.binding.binding_digest:
+                    raise PilotError(PilotErrorCode.STATE_TRANSITION_INVALID, "engine result assesses another task class or binding")
             outcome = next((a.outcome for a in res.assessments if a.method == r.method), None)
             refusals = tuple(sorted(x.code.value for x in res.refusals if x.method is None or x.method == r.method))
             if r.state is PilotConfigurationState.EVALUATED and outcome != r.fit_outcome:
@@ -304,5 +318,5 @@ def validate_lineage(records: Iterable[PilotConfigurationStateRecord], manifests
 
 __all__ = [
     "PILOT_STATE_SCHEMA_VERSION", "APPROVAL_STATUS_NONE", "PilotConfigurationState", "RevisionScope", "LifecycleEvent",
-    "derive_revision_scope", "PilotConfigurationStateRecord", "propose", "transition", "validate_lineage",
+    "comparison_request_id", "derive_revision_scope", "PilotConfigurationStateRecord", "propose", "transition", "validate_lineage",
 ]
