@@ -852,16 +852,25 @@ obligations the contracts package cannot enforce on a hand-built value.
 envelope it contains against the literals it supports, and refuses the whole
 request with `UNSUPPORTED_SCHEMA_VERSION` on any mismatch; a `Literal`
 annotation is documentation, not enforcement, so this check is explicit
-runtime logic. Then: a pure function of the request: no I/O, no clock
-other than `produced_at`, no normalization or unit conversion, no fetch of a
+runtime logic. Then: a pure function of the request and of `produced_at`:
+`compare(request, *, produced_at)` takes `produced_at` as a **required**,
+timezone-aware, caller-supplied keyword argument (`DATETIME_NAIVE` otherwise)
+and the engine **reads no clock** (owner-ratified correction 30, §12). No
+I/O, no normalization or unit conversion, no fetch of a
 `benchmark_ref` (an unresolvable threshold is `THRESHOLD_UNRESOLVABLE`), no
 read of `self_reported_quality`, no averaging, no fallback across dimensions,
 no inference of authority from names. **Authority resolution is
 requester-asserted**: `resolved_authorities` and `resolved_admissions` are
 inputs the engine trusts only for consistency, never for truth, and every
 result states this in `authority_resolution_basis`. Determinism: the same
-request bytes produce the same `result_digest` modulo `produced_at`, which is
-excluded from `result_digest`, given the output ordering above.
+request bytes produce the same `result_digest` regardless of `produced_at`,
+which is excluded from `result_digest`, given the output ordering above.
+Identical explicit inputs at the same instant produce identical
+`result_digest` and identical `assessment_digest`s across processes and hash
+seeds; equivalent timezone-aware representations of one instant are one
+instant. Changing `produced_at` changes every `assessment_digest` (through
+`assessed_at`) and never `result_digest`. Digest coverage and every
+schema-version literal are unchanged by this correction (R52–R55).
 
 **Unresolved 7.1 — attainment record for readiness.** No `Attainment*` class
 exists anywhere `[V]`, and composite ballot 4 remains `[R]`. (A) the result is
@@ -1164,6 +1173,10 @@ and the code that must be raised or returned.
 | R49 | C21 with C19 and C20 where C20's `verifier_identity` equals the record's `issuer_identity`, or C19's `attester_identity`, or `requester_identity` | engine `SELF_VERIFICATION` |
 | R50 | a `ReasoningMethodFitAssessment` built by hand with `assessor_identity` differing from the enclosing result's `engine_identity` | `ASSESSOR_ENGINE_MISMATCH` on result construction |
 | R51 | `compare(C21)` run twice with `records`, `candidates` and `quality_results` supplied in reversed input order | identical `result_digest` (output ordering is contractual) |
+| R52 | `compare(C21)` with `produced_at` omitted | `TypeError`: no default, no clock read |
+| R53 | `compare(C21, produced_at=<naive datetime>)` | `DATETIME_NAIVE` |
+| R54 | `compare(C21)` twice at one instant, and once more with the same instant in another UTC offset | identical `result_digest` and identical `assessment_digest`s across all three, and across processes and hash seeds |
+| R55 | `compare(C21)` at one instant, then one microsecond later | identical `result_digest`; every `assessment_digest` differs; `assessed_at` equals the result's `produced_at` |
 | C24 | `ComparisonPolicy` (aggregated) | as C8 with `quality_aggregation = AggregationRef("research.mean", "0", calc ref)`; a request pairing it with C18 constructs and assesses |
 
 `ContractErrorCode` members: `REF_BLANK_FIELD`, `DIGEST_MALFORMED`,
@@ -1228,3 +1241,18 @@ and the code that must be raised or returned.
 | 27 | "No planned moves" overstated for the generic comparison port | Port ownership scoped to while reasoning-method fit is the sole request type; eventual home named as a later ballot's ruling (§1) |
 | 28 | A hand-built assessment carried no binding to the engine that produced it | `assessor_identity` and `engine_version` bound to the enclosing result; bare assessment declared not a governed object (§5, §7, R50) |
 | 29 | Lineage refusal's limits unstated; §5 rule 2 mixed per-method and request-level scopes | Request-contained, directly-linked-pairs-only limits stated (§4); rule 2 split into request-level and per-method clauses (§5) |
+
+| 30 | `compare()` defaulted `produced_at` to a wall-clock read, so identical explicit inputs could yield different `assessment_digest`s and the engine was not a pure function of its arguments | `produced_at` required, timezone-aware, caller-supplied; no clock read anywhere in the distribution; R52–R55 added; package `ugence-readiness-comparison` 0.1.0 → 0.2.0 (signature change, no schema change) (§7, §11) |
+
+**Ratification record — `produced_at` correction (owner ruling, 2026-09-02).**
+*Owner ruling, verbatim:* "the Slice 1 comparison engine must take produced_at
+as a required, timezone-aware, caller-supplied keyword argument and must not
+read the wall clock." Established by this correction: identical explicit
+inputs at the same instant produce identical result and assessment digests;
+changing `produced_at` changes the assessment digests; `produced_at` remains
+excluded from `result_digest`; digest coverage and all schema-version
+literals remain unchanged. **Authority.** Owner ratification by Rakesh Mohan,
+2026-09-02, issued as an explicit owner instruction in Claude Code session
+`session_01VXERHvJzbb9cjZ1GyFFQLn`, following a read-only investigation whose
+analysis was advisory only; the owner instruction was the ratifying act. No
+§10 ballot ruling changes.

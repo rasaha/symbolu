@@ -1,8 +1,8 @@
 """The comparison engine: ``compare(request) -> result``.
 
 Implements specification §5 (outcome rules) and §7 (ports, engine obligations)
-exactly. A pure function of the request: no I/O, no clock other than
-``produced_at``, no normalization or unit conversion, no fetch of a
+exactly. A pure function of the request and a caller-supplied, timezone-aware
+``produced_at``: no I/O, no clock read, no normalization or unit conversion, no fetch of a
 ``benchmark_ref``, no read of ``self_reported_quality``, no averaging, no
 fallback across dimensions, no inference of authority from names.
 
@@ -14,13 +14,15 @@ contract itself.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime
 from decimal import Decimal, InvalidOperation
 from typing import Dict, List, Optional, Tuple
 
 from ugence_governance_contracts.api import AttestationStatus, MetricClaim, VerificationStatus
 from ugence_jcs import canonical_sha256_hex
 from ugence_reasoning_method_governance.api import (
+    ContractError,
+    ContractErrorCode,
     ATTESTATION_ENVELOPE_SCHEMA_VERSION,
     AUTHORITY_RESOLUTION_BASIS_V1,
     COMPARISON_REQUEST_SCHEMA_VERSION,
@@ -62,11 +64,13 @@ _HIGHER = frozenset({ComparisonOperator.GTE, ComparisonOperator.GT})
 _LOWER = frozenset({ComparisonOperator.LTE, ComparisonOperator.LT})
 
 
-def compare(request: ReadinessComparisonRequest, *, produced_at: Optional[datetime] = None) -> ReadinessComparisonResult:
+def compare(request: ReadinessComparisonRequest, *, produced_at: datetime) -> ReadinessComparisonResult:
+    """``produced_at`` is required and caller-supplied (spec §7, correction 30): the
+    engine reads no clock. A naive datetime is refused with ``DATETIME_NAIVE``."""
     if not isinstance(request, ReadinessComparisonRequest):
         raise TypeError("compare() takes a ReadinessComparisonRequest")
-    if produced_at is None:
-        produced_at = datetime.now(timezone.utc)
+    if not isinstance(produced_at, datetime) or produced_at.tzinfo is None or produced_at.tzinfo.utcoffset(produced_at) is None:
+        raise ContractError(ContractErrorCode.DATETIME_NAIVE, "produced_at must be a timezone-aware datetime")
     ctx = _Context(request, produced_at)
     ctx.run()
     return ctx.result()
