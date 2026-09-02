@@ -384,9 +384,12 @@ boundary and no pilot can be assessed.
 Constants, thresholds, sampling rates, label semantics beyond the three names,
 catalog members and profile fields remain unratified with no defaults.
 
-**Recommendation:** ratify §1, §2, §4 and §5 as architecture. Ratify nothing
-numeric. Create no contract, connect no runtime, and change no enum until
-decision 2 is taken — it gates every later step.
+**Recommendation (post-ratification, 2026-09-02):** decision 2's boundary and
+adapter architecture is resolved AMENDED, and decision 4 is resolved AMENDED, as
+recorded above. The later execution-record contract round that decision 2 names
+still gates implementation and pilots. Decisions 1, 3 and 5 remain `[R]`.
+Ratify nothing numeric. Create no contract, connect no runtime, and change no
+enum until that contract round is taken.
 
 **Ratification record (2026-09-02).** Decision 2 AMENDED; decision 4 AMENDED —
 each as recorded above. Decisions 1, 3 and 5 remain `[R]`. Decision 2's ruling

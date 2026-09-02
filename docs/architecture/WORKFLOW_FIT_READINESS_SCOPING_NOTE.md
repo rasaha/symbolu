@@ -1,8 +1,8 @@
 # Workflow-Fit Readiness — Scoping Note
 
 **Status:** scoping note; **owner decisions 2, 3 and 5 recorded 2026-09-02**
-(§11: decision 2 RATIFIED, decision 3 RATIFIED AS AMENDED, decision 5 AMENDED;
-decisions 1 and 4 remain `[R]`). No implementation, no package change, no
+(§11: decision 2 RATIFIED, decision 3 AMENDED, decision 5 AMENDED; decisions 1
+and 4 remain `[R]`). No implementation, no package change, no
 contract or protocol proposal.
 **Scope:** `agentic/agentic_framework/reasoning_workflows.py`, the S2-B strategy
 vocabulary, the readiness and governed-value contracts, and the Context
@@ -394,8 +394,8 @@ until that role is assigned.
    or alias `ReadinessClassification`. Ratification covers the names only; it
    places them in no package, contract or enum, and the harness remains
    research tooling.
-3. **Sufficiency cap** — ~~`[R]`~~ **RATIFIED AS AMENDED 2026-09-02.** *As
-   proposed:* whether value above `τ_t` is recognised, conditioned on domain and
+3. **Sufficiency cap** — ~~`[R]`~~ **AMENDED 2026-09-02 — the amended wording
+   is the ratified owner ruling.** *As proposed:* whether value above `τ_t` is recognised, conditioned on domain and
    outcome class, with per-task-class declaration offered as one option and no
    default. *Owner ruling:* each governed task class declares a **versioned**
    threshold-based or improvement-valued sufficiency rule. There is no global
@@ -418,14 +418,16 @@ until that role is assigned.
 Constants, thresholds, weights, ordinal mappings, exponents, sample sizes and
 acceptance criteria remain unratified with no defaults.
 
-**Recommendation:** ratify §1, §2 and §6 as architecture. Ratify nothing
-numeric, change no contract, and add no enum or protocol member. Decision 5 gates
-any catalog work; decisions 1 and 4 gate any measurement work; the
-`WorkflowSelector` validation study in §7 can proceed under the research
-configuration in §3 and §8 without any of them.
+**Recommendation (post-ratification, 2026-09-02):** decisions 2, 3 and 5 are
+resolved as recorded above. Decisions 1 (usage binding) and 4 (trust controls)
+remain `[R]` and still gate any measurement work. Any `CapabilityDimension`
+still requires separate ratification under decision 5. Ratify nothing numeric,
+change no contract, and add no enum or protocol member. The `WorkflowSelector`
+validation study in §7 continues under the research configuration in §3 and §8;
+its output is not admitted evidence for any governed task class.
 
-**Ratification record (2026-09-02).** Decision 2 RATIFIED; decision 3 RATIFIED
-AS AMENDED; decision 5 AMENDED — each as recorded above. Decisions 1 (usage
+**Ratification record (2026-09-02).** Decision 2 RATIFIED; decision 3 AMENDED;
+decision 5 AMENDED — each as recorded above. Decisions 1 (usage
 binding) and 4 (trust controls) remain `[R]`. The §7 validation study harness
 and its CI were merged in PR #1566 under the research configuration before these
 rulings; its `SUFFICIENCY_RULE` is a research-only reading and is superseded, for

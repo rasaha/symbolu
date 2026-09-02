@@ -282,10 +282,12 @@ what already exists and is corrected here.
 Constants, formulas, exponents, mappings, coverage minima and statistical
 acceptance criteria remain unratified with no defaults, as in §8.
 
-**Recommendation:** ratify §2 and §4 as architecture — §4 by *binding to the
-existing ratified role*, not by creating one. Ratify nothing numeric. Ballot 2
-requires an ADR amendment before any code. Ballots 1, 3 and 4 gate
-implementation; ballot 5 gates any advisory output beyond a single score.
+**Recommendation (post-ratification, 2026-09-02):** ballot 1 is resolved
+AMENDED as recorded above; commissioning and contract ratification for the new
+readiness-comparison component still block implementation. Ballots 2–5 remain
+`[R]`. Ratify nothing numeric. Ballot 2 requires an ADR amendment before any
+code. Ballots 3 and 4 gate implementation; ballot 5 gates any advisory output
+beyond a single score.
 
 **Ratification record (2026-09-02).** Ballot 1 AMENDED as recorded above.
 Ballots 2, 3, 4 and 5 remain `[R]`. The ruling departs from the §4
