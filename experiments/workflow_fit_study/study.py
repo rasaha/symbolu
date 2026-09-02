@@ -64,6 +64,11 @@ __all__ = [
 MEASUREMENT_SOURCE = "RUNTIME_REPORTED (OBSERVED / UNATTESTED / UNVERIFIED)"
 QUALITY_SOURCE = "INDEPENDENT_SCORER (caller-supplied; never the workflow's own score)"
 RESOURCE_RULE = "calls-only-strict (declared research rule, not ratified)"
+SUFFICIENCY_RULE = (
+    "threshold-based (quality above tau carries no further value; a cheaper "
+    "sufficient workflow dominates) — resolves scoping-note §11 ballot 3 in one "
+    "direction for this study only; the ballot remains open"
+)
 
 _Q = Decimal("0.0001")
 
@@ -372,6 +377,7 @@ def render_report(result: StudyResult) -> str:
     L.append(f"- Quality source: {QUALITY_SOURCE}")
     L.append(f"- Telemetry source: {MEASUREMENT_SOURCE}")
     L.append(f"- Resource rule: {RESOURCE_RULE}")
+    L.append(f"- Sufficiency rule: {SUFFICIENCY_RULE}")
     L.append(f"- Baseline (provisional, caller-declared): `{result.config.baseline.value}`")
     L.append(f"- Studied workflows: {', '.join('`'+w.value+'`' for w in result.config.workflows)}")
     L.append("- Latency: diagnostic only; not part of any comparison")

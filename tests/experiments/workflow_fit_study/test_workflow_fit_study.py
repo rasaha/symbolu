@@ -89,8 +89,12 @@ def test_missing_threshold_and_missing_baseline_yield_evidence_absent():
 
 
 def test_no_default_threshold_exists():
-    c = cfg({})
-    assert c.sufficiency.get("anything") is None
+    # a class with no declared tau must not be assessed against any implicit default
+    a = assess([rec("undeclared", LC, 0.99, 1), rec("undeclared", TOT, 0.99, 4)], cfg({}, (LC, TOT)))
+    assert a[("undeclared", LC)].outcome is FitOutcome.COMPARISON_EVIDENCE_ABSENT
+    assert a[("undeclared", TOT)].outcome is FitOutcome.COMPARISON_EVIDENCE_ABSENT
+    assert a[("undeclared", LC)].quality_margin is None
+    assert a[("undeclared", TOT)].quality_margin is None
     with pytest.raises(ValueError):
         cfg({"t": Decimal("1.5")})
     with pytest.raises(ValueError):
@@ -106,14 +110,28 @@ def test_self_reported_quality_never_affects_assessment():
 
 
 def test_determinism_of_report():
-    recs = [rec("t", LC, 0.92, 1), rec("t", TOT, 0.94, 4)]
-    c = cfg({"t": Decimal("0.90")}, (LC, TOT))
+    # two task classes, two workflows, independently built record lists in differing input order
+    forward = [rec("alpha", LC, 0.92, 1), rec("alpha", TOT, 0.94, 4),
+               rec("beta", LC, 0.72, 1), rec("beta", TOT, 0.91, 4)]
+    reverse = [rec("beta", TOT, 0.91, 4), rec("beta", LC, 0.72, 1),
+               rec("alpha", TOT, 0.94, 4), rec("alpha", LC, 0.92, 1)]
+    c = cfg({"alpha": Decimal("0.90"), "beta": Decimal("0.90")}, (LC, TOT))
     from experiments.workflow_fit_study.study import StudyResult
-    r1 = StudyResult(c, tuple(recs), aggregate(recs), assess(recs, c), ())
-    r2 = StudyResult(c, tuple(recs), aggregate(recs), assess(recs, c), ())
-    assert render_report(r1) == render_report(r2)
-    assert "diagnostic only" in render_report(r1)
-    assert "never used here" in render_report(r1)
+    # aggregate() must impose (task_class, workflow) order regardless of input order
+    assert list(aggregate(forward)) == list(aggregate(reverse)) == [("alpha", LC), ("alpha", TOT), ("beta", LC), ("beta", TOT)]
+    r1 = StudyResult(c, tuple(forward), aggregate(forward), assess(forward, c), ())
+    r2 = StudyResult(c, tuple(reverse), aggregate(reverse), assess(reverse, c), ())
+    rep1, rep2 = render_report(r1), render_report(r2)
+    assert rep1 == rep2
+    # class sections are emitted in sorted order even when the aggregates mapping is not
+    unsorted = dict(reversed(list(aggregate(reverse).items())))
+    r3 = StudyResult(c, tuple(reverse), unsorted, assess(reverse, c), ())
+    rep3 = render_report(r3)
+    assert rep3 == rep1
+    assert rep3.index("## Task class `alpha`") < rep3.index("## Task class `beta`")
+    assert "diagnostic only" in rep1
+    assert "never used here" in rep1
+    assert "Sufficiency rule:" in rep1 and "ballot 3" in rep1
 
 
 # ------------------------------------------------------------------ integration with real workflows
@@ -143,7 +161,8 @@ def test_integration_runs_real_workflows_and_counts_calls():
     assert by[TOT].calls_runtime_reported > by[LC].calls_runtime_reported
     assert result.assessments[("routine", LC)].outcome is FitOutcome.SUFFICIENT_PARETO_EFFICIENT
     assert result.assessments[("routine", TOT)].outcome is FitOutcome.SUFFICIENT_RESOURCE_DOMINATED
-    # the workflow's own quality_score was captured but is not the quality used
+    # the self-reported score is captured as a bounded diagnostic; its isolation from
+    # `quality` is established by the scorer assertion above, not by this range check
     assert all(0.0 <= r.self_reported_quality <= 1.0 for r in result.records)
     report = render_report(result)
     assert "`routine`" in report and "SUFFICIENT_RESOURCE_DOMINATED" in report
