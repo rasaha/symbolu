@@ -1,8 +1,10 @@
 # Reasoning Method Governance — Contract Specification and Commissioning Ballot
 
-**Status:** implementable specification for owner ratification, **revision 4**
-(three correction passes of 2026-09-02 applied; §12 lists all twenty-nine corrections).
-Nothing here is implemented and no ballot is recorded. It turns the six owner
+**Status:** **RATIFIED — all five §10 ballot items ratified as recommended by
+the owner, 2026-09-02.** Revision 4 (three correction passes applied; §12
+lists all twenty-nine corrections). Slice 1 (§9) is commissioned as
+research-only work and is **not yet implemented**; implementation awaits a
+separate owner instruction. It turns the six owner
 rulings of 2026-09-02 into contracts with exact fields, and ends with a ballot
 that, once ratified, commissions the first implementation slice as
 **research-only** work.
@@ -987,7 +989,7 @@ produced carries `usage_scope = "RESEARCH_ONLY"`.
 
 ---
 
-## 10. Owner ballot `[R]`
+## 10. Owner ballot — ~~`[R]`~~ **RATIFIED 2026-09-02**
 
 Ratifying all five commissions slice 1 as specified in §9, as research-only
 work. Each item names its recommendation; "ratify as recommended" is a
@@ -1002,13 +1004,13 @@ ratifying it for approval-bearing work would commission an engine that admits
 one execution per method. Items 1 and 3 are independent of the rest, except
 that rejecting every option of 1.1 leaves `ExecutionTelemetry` undefined.
 
-1. **Placement and ownership** — two packages with stable ownership as in
+1. ****Placement and ownership — RATIFIED AS RECOMMENDED** — two packages with stable ownership as in
    §1: shared contracts in `ugence-reasoning-method-governance`, the
    comparison implementation in `ugence-readiness-comparison`, both in slice
    1, no code placed for a later move, the comparison port owned by the contracts package only while reasoning-method fit is its sole request type (§1); telemetry vocabulary mirrored and pinned by test
    (1.1-B); forbidden imports enforced by boundary test in both packages.
    *Options: 1.1-A / 1.1-B / 1.1-C. Recommendation: 1.1-B.*
-2. **Catalog and task-class vocabulary** — `ReasoningMethodCatalogRef` and
+2. ****Catalog and task-class vocabulary — RATIFIED AS RECOMMENDED** — `ReasoningMethodCatalogRef` and
    `ReasoningMethodRef` as in §2 with no blank-method refs; implementation
    status derived from evidence, with the seven `WorkflowType` members at
    `EXECUTABLE_TESTED` on the cited evidence and a growth rule requiring
@@ -1017,7 +1019,7 @@ that rejecting every option of 1.1 leaves `ExecutionTelemetry` undefined.
    `TaskReversibility` distinct from action reversibility (3.2-A);
    compatibility by digest equality.
    *Options: 2.1-A/B/C, 3.1-A/B/C, 3.2-A/B/C. Recommendations: C, B, A.*
-3. **Execution record and evidence** — v1 record permanently at
+3. ****Execution record and evidence — RATIFIED AS RECOMMENDED** — v1 record permanently at
    `OBSERVED/UNATTESTED/UNVERIFIED` as class constants; attestation and
    verification only as authority envelopes referencing `record_digest`, with
    status computed from envelopes whose issuers are resolved in the request;
@@ -1025,7 +1027,7 @@ that rejecting every option of 1.1 leaves `ExecutionTelemetry` undefined.
    two-records-in-one-lineage refused (4.1-A); free-string issuer identity
    (4.2-A); artifacts by reference only.
    *Options: 4.1-A/B/C, 4.2-A/B/C. Recommendations: A, A.*
-4. **Comparison policy and rules** — required dimensions declared in the
+4. ****Comparison policy and rules — RATIFIED AS RECOMMENDED** — required dimensions declared in the
    class's `ComparisonPolicy`, all required on every record, no fallback;
    quality direction derived from the comparator with `EQ`/`NEQ`, unit
    mismatch and non-decimal scales refused; exactly one governed quality
@@ -1035,7 +1037,7 @@ that rejecting every option of 1.1 leaves `ExecutionTelemetry` undefined.
    admission, never by reference presence; the four-outcome derivation of §5
    exactly.
    *Options: 5.1-A/B/C. Recommendation: A.*
-5. **Commissioning, research-only** — slice 1 scope, exclusions and
+5. ****Commissioning, research-only — RATIFIED AS RECOMMENDED** — slice 1 scope, exclusions and
    definition of done as in §9; no approval eligibility, pilot state,
    Decision Authority responsibility, revision lineage or reassessment
    trigger until Advisor decision 5 is ratified; no capture boundary required
@@ -1049,6 +1051,24 @@ No constant, threshold, coverage minimum, sampling rate or acceptance
 criterion is ratified by this ballot. Composite ballots 2–5, Advisor
 decisions 1, 3 and 5, and Workflow-Fit decisions 1 and 4 remain `[R]` and are
 not needed for slice 1.
+
+**Ratification record (2026-09-02).** *Owner ruling, verbatim:* "Ratify all
+five as recommended." Applied to every item above: item 1 with 1.1-B; item 2
+with 2.1-C, 3.1-B and 3.2-A; item 3 with 4.1-A and 4.2-A; item 4 with 5.1-A;
+item 5 with 8.1-A, 8.2-B and 7.1-C, and 6.1-A reserved for a later slice. The
+co-decided pairs (2 with 4, 4 with 5) were ratified together as required.
+Effect: slice 1 as specified in §9 is **commissioned** as research-only work.
+Implementation has **not** begun and awaits a separate owner instruction; this
+record commissions, it does not execute.
+
+**Authority.** Owner ratification by Rakesh Mohan, 2026-09-02, issued as an
+explicit owner instruction in Claude Code session
+`session_01VXERHvJzbb9cjZ1GyFFQLn` after two independent reviews (factual,
+with repository access; design, without) whose amendments are recorded in
+§12 as revisions 3 and 4. The model analysis and both reviews were advisory
+only; the owner instruction was the ratifying act. Nothing numeric was
+ratified, and no code, contract, enum, experiment or test changed with this
+record.
 
 ---
 
