@@ -1,0 +1,121 @@
+# Documentation-drift gate for docs/AGENT_READINESS_AND_ROI_PLAIN_ENGLISH.md.
+#
+# That document quotes live output from two packages — the Stage 1 verdict from
+# ugence-agent-value-readiness's assess_readiness, and the Stage 2 money figures from
+# governed-value's score_case — so it rots silently whenever either changes.
+# tests/test_readiness_governed_value_doc_drift.py rebuilds both worked examples and fails
+# with the stale document line named.
+#
+# This is a narrowly scoped job rather than an addition to an existing one because NO
+# workflow in this repository runs the root `tests/` suite as a whole: every workflow that
+# touches `tests/` names specific files or directories. The root suite also cannot currently
+# be collected in full (146 pre-existing collection errors, unrelated to this gate), so
+# there is no whole-suite job to attach to.
+name: Readiness / Governed Value Doc Drift CI
+
+on:
+  push:
+    branches: ["main", "master", "dev", "claude/**"]
+    paths:
+      - "docs/AGENT_READINESS_AND_ROI_PLAIN_ENGLISH.md"
+      - "tests/test_readiness_governed_value_doc_drift.py"
+      - "conftest.py"
+      - "packages/capabilities/agent-value-readiness/**"
+      - "packages/governed-value/**"
+      - "packages/policy-authority/**"
+      - "packages/uvi-policy-contracts/**"
+      - "packages/governance-contracts/**"
+      - "packages/jcs/**"
+      - ".github/workflows/readiness-governed-value-doc-drift-ci.yml"
+  pull_request:
+    branches: ["main", "master", "dev", "claude/**"]
+    paths:
+      - "docs/AGENT_READINESS_AND_ROI_PLAIN_ENGLISH.md"
+      - "tests/test_readiness_governed_value_doc_drift.py"
+      - "conftest.py"
+      - "packages/capabilities/agent-value-readiness/**"
+      - "packages/governed-value/**"
+      - "packages/policy-authority/**"
+      - "packages/uvi-policy-contracts/**"
+      - "packages/governance-contracts/**"
+      - "packages/jcs/**"
+      - ".github/workflows/readiness-governed-value-doc-drift-ci.yml"
+  workflow_dispatch:
+
+env:
+  # Installed in dependency order so each distribution's declared first-party requirement is
+  # already present. The monorepo's packages are not on any index, so a resolve would fail.
+  # governed-value declares no dependencies at all; agent-value-readiness pulls the policy
+  # chain (governance-contracts -> uvi-policy-contracts -> policy-authority). No third-party
+  # runtime dependency is needed: the Policy Authority signs with its own stdlib-only
+  # Ed25519, and neither package under test imports anything outside the standard library.
+  FIRST_PARTY: >-
+    packages/jcs
+    packages/governance-contracts
+    packages/uvi-policy-contracts
+    packages/policy-authority
+    packages/capabilities/agent-value-readiness
+    packages/governed-value
+
+jobs:
+  doc-drift-gate:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Cache pip dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-doc-drift-${{ hashFiles('packages/**/pyproject.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-doc-drift-
+            ${{ runner.os }}-pip-
+
+      - name: Install first-party packages
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest
+          for pkg in $FIRST_PARTY; do pip install -e "$pkg"; done
+
+      - name: Confirm both modules import from the installed distributions
+        run: |
+          python - <<'PY'
+          import importlib
+          for name in (
+              "ugence_agent_value_readiness.api",
+              "ugence_uvi_policy_contracts.api",
+              "ugence_policy_authority.api",
+              "governed_value.services.scorer",
+          ):
+              importlib.import_module(name)
+              print(f"ok  {name}")
+          PY
+
+      - name: Run the documentation-drift gate
+        # `shell: bash` is load-bearing: it runs `bash --noprofile --norc -eo pipefail`,
+        # whereas the default shell is `bash -e` WITHOUT pipefail. Piping pytest into tee
+        # under the default shell would report the exit status of `tee` — always 0 — and a
+        # drifted document would pass CI green.
+        shell: bash
+        run: |
+          python -m pytest tests/test_readiness_governed_value_doc_drift.py \
+            -v \
+            --tb=short \
+            --disable-warnings \
+            2>&1 | tee readiness-doc-drift-pytest.log
+
+      - name: Upload gate log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: readiness-doc-drift-pytest-log
+          path: readiness-doc-drift-pytest.log
+          if-no-files-found: ignore
