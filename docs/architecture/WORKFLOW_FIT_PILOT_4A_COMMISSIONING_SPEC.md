@@ -675,7 +675,7 @@ class PilotConfigurationState(str, Enum):
     PROPOSED = "PROPOSED"                       # manifest validated; nothing run
     UNDER_TEST = "UNDER_TEST"                   # at least one observation validated; no engine result yet
     EVALUATED = "EVALUATED"                     # an engine result assessed this method with one of the three assessed outcomes
-    INCONCLUSIVE = "INCONCLUSIVE"               # COMPARISON_EVIDENCE_ABSENT, an engine refusal, or CAPTURE_INCOMPLETE for this method
+    INCONCLUSIVE = "INCONCLUSIVE"               # COMPARISON_EVIDENCE_ABSENT, an engine refusal, or CAPTURE_INCOMPLETE / WORKFLOW_FAILED for this method
     REVISED = "REVISED"                         # superseded: a successor manifest exists
 
 class RevisionScope(str, Enum):                 # derived by comparing predecessor and successor manifests; several may apply
@@ -735,13 +735,20 @@ def transition(predecessor: PilotConfigurationStateRecord, event: LifecycleEvent
 ```
 
 **Closed transitions.** `PROPOSED → UNDER_TEST → EVALUATED | INCONCLUSIVE`;
-any state `→ REVISED`. `EVALUATED` and `INCONCLUSIVE` never transition to
-each other or to `UNDER_TEST`: a different result requires a different
-manifest, hence `REVISED`. A constructor can check a record's own shape only;
-**transition history is enforced by `transition` and `propose`**, which
-receive the predecessor record and the relevant manifests, and by
-`validate_lineage(records, manifests)`, which replays a chain and refuses a
-record that no permitted transition produces.
+`PROPOSED → INCONCLUSIVE` only on a capture or workflow refusal
+(`CAPTURE_INCOMPLETE`, `WORKFLOW_FAILED`), since an incomplete run validates
+no observation and so never reaches `UNDER_TEST`; any state `→ REVISED`.
+`EVALUATED` and `INCONCLUSIVE` never transition to each other or to
+`UNDER_TEST`: a different result requires a different manifest, hence
+`REVISED`. A constructor can check a record's own shape only; **transition
+history is enforced by `transition` and `propose`**, which receive the
+predecessor record and the relevant manifests, and by
+`validate_lineage(records, manifests, results)`, which replays a chain,
+refuses a record that no permitted transition produces, and refuses an
+`EVALUATED` or `INCONCLUSIVE` record whose named engine result is not
+supplied or does not give that method the recorded outcome and refusals.
+`WORKFLOW_FAILED` is the pilot refusal recorded when the tested workflow
+itself raises after a captured provider failure: the run ends incomplete.
 
 **Revision scope** covers any change to the configuration, the task class,
 the benchmark manifest, the comparison plan or the sufficiency rule (the
@@ -869,7 +876,7 @@ or acceptance figure.
 | A12 | boundary process observes N capture records for a method while the workflow reports M ≠ N | record telemetry carries N with `llm_calls_basis = INJECTED_COUNTER` and `capture_refs` = manifest digest + fingerprints; diagnostics carry M under `RUNTIME_REPORTED_DIAGNOSTIC`; the envelope is over the record digest computed with N; `EvidenceStatusView` shows `ATTESTED` on the envelope's fields |
 | A13 | `issue_attestation` given a record payload whose telemetry differs from the recomputation over the supplied capture records, or whose `record_digest` is not the digest of the payload; or with `boundary_identity` equal to `record_issuer_identity` or `requester_identity`; or with an `envelope_id` other than the deterministic form | `TELEMETRY_NOT_RECOMPUTED` / `SELF_ATTESTATION` / `ATTESTATION_MISMATCH`; no envelope |
 | A13a | `issue_attestation` has no `attested_at` parameter; two issuances of the same record by the boundary carry boundary-generated, timezone-aware `attested_at` values that are not earlier than every capture record's `captured_at`; the runner process reads no clock | as stated; a caller-supplied instant cannot be passed |
-| A14 | a run with a gap in capture sequence numbers; a benchmark case with no `CASE_BEGIN`/`CASE_END` pair or appearing twice; `captured calls ≠ harness_observed_calls` in **either** direction at `CASE_END` or `RUN_END` | no record, no envelope; state `INCONCLUSIVE` with `CAPTURE_INCOMPLETE` |
+| A14 | a run with a gap in capture sequence numbers; a benchmark case with no `CASE_BEGIN`/`CASE_END` pair or appearing twice; `captured calls ≠ harness_observed_calls` in **either** direction at `CASE_END` or `RUN_END` | no record, no envelope; state `INCONCLUSIVE` with `CAPTURE_INCOMPLETE` (`WORKFLOW_FAILED` when the workflow itself raised); when the governed baseline's run is incomplete the engine is still called and every complete method becomes `INCONCLUSIVE` with the engine's `BASELINE_ABSENT` refusal |
 | A15 | one capture record with `usage_availability ≠ AVAILABLE`; and separately a run where `total_tokens` is present in every record but `input_tokens` is absent in one | first: `token_usage = None`, availability carries the reason, the envelope attests `telemetry.llm_calls` only; second: `total_tokens` summed and attested, `input_tokens = None` and not attested |
 | A16 | an envelope whose `attested_fields` are not a subset of the declaration's allowed fields, omit `telemetry.llm_calls`, cover a record digest other than the observation's, or whose `capture_boundary_ref` is not the digest of the record's ordered capture fingerprints | `ATTESTATION_MISMATCH` |
 | A16a | gateway round trip: a `GatewayRequest` carrying prompt text yields a `GatewayResponse` whose `text` is the provider port's output, whose `capture_fingerprint` names a capture record holding only `prompt_digest` and `response_digest`; a provider exception yields `status = EXCEPTION`, `text = None`, `error_class` set, and still one capture record; a factory path that does not resolve to a `ProviderPort` aborts with `PROVIDER_FACTORY_INVALID` before any frame | as stated; the prompt and response text never appear in any record or envelope |
@@ -885,7 +892,7 @@ or acceptance figure.
 | A25 | **synthetic engine-coverage fixture** (the PR #1566 four-outcome fixtures, not a pilot run) | exactly the four `FitOutcome` names appear; `result_digest` stable across two runs at one `produced_at` |
 | A26 | real pilot runner end to end on the harness fixtures with a stub provider client injected into the boundary process | only the outcomes its evidence warrants appear; no `COMPARISON_EVIDENCE_ABSENT` unless evidence is genuinely absent; `authority_resolution_basis == REQUESTER_ASSERTED`; one record, one observation and one evaluation per method |
 | A27 | `SUPERSEDED` with a successor manifest differing in configuration, task class, benchmark manifest, plan, sufficiency rule, advice, evaluator, capture boundary or aggregation (each in turn, then several at once) | predecessor `REVISED` records for every method with `successor_manifest_digest` and the derived manifest-level `revision_scope`; successor `PROPOSED` records for every successor method with `predecessor_manifest_digest`, `predecessor_state_digest` = the matching `REVISED` record's digest (or `None` for a method new to the successor) and the same scope; all records constructible in order; `validate_lineage` accepts the chain, including a method dropped by the successor |
-| A28 | `SUPERSEDED` with a successor manifest identical to the predecessor; a `REVISED` record whose `revision_scope` differs from the derivation; a chain missing a `REVISED` record for a predecessor method or a `PROPOSED` record for a successor method; a chain containing a record no permitted transition produces | `REVISION_WITHOUT_CHANGE`; `REVISION_SCOPE_MISMATCH`; `LINEAGE_INCOMPLETE`; `validate_lineage` refuses |
+| A28 | `SUPERSEDED` with a successor manifest identical to the predecessor; a `REVISED` record whose `revision_scope` differs from the derivation; a chain missing a `REVISED` record for a predecessor method or a `PROPOSED` record for a successor method; a chain containing a record no permitted transition produces; a hand-built `EVALUATED` or `INCONCLUSIVE` record naming a result digest that is not supplied or that gives the method a different outcome | `REVISION_WITHOUT_CHANGE`; `REVISION_SCOPE_MISMATCH`; `LINEAGE_INCOMPLETE`; `validate_lineage` refuses (`STATE_TRANSITION_INVALID` / `LINEAGE_INCOMPLETE`) |
 | A29 | any state record | `approval_status == "NONE"`, `usage_scope == RESEARCH_ONLY`; field-set test finds no `approved`, `eligible`, `qualified`, `production` field; no state name equals a `FitOutcome` name |
 | A30 | AST boundary scan of the package | no `agentic`, runtime, proposer, composer, readiness, `governed_value`, Context Minimization, network client or LLM SDK import anywhere; `socket`, `subprocess` and `importlib` only inside the boundary subpackage, with exactly one `import_module` call in its entry module; no clock read outside the boundary's `captured_at` and `attested_at`; `CaptureAttemptStatus` members pinned to Context Minimization's `AttemptStatus` under a test-only import |
 | A31 | numeric scan of `src/` | no owner-supplied numeric default, threshold, sample size, coverage target or acceptance figure; integer fields are counts validated non-negative (positive where required) |
@@ -1053,3 +1060,14 @@ dotted path and the boundary constructs the `ProviderPort` internally, as
 §4.1 specifies; step 5 no longer takes `attested_at` from the caller, the
 boundary generating the single timezone-aware issuance instant itself
 (A13a). Documentation only; the §10 rulings are unchanged.
+
+**Post-implementation audit correction (adversarial review of PR #1575 at
+`fc895f2a`, 2026-09-02).** (1) `validate_lineage` now receives the engine
+results and refuses an `EVALUATED` or `INCONCLUSIVE` record whose named
+result is absent or disagrees, so no state is reachable around a fabricated
+result digest (§6.2, A28). (2) The closed-transition list gains
+`PROPOSED → INCONCLUSIVE` on a capture or workflow refusal, which the
+implementation needs because an incomplete run validates no observation;
+`WORKFLOW_FAILED` is named (§6.2, A14). (3) When the baseline's run is
+incomplete the engine is still called so complete methods do not remain
+`UNDER_TEST` (A14). No ballot ruling changes.

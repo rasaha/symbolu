@@ -44,7 +44,7 @@ res = api.run_pilot(m, catalog=pf.catalog(), rule_set=pf.rule_set(), advisory=ad
                     identity=pf.IDENTITY, provider_factory="stub_provider:make_provider", now=pf.clock(), boundary_env=env)
 assert all(r.complete for r in res.runs) and all(r.attestation is not None for r in res.runs)
 assert res.result.authority_resolution_basis == "REQUESTER_ASSERTED" and all(v.verification_status.value == "UNVERIFIED" for v in res.result.evidence_status)
-api.validate_lineage(res.states, [m])
+api.validate_lineage(res.states, [m], [res.result])
 for forbidden in ("agentic", "ugence_context_minimization", "ugence_agent_value_readiness", "governed_value", "ugence_trusted_evidence_authority", "numpy", "openai", "anthropic"):
     try:
         importlib.import_module(forbidden)

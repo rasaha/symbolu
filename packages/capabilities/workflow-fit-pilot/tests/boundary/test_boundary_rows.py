@@ -98,6 +98,20 @@ def test_a14_incomplete_capture_yields_no_record_and_inconclusive_state():
     st = [s for s in res.states if s.method.method_id == "debate"][-1]
     assert st.state.value == "INCONCLUSIVE" and st.refusal_codes == ("CAPTURE_INCOMPLETE",)
     assert res.coverage.methods_without_record == (run.method,) and not res.coverage.summary_permitted
+    # baseline run incomplete: the engine is still called and complete methods become INCONCLUSIVE with BASELINE_ABSENT
+    class NoBaseline(pf.FakeExecutor):
+        def execute(self, method, query, context, client):
+            if method.method_id == "linear_chain":
+                raise RuntimeError("baseline workflow failed")
+            return super().execute(method, query, context, client)
+
+    mb, resb = _run(executor=NoBaseline(pf.DEFAULT_CALLS))
+    assert resb.result is not None and any(x.code.value == "BASELINE_ABSENT" for x in resb.result.refusals)
+    finals = {}
+    for st in resb.states:
+        finals[st.method.method_id] = st
+    assert all(st.state.value == "INCONCLUSIVE" for st in finals.values())
+    assert finals["linear_chain"].refusal_codes == ("WORKFLOW_FAILED",) and "BASELINE_ABSENT" in finals["debate"].refusal_codes
     # a case never run: gap detected at RUN_END
     class CaseSkipper(pf.FakeExecutor):
         def execute(self, method, query, context, client):

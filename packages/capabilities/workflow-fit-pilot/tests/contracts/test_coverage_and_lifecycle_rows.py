@@ -183,7 +183,21 @@ def test_a27_a28_revision_lineage_one_way_derived_scope_and_drift():
     refuses(E.REVISION_SCOPE_MISMATCH, lambda: validate_lineage([records[0], forged], [m, succ]))
     refuses(E.LINEAGE_INCOMPLETE, lambda: validate_lineage(records[:3], [m, succ]))
     impossible = dataclasses.replace(records[2], state=S.EVALUATED, fit_outcome=FitOutcome.INSUFFICIENT_QUALITY, result_digest="a" * 64, revision_scope=(), predecessor_manifest_digest=None, state_digest="")
-    refuses(E.STATE_TRANSITION_INVALID, lambda: validate_lineage([records[0], impossible], [m, succ]))
+    refuses(E.LINEAGE_INCOMPLETE, lambda: validate_lineage([records[0], impossible], [m, succ]))  # the fabricated result is not supplied
+    # a hand-built EVALUATED around a fabricated result digest, following a genuine UNDER_TEST record
+    p0 = propose(m, m.methods[0].method, recorded_by="r", recorded_at=now())
+    u0 = transition(p0, LifecycleEvent.OBSERVATION_VALIDATED, manifest=m, recorded_by="r", recorded_at=now())
+    kw = {f.name: getattr(u0, f.name) for f in dataclasses.fields(u0) if f.name != "state_digest"}
+    forged = PilotConfigurationStateRecord(**{**kw, "state": S.EVALUATED, "fit_outcome": FitOutcome.SUFFICIENT_PARETO_EFFICIENT, "result_digest": "b" * 64, "predecessor_state_digest": u0.state_digest})
+    refuses(E.LINEAGE_INCOMPLETE, lambda: validate_lineage([p0, u0, forged], [m]))
+    # with a genuine result that gives the method a different outcome
+    res = run_pilot(m, catalog=pf.catalog(), rule_set=pf.rule_set(), advisory=adv, cases=pf.cases(), executor=pf.FakeExecutor(pf.DEFAULT_CALLS), scorer=pf.KeywordScorer(),
+                    identity=pf.IDENTITY, provider_factory="stub_provider:make_provider", now=pf.clock(), boundary_env=pf.boundary_env())
+    validate_lineage(res.states, [m], [res.result])
+    refuses(E.LINEAGE_INCOMPLETE, lambda: validate_lineage(res.states, [m]))
+    ev = next(x for x in res.states if x.state is S.EVALUATED and x.fit_outcome is FitOutcome.SUFFICIENT_RESOURCE_DOMINATED)
+    lied = dataclasses.replace(ev, fit_outcome=FitOutcome.SUFFICIENT_PARETO_EFFICIENT, state_digest="")
+    refuses(E.STATE_TRANSITION_INVALID, lambda: validate_lineage([x for x in res.states if x is not ev] + [lied], [m], [res.result]))
 
 
 def test_a29_state_record_constants_and_no_approval_field():

@@ -31,7 +31,7 @@ def test_a26_real_workflows_behind_the_boundary():
     warranted = set(res.outcomes.values())
     assert warranted <= set(FitOutcome) and FitOutcome.COMPARISON_EVIDENCE_ABSENT not in warranted
     assert all(r.record.telemetry.llm_calls == r.diagnostics.harness_observed_calls for r in res.runs)
-    validate_lineage(res.states, [m])
+    validate_lineage(res.states, [m], [res.result])
     text = render(res)
     assert "authority_resolution_basis=REQUESTER_ASSERTED" in text and "SUMMARY:" in text
     # A second run reproduces the same captured telemetry, quality and outcomes. Capture

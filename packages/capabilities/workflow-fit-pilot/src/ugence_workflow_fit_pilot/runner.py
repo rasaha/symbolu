@@ -247,7 +247,7 @@ def run_pilot(
     request = result = None
     outcomes: Dict[ReasoningMethodRef, FitOutcome] = {}
     baseline = manifest.plan.baseline
-    if complete_runs and any(r.method == baseline for r in complete_runs):
+    if complete_runs:  # the engine decides; an absent baseline is its request-level refusal, never the runner's silence
         request = ReadinessComparisonRequest(
             schema_version=COMPARISON_REQUEST_SCHEMA_VERSION, request_id=f"{manifest.manifest_id}:comparison", task_class=manifest.plan.task_class,
             catalog=catalog.ref(), baseline=baseline, candidates=tuple(r.method for r in complete_runs),

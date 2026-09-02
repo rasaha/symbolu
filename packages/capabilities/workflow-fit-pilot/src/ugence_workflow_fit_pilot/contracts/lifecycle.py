@@ -242,15 +242,31 @@ _PERMITTED = {
 }
 
 
-def validate_lineage(records: Iterable[PilotConfigurationStateRecord], manifests: Iterable[PilotStudyManifest]) -> None:
+def validate_lineage(records: Iterable[PilotConfigurationStateRecord], manifests: Iterable[PilotStudyManifest], results: Iterable[ReadinessComparisonResult] = ()) -> None:
     """Replays every chain and refuses a record no permitted transition produces, a
-    revision scope that differs from the derivation, or an incomplete supersession."""
+    revision scope that differs from the derivation, an incomplete supersession, or an
+    EVALUATED / INCONCLUSIVE record whose named engine result is not supplied or does not
+    give this method the recorded outcome and refusals. A state can therefore not be
+    reached by hand-building a record around a fabricated result digest."""
     recs = list(records)
     by_digest: Dict[str, PilotConfigurationStateRecord] = {r.state_digest: r for r in recs}
     mans: Dict[str, PilotStudyManifest] = {m.manifest_digest: m for m in manifests}
+    ress: Dict[str, ReadinessComparisonResult] = {x.result_digest: x for x in results}
     for r in recs:
         if r.manifest_digest not in mans:
             raise PilotError(PilotErrorCode.LINEAGE_INCOMPLETE, "record names an unsupplied manifest")
+        if r.result_digest is not None:
+            res = ress.get(r.result_digest)
+            if res is None:
+                raise PilotError(PilotErrorCode.LINEAGE_INCOMPLETE, f"{r.state.value} record names an unsupplied engine result")
+            outcome = next((a.outcome for a in res.assessments if a.method == r.method), None)
+            refusals = tuple(sorted(x.code.value for x in res.refusals if x.method is None or x.method == r.method))
+            if r.state is PilotConfigurationState.EVALUATED and outcome != r.fit_outcome:
+                raise PilotError(PilotErrorCode.STATE_TRANSITION_INVALID, "EVALUATED outcome differs from the engine result for this method")
+            if r.state is PilotConfigurationState.INCONCLUSIVE and (outcome != r.fit_outcome or refusals != r.refusal_codes):
+                raise PilotError(PilotErrorCode.STATE_TRANSITION_INVALID, "INCONCLUSIVE outcome or refusals differ from the engine result for this method")
+        elif r.state is PilotConfigurationState.EVALUATED:
+            raise PilotError(PilotErrorCode.STATE_TRANSITION_INVALID, "EVALUATED requires an engine result")
         if r.state is PilotConfigurationState.PROPOSED:
             if r.predecessor_manifest_digest is not None:
                 pm = mans.get(r.predecessor_manifest_digest)
