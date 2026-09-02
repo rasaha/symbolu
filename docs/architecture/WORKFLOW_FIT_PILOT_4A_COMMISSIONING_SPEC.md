@@ -1,13 +1,14 @@
 # Trusted Workflow-Fit Pilot (Phase 4A) — Commissioning Specification and Ballot
 
-**Status:** `[R]` — revision 3, awaiting the four-item owner ballot in §10.
+**Status:** `[R]` — revision 4, awaiting the four-item owner ballot in §10.
 **Nothing here is implemented.** This document commissions one research-only
 pilot package and one gate, and nothing else. It replaces further scoping
 notes: the four open decisions it resolves (Workflow-Fit 1 and 4, Advisor 3
 and 5) are answered together in §3–§6, because each is unusable without the
 others. Revision 2 applied eleven owner corrections; revision 3 applies the
 adversarial design review's four blockers, nine major defects and three
-minor corrections (§11).
+minor corrections; revision 4 applies the two follow-up reviews of revision
+3 (§11).
 **Authority applied:** Workflow-Fit decisions 2, 3, 5 and Advisor decisions 1,
 2, 4 as recorded in their notes; the Slice 1 contracts (`4369089d`,
 correction 30 at `4324cbdd`); Slice 2 (`8bd6ccf3`); the Phase 3 intake ruling
@@ -73,7 +74,11 @@ Slice 2 contract changes.
 `AggregationRef`, `USAGE_SCOPE_RESEARCH_ONLY`, `AUTHORITY_RESOLUTION_BASIS_V1 =
 "REQUESTER_ASSERTED"`, `AdvisoryClassification`, `AdvisoryEligibility`,
 `RULE_DERIVED`, `COMPARISON_EVIDENCE_ABSENT`. No new label is a synonym of
-any of these, and no lifecycle state names an outcome (§6.2).
+any of these, and no lifecycle state names an outcome (§6.2). The pilot
+package does not depend on Context Minimization, so it defines a pilot-local
+`CaptureAttemptStatus` (`SUCCEEDED / FAILED / TIMEOUT / EXCEPTION`) and pins
+its members to Context Minimization's `AttemptStatus` under a test-only
+import, in the Slice 1 vocabulary-pin pattern.
 
 **Numbers.** This document supplies **no owner-supplied numeric default,
 threshold, sample size, coverage target or acceptance figure**. Observed
@@ -155,9 +160,11 @@ class PilotStudyManifest:
 
 **Constructor obligations (shape only).** Exactly one assignment carries
 `GOVERNED_BASELINE` and its method equals `plan.baseline`
-(`ROLE_INCONSISTENT`); `ADVISOR_QUALIFIED` appears only when
-`advisory_digest` and `rule_set` are present, and never when they are absent
-(`ADVISORY_REQUIRED`); no method appears twice (`METHOD_DUPLICATE`); every
+(`ROLE_INCONSISTENT`); any `ADVISOR_QUALIFIED` role **requires**
+`advisory_digest` and `rule_set` (`ADVISORY_REQUIRED`), while a manifest may
+carry `advisory_digest` with **no** such role, which is exactly the
+empty-qualifying-set case and is checked by `validate_manifest`; `rule_set`
+is present iff `advisory_digest` is; no method appears twice (`METHOD_DUPLICATE`); every
 `plan.recommended` member is assigned; `benchmark.benchmark_manifest_digest ==
 plan.task_class.benchmark_set_digest` (`BENCHMARK_MANIFEST_MISMATCH`);
 `quality_aggregation` equals the task class's declared aggregation when one
@@ -167,16 +174,26 @@ is declared (`AGGREGATION_MISMATCH`); `capture_boundary.allowed_attested_fields
 the constants.
 
 **Pre-execution validation, `validate_manifest(manifest, *, catalog,
-advisory=None)`**, runs before the runner accepts the manifest and again by
-any consumer. It receives the **full catalog** and the **full advisory**
-(when any `ADVISOR_QUALIFIED` role exists) and refuses:
+rule_set, advisory=None) -> ValidatedManifest`**, runs before the runner
+accepts the manifest and again by any consumer. It receives the **full
+catalog**, the **full `RuleSet`** whose admissibility predicate defines the
+admissible set (always, whether or not advice is used), and the **full
+advisory** whenever `advisory_digest` is set. It refuses:
 
 | Check | Refusal |
 |---|---|
-| `advisory` omitted while `advisory_digest` is set, or supplied with a different digest, rule set or `task_class_digest` than the plan's | `ADVISORY_REQUIRED` / `ADVISORY_MISMATCH` |
-| the set of methods carrying `ADVISOR_QUALIFIED` ≠ the advisory's **complete** `qualifying` set; or `plan.recommended` ≠ that set | `ADVISORY_MISMATCH` |
-| under exhaustive composition (6.1-A), the set of assigned methods ≠ the catalog's admissible set under the advisory's rule-set admissibility; or a `CHALLENGER` role on a qualified method; or an admissible non-qualified method without `CHALLENGER` | `COMPOSITION_INCOMPLETE` |
+| `catalog.ref() ≠ plan.catalog`; or `rule_set.ref() ≠ manifest.rule_set` when set | `CATALOG_MISMATCH` / `RULE_SET_MISMATCH` |
+| `advisory` omitted while `advisory_digest` is set, or supplied with a different digest, rule set, catalog ref or `task_class_digest` than the manifest's and plan's | `ADVISORY_REQUIRED` / `ADVISORY_MISMATCH` |
+| the set of methods carrying `ADVISOR_QUALIFIED` ≠ the advisory's **complete** `qualifying` set (both may be empty); or `plan.recommended` ≠ that set | `ADVISORY_MISMATCH` |
+| under exhaustive composition (6.1-A), the set of assigned methods ≠ the catalog's admissible set under `rule_set.admissibility`; or a `CHALLENGER` role on a qualified method; or an admissible non-qualified method without `CHALLENGER` | `COMPOSITION_INCOMPLETE` |
 | any assigned method absent from the catalog | `METHOD_NOT_IN_CATALOG` |
+
+On success it returns a `ValidatedManifest` — a frozen record of
+`manifest_digest`, `catalog_digest`, `rule_set_digest`, `advisory_digest`
+(or `None`), the validated admissible method set, the validating package
+version and a digest of its own — which `validate_observation` requires as
+an input, so no observation can be validated against a manifest that was
+never validated.
 
 **Role deduplication.** Roles are non-exclusive: a baseline that the advisory
 did not qualify carries `GOVERNED_BASELINE` and `CHALLENGER`; a qualified
@@ -275,30 +292,32 @@ class QualityEvaluationRecord:
     evaluator_declaration_digest: str           # == manifest.evaluator.declaration_digest
     scoring_instruction_digest: str             # == manifest.evaluator.scoring_instruction_digest
     quality_aggregation: AggregationRef         # == manifest.quality_aggregation
-    claim_digest: str                           # the MetricClaim produced (its evidence_refs name this evaluation_id)
-    quality_result_digest: str                  # the QualityResult carrying that claim_ref and aggregation
+    claim_digest: str                           # JCS digest of the MetricClaim's fields (MetricClaim has no self-digest; the pilot canonicalizes it with its package-local canonicalizer)
+    quality_result_digest: str                  # JCS digest of the QualityResult carrying that claim_ref and aggregation
     independence_status: Literal["DECLARED_UNVERIFIED"]
     evaluated_by: str                           # == manifest.evaluator.evaluator_identity
     evaluated_at: datetime
     evaluation_digest: str
 ```
 
-**`validate_observation(observation, *, manifest, plan, record, benchmark,
-evaluation, quality_claim, advisory=None, attestation=None)`** receives every
-object needed to verify the observation's claims and refuses any missing or
-mismatched one. It presupposes `validate_manifest` (§3.1) has passed on the
-same manifest, catalog and advisory, and never infers membership, roles or
-advice from digests alone.
+**`validate_observation(observation, *, validated, manifest, plan, record,
+benchmark, evaluation, quality_claim, quality_result, advisory=None,
+attestation=None)`** receives every object needed to verify the
+observation's claims and refuses any missing or mismatched one. `validated`
+is the `ValidatedManifest` returned by `validate_manifest` (§3.1); the
+prerequisite is therefore an input, not a presupposition. It never infers
+membership, roles or advice from digests alone.
 
 | Check | Refusal |
 |---|---|
-| `observation.manifest_digest == manifest.manifest_digest`; `manifest.plan == plan` | `MANIFEST_MISMATCH` |
+| `validated.manifest_digest == manifest.manifest_digest == observation.manifest_digest`; `validated.advisory_digest == manifest.advisory_digest`; `manifest.plan == plan` | `MANIFEST_MISMATCH` / `MANIFEST_NOT_VALIDATED` |
 | `record.record_digest == observation.record_digest`; `record.method == observation.method`; `record.task_class_digest`, `record.binding`, `record.model_ref` equal the observation's and the plan's | `RECORD_MISMATCH` |
 | `benchmark.benchmark_manifest_digest == observation.case_set_digest == plan.task_class.benchmark_set_digest`; `benchmark.case_count == observation.case_count` | `BENCHMARK_MANIFEST_MISMATCH` |
-| `evaluation.evaluation_digest == observation.quality_evaluation_digest`; its `manifest_digest`, `record_digest`, `case_set_digest`, `evaluator_declaration_digest`, `scoring_instruction_digest`, `quality_aggregation` and `evaluated_by` equal the manifest's and the observation's; `quality_claim` digest `== evaluation.claim_digest`; the claim's `evidence_refs` name `evaluation.evaluation_id`; its `transformation_method == CALCULATED` | `QUALITY_EVALUATION_MISMATCH` |
+| `evaluation.evaluation_digest == observation.quality_evaluation_digest`; its `manifest_digest`, `record_digest`, `case_set_digest`, `evaluator_declaration_digest`, `scoring_instruction_digest`, `quality_aggregation` and `evaluated_by` equal the manifest's and the observation's; the JCS digest of `quality_claim` `== evaluation.claim_digest`; the claim's `evidence_refs` name `evaluation.evaluation_id`; its `transformation_method == CALCULATED` | `QUALITY_EVALUATION_MISMATCH` |
+| the JCS digest of `quality_result` `== evaluation.quality_result_digest`; `quality_result.method == observation.method`; `quality_result.claim_ref == quality_claim.claim_id`; `quality_result.value == quality_claim.value`; `quality_result.aggregation == manifest.quality_aggregation` | `QUALITY_RESULT_MISMATCH` |
 | observation roles equal the manifest assignment's roles for this method | `ROLE_INCONSISTENT` |
 | any role is `ADVISOR_QUALIFIED` ⇒ `advisory` supplied with `manifest.advisory_digest` and this method ∈ `advisory.qualifying` | `ADVISORY_REQUIRED` / `ADVISORY_MISMATCH` |
-| `observation.attestation_envelope_digest` set ⇒ `attestation` supplied, its digest equal, its `record_digest == record.record_digest`, its `attester_identity == manifest.capture_boundary.boundary_identity`, and its `attested_fields` a non-empty subset of `manifest.capture_boundary.allowed_attested_fields` containing `telemetry.llm_calls` | `ATTESTATION_MISMATCH` |
+| `observation.attestation_envelope_digest` set ⇒ `attestation` supplied, its digest equal, its `record_digest == record.record_digest`, its `attester_identity == manifest.capture_boundary.boundary_identity`, its `attested_fields` a non-empty subset of `manifest.capture_boundary.allowed_attested_fields` containing `telemetry.llm_calls`, and its `capture_boundary_ref` equal to the JCS digest of `record.telemetry.capture_refs[1:]` (the ordered capture fingerprints, §4.2) | `ATTESTATION_MISMATCH` |
 | the manifest digest stamped on the record's `capture_refs` (§4.2) equals `observation.manifest_digest`; `record.captured_at` and `observation.observed_at` are not earlier than `manifest.preregistered_at` (a local chronology check, not proof) | `MANIFEST_NOT_PRIOR` |
 
 **Unresolved 3.1 — where the binding lives.**
@@ -314,48 +333,98 @@ advice from digests alone.
 
 ## 4. Decision 2 — Trust controls (Workflow-Fit 4)
 
-### 4.1 The capture boundary: port and process
+### 4.1 The capture boundary: port, process and provider factory
 
 The pilot introduces one component, the **capture boundary**, declared in
 the manifest and running in **a separate operating-system process** from the
-workflow under test. Its contract is a port, not a network client:
+workflow under test. Its contract is a port and a frame protocol, not a
+network client:
 
 ```python
 class ProviderGatewayPort(Protocol):            # implemented by the boundary process; the ONLY client the workflow is given
     def call(self, request: GatewayRequest) -> GatewayResponse: ...
 
 @dataclass(frozen=True)
-class GatewayRequest:
-    manifest_digest: str                        # stamped by the runner; the boundary refuses a request without one it was started with
+class GatewayRequest:                           # one frame per model call, written by the workflow-side stub
+    manifest_digest: str                        # stamped by the runner; the boundary refuses a request without the digest it was started with
     method_id: str
     method_version: str
     run_id: str                                 # the execution's invocation_id
     case_digest: str                            # member of the benchmark manifest
     sequence: int                               # per (run_id, case_digest), starting at 1, contiguous
-    prompt_digest: str                          # digest of the prompt text; the text itself never enters a record
+    prompt: str                                 # the prompt TEXT: the provider needs it; only its digest ever enters a record
+
+@dataclass(frozen=True)
+class GatewayResponse:
+    sequence: int                               # echoes the request
+    status: CaptureAttemptStatus                # SUCCEEDED / FAILED / TIMEOUT / EXCEPTION
+    text: Optional[str]                         # the model output when SUCCEEDED; None otherwise
+    error_class: Optional[str]                  # the provider error's class name when not SUCCEEDED; never the message text
+    usage: Optional[TokenUsageSnapshot]         # provider-reported usage as the provider port returned it
+    usage_availability: UsageAvailabilityToken
+    provider_request_id: Optional[str]
+    capture_fingerprint: str                    # the CaptureRecord the boundary wrote for this call (§4.2)
+
+class RunControlFrame(str, Enum):               # written by the RUNNER, never by the workflow
+    RUN_BEGIN = "RUN_BEGIN"                     # (manifest_digest, method, run_id)
+    CASE_BEGIN = "CASE_BEGIN"                   # (run_id, case_digest)
+    CASE_END = "CASE_END"                       # (run_id, case_digest, harness_observed_calls_for_case)
+    RUN_END = "RUN_END"                         # (run_id, harness_observed_calls)
 ```
 
-**Transport.** A local inter-process channel (a Unix domain socket or a pipe
-pair) carrying JSON-encoded `GatewayRequest`/`GatewayResponse` frames, one
-frame per call, referenced by `CaptureBoundaryDeclaration.port_ref`. The
-harness's workflow client is a thin stub that writes one frame per model call
-and reads one response; it holds no provider credential and no SDK. The
-**provider client lives inside the boundary process** and is injected there
-by the caller at start-up; the pilot package therefore imports no network or
-LLM SDK and no `agentic` module, exactly as the boundary test requires.
+**Provider side.** Inside the boundary process the provider is reached only
+through a pilot-defined port:
 
-**Completeness rule.** The workflow under test is constructed with the
-gateway stub as its only client, so every model call passes through the
-boundary or does not happen. A run in which the boundary's per-call sequence
-numbers are not contiguous, or in which the harness reports a call the
-boundary did not see (`harness_observed_calls > captured calls`), is
-**not attested**: no execution record is issued for that method and the
-method's state becomes `INCONCLUSIVE` with refusal `CAPTURE_INCOMPLETE`.
+```python
+class ProviderPort(Protocol):                   # implemented by the CALLER, outside the pilot package
+    def complete(self, prompt: str) -> ProviderResult: ...
+
+@dataclass(frozen=True)
+class ProviderResult:
+    text: str
+    usage: Optional[TokenUsageSnapshot]
+    usage_availability: UsageAvailabilityToken
+    provider_request_id: Optional[str]
+    provider_id: str
+```
+
+**Process start and provider construction.** The runner starts the boundary
+with `subprocess` as a separate interpreter process, passing three
+arguments: the transport endpoint, the manifest digest, and a
+`provider_factory` dotted path (`package.module:function`). The boundary
+entry module performs **exactly one dynamic import** of that module and calls
+the function, which must return a `ProviderPort`; the object never crosses
+the process boundary, so nothing need be serializable. The provider SDK is
+imported by the caller's factory module, never by the pilot package; the
+boundary test (A30) permits that single `importlib.import_module` call in
+the boundary entry module and nowhere else. A factory that fails to import or
+returns an object without `complete` aborts the boundary before any run
+(`PROVIDER_FACTORY_INVALID`).
+
+**Transport.** A local inter-process channel (a Unix domain socket, or a
+pipe pair where sockets are unavailable) carrying JSON-encoded frames, one
+per call or control event, referenced by
+`CaptureBoundaryDeclaration.port_ref`. The harness's workflow client is a
+thin stub that writes one `GatewayRequest` per model call and reads one
+`GatewayResponse`; it holds no provider credential and no SDK.
+
+**Completeness rule (exact, both directions).** The workflow under test is
+constructed with the gateway stub as its only client; that this is its only
+call path is a harness property the package cannot prove and is declared in
+`process_separation_ref`. A method's run is complete iff, for that `run_id`:
+every case digest of the benchmark manifest appears exactly once between
+`CASE_BEGIN` and `CASE_END`; sequence numbers within each case are
+contiguous from 1; and the boundary's captured call count equals the
+harness-observed count at `RUN_END` and per case at `CASE_END` (`captured ==
+harness_observed`, refusing **either** direction of disagreement). An
+incomplete run yields **no execution record and no envelope**; the method's
+state becomes `INCONCLUSIVE` with refusal `CAPTURE_INCOMPLETE`.
 
 **Failure behaviour.** A provider failure is a capture record with
-`AttemptStatus` other than `SUCCEEDED`; it counts as a call. A boundary
-failure to write a record aborts the run for that method (`CAPTURE_INCOMPLETE`).
-The boundary never retries on the workflow's behalf.
+`CaptureAttemptStatus` other than `SUCCEEDED`; it counts as a call and is
+returned to the workflow as a `GatewayResponse` with `text = None`. A
+boundary failure to write a record aborts the run for that method
+(`CAPTURE_INCOMPLETE`). The boundary never retries on the workflow's behalf.
 
 ### 4.2 The capture record
 
@@ -369,7 +438,7 @@ class CaptureRecord:                            # ApiCallTokenRecord-shaped; one
     sequence: int
     provider_id: str
     attempt_id: str
-    status: AttemptStatus                       # SUCCEEDED / FAILED / TIMEOUT / EXCEPTION
+    status: CaptureAttemptStatus                # pilot-local; pinned to Context Minimization's AttemptStatus by test
     provider_invoked: bool
     usage_availability: UsageAvailabilityToken
     usage: Optional[TokenUsageSnapshot]         # provider-reported; None when unavailable
@@ -379,40 +448,58 @@ class CaptureRecord:                            # ApiCallTokenRecord-shaped; one
     capture_fingerprint: str                    # JCS digest of the fields above
 ```
 
-**Correlation.** A capture record belongs to a method's run iff its
-`manifest_digest`, `method`, `run_id` and `case_digest` match and its
-`sequence` is contiguous within `(run_id, case_digest)`. The boundary
-retains its records for the manifest; nothing else may write them.
+**Correlation and canonical order.** A capture record belongs to a
+method's run iff its `manifest_digest`, `method`, `run_id` and `case_digest`
+match and its `sequence` is contiguous within `(run_id, case_digest)`. The
+**canonical order** of a run's records is the tuple `(case_digest,
+sequence)`, ascending, with `case_digest` ordered as in the benchmark
+manifest (ascending by code point); every reference to "sequence order"
+means this total order, so `capture_refs` and `capture_boundary_ref` are
+deterministic. The boundary retains its records for the manifest; nothing
+else may write them.
 
 ### 4.3 Order of operations and attestation issuance
 
 1. The runner validates the manifest (§3.1) and starts the boundary with the
    manifest digest and the injected provider client.
 2. The workflow runs behind the boundary over the complete case set.
-3. **The boundary recomputes telemetry** from its own capture records:
-   `llm_calls` = the count of capture records for the run under
-   `manifest.resource_aggregation` (the sum over the case set);
-   `llm_calls_basis = INJECTED_COUNTER`; `token_usage` = the summed
-   provider-reported usage with `token_count_basis = PROVIDER_REPORTED` and
-   `token_usage_availability = AVAILABLE` **only if every capture record has
-   `usage_availability = AVAILABLE`**, otherwise `token_usage = None` with the
-   first unavailable reason; `capture_refs` = the manifest digest followed by
-   every `capture_fingerprint` in sequence order.
+3. **The boundary recomputes telemetry** from its own capture records, in
+   canonical order (§4.2): `llm_calls` = the count of capture records for
+   the run under `manifest.resource_aggregation` (the sum over the case
+   set); `llm_calls_basis = INJECTED_COUNTER`; `token_usage` =
+   provider-reported usage summed **per field**, where a field is summed only
+   if it is present in every capture record and is otherwise `None`;
+   `token_usage_availability = AVAILABLE` only if every capture record has
+   `usage_availability = AVAILABLE`, otherwise the first unavailable reason
+   and `token_usage = None`; `token_count_basis = PROVIDER_REPORTED` when
+   `token_usage` is present, else `UNKNOWN`; `capture_refs` = the manifest
+   digest followed by every `capture_fingerprint` in canonical order. The
+   boundary returns this telemetry to the runner as a JSON payload.
 4. The adapter constructs the execution record **with exactly that
-   telemetry** and digests it.
-5. **`issue_attestation(record, capture_records, *, declaration) ->
+   telemetry** and digests it, then passes the record's **canonical JCS
+   payload** (the exact payload whose digest is `record_digest`, with the
+   digest field included) back to the boundary. No deserialization into the
+   Slice 1 dataclass happens in the boundary.
+5. **`issue_attestation(record_payload, capture_records, *, declaration,
+   record_issuer_identity, requester_identity, envelope_id, attested_at) ->
    AttestationEnvelope`** runs in the boundary process. It recomputes step 3
-   from the supplied capture records, verifies that the record's telemetry
-   equals the recomputation field by field and that `record.record_digest`
-   equals the digest of the supplied record, and refuses otherwise
-   (`TELEMETRY_NOT_RECOMPUTED`). It then issues the envelope over
-   `record.record_digest` with `attested_fields` = the **supported subset**
-   of `declaration.allowed_attested_fields`: always `telemetry.llm_calls`;
-   the token fields only when `token_usage` is present;
-   `capture_boundary_ref` = the JCS digest of the ordered capture
-   fingerprints; `attester_identity = declaration.boundary_identity`, which
-   must differ from the record's `issuer_identity` and the request's
-   `requester_identity` (Slice 1 `SELF_ATTESTATION` otherwise) `[V]`.
+   from the supplied capture records; recomputes the record digest from the
+   payload with the digest field excluded and verifies it equals the
+   payload's `record_digest`; verifies the payload's `telemetry` equals the
+   recomputation field by field, and refuses otherwise
+   (`TELEMETRY_NOT_RECOMPUTED`); verifies `declaration.boundary_identity`
+   differs from `record_issuer_identity` and `requester_identity`, refusing
+   otherwise before Slice 1 would (`SELF_ATTESTATION`) `[V]`. It then issues
+   the envelope over `record_digest` with `attested_fields` = the
+   **supported subset** of `declaration.allowed_attested_fields`: always
+   `telemetry.llm_calls`; each token field only when that field of
+   `token_usage` is present; `capture_boundary_ref` = the JCS digest of the
+   ordered capture fingerprints; `attester_identity =
+   declaration.boundary_identity`; `envelope_id` as supplied by the runner
+   and required to equal `f"att:{record_digest[:16]}:{boundary_identity}"`
+   (deterministic, so two issuances collide rather than multiply);
+   `attested_at` as supplied, timezone-aware (the boundary's own clock read
+   at issuance, the one clock read the package permits, §7).
 
 **An envelope never carries a competing value**: it attests values the
 boundary itself recomputed and found in the record. The boundary never
@@ -588,12 +675,21 @@ class RevisionScope(str, Enum):                 # derived by comparing predecess
     CONFIGURATION = "CONFIGURATION"             # plan.binding.configuration_digest or binding_digest differs
     TASK_CLASS = "TASK_CLASS"                   # plan.task_class.task_class_digest differs
     BENCHMARK_MANIFEST = "BENCHMARK_MANIFEST"   # benchmark.benchmark_manifest_digest differs
-    COMPARISON_PLAN = "COMPARISON_PLAN"         # plan_digest differs for a reason other than the above
+    COMPARISON_PLAN = "COMPARISON_PLAN"         # plan_digest differs after masking task_class, binding and benchmark (baseline, recommended, challengers, catalog, preregistration)
     SUFFICIENCY_RULE = "SUFFICIENCY_RULE"       # the task class's sufficiency rule id or version differs
+    # The four scopes below extend the owner-listed five so that every manifest coordinate is
+    # revisable; they are put to ballot item 4 as an amendment [R].
+    ADVICE = "ADVICE"                           # advisory_digest or rule_set differs
+    EVALUATOR = "EVALUATOR"                     # evaluator.declaration_digest differs
+    CAPTURE_BOUNDARY = "CAPTURE_BOUNDARY"       # capture_boundary declaration differs
+    AGGREGATION = "AGGREGATION"                 # resource_aggregation or quality_aggregation differs
 
 def derive_revision_scope(predecessor: PilotStudyManifest, successor: PilotStudyManifest) -> tuple[RevisionScope, ...]:
     """Pure. Returns the non-empty, member-ordered set of scopes in which the two manifests differ,
-    or refuses REVISION_WITHOUT_CHANGE when no covered coordinate differs."""
+    or refuses REVISION_WITHOUT_CHANGE when no covered coordinate differs. Every manifest field is
+    covered by some scope (a difference only in `methods` is a difference in ADVICE, COMPARISON_PLAN
+    or the catalog's admissible set, hence never uncovered), so two manifests with different digests
+    always yield a scope."""
 
 @dataclass(frozen=True)
 class PilotConfigurationStateRecord:
@@ -641,13 +737,29 @@ receive the predecessor record and the relevant manifests, and by
 record that no permitted transition produces.
 
 **Revision scope** covers any change to the configuration, the task class,
-the benchmark manifest, the comparison plan or the sufficiency rule; any of
-these yields a new `manifest_digest`, a `REVISED` record on the predecessor
-naming `successor_manifest_digest` with the derived `revision_scope`, and a
+the benchmark manifest, the comparison plan or the sufficiency rule (the
+owner-listed five) and, subject to ballot item 4, to the advice, the
+evaluator, the capture boundary or the aggregation references; any of these
+yields a new `manifest_digest`, a `REVISED` record on the predecessor naming
+`successor_manifest_digest` with the derived `revision_scope`, and a
 `PROPOSED` record on the successor naming `predecessor_manifest_digest` and
-`predecessor_state_digest` (the `REVISED` record's digest). A caller cannot
-omit or invent a scope: `validate_lineage` recomputes
-`derive_revision_scope` and refuses a mismatch (`REVISION_SCOPE_MISMATCH`).
+`predecessor_state_digest` (the `REVISED` record's digest). `revision_scope`
+is a **manifest-level** property: every successor `PROPOSED` record carries
+the same derived tuple. A caller cannot omit or invent a scope:
+`validate_lineage` recomputes `derive_revision_scope` and refuses a mismatch
+(`REVISION_SCOPE_MISMATCH`).
+
+**Method-set drift between manifests.** Superseding is per manifest, so
+`transition(SUPERSEDED)` is applied to **every** method record of the
+predecessor. A method absent from the successor still receives a `REVISED`
+record whose `successor_manifest_digest` names a manifest in which it has no
+assignment; `validate_lineage` accepts that as the method's terminal record.
+A method new to the successor receives a `PROPOSED` record from
+`propose(successor_manifest, predecessor=None, predecessor_manifest=...)`
+with `predecessor_manifest_digest` set, `predecessor_state_digest = None`
+and the manifest-level `revision_scope`; `validate_lineage` requires that
+every predecessor method has a `REVISED` record and every successor method
+has a `PROPOSED` record (`LINEAGE_INCOMPLETE` otherwise).
 
 **The configuration is identified before testing** because `PROPOSED`
 requires a validated manifest and refuses any observation. **No state is an
@@ -700,12 +812,17 @@ Composer; no runtime integration.
 **Package.** `packages/capabilities/workflow-fit-pilot` →
 `ugence-workflow-fit-pilot`, depending on `ugence-reasoning-method-governance`,
 `ugence-readiness-comparison`, `ugence-reasoning-method-advisor`,
-`ugence-governance-contracts`, `ugence-jcs`; the boundary process entry
-point, port, capture record and `issue_attestation` in a subpackage that
-imports only the standard library's process and socket facilities plus the
-contracts above, and never `agentic`, a network client or an LLM SDK; the
-harness stays in `experiments/`. Boundary test as in Slices 1 and 2, with the
-socket allowance limited to the boundary subpackage.
+`ugence-governance-contracts`, `ugence-jcs` (not on Context Minimization:
+`CaptureAttemptStatus` is pilot-local and pinned by a test-only import);
+the boundary process entry point, ports, frames, capture record and
+`issue_attestation` in a subpackage that imports only the standard library's
+`subprocess`, `socket`, `json`, `importlib` and `datetime` facilities plus
+the contracts above, and never `agentic`, a network client or an LLM SDK;
+the harness stays in `experiments/`. Boundary test as in Slices 1 and 2,
+with three allowances limited to the boundary subpackage: the socket and
+subprocess imports, exactly one `importlib.import_module` call in the entry
+module for the provider factory, and one clock read for
+`CaptureRecord.captured_at` and `attested_at`.
 
 **In scope:** §3.1 manifest and `validate_manifest`; §3.2 benchmark
 manifest; §3.3 observation and diagnostics; §3.4 evaluation record and
@@ -732,21 +849,23 @@ or acceptance figure.
 | # | Test | Expected |
 |---|---|---|
 | A1 | manifest whose baseline assignment's method ≠ `plan.baseline`, or with no `GOVERNED_BASELINE`, or two | `ROLE_INCONSISTENT` |
-| A2 | manifest with an `ADVISOR_QUALIFIED` role and `advisory_digest=None`; or `advisory_digest` set and no such role; or `validate_manifest` called without the advisory when the digest is set | `ADVISORY_REQUIRED` |
+| A2 | manifest with an `ADVISOR_QUALIFIED` role and `advisory_digest=None`; or `rule_set` present without `advisory_digest`; or `validate_manifest` called without the advisory when the digest is set | `ADVISORY_REQUIRED`; a manifest with `advisory_digest` set and no qualified role constructs and validates when the advisory's qualifying set is empty |
 | A3 | manifest listing one method twice; or `allowed_attested_fields` outside `ATTESTABLE_TELEMETRY_FIELDS` or lacking `telemetry.llm_calls` | `METHOD_DUPLICATE` / `ATTESTED_FIELDS_INVALID` |
 | A4 | manifest whose `benchmark.benchmark_manifest_digest ≠ plan.task_class.benchmark_set_digest` | `BENCHMARK_MANIFEST_MISMATCH` |
 | A5 | benchmark manifest with unsorted, repeated or empty `case_digests`, `case_count ≠ len` or `case_count ≤ 0`, or a head `content_digest` that is not the digest of the list | refused at construction (`BENCHMARK_HEAD_MISMATCH` for the head) |
-| A6 | `validate_manifest` with an advisory whose complete qualifying set differs from the `ADVISOR_QUALIFIED` methods or from `plan.recommended`; or with a catalog whose admissible set is not exactly the assigned set; or a `CHALLENGER` role on a qualified method | `ADVISORY_MISMATCH` / `COMPOSITION_INCOMPLETE` |
+| A6 | `validate_manifest` with an advisory whose complete qualifying set differs from the `ADVISOR_QUALIFIED` methods or from `plan.recommended`; or whose catalog ref differs from the plan's; or with a catalog or rule set whose ref differs from the manifest's; or with a catalog whose admissible set under `rule_set.admissibility` is not exactly the assigned set; or a `CHALLENGER` role on a qualified method; or called without the rule set | `ADVISORY_MISMATCH` / `CATALOG_MISMATCH` / `RULE_SET_MISMATCH` / `COMPOSITION_INCOMPLETE`; success returns a `ValidatedManifest` whose digest changes with any input |
 | A7 | observation naming a manifest digest other than the supplied manifest's; or whose record's `capture_refs` stamp a different manifest digest; or whose instants precede `preregistered_at` | `MANIFEST_MISMATCH` / `MANIFEST_NOT_PRIOR`; the report prints `preregistration_status = DECLARED_UNVERIFIED` |
 | A8 | observation with `case_set_digest ≠ benchmark_manifest_digest` or `case_count` mismatch | `BENCHMARK_MANIFEST_MISMATCH` |
 | A9 | observation roles differing from the manifest assignment; or an `ADVISOR_QUALIFIED` observation whose supplied advisory did not qualify the method | `ROLE_INCONSISTENT` / `ADVISORY_MISMATCH` |
-| A10 | `validate_observation` called with any required object omitted, or with a record whose digest, method, binding, task class or model differs | refused (`RECORD_MISMATCH` etc.); never a pass by omission |
-| A11 | evaluation record whose `evaluator_declaration_digest`, `scoring_instruction_digest`, `quality_aggregation` or `evaluated_by` differs from the manifest's; or a claim whose `evidence_refs` do not name the evaluation id; or whose digest ≠ `evaluation.claim_digest` | `QUALITY_EVALUATION_MISMATCH` |
+| A10 | `validate_observation` called with any required object omitted, with a `ValidatedManifest` for a different manifest or advisory, or with a record whose digest, method, binding, task class or model differs | refused (`MANIFEST_NOT_VALIDATED`, `RECORD_MISMATCH` etc.); never a pass by omission |
+| A11 | evaluation record whose `evaluator_declaration_digest`, `scoring_instruction_digest`, `quality_aggregation` or `evaluated_by` differs from the manifest's; or a claim whose `evidence_refs` do not name the evaluation id; or whose JCS digest ≠ `evaluation.claim_digest`; or a `QualityResult` whose digest, `claim_ref`, `value`, `method` or `aggregation` does not match | `QUALITY_EVALUATION_MISMATCH` / `QUALITY_RESULT_MISMATCH` |
 | A12 | boundary process observes N capture records for a method while the workflow reports M ≠ N | record telemetry carries N with `llm_calls_basis = INJECTED_COUNTER` and `capture_refs` = manifest digest + fingerprints; diagnostics carry M under `RUNTIME_REPORTED_DIAGNOSTIC`; the envelope is over the record digest computed with N; `EvidenceStatusView` shows `ATTESTED` on the envelope's fields |
-| A13 | `issue_attestation` given a record whose telemetry differs from the recomputation over the supplied capture records, or whose digest is not the record's | `TELEMETRY_NOT_RECOMPUTED`; no envelope |
-| A14 | a run with a gap in capture sequence numbers, or `harness_observed_calls > captured calls` | no record, no envelope; state `INCONCLUSIVE` with `CAPTURE_INCOMPLETE` |
-| A15 | one capture record with `usage_availability ≠ AVAILABLE` | `token_usage = None`, `token_usage_availability` carries the reason; the envelope attests `telemetry.llm_calls` only; a record with every call `AVAILABLE` gets the token fields attested as well |
-| A16 | an envelope whose `attested_fields` are not a subset of the declaration's allowed fields, omit `telemetry.llm_calls`, or cover a record digest other than the observation's | `ATTESTATION_MISMATCH` |
+| A13 | `issue_attestation` given a record payload whose telemetry differs from the recomputation over the supplied capture records, or whose `record_digest` is not the digest of the payload; or with `boundary_identity` equal to `record_issuer_identity` or `requester_identity`; or with an `envelope_id` other than the deterministic form | `TELEMETRY_NOT_RECOMPUTED` / `SELF_ATTESTATION` / `ATTESTATION_MISMATCH`; no envelope |
+| A14 | a run with a gap in capture sequence numbers; a benchmark case with no `CASE_BEGIN`/`CASE_END` pair or appearing twice; `captured calls ≠ harness_observed_calls` in **either** direction at `CASE_END` or `RUN_END` | no record, no envelope; state `INCONCLUSIVE` with `CAPTURE_INCOMPLETE` |
+| A15 | one capture record with `usage_availability ≠ AVAILABLE`; and separately a run where `total_tokens` is present in every record but `input_tokens` is absent in one | first: `token_usage = None`, availability carries the reason, the envelope attests `telemetry.llm_calls` only; second: `total_tokens` summed and attested, `input_tokens = None` and not attested |
+| A16 | an envelope whose `attested_fields` are not a subset of the declaration's allowed fields, omit `telemetry.llm_calls`, cover a record digest other than the observation's, or whose `capture_boundary_ref` is not the digest of the record's ordered capture fingerprints | `ATTESTATION_MISMATCH` |
+| A16a | gateway round trip: a `GatewayRequest` carrying prompt text yields a `GatewayResponse` whose `text` is the provider port's output, whose `capture_fingerprint` names a capture record holding only `prompt_digest` and `response_digest`; a provider exception yields `status = EXCEPTION`, `text = None`, `error_class` set, and still one capture record; a factory path that does not resolve to a `ProviderPort` aborts with `PROVIDER_FACTORY_INVALID` before any frame | as stated; the prompt and response text never appear in any record or envelope |
+| A16b | two runs whose capture records are identical but delivered in different arrival order | identical `capture_refs`, `capture_boundary_ref`, telemetry and record digest (canonical `(case_digest, sequence)` order) |
 | A17 | attestation whose `attester_identity` equals the record issuer or the requester | Slice 1 `SELF_ATTESTATION`, unchanged |
 | A18 | attester not in `resolved_authorities` | listed in `ignored_envelopes`; status `UNATTESTED` |
 | A19 | any pilot result | every `EvidenceStatusView.verification_status == UNVERIFIED`; the report never prints "verified" or "trusted"; every quality figure carries `DECLARED_UNVERIFIED` and the calibration-blank flag; every judgment line carries `RESEARCH_ONLY` |
@@ -757,10 +876,10 @@ or acceptance figure.
 | A24 | `transition` from `PROPOSED` on `RESULT_ASSESSED`; `EVALUATED` on `RESULT_INCONCLUSIVE`; `RESULT_ASSESSED` whose result gives this method `COMPARISON_EVIDENCE_ABSENT`; an `INCONCLUSIVE` record with neither that outcome nor a refusal code; an outcome line rendering `SUFFICIENT_RESOURCE_DOMINATED` as "qualified" or "success" (the `ADVISOR_QUALIFIED` role label is not an outcome line and is permitted) | each refused (`STATE_TRANSITION_INVALID` for the transitions) |
 | A25 | **synthetic engine-coverage fixture** (the PR #1566 four-outcome fixtures, not a pilot run) | exactly the four `FitOutcome` names appear; `result_digest` stable across two runs at one `produced_at` |
 | A26 | real pilot runner end to end on the harness fixtures with a stub provider client injected into the boundary process | only the outcomes its evidence warrants appear; no `COMPARISON_EVIDENCE_ABSENT` unless evidence is genuinely absent; `authority_resolution_basis == REQUESTER_ASSERTED`; one record, one observation and one evaluation per method |
-| A27 | `SUPERSEDED` with a successor manifest differing in configuration, task class, benchmark manifest, plan or sufficiency rule (each in turn, then several at once) | predecessor `REVISED` with `successor_manifest_digest` and the derived `revision_scope`; successor `PROPOSED` from `propose` with `predecessor_manifest_digest`, `predecessor_state_digest` = the `REVISED` record's digest and the same scope; both records constructible in order; `validate_lineage` accepts the chain |
-| A28 | `SUPERSEDED` with a successor manifest that differs in no covered coordinate; a `REVISED` record whose `revision_scope` differs from the derivation; a chain containing a record no permitted transition produces | `REVISION_WITHOUT_CHANGE`; `REVISION_SCOPE_MISMATCH`; `validate_lineage` refuses |
+| A27 | `SUPERSEDED` with a successor manifest differing in configuration, task class, benchmark manifest, plan, sufficiency rule, advice, evaluator, capture boundary or aggregation (each in turn, then several at once) | predecessor `REVISED` records for every method with `successor_manifest_digest` and the derived manifest-level `revision_scope`; successor `PROPOSED` records for every successor method with `predecessor_manifest_digest`, `predecessor_state_digest` = the matching `REVISED` record's digest (or `None` for a method new to the successor) and the same scope; all records constructible in order; `validate_lineage` accepts the chain, including a method dropped by the successor |
+| A28 | `SUPERSEDED` with a successor manifest identical to the predecessor; a `REVISED` record whose `revision_scope` differs from the derivation; a chain missing a `REVISED` record for a predecessor method or a `PROPOSED` record for a successor method; a chain containing a record no permitted transition produces | `REVISION_WITHOUT_CHANGE`; `REVISION_SCOPE_MISMATCH`; `LINEAGE_INCOMPLETE`; `validate_lineage` refuses |
 | A29 | any state record | `approval_status == "NONE"`, `usage_scope == RESEARCH_ONLY`; field-set test finds no `approved`, `eligible`, `qualified`, `production` field; no state name equals a `FitOutcome` name |
-| A30 | AST boundary scan of the package | no `agentic`, runtime, proposer, composer, readiness, `governed_value`, network client or LLM SDK import anywhere; standard-library socket and process imports only inside the boundary subpackage; no clock read outside the boundary's `captured_at` |
+| A30 | AST boundary scan of the package | no `agentic`, runtime, proposer, composer, readiness, `governed_value`, Context Minimization, network client or LLM SDK import anywhere; `socket`, `subprocess` and `importlib` only inside the boundary subpackage, with exactly one `import_module` call in its entry module; no clock read outside the boundary's `captured_at` and `attested_at`; `CaptureAttemptStatus` members pinned to Context Minimization's `AttemptStatus` under a test-only import |
 | A31 | numeric scan of `src/` | no owner-supplied numeric default, threshold, sample size, coverage target or acceptance figure; integer fields are counts validated non-negative (positive where required) |
 
 ---
@@ -785,14 +904,17 @@ coverage target or acceptance figure.
    benchmark manifest with its complete ordered case-digest set bound to its
    head, the capture-boundary and evaluator declarations and the aggregation
    references, with preregistration `DECLARED_UNVERIFIED` and locally
-   enforced; one `PilotObservation` and one `QualityEvaluationRecord` per
-   method at Slice 1's aggregation boundary; and `validate_observation`
-   receiving every object, the attestation included. No execution-record
-   change.
+   enforced; `validate_manifest` receiving the full catalog, rule set and
+   advisory and returning a `ValidatedManifest`; one `PilotObservation` and
+   one `QualityEvaluationRecord` per method at Slice 1's aggregation
+   boundary; and `validate_observation` receiving every object, the
+   validated-manifest artifact, quality result and attestation included. No
+   execution-record change.
 2. **Trust controls.** Ratify §4 and §5: a separate-process capture boundary
-   reached through the gateway port as the workflow's only client, with the
-   provider client injected into the boundary; a completeness rule under
-   which an incomplete capture yields no record; telemetry recomputed by the
+   reached through the gateway frames as the workflow's only client, with the
+   provider constructed inside the boundary from a caller-supplied factory
+   through one dynamic import; an exact two-directional completeness rule
+   over cases and calls under which an incomplete capture yields no record; telemetry recomputed by the
    boundary from its capture records (`INJECTED_COUNTER`,
    `PROVIDER_REPORTED`) and digested into the record before
    `issue_attestation`, which recomputes and refuses mismatch, attesting the
@@ -813,11 +935,15 @@ coverage target or acceptance figure.
    `validate_lineage` operations, the `FitOutcome` carried separately; the
    configuration identified at `PROPOSED` before any run; revision for any
    change to configuration, task class, benchmark manifest, comparison plan
-   or sufficiency rule, with `revision_scope` derived from the two manifests
-   and one-way lineage (predecessor names the successor manifest; successor
-   names the predecessor state); `approval_status = "NONE"` constant; the
-   ledger placed in the pilot package (6.2-A); ballot 8.2 and production
-   approval remain open.
+   or sufficiency rule, **and, as an amendment to the owner-listed five,
+   for any change to the advice, the evaluator, the capture boundary or the
+   aggregation references** (without which such manifests could not be
+   superseded), with `revision_scope` derived from the two manifests as a
+   manifest-level property, one-way lineage (predecessor names the
+   successor manifest; successor names the predecessor state), and stated
+   rules for methods dropped by or new to a successor; `approval_status =
+   "NONE"` constant; the ledger placed in the pilot package (6.2-A); ballot
+   8.2 and production approval remain open.
 
 **Definition of done for 4A** (after ratification): package
 `ugence-workflow-fit-pilot` with the §3–§6 contracts and operations, the
@@ -865,6 +991,30 @@ owner-supplied numeric figure.
 | m1 | `case_count` non-negative while the list is non-empty | positive (§3.2, A5) |
 | m2 | "qualified" prohibition could reject the `ADVISOR_QUALIFIED` role label | prohibition scoped to outcome lines; the role label is permitted (§6.2, A24) |
 | m3 | Transitions enforced by constructors alone | pure `transition`, `propose`, `validate_lineage` receiving predecessor record and manifests (§6.2, A24, A27, A28) |
+
+The four ballot items of §10 were revised accordingly and remain `[R]`.
+Nothing is ratified by this revision.
+
+### Revision 4 (two follow-up reviews of revision 3, applied on owner instruction, 2026-09-02)
+
+| # | Defect | Resolution |
+|---|---|---|
+| B1 | Empty qualifying set unconstructible with its advisory recorded (A2 versus §6.1) | role ⇒ digest, not iff; `validate_manifest` compares possibly empty sets (§3.1, A2) |
+| B2 | Gateway could not execute a call: only a prompt digest crossed, `GatewayResponse` undefined | `GatewayRequest.prompt` text; `GatewayResponse` with status, text, error class, usage, availability, provider request id and capture fingerprint; text never enters a record (§4.1, A16a) |
+| B3 | `issue_attestation` lacked the identities and envelope fields it must use | receives the record's canonical payload, capture records, declaration, record issuer and requester identities, deterministic `envelope_id` and `attested_at`; refuses self-attestation itself (§4.3, A13) |
+| B4 | `quality_result_digest` unvalidated | `validate_observation` receives the `QualityResult`; `QUALITY_RESULT_MISMATCH`; claim and result digests defined as JCS digests (§3.4, A11) |
+| M5 | `validate_manifest` could not compute admissibility; no rule set or catalog-ref checks | receives the `RuleSet`; `CATALOG_MISMATCH`, `RULE_SET_MISMATCH`; advisory catalog ref checked (§3.1, A6) |
+| M6 | Manifest validation only presupposed by observation validation | `ValidatedManifest` artifact returned and required; `MANIFEST_NOT_VALIDATED` (§3.1, §3.4, A10) |
+| M7 | `RevisionScope` could not express advice, evaluator, boundary or aggregation changes | four scopes added and put to ballot item 4 as an amendment `[R]`; every manifest coordinate now covered (§6.2, A27) |
+| M8 | Method-set drift across manifests unspecified | superseding applied to every predecessor method; dropped methods terminal; new methods `PROPOSED` with `predecessor_state_digest = None`; manifest-level scope; `LINEAGE_INCOMPLETE` (§6.2, A27, A28) |
+| M9 | Record transfer into the boundary unspecified | canonical JCS payload passed; digest recomputed from it; no deserialization (§4.3) |
+| M10 | Provider injection across processes undefined | `ProviderPort`, `ProviderResult`, `subprocess` start with a factory dotted path, exactly one dynamic import in the entry module; `PROVIDER_FACTORY_INVALID` (§4.1, §7, A16a, A30) |
+| M11 | Completeness blind to skipped cases and one-directional | runner-written `RUN_BEGIN / CASE_BEGIN / CASE_END / RUN_END` frames; every case exactly once; `captured == harness_observed` in both directions (§4.1, A14) |
+| M12 | `AttemptStatus` had no source under the import boundary | pilot-local `CaptureAttemptStatus` pinned to Context Minimization by test-only import (§2, §4.2, A30) |
+| M13 | Capture-record order ambiguous across cases | canonical order `(case_digest, sequence)`; deterministic `capture_refs` and record digest (§4.2, A16b) |
+| m1 | `capture_boundary_ref` not rechecked against the record | recomputed from `capture_refs[1:]` in `validate_observation` (§3.4, A16) |
+| m2 | Per-field token summation undefined | a field is summed only if present in every record, else `None`; attested per field (§4.3, A15) |
+| m3 | "Only client" presented as a package property | declared in `process_separation_ref`, not proven (§4.1) |
 
 The four ballot items of §10 were revised accordingly and remain `[R]`.
 Nothing is ratified by this revision.
