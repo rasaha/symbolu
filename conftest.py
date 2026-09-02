@@ -34,6 +34,11 @@ for _src in (project_root / "packages" / "jcs" / "src",
              project_root / "packages" / "uvi-policy-contracts" / "src",
              project_root / "packages" / "policy-authority" / "src",
              project_root / "packages" / "capabilities" / "agent-value-readiness" / "src",
-             project_root / "packages" / "governed-value" / "src"):
+             project_root / "packages" / "governed-value" / "src",
+             # Reasoning Method Governance slice 1: the shared contracts and the
+             # comparison engine. Required by both packages' tests and by
+             # tests/experiments/workflow_fit_study/test_governed_adapter.py.
+             project_root / "packages" / "capabilities" / "reasoning-method-governance" / "src",
+             project_root / "packages" / "capabilities" / "readiness-comparison" / "src"):
     if _src.is_dir() and str(_src) not in sys.path:
         sys.path.insert(0, str(_src))
