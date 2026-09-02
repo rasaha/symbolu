@@ -1,0 +1,117 @@
+# Slice 1 gate for the Reasoning Method Governance contracts and the Readiness
+# Comparison engine (docs/architecture/REASONING_METHOD_GOVERNANCE_CONTRACT_AND_COMMISSIONING_BALLOT.md §9).
+#
+# Runs both packages' test suites (the §11 contract-consistency matrix, the
+# four-outcome fixtures from PR #1566, the vocabulary-pin and boundary tests) and
+# the harness adapter tests under tests/experiments/workflow_fit_study. numpy is
+# installed because the adapter test imports the study harness, whose package
+# init imports numpy transitively; the packages under test import no third-party
+# runtime dependency.
+name: Reasoning Method Governance CI
+
+on:
+  push:
+    branches: ["main", "master", "dev", "claude/**"]
+    paths:
+      - "packages/capabilities/reasoning-method-governance/**"
+      - "packages/capabilities/readiness-comparison/**"
+      - "packages/capabilities/context-minimization/src/ugence_context_minimization/token_accounting.py"
+      - "packages/governance-contracts/**"
+      - "packages/uvi-policy-contracts/**"
+      - "packages/jcs/**"
+      - "experiments/workflow_fit_study/**"
+      - "tests/experiments/workflow_fit_study/**"
+      - "agentic/agentic_framework/adaptive_prompts.py"
+      - "agentic/agentic_framework/reasoning_workflows.py"
+      - "conftest.py"
+      - ".github/workflows/reasoning-method-governance-ci.yml"
+  pull_request:
+    branches: ["main", "master", "dev", "claude/**"]
+    paths:
+      - "packages/capabilities/reasoning-method-governance/**"
+      - "packages/capabilities/readiness-comparison/**"
+      - "packages/capabilities/context-minimization/src/ugence_context_minimization/token_accounting.py"
+      - "packages/governance-contracts/**"
+      - "packages/uvi-policy-contracts/**"
+      - "packages/jcs/**"
+      - "experiments/workflow_fit_study/**"
+      - "tests/experiments/workflow_fit_study/**"
+      - "agentic/agentic_framework/adaptive_prompts.py"
+      - "agentic/agentic_framework/reasoning_workflows.py"
+      - "conftest.py"
+      - ".github/workflows/reasoning-method-governance-ci.yml"
+  workflow_dispatch:
+
+env:
+  # Dependency order: each distribution's first-party requirement is already installed.
+  FIRST_PARTY: >-
+    packages/jcs
+    packages/governance-contracts
+    packages/uvi-policy-contracts
+    packages/capabilities/context-minimization
+    packages/capabilities/reasoning-method-governance
+    packages/capabilities/readiness-comparison
+
+jobs:
+  reasoning-method-governance:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Cache pip dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-rmg-${{ hashFiles('packages/**/pyproject.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-rmg-
+            ${{ runner.os }}-pip-
+
+      - name: Install first-party packages
+        run: |
+          python -m pip install --upgrade pip
+          pip install numpy pytest
+          for pkg in $FIRST_PARTY; do pip install -e "$pkg"; done
+
+      - name: Confirm the packages import from the installed distributions
+        run: |
+          python - <<'PY'
+          import importlib
+          for name in (
+              "ugence_reasoning_method_governance.api",
+              "ugence_readiness_comparison",
+              "ugence_context_minimization.token_accounting",
+          ):
+              importlib.import_module(name)
+              print(f"ok  {name}")
+          PY
+
+      - name: Run the contract, engine and adapter suites
+        # `shell: bash` is load-bearing: it runs `bash --noprofile --norc -eo pipefail`,
+        # whereas the default shell is `bash -e` WITHOUT pipefail. Piping pytest into tee
+        # under the default shell would report tee's exit status and mask a failure.
+        shell: bash
+        run: |
+          python -m pytest \
+            packages/capabilities/reasoning-method-governance/tests \
+            packages/capabilities/readiness-comparison/tests \
+            tests/experiments/workflow_fit_study \
+            -v \
+            --tb=short \
+            --disable-warnings \
+            2>&1 | tee reasoning-method-governance-pytest.log
+
+      - name: Upload test log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reasoning-method-governance-pytest-log
+          path: reasoning-method-governance-pytest.log
+          if-no-files-found: ignore

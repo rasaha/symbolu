@@ -1,0 +1,53 @@
+# Independent distribution for the Ugence Reasoning Method Governance contracts.
+#
+# Slice 1 of docs/architecture/REASONING_METHOD_GOVERNANCE_CONTRACT_AND_COMMISSIONING_BALLOT.md
+# (owner-ratified 2026-09-02, §9): the SHARED reasoning-method contracts — catalog and
+# refs, task profile / task-class identity / comparison policy, the v1 execution record
+# whose evidence axes are class constants, the fit assessment, the attestation and
+# verification envelope shapes, the comparison-engine port contracts, the research plan
+# shape, and the contract error / refusal code enums.
+#
+# This package holds contracts ONLY. The comparison implementation lives in
+# ugence-readiness-comparison and this package never imports it. It never imports the
+# experimental reasoning runtime under agentic/ (a boundary test enforces this), and it
+# issues no envelope, performs no comparison, and assigns no approval, eligibility or
+# lifecycle state. Every object it produces is research-only evidence.
+#
+# Build:    python -m build packages/capabilities/reasoning-method-governance
+# Verify:   python packages/capabilities/reasoning-method-governance/verify_reasoning_method_governance_distribution.py
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ugence-reasoning-method-governance"
+dynamic = ["version"]
+description = "Ugence Reasoning Method Governance — shared reasoning-method contracts (catalog, task class, execution record, fit assessment, envelopes, comparison ports); research-only slice 1."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "Proprietary" }
+authors = [{ name = "Rakesh Mohan" }]
+keywords = ["ugence", "reasoning-method", "governance", "contracts"]
+# Depends only on the neutral governance-contracts leaf (evidence axes, MetricClaim,
+# BenchmarkReference), the uvi-policy-contracts leaf (GovernedThreshold,
+# ComparisonOperator) and the stdlib-only JCS canonicalizer. Telemetry vocabulary is
+# MIRRORED from context-minimization and pinned by a test-only import (spec §1, 1.1-B);
+# there is no runtime dependency on any capability package.
+dependencies = [
+    "ugence-governance-contracts>=0.3.1",
+    "ugence-uvi-policy-contracts>=0.1.0",
+    "ugence-jcs>=0.2.0",
+]
+
+[project.optional-dependencies]
+test = ["pytest>=7.0"]
+
+[tool.setuptools.dynamic]
+version = { attr = "ugence_reasoning_method_governance.__version__" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["ugence_reasoning_method_governance*"]
+
+[tool.setuptools.package-data]
+ugence_reasoning_method_governance = ["py.typed"]
