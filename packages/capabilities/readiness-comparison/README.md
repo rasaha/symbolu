@@ -5,7 +5,7 @@ consuming-evaluation-engine role, as assigned by the owner ruling on Composite
 ballot §10.1 and commissioned (research-only, slice 1) by the ratified ballot in
 `docs/architecture/REASONING_METHOD_GOVERNANCE_CONTRACT_AND_COMMISSIONING_BALLOT.md` §9.
 
-One pure function: `compare(request) -> result`, implementing §5 and §7 of that
+One pure function: `compare(request, *, produced_at) -> result`, implementing §5 and §7 of that
 specification exactly. It performs no I/O, no normalization, no fetch of a
 benchmark reference, no averaging, no fallback across resource dimensions, no
 read of self-reported quality, and no inference of authority from names.
@@ -16,3 +16,7 @@ approval-bearing.
 
 The port contracts live in `ugence-reasoning-method-governance`; that package
 never imports this one.
+
+`produced_at` is required, timezone-aware and caller-supplied; the engine reads
+no clock. It is excluded from `result_digest` and enters each
+`assessment_digest` through `assessed_at` (spec §7, correction 30; package 0.2.0).

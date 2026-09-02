@@ -22,7 +22,7 @@ name = "ugence-readiness-comparison"
 # Static: the package __init__ imports the engine, whose contract dependencies are
 # not present in an isolated build environment, so a dynamic attr lookup cannot run.
 # tests/packaging/test_boundaries.py pins this to ugence_readiness_comparison.__version__.
-version = "0.1.0"
+version = "0.2.0"
 description = "Ugence Readiness Comparison — the pure comparison engine over reasoning-method governance contracts (research-only slice 1)."
 readme = "README.md"
 requires-python = ">=3.10"

@@ -1,5 +1,5 @@
 """The engine package imports no runtime, no capability beyond its declared
-contract dependencies, and performs no I/O or clock reads beyond produced_at."""
+contract dependencies, and performs no I/O and no clock read at all (produced_at is caller-supplied)."""
 
 from __future__ import annotations
 
@@ -50,6 +50,21 @@ def test_static_pyproject_version_matches_package_version():
     assert re.search(r'^version = "([^"]+)"', text, re.M).group(1) == __version__
 
 
-def test_single_clock_read_is_produced_at_default_only():
-    engine = (SRC / "engine.py").read_text(encoding="utf-8")
-    assert engine.count("datetime.now(") == 1
+CLOCK_SOURCES = ("datetime.now(", "datetime.utcnow(", "utcnow(", "date.today(", "time.time(", "monotonic(", "perf_counter(", "time_ns(")
+
+
+def test_no_module_reads_a_wall_clock():
+    for path in SRC.rglob("*.py"):
+        text = path.read_text(encoding="utf-8")
+        for needle in CLOCK_SOURCES:
+            assert needle not in text, f"{path.name} reads a clock: {needle}"
+        for node in ast.walk(_tree(path)):
+            if isinstance(node, (ast.Import, ast.ImportFrom)):
+                names = [a.name for a in node.names] + ([node.module] if isinstance(node, ast.ImportFrom) and node.module else [])
+                assert "time" not in names and "timezone" not in names, f"{path.name} imports {names}"
+
+
+def test_version_is_0_2_0_after_the_produced_at_correction():
+    from ugence_readiness_comparison import __version__
+
+    assert __version__ == "0.2.0"
