@@ -1,6 +1,6 @@
 # Phase 4C — First Genuine Research-Only Workflow-Fit Pilot: Commissioning Note and Ballot
 
-**Revision 11.** Status: documentation only. **Nothing in this note authorises a
+**Revision 12.** Status: documentation only. **Nothing in this note authorises a
 provider call.** Until every ballot item in §3 is ratified by the owner, no
 code path in this repository may contact a provider, hold a credential, or
 run a real workflow behind the pilot boundary.
@@ -507,6 +507,30 @@ originates, so the experiment-side executor can import it;
 that would invert the dependency boundary the adapter exists to preserve
 `[V]` (`experiments/workflow_fit_study/pilot_executor.py`).
 
+### 2.10 Unit of evaluation (owner ruling, revision 12)
+
+**Workflow-Fit evaluates the declared primary reasoning strategy of a complete
+agentic workflow.** A workflow may orchestrate multiple agents or
+prompt-defined roles, but Workflow-Fit does **not** search for, optimise or
+separately attribute combinations of agent-level reasoning strategies. Agent
+roles, prompts, local reasoning behaviour and orchestration are part of the
+**fixed workflow configuration under evaluation**; changing any of them creates
+a **different workflow configuration requiring separate evaluation**.
+
+**Verified implementation limitation `[V]`.** The current harness represents
+**workflow stages and prompt-defined roles, not independently governed
+agents**, and offers **no per-role reasoning binding or attribution**. No agent
+concept exists anywhere in the pilot or governance packages; every workflow
+receives a single `LLMClient` whose sole operation is `call(prompt) -> str`, so
+stage labels such as `ADVOCATE_A`, `CRITIC_v1` or `SCORE_BRANCHES` are strings
+accompanying prompts rather than addressable identities; `ReasoningMethodRef`
+is `(catalog, method_id, method_version)`, one binding per workflow; and the
+boundary attributes every capture record to a single `run_id` and method, so
+per-role attribution is absent from the evidence as well as from the
+configuration. The ruling above is therefore the only reading the merged code
+can represent — and nothing in the contracts *enforces* configuration fixity,
+which rests on the preregistered commitment covering the harness version.
+
 ## 3. Ballot — five owner decisions `[R]`
 
 Each item lists the **concrete values the owner must supply at
@@ -590,9 +614,17 @@ threshold basis fixed before the pilot: **3 confirmatory repetitions**.
 Without one: **1 calibration run + 3 confirmatory repetitions**. The
 calibration run carries its **own preregistered commitment**, is labelled
 `CALIBRATION`, is **not** one of the three, and **never enters the
-confirmatory comparison, coverage report or success summary**. Its only
-output is a candidate threshold, which is preregistered before any
-confirmatory repetition runs.
+confirmatory comparison, coverage report or success summary**. It **only
+instantiates** a threshold from a rule preregistered **before** it runs
+(revision 12): the statistic, the mechanical mapping formula, rounding,
+boundary-equality behaviour, treatment of missing and inconclusive methods,
+threshold scope, and any evidence-admission reference the consequence class
+requires must all be fixed in the commitment first. **The formula itself is
+still open and therefore blocks calibration execution** — no calibration run
+may be authorised until it is preregistered. Because a 50-case binary mean is
+quantised to 0.02 (§3.1), the rounding rule must state behaviour at exact
+multiples of 0.02, and a threshold finer than 0.02 is unrepresentable in the
+result.
 
 **`manifest_id` — PROPOSED, NOT RATIFIED.**
 `<benchmark id>@<benchmark version>.<task class id>.<CALIBRATION|CONFIRMATORY>.rep<ordinal>.<pre-execution nonce>`,
@@ -673,8 +705,13 @@ decision.
 | D3 | missing required usage produces `DIMENSION_UNAVAILABLE`; no fallback, no zero-filling, no reduced-dimension comparison |
 | D3 | **(revision 11)** `TOTAL_TOKENS` **not admitted**; `LLM_CALLS` alone is the operative resource configuration. Grounds: complete provider-usage reporting for every potentially charged attempt — failures and timeouts included — has not been established. This is not a claim that the provider never returns usage in those circumstances |
 | D3 | **(revision 11)** the pilot therefore compares resource use **by call count**. Its results must not be represented as a comparison of token consumption or token cost |
+| D2–D3 | **(revision 12)** results apply only to the 50 sampled items under the pinned wrapped configuration; they do **not** generalise to BBH overall, to logical reasoning generally, or to production workloads |
+| D2–D3 | **(revision 12)** published BBH scores are **not directly comparable**, because this pilot adds an output wrapper to each case |
+| D2–D3 | **(revision 12)** scorer-only custody prevents runtime answer leakage but does **not** establish absence of training-data contamination; the upstream canary string expresses maintainer intent, not provider compliance `[V]` |
+| D2–D3 | **(revision 12)** case and expected-answer digests provide **integrity, not confidentiality**; for this seven-option benchmark a party holding the public inputs can brute-force the committed answer in seven trials |
+| D4 | **(revision 12)** accounting ceilings: **2 800** maximum workflow calls per repetition (7 workflows × 50 cases × shared per-case cap 8) and **11 200** across one calibration plus three confirmatory repetitions. Under the selected design there are **no known provider calls outside the workflows' `_call_llm` paths** `[V]`. Only the **shared per-case cap of 8** is enforced; the per-method and repetition totals are accounting figures |
 | D3 | `score.unit`; arithmetic-mean aggregation |
-| D3 | threshold sourced externally where a defensible external basis exists; otherwise one separate calibration run establishes a candidate threshold before confirmatory execution |
+| D3 | threshold sourced externally where a defensible external basis exists; otherwise one separate calibration run **instantiates a threshold from a rule preregistered before it runs** (revision 12). The commitment must fix the statistic, the mechanical mapping formula, rounding, boundary-equality behaviour, treatment of missing and inconclusive methods, threshold scope, and any required evidence-admission reference. **Calibration confers no post-hoc discretion**: a threshold may never be chosen after inspecting calibration results |
 | D3 | representativeness requires an explicit population, a sampling procedure and a written limitation statement; structural-token traceability alone does not prove representative sampling |
 | D4 | shared per-case cap **8**; 7 clears every current bounded path; 8 gives one call of headroom and does **not** guarantee safety after workflow change |
 | D4 | every workflow or constructor-parameter change reruns the provider-free bounded-path test |
@@ -743,12 +780,68 @@ providing India-local processing.
 `developers.openai.com/api/docs/guides/workload-identity-federation`;
 `developers.openai.com/api/docs/guides/your-data`.
 
+#### CONDITIONAL OWNER SELECTION — BENCHMARK AND TASK CLASS (D2–D3)
+
+Selected by the owner in the post-revision-11 D2–D3 round. **D2 and D3 remain
+incomplete**: the identities, custody, governance text and the calibration
+formula below are still open.
+
+| Item | Value | Status |
+|---|---|---|
+| Task | BIG-Bench Hard `logical_deduction_seven_objects` | owner-selected |
+| Upstream commit | `9ee07bd481feebf959a6b59d61ea57bdcf30964d` | `[V]` reproduced by `git fetch --depth 1` + `git cat-file` |
+| Licence | MIT | `[V]` upstream repository |
+| Benchmark identity | `bbh.logical_deduction_seven_objects.wrapped.v1@9ee07bd481feebf959a6b59d61ea57bdcf30964d` | owner-selected |
+| File SHA-256 | `2896c7e3482eea318dd37bcc370d24ec3cc91e8374c1784287b5dbd38a529e33` | `[V]` |
+| Git blob SHA-1 | `2bc3766619b76d9f4b379782b8c25d3e022025e8` | `[V]` |
+| Population | 250 examples; 250 targets; 250 unique inputs; 250 unique (input, target) pairs; targets span exactly `(A)`–`(G)` | `[V]` independently counted |
+| Sample size | 50 | owner-selected, **operational first-pilot size, not power-justified** |
+| Score resolution | one case moves a 50-case mean by **0.02**; means are quantised to multiples of 0.02 | `[V]` arithmetic |
+| Sampling algorithm | `bbh_hash_rank_select.v1` — see below | owner-ratified |
+| Seed | hex `2896c7e3482eea31` = decimal `2924744787006253617` (first 16 hex characters of the file SHA-256 as an unsigned 64-bit big-endian integer) | owner-ratified, conversion `[V]` |
+| Selected indexes | 50 unique indexes in `[0, 249]`, derived, published ascending | mechanically derived |
+| Selected-index-list digest | `c521cdd75dc3b8c9e589835ade4b780ef26ba955d4077f5c7ad74e803be60682` | mechanically derived |
+| Execution order | ascending derived case-digest order | owner-selected; matches the merged runner `[V]` |
+| Scoring | `bbh-ld7.v1`, binary — see below | owner-ratified |
+| Evaluator kind | `PROGRAMMATIC` | **conditional**: final only after the implementation, complete procedure text, evaluator identity and version, and `scoring_instruction_digest` are inspected and fixed |
+| Expected answers | derived from the pinned upstream `target` fields; available only to the scorer | owner-selected |
+| External threshold | none presently established for this wrapped task and sample | owner-selected |
+| Repetition branch | 1 preregistered `CALIBRATION` run, then 3 confirmatory | owner-selected |
+
+**`bbh_hash_rank_select.v1`.** For each upstream index `i` in `0…249` compute
+`k(i) = SHA-256(seed_ascii ‖ ":" ‖ index_ascii)` as lowercase hex, where both
+components are decimal ASCII with no sign, padding or leading zeros and `‖` is
+byte concatenation around a single ASCII colon. Sort all 250 pairs ascending by
+`(k(i), i)`; select the first 50; publish them in ascending numerical order.
+The list is digested with `ugence_jcs.canonical_sha256_hex`. **Instantiation
+detail `[V]`:** the Action-Profile canonicaliser rejects bare JSON numbers
+(`BareNumberError`), so the digest is taken over the **decimal-string form** of
+the index list — the same shape the repository's own `payload()`/`digest_of`
+produces. Index order is the position in the `examples` array of the pinned
+file, zero-based, unfiltered. Ties break on ascending `i`. The derivation needs
+no benchmark content: it consumes only the seed and the index range.
+
+**`bbh-ld7.v1` scoring, binary.** Take the last line of the final response whose
+stripped form begins with `ANSWER:` (case-insensitive); remove the prefix;
+collapse internal whitespace; strip surrounding parentheses and whitespace;
+upper-case; require exactly one character in `A`–`G`. Normalise the expected
+target identically. Score `1` on exact equality, `0` otherwise. No partial
+credit, no semantic judgment, no prose fallback; absent or malformed output
+scores `0`.
+
+**Open under D2–D3:** benchmark author and distinct approver; benchmark-custody
+URI with readers and writers; evaluator identity, version and actual
+implementation; separation declaration; `profile.json` and `task_class.json`;
+consequence class and any required evidence-admission reference; final
+population and representativeness governance text; and the calibration
+statistic and threshold formula, which **blocks calibration execution**.
+
 #### CONDITIONAL OWNER SELECTION — NOT YET FINAL
 
 | Ballot | Selection | Condition |
 |---|---|---|
-| D2 | evaluator kind `PROGRAMMATIC` | only if the eventual benchmark supports objective, deterministic programmatic scoring; the label `PROGRAMMATIC` does not itself prove determinism `[V]` (`EvaluatorKind` is a declared kind; no contract verifies determinism). Final selection awaits the benchmark and scoring procedure |
-| D4 | 3 confirmatory repetitions, or 1 calibration + 3 confirmatory | which branch applies depends on whether a defensible external threshold basis exists (D3) |
+| D2 | evaluator kind `PROGRAMMATIC` | the benchmark-side condition is met (revision 12): a single option letter admits deterministic comparison. The label still proves nothing `[V]` (`EvaluatorKind` is declared; no contract verifies determinism), so final selection awaits inspection of the scorer implementation, the complete procedure text, the evaluator identity and version, and the fixing of `scoring_instruction_digest` |
+| D4 | **branch resolved (revision 12):** 1 `CALIBRATION` run + 3 confirmatory, no external threshold being established | remains blocked until the calibration statistic and threshold formula are preregistered (§D4) |
 | D1 | the exact environment allowlist keys | the policy is ratified; the key set is derived by provider-free testing and returns for separate ratification |
 
 #### WITHDRAWN ASSISTANT PROPOSALS
@@ -766,8 +859,8 @@ providing India-local processing.
 |---|---|
 | D1 — conditionally selected (not verified, not final) | provider route, model candidate, API surface and credential architecture — see **Conditional owner selection — provider route** above |
 | D1 — unresolved facts and confirmations | executed-identity confirmation (§2.5); snapshot availability for the whole pilot; deployment region; retention-policy reference and version with ZDR/MAM eligibility; workload-identity host, principal, issuer, audience and token source; and the exact environment keys after provider-free derivation and separate ratification |
-| D2 | benchmark author; approver, distinct; benchmark id and version; case list and expected answers; benchmark-custody location; evaluator identity and version; scoring procedure text; separation declaration reference |
-| D3 | `profile.json`; `task_class.json`; consequence class; evidence-admission reference where the class is `MATERIAL` or `SEVERE` with threshold-based sufficiency `[V]`; population definition; representativeness statement; threshold literal and its basis |
+| D2 | benchmark author; approver, distinct; benchmark-custody URI with readers and writers; evaluator identity, version and actual implementation; complete scoring procedure text; separation declaration reference. *(Benchmark id, pinned bytes, case selection and expected answers are settled or mechanically derived — see the D2–D3 selection above.)* |
+| D3 | `profile.json`; `task_class.json`; consequence class; evidence-admission reference where the class is `MATERIAL` or `SEVERE` with threshold-based sufficiency `[V]`; final population and representativeness governance text; and the **calibration statistic and threshold-mapping formula**, whose absence **blocks calibration execution** (revision 12) |
 | D4 | pricing source and version; currency; spending ceiling |
 | D5 | preregistration medium; registry endpoint; both custody locations; registry and custody writer identities; ACL principals; key custodian; evidence retention period; canary retention period; deletion rules |
 
@@ -854,8 +947,9 @@ row may reach a provider:
 
 Provider calls before ratification; any credential in the repository or in
 any artifact; cross-run aggregation; advisor changes from pilot results;
-readiness composites; production eligibility, approval or configuration
-mutation; TEV integration; any quality unit or aggregation other than §2.6;
+readiness composites; **any search over, optimisation of, or separate
+attribution to agent-level reasoning strategies within a workflow (§2.10)**;
+production eligibility, approval or configuration mutation; TEV integration; any quality unit or aggregation other than §2.6;
 any claim that a run measures reasoning quality beyond the declared
 benchmark; **requester-declared provider identity as an execution mode**
 (§2.5 — an excluded future research option only); **any newly invented
@@ -1156,3 +1250,61 @@ represented as a comparison of token consumption or token cost.
 **Unchanged by this revision.** §2.4 and §2.5 are not modified; the new
 subsection cross-references them. No implementation is commissioned, the enum
 stays at 33 members `[V]`, and D1–D5 remain incomplete.
+
+### Revision 12 (benchmark, task class and unit of evaluation, 2026-09-03)
+
+**Source of authority.** An owner decision taken **after** revision 11, in the
+D2–D3 benchmark and evaluator round. Earlier revision records are unchanged;
+none of these decisions existed before this round.
+
+**Unit of evaluation.** §2.10 records the ruling that Workflow-Fit evaluates the
+declared primary reasoning strategy of a **complete** agentic workflow, never a
+search over agent-level strategy combinations, with roles, prompts, local
+reasoning behaviour and orchestration fixed as configuration. The separate
+`[V]` finding — that the harness represents stages and prompt-defined roles
+rather than independently governed agents, with no per-role binding or
+attribution — is recorded alongside it, and §5 gains the matching exclusion.
+
+**Benchmark and sampling.** BBH `logical_deduction_seven_objects` at commit
+`9ee07bd4…`, MIT, with the file SHA-256, blob SHA-1 and a **250 / 250 / 250 /
+250** count independently reproduced through Git rather than accepted as
+transmitted. Sampling is `bbh_hash_rank_select.v1` under a seed **derived from
+the verified file digest** rather than chosen — hex `2896c7e3482eea31`, decimal
+`2924744787006253617`, conversion checked — yielding 50 unique indexes in
+`[0, 249]` whose ascending list digests to
+`c521cdd75dc3b8c9e589835ade4b780ef26ba955d4077f5c7ad74e803be60682`. The
+derivation consumed only the seed and the index range: no benchmark input or
+target was inspected, printed or copied into this repository. One
+instantiation detail is recorded because it is not optional `[V]`: bare JSON
+numbers are rejected by the canonicaliser, so the digest is over the
+decimal-string form of the list.
+
+**Scoring and evaluator.** `bbh-ld7.v1` binary scoring is ratified in full.
+`PROGRAMMATIC` stays **conditional**: the benchmark-side condition is met, but
+the label proves nothing and final selection awaits the implementation, the
+complete procedure text, the evaluator identity and version, and a fixed
+`scoring_instruction_digest`.
+
+**Calibration.** Every calibration statement is corrected so it cannot permit
+post-hoc threshold selection: the statistic, mapping formula, rounding,
+boundary-equality behaviour, missing and inconclusive-method treatment,
+threshold scope and any required admission reference must be preregistered
+**before** the run, which may then only **instantiate** the rule. **The formula
+is open and blocks calibration execution.**
+
+**Limitations recorded as selected**, in §3.1: the 0.02 resolution; claims
+confined to the sampled wrapped configuration; no generalisation to BBH,
+logical reasoning or production; non-comparability with published BBH scores;
+contamination unestablished, with the canary expressing intent rather than
+compliance; digests giving integrity but not confidentiality, brute-forceable
+in seven trials here; call-count rather than token comparison; and the 2 800 /
+11 200 accounting ceilings with only the shared per-case cap enforced.
+
+**Still incomplete.** **D2 and D3 are not complete**, and neither is any other
+ballot item. Open: benchmark author and distinct approver; custody URI, readers
+and writers; evaluator identity, version and implementation; separation
+declaration; `profile.json` and `task_class.json`; consequence class and any
+admission reference; final population and representativeness text; the
+calibration statistic and formula; and all unresolved D1, D4 and D5 facts. **No
+implementation was commissioned**, no benchmark content entered this
+repository, no credential was accessed and no provider was called.
