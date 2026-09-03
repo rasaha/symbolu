@@ -85,7 +85,7 @@ Raw provider requests and responses never enter a bundle.
 | `provider_failure` | provider raises for one method | that run `INCONCLUSIVE` (`WORKFLOW_FAILED`); others assessed |
 | `incomplete_capture` | one uncaptured in-process call | that run `INCONCLUSIVE` (`CAPTURE_INCOMPLETE`) |
 | `engine_refusal` | governed baseline's workflow fails | engine refuses `BASELINE_ABSENT`; every method `COMPARISON_EVIDENCE_ABSENT` |
-| `zero_call_run` | a method that makes no call in any case | refused by the 4A boundary at `ATTEST` (see gap below) |
+| `zero_call_run` | every method makes no call in any case | complete; `llm_calls = 0` attested over the manifest stamp; every method `INSUFFICIENT_QUALITY` (no answer line) |
 
 A zero-call **case** inside a run with other calls is complete and scores 0
 under the reference evaluator (no `ANSWER:` line); this is the mechanism working,
@@ -103,20 +103,19 @@ not a quality finding.
    benchmark manifest. No command reads a clock.
 3. **Scoring-instruction digest.** Digest of the scoring rule text, the
    benchmark manifest digest and the sufficiency rule id/version.
-4. **Zero-call telemetry.** No interpretation was needed for zero-call cases;
-   see the gap for zero-call runs.
+4. **Zero-call telemetry.** None needed: zero-call cases and zero-call runs
+   both follow the ratified 4A recomputation (spec §4.3, §11).
 5. **Bundle index.** A plain JSON map plus its JCS digest, no schema version.
 
-## Gap note `[G]`
+## Zero-call runs (gap resolved by owner ruling, 2026-09-02)
 
-A method run that makes **no provider call in any case** cannot be attested by
-the ratified 4A boundary: `issue_attestation` takes the manifest from the first
-capture record and refuses `TELEMETRY_NOT_RECOMPUTED: no capture records`; the
-runner surfaces this as a hard `PilotError`, not as an `INCONCLUSIVE` state. The
-fixture's `zero_call_run` scenario demonstrates the refusal. Whether the
-boundary may attest "zero calls observed" over an empty capture set is an
-attestation-semantics decision for the owner (spec §4.3); nothing here changes
-4A to work around it.
+The first 4B revision recorded a gap: the 4A boundary could not attest a
+method run with no provider call in any case. The owner ruled (spec §11,
+"Zero-call attestation ruling") that such a completed run attests
+`telemetry.llm_calls = 0` over the boundary's manifest stamp, while missing
+cases, skipped control frames, workflow failure or unequal counts remain
+`INCONCLUSIVE`. 4A now implements the ruling (row A14a) and the
+`zero_call_run` scenario exercises it.
 
 ## Exclusions (unchanged from the commissioning message)
 
