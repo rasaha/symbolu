@@ -24,9 +24,13 @@ from .._canon import digest_of, require_digest, require_member, require_nonblank
 from ..errors import PilotError, PilotErrorCode
 from ..version import __version__
 from .benchmark import BenchmarkManifest
+from .calibration import CalibrationProvenance, PilotRunRole, require_canonical_decimal
 from .evaluator import QualityEvaluatorDeclaration
 
 PILOT_MANIFEST_SCHEMA_VERSION = "workflow_fit_pilot.manifest.v1"
+PILOT_MANIFEST_SCHEMA_VERSION_V1 = PILOT_MANIFEST_SCHEMA_VERSION
+PILOT_MANIFEST_SCHEMA_VERSION_V2 = "workflow_fit_pilot.manifest.v2"
+SUPPORTED_MANIFEST_SCHEMA_VERSIONS = (PILOT_MANIFEST_SCHEMA_VERSION_V1, PILOT_MANIFEST_SCHEMA_VERSION_V2)
 PREREGISTRATION_DECLARED_UNVERIFIED = "DECLARED_UNVERIFIED"
 
 
@@ -106,10 +110,15 @@ class PilotStudyManifest:
     preregistered_by: str
     preregistered_at: datetime
     manifest_digest: str = ""
+    # v2 only. Appended after manifest_digest so every existing v1 call site keeps its
+    # positional shape, and excluded from the v1 digest payload so historical
+    # mechanism-validation artifacts keep the digests they were issued with.
+    run_role: Optional[PilotRunRole] = None
+    calibration_provenance: Optional[CalibrationProvenance] = None
 
     def __post_init__(self) -> None:
-        if self.schema_version != PILOT_MANIFEST_SCHEMA_VERSION:
-            raise PilotError(PilotErrorCode.SCHEMA_VERSION_UNSUPPORTED, f"PilotStudyManifest.schema_version must be {PILOT_MANIFEST_SCHEMA_VERSION}")
+        if self.schema_version not in SUPPORTED_MANIFEST_SCHEMA_VERSIONS:
+            raise PilotError(PilotErrorCode.SCHEMA_VERSION_UNSUPPORTED, f"PilotStudyManifest.schema_version must be one of {SUPPORTED_MANIFEST_SCHEMA_VERSIONS}")
         require_nonblank(self.manifest_id, "PilotStudyManifest.manifest_id")
         if not isinstance(self.plan, ResearchComparisonPlan):
             raise ContractError(ContractErrorCode.REF_BLANK_FIELD, "PilotStudyManifest.plan must be a ResearchComparisonPlan")
@@ -157,7 +166,85 @@ class PilotStudyManifest:
             raise ContractError(ContractErrorCode.REF_BLANK_FIELD, f"usage_scope is fixed at {USAGE_SCOPE_RESEARCH_ONLY}")
         require_nonblank(self.preregistered_by, "PilotStudyManifest.preregistered_by")
         require_tzaware(self.preregistered_at, "PilotStudyManifest.preregistered_at")
-        settle_digest(self, "manifest_digest", digest_of(self, exclude=("manifest_digest",)))
+        self._validate_run_role()
+        excluded = ("manifest_digest",) if self.is_v2 else ("manifest_digest", "run_role", "calibration_provenance")
+        settle_digest(self, "manifest_digest", digest_of(self, exclude=excluded))
+
+    @property
+    def is_v2(self) -> bool:
+        return self.schema_version == PILOT_MANIFEST_SCHEMA_VERSION_V2
+
+    def _validate_run_role(self) -> None:
+        """v1 carries no role and never acquires one; v2 requires one and is validated
+        against it. A missing role is never read as CONFIRMATORY."""
+        if not self.is_v2:
+            if self.run_role is not None or self.calibration_provenance is not None:
+                raise PilotError(PilotErrorCode.RUN_ROLE_INVALID, "a v1 manifest carries no run role and no calibration provenance")
+            return
+        if not isinstance(self.run_role, PilotRunRole):
+            raise PilotError(PilotErrorCode.RUN_ROLE_INVALID, "a v2 manifest requires an explicit PilotRunRole; none is inferred")
+        # A31: the pilot package never assigns a threshold value; it only reads the
+        # governed reference the task class already carries.
+        threshold_ref = self.plan.task_class.comparison_policy.sufficiency.threshold
+        has_literal = bool(threshold_ref.literal_value and threshold_ref.literal_value.strip())
+        if self.run_role is PilotRunRole.CALIBRATION:
+            self._validate_calibration_shape(threshold_ref, has_literal)
+        else:
+            self._validate_confirmatory_shape(threshold_ref, has_literal)
+
+    def _validate_calibration_shape(self, threshold_ref, has_literal: bool) -> None:
+        if len(self.methods) != 1:
+            raise PilotError(PilotErrorCode.ROLE_ARTIFACT_INCONSISTENT, "a CALIBRATION manifest assigns exactly one method")
+        assignment = self.methods[0]
+        # Restated for locality. The general rule above already forces the single
+        # assignment to be plan.baseline, so this branch cannot fire; it is kept because
+        # the baseline-only identity is the load-bearing calibration invariant and a
+        # future change to the general rule must not silently widen calibration.
+        if assignment.method != self.plan.baseline:
+            raise PilotError(PilotErrorCode.ROLE_ARTIFACT_INCONSISTENT, "the CALIBRATION method must be plan.baseline")
+        # F1, ratified in revision 16: the baseline-only set was fixed before execution,
+        # so PREREGISTERED is the truthful sampling kind. Risk-based and randomized
+        # selection would misdescribe a composition that was never sampled.
+        if self.plan.challengers.kind is not SamplingKind.PREREGISTERED:
+            raise PilotError(
+                PilotErrorCode.ROLE_ARTIFACT_INCONSISTENT,
+                "a CALIBRATION plan declares SamplingKind.PREREGISTERED; its baseline-only composition is not sampled",
+            )
+        if tuple(assignment.roles) != (PilotRole.GOVERNED_BASELINE,):
+            raise PilotError(PilotErrorCode.ROLE_ARTIFACT_INCONSISTENT, "the CALIBRATION assignment carries exactly the GOVERNED_BASELINE role")
+        if self.plan.recommended:
+            raise PilotError(PilotErrorCode.ROLE_ARTIFACT_INCONSISTENT, "a CALIBRATION manifest recommends no method")
+        if threshold_ref.benchmark_ref is None or has_literal:
+            raise PilotError(PilotErrorCode.ROLE_ARTIFACT_INCONSISTENT, "a CALIBRATION threshold carries a benchmark_ref and no literal_value")
+        if self.calibration_provenance is not None:
+            raise PilotError(PilotErrorCode.CALIBRATION_PROVENANCE_INVALID, "a CALIBRATION manifest carries no calibration provenance")
+
+    def _validate_confirmatory_shape(self, threshold_ref, has_literal: bool) -> None:
+        if not has_literal or threshold_ref.benchmark_ref is not None:
+            raise PilotError(PilotErrorCode.ROLE_ARTIFACT_INCONSISTENT, "a CONFIRMATORY threshold carries a literal_value and no benchmark_ref")
+        # F2, ratified in revision 16. The bar a confirmatory run is judged against must
+        # carry the same canonical spelling the calibration statistic and the provenance
+        # literal carry, so slice 3 can reconcile all three by code-point equality. This
+        # reads the governed literal the task class already holds; it assigns nothing and
+        # normalises nothing (A31).
+        require_canonical_decimal(threshold_ref.literal_value, "a CONFIRMATORY threshold literal_value")
+        if not isinstance(self.calibration_provenance, CalibrationProvenance):
+            raise PilotError(PilotErrorCode.CALIBRATION_PROVENANCE_INVALID, "a CONFIRMATORY manifest requires complete CalibrationProvenance")
+
+    def require_phase_4c_eligible(self) -> "PilotStudyManifest":
+        """Historical v1 artifacts stay verifiable but are never eligible for a genuine
+        Phase 4C run: they carry no committed role, and inferring one would be exactly
+        the silent upgrade revision 14 forbids.
+
+        **F3, slice-3 obligation (revision 16).** Nothing in this package calls this
+        method: it makes ineligibility *expressible*, not *enforced*. Until slice 3 calls
+        it from the run entry point, a v1 manifest is refused only by callers that ask."""
+        if not self.is_v2:
+            raise PilotError(
+                PilotErrorCode.RUN_ROLE_INVALID,
+                f"{self.schema_version} is historical mechanism validation and is not eligible for a Phase 4C run",
+            )
+        return self
 
     def assignment(self, method: ReasoningMethodRef) -> Optional[PilotMethodAssignment]:
         for m in self.methods:
@@ -197,7 +284,11 @@ def admissible_methods(catalog: ReasoningMethodCatalog, rule_set: RuleSet) -> Tu
 
 
 def validate_manifest(manifest: PilotStudyManifest, *, catalog: ReasoningMethodCatalog, rule_set: RuleSet, advisory: Optional[ReasoningMethodAdvisory] = None) -> ValidatedManifest:
-    """§3.1 pre-execution validation. Receives the full catalog, rule set and advisory."""
+    """§3.1 pre-execution validation. Receives the full catalog, rule set and advisory.
+
+    Run-role-aware since revision 16: a v2 CALIBRATION manifest preregisters the
+    baseline-only set, a CONFIRMATORY manifest preregisters the exhaustive admissible
+    set, and a v1 manifest keeps exactly the behaviour it has always had."""
     if not isinstance(manifest, PilotStudyManifest) or not isinstance(catalog, ReasoningMethodCatalog) or not isinstance(rule_set, RuleSet):
         raise TypeError("validate_manifest(manifest, *, catalog, rule_set, advisory=None)")
     if catalog.ref() != manifest.plan.catalog:
@@ -229,17 +320,31 @@ def validate_manifest(manifest: PilotStudyManifest, *, catalog: ReasoningMethodC
             raise PilotError(PilotErrorCode.METHOD_NOT_IN_CATALOG, f"{m.method.method_id}@{m.method.method_version} is not in the catalog")
     if manifest.plan.challengers.kind is SamplingKind.PREREGISTERED:
         assigned = frozenset(m.method for m in manifest.methods)
-        if assigned != frozenset(admissible):
-            raise PilotError(PilotErrorCode.COMPOSITION_INCOMPLETE, "under exhaustive preregistered composition the assigned methods must equal the admissible catalog set")
-        for m in manifest.methods:
-            is_challenger = PilotRole.CHALLENGER in m.roles
-            if (m.method in qualified) == is_challenger:
-                raise PilotError(PilotErrorCode.COMPOSITION_INCOMPLETE, f"{m.method.method_id}: CHALLENGER iff admissible and not qualified")
+        if manifest.is_v2 and manifest.run_role is PilotRunRole.CALIBRATION:
+            # F1, ratified in revision 16. Calibration and confirmation both preregister
+            # their composition; they preregister *different* sets. A calibration run
+            # measures one statistic from the governed baseline alone, so its complete
+            # preregistered set is exactly {plan.baseline} — applying the confirmatory
+            # "every admissible method is assigned" rule to it would refuse the very shape
+            # the manifest contract requires. The confirmatory rule below is unchanged.
+            if assigned != frozenset({manifest.plan.baseline}):
+                raise PilotError(PilotErrorCode.COMPOSITION_INCOMPLETE, "under CALIBRATION the preregistered assigned set is exactly {plan.baseline}")
+            if PilotRole.CHALLENGER in manifest.methods[0].roles:
+                raise PilotError(PilotErrorCode.COMPOSITION_INCOMPLETE, "a CALIBRATION run assigns no challenger")
+        else:
+            if assigned != frozenset(admissible):
+                raise PilotError(PilotErrorCode.COMPOSITION_INCOMPLETE, "under exhaustive preregistered composition the assigned methods must equal the admissible catalog set")
+            for m in manifest.methods:
+                is_challenger = PilotRole.CHALLENGER in m.roles
+                if (m.method in qualified) == is_challenger:
+                    raise PilotError(PilotErrorCode.COMPOSITION_INCOMPLETE, f"{m.method.method_id}: CHALLENGER iff admissible and not qualified")
     return ValidatedManifest(manifest.manifest_digest, catalog.catalog_digest, rule_set.rule_set_digest, manifest.advisory_digest, admissible, __version__)
 
 
 __all__ = [
-    "PILOT_MANIFEST_SCHEMA_VERSION", "PREREGISTRATION_DECLARED_UNVERIFIED", "ATTESTABLE_TELEMETRY_FIELDS", "LLM_CALLS_FIELD",
+    "PILOT_MANIFEST_SCHEMA_VERSION", "PILOT_MANIFEST_SCHEMA_VERSION_V1", "PILOT_MANIFEST_SCHEMA_VERSION_V2",
+    "SUPPORTED_MANIFEST_SCHEMA_VERSIONS",
+    "PREREGISTRATION_DECLARED_UNVERIFIED", "ATTESTABLE_TELEMETRY_FIELDS", "LLM_CALLS_FIELD",
     "PreregistrationStatus", "PilotRole", "sorted_roles", "PilotMethodAssignment", "CaptureBoundaryDeclaration", "PilotStudyManifest", "ValidatedManifest",
     "admissible_methods", "validate_manifest",
 ]

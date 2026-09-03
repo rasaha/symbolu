@@ -1,0 +1,203 @@
+"""Calibration contracts for the revision-14/15 run-role architecture.
+
+A calibration run measures one statistic and instantiates nothing by itself. It carries
+the **same** governed plan, binding, roles and task-class identity a confirmatory run
+does — because ``ReasoningMethodExecutionRecord`` and ``PilotObservation`` require them —
+and differs in exactly two committed ways: its ``PilotRunRole`` and a governed threshold
+that names a benchmark rather than a literal, so the comparison engine's ``tau`` is
+``None`` by construction.
+
+``CalibrationResult`` is deliberately reduced. It re-declares nothing that
+``QualityEvaluationRecord`` and the attestation envelope already bind transitively;
+it adds only what nothing else carries — the statistic, the sample-index digest, the
+preregistration commitment pair, the verdict-custody reference and the formula identity.
+Cross-artifact traversal (statistic against the reachable ``QualityResult``, literal
+against the confirmatory threshold) belongs to the verifier slice, not to these value
+objects.
+
+**Slice-3 obligations recorded here, not implemented here** (revision 16):
+
+- **F3.** ``PilotStudyManifest.require_phase_4c_eligible()`` exists but no execution
+  entry point calls it. A v1 manifest is refused *by that method*, which is not the
+  same as being refused *by the runner*. Slice 3 must call it at the run entry point.
+- **F4.** ``run_role`` and ``calibration_provenance`` are excluded from the **v1**
+  digest payload, so a v1 object whose role was set by circumventing the frozen
+  dataclass keeps a digest that still verifies. No public construction path produces
+  such an object and the package has no manifest deserialiser, but a slice-3 verifier
+  must re-run ``_validate_run_role()`` rather than trust a recomputed v1 digest alone.
+- Slice 3 compares ``statistic_value``, ``instantiated_literal`` and the confirmatory
+  threshold literal by **exact code-point equality** over the canonical form below, and
+  must check the canonical rendering of the reachable ``QualityResult.value`` against
+  the calibration statistic.
+"""
+
+from __future__ import annotations
+
+import re
+from dataclasses import dataclass
+from datetime import datetime
+from decimal import Decimal, InvalidOperation
+from enum import Enum
+from typing import Any
+
+from ugence_reasoning_method_governance.api import ContractError, ContractErrorCode
+
+from .._canon import digest_of, require_digest, require_nonblank, require_tzaware, settle_digest
+from ..errors import PilotError, PilotErrorCode
+
+CALIBRATION_RESULT_SCHEMA_VERSION = "workflow_fit_pilot.calibration_result.v1"
+CALIBRATION_GOVERNED_UNIT = "score.unit"
+
+
+class PilotRunRole(str, Enum):
+    """The committed role of a manifest v2 run. There is no default: a missing or
+    unknown role is refused, and a v1 manifest never acquires one by inference."""
+
+    CALIBRATION = "CALIBRATION"
+    CONFIRMATORY = "CONFIRMATORY"
+
+
+# The revision-16 canonical decimal grammar. One decimal value has exactly one
+# admissible spelling, so slice 3 can reconcile a calibration statistic, a provenance
+# literal and a confirmatory threshold by **code-point equality** rather than by
+# numeric parsing — and so a digest over any of them is a digest over the value.
+#
+# Optional "-", then an integer part with no leading zeros (a lone zero, or a non-zero
+# leading digit followed by any digits), then optionally "." and a fractional part whose
+# last digit is non-zero. Rejected by construction: a leading "+", exponent notation, a
+# leading integer zero, a trailing fractional zero, and surrounding whitespace.
+# A negative zero matches this pattern and is rejected separately: every zero is "0".
+# The worked examples live in revision 16 of the commissioning note, not here: the A31
+# gate forbids a numeric literal anywhere in this package's source.
+_CANONICAL_DECIMAL = re.compile(r"^-?(?:0|[1-9][0-9]*)(?:\.[0-9]*[1-9])?$")
+CANONICAL_DECIMAL_GRAMMAR = _CANONICAL_DECIMAL.pattern
+
+
+def require_canonical_decimal(value: Any, name: str) -> Decimal:
+    """A finite decimal in the single canonical spelling ratified in revision 16.
+
+    Stricter than the repository's older convention: ``MetricClaim.value`` and
+    ``GovernedThreshold.literal_value`` are only required to be non-empty strings and
+    are not parsed, so they admit several spellings of one value. Phase 4C cannot,
+    because these fields are compared and digested as strings. An equivalent but
+    non-canonical form is **refused, never silently normalised** — normalising would
+    change a digest-bound value behind the caller's back.
+
+    Bare numbers are refused outright: the canonicaliser admits none, and a float would
+    not round-trip. This rule is Phase 4C's own and is not imposed retroactively on any
+    other governance contract."""
+    if not isinstance(value, str):
+        raise ContractError(ContractErrorCode.DECIMAL_UNPARSEABLE, f"{name} must be a decimal string, not {type(value).__name__}")
+    if not _CANONICAL_DECIMAL.match(value) or value == "-0":
+        raise ContractError(
+            ContractErrorCode.DECIMAL_UNPARSEABLE,
+            f"{name} must be a canonical decimal string (no whitespace, leading '+', exponent, "
+            f"leading integer zero, trailing fractional zero or signed zero); got {value!r}",
+        )
+    try:
+        parsed = Decimal(value)
+    except InvalidOperation:  # unreachable through the grammar; kept so a pattern change fails closed
+        raise ContractError(ContractErrorCode.DECIMAL_UNPARSEABLE, f"{name} must be a decimal string") from None
+    if not parsed.is_finite():  # likewise unreachable: the grammar admits no NaN or Infinity
+        raise ContractError(ContractErrorCode.DECIMAL_UNPARSEABLE, f"{name} must be finite")
+    return parsed
+
+
+def require_positive_count(value: Any, name: str) -> int:
+    """The repository's typed-string numeric convention applies to the canonical payload;
+    in the constructor the count is a positive Python integer, never a bool."""
+    if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
+        raise PilotError(PilotErrorCode.COUNT_INVALID, f"{name} must be a positive integer")
+    return value
+
+
+@dataclass(frozen=True)
+class CalibrationProvenance:
+    """The confirmatory manifest's binding to the calibration that instantiated its
+    threshold. Carried inside the manifest, so it participates in the manifest digest.
+
+    This object proves *which* calibration a literal came from. Proving the literal
+    *equals* that calibration's statistic and the task class's threshold is the
+    verifier's job, deferred to the next slice."""
+
+    calibration_result_digest: str
+    calibration_manifest_digest: str
+    calibration_commitment_identifier: str
+    calibration_index_digest: str
+    formula_id: str
+    formula_version: str
+    instantiated_literal: str
+
+    def __post_init__(self) -> None:
+        for name in ("calibration_result_digest", "calibration_manifest_digest", "calibration_index_digest"):
+            require_digest(getattr(self, name), f"CalibrationProvenance.{name}")
+        for name in ("calibration_commitment_identifier", "formula_id", "formula_version"):
+            require_nonblank(getattr(self, name), f"CalibrationProvenance.{name}")
+        require_canonical_decimal(self.instantiated_literal, "CalibrationProvenance.instantiated_literal")
+
+
+@dataclass(frozen=True)
+class CalibrationResult:
+    """The only artifact permitted to instantiate a confirmatory threshold.
+
+    Every field here is something no other artifact binds. The benchmark, method,
+    evaluator, scorer and run identities are reachable through ``evaluation_digest`` and
+    ``attestation_digest`` and are deliberately not repeated."""
+
+    schema_version: str
+    calibration_id: str
+    manifest_digest: str
+    evaluation_digest: str
+    attestation_digest: str
+    statistic_value: str
+    governed_unit: str
+    score_count: int
+    sample_index_digest: str
+    commitment_identifier: str
+    index_digest: str
+    verdict_custody_ref: str
+    formula_id: str
+    formula_version: str
+    issued_by: str
+    issued_at: datetime
+    calibration_result_digest: str = ""
+
+    def __post_init__(self) -> None:
+        if self.schema_version != CALIBRATION_RESULT_SCHEMA_VERSION:
+            raise PilotError(
+                PilotErrorCode.SCHEMA_VERSION_UNSUPPORTED,
+                f"CalibrationResult.schema_version must be {CALIBRATION_RESULT_SCHEMA_VERSION}",
+            )
+        require_nonblank(self.calibration_id, "CalibrationResult.calibration_id")
+        for name in ("manifest_digest", "evaluation_digest", "attestation_digest", "sample_index_digest", "index_digest"):
+            require_digest(getattr(self, name), f"CalibrationResult.{name}")
+        require_canonical_decimal(self.statistic_value, "CalibrationResult.statistic_value")
+        if self.governed_unit != CALIBRATION_GOVERNED_UNIT:
+            # F5, revision 16 — limitation recorded, not repaired. The statistic is
+            # present and only its unit is wrong, so CALIBRATION_STATISTIC_UNAVAILABLE is
+            # a semantic stretch. No existing code fits exactly: the precise name,
+            # UNIT_MISMATCH, belongs to ``RefusalCode``, the comparison engine's
+            # *evaluation-time* vocabulary, which ``ContractError`` cannot carry and which
+            # a constructor has no standing to raise. Adding a code was forbidden, so the
+            # ratified code is retained and the imprecision is documented here.
+            raise PilotError(
+                PilotErrorCode.CALIBRATION_STATISTIC_UNAVAILABLE,
+                f"CalibrationResult.governed_unit is fixed at {CALIBRATION_GOVERNED_UNIT}",
+            )
+        require_positive_count(self.score_count, "CalibrationResult.score_count")
+        for name in ("commitment_identifier", "verdict_custody_ref", "formula_id", "formula_version", "issued_by"):
+            require_nonblank(getattr(self, name), f"CalibrationResult.{name}")
+        require_tzaware(self.issued_at, "CalibrationResult.issued_at")
+        settle_digest(self, "calibration_result_digest", digest_of(self, exclude=("calibration_result_digest",)))
+
+
+__all__ = [
+    "CALIBRATION_RESULT_SCHEMA_VERSION",
+    "CALIBRATION_GOVERNED_UNIT",
+    "CANONICAL_DECIMAL_GRAMMAR",
+    "PilotRunRole",
+    "CalibrationProvenance",
+    "CalibrationResult",
+    "require_canonical_decimal",
+    "require_positive_count",
+]

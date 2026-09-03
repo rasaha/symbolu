@@ -6,6 +6,14 @@ from .boundary.process import BoundaryProcess
 from .boundary.transport import STDIO_ENDPOINT, UNIX_SOCKETS_AVAILABLE
 from .boundary.frames import CaptureAttemptStatus, CaptureRecord, GatewayRequest, GatewayResponse, ProviderPort, ProviderResult, RunControlFrame
 from .contracts.benchmark import BENCHMARK_MANIFEST_SCHEMA_VERSION, BenchmarkManifest, case_list_digest
+from .contracts.calibration import (
+    CALIBRATION_GOVERNED_UNIT,
+    CALIBRATION_RESULT_SCHEMA_VERSION,
+    CANONICAL_DECIMAL_GRAMMAR,
+    CalibrationProvenance,
+    CalibrationResult,
+    PilotRunRole,
+)
 from .contracts.coverage import ChallengerCoverageReport, SuccessSummary, build_coverage_report, success_summary
 from .contracts.evaluator import INDEPENDENCE_DECLARED_UNVERIFIED, EvaluatorKind, QualityEvaluatorDeclaration
 from .contracts.lifecycle import (
@@ -25,6 +33,9 @@ from .contracts.manifest import (
     ATTESTABLE_TELEMETRY_FIELDS,
     LLM_CALLS_FIELD,
     PILOT_MANIFEST_SCHEMA_VERSION,
+    PILOT_MANIFEST_SCHEMA_VERSION_V1,
+    PILOT_MANIFEST_SCHEMA_VERSION_V2,
+    SUPPORTED_MANIFEST_SCHEMA_VERSIONS,
     PREREGISTRATION_DECLARED_UNVERIFIED,
     CaptureBoundaryDeclaration,
     PilotMethodAssignment,
@@ -54,7 +65,10 @@ from .version import __version__
 
 __all__ = [
     "__version__", "PilotError", "PilotErrorCode",
-    "PILOT_MANIFEST_SCHEMA_VERSION", "PREREGISTRATION_DECLARED_UNVERIFIED", "ATTESTABLE_TELEMETRY_FIELDS", "LLM_CALLS_FIELD",
+    "PILOT_MANIFEST_SCHEMA_VERSION", "PILOT_MANIFEST_SCHEMA_VERSION_V1", "PILOT_MANIFEST_SCHEMA_VERSION_V2",
+    "SUPPORTED_MANIFEST_SCHEMA_VERSIONS", "CALIBRATION_RESULT_SCHEMA_VERSION", "CALIBRATION_GOVERNED_UNIT",
+    "CANONICAL_DECIMAL_GRAMMAR",
+    "PilotRunRole", "CalibrationProvenance", "CalibrationResult", "PREREGISTRATION_DECLARED_UNVERIFIED", "ATTESTABLE_TELEMETRY_FIELDS", "LLM_CALLS_FIELD",
     "PilotRole", "PreregistrationStatus", "PilotMethodAssignment", "CaptureBoundaryDeclaration", "PilotStudyManifest", "ValidatedManifest", "admissible_methods", "validate_manifest",
     "BENCHMARK_MANIFEST_SCHEMA_VERSION", "BenchmarkManifest", "case_list_digest",
     "INDEPENDENCE_DECLARED_UNVERIFIED", "EvaluatorKind", "QualityEvaluatorDeclaration",
