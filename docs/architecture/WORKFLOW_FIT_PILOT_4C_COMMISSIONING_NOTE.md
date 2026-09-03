@@ -1,9 +1,19 @@
 # Phase 4C — First Genuine Research-Only Workflow-Fit Pilot: Commissioning Note and Ballot
 
-**Revision 9.** Status: documentation only. **Nothing in this note authorises a
+**Revision 10.** Status: documentation only. **Nothing in this note authorises a
 provider call.** Until every ballot item in §3 is ratified by the owner, no
 code path in this repository may contact a provider, hold a credential, or
-run a real workflow behind the pilot boundary. Every output of a ratified 4C
+run a real workflow behind the pilot boundary.
+
+**Decision status after the post-revision-9 owner round.** D1–D5 are
+**partially decided and none is fully ratified**. The owner ratified a body of
+**policy** in that round (§3.1, revision-10 record); the **facts** each ballot
+needs — provider, benchmark, people, task class, pricing, infrastructure,
+custody locations and retention periods — remain open, and several selections
+remain **conditional** on facts not yet supplied. Ratifying policy is not
+ratifying a ballot item. **Phase 4C implementation is not commissioned**, no
+genuine provider-backed pilot is authorised, and PR #1578 remains a
+documentation-only commissioning pull request. Every output of a ratified 4C
 run remains `RESEARCH_ONLY` with `preregistration_status =
 DECLARED_UNVERIFIED`. No benchmark-derived advisor behaviour, no
 `BENCHMARK_DERIVED` label and no silent governed-contract change is in scope.
@@ -90,7 +100,7 @@ manifest digest, run identities, record identities and comparison request
 id). A repetition is a whole pilot run. Cross-run aggregation is **deferred to
 a later ballot**; 4C reports repetitions side by side without combining them.
 
-**Re-running a halted repetition — PROPOSED, NOT RATIFIED (assistant selection, revision 5; relabelled revision 9).** A repetition
+**Re-running a halted repetition — OWNER-RATIFIED POLICY, REVISION 10** (assistant selection at revision 5; selected by the owner in the post-revision-9 round).** A repetition
 halted by a trust-infrastructure failure (§2.8) **may not be re-run under the
 same preregistered manifest and `index_digest`**. The replacement attempt is
 a new repetition: a fresh preregistration, a distinct `manifest_id` and its
@@ -103,14 +113,17 @@ identity, which is the precise thing preregistration exists to prevent. The
 same rule holds however the repetition was halted, including a halt with no
 provider call made.
 
-**The enforcing authority — PROPOSED, NOT RATIFIED (assistant selection,
-revision 7; relabelled revision 9).** Revision 6 recorded that nothing durable marks a commitment consumed:
+**The enforcing authority — the registry's adoption and semantics are
+OWNER-RATIFIED POLICY, REVISION 10**; its endpoint, writer identity and
+addressing remain open or proposed (§3.1).** Revision 6 recorded that nothing durable marks a commitment consumed:
 `run` verifies bundle contents and consults no history `[V]` (`pipeline.py`,
 `run`), the prepared bundle cannot hold the mark because it is immutable and
 its digest **is** the commitment, and a local run directory binds no other
-machine. The following is an assistant proposal awaiting owner ratification:
+machine. The owner adopted the registry in the post-revision-9 round. The mechanics
+below are ratified policy **except** the writer-identity name and addressing,
+which remain assistant proposals (§3.1):
 
-| Question | Proposal (not ratified) |
+| Question | Status after revision 10 |
 |---|---|
 | registry and location | a dedicated **append-only commitment registry**, co-located with the D5 preregistration medium and addressed by the pair (commitment identifier, `index_digest`). It is **not** either custody store: expected answers keep their own access-control list, and a store the runner host must write to may not be the store holding answers |
 | marking authority | one named **registry writer identity**, distinct from both custody writers, from the boundary and from the evaluator. `run` acts as that identity and no other principal may append a consumption entry |
@@ -147,12 +160,13 @@ The boundary sees provider prompts and responses; the experiment-side scorer
 alone sees expected answers. **Expected answers must never enter the
 provider boundary.**
 
-**Rule — the two-writer design is PROPOSED, NOT RATIFIED** (assistant design,
-revisions 2–3; the owner's revision-4 instruction assumed it without ratifying
-it). Within it, the **pre-run custody block** and the **post-attestation
-discard** below are likewise **PROPOSED — NOT RATIFIED**: the governing
-authority audit admits only the **in-boundary exchange-custody path** and its
-direct `PROPOSED` → `INCONCLUSIVE` transition as owner-ratified.
+**Rule — the two-writer design is OWNER-RATIFIED POLICY, REVISION 10**
+(assistant design, revisions 2–3; not ratified by the revision-4 instruction,
+which assumed it; selected by the owner in the post-revision-9 round). The
+**pre-run custody block** and the **post-attestation discard** below are
+owner-ratified on the same authority. The **in-boundary exchange-custody
+path** and its direct `PROPOSED` → `INCONCLUSIVE` transition remain
+owner-ratified from revision 4.
 Two append-only custody writers, each referencing the manifest digest and the
 preregistered `index_digest`:
 
@@ -346,9 +360,9 @@ Later methods may continue **only if** the boundary and **both** custody
 services remain healthy. Coverage reporting must expose the missing method,
 and no complete-set comparison may be claimed.
 
-**The discriminator — PROPOSED, NOT RATIFIED (assistant selection, revision 5;
-mechanics corrected on owner-transmitted review, revision 6; relabelled
-revision 9).** A retention write or verification failure does not classify
+**The discriminator — OWNER-RATIFIED POLICY, REVISION 10** (assistant
+selection at revision 5; mechanics corrected on owner-transmitted review at
+revision 6; adopted by the owner in the post-revision-9 round).** A retention write or verification failure does not classify
 itself; **a custody health check does**. It applies to **in-run failures
 only** — an exchange or verdict-retention failure inside a run. A **pre-run**
 custody failure is never health-checked and never classified into a method:
@@ -382,22 +396,21 @@ The verdict decides scope:
 - health check **fails, times out, or cannot be performed** → **service
   failure**: the repetition stops under the rule above.
 
-The health check is itself a custody operation, bounded by the **proposed custody
-health-check timeout of 5 000 ms** (D4, PROPOSED — NOT RATIFIED) — **not** the provider-call
+The health check is itself a custody operation, bounded by the **custody health-check timeout of 5 000 ms**, owner-ratified in revision 10 (D4) — **not** the provider-call
 timeout, which is a different port with a different owner. It is attempted
 **once** and never retried, so a failing service cannot be probed into looking
 healthy.
 
-**Where the canary is written — PROPOSED, NOT RATIFIED (assistant selection,
-revision 7; relabelled revision 9).** Into the **same
+**Where the canary is written — OWNER-RATIFIED POLICY, REVISION 10.** Into the **same
 custody store** whose health is in question, under a **reserved key prefix**.
 A canary written anywhere else would prove nothing about the store that just
 failed, which is the whole purpose of the probe. It is excluded from every
 evidence read, never keyed by case digest, and carries its **own** retention
 and deletion rule rather than the evidence retention period: probes are
 operational exhaust and must not accumulate under evidence retention, nor
-dilute what an independent re-evaluator reads. **Canary retention of 30 days is PROPOSED, NOT RATIFIED**
-(assistant selection, revision 8), after which a canary is deleted; deleting one is never an
+dilute what an independent re-evaluator reads. Canaries carry a **separate** retention and deletion policy, owner-ratified in
+revision 10; the **period itself is an OPEN OWNER FACT** and the assistant's
+30-day figure is **withdrawn**, after which a canary is deleted; deleting one is never an
 evidence deletion and never touches a record keyed by case digest. Its own
 failure is a service failure, never a fresh method-local one. On the
 boundary-side writer a `METHOD_LOCAL` scope still leaves that method
@@ -455,8 +468,8 @@ The seven workflows' intrinsic bounded paths per case `[V]`:
 | `socratic_progressive` | 4 | 4 fixed stages |
 | `metacognitive` | 10 | delegates to a selected workflow; at most the delegate's path |
 
-**PROPOSED — NOT RATIFIED.** The largest bounded path among the seven
-workflows as they stand is **7** calls, so a shared cap of **7** already
+**OWNER-RATIFIED POLICY, REVISION 10.** The largest bounded path among the
+seven workflows as they stand is **7** calls, so a shared cap of **7** already
 clears every present path. The proposed value is **8**, which is 7 plus one
 call of headroom against a workflow whose parameters change (`num_branches`,
 `max_revisions`, `max_sub_problems` are constructor arguments). Per-method
@@ -479,10 +492,20 @@ comparison and must become `INCONCLUSIVE`. The sentinel is a runtime string in
 `agentic/`, not a governed constant; a check depending on it must fail closed
 if the string changes.
 
-**A seventh refusal code, proposed only.** `WORKFLOW_BUDGET_EXHAUSTED` would
-name this condition. The existing 4C design already proposes **six** new codes
-(§4); adopting this one makes **seven**. **Neither six nor seven is
-owner-ratified.**
+**A seventh refusal code — selected in revision 10.**
+`WORKFLOW_BUDGET_EXHAUSTED` names this condition. With the six others (§4) the
+owner selected **seven** additions. The enum itself is unchanged: it has 33
+members today `[V]`, and a future commissioned vocabulary would have 40.
+
+**The sentinel becomes a shared constant — owner-ratified policy, revision
+10.** `"(budget exhausted)"` must be one shared runtime constant used by the
+reasoning workflows, `HarnessWorkflowExecutor` and the provider-free tests.
+Implementation is **deferred** until Phase 4C is commissioned. The constant
+belongs on the `agentic/agentic_framework` side, where the sentinel
+originates, so the experiment-side executor can import it;
+`ugence_workflow_fit_pilot` must **not** import the research harness, since
+that would invert the dependency boundary the adapter exists to preserve
+`[V]` (`experiments/workflow_fit_study/pilot_executor.py`).
 
 ## 3. Ballot — five owner decisions `[R]`
 
@@ -617,26 +640,79 @@ with the repetition scope of §2.8.
 Git keeps digests and the governed evidence objects only. Digest-only
 evidence is insufficient for later independent re-evaluation.
 
-### 3.1 Candidate values — PROPOSED, NOT RATIFIED
+### 3.1 Decision status of every selection (revision 10)
 
-None of these is owner-ratified. Each is an assistant proposal offered so the
-owner has something concrete to accept, amend or reject; every D1–D5 fact
-placeholder stays open regardless.
+Four statuses, and nothing sits between them. **Policy ratification is not
+ballot ratification:** no D-item below is complete, because each still needs
+facts listed as open.
 
-| Ballot | Candidate |
+#### OWNER-RATIFIED POLICY — REVISION 10
+
+Selected by the owner in the post-revision-9 D1–D5 decision round.
+
+| Ballot | Ratified policy |
 |---|---|
 | D1 | temperature 0; top-p 1.0; maximum output 1024 tokens; no stop sequences |
-| D1 | credential option A, workload identity, with a minimal environment allowlist whose every key is named in the ballot |
-| D2 | append-only benchmark versioning: a corrected answer is a new version, never an in-place edit |
-| D2 | expected answers reachable only by the scorer — never a workflow-visible input, never the boundary |
-| D2 | programmatic evaluator, with calibration evidence explicitly declared absent because scoring is deterministic |
-| D3 | `LLM_CALLS` universally required; `TOTAL_TOKENS` admitted only on complete usage (§D3) |
-| D4 | shared per-case cap 8 (§2.9); zero retries; sequential execution; 60-second provider-call timeout |
-| D4 | 3 confirmatory repetitions with an external threshold; otherwise 1 separate calibration run plus 3 confirmatory |
-| D4 | custody health-check timeout 5 000 ms, distinct from the provider-call timeout |
-| D5 | external append-only preregistration medium |
-| D5 | commitment-registry mechanics and the canary's placement, prefix and 30-day retention (§2.2, §2.8) |
-| D5 | evidence retention of at least 24 months, no deletion while a claim cites the run |
+| D1 | preregistered seed per repetition where supported, else an explicit "provider offers no seed" declaration |
+| D1 | credential option A, boundary-side workload identity; immutable deployment identity required on **every** attempt |
+| D1 | bounded credential claim: the credential does not enter the runner process or runner environment; the boundary retrieves and holds it |
+| D1 | allowlist **policy**: derive the smallest functional child-process environment by provider-free testing; admit no key for convenience; admit `PYTHONPATH` only if proven necessary and its value controlled; `PATH` and the interpreter are process prerequisites only, never credential isolation; every exact key and constraint returns for separate owner ratification before a genuine run |
+| D2 | append-only benchmark versioning; a correction creates a new version, never an in-place mutation |
+| D2 | expected answers accessible only to the scorer, never in workflow-visible inputs and never in the provider boundary |
+| D2 | distinct benchmark author and approver |
+| D2 | the two-writer custody architecture (§2.3) |
+| D2 | pre-run custody failure blocks preparation and preregistration |
+| D2 | post-attestation retention or evaluation failure discards that method's emitted evidence and makes it `INCONCLUSIVE` |
+| D3 | `LLM_CALLS` universally required |
+| D3 | missing required usage produces `DIMENSION_UNAVAILABLE`; no fallback, no zero-filling, no reduced-dimension comparison |
+| D3 | `score.unit`; arithmetic-mean aggregation |
+| D3 | threshold sourced externally where a defensible external basis exists; otherwise one separate calibration run establishes a candidate threshold before confirmatory execution |
+| D3 | representativeness requires an explicit population, a sampling procedure and a written limitation statement; structural-token traceability alone does not prove representative sampling |
+| D4 | shared per-case cap **8**; 7 clears every current bounded path; 8 gives one call of headroom and does **not** guarantee safety after workflow change |
+| D4 | every workflow or constructor-parameter change reruns the provider-free bounded-path test |
+| D4 | per-method and repetition ceilings are accounting figures, not independent enforcement controls |
+| D4 | zero retries; sequential execution; 60-second provider-call timeout |
+| D4 | calibration carries its own preregistered commitment and never enters confirmatory comparison, coverage or success reporting |
+| D4 | manifest identity `<benchmark id>@<benchmark version>.<task class id>.<CALIBRATION\|CONFIRMATORY>.rep<ordinal>.<pre-execution nonce>`; replacement after a halt uses a fresh nonce or ordinal; the halted identity is retained and never overwritten |
+| D4 | bounded custody-health-check discriminator adopted; 5 000 ms timeout; performed by the process owning the writer; one check, no retry |
+| D4 | stop conditions: call-ceiling breach, spending-ceiling breach, trust-infrastructure failure |
+| D5 | external append-only preregistration |
+| D5 | receipt binds commitment identifier, `index_digest`, `manifest_id`, nonce, recording instant and recorder identity |
+| D5 | a halted commitment may not be reused |
+| D5 | durable spent-commitment registry adopted; separate from both custody stores; logically co-located with the preregistration authority where feasible |
+| D5 | single conditional append, never read-then-write; consumption immediately before boundary startup; unavailability fails closed; consumption terminal after a crash; a missing outcome entry never reopens a commitment |
+| D5 | canary written to the custody store it tests under a reserved prefix; excluded from evidence reads and case-digest addressing; separate retention and deletion policy |
+| D5 | customer-managed encryption, bounded: it protects retained evidence only when the runner, workflows and unrelated operators lack decrypt permission |
+| codes | seven additions selected (§4) |
+| codes | `"(budget exhausted)"` must become one shared runtime constant (§2.9, §4) |
+
+#### CONDITIONAL OWNER SELECTION — NOT YET FINAL
+
+| Ballot | Selection | Condition |
+|---|---|---|
+| D2 | evaluator kind `PROGRAMMATIC` | only if the eventual benchmark supports objective, deterministic programmatic scoring; the label `PROGRAMMATIC` does not itself prove determinism `[V]` (`EvaluatorKind` is a declared kind; no contract verifies determinism). Final selection awaits the benchmark and scoring procedure |
+| D3 | `TOTAL_TOKENS` admitted | only when every attempt of every compared method has complete provider usage — an unresolved D1 provider fact. Until then the operative configuration is `LLM_CALLS` alone |
+| D4 | 3 confirmatory repetitions, or 1 calibration + 3 confirmatory | which branch applies depends on whether a defensible external threshold basis exists (D3) |
+| D1 | the exact environment allowlist keys | the policy is ratified; the key set is derived by provider-free testing and returns for separate ratification |
+
+#### WITHDRAWN ASSISTANT PROPOSALS
+
+| Proposal | Status |
+|---|---|
+| literal allowlist `PATH`, `PYTHONPATH`, `LANG`, `LC_ALL` | **withdrawn** in revision 10; not replaced by another list. The allowlist policy above governs instead |
+| evidence retention of at least 24 months | **withdrawn** in revision 10; the period is an open owner choice pending review |
+| canary retention of 30 days | **withdrawn** as a fixed value; canaries keep a *separate* retention policy whose period is open |
+| registry writer identity `workflow_fit_commitment_registry.writer` and addressing `commitments/<identifier>/<index_digest>` | remain **assistant proposals**; the owner ratified the registry's adoption, separation, append semantics, consumption point and failure behaviour, not these names |
+
+#### OPEN OWNER FACTS
+
+| Ballot | Facts still required |
+|---|---|
+| D1 | provider name; model identity and version; deployment region; retention-policy reference and version; workload-identity principal; token audience; secret location; retrieval mechanism; the exact environment keys after testing; whether the provider returns complete token usage on every attempt |
+| D2 | benchmark author; approver, distinct; benchmark id and version; case list and expected answers; benchmark-custody location; evaluator identity and version; scoring procedure text; separation declaration reference |
+| D3 | `profile.json`; `task_class.json`; consequence class; evidence-admission reference where the class is `MATERIAL` or `SEVERE` with threshold-based sufficiency `[V]`; population definition; representativeness statement; threshold literal and its basis |
+| D4 | pricing source and version; currency; spending ceiling |
+| D5 | preregistration medium; registry endpoint; both custody locations; registry and custody writer identities; ACL principals; key custodian; evidence retention period; canary retention period; deletion rules |
 
 Temperature 0 **removes a major sampling control but does not establish
 determinism**; a provider may still vary across attempts.
@@ -654,15 +730,15 @@ record: (i) boundary hard stop at the call ceiling and on
 `PROVIDER_IDENTITY_UNVERIFIED`; (ii) boundary-side exchange writer; (iii)
 runner amendment discarding the method's evidence after a post-attestation
 retention or evaluation failure and emitting `INCONCLUSIVE` with the exact
-stage code; (iv) **six** refusal codes added to `PilotErrorCode` —
-`PROVIDER_IDENTITY_UNVERIFIED`, `RETENTION_WRITE_FAILED`,
+stage code; (iv) the **seven** refusal codes the owner selected in revision 10
+— `PROVIDER_IDENTITY_UNVERIFIED`, `RETENTION_WRITE_FAILED`,
 `RETENTION_VERIFY_FAILED`, `EVALUATION_FAILED`, `COMMITMENT_ALREADY_SPENT`,
-`COMMITMENT_REGISTRY_UNAVAILABLE`. The enum today has **33** members,
-enumerated from the class body, and contains none of them `[V]`
-(`errors.py`); `RETENTION_FAILED` is withdrawn. Six additions would take the
-vocabulary to **39**; adopting the proposed `WORKFLOW_BUDGET_EXHAUSTED` (§2.9)
-would make seven additions and **40**. **Neither six nor seven is
-owner-ratified.** (v) only
+`COMMITMENT_REGISTRY_UNAVAILABLE`, `WORKFLOW_BUDGET_EXHAUSTED`. The three
+stage codes were owner-ratified in revision 4; revision 10 ratifies the
+remaining four names and the seven-code accounting. **The enum has not
+changed**: `errors.py` has **33** members today and contains none of the seven
+`[V]`; a future commissioned vocabulary would have **40**. `RETENTION_FAILED`
+stays withdrawn. (v) only
 if D1 selects option B, a separately ratified launch/connection port over the
 existing frame protocol; the benchmark-custody writer with the runner-side
 bounded health check of §2.8; a **boundary-internal** exchange-writer health
@@ -927,6 +1003,62 @@ as PROPOSED — NOT RATIFIED.
 
 Ballot items remain five and remain `[R]`; D1–D5 still need their provider,
 benchmark, threshold, budget, identity and custody values, and D5 still needs
-the registry endpoint. Every candidate value in this note is an assistant
-proposal except the revision-4 rulings listed above. No revision changed code,
-contract or CI gate, and none authorises a provider call.
+the registry endpoint. As of revision 9, every candidate value in this note
+was an assistant proposal except the revision-4 rulings listed above; the
+owner's post-revision-9 round changed that, and revision 10 records it. No
+revision changed code, contract or CI gate, and none authorises a provider
+call.
+
+### Revision 10 (owner policy selections from the post-revision-9 D1–D5 round, 2026-09-03)
+
+**Source of authority.** An explicit owner policy-selection instruction issued
+**after** revision 9, in the D1–D5 decision round. These are new decisions of
+that round. They are **not** retroactive: revisions 4–9 stand exactly as
+recorded, and revision 9's authority audit remains historical fact. What
+revision 9 correctly called assistant proposals were assistant proposals when
+it said so; the owner has since selected many of them.
+
+**Newly ratified policy categories** — enumerated in §3.1 and reflected in
+§2.2, §2.3, §2.8, §2.9 and §4: D1 decoding parameters, seed handling,
+credential option A with the bounded credential claim, immutable-identity
+verification on every attempt and the allowlist **derivation policy**; D2
+append-only versioning, scorer-only answer access, distinct author and
+approver, the two-writer custody architecture, the pre-run custody block and
+the post-attestation discard; D3 `LLM_CALLS` as universally required, the
+no-fallback `DIMENSION_UNAVAILABLE` posture, `score.unit` with arithmetic
+mean, external threshold sourcing with a calibration fallback, and the
+representativeness minimum; D4 the shared per-case cap 8 with its stated
+limits, the bounded-path retest obligation, ceilings as accounting figures,
+zero retries, sequential execution, the 60-second provider timeout, the
+calibration separation, the manifest identity and halt-replacement rule, the
+health-check discriminator with its 5 000 ms timeout and writer-owning
+performer, and the stop conditions; D5 external append-only preregistration,
+the receipt binding, the no-reuse rule, adoption of the spent-commitment
+registry with its separation, append semantics, consumption point and failure
+behaviour, canary placement and separate retention policy, and bounded
+customer-managed encryption; plus the seven refusal codes and the shared
+sentinel constant.
+
+**Conditional selections, not final:** evaluator kind `PROGRAMMATIC` pending a
+benchmark that supports objective deterministic scoring — the label alone
+proves nothing; `TOTAL_TOKENS` admission pending the provider-usage fact; the
+repetition branch pending whether a defensible external threshold basis
+exists; and the exact allowlist keys pending provider-free derivation and a
+separate ratification.
+
+**Withdrawn assistant proposals:** the literal `PATH`, `PYTHONPATH`, `LANG`,
+`LC_ALL` allowlist, replaced by no other list; the 24-month evidence-retention
+period; and the 30-day canary retention figure. The registry writer-identity
+name and addressing remain assistant proposals rather than ratified values.
+
+**Remaining owner-supplied facts:** every entry in §3.1's open-facts table —
+provider, benchmark, people, task class and consequence class, threshold,
+pricing, custody and registry locations, identities, ACL principals, key
+custodian, and the evidence and canary retention periods, the last pending
+legal, privacy, customer-contract and research-reproducibility review.
+
+**Policy ratification is not ballot ratification.** D1, D2, D3, D4 and D5 are
+each **partially decided and none is fully ratified**. **No implementation was
+commissioned by this revision**: the enum is unchanged at 33 members `[V]`, no
+code, test, contract or CI file was touched, no credential was accessed and no
+provider was called.
