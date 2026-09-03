@@ -1,0 +1,8 @@
+{
+  "evaluator_identity": "evaluator:reference-exact-answer",
+  "evaluator_version": "0",
+  "kind": "PROGRAMMATIC",
+  "model_ref": null,
+  "separation_declaration_ref": "separation:declared:runner-process-scorer:expected-answers-outside-workflow-inputs",
+  "calibration_evidence_ref": null
+}

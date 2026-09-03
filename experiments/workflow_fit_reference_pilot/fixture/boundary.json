@@ -1,0 +1,7 @@
+{
+  "boundary_identity": "boundary:reference-pilot-gateway",
+  "boundary_version": "0.1.0",
+  "process_separation_ref": "separation:declared:separate-os-process:unverified",
+  "port_ref": "transport:unix-socket-or-stdio-pipe:runner-owned",
+  "allowed_attested_fields": ["telemetry.llm_calls", "telemetry.token_usage.input_tokens", "telemetry.token_usage.output_tokens", "telemetry.token_usage.total_tokens"]
+}

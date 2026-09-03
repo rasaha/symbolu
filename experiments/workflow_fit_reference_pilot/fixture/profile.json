@@ -1,0 +1,11 @@
+{
+  "profile_id": "profile.reference-pilot.synthetic",
+  "domain_ref": "domain:synthetic-structured-answers",
+  "intended_outcome_ref": "outcome:exact-structured-answer",
+  "consequence_class": "NEGLIGIBLE",
+  "reversibility": "OUTCOME_REVERSIBLE",
+  "evidence_requirement_refs": [],
+  "tool_requirement_refs": [],
+  "structural_characteristics": ["multi_part_question", "ambiguity_detected"],
+  "population_ref": "population:synthetic-fixture"
+}

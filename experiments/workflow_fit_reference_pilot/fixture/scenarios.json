@@ -1,0 +1,256 @@
+{
+  "scenarios": {
+    "nominal": {
+      "provider_mode": "ok",
+      "calls": {
+        "debate": {
+          "case.arith": 2,
+          "case.capital": 2,
+          "case.boiling": 2
+        },
+        "iterative_refinement": {
+          "case.arith": 3,
+          "case.capital": 1,
+          "case.boiling": 2
+        },
+        "linear_chain": {
+          "case.arith": 1,
+          "case.capital": 1,
+          "case.boiling": 1
+        },
+        "map_reduce": {
+          "case.arith": 0,
+          "case.capital": 1,
+          "case.boiling": 3
+        },
+        "metacognitive": {
+          "case.arith": 2,
+          "case.capital": 0,
+          "case.boiling": 1
+        },
+        "socratic_progressive": {
+          "case.arith": 1,
+          "case.capital": 1,
+          "case.boiling": 0
+        },
+        "tree_of_thought": {
+          "case.arith": 4,
+          "case.capital": 4,
+          "case.boiling": 4
+        }
+      },
+      "bypass_method": null,
+      "fail_method": null
+    },
+    "no_usage": {
+      "provider_mode": "no_usage",
+      "calls": {
+        "debate": {
+          "case.arith": 1,
+          "case.capital": 1,
+          "case.boiling": 1
+        },
+        "iterative_refinement": {
+          "case.arith": 1,
+          "case.capital": 1,
+          "case.boiling": 1
+        },
+        "linear_chain": {
+          "case.arith": 1,
+          "case.capital": 1,
+          "case.boiling": 1
+        },
+        "map_reduce": {
+          "case.arith": 1,
+          "case.capital": 1,
+          "case.boiling": 1
+        },
+        "metacognitive": {
+          "case.arith": 1,
+          "case.capital": 1,
+          "case.boiling": 1
+        },
+        "socratic_progressive": {
+          "case.arith": 1,
+          "case.capital": 1,
+          "case.boiling": 1
+        },
+        "tree_of_thought": {
+          "case.arith": 1,
+          "case.capital": 1,
+          "case.boiling": 1
+        }
+      },
+      "bypass_method": null,
+      "fail_method": null
+    },
+    "provider_failure": {
+      "provider_mode": "raise:tree_of_thought",
+      "calls": {
+        "debate": {
+          "case.arith": 2,
+          "case.capital": 2,
+          "case.boiling": 2
+        },
+        "iterative_refinement": {
+          "case.arith": 3,
+          "case.capital": 1,
+          "case.boiling": 2
+        },
+        "linear_chain": {
+          "case.arith": 1,
+          "case.capital": 1,
+          "case.boiling": 1
+        },
+        "map_reduce": {
+          "case.arith": 0,
+          "case.capital": 1,
+          "case.boiling": 3
+        },
+        "metacognitive": {
+          "case.arith": 2,
+          "case.capital": 0,
+          "case.boiling": 1
+        },
+        "socratic_progressive": {
+          "case.arith": 1,
+          "case.capital": 1,
+          "case.boiling": 0
+        },
+        "tree_of_thought": {
+          "case.arith": 4,
+          "case.capital": 4,
+          "case.boiling": 4
+        }
+      },
+      "bypass_method": null,
+      "fail_method": null
+    },
+    "incomplete_capture": {
+      "provider_mode": "ok",
+      "calls": {
+        "debate": {
+          "case.arith": 1,
+          "case.capital": 1,
+          "case.boiling": 1
+        },
+        "iterative_refinement": {
+          "case.arith": 1,
+          "case.capital": 1,
+          "case.boiling": 1
+        },
+        "linear_chain": {
+          "case.arith": 1,
+          "case.capital": 1,
+          "case.boiling": 1
+        },
+        "map_reduce": {
+          "case.arith": 1,
+          "case.capital": 1,
+          "case.boiling": 1
+        },
+        "metacognitive": {
+          "case.arith": 1,
+          "case.capital": 1,
+          "case.boiling": 1
+        },
+        "socratic_progressive": {
+          "case.arith": 1,
+          "case.capital": 1,
+          "case.boiling": 1
+        },
+        "tree_of_thought": {
+          "case.arith": 1,
+          "case.capital": 1,
+          "case.boiling": 1
+        }
+      },
+      "bypass_method": "debate",
+      "fail_method": null
+    },
+    "engine_refusal": {
+      "provider_mode": "ok",
+      "calls": {
+        "debate": {
+          "case.arith": 1,
+          "case.capital": 1,
+          "case.boiling": 1
+        },
+        "iterative_refinement": {
+          "case.arith": 1,
+          "case.capital": 1,
+          "case.boiling": 1
+        },
+        "linear_chain": {
+          "case.arith": 1,
+          "case.capital": 1,
+          "case.boiling": 1
+        },
+        "map_reduce": {
+          "case.arith": 1,
+          "case.capital": 1,
+          "case.boiling": 1
+        },
+        "metacognitive": {
+          "case.arith": 1,
+          "case.capital": 1,
+          "case.boiling": 1
+        },
+        "socratic_progressive": {
+          "case.arith": 1,
+          "case.capital": 1,
+          "case.boiling": 1
+        },
+        "tree_of_thought": {
+          "case.arith": 1,
+          "case.capital": 1,
+          "case.boiling": 1
+        }
+      },
+      "bypass_method": null,
+      "fail_method": "linear_chain"
+    },
+    "zero_call_run": {
+      "provider_mode": "ok",
+      "calls": {
+        "debate": {
+          "case.arith": 0,
+          "case.capital": 0,
+          "case.boiling": 0
+        },
+        "iterative_refinement": {
+          "case.arith": 0,
+          "case.capital": 0,
+          "case.boiling": 0
+        },
+        "linear_chain": {
+          "case.arith": 0,
+          "case.capital": 0,
+          "case.boiling": 0
+        },
+        "map_reduce": {
+          "case.arith": 0,
+          "case.capital": 0,
+          "case.boiling": 0
+        },
+        "metacognitive": {
+          "case.arith": 0,
+          "case.capital": 0,
+          "case.boiling": 0
+        },
+        "socratic_progressive": {
+          "case.arith": 0,
+          "case.capital": 0,
+          "case.boiling": 0
+        },
+        "tree_of_thought": {
+          "case.arith": 0,
+          "case.capital": 0,
+          "case.boiling": 0
+        }
+      },
+      "bypass_method": null,
+      "fail_method": null
+    }
+  }
+}

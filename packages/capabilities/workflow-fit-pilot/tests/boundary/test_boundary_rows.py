@@ -195,16 +195,36 @@ def test_a16c_pipe_transport_fallback():
         bp.stop(conn)
         conn.close()
     adv = pf.advisory(m.plan.task_class)
-    from ugence_workflow_fit_pilot.runner import run_pilot as _rp
-    import ugence_workflow_fit_pilot.runner as runner_mod
-    original = runner_mod.BoundaryProcess
-    runner_mod.BoundaryProcess = lambda man, fac, env=None: original(man, fac, env=env, transport="pipe")
-    try:
-        res = _rp(m, catalog=pf.catalog(), rule_set=pf.rule_set(), advisory=adv, cases=pf.cases(), executor=pf.FakeExecutor(pf.DEFAULT_CALLS), scorer=pf.KeywordScorer(),
-                  identity=pf.IDENTITY, provider_factory="stub_provider:make_provider", now=pf.clock(), boundary_env=pf.boundary_env())
-    finally:
-        runner_mod.BoundaryProcess = original
+    res = run_pilot(m, catalog=pf.catalog(), rule_set=pf.rule_set(), advisory=adv, cases=pf.cases(), executor=pf.FakeExecutor(pf.DEFAULT_CALLS), scorer=pf.KeywordScorer(),
+                    identity=pf.IDENTITY, provider_factory="stub_provider:make_provider", now=pf.clock(), boundary_env=pf.boundary_env(), transport="pipe")
     assert all(r.complete and r.attestation is not None for r in res.runs)
+
+
+def test_a16d_transport_equivalence():
+    """Equivalent inputs over the socket and the pipe pair yield equivalent evidence: identical
+    telemetry, capture order, attested fields, quality claims and results, observations (apart
+    from the boundary-generated capture instants and the fingerprints that carry them),
+    engine outcomes, coverage and lifecycle states. Capture fingerprints and the digests that
+    include them legitimately differ because the boundary reads its own clock per call."""
+    m = pf.manifest()
+    adv = pf.advisory(m.plan.task_class)
+    kw = dict(catalog=pf.catalog(), rule_set=pf.rule_set(), advisory=adv, cases=pf.cases(), scorer=pf.KeywordScorer(), identity=pf.IDENTITY, provider_factory="stub_provider:make_provider", boundary_env=pf.boundary_env())
+    a = run_pilot(m, executor=pf.FakeExecutor(pf.DEFAULT_CALLS), now=pf.clock(), transport="unix", **kw)
+    b = run_pilot(m, executor=pf.FakeExecutor(pf.DEFAULT_CALLS), now=pf.clock(), transport="pipe", **kw)
+
+    def evidence(res):
+        out = {}
+        for r in res.runs:
+            tel = dataclasses.replace(r.record.telemetry, capture_refs=())
+            out[r.method.method_id] = (
+                tel, [c.order_key for c in r.capture_records], [(c.status, c.usage, c.prompt_digest, c.response_digest) for c in r.capture_records],
+                r.attestation.attested_fields, r.quality_claim.value, r.quality_result.value, r.observation.roles, r.observation.case_count, r.diagnostics,
+            )
+        return out, res.outcomes, dataclasses.replace(res.coverage), [(s.method.method_id, s.state, s.fit_outcome, s.refusal_codes) for s in res.states]
+
+    assert evidence(a) == evidence(b)
+    assert a.result.result_digest != "" and a.result.authority_resolution_basis == b.result.authority_resolution_basis
+    assert {v.attestation_status for v in a.result.evidence_status} == {v.attestation_status for v in b.result.evidence_status}
 
 
 def test_a16b_canonical_capture_order_is_deterministic():

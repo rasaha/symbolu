@@ -3,7 +3,8 @@
 #
 # Runs the pilot package's suite: every §8 acceptance row, the boundary-process rows
 # (a real separate process with a stub provider), the import-boundary and numeric scans,
-# and the end-to-end row over the research harness. numpy is installed only so the
+# and the end-to-end row over the research harness. Also runs the Phase 4B reference-pilot
+# qualification suite (experiments/workflow_fit_reference_pilot: mechanism validation only). numpy is installed only so the
 # end-to-end row and the CaptureAttemptStatus vocabulary pin can import the runtime tree
 # and Context Minimization under test-only imports; the package under test imports neither.
 name: Workflow-Fit Pilot CI
@@ -14,6 +15,9 @@ on:
     paths:
       - "packages/capabilities/workflow-fit-pilot/**"
       - "experiments/workflow_fit_study/pilot_executor.py"
+      - "experiments/workflow_fit_reference_pilot/**"
+      - "experiments/reasoning_method_advisor_demo/**"
+      - "tests/experiments/workflow_fit_reference_pilot/**"
       - "packages/capabilities/reasoning-method-governance/**"
       - "packages/capabilities/readiness-comparison/**"
       - "packages/capabilities/reasoning-method-advisor/**"
@@ -27,6 +31,9 @@ on:
     paths:
       - "packages/capabilities/workflow-fit-pilot/**"
       - "experiments/workflow_fit_study/pilot_executor.py"
+      - "experiments/workflow_fit_reference_pilot/**"
+      - "experiments/reasoning_method_advisor_demo/**"
+      - "tests/experiments/workflow_fit_reference_pilot/**"
       - "packages/capabilities/reasoning-method-governance/**"
       - "packages/capabilities/readiness-comparison/**"
       - "packages/capabilities/reasoning-method-advisor/**"
@@ -91,6 +98,7 @@ jobs:
         run: |
           python -m pytest \
             packages/capabilities/workflow-fit-pilot/tests \
+            tests/experiments/workflow_fit_reference_pilot \
             -v \
             --tb=short \
             --disable-warnings \
