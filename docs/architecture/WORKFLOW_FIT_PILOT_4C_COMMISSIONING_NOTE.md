@@ -1,6 +1,6 @@
 # Phase 4C — First Genuine Research-Only Workflow-Fit Pilot: Commissioning Note and Ballot
 
-**Revision 10.** Status: documentation only. **Nothing in this note authorises a
+**Revision 11.** Status: documentation only. **Nothing in this note authorises a
 provider call.** Until every ballot item in §3 is ratified by the owner, no
 code path in this repository may contact a provider, hold a credential, or
 run a real workflow behind the pilot boundary.
@@ -554,10 +554,14 @@ Values: the exact `profile.json` and `task_class.json`; the population
 definition; a written representativeness statement saying why these cases
 represent the declared task class and what they do not cover; the quality
 threshold literal and comparator in `score.unit` under arithmetic-mean
-aggregation (§2.6); and the resource dimensions compared. **PROPOSED — NOT RATIFIED:**
-`LLM_CALLS` is the universally required dimension; `TOTAL_TOKENS` is admitted
-only when the provider returns complete usage for **every** attempt of **every**
-compared method, and is otherwise omitted — the engine refuses
+aggregation (§2.6); and the resource dimensions compared. **Owner-ratified:** `LLM_CALLS` is the
+universally required dimension, and **`TOTAL_TOKENS` is not admitted**
+(revision 11), because complete provider-usage reporting for every potentially
+charged attempt — failures and timeouts included — has not been established;
+that is not a claim that the provider never returns usage in those cases. The
+pilot therefore compares resource use **by call count**, and its results must
+not be represented as a comparison of token consumption or token cost. The
+engine refuses
 `DIMENSION_UNAVAILABLE` on a missing value with **no fallback to fewer
 dimensions** `[V]` (`readiness-comparison/engine.py`), so an optimistic
 declaration converts one absent usage field into a lost repetition.
@@ -646,9 +650,11 @@ Four statuses, and nothing sits between them. **Policy ratification is not
 ballot ratification:** no D-item below is complete, because each still needs
 facts listed as open.
 
-#### OWNER-RATIFIED POLICY — REVISION 10
+#### OWNER-RATIFIED POLICY — REVISIONS 10–11
 
-Selected by the owner in the post-revision-9 D1–D5 decision round.
+Selected by the owner in the post-revision-9 D1–D5 decision round, except the two
+rows marked **(revision 11)**, which come from the later D1 provider-route
+decision.
 
 | Ballot | Ratified policy |
 |---|---|
@@ -665,6 +671,8 @@ Selected by the owner in the post-revision-9 D1–D5 decision round.
 | D2 | post-attestation retention or evaluation failure discards that method's emitted evidence and makes it `INCONCLUSIVE` |
 | D3 | `LLM_CALLS` universally required |
 | D3 | missing required usage produces `DIMENSION_UNAVAILABLE`; no fallback, no zero-filling, no reduced-dimension comparison |
+| D3 | **(revision 11)** `TOTAL_TOKENS` **not admitted**; `LLM_CALLS` alone is the operative resource configuration. Grounds: complete provider-usage reporting for every potentially charged attempt — failures and timeouts included — has not been established. This is not a claim that the provider never returns usage in those circumstances |
+| D3 | **(revision 11)** the pilot therefore compares resource use **by call count**. Its results must not be represented as a comparison of token consumption or token cost |
 | D3 | `score.unit`; arithmetic-mean aggregation |
 | D3 | threshold sourced externally where a defensible external basis exists; otherwise one separate calibration run establishes a candidate threshold before confirmatory execution |
 | D3 | representativeness requires an explicit population, a sampling procedure and a written limitation statement; structural-token traceability alone does not prove representative sampling |
@@ -686,12 +694,60 @@ Selected by the owner in the post-revision-9 D1–D5 decision round.
 | codes | seven additions selected (§4) |
 | codes | `"(budget exhausted)"` must become one shared runtime constant (§2.9, §4) |
 
+#### CONDITIONAL OWNER SELECTION — PROVIDER ROUTE (D1)
+
+Selected by the owner in the post-revision-10 D1 decision round as the
+**conditional default route**. This is **not** completed D1 ratification and
+**not** a verified provider fact.
+
+**Evidence status.** Every provider-side claim in this table is
+**owner-supplied or externally transmitted**, never `[V]`. Official OpenAI
+documentation was **not reachable** from the environment that produced this
+note — `developers.openai.com` and `platform.openai.com` are blocked by egress
+policy — so nothing here was fetched or independently verified. The official
+pages are listed below as **evidence references to be checked**, not as
+citations supporting a verified claim.
+
+| Field | Owner-selected value (not verified) |
+|---|---|
+| Provider route | OpenAI API direct |
+| Model candidate | `gpt-4.1-2025-04-14` |
+| API surface | Chat Completions |
+| Credential architecture | boundary-side OpenAI workload-identity federation mapped to a Platform service account (the D1 option-A shape of §2.4; §2.4's allowlist-derivation policy is unchanged and still requires separate ratification of the key set) |
+| Operative resource configuration | `LLM_CALLS` only |
+| `TOTAL_TOKENS` | not admitted |
+| Evidence status | owner-supplied / externally transmitted; **not** `[V]`; not fetched or independently verified |
+
+**This selection does not establish compliance with §2.5.** The owner-ratified
+refusal of any provider that cannot return an immutable executed deployment
+identity is unchanged and is **not** satisfied by naming a route. **If the
+confirmation below fails, the route is disqualified.**
+
+**Unresolved conditions — all must be satisfied before D1 can complete:**
+
+1. the response `model` must be confirmed to identify the **immutable snapshot that actually executed** every successful attempt, not the requested model;
+2. the selected snapshot must be confirmed to remain **available throughout the entire pilot**;
+3. the **processing region** must be selected and accepted;
+4. **retention arrangements** and any ZDR / modified-abuse-monitoring eligibility must be confirmed;
+5. the **workload-identity host, principal, issuer, audience and token source** must be supplied;
+6. the **exact boundary environment keys** must be derived by provider-free testing and **separately owner-ratified** (§2.4).
+
+**Reopen trigger.** India-only processing is **not** currently an owner
+requirement. **If India-only processing becomes mandatory, the provider-route
+decision reopens**, because the OpenAI India option is not established as
+providing India-local processing.
+
+**Evidence references to be checked** (unfetched, unverified):
+`developers.openai.com/api/docs/models/gpt-4.1`;
+`developers.openai.com/api/reference/python/resources/chat/subresources/completions/methods/create/`;
+`developers.openai.com/api/docs/guides/workload-identity-federation`;
+`developers.openai.com/api/docs/guides/your-data`.
+
 #### CONDITIONAL OWNER SELECTION — NOT YET FINAL
 
 | Ballot | Selection | Condition |
 |---|---|---|
 | D2 | evaluator kind `PROGRAMMATIC` | only if the eventual benchmark supports objective, deterministic programmatic scoring; the label `PROGRAMMATIC` does not itself prove determinism `[V]` (`EvaluatorKind` is a declared kind; no contract verifies determinism). Final selection awaits the benchmark and scoring procedure |
-| D3 | `TOTAL_TOKENS` admitted | only when every attempt of every compared method has complete provider usage — an unresolved D1 provider fact. Until then the operative configuration is `LLM_CALLS` alone |
 | D4 | 3 confirmatory repetitions, or 1 calibration + 3 confirmatory | which branch applies depends on whether a defensible external threshold basis exists (D3) |
 | D1 | the exact environment allowlist keys | the policy is ratified; the key set is derived by provider-free testing and returns for separate ratification |
 
@@ -708,7 +764,8 @@ Selected by the owner in the post-revision-9 D1–D5 decision round.
 
 | Ballot | Facts still required |
 |---|---|
-| D1 | provider name; model identity and version; deployment region; retention-policy reference and version; workload-identity principal; token audience; secret location; retrieval mechanism; the exact environment keys after testing; whether the provider returns complete token usage on every attempt |
+| D1 — conditionally selected (not verified, not final) | provider route, model candidate, API surface and credential architecture — see **Conditional owner selection — provider route** above |
+| D1 — unresolved facts and confirmations | executed-identity confirmation (§2.5); snapshot availability for the whole pilot; deployment region; retention-policy reference and version with ZDR/MAM eligibility; workload-identity host, principal, issuer, audience and token source; and the exact environment keys after provider-free derivation and separate ratification |
 | D2 | benchmark author; approver, distinct; benchmark id and version; case list and expected answers; benchmark-custody location; evaluator identity and version; scoring procedure text; separation declaration reference |
 | D3 | `profile.json`; `task_class.json`; consequence class; evidence-admission reference where the class is `MATERIAL` or `SEVERE` with threshold-based sufficiency `[V]`; population definition; representativeness statement; threshold literal and its basis |
 | D4 | pricing source and version; currency; spending ceiling |
@@ -1062,3 +1119,40 @@ each **partially decided and none is fully ratified**. **No implementation was
 commissioned by this revision**: the enum is unchanged at 33 members `[V]`, no
 code, test, contract or CI file was touched, no credential was accessed and no
 provider was called.
+
+### Revision 11 (conditional provider-route selection, 2026-09-03)
+
+**Source of authority.** An owner decision taken **after** revision 10, in the
+D1 provider-selection round. It is recorded here rather than inside the
+revision-10 record, which describes a different and earlier round and is left
+untouched.
+
+**What the owner selected.** OpenAI API direct as the **conditional default**
+provider route, with `gpt-4.1-2025-04-14` on Chat Completions, boundary-side
+OpenAI workload-identity federation mapped to a Platform service account, and
+`LLM_CALLS` as the operative resource configuration. Recorded in §3.1 under
+**Conditional owner selection — provider route (D1)**.
+
+**What it is not.** It is **not** completed D1 ratification, **not** a verified
+provider fact, and **not** compliance with §2.5. The immutable-executed-identity
+refusal stands unchanged; **the route is disqualified if that confirmation
+fails**. Six conditions remain open, and India-only processing is a named
+reopen trigger.
+
+**Evidence status.** Official OpenAI documentation was unreachable from this
+environment (`developers.openai.com`, `platform.openai.com` blocked by egress
+policy), so every provider-side claim is **owner-supplied or externally
+transmitted**, never `[V]`. The official URLs appear as references to be
+checked, not as verification.
+
+**`TOTAL_TOKENS` is now settled rather than pending.** It is **not admitted**,
+on the ground that complete provider-usage reporting for every potentially
+charged attempt — failures and timeouts included — has not been established;
+this is deliberately weaker than a claim that the provider never returns usage
+in those circumstances. The consequence is recorded in D3 and §3.1: the pilot
+compares resource use **by call count**, and its results must not be
+represented as a comparison of token consumption or token cost.
+
+**Unchanged by this revision.** §2.4 and §2.5 are not modified; the new
+subsection cross-references them. No implementation is commissioned, the enum
+stays at 33 members `[V]`, and D1–D5 remain incomplete.
