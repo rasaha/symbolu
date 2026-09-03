@@ -485,10 +485,15 @@ else may write them.
    payload** (the exact payload whose digest is `record_digest`, with the
    digest field included) back to the boundary. No deserialization into the
    Slice 1 dataclass happens in the boundary.
-5. **`issue_attestation(record_payload, capture_records, *, declaration,
-   record_issuer_identity, requester_identity, envelope_id) ->
-   AttestationEnvelope`** runs in the boundary process. It recomputes step 3
-   from the supplied capture records; recomputes the record digest from the
+5. **`issue_attestation(record_payload, capture_records, *, manifest_digest,
+   declaration, record_issuer_identity, requester_identity, envelope_id) ->
+   AttestationEnvelope`** runs in the boundary process. `manifest_digest` is
+   the boundary's preregistered run state; it must equal the manifest stamp
+   in the record's `capture_refs` and every capture record's stamp
+   (`ATTESTATION_MISMATCH` otherwise). It recomputes step 3 from the supplied
+   capture records, an empty set recomputing to `llm_calls = 0`,
+   `llm_calls_basis = INJECTED_COUNTER`, no token usage and
+   `capture_refs = (manifest_digest,)` (zero-call rule, §11); recomputes the record digest from the
    payload with the digest field excluded and verifies it equals the
    payload's `record_digest`; verifies the payload's `telemetry` equals the
    recomputation field by field, and refuses otherwise
@@ -879,6 +884,7 @@ or acceptance figure.
 | A12 | boundary process observes N capture records for a method while the workflow reports M ≠ N | record telemetry carries N with `llm_calls_basis = INJECTED_COUNTER` and `capture_refs` = manifest digest + fingerprints; diagnostics carry M under `RUNTIME_REPORTED_DIAGNOSTIC`; the envelope is over the record digest computed with N; `EvidenceStatusView` shows `ATTESTED` on the envelope's fields |
 | A13 | `issue_attestation` given a record payload whose telemetry differs from the recomputation over the supplied capture records, or whose `record_digest` is not the digest of the payload; or with `boundary_identity` equal to `record_issuer_identity` or `requester_identity`; or with an `envelope_id` other than the deterministic form | `TELEMETRY_NOT_RECOMPUTED` / `SELF_ATTESTATION` / `ATTESTATION_MISMATCH`; no envelope |
 | A13a | `issue_attestation` has no `attested_at` parameter; two issuances of the same record by the boundary carry boundary-generated, timezone-aware `attested_at` values that are not earlier than every capture record's `captured_at`; the runner process reads no clock | as stated; a caller-supplied instant cannot be passed |
+| A14a | a completed run whose every preregistered case has exactly one `CASE_BEGIN`/`CASE_END` pair, every per-case and run-level `harness_observed_calls` is zero and no completeness or workflow-failure condition exists | record with `telemetry.llm_calls = 0`, `llm_calls_basis = INJECTED_COUNTER`, no token usage, `capture_refs = (manifest_digest,)`; envelope over the boundary's manifest stamp attesting the supported fields, `telemetry.llm_calls` included; a zero-call run with a missing case, skipped control frame, workflow failure or unequal count remains `INCONCLUSIVE` with the applicable refusal |
 | A14 | a run with a gap in capture sequence numbers; a benchmark case with no `CASE_BEGIN`/`CASE_END` pair or appearing twice; `captured calls ≠ harness_observed_calls` in **either** direction at `CASE_END` or `RUN_END` | no record, no envelope; state `INCONCLUSIVE` with `CAPTURE_INCOMPLETE` (`WORKFLOW_FAILED` when the workflow itself raised); when the governed baseline's run is incomplete the engine is still called and every complete method becomes `INCONCLUSIVE` with the engine's `BASELINE_ABSENT` refusal |
 | A15 | one capture record with `usage_availability ≠ AVAILABLE`; and separately a run where `total_tokens` is present in every record but `input_tokens` is absent in one | first: `token_usage = None`, availability carries the reason, the envelope attests `telemetry.llm_calls` only; second: `total_tokens` summed and attested, `input_tokens = None` and not attested |
 | A16 | an envelope whose `attested_fields` are not a subset of the declaration's allowed fields, omit `telemetry.llm_calls`, cover a record digest other than the observation's, or whose `capture_boundary_ref` is not the digest of the record's ordered capture fingerprints | `ATTESTATION_MISMATCH` |
@@ -1080,3 +1086,29 @@ incomplete the engine is still called so complete methods do not remain
 the same method and outcome was accepted by `validate_lineage`; results are
 now bound to their manifest through the engine request id and each
 assessment's task-class and binding digests (§6.2, A28).
+
+### Zero-call attestation ruling (owner instruction, 2026-09-02) — RATIFIED
+
+*Owner ruling, verbatim:* "A completed method run may attest
+telemetry.llm_calls = 0 over an empty capture-record set when every
+preregistered benchmark case has exactly one completed CASE_BEGIN/CASE_END
+pair, every per-case and run-level harness-observed count is zero, and no
+completeness or workflow-failure condition exists. The manifest digest comes
+from the boundary's preregistered run state and must equal the manifest stamp
+in the record's capture_refs. The record carries llm_calls_basis =
+INJECTED_COUNTER, no token usage, and capture_refs = (manifest_digest,); the
+envelope attests only supported fields, including telemetry.llm_calls.
+Missing cases, skipped control frames, workflow failure or unequal counts
+remain INCONCLUSIVE with the applicable refusal."
+
+**Authority.** Owner ratification by Rakesh Mohan, 2026-09-02, issued as an
+explicit owner instruction in Claude Code session
+`session_01VXERHvJzbb9cjZ1GyFFQLn`, resolving the gap recorded by the Phase
+4B reference-pilot workspace (PR #1576). The model's gap note was advisory
+only; the owner instruction is the ratifying act.
+
+**Applied.** §4.3 step 5 takes `manifest_digest` from the boundary's run
+state instead of the first capture record and accepts an empty capture set
+under the recomputation already specified in step 3; §8 gains row A14a for
+both branches. The completeness judgment is unchanged and remains the
+boundary server's `RUN_END` rule (A14). No other ruling changes.

@@ -60,21 +60,21 @@ def test_a13_issue_attestation_recomputes_and_refuses():
     decl = m.capture_boundary
     payload_ok = record_canonical_payload(run.record)
     eid = envelope_id_for(run.record.record_digest, decl.boundary_identity)
-    env = issue_attestation(payload_ok, run.capture_records, declaration=decl, record_issuer_identity="adapter:pilot-runner", requester_identity="requester:pilot", envelope_id=eid)
+    env = issue_attestation(payload_ok, run.capture_records, manifest_digest=m.manifest_digest, declaration=decl, record_issuer_identity="adapter:pilot-runner", requester_identity="requester:pilot", envelope_id=eid)
     assert env.record_digest == run.record.record_digest and env.attester_identity == decl.boundary_identity
     tampered = json.loads(json.dumps(payload_ok)); tampered["telemetry"]["llm_calls"] = "99"
-    refuses(E.TELEMETRY_NOT_RECOMPUTED, lambda: issue_attestation(tampered, run.capture_records, declaration=decl, record_issuer_identity="a", requester_identity="r", envelope_id=eid))
+    refuses(E.TELEMETRY_NOT_RECOMPUTED, lambda: issue_attestation(tampered, run.capture_records, manifest_digest=m.manifest_digest, declaration=decl, record_issuer_identity="a", requester_identity="r", envelope_id=eid))
     wrong_digest = dict(payload_ok); wrong_digest["record_digest"] = "0" * 64
-    refuses(E.TELEMETRY_NOT_RECOMPUTED, lambda: issue_attestation(wrong_digest, run.capture_records, declaration=decl, record_issuer_identity="a", requester_identity="r", envelope_id=envelope_id_for("0" * 64, decl.boundary_identity)))
-    refuses(E.TELEMETRY_NOT_RECOMPUTED, lambda: issue_attestation(payload_ok, run.capture_records[:-1], declaration=decl, record_issuer_identity="a", requester_identity="r", envelope_id=eid))
-    refuses(E.SELF_ATTESTATION, lambda: issue_attestation(payload_ok, run.capture_records, declaration=decl, record_issuer_identity=decl.boundary_identity, requester_identity="r", envelope_id=eid))
-    refuses(E.SELF_ATTESTATION, lambda: issue_attestation(payload_ok, run.capture_records, declaration=decl, record_issuer_identity="a", requester_identity=decl.boundary_identity, envelope_id=eid))
-    refuses(E.ATTESTATION_MISMATCH, lambda: issue_attestation(payload_ok, run.capture_records, declaration=decl, record_issuer_identity="a", requester_identity="r", envelope_id="att:other"))
+    refuses(E.TELEMETRY_NOT_RECOMPUTED, lambda: issue_attestation(wrong_digest, run.capture_records, manifest_digest=m.manifest_digest, declaration=decl, record_issuer_identity="a", requester_identity="r", envelope_id=envelope_id_for("0" * 64, decl.boundary_identity)))
+    refuses(E.TELEMETRY_NOT_RECOMPUTED, lambda: issue_attestation(payload_ok, run.capture_records[:-1], manifest_digest=m.manifest_digest, declaration=decl, record_issuer_identity="a", requester_identity="r", envelope_id=eid))
+    refuses(E.SELF_ATTESTATION, lambda: issue_attestation(payload_ok, run.capture_records, manifest_digest=m.manifest_digest, declaration=decl, record_issuer_identity=decl.boundary_identity, requester_identity="r", envelope_id=eid))
+    refuses(E.SELF_ATTESTATION, lambda: issue_attestation(payload_ok, run.capture_records, manifest_digest=m.manifest_digest, declaration=decl, record_issuer_identity="a", requester_identity=decl.boundary_identity, envelope_id=eid))
+    refuses(E.ATTESTATION_MISMATCH, lambda: issue_attestation(payload_ok, run.capture_records, manifest_digest=m.manifest_digest, declaration=decl, record_issuer_identity="a", requester_identity="r", envelope_id="att:other"))
     # attribution: another method's capture records, even with identical counts, are refused
     other = next(r for r in res.runs if r.method.method_id == "map_reduce")
-    refuses(E.ATTESTATION_MISMATCH, lambda: issue_attestation(payload_ok, other.capture_records, declaration=decl, record_issuer_identity="a", requester_identity="r", envelope_id=eid))
+    refuses(E.ATTESTATION_MISMATCH, lambda: issue_attestation(payload_ok, other.capture_records, manifest_digest=m.manifest_digest, declaration=decl, record_issuer_identity="a", requester_identity="r", envelope_id=eid))
     foreign = tuple(dataclasses.replace(c, run_id="someone-elses-run", capture_fingerprint="") for c in run.capture_records)
-    refuses(E.ATTESTATION_MISMATCH, lambda: issue_attestation(payload_ok, foreign, declaration=decl, record_issuer_identity="a", requester_identity="r", envelope_id=eid))
+    refuses(E.ATTESTATION_MISMATCH, lambda: issue_attestation(payload_ok, foreign, manifest_digest=m.manifest_digest, declaration=decl, record_issuer_identity="a", requester_identity="r", envelope_id=eid))
 
 
 def test_a13a_attested_at_is_boundary_generated():
@@ -175,6 +175,49 @@ def test_a16a_gateway_round_trip_failure_and_invalid_factory():
     assert st.state.value == "INCONCLUSIVE" and st.refusal_codes == ("WORKFLOW_FAILED",)
     refuses(E.PROVIDER_FACTORY_INVALID, lambda: BoundaryProcess(m, "stub_provider:not_a_provider", env=pf.boundary_env()))
     refuses(E.PROVIDER_FACTORY_INVALID, lambda: BoundaryProcess(m, "no_such_module:make", env=pf.boundary_env()))
+
+
+def test_a14a_zero_call_run_is_complete_and_attested_over_the_manifest_stamp():
+    """Owner ruling 2026-09-02 (§11): a completed run with an empty capture set attests llm_calls = 0."""
+    calls = dict(pf.DEFAULT_CALLS); calls["metacognitive"] = 0
+    m, res = _run(calls=calls)
+    run = next(r for r in res.runs if r.method.method_id == "metacognitive")
+    assert run.complete and run.capture_records == () and run.record is not None and run.attestation is not None
+    t = run.record.telemetry
+    assert t.llm_calls == 0 and t.llm_calls_basis is CountBasis.INJECTED_COUNTER and t.token_usage is None
+    assert t.token_usage_availability is UsageAvailabilityToken.UNAVAILABLE_NOT_REPORTED and t.token_count_basis is CountBasis.UNKNOWN
+    assert t.capture_refs == (m.manifest_digest,)
+    assert run.attestation.attested_fields == ("telemetry.llm_calls",) and run.attestation.record_digest == run.record.record_digest
+    assert run.diagnostics.harness_observed_calls == 0 and run.diagnostics.total_llm_calls_reported == 0
+    assert run.method in res.outcomes and run.method not in res.coverage.methods_without_record
+    view = next(v for v in res.result.evidence_status if v.record_digest == run.record.record_digest)
+    assert view.attestation_status.value == "ATTESTED" and view.attested_fields == ("telemetry.llm_calls",)
+    # the function itself: the manifest stamp comes from the boundary, never from the (empty) capture set
+    decl = m.capture_boundary
+    payload_ok = record_canonical_payload(run.record)
+    eid = envelope_id_for(run.record.record_digest, decl.boundary_identity)
+    env = issue_attestation(payload_ok, (), manifest_digest=m.manifest_digest, declaration=decl, record_issuer_identity="a", requester_identity="r", envelope_id=eid)
+    assert env.attested_fields == ("telemetry.llm_calls",) and env.record_digest == run.record.record_digest
+    refuses(E.ATTESTATION_MISMATCH, lambda: issue_attestation(payload_ok, (), manifest_digest="0" * 64, declaration=decl, record_issuer_identity="a", requester_identity="r", envelope_id=eid))
+    nonzero = json.loads(json.dumps(payload_ok)); nonzero["telemetry"]["llm_calls"] = "1"
+    refuses(E.TELEMETRY_NOT_RECOMPUTED, lambda: issue_attestation(nonzero, (), manifest_digest=m.manifest_digest, declaration=decl, record_issuer_identity="a", requester_identity="r", envelope_id=eid))
+    with_usage = json.loads(json.dumps(payload_ok)); with_usage["telemetry"]["token_usage"] = {"input_tokens": "1", "cached_input_tokens": None, "cache_write_input_tokens": None, "output_tokens": None, "reasoning_tokens": None, "total_tokens": None, "provider_request_id": None, "usage_schema": None, "adapter_id": None, "adapter_version": None}
+    refuses(E.TELEMETRY_NOT_RECOMPUTED, lambda: issue_attestation(with_usage, (), manifest_digest=m.manifest_digest, declaration=decl, record_issuer_identity="a", requester_identity="r", envelope_id=eid))
+
+
+def test_a14a_zero_call_run_with_a_missing_case_or_unequal_count_stays_inconclusive():
+    """The ruling's other branch: zero calls do not excuse skipped control frames or unequal counts."""
+    class SkipsACase(pf.FakeExecutor):
+        def execute(self, method, query, context, client):
+            if method.method_id == "metacognitive" and "refund" in query:
+                client.calls += 1  # an in-process call the boundary never saw: harness_observed 1 != captured 0
+            return super().execute(method, query, context, client)
+    calls = dict(pf.DEFAULT_CALLS); calls["metacognitive"] = 0
+    m, res = _run(executor=SkipsACase(calls))
+    run = next(r for r in res.runs if r.method.method_id == "metacognitive")
+    assert not run.complete and run.record is None and run.attestation is None
+    st = [s for s in res.states if s.method == run.method][-1]
+    assert st.state.value == "INCONCLUSIVE" and E.CAPTURE_INCOMPLETE.value in st.refusal_codes
 
 
 def test_a16c_pipe_transport_fallback():

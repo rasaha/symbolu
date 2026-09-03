@@ -191,11 +191,18 @@ def test_engine_refusal_scenario_reaches_the_engine_refusal_path(bundles):
     assert "REFUSALS: BASELINE_ABSENT" in (bundles["engine_refusal"] / "report.txt").read_text()
 
 
-def test_zero_call_run_is_refused_by_the_ratified_boundary_gap_documented(prepared, tmp_path):
-    with pytest.raises(PilotError) as e:
-        pipeline.run(FIXTURE, prepared, tmp_path / "z", scenario="zero_call_run", transport="unix")
-    assert e.value.code is PilotErrorCode.TELEMETRY_NOT_RECOMPUTED
-    assert "zero_call_run" in (WS / "README.md").read_text() and "[G]" in (WS / "README.md").read_text()
+def test_zero_call_run_is_complete_and_attested_under_the_owner_ruling(prepared, tmp_path):
+    root = tmp_path / "z"
+    r = pipeline.run(FIXTURE, prepared, root, scenario="zero_call_run", transport="unix")
+    assert all(x.complete and x.capture_records == () for x in r.runs)
+    for x in r.runs:
+        assert x.record.telemetry.llm_calls == 0 and x.record.telemetry.token_usage is None
+        assert x.record.telemetry.capture_refs == (r.manifest.manifest_digest,)
+        assert x.attestation.attested_fields == ("telemetry.llm_calls",)
+        assert x.quality_result.value == "0"  # no ANSWER line was ever produced: the mechanism, not a quality finding
+    assert set(r.outcomes.values()) == {FitOutcome.INSUFFICIENT_QUALITY}
+    pipeline.verify(root)
+    assert "zero_call_run" in (WS / "README.md").read_text()
 
 
 def test_unknown_scenario_is_refused(prepared, tmp_path):

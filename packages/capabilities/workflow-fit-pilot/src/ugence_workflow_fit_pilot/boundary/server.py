@@ -158,7 +158,7 @@ class BoundaryServer:
         if run is None or not run.ended or run.incomplete_reasons:
             raise PilotError(PilotErrorCode.CAPTURE_INCOMPLETE, "attestation requires a complete, ended run")
         env = issue_attestation(
-            f["record_payload"], canonical_order(run.records), declaration=self.declaration,
+            f["record_payload"], canonical_order(run.records), manifest_digest=self.manifest_digest, declaration=self.declaration,
             record_issuer_identity=f["record_issuer_identity"], requester_identity=f["requester_identity"], envelope_id=f["envelope_id"],
         )
         return {"ok": True, "envelope": payload(env)}
