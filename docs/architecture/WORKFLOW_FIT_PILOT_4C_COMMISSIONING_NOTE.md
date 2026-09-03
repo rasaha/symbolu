@@ -1719,3 +1719,83 @@ accepted spelling. **It does not commission slice 3, enforce F3 or F4 at
 runtime, or authorise a genuine pilot.** D1–D5 remain incomplete, no
 credential was accessed, no provider was called, and no benchmark content
 entered this repository.
+
+### Revision 17 (owner rulings: distinct digest meanings, custody-reference semantics, slice-3A/3B split, 2026-09-03)
+
+**Source of authority.** The slice-3 preflight (independent of any implementation)
+proposed completing a governed `CalibrationResult` by defining `index_digest`
+identically to `sample_index_digest`, and by carrying `verdict_custody_ref` as a
+fixed placeholder string. Both proposals are **rejected by owner ruling** below,
+and the previously proposed slice 3 is split so that only what these rulings make
+constructible is commissioned now.
+
+**Three digests, kept strictly distinct.**
+
+1. **`sample_index_digest`** commits to the ascending list of the 50 selected
+   upstream BBH indexes, each encoded as a decimal string, under the governed
+   algorithm `bbh_hash_rank_select.v1` (revision 12). Its governed value for the
+   pilot fixture is
+   `c521cdd75dc3b8c9e589835ade4b780ef26ba955d4077f5c7ad74e803be60682`. It commits
+   to *which upstream items were sampled*, nothing else.
+2. **`case_set_digest`** commits to the governed case set through the existing
+   benchmark contracts (`BenchmarkManifest.benchmark_manifest_digest` and the
+   `case_list_digest` helper). It is a digest over *case digests*, not over
+   upstream indexes, and is not the sample-index digest.
+3. **`index_digest`** commits to the Phase 4C prepared bundle's own `index.json`
+   — `ugence_jcs.canonical_sha256_hex` over the sorted path-to-SHA-256 map of the
+   nine ratified prepared artifacts (revision 4, §2.1). It cannot be derived until
+   that exact artifact set exists on disk; it is a digest over *the prepared
+   bundle itself*, not over the sample or the case set.
+
+**Rejected: merging `index_digest` and `sample_index_digest`.** The slice-3
+preflight proposed this as a temporary interim definition to unblock
+`CalibrationResult` construction without building the prepared-bundle
+subsystem. The owner rejects it: the two values answer different questions —
+"which indexes were sampled" versus "which exact prepared artifact set was
+committed" — and collapsing them would let a bundle substitution attack (same
+sample, different provider configuration, different experimental design) pass
+undetected under a digest that claims to cover the whole prepared set. No
+`CalibrationResult` may carry a fabricated or merged `index_digest`.
+
+**`verdict_custody_ref` — preregistered and index-bound, never a placeholder.**
+The slice-3 preflight's proposal of a fixed placeholder string (analogous to
+`PREREGISTRATION_DECLARED_UNVERIFIED`) is **rejected**: unlike preregistration
+status, a custody reference points at a specific write target, and a fabricated
+one would let a `CalibrationResult` claim custody that was never established.
+Instead: `verdict_custody_ref` **must be supplied before preparation**, recorded
+in the governed `experimental_design.json`, and therefore **committed by the
+prepared bundle's `index_digest`** like every other prepared fact. It may be
+copied into a `CalibrationResult` **only after** a later custody port
+successfully writes and verifies verdict evidence at that exact reference —
+slice 3A commits the reference; a later slice proves the write. For
+provider-free tests, a clearly test-only URI such as `memory://workflow-fit-test/…`
+may be used through a deterministic fake; it is never valid evidence for a
+genuine run, and the production custody endpoint and its ACL facts remain D5
+gates, unresolved by this revision.
+
+**Slice split.** The previously commissioned "slice 3 core" is split:
+
+- **Slice 3A** (commissioned by this revision): the Phase 4C prepared-bundle
+  schemas, a deterministic writer, reader and verifier, under the ratified
+  nine-path layout and the two role-specific commitment identifiers
+  (`workflow_fit_prepared_index.v1` confirmatory,
+  `workflow_fit_prepared_index.calibration.v1` calibration). Its output supplies
+  a governed `index_digest`, `sample_index_digest` and `verdict_custody_ref` —
+  nothing else.
+- **Slice 3B** (not commissioned by this revision): F3/F4 runtime enforcement,
+  the custody port, runner role branching, calibration output bundles,
+  `CalibrationResult` construction and confirmatory provenance reconciliation.
+
+**No `CalibrationResult` before both verifications.** A `CalibrationResult` may
+be constructed only after (1) a slice-3A prepared bundle for that calibration
+run verifies completely — every path present, every digest recomputed,
+`sample_index_digest` independently reproduced from seed/population/algorithm —
+and (2) the custody port slice 3B commissions successfully writes and verifies
+verdict evidence at the bundle's committed `verdict_custody_ref`. Neither
+condition alone is sufficient.
+
+**Status.** This revision resolves the slice-3 preflight blocker by ruling, not
+by building. It authorises slice 3A's prepared-bundle subsystem only. It does
+**not** authorise runner changes, custody writes, `CalibrationResult`
+construction, confirmatory provenance traversal, a genuine pilot, or any
+provider call. D1–D5 remain incomplete.
