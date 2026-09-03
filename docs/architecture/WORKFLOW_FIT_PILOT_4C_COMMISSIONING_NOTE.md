@@ -119,9 +119,13 @@ machine. The following is an assistant proposal awaiting owner ratification:
 | registry unavailable | **fail closed**, exactly as a pre-run custody failure does: refuse with `COMMITMENT_REGISTRY_UNAVAILABLE`, start no boundary, write no lifecycle record. An unreachable registry never permits an optimistic run |
 | crash after marking, no provider call | the commitment **stays spent**. Consumption is terminal: no rollback, no unmark, no reuse, and the replacement is a new preregistration with a distinct `manifest_id` (above). A run appends a closing outcome entry when it terminates, but a **missing** outcome entry never reopens a commitment — that asymmetry is what stops a crash from becoming a re-roll |
 
-A second `run` of a consumed commitment is refused with
-`COMMITMENT_ALREADY_SPENT`. Both codes join the governed vocabulary under §4.
-`[G]` is lifted: T17 and T25 are testable against this registry.
+A second `run` of a consumed commitment would be refused with
+`COMMITMENT_ALREADY_SPENT`. Both codes are **proposed** additions to the
+governed vocabulary (§4). The revision-6 `[G]` is **not** lifted by this
+proposal: the decision remains open until the owner ratifies a durable
+authority. T17 and T25–T27 are acceptance obligations for this **proposed**
+mechanism, testable against a conforming registry double, and they test nothing
+ratified.
 
 **Deployment facts — PROPOSED, NOT RATIFIED (assistant selection, revision 8;
 relabelled revision 9).** The registry writer identity is
@@ -133,8 +137,9 @@ bound at D5 ratification and is deliberately not written here**: it names
 infrastructure that does not exist in this repository, and a plausible-looking
 URI in a governance document would be a fabricated `[V]`. Everything a test
 needs — the identity, the addressing, the atomicity and the refusal codes — is
-fixed above, so T17 and T25–T26 are testable against a conforming
-registry double before the endpoint exists.
+fixed above, so T17 and T25–T26 could be exercised against a conforming
+registry double before the endpoint exists — as obligations for a proposed
+mechanism, not a ratified one.
 
 ### 2.3 Custody writers (resolves B3)
 
@@ -142,8 +147,12 @@ The boundary sees provider prompts and responses; the experiment-side scorer
 alone sees expected answers. **Expected answers must never enter the
 provider boundary.**
 
-**Rule.** Two append-only custody writers, each referencing the manifest
-digest and the preregistered `index_digest`:
+**Rule — the two-writer design is PROPOSED, NOT RATIFIED** (assistant design,
+revisions 2–3; the owner's revision-4 instruction assumed it without ratifying
+it). Within it, the **pre-run custody block** and the **post-attestation
+discard** below are owner-ratified, being stated verbatim in that instruction.
+Two append-only custody writers, each referencing the manifest digest and the
+preregistered `index_digest`:
 
 - the **boundary-side exchange writer**, inside the boundary process, retains
   every provider prompt and response with its `capture_fingerprint`
@@ -443,11 +452,16 @@ The seven workflows' intrinsic bounded paths per case `[V]`:
 | `socratic_progressive` | 4 | 4 fixed stages |
 | `metacognitive` | 10 | delegates to a selected workflow; at most the delegate's path |
 
-**PROPOSED — NOT RATIFIED.** Shared per-case cap **8**, which clears the
-largest intrinsic path (7) so no method is truncated; per-method ceiling
-`case_count x 8`; repetition ceiling the sum of the assigned methods'
-ceilings; retry allowance **zero**. The floor is 7; below 8 a method is
-silently truncated.
+**PROPOSED — NOT RATIFIED.** The largest bounded path among the seven
+workflows as they stand is **7** calls, so a shared cap of **7** already
+clears every present path. The proposed value is **8**, which is 7 plus one
+call of headroom against a workflow whose parameters change (`num_branches`,
+`max_revisions`, `max_sub_problems` are constructor arguments). Per-method
+ceiling `case_count x 8` — an accounting figure, since the executor cannot
+enforce per method; repetition ceiling the sum of the assigned methods'
+ceilings; retry allowance **zero**. A cap of 7 is sufficient today and a cap
+below 7 would truncate at least one workflow; it is **not** the case that
+every value below 8 truncates.
 
 **Detection, experiment-side.** A `CaptureRecord` carries digests, never a
 stage response, and `HarnessWorkflowExecutor` currently **discards**
@@ -560,16 +574,17 @@ identity is never reused or overwritten.
 ceiling `case_count x 8`; repetition ceiling the sum over assigned methods;
 retry allowance zero. The merged executor supports one shared value only
 (§2.9).
-The **partial-run policy is ruled in §2.8** (trust-infrastructure failure
-stops the repetition; a method-local failure, a ceiling breach included, ends
-only that method `INCONCLUSIVE`; scope decided by the one bounded custody
-health check) and is ratified by this item, not re-decided in it. So is the
-§2.2 rule that a halted repetition is replaced by a **new** preregistration
-with a distinct `manifest_id`, never re-run under the same commitment — the
-repetition count this item fixes is a count of **preregistered** repetitions,
-and a halted one is not replaced within it. The D4 timeout bounds the health
-check. The boundary-side hard stop at the call ceiling is a 4A amendment
-ratified by this item.
+**Owner-ratified by this item, and only this:** the revision-4 partial-run
+policy — a trust-infrastructure failure stops the repetition; a method-local
+failure ends only that method `INCONCLUSIVE`.
+
+The following are **PROPOSED — NOT RATIFIED** and are **not** folded into that
+ruling: the bounded custody health-check discriminator and its 5 000 ms
+timeout (§2.8); the prohibition on reusing a halted commitment (§2.2); the
+replacement manifest identity above; and the commitment-registry mechanics
+(§2.2, D5). Ratifying the partial-run policy does not ratify any of them. The
+boundary-side hard stop at the call ceiling is a 4A amendment this item would
+ratify.
 
 **D5. Preregistration and evidence retention.**
 Values: the preregistration medium and the receipt form in which the owner
@@ -599,6 +614,30 @@ with the repetition scope of §2.8.
 Git keeps digests and the governed evidence objects only. Digest-only
 evidence is insufficient for later independent re-evaluation.
 
+### 3.1 Candidate values — PROPOSED, NOT RATIFIED
+
+None of these is owner-ratified. Each is an assistant proposal offered so the
+owner has something concrete to accept, amend or reject; every D1–D5 fact
+placeholder stays open regardless.
+
+| Ballot | Candidate |
+|---|---|
+| D1 | temperature 0; top-p 1.0; maximum output 1024 tokens; no stop sequences |
+| D1 | credential option A, workload identity, with a minimal environment allowlist whose every key is named in the ballot |
+| D2 | append-only benchmark versioning: a corrected answer is a new version, never an in-place edit |
+| D2 | expected answers reachable only by the scorer — never a workflow-visible input, never the boundary |
+| D2 | programmatic evaluator, with calibration evidence explicitly declared absent because scoring is deterministic |
+| D3 | `LLM_CALLS` universally required; `TOTAL_TOKENS` admitted only on complete usage (§D3) |
+| D4 | shared per-case cap 8 (§2.9); zero retries; sequential execution; 60-second provider-call timeout |
+| D4 | 3 confirmatory repetitions with an external threshold; otherwise 1 separate calibration run plus 3 confirmatory |
+| D4 | custody health-check timeout 5 000 ms, distinct from the provider-call timeout |
+| D5 | external append-only preregistration medium |
+| D5 | commitment-registry mechanics and the canary's placement, prefix and 30-day retention (§2.2, §2.8) |
+| D5 | evidence retention of at least 24 months, no deletion while a claim cites the run |
+
+Temperature 0 **removes a major sampling control but does not establish
+determinism**; a provider may still vary across attempts.
+
 ## 4. What ratification would commission `[I]`
 
 Only after all five items are ratified: `prepare` extended to write
@@ -615,10 +654,12 @@ retention or evaluation failure and emitting `INCONCLUSIVE` with the exact
 stage code; (iv) **six** refusal codes added to `PilotErrorCode` —
 `PROVIDER_IDENTITY_UNVERIFIED`, `RETENTION_WRITE_FAILED`,
 `RETENTION_VERIFY_FAILED`, `EVALUATION_FAILED`, `COMMITMENT_ALREADY_SPENT`,
-`COMMITMENT_REGISTRY_UNAVAILABLE`; the enum today has 34 members and contains
-none of them `[V]` (`errors.py`), and `RETENTION_FAILED` is withdrawn.
-Adopting the proposed `WORKFLOW_BUDGET_EXHAUSTED` (§2.9) would make seven.
-**Neither six nor seven is owner-ratified.** (v) only
+`COMMITMENT_REGISTRY_UNAVAILABLE`. The enum today has **33** members,
+enumerated from the class body, and contains none of them `[V]`
+(`errors.py`); `RETENTION_FAILED` is withdrawn. Six additions would take the
+vocabulary to **39**; adopting the proposed `WORKFLOW_BUDGET_EXHAUSTED` (§2.9)
+would make seven additions and **40**. **Neither six nor seven is
+owner-ratified.** (v) only
 if D1 selects option B, a separately ratified launch/connection port over the
 existing frame protocol; the benchmark-custody writer with the runner-side
 bounded health check of §2.8; a **boundary-internal** exchange-writer health
@@ -667,7 +708,7 @@ row may reach a provider:
 | T25 | consumption is a single conditional append immediately before boundary startup: two concurrent `run` invocations resolve with exactly one proceeding; an unavailable registry refuses with `COMMITMENT_REGISTRY_UNAVAILABLE`, starting no boundary and writing no lifecycle record; a commitment marked spent before any provider call stays spent across a crash; and a missing outcome entry never reopens one |
 | T26 | only the named registry writer identity can append a consumption entry, and no principal can unmark one |
 | T27 | the canary lands in the probed store under the reserved prefix, is absent from every evidence read and from case-digest keying, and falls under the canary retention rule rather than the evidence retention period |
-| T28 | **no provider:** a deterministic fake LLM client drives all seven workflows across the case set and records each one's actual call count, proving every intrinsic bounded path completes and that the selected shared cap produces **no** `"(budget exhausted)"` step for any workflow |
+| T28 | **PROPOSED — NOT RATIFIED. No provider:** a deterministic fake LLM client drives all seven workflows across the case set, records each one's actual call count, inspects **all** `WorkflowResult.steps`, and verifies that the selected shared cap produces **no** `"(budget exhausted)"` sentinel for any workflow |
 | T29 | a run whose `WorkflowResult.steps` contain the exhaustion sentinel does not enter a comparison and becomes `INCONCLUSIVE`; the check inspects all steps before `ExecutionOutcome` is returned, and fails closed if the sentinel string is absent from the runtime |
 | T30 | a `CALIBRATION` repetition carries its own commitment and appears in no confirmatory comparison, coverage report or success summary |
 | T31 | a replacement after a halt carries a fresh nonce or new ordinal, and the halted `manifest_id` is neither reused nor overwritten |
@@ -760,7 +801,8 @@ not decided.
 | 5 | the runner's generic mapping would collapse the new codes, and reason strings were unvalidated `[V]` | the amendment preserves the exact code and validates every reason string's type, code prefix and permitted content (§2.3, T24) |
 
 The **durable spent-commitment authority is the only new owner choice** this
-review introduces; revision 7 closes it.
+review introduces. It remains **open**: revision 7 proposed values for it but
+did not close or ratify it.
 
 ### Revision 7 (assistant proposals for the three values revision 6 left open, 2026-09-03)
 
@@ -779,9 +821,10 @@ RATIFIED.**
 | 7 | custody health-check timeout (D4) | **5 000 ms**, declared separately from the provider-call timeout and never conflated with it |
 | 8 | canary retention (D5) | canaries go to the **store they probe**, under a reserved prefix — a canary written elsewhere proves nothing about the failing store — excluded from evidence reads and from case-digest keying, under their own short retention and deletion rule rather than the evidence period |
 
-`COMMITMENT_ALREADY_SPENT` and `COMMITMENT_REGISTRY_UNAVAILABLE` join the
-governed vocabulary (§4, now five new codes). The §2.2 `[G]` is lifted, and
-T17 and T25–T27 test the ratified mechanism.
+`COMMITMENT_ALREADY_SPENT` and `COMMITMENT_REGISTRY_UNAVAILABLE` are
+**proposed** vocabulary additions (§4). Revision 7 neither lifted the §2.2
+`[G]` nor closed the spent-commitment decision; T17 and T25–T27 are
+obligations for a proposed mechanism.
 
 ### Revision 8 (deployment facts and end-to-end audit, 2026-09-03)
 
@@ -857,6 +900,25 @@ Calibration and confirmatory repetitions are separated, each with its own
 commitment (D4). The `manifest_id` gains a role segment and a pre-execution
 nonce (D4). The workload-identity and encryption claims are reduced to their
 bounded forms (§2.4, D5). Obligations T28–T32 added.
+
+**Residual corrections applied within revision 9 (second pass).** The first
+pass of this revision left contradictions the audit itself had identified.
+Corrected here: the claim that revision 7 *closed* the spent-commitment
+decision — it proposed values and closed nothing, and the §2.2 `[G]` stands;
+the claim that T17 and T25–T27 test a *ratified* mechanism — they are
+obligations for a proposed one; D4's folding of the health-check
+discriminator, the 5 000 ms timeout, the halted-commitment prohibition, the
+replacement identity and the registry mechanics into the owner-ratified
+partial-run policy — only the revision-4 policy itself is ratified by that
+item; the enum size, stated as 34 from a `grep` that over-counted and now
+**33** by enumerating the class body, making six additions **39** and seven
+**40**; the cap rationale, which claimed every value below 8 truncates when
+the largest present bounded path is **7**, so 7 suffices today and 8 is one
+call of headroom; the unlabelled T28; and the two-custody-writer design, an
+assistant design the revision-4 instruction assumed rather than ratified,
+though the pre-run block and post-attestation discard inside it are
+owner-ratified verbatim. A consolidated §3.1 now lists every candidate value
+as PROPOSED — NOT RATIFIED.
 
 Ballot items remain five and remain `[R]`; D1–D5 still need their provider,
 benchmark, threshold, budget, identity and custody values, and D5 still needs
