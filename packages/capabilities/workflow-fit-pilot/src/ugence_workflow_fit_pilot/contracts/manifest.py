@@ -24,9 +24,13 @@ from .._canon import digest_of, require_digest, require_member, require_nonblank
 from ..errors import PilotError, PilotErrorCode
 from ..version import __version__
 from .benchmark import BenchmarkManifest
+from .calibration import CalibrationProvenance, PilotRunRole
 from .evaluator import QualityEvaluatorDeclaration
 
 PILOT_MANIFEST_SCHEMA_VERSION = "workflow_fit_pilot.manifest.v1"
+PILOT_MANIFEST_SCHEMA_VERSION_V1 = PILOT_MANIFEST_SCHEMA_VERSION
+PILOT_MANIFEST_SCHEMA_VERSION_V2 = "workflow_fit_pilot.manifest.v2"
+SUPPORTED_MANIFEST_SCHEMA_VERSIONS = (PILOT_MANIFEST_SCHEMA_VERSION_V1, PILOT_MANIFEST_SCHEMA_VERSION_V2)
 PREREGISTRATION_DECLARED_UNVERIFIED = "DECLARED_UNVERIFIED"
 
 
@@ -106,10 +110,15 @@ class PilotStudyManifest:
     preregistered_by: str
     preregistered_at: datetime
     manifest_digest: str = ""
+    # v2 only. Appended after manifest_digest so every existing v1 call site keeps its
+    # positional shape, and excluded from the v1 digest payload so historical
+    # mechanism-validation artifacts keep the digests they were issued with.
+    run_role: Optional[PilotRunRole] = None
+    calibration_provenance: Optional[CalibrationProvenance] = None
 
     def __post_init__(self) -> None:
-        if self.schema_version != PILOT_MANIFEST_SCHEMA_VERSION:
-            raise PilotError(PilotErrorCode.SCHEMA_VERSION_UNSUPPORTED, f"PilotStudyManifest.schema_version must be {PILOT_MANIFEST_SCHEMA_VERSION}")
+        if self.schema_version not in SUPPORTED_MANIFEST_SCHEMA_VERSIONS:
+            raise PilotError(PilotErrorCode.SCHEMA_VERSION_UNSUPPORTED, f"PilotStudyManifest.schema_version must be one of {SUPPORTED_MANIFEST_SCHEMA_VERSIONS}")
         require_nonblank(self.manifest_id, "PilotStudyManifest.manifest_id")
         if not isinstance(self.plan, ResearchComparisonPlan):
             raise ContractError(ContractErrorCode.REF_BLANK_FIELD, "PilotStudyManifest.plan must be a ResearchComparisonPlan")
@@ -157,7 +166,63 @@ class PilotStudyManifest:
             raise ContractError(ContractErrorCode.REF_BLANK_FIELD, f"usage_scope is fixed at {USAGE_SCOPE_RESEARCH_ONLY}")
         require_nonblank(self.preregistered_by, "PilotStudyManifest.preregistered_by")
         require_tzaware(self.preregistered_at, "PilotStudyManifest.preregistered_at")
-        settle_digest(self, "manifest_digest", digest_of(self, exclude=("manifest_digest",)))
+        self._validate_run_role()
+        excluded = ("manifest_digest",) if self.is_v2 else ("manifest_digest", "run_role", "calibration_provenance")
+        settle_digest(self, "manifest_digest", digest_of(self, exclude=excluded))
+
+    @property
+    def is_v2(self) -> bool:
+        return self.schema_version == PILOT_MANIFEST_SCHEMA_VERSION_V2
+
+    def _validate_run_role(self) -> None:
+        """v1 carries no role and never acquires one; v2 requires one and is validated
+        against it. A missing role is never read as CONFIRMATORY."""
+        if not self.is_v2:
+            if self.run_role is not None or self.calibration_provenance is not None:
+                raise PilotError(PilotErrorCode.RUN_ROLE_INVALID, "a v1 manifest carries no run role and no calibration provenance")
+            return
+        if not isinstance(self.run_role, PilotRunRole):
+            raise PilotError(PilotErrorCode.RUN_ROLE_INVALID, "a v2 manifest requires an explicit PilotRunRole; none is inferred")
+        # A31: the pilot package never assigns a threshold value; it only reads the
+        # governed reference the task class already carries.
+        threshold_ref = self.plan.task_class.comparison_policy.sufficiency.threshold
+        has_literal = bool(threshold_ref.literal_value and threshold_ref.literal_value.strip())
+        if self.run_role is PilotRunRole.CALIBRATION:
+            self._validate_calibration_shape(threshold_ref, has_literal)
+        else:
+            self._validate_confirmatory_shape(threshold_ref, has_literal)
+
+    def _validate_calibration_shape(self, threshold_ref, has_literal: bool) -> None:
+        if len(self.methods) != 1:
+            raise PilotError(PilotErrorCode.ROLE_ARTIFACT_INCONSISTENT, "a CALIBRATION manifest assigns exactly one method")
+        assignment = self.methods[0]
+        if assignment.method != self.plan.baseline:
+            raise PilotError(PilotErrorCode.ROLE_ARTIFACT_INCONSISTENT, "the CALIBRATION method must be plan.baseline")
+        if tuple(assignment.roles) != (PilotRole.GOVERNED_BASELINE,):
+            raise PilotError(PilotErrorCode.ROLE_ARTIFACT_INCONSISTENT, "the CALIBRATION assignment carries exactly the GOVERNED_BASELINE role")
+        if self.plan.recommended:
+            raise PilotError(PilotErrorCode.ROLE_ARTIFACT_INCONSISTENT, "a CALIBRATION manifest recommends no method")
+        if threshold_ref.benchmark_ref is None or has_literal:
+            raise PilotError(PilotErrorCode.ROLE_ARTIFACT_INCONSISTENT, "a CALIBRATION threshold carries a benchmark_ref and no literal_value")
+        if self.calibration_provenance is not None:
+            raise PilotError(PilotErrorCode.CALIBRATION_PROVENANCE_INVALID, "a CALIBRATION manifest carries no calibration provenance")
+
+    def _validate_confirmatory_shape(self, threshold_ref, has_literal: bool) -> None:
+        if not has_literal or threshold_ref.benchmark_ref is not None:
+            raise PilotError(PilotErrorCode.ROLE_ARTIFACT_INCONSISTENT, "a CONFIRMATORY threshold carries a literal_value and no benchmark_ref")
+        if not isinstance(self.calibration_provenance, CalibrationProvenance):
+            raise PilotError(PilotErrorCode.CALIBRATION_PROVENANCE_INVALID, "a CONFIRMATORY manifest requires complete CalibrationProvenance")
+
+    def require_phase_4c_eligible(self) -> "PilotStudyManifest":
+        """Historical v1 artifacts stay verifiable but are never eligible for a genuine
+        Phase 4C run: they carry no committed role, and inferring one would be exactly
+        the silent upgrade revision 14 forbids."""
+        if not self.is_v2:
+            raise PilotError(
+                PilotErrorCode.RUN_ROLE_INVALID,
+                f"{self.schema_version} is historical mechanism validation and is not eligible for a Phase 4C run",
+            )
+        return self
 
     def assignment(self, method: ReasoningMethodRef) -> Optional[PilotMethodAssignment]:
         for m in self.methods:
