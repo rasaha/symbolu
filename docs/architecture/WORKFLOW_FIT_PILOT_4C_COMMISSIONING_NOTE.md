@@ -1,6 +1,6 @@
 # Phase 4C — First Genuine Research-Only Workflow-Fit Pilot: Commissioning Note and Ballot
 
-**Revision 7.** Status: documentation only. **Nothing in this note authorises a
+**Revision 8.** Status: documentation only. **Nothing in this note authorises a
 provider call.** Until every ballot item in §3 is ratified by the owner, no
 code path in this repository may contact a provider, hold a credential, or
 run a real workflow behind the pilot boundary. Every output of a ratified 4C
@@ -123,6 +123,18 @@ A second `run` of a consumed commitment is refused with
 `COMMITMENT_ALREADY_SPENT`. Both codes join the governed vocabulary under §4.
 `[G]` is lifted: T17 and T25 are testable against this registry.
 
+**Deployment facts (revision 8).** The registry writer identity is
+`workflow_fit_commitment_registry.writer`, a name reserved to this purpose and
+held by no custody writer, boundary or evaluator. Entries are addressed
+`commitments/<commitment identifier>/<index_digest>`, one consumption entry
+and at most one outcome entry per pair. The registry's **concrete endpoint is
+bound at D5 ratification and is deliberately not written here**: it names
+infrastructure that does not exist in this repository, and a plausible-looking
+URI in a governance document would be a fabricated `[V]`. Everything a test
+needs — the identity, the addressing, the atomicity and the refusal codes — is
+fixed above, so T17 and T25–T26 are testable against a conforming
+registry double before the endpoint exists.
+
 ### 2.3 Custody writers (resolves B3)
 
 The boundary sees provider prompts and responses; the experiment-side scorer
@@ -243,7 +255,8 @@ that class launches its own subprocess `[V]` (`runner.py`,
 `boundary/process.py`) — and remains available **only** through a separately
 specified launch/connection-port amendment that reuses the **existing pilot
 frame protocol** over the **supported Unix-socket or pipe transports** `[V]`
-(row A16d, `transport` on `run_pilot`). If B is later selected, its exact
+(4A spec §4 transport prose; `transport` on `run_pilot`; the equivalence test
+`test_a16d_transport_equivalence`). If B is later selected, its exact
 supervisor handoff and attachment mechanism must be ratified **before**
 implementation; no mechanism is specified here. Option C remains explicitly
 **non-isolating**.
@@ -359,10 +372,12 @@ healthy.
 custody store** whose health is in question, under a **reserved key prefix**.
 A canary written anywhere else would prove nothing about the store that just
 failed, which is the whole purpose of the probe. It is excluded from every
-evidence read, never keyed by case digest, and carries its **own** short
-retention and deletion rule (D5) rather than the evidence retention period:
-probes are operational exhaust and must not accumulate under evidence
-retention, nor dilute what an independent re-evaluator reads. Its own
+evidence read, never keyed by case digest, and carries its **own** retention
+and deletion rule rather than the evidence retention period: probes are
+operational exhaust and must not accumulate under evidence retention, nor
+dilute what an independent re-evaluator reads. **Canary retention is 30 days**
+(revision 8), after which a canary is deleted; deleting one is never an
+evidence deletion and never touches a record keyed by case digest. Its own
 failure is a service failure, never a fresh method-local one. On the
 boundary-side writer a `METHOD_LOCAL` scope still leaves that method
 `INCONCLUSIVE`, because the boundary has already returned a non-retryable
@@ -472,13 +487,15 @@ prepared bundle's `index_digest` before execution (§2.1), per repetition; the t
 identities, access-control lists, encryption and key custody, retention
 period and deletion rule. **Ratified in revision 7, not open:** health-check
 canaries share the store they probe under a reserved prefix, excluded from
-evidence reads, with their own short retention and deletion rule (§2.8) — the
-owner supplies that period; and the **spent-commitment authority** of §2.2 in
-full (registry co-located with the preregistration medium, one named registry
-writer identity, single conditional append, consumption immediately before
-boundary startup, fail-closed when unavailable, consumption terminal after a
-crash) — the owner supplies the registry's concrete location and writer
-identity. Also the ratification of the boundary-side exchange
+evidence reads, under a **30-day** canary retention (§2.8); and the
+**spent-commitment authority** of §2.2 in full — registry co-located with the
+preregistration medium, addressing
+`commitments/<identifier>/<index_digest>`, the writer identity
+`workflow_fit_commitment_registry.writer`, a single conditional append,
+consumption immediately before boundary startup, fail-closed when
+unavailable, consumption terminal after a crash. The **registry's concrete
+endpoint is the one value this item still needs**; it names infrastructure
+outside this repository. Also the ratification of the boundary-side exchange
 writer, the runner retention amendment and the three new refusal codes as 4A
 amendments. The fail-closed behaviour is **ruled in §2.3**, not decided here:
 pre-run custody failure blocks preparation and preregistration; an in-run
@@ -662,10 +679,38 @@ must still name are listed below.
 governed vocabulary (§4, now five new codes). The §2.2 `[G]` is lifted, and
 T17 and T25–T27 test the ratified mechanism.
 
-**Still required from the owner:** the registry's concrete location and the
-name of its writer identity; and the canary retention period. These are
-deployment facts, not policy — the policy above holds whatever they are.
+### Revision 8 (deployment facts and end-to-end audit, 2026-09-03)
+
+Two of the three facts revision 7 deferred are supplied: the registry writer
+identity `workflow_fit_commitment_registry.writer` with the addressing
+`commitments/<identifier>/<index_digest>` (§2.2), and a **30-day** canary
+retention (§2.8). The third — the registry's concrete endpoint — is
+deliberately still open: it names infrastructure outside this repository, and
+inventing a URI here would be a fabricated `[V]`. Nothing depends on it that a
+conforming registry double cannot stand in for.
+
+The whole note was then audited against the merged 4A/4B code. One citation
+was **wrong and is corrected**: §2.4 cited "row A16d" as `[V]` for transport
+equivalence. **No such row exists in the 4A spec** — its acceptance table runs
+A16, A16a, A16b, A17 — and the identifier lives only in a test,
+`test_a16d_transport_equivalence`, and in the message of commit `93c6b9f1f`.
+The claim now cites the 4A spec's §4 transport prose, the merged `transport`
+parameter and that test. The underlying capability is real; only the reference
+was false. That the 4A acceptance table lacks a row its own test claims is a
+gap **in 4A**, outside this note's scope to fix.
+
+Every other `[V]` in the note re-verified against the merged tree: the §1
+inventory (`pilot_executor.py` `max_llm_calls`, `recompute_telemetry`,
+`entry.py --provider-factory`, `loaders.py` `CREDENTIAL_KEYS`, the 4B
+digest-only bundle test, rows A14/A14a/A16a/A30, `QUALITY_UNIT` and `_mean`);
+the §2.1 prepared layout and index self-exclusion; §2.2's history-free `run`;
+§2.3's `FORBIDDEN_RENDERINGS`, prefix-derived refusal, code-only
+`refusal_codes` and the direct `PROPOSED` → `INCONCLUSIVE` transition;
+§2.4's unconditional `BoundaryProcess`; and §2.8's frame set, exact-method
+equality in `_load_status` and `verify`, comparison over complete runs, and
+`success_summary` gating.
 
 Ballot items remain five and remain `[R]`; D1–D5 still need their provider,
-benchmark, threshold, budget, identity and custody values. No revision changed
-code, contract or CI gate, and none authorises a provider call.
+benchmark, threshold, budget, identity and custody values, and D5 still needs
+the registry endpoint. No revision changed code, contract or CI gate, and none
+authorises a provider call.
