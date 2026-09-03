@@ -1,6 +1,6 @@
 # Phase 4C — First Genuine Research-Only Workflow-Fit Pilot: Commissioning Note and Ballot
 
-**Revision 13.** Status: documentation only. **Nothing in this note authorises a
+**Revision 14.** Status: documentation only. **Nothing in this note authorises a
 provider call.** Until every ballot item in §3 is ratified by the owner, no
 code path in this repository may contact a provider, hold a credential, or
 run a real workflow behind the pilot boundary.
@@ -554,7 +554,7 @@ there is no threshold to fake and no request the runner could construct.
 |---|---|---|
 | `workflow_fit_pilot.manifest.v1` | none | historical **mechanism validation only**; verifiable, **never** 4C-eligible, and **never** defaulted to `CONFIRMATORY` |
 | `workflow_fit_pilot.manifest.v2` | `CONFIRMATORY` | requires explicit `run_role` and complete `CalibrationProvenance` |
-| `workflow_fit_pilot.calibration_manifest.v1` | `CALIBRATION` | separate contract; no plan, no task class, no policy, no threshold |
+| `workflow_fit_pilot.manifest.v2` | `CALIBRATION` | **superseded by revision 14:** the same v2 contract with the calibration role, carrying the full governed structure below. The separate `calibration_manifest.v1` contract and `CalibrationTaskBinding` are **withdrawn** |
 
 An absent, unknown or mismatched run role **fails closed**. A calibration
 manifest must not contain a comparison plan, task-class identity, comparison
@@ -566,15 +566,67 @@ PilotRunRole:
   CONFIRMATORY
 ```
 
-**`CalibrationManifest`** carries: schema version; manifest id; explicit
-`CALIBRATION` role; benchmark manifest; `CalibrationTaskBinding`; exactly one
-reasoning method (`linear_chain`); capture boundary; evaluator declaration;
-identity declaration; quality aggregation; usage scope; preregistration
-identity and instant; manifest digest.
+**Calibration manifest shape — corrected by revision 14.** Revision 13 said
+calibration carries no plan and no task class. That is **incompatible with the
+mandatory contracts** and is superseded. `ReasoningMethodExecutionRecord`
+requires `binding: BindingRef`, `task_class_ref` and `task_class_digest`, all
+mandatory `[V]` (`contracts/record.py`); `PilotObservation` requires
+`task_class_digest`, `binding` and `roles` `[V]`; and `validate_observation`
+cross-checks `manifest.plan == plan`, `record.task_class_digest ==
+observation.task_class_digest == plan.task_class.task_class_digest`,
+`record.binding == observation.binding == plan.binding`, the benchmark digests
+against `plan.task_class.benchmark_set_digest`, and both aggregations against
+the manifest `[V]` (`contracts/observation.py`). Without those, calibration
+could produce no execution record, no attestation, no quality evaluation and
+therefore no `CalibrationResult`.
 
-**`CalibrationTaskBinding`** carries `domain_ref`, `intended_outcome_ref`,
-`population_ref`, `benchmark_set_ref` and `profile_digest`. It is **descriptive
-binding only** and must never import a task class or comparison policy.
+**Minimum governed shape a calibration run must carry `[V]`** — verified field
+by field against the constructors and validators, not assumed:
+
+- `PilotStudyManifest` at `…manifest.v2` with `run_role = CALIBRATION`:
+  `manifest_id`, `plan`, `advisory_digest = None`, `rule_set`, `methods`,
+  `benchmark`, `capture_boundary`, `evaluator`, `resource_aggregation`,
+  `quality_aggregation`, `preregistration_status`, `usage_scope`,
+  `preregistered_by`, `preregistered_at`, `manifest_digest`.
+- `ResearchComparisonPlan`: `plan_id`, `task_class`, `binding` (`BindingRef`),
+  `catalog`, `baseline = linear_chain`, `recommended = ()` — which must equal
+  the advisory's qualifying set, empty when no advisory is named `[V]` —
+  `challengers` (`ChallengerSamplingPolicy` with `kind`, non-blank `policy_ref`
+  and `declared_coverage_ref`), `usage_scope`, `preregistered_by`,
+  `preregistered_at`.
+- `methods`: **exactly one** `PilotMethodAssignment` — `linear_chain` with
+  `roles = (GOVERNED_BASELINE,)`, matching `plan.baseline` `[V]`. No
+  `ADVISOR_QUALIFIED` role, which would require an advisory digest `[V]`; no
+  `CHALLENGER`.
+
+**The calibration task class.** A full `TaskClassIdentity` binding the same
+benchmark, profile, task description and baseline method as the calibration
+run, with `consequence_class = NEGLIGIBLE`, `reversibility =
+OUTCOME_REVERSIBLE`, `structural_characteristics = ()`, `required_dimensions =
+(LLM_CALLS,)`, and — the load-bearing part — a `GovernedThreshold` that
+carries **`benchmark_ref` and never `literal_value`**. `GovernedThreshold`
+accepts exactly one of the two `[V]`, and the engine computes
+`tau = Decimal(literal_value)` **only when `benchmark_ref is None`** `[V]`
+(`engine.py`), so **no numeric calibration threshold exists and `tau` is
+`None` by construction**. Its distinct `task_class_id` and threshold form give
+it a `task_class_digest` different from the confirmatory class, so the two are
+never interchangeable.
+
+**Two independent protections, as ratified in revision 14:** first, no
+threshold literal exists from which any fit assessment could be computed;
+second, the committed `CALIBRATION` role forbids the runner from constructing
+or executing a comparison request at all. Calibration therefore produces **no
+fit, sufficiency, Pareto or resource-domination claim**.
+
+**Rejected alternatives (revision 14).** Making task-class, binding or role
+fields optional in the shared execution and observation contracts; removing
+calibration attestation; inserting a placeholder numeric threshold; and
+relying on report suppression alone.
+
+**One consequential loader change `[V]`.** The experiment-side
+`load_task_class` requires `threshold.literal` to parse as `Decimal`, so it
+needs a variant accepting a benchmark-referenced threshold. That is a Phase 4C
+experiment-side change, not a governance-contract change.
 
 **`CalibrationResult`** (`workflow_fit_pilot.calibration_result.v1`):
 `calibration_id`, `manifest_digest`, `evaluation_digest`, `attestation_digest`,
@@ -1492,6 +1544,52 @@ registered vocabulary remains open.
 
 **Status.** Revision 13 records architecture and policy only. It does **not**
 complete D1–D5 and does **not** commission implementation.
+
+### Revision 14 (calibration binding resolution, 2026-09-03)
+
+**Source of authority.** An owner ruling taken after the implementation-
+readiness review, which found one contract contradiction in revision 13.
+Revision 13's record stands unchanged; **only its statement that calibration
+carries no plan and no task class is superseded**, because the mandatory
+execution-record and observation contracts make that shape impossible `[V]`.
+
+**Ratified.** Calibration retains every governed plan, binding, role and
+task-class identity that `ReasoningMethodExecutionRecord`, `PilotObservation`,
+attestation, quality evaluation and lineage verification require — the exact
+minimum shape is enumerated in §2.11 from the constructors themselves. Its
+`GovernedThreshold` uses **`benchmark_ref`, never `literal_value`**, so no
+numeric calibration threshold exists and engine `tau` is `None` `[V]`.
+Calibration keeps its explicit committed `CALIBRATION` run role, and the runner
+must not construct or execute a comparison request for it — two independent
+protections. Calibration remains **baseline-only** with `linear_chain` as the
+sole assigned method. Confirmatory execution still requires a literal
+instantiated from a valid `CalibrationResult` and bound through
+`CalibrationProvenance`.
+
+**Withdrawn.** The separate `calibration_manifest.v1` contract and
+`CalibrationTaskBinding`: calibration uses `…manifest.v2` under the calibration
+role instead. The manifest-version split and the explicit run roles are
+preserved; the discriminated union is now by committed role within v2, and
+`…manifest.v1` remains historical mechanism validation, never 4C-eligible.
+
+**Rejected.** Optional task-class, binding or role fields in shared contracts;
+removing calibration attestation; a placeholder numeric threshold; report
+suppression alone.
+
+**Preserved unchanged.** Reduced `CalibrationResult`; `CalibrationProvenance`;
+baseline-only accounting of 400 and combined 8 800; calibration artifact
+restrictions; the lifecycle endpoint qualification and its `[G]`;
+`workflow_fit_prepared_index.calibration.v1`; `calfloor.linear_chain.v1` with
+its self-reference constraint; the benchmark, sampling and `bbh-ld7.v2`
+decisions; and the eleven-code prospective accounting of **33 → 44**.
+
+**Status.** This resolves the **sole** contract contradiction the
+implementation-readiness review found, and **provider-free implementation is
+architecturally unblocked after revision 14**. The unresolved provider,
+credential, pricing, custody, registry and retention facts block **genuine
+execution**, not deterministic implementation with fixtures and test doubles.
+**D1–D5 remain incomplete for a genuine pilot, and Phase 4C implementation is
+not commissioned by this documentation revision.**
 
 **Still incomplete.** **D2 and D3 are not complete**, and neither is any other
 ballot item. Open: benchmark author and distinct approver; custody URI, readers
