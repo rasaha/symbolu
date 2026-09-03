@@ -1640,3 +1640,82 @@ admission reference; final population and representativeness text; the
 calibration statistic and formula; and all unresolved D1, D4 and D5 facts. **No
 implementation was commissioned**, no benchmark content entered this
 repository, no credential was accessed and no provider was called.
+
+### Revision 16 (slice-2 corrections: calibration composition and canonical decimals, 2026-09-03)
+
+**Source of authority.** An independent adversarial review of implementation
+slice 2 (PR #1580) found two findings, F1 and F2, that made a manifest shape
+the contract accepted fail the package's own validator, or left a digest-bound
+numeric value with more than one accepted spelling. Both are resolved here by
+owner ruling; the corresponding code and tests land on the slice-2 branch, not
+on this documentation branch.
+
+**F1 — calibration composition, ratified.** A `CALIBRATION` manifest's plan
+declares `SamplingKind.PREREGISTERED`. Under a v2 `CALIBRATION` manifest the
+preregistered assigned-method set is **exactly `{plan.baseline}`**; the single
+assignment carries only `GOVERNED_BASELINE`; challengers and recommendations
+remain empty. `validate_manifest` is **run-role-aware**: it no longer applies
+the confirmatory "every admissible method is assigned" composition rule to a
+calibration manifest. Under `CONFIRMATORY` the existing preregistered
+completeness rule is **unchanged**.
+
+**Why `PREREGISTERED` and not risk-based or randomized sampling.** The
+baseline-only calibration composition was fixed before execution — it is not
+a draw from a larger admissible set, and no sampling rule chose it. Declaring
+`RISK_BASED` or `RANDOMIZED` would assert a selection process that never
+occurred. `PREREGISTERED` is the truthful value for a composition committed in
+advance, and it is truthful for calibration in exactly the sense it is
+truthful for the exhaustive confirmatory composition — the two preregister
+different sets, not different kinds of commitment.
+
+**Why confirmatory completeness is untouched.** `CONFIRMATORY` still runs the
+full admissible catalog under the advisor-qualified/challenger split; nothing
+about calibration's narrower, fixed composition bears on that rule, and
+narrowing it for calibration must not narrow it for confirmation too.
+
+**F2 — canonical decimals, ratified.** Every new digest-bound Phase 4C
+calibration value is a **code-point canonical decimal string**. The canonical
+form: a string; no surrounding whitespace; no leading `+`; no exponent
+notation; `-` only for a nonzero negative value; no leading integer zeros
+except the integer zero itself; no decimal point for an integer; no trailing
+fractional zeros; every zero, including a negative-zero input, represented
+only as `"0"`; and it parses to a finite `Decimal`. An equivalent but
+non-canonical spelling — `"0.620"`, `"+0.62"`, `"6.2E-1"`, `"00.62"`,
+`"0.0"`, `"-0"` — is **refused, never silently normalised**: normalising a
+digest-bound field would change what a caller committed to without their
+digest changing to match.
+
+Worked examples: `"0"`, `"1"`, `"0.62"` and `"-0.25"` (where the field
+otherwise permits a negative value) are valid; `"0.620"`, `"+0.62"`,
+`"6.2E-1"` and `"-0"` are refused.
+
+**Scope of F2.** `CalibrationResult.statistic_value`, `CalibrationProvenance
+.instantiated_literal`, and a v2 `CONFIRMATORY` manifest's threshold
+`literal_value` are canonical under this rule. **Slice-3 verification compares
+these canonical strings by exact code-point equality** — including checking
+that the canonical string derived from the reachable `QualityResult.value`
+equals the calibration statistic. This rule is **Phase 4C's own**: it is not
+imposed retroactively on `MetricClaim.value`, `GovernedThreshold.literal_value`
+in any other governance contract, or on any historical v1 threshold literal.
+Existing v1 threshold behaviour and every v1 digest, including the anchor
+`de6f18598c1fe23d5b7940fb5fb012b07f8ffca462956a9ddf673fddde5b39c9`, are
+unchanged.
+
+**F3 and F4 remain slice-3 obligations, not resolved here.** F3: nothing in
+the package's execution path calls `require_phase_4c_eligible()` — a v1
+manifest is refused *by that method*, not yet by any run entry point. F4: the
+v1 digest payload excludes `run_role`/`calibration_provenance`, so a v1 object
+whose role field was set by circumventing the frozen dataclass would keep a
+digest that still verifies; no public construction path produces such an
+object today, but a slice-3 verifier must re-run the manifest's role
+validation rather than trust a recomputed v1 digest alone. Both are recorded
+as acceptance obligations on the slice-2 branch; neither is implemented by
+this revision or by the slice-2 correction it authorises.
+
+**Status.** This revision completes slice-2's contract semantics — the
+constructible calibration and confirmatory shapes now also pass the package's
+own validator, and every new digest-bound numeric field has exactly one
+accepted spelling. **It does not commission slice 3, enforce F3 or F4 at
+runtime, or authorise a genuine pilot.** D1–D5 remain incomplete, no
+credential was accessed, no provider was called, and no benchmark content
+entered this repository.
