@@ -1,6 +1,6 @@
 # Phase 4C — First Genuine Research-Only Workflow-Fit Pilot: Commissioning Note and Ballot
 
-**Revision 8.** Status: documentation only. **Nothing in this note authorises a
+**Revision 9.** Status: documentation only. **Nothing in this note authorises a
 provider call.** Until every ballot item in §3 is ratified by the owner, no
 code path in this repository may contact a provider, hold a credential, or
 run a real workflow behind the pilot boundary. Every output of a ratified 4C
@@ -90,7 +90,7 @@ manifest digest, run identities, record identities and comparison request
 id). A repetition is a whole pilot run. Cross-run aggregation is **deferred to
 a later ballot**; 4C reports repetitions side by side without combining them.
 
-**Re-running a halted repetition (owner ruling, revision 5).** A repetition
+**Re-running a halted repetition — PROPOSED, NOT RATIFIED (assistant selection, revision 5; relabelled revision 9).** A repetition
 halted by a trust-infrastructure failure (§2.8) **may not be re-run under the
 same preregistered manifest and `index_digest`**. The replacement attempt is
 a new repetition: a fresh preregistration, a distinct `manifest_id` and its
@@ -103,14 +103,14 @@ identity, which is the precise thing preregistration exists to prevent. The
 same rule holds however the repetition was halted, including a halt with no
 provider call made.
 
-**The enforcing authority (owner ruling, revision 7; supersedes the revision-6
-gap).** Revision 6 recorded that nothing durable marks a commitment consumed:
+**The enforcing authority — PROPOSED, NOT RATIFIED (assistant selection,
+revision 7; relabelled revision 9).** Revision 6 recorded that nothing durable marks a commitment consumed:
 `run` verifies bundle contents and consults no history `[V]` (`pipeline.py`,
 `run`), the prepared bundle cannot hold the mark because it is immutable and
 its digest **is** the commitment, and a local run directory binds no other
-machine. The authority is now ratified:
+machine. The following is an assistant proposal awaiting owner ratification:
 
-| Question | Ruling |
+| Question | Proposal (not ratified) |
 |---|---|
 | registry and location | a dedicated **append-only commitment registry**, co-located with the D5 preregistration medium and addressed by the pair (commitment identifier, `index_digest`). It is **not** either custody store: expected answers keep their own access-control list, and a store the runner host must write to may not be the store holding answers |
 | marking authority | one named **registry writer identity**, distinct from both custody writers, from the boundary and from the evaluator. `run` acts as that identity and no other principal may append a consumption entry |
@@ -123,7 +123,8 @@ A second `run` of a consumed commitment is refused with
 `COMMITMENT_ALREADY_SPENT`. Both codes join the governed vocabulary under §4.
 `[G]` is lifted: T17 and T25 are testable against this registry.
 
-**Deployment facts (revision 8).** The registry writer identity is
+**Deployment facts — PROPOSED, NOT RATIFIED (assistant selection, revision 8;
+relabelled revision 9).** The registry writer identity is
 `workflow_fit_commitment_registry.writer`, a name reserved to this purpose and
 held by no custody writer, boundary or evaluator. Entries are addressed
 `commitments/<commitment identifier>/<index_digest>`, one consumption entry
@@ -176,7 +177,8 @@ preserved as **non-authoritative diagnostic** information; it never carries
 secrets, prompts, responses or expected answers, and it never determines the
 refusal code.
 
-**Where the diagnostic is retained (owner ruling, revision 5).** In the
+**Where the diagnostic is retained — PROPOSED, NOT RATIFIED (assistant
+selection, revision 5; relabelled revision 9).** In the
 **run report, carried by the non-evidential run-status artifact** — the
 method's `reasons` entry in `run_status.json`, which `report.txt` renders for
 an incomplete method. The mechanism is not free: `verify` re-renders
@@ -261,6 +263,11 @@ supervisor handoff and attachment mechanism must be ratified **before**
 implementation; no mechanism is specified here. Option C remains explicitly
 **non-isolating**.
 
+Under option A the bounded claim is: **the secret does not enter the runner
+process or the runner environment; the boundary process retrieves and holds
+it.** It does not follow that the secret is absent from the whole process
+tree — the boundary is a child process on the same host.
+
 For whichever option is selected, the ballot must **name every environment
 key** admitted by the minimal child-process allowlist, and nothing else
 reaches the child. `PATH` and the interpreter executable are process
@@ -327,8 +334,9 @@ Later methods may continue **only if** the boundary and **both** custody
 services remain healthy. Coverage reporting must expose the missing method,
 and no complete-set comparison may be claimed.
 
-**The discriminator (owner ruling, revision 5; mechanics corrected in
-revision 6).** A retention write or verification failure does not classify
+**The discriminator — PROPOSED, NOT RATIFIED (assistant selection, revision 5;
+mechanics corrected on owner-transmitted review, revision 6; relabelled
+revision 9).** A retention write or verification failure does not classify
 itself; **a custody health check does**. It applies to **in-run failures
 only** — an exchange or verdict-retention failure inside a run. A **pre-run**
 custody failure is never health-checked and never classified into a method:
@@ -362,21 +370,22 @@ The verdict decides scope:
 - health check **fails, times out, or cannot be performed** → **service
   failure**: the repetition stops under the rule above.
 
-The health check is itself a custody operation, bounded by the **custody
-health-check timeout of 5 000 ms** ratified in D4 — **not** the provider-call
+The health check is itself a custody operation, bounded by the **proposed custody
+health-check timeout of 5 000 ms** (D4, PROPOSED — NOT RATIFIED) — **not** the provider-call
 timeout, which is a different port with a different owner. It is attempted
 **once** and never retried, so a failing service cannot be probed into looking
 healthy.
 
-**Where the canary is written (owner ruling, revision 7).** Into the **same
+**Where the canary is written — PROPOSED, NOT RATIFIED (assistant selection,
+revision 7; relabelled revision 9).** Into the **same
 custody store** whose health is in question, under a **reserved key prefix**.
 A canary written anywhere else would prove nothing about the store that just
 failed, which is the whole purpose of the probe. It is excluded from every
 evidence read, never keyed by case digest, and carries its **own** retention
 and deletion rule rather than the evidence retention period: probes are
 operational exhaust and must not accumulate under evidence retention, nor
-dilute what an independent re-evaluator reads. **Canary retention is 30 days**
-(revision 8), after which a canary is deleted; deleting one is never an
+dilute what an independent re-evaluator reads. **Canary retention of 30 days is PROPOSED, NOT RATIFIED**
+(assistant selection, revision 8), after which a canary is deleted; deleting one is never an
 evidence deletion and never touches a record keyed by case digest. Its own
 failure is a service failure, never a fresh method-local one. On the
 boundary-side writer a `METHOD_LOCAL` scope still leaves that method
@@ -403,6 +412,60 @@ their evidence stays individually verifiable; and make coverage and report
 rendering distinguish an **incomplete repetition** from ordinary
 method-local incompleteness, with `success_summary` unavailable in the
 former `[V]` (`contracts/coverage.py`).
+
+### 2.9 Call ceiling and workflow budget exhaustion (revision 9)
+
+**One shared cap, not per-method `[V]`.** `HarnessWorkflowExecutor.__init__`
+stores a single `max_llm_calls` and passes that same value to every workflow:
+`wf.execute(query, client, context=context, max_llm_calls=self._max)`
+(`experiments/workflow_fit_study/pilot_executor.py`). A method-specific cap is
+**not expressible** against the merged executor. Any per-method ceiling is
+therefore an accounting figure, not an enforcement point.
+
+**Exhaustion is silent `[V]`.** `ReasoningWorkflow._call_llm` checks
+`if call_counter[0] >= max_calls` and, when the budget is spent, appends a
+step whose `response` is the runtime sentinel `"(budget exhausted)"` and
+returns normally (`agentic/agentic_framework/reasoning_workflows.py`). No
+exception, no refusal, no telemetry signal. An undersized cap therefore yields
+a **completed** run with a truncated reasoning path, scored as though the
+method had run as designed — a comparison biased toward methods with shorter
+intrinsic paths, with nothing in the evidence to show it.
+
+The seven workflows' intrinsic bounded paths per case `[V]`:
+
+| Workflow | Declared default | Intrinsic bounded path |
+|---|---|---|
+| `linear_chain` | 4 | 4 fixed stages |
+| `tree_of_thought` | 8 | 5 = `num_branches` 3 + score + synthesise |
+| `iterative_refinement` | 8 | 7 = generate + `max_revisions` 3 x (critic + revise) |
+| `debate` | 5 | 4 fixed stages |
+| `map_reduce` | 8 | 6 = decompose + up to `max_sub_problems` 4 + reduce |
+| `socratic_progressive` | 4 | 4 fixed stages |
+| `metacognitive` | 10 | delegates to a selected workflow; at most the delegate's path |
+
+**PROPOSED — NOT RATIFIED.** Shared per-case cap **8**, which clears the
+largest intrinsic path (7) so no method is truncated; per-method ceiling
+`case_count x 8`; repetition ceiling the sum of the assigned methods'
+ceilings; retry allowance **zero**. The floor is 7; below 8 a method is
+silently truncated.
+
+**Detection, experiment-side.** A `CaptureRecord` carries digests, never a
+stage response, and `HarnessWorkflowExecutor` currently **discards**
+`WorkflowResult.steps`, returning only `final_response` and
+`total_llm_calls_reported` `[V]` (`pilot_executor.py`; `runner.py`,
+`ExecutionOutcome`). Exhaustion is therefore invisible to the boundary and to
+every governed contract. **PROPOSED — NOT RATIFIED:** an experiment-side check
+inside `HarnessWorkflowExecutor` inspects **all** `WorkflowResult.steps`
+before returning an `ExecutionOutcome`; if any step's `response` equals the
+runtime sentinel `"(budget exhausted)"`, that method must **not** enter a
+comparison and must become `INCONCLUSIVE`. The sentinel is a runtime string in
+`agentic/`, not a governed constant; a check depending on it must fail closed
+if the string changes.
+
+**A seventh refusal code, proposed only.** `WORKFLOW_BUDGET_EXHAUSTED` would
+name this condition. The existing 4C design already proposes **six** new codes
+(§4); adopting this one makes **seven**. **Neither six nor seven is
+owner-ratified.**
 
 ## 3. Ballot — five owner decisions `[R]`
 
@@ -451,24 +514,52 @@ Values: the exact `profile.json` and `task_class.json`; the population
 definition; a written representativeness statement saying why these cases
 represent the declared task class and what they do not cover; the quality
 threshold literal and comparator in `score.unit` under arithmetic-mean
-aggregation (§2.6); and the resource dimensions compared. Threshold, unit,
+aggregation (§2.6); and the resource dimensions compared. **PROPOSED — NOT RATIFIED:**
+`LLM_CALLS` is the universally required dimension; `TOTAL_TOKENS` is admitted
+only when the provider returns complete usage for **every** attempt of **every**
+compared method, and is otherwise omitted — the engine refuses
+`DIMENSION_UNAVAILABLE` on a missing value with **no fallback to fewer
+dimensions** `[V]` (`readiness-comparison/engine.py`), so an optimistic
+declaration converts one absent usage field into a lost repetition.
+`ResourceDimension` has exactly these two members `[V]`
+(`contracts/task_class.py`). Threshold, unit,
 aggregation and dimensions are **pilot configuration**, not architectural
 defaults. Structural-token traceability per case is required but is not
 itself evidence of representative sampling.
 
 **D4. Experimental design.**
-Values: repetition count, with one preregistered manifest and index per
-repetition and the `manifest_id` naming rule (§2.2); the **custody
-health-check timeout, ratified at 5 000 ms** (§2.8, revision 7), stated
-separately from the provider-call timeout below and never conflated with it;
-stochastic-control
-declaration (seed per repetition, or "provider offers no seed" with the
-pinned temperature); concurrency (sequential unless stated); run-level call
-ceiling and its scope (per run, per method, per case); spending ceiling with
-its pricing source, currency and the count it is derived from; timeout per
-provider call and who owns it (provider factory); retry policy, with every
-retry a captured attempt that counts in `llm_calls`; stop conditions; and case
-ordering (preregistered order, or a declared randomisation with its seed).
+Values: repetition count and role; the `manifest_id` naming rule (§2.2); the
+custody health-check timeout (§2.8, **PROPOSED at 5 000 ms — NOT RATIFIED**),
+stated separately from the provider-call timeout below and never conflated
+with it; stochastic-control declaration (seed per repetition, or "provider
+offers no seed" with the pinned temperature — note that **temperature 0
+removes a major sampling control but does not establish determinism**, since
+providers may still vary across attempts); concurrency (sequential unless
+stated); the call ceiling of §2.9; spending ceiling with its pricing source,
+currency and the count it is derived from; timeout per provider call and who
+owns it (provider factory); retry policy, with every retry a captured attempt
+that counts in `llm_calls`; stop conditions; and case ordering (preregistered
+order, or a declared randomisation with its seed).
+
+**Repetition count and role — PROPOSED, NOT RATIFIED.** With an external
+threshold basis fixed before the pilot: **3 confirmatory repetitions**.
+Without one: **1 calibration run + 3 confirmatory repetitions**. The
+calibration run carries its **own preregistered commitment**, is labelled
+`CALIBRATION`, is **not** one of the three, and **never enters the
+confirmatory comparison, coverage report or success summary**. Its only
+output is a candidate threshold, which is preregistered before any
+confirmatory repetition runs.
+
+**`manifest_id` — PROPOSED, NOT RATIFIED.**
+`<benchmark id>@<benchmark version>.<task class id>.<CALIBRATION|CONFIRMATORY>.rep<ordinal>.<pre-execution nonce>`,
+the nonce derived before execution and recorded in the D5 receipt. A
+replacement after a halt takes a **fresh nonce or a new ordinal**; the halted
+identity is never reused or overwritten.
+
+**Call ceiling — PROPOSED, NOT RATIFIED.** Shared per-case cap 8; per-method
+ceiling `case_count x 8`; repetition ceiling the sum over assigned methods;
+retry allowance zero. The merged executor supports one shared value only
+(§2.9).
 The **partial-run policy is ruled in §2.8** (trust-infrastructure failure
 stops the repetition; a method-local failure, a ceiling breach included, ends
 only that method `INCONCLUSIVE`; scope decided by the one bounded custody
@@ -485,19 +576,22 @@ Values: the preregistration medium and the receipt form in which the owner
 records the commitment identifier `workflow_fit_prepared_index.v1` and the
 prepared bundle's `index_digest` before execution (§2.1), per repetition; the two custody writers of §2.3 with their locations, writer
 identities, access-control lists, encryption and key custody, retention
-period and deletion rule. **Ratified in revision 7, not open:** health-check
-canaries share the store they probe under a reserved prefix, excluded from
-evidence reads, under a **30-day** canary retention (§2.8); and the
-**spent-commitment authority** of §2.2 in full — registry co-located with the
+period and deletion rule. **PROPOSED — NOT RATIFIED (assistant selections, revisions 7–8):**
+health-check canaries share the store they probe under a reserved prefix,
+excluded from evidence reads, under a **30-day** canary retention (§2.8); and
+the **spent-commitment authority** of §2.2 in full — registry co-located with the
 preregistration medium, addressing
 `commitments/<identifier>/<index_digest>`, the writer identity
 `workflow_fit_commitment_registry.writer`, a single conditional append,
 consumption immediately before boundary startup, fail-closed when
 unavailable, consumption terminal after a crash. The **registry's concrete
 endpoint is the one value this item still needs**; it names infrastructure
-outside this repository. Also the ratification of the boundary-side exchange
-writer, the runner retention amendment and the three new refusal codes as 4A
-amendments. The fail-closed behaviour is **ruled in §2.3**, not decided here:
+outside this repository. Encryption note: customer-managed key custody protects the retained evidence
+**only when the runner, the workflows and unrelated operators lack decrypt
+permission**; a customer-managed key whose decrypt authority the runner
+principal retains protects nothing against that principal's compromise.
+Also the ratification of the boundary-side exchange writer, the runner
+retention amendment and the **six** new refusal codes (§4) as 4A amendments. The fail-closed behaviour is **ruled in §2.3**, not decided here:
 pre-run custody failure blocks preparation and preregistration; an in-run
 failure is classified by the operation that failed and carries
 `RETENTION_WRITE_FAILED`, `RETENTION_VERIFY_FAILED` or `EVALUATION_FAILED`,
@@ -518,9 +612,13 @@ record: (i) boundary hard stop at the call ceiling and on
 `PROVIDER_IDENTITY_UNVERIFIED`; (ii) boundary-side exchange writer; (iii)
 runner amendment discarding the method's evidence after a post-attestation
 retention or evaluation failure and emitting `INCONCLUSIVE` with the exact
-stage code; (iv) five refusal codes added to `PilotErrorCode` — the three stage
-codes plus `COMMITMENT_ALREADY_SPENT` and `COMMITMENT_REGISTRY_UNAVAILABLE`;
-(v) only
+stage code; (iv) **six** refusal codes added to `PilotErrorCode` —
+`PROVIDER_IDENTITY_UNVERIFIED`, `RETENTION_WRITE_FAILED`,
+`RETENTION_VERIFY_FAILED`, `EVALUATION_FAILED`, `COMMITMENT_ALREADY_SPENT`,
+`COMMITMENT_REGISTRY_UNAVAILABLE`; the enum today has 34 members and contains
+none of them `[V]` (`errors.py`), and `RETENTION_FAILED` is withdrawn.
+Adopting the proposed `WORKFLOW_BUDGET_EXHAUSTED` (§2.9) would make seven.
+**Neither six nor seven is owner-ratified.** (v) only
 if D1 selects option B, a separately ratified launch/connection port over the
 existing frame protocol; the benchmark-custody writer with the runner-side
 bounded health check of §2.8; a **boundary-internal** exchange-writer health
@@ -569,6 +667,11 @@ row may reach a provider:
 | T25 | consumption is a single conditional append immediately before boundary startup: two concurrent `run` invocations resolve with exactly one proceeding; an unavailable registry refuses with `COMMITMENT_REGISTRY_UNAVAILABLE`, starting no boundary and writing no lifecycle record; a commitment marked spent before any provider call stays spent across a crash; and a missing outcome entry never reopens one |
 | T26 | only the named registry writer identity can append a consumption entry, and no principal can unmark one |
 | T27 | the canary lands in the probed store under the reserved prefix, is absent from every evidence read and from case-digest keying, and falls under the canary retention rule rather than the evidence retention period |
+| T28 | **no provider:** a deterministic fake LLM client drives all seven workflows across the case set and records each one's actual call count, proving every intrinsic bounded path completes and that the selected shared cap produces **no** `"(budget exhausted)"` step for any workflow |
+| T29 | a run whose `WorkflowResult.steps` contain the exhaustion sentinel does not enter a comparison and becomes `INCONCLUSIVE`; the check inspects all steps before `ExecutionOutcome` is returned, and fails closed if the sentinel string is absent from the runtime |
+| T30 | a `CALIBRATION` repetition carries its own commitment and appears in no confirmatory comparison, coverage report or success summary |
+| T31 | a replacement after a halt carries a fresh nonce or new ordinal, and the halted `manifest_id` is neither reused nor overwritten |
+| T32 | a task class declaring `TOTAL_TOKENS` against records missing usage yields `DIMENSION_UNAVAILABLE` rather than a zero-filled or reduced-dimension comparison |
 
 ## 5. Explicitly excluded
 
@@ -624,14 +727,15 @@ and custody values.
 | M4 | option B's connection mechanism | none is invented: no TCP credential port and no HTTP credential protocol; A recommended; B only via a separately ratified launch/connection-port amendment over the existing frame protocol and supported transports; C non-isolating; every allowlisted environment key named in D1; `PATH` and the interpreter are not isolation |
 | M5 | identity acceptance policy | binding: refuse any provider that cannot return an immutable deployment identity; same identity required on every attempt; requester-declared identity is not a 4C mode and never shares the verified `provider_id` representation |
 
-### Revision 5 (owner rulings on the three choices revision 4 surfaced, 2026-09-03)
+### Revision 5 (assistant selections on the three choices revision 4 surfaced, 2026-09-03)
 
-Revision 4 named three policy choices and deliberately left them unruled.
-The owner commissioned this revision to close them; the values below were
-selected to follow the fail-closed posture the earlier rulings established,
-and stand as rulings subject to the owner's correction.
+Revision 4 named three policy choices and deliberately left them unruled. The
+owner asked for them to be closed but supplied no values; the assistant
+selected each to follow the fail-closed posture the revision-4 rulings
+established. **They were mislabelled "owner ruling" until revision 9. All
+three are PROPOSED — NOT RATIFIED.**
 
-| # | Choice | Owner ruling |
+| # | Choice | Assistant selection — PROPOSED, NOT RATIFIED |
 |---|---|---|
 | 1 | where the non-authoritative exception diagnostic is retained | **the run report, carried by the method's `reasons` in the non-evidential `run_status.json`** — the artifact `verify` re-renders `report.txt` from, so a log-only diagnostic would make the bundle unverifiable; never in governed evidence (`refusal_codes` carries the code alone), never in either custody store, omitted rather than redacted when it needs a secret, prompt, response or expected answer (§2.3) |
 | 2 | when a custody failure becomes a service failure | **one bounded custody health check decides**: it succeeds → method-local; it fails, times out or cannot be performed → repetition-wide. Attempted once, never retried, carrying no benchmark content; bounded by the D4 timeout (§2.8) |
@@ -658,13 +762,13 @@ not decided.
 The **durable spent-commitment authority is the only new owner choice** this
 review introduces; revision 7 closes it.
 
-### Revision 7 (ratification of the three values revision 6 left open, 2026-09-03)
+### Revision 7 (assistant proposals for the three values revision 6 left open, 2026-09-03)
 
-The owner commissioned this revision to supply the values, which stand as
-rulings subject to their correction; the two concrete deployment facts they
-must still name are listed below.
+The owner asked for the values but supplied none; the assistant proposed each.
+**They were recorded as ratified until revision 9 and are PROPOSED — NOT
+RATIFIED.**
 
-| # | Value | Owner ruling |
+| # | Value | Assistant proposal — NOT RATIFIED |
 |---|---|---|
 | 1 | spent-commitment registry | append-only, co-located with the preregistration medium, keyed by (identifier, `index_digest`), and **not** either custody store (§2.2) |
 | 2 | marking authority | one named registry writer identity, distinct from both custody writers, the boundary and the evaluator; `run` acts as it and nothing else may append a consumption entry |
@@ -681,7 +785,8 @@ T17 and T25–T27 test the ratified mechanism.
 
 ### Revision 8 (deployment facts and end-to-end audit, 2026-09-03)
 
-Two of the three facts revision 7 deferred are supplied: the registry writer
+Two of the three facts revision 7 deferred are **proposed by the assistant, not
+ratified** (relabelled revision 9): the registry writer
 identity `workflow_fit_commitment_registry.writer` with the addressing
 `commitments/<identifier>/<index_digest>` (§2.2), and a **30-day** canary
 retention (§2.8). The third — the registry's concrete endpoint — is
@@ -710,7 +815,51 @@ the §2.1 prepared layout and index self-exclusion; §2.2's history-free `run`;
 equality in `_load_status` and `verify`, comparison over complete runs, and
 `success_summary` gating.
 
+### Revision 9 (authority audit and verified technical corrections, 2026-09-03)
+
+**Authority audit.** Revisions 5, 7 and 8 recorded assistant selections under
+owner labels. The owner's instructions for those revisions named the
+*questions* and asked for values; they supplied none. Revision 9 strips the
+false attribution. "Subject to owner correction" is not ratification.
+
+**Owner-ratified — the revision-4 instructions, and only these:** the exact
+`workflow_fit_prepared_index.v1` layout (§2.1); operation-based failure
+classification (§2.3); `RETENTION_WRITE_FAILED`, `RETENTION_VERIFY_FAILED`,
+`EVALUATION_FAILED`; `Exception` caught at each port call site and never
+`BaseException` (§2.3); the boundary-custody behaviour with its direct
+`PROPOSED` → `INCONCLUSIVE` transition (§2.3); the partial-run policy (§2.8);
+credential option A recommended with no invented secret-transfer protocol and
+option C labelled non-isolating (§2.4); and refusal of any provider that
+cannot return an immutable deployment identity (§2.5).
+
+**Relabelled PROPOSED — NOT RATIFIED:** diagnostic retention in
+`run_status.json` `reasons` (§2.3); the health-check discriminator (§2.8); the
+canary's placement in the probed store (§2.8); the no-re-run rule for a halted
+commitment (§2.2); the whole spent-commitment registry proposal, its
+addressing and writer identity (§2.2, D5); the 5 000 ms health-check timeout
+(§2.8, D4); and the 30-day canary retention (§2.8, D5). The revision-6
+corrections were owner-transmitted and are additionally forced by the merged
+code, so they stand as corrections rather than selections.
+
+**Verified technical corrections.** The call ceiling `cases x methods x 1` is
+withdrawn: the merged executor supplies **one shared** `max_llm_calls` to every
+workflow and budget exhaustion is **silent**, appending a `"(budget
+exhausted)"` step and returning normally `[V]` (§2.9). A `CaptureRecord`
+carries digests, not stage responses, and `HarnessWorkflowExecutor` discards
+`WorkflowResult.steps`, so the condition is invisible to the boundary — a
+proposed experiment-side check inspects all steps before returning
+`ExecutionOutcome` (§2.9). `WORKFLOW_BUDGET_EXHAUSTED` is proposed, taking the
+proposed count from six to seven; neither count is ratified (§4).
+`TOTAL_TOKENS` is conditional because the engine refuses
+`DIMENSION_UNAVAILABLE` with no dimension fallback `[V]` (D3). Temperature 0
+removes a major sampling control but does **not** establish determinism (D4).
+Calibration and confirmatory repetitions are separated, each with its own
+commitment (D4). The `manifest_id` gains a role segment and a pre-execution
+nonce (D4). The workload-identity and encryption claims are reduced to their
+bounded forms (§2.4, D5). Obligations T28–T32 added.
+
 Ballot items remain five and remain `[R]`; D1–D5 still need their provider,
 benchmark, threshold, budget, identity and custody values, and D5 still needs
-the registry endpoint. No revision changed code, contract or CI gate, and none
-authorises a provider call.
+the registry endpoint. Every candidate value in this note is an assistant
+proposal except the revision-4 rulings listed above. No revision changed code,
+contract or CI gate, and none authorises a provider call.
