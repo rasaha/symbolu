@@ -1,6 +1,6 @@
 # Phase 4C — First Genuine Research-Only Workflow-Fit Pilot: Commissioning Note and Ballot
 
-**Revision 6.** Status: documentation only. **Nothing in this note authorises a
+**Revision 7.** Status: documentation only. **Nothing in this note authorises a
 provider call.** Until every ballot item in §3 is ratified by the owner, no
 code path in this repository may contact a provider, hold a credential, or
 run a real workflow behind the pilot boundary. Every output of a ratified 4C
@@ -103,18 +103,25 @@ identity, which is the precise thing preregistration exists to prevent. The
 same rule holds however the repetition was halted, including a halt with no
 provider call made.
 
-**The ruling is coherent but not yet enforceable `[G]` (revision 6).** No
-durable authority records that a commitment has been consumed. `run` verifies
-bundle contents and consults no history `[V]` (`pipeline.py`, `run`), so the
-same prepared bundle can be run again into another output directory. The
-prepared bundle itself cannot hold the mark — it is immutable and its digest
-is the commitment — and a local run directory cannot bind another machine or
-workspace. The **durable spent-commitment authority is therefore a new owner
-choice, balloted under D5**; until it is ratified, `run` cannot refuse a spent
-commitment and T17 is not testable. Because a zero-call halt already consumes
-the commitment (above), the safest mechanics are an atomic check-and-mark
-**before boundary startup**, but the registry and its procedure are the
-owner's to decide, not this note's.
+**The enforcing authority (owner ruling, revision 7; supersedes the revision-6
+gap).** Revision 6 recorded that nothing durable marks a commitment consumed:
+`run` verifies bundle contents and consults no history `[V]` (`pipeline.py`,
+`run`), the prepared bundle cannot hold the mark because it is immutable and
+its digest **is** the commitment, and a local run directory binds no other
+machine. The authority is now ratified:
+
+| Question | Ruling |
+|---|---|
+| registry and location | a dedicated **append-only commitment registry**, co-located with the D5 preregistration medium and addressed by the pair (commitment identifier, `index_digest`). It is **not** either custody store: expected answers keep their own access-control list, and a store the runner host must write to may not be the store holding answers |
+| marking authority | one named **registry writer identity**, distinct from both custody writers, from the boundary and from the evaluator. `run` acts as that identity and no other principal may append a consumption entry |
+| atomic check-and-mark | a **single conditional append** — commit an entry only if no consumption entry exists for that pair — over the medium's native atomic primitive. Never read-then-write: two concurrent `run` invocations must resolve deterministically, one proceeding and one refused |
+| consumption point | **immediately before boundary startup**: after `run` has matched the preregistered identifier and digest (§2.1) and before the boundary process is constructed or launched, so a halt with no provider call still consumes |
+| registry unavailable | **fail closed**, exactly as a pre-run custody failure does: refuse with `COMMITMENT_REGISTRY_UNAVAILABLE`, start no boundary, write no lifecycle record. An unreachable registry never permits an optimistic run |
+| crash after marking, no provider call | the commitment **stays spent**. Consumption is terminal: no rollback, no unmark, no reuse, and the replacement is a new preregistration with a distinct `manifest_id` (above). A run appends a closing outcome entry when it terminates, but a **missing** outcome entry never reopens a commitment — that asymmetry is what stops a crash from becoming a re-roll |
+
+A second `run` of a consumed commitment is refused with
+`COMMITMENT_ALREADY_SPENT`. Both codes join the governed vocabulary under §4.
+`[G]` is lifted: T17 and T25 are testable against this registry.
 
 ### 2.3 Custody writers (resolves B3)
 
@@ -342,10 +349,20 @@ The verdict decides scope:
 - health check **fails, times out, or cannot be performed** → **service
   failure**: the repetition stops under the rule above.
 
-The health check is itself a custody operation, bounded by the custody
-health-check timeout balloted in D4 — **not** the provider-call timeout, which
-is a different port with a different owner. It is attempted **once** and never
-retried, so a failing service cannot be probed into looking healthy. Its own
+The health check is itself a custody operation, bounded by the **custody
+health-check timeout of 5 000 ms** ratified in D4 — **not** the provider-call
+timeout, which is a different port with a different owner. It is attempted
+**once** and never retried, so a failing service cannot be probed into looking
+healthy.
+
+**Where the canary is written (owner ruling, revision 7).** Into the **same
+custody store** whose health is in question, under a **reserved key prefix**.
+A canary written anywhere else would prove nothing about the store that just
+failed, which is the whole purpose of the probe. It is excluded from every
+evidence read, never keyed by case digest, and carries its **own** short
+retention and deletion rule (D5) rather than the evidence retention period:
+probes are operational exhaust and must not accumulate under evidence
+retention, nor dilute what an independent re-evaluator reads. Its own
 failure is a service failure, never a fresh method-local one. On the
 boundary-side writer a `METHOD_LOCAL` scope still leaves that method
 `INCONCLUSIVE`, because the boundary has already returned a non-retryable
@@ -427,8 +444,9 @@ itself evidence of representative sampling.
 **D4. Experimental design.**
 Values: repetition count, with one preregistered manifest and index per
 repetition and the `manifest_id` naming rule (§2.2); the **custody
-health-check timeout** of §2.8, stated separately from the provider-call
-timeout below; stochastic-control
+health-check timeout, ratified at 5 000 ms** (§2.8, revision 7), stated
+separately from the provider-call timeout below and never conflated with it;
+stochastic-control
 declaration (seed per repetition, or "provider offers no seed" with the
 pinned temperature); concurrency (sequential unless stated); run-level call
 ceiling and its scope (per run, per method, per case); spending ceiling with
@@ -452,15 +470,15 @@ Values: the preregistration medium and the receipt form in which the owner
 records the commitment identifier `workflow_fit_prepared_index.v1` and the
 prepared bundle's `index_digest` before execution (§2.1), per repetition; the two custody writers of §2.3 with their locations, writer
 identities, access-control lists, encryption and key custody, retention
-period and deletion rule; **whether the §2.8 health-check canary records
-share the evidence custody store**, and whether that retention period and
-deletion rule apply to them; the **durable spent-commitment authority** of
-§2.2 — registry and location, the authority permitted to mark a commitment
-spent, the atomic check-and-mark operation, the exact point of consumption
-(before boundary startup unless stated otherwise), the behaviour when the
-registry is unavailable, and the crash-recovery rule where a commitment is
-marked spent but no provider call occurred; and the ratification of the
-boundary-side exchange
+period and deletion rule. **Ratified in revision 7, not open:** health-check
+canaries share the store they probe under a reserved prefix, excluded from
+evidence reads, with their own short retention and deletion rule (§2.8) — the
+owner supplies that period; and the **spent-commitment authority** of §2.2 in
+full (registry co-located with the preregistration medium, one named registry
+writer identity, single conditional append, consumption immediately before
+boundary startup, fail-closed when unavailable, consumption terminal after a
+crash) — the owner supplies the registry's concrete location and writer
+identity. Also the ratification of the boundary-side exchange
 writer, the runner retention amendment and the three new refusal codes as 4A
 amendments. The fail-closed behaviour is **ruled in §2.3**, not decided here:
 pre-run custody failure blocks preparation and preregistration; an in-run
@@ -483,7 +501,9 @@ record: (i) boundary hard stop at the call ceiling and on
 `PROVIDER_IDENTITY_UNVERIFIED`; (ii) boundary-side exchange writer; (iii)
 runner amendment discarding the method's evidence after a post-attestation
 retention or evaluation failure and emitting `INCONCLUSIVE` with the exact
-stage code; (iv) the three refusal codes added to `PilotErrorCode`; (v) only
+stage code; (iv) five refusal codes added to `PilotErrorCode` — the three stage
+codes plus `COMMITMENT_ALREADY_SPENT` and `COMMITMENT_REGISTRY_UNAVAILABLE`;
+(v) only
 if D1 selects option B, a separately ratified launch/connection port over the
 existing frame protocol; the benchmark-custody writer with the runner-side
 bounded health check of §2.8; a **boundary-internal** exchange-writer health
@@ -496,8 +516,8 @@ rendering that separates an incomplete repetition from method-local
 incompleteness; the runner amendment preserving the **exact** refusal code and
 validating every reason string (§2.3); and `run` performing the atomic
 check-and-mark against the D5 spent-commitment registry before boundary
-startup, refusing a commitment already consumed (§2.2) — commissioned only
-once that registry is ratified. One preregistered run per repetition. The CI
+startup, refusing a commitment already consumed (§2.2), with the registry's
+append-only consumption and outcome entries. One preregistered run per repetition. The CI
 gate stays provider-free.
 
 **Acceptance obligations.** Each branch ruled above needs its own row, and no
@@ -521,7 +541,7 @@ row may reach a provider:
 | T14 | the child process environment equals the ratified allowlist exactly; no refusal payload, log line or retained record carries the credential, a prompt, a response or an expected answer |
 | T15 | the exception class reaches only the method's `run_status.json` reason and the `report.txt` line rendered from it — no lifecycle record, contract object or custody record carries it; the reason begins with the refusal code; a diagnostic needing a secret, prompt, response or expected answer is omitted; and `verify` still re-renders the report byte-identically |
 | T16 | a retention failure whose custody health check succeeds is method-local and later methods run; one whose health check fails, times out or cannot be performed stops the repetition; the health check is attempted exactly once and carries no benchmark content |
-| T17 | a halted repetition cannot be re-run under its own manifest and `index_digest` — `run` refuses the commitment the registry records as spent — and its evidence survives the replacement repetition intact |
+| T17 | a halted repetition cannot be re-run under its own manifest and `index_digest`: `run` refuses with `COMMITMENT_ALREADY_SPENT` against the registry's consumption entry, and the halted evidence survives the replacement repetition intact |
 | T18 | the exchange-writer health check runs inside the boundary and its scope reaches the runner in the refusal; the runner holds no reference to that writer or its credential, and no import path exposes it |
 | T19 | the canary carries its own identifier, produces no capture record, does not change `llm_calls`, and never renders as a provider attempt |
 | T20 | a pre-run custody failure is never health-checked and never classified into a method: no runner, no lifecycle record, no `INCONCLUSIVE` |
@@ -529,7 +549,9 @@ row may reach a provider:
 | T22 | after a repetition-wide halt no comparison request or result is created or rendered, no winner and no success summary appear, and each earlier method's evidence still verifies individually |
 | T23 | the report distinguishes an incomplete repetition from a method-local incompleteness |
 | T24 | a `RETENTION_WRITE_FAILED`, `RETENTION_VERIFY_FAILED` or `EVALUATION_FAILED` reaches the lifecycle record unchanged — never collapsed to `WORKFLOW_FAILED` or `CAPTURE_INCOMPLETE` — and a reason string that is not a string, lacks its code prefix, or carries anything beyond operation, method identity and exception class is refused |
-| T25 | the registry's check-and-mark is atomic and precedes boundary startup: a second `run` of the same commitment is refused, an unavailable registry refuses rather than proceeds, and a commitment marked spent before any provider call stays spent |
+| T25 | consumption is a single conditional append immediately before boundary startup: two concurrent `run` invocations resolve with exactly one proceeding; an unavailable registry refuses with `COMMITMENT_REGISTRY_UNAVAILABLE`, starting no boundary and writing no lifecycle record; a commitment marked spent before any provider call stays spent across a crash; and a missing outcome entry never reopens one |
+| T26 | only the named registry writer identity can append a consumption entry, and no principal can unmark one |
+| T27 | the canary lands in the probed store under the reserved prefix, is absent from every evidence read and from case-digest keying, and falls under the canary retention rule rather than the evidence retention period |
 
 ## 5. Explicitly excluded
 
@@ -617,6 +639,33 @@ not decided.
 | 5 | the runner's generic mapping would collapse the new codes, and reason strings were unvalidated `[V]` | the amendment preserves the exact code and validates every reason string's type, code prefix and permitted content (§2.3, T24) |
 
 The **durable spent-commitment authority is the only new owner choice** this
-review introduces. Ballot items remain five and remain `[R]`; nothing was
-ratified by any revision. No revision changed code, contract or CI gate, and
-none authorises a provider call.
+review introduces; revision 7 closes it.
+
+### Revision 7 (ratification of the three values revision 6 left open, 2026-09-03)
+
+The owner commissioned this revision to supply the values, which stand as
+rulings subject to their correction; the two concrete deployment facts they
+must still name are listed below.
+
+| # | Value | Owner ruling |
+|---|---|---|
+| 1 | spent-commitment registry | append-only, co-located with the preregistration medium, keyed by (identifier, `index_digest`), and **not** either custody store (§2.2) |
+| 2 | marking authority | one named registry writer identity, distinct from both custody writers, the boundary and the evaluator; `run` acts as it and nothing else may append a consumption entry |
+| 3 | check-and-mark | a single conditional append over the medium's atomic primitive — never read-then-write — so concurrent invocations resolve with exactly one proceeding |
+| 4 | consumption point | immediately before boundary startup, after the §2.1 identifier and digest match, so a zero-call halt still consumes |
+| 5 | registry unavailable | fail closed: `COMMITMENT_REGISTRY_UNAVAILABLE`, no boundary, no lifecycle record — the pre-run custody posture |
+| 6 | crash after marking | consumption is terminal; a run appends a closing outcome entry, but a missing outcome entry never reopens a commitment, which is what stops a crash from becoming a re-roll |
+| 7 | custody health-check timeout (D4) | **5 000 ms**, declared separately from the provider-call timeout and never conflated with it |
+| 8 | canary retention (D5) | canaries go to the **store they probe**, under a reserved prefix — a canary written elsewhere proves nothing about the failing store — excluded from evidence reads and from case-digest keying, under their own short retention and deletion rule rather than the evidence period |
+
+`COMMITMENT_ALREADY_SPENT` and `COMMITMENT_REGISTRY_UNAVAILABLE` join the
+governed vocabulary (§4, now five new codes). The §2.2 `[G]` is lifted, and
+T17 and T25–T27 test the ratified mechanism.
+
+**Still required from the owner:** the registry's concrete location and the
+name of its writer identity; and the canary retention period. These are
+deployment facts, not policy — the policy above holds whatever they are.
+
+Ballot items remain five and remain `[R]`; D1–D5 still need their provider,
+benchmark, threshold, budget, identity and custody values. No revision changed
+code, contract or CI gate, and none authorises a provider call.
