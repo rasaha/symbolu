@@ -1,6 +1,6 @@
 # Phase 4C — First Genuine Research-Only Workflow-Fit Pilot: Commissioning Note and Ballot
 
-**Revision 5.** Status: documentation only. **Nothing in this note authorises a
+**Revision 6.** Status: documentation only. **Nothing in this note authorises a
 provider call.** Until every ballot item in §3 is ratified by the owner, no
 code path in this repository may contact a provider, hold a credential, or
 run a real workflow behind the pilot boundary. Every output of a ratified 4C
@@ -103,6 +103,19 @@ identity, which is the precise thing preregistration exists to prevent. The
 same rule holds however the repetition was halted, including a halt with no
 provider call made.
 
+**The ruling is coherent but not yet enforceable `[G]` (revision 6).** No
+durable authority records that a commitment has been consumed. `run` verifies
+bundle contents and consults no history `[V]` (`pipeline.py`, `run`), so the
+same prepared bundle can be run again into another output directory. The
+prepared bundle itself cannot hold the mark — it is immutable and its digest
+is the commitment — and a local run directory cannot bind another machine or
+workspace. The **durable spent-commitment authority is therefore a new owner
+choice, balloted under D5**; until it is ratified, `run` cannot refuse a spent
+commitment and T17 is not testable. Because a zero-call halt already consumes
+the commitment (above), the safest mechanics are an atomic check-and-mark
+**before boundary startup**, but the registry and its procedure are the
+owner's to decide, not this note's.
+
 ### 2.3 Custody writers (resolves B3)
 
 The boundary sees provider prompts and responses; the experiment-side scorer
@@ -162,7 +175,18 @@ a writer that has just failed cannot be the recorder of its own failure. The
 reason string names the failing operation, the method and the exception
 class, and begins with the refusal code so the authoritative part is
 unambiguous; anything that cannot be rendered without a secret, a prompt, a
-response or an expected answer is **omitted rather than redacted**.
+response or an expected answer is **omitted rather than redacted**, an
+exception class whose own name contains a forbidden rendering `[V]`
+(`report.py`, `FORBIDDEN_RENDERINGS`) included.
+
+**The prefix is load-bearing, not cosmetic (revision 6).** The merged runner
+derives the authoritative refusal from the reason strings by prefix match
+`[V]` (`runner.py`: `WORKFLOW_FAILED` when a reason starts with it, else
+`CAPTURE_INCOMPLETE`). That two-way mapping **cannot carry the three new
+codes**, so the §4 runner amendment must preserve the **exact** code rather
+than collapse it, and must validate every reason string: a string, beginning
+with the refusal code it carries, containing only the failing operation, the
+method identity and the exception-class diagnostic, and nothing else.
 
 Both writers fail closed, at three distinct moments:
 
@@ -283,25 +307,70 @@ Later methods may continue **only if** the boundary and **both** custody
 services remain healthy. Coverage reporting must expose the missing method,
 and no complete-set comparison may be claimed.
 
-**The discriminator (owner ruling, revision 5).** A retention write or
-verification failure does not classify itself; **a custody health check
-does**. On any `RETENTION_WRITE_FAILED` or `RETENTION_VERIFY_FAILED`, the
-runner performs **one bounded health check** against that custody service —
-an append and read-back of a record carrying no benchmark, prompt or response
-content — before deciding scope:
+**The discriminator (owner ruling, revision 5; mechanics corrected in
+revision 6).** A retention write or verification failure does not classify
+itself; **a custody health check does**. It applies to **in-run failures
+only** — an exchange or verdict-retention failure inside a run. A **pre-run**
+custody failure is never health-checked and never classified into a method:
+§2.3 blocks preparation and preregistration outright, and before
+preregistration there is no runner, no method and no lifecycle to classify.
+
+On an in-run `RETENTION_WRITE_FAILED` or `RETENTION_VERIFY_FAILED`, **the
+process that owns the failing writer** performs **one bounded health check** —
+an append and read-back of a canary record carrying no benchmark, prompt or
+response content — before scope is decided:
+
+- the **boundary** performs the check for the boundary-side exchange writer,
+  **inside the boundary process**, and returns the original typed refusal
+  together with `failure_scope` = `METHOD_LOCAL` or `REPETITION_WIDE`;
+- the **runner** performs the check for the experiment-side benchmark-custody
+  writer only.
+
+The runner **never imports, holds or reaches the boundary's writer or its
+credential**, and the boundary protocol must carry the scope: the merged
+protocol has `RUN_BEGIN`, `CASE_BEGIN`, `CALL`, `CASE_END`, `RUN_END`,
+`ATTEST`, `PING` and `SHUTDOWN` and **no custody-health operation** `[V]`
+(`boundary/server.py`, `boundary/client.py`), so the scope field is
+commissioned in §4. The canary carries **its own identifier** and is **never
+represented as a provider exchange**: it is not a capture record, it never
+reaches `llm_calls`, and it never appears as an attempt.
+
+The verdict decides scope:
 
 - health check **succeeds** → the failure was record-scoped: **method-local**,
   that method `INCONCLUSIVE` with its exact code, later methods may continue;
 - health check **fails, times out, or cannot be performed** → **service
   failure**: the repetition stops under the rule above.
 
-The health check is itself a custody operation and is bounded by the D4
-timeout; it is attempted **once** and never retried, so a failing service
-cannot be probed into looking healthy. Its own failure is a service failure,
-never a fresh method-local one. The same discriminator applies to the
-boundary-side exchange writer, except that the boundary has already returned
-a non-retryable refusal for that method (§2.3), so a successful health check
-leaves the repetition running with that one method `INCONCLUSIVE`.
+The health check is itself a custody operation, bounded by the custody
+health-check timeout balloted in D4 — **not** the provider-call timeout, which
+is a different port with a different owner. It is attempted **once** and never
+retried, so a failing service cannot be probed into looking healthy. Its own
+failure is a service failure, never a fresh method-local one. On the
+boundary-side writer a `METHOD_LOCAL` scope still leaves that method
+`INCONCLUSIVE`, because the boundary has already returned a non-retryable
+refusal for it (§2.3); what the scope decides is whether the **repetition**
+continues.
+
+**Representing a repetition-wide halt (revision 6).** The merged result model
+cannot express this halt as ruled, and the gap is mechanical, not a new
+decision. Verification today requires `run_status.json` to carry **exactly**
+the manifest's assigned methods, lifecycle states to cover **exactly** those
+methods, and any complete method to feed a comparison result `[V]`
+(`pipeline.py`, `_load_status` and `verify`; `runner.py`, `complete_runs`),
+while §2.8 requires unstarted methods to have **no** lifecycle record and
+forbids a winner or a success figure after a halt. The amendments in §4
+therefore must: add a **non-governed repetition-level status** — halted or
+incomplete — to `run_status.json`, carrying the fatal refusal; represent
+unstarted methods in run status **without fabricating** a `MethodRun`, an
+execution record or a lifecycle state; relax verification's exact
+lifecycle-method equality **only** for a validated repetition-wide halt;
+**suppress creation and rendering of the comparison request and result**
+after a repetition-wide trust failure even when earlier methods completed —
+their evidence stays individually verifiable; and make coverage and report
+rendering distinguish an **incomplete repetition** from ordinary
+method-local incompleteness, with `success_summary` unavailable in the
+former `[V]` (`contracts/coverage.py`).
 
 ## 3. Ballot — five owner decisions `[R]`
 
@@ -357,7 +426,9 @@ itself evidence of representative sampling.
 
 **D4. Experimental design.**
 Values: repetition count, with one preregistered manifest and index per
-repetition and the `manifest_id` naming rule (§2.2); stochastic-control
+repetition and the `manifest_id` naming rule (§2.2); the **custody
+health-check timeout** of §2.8, stated separately from the provider-call
+timeout below; stochastic-control
 declaration (seed per repetition, or "provider offers no seed" with the
 pinned temperature); concurrency (sequential unless stated); run-level call
 ceiling and its scope (per run, per method, per case); spending ceiling with
@@ -381,7 +452,15 @@ Values: the preregistration medium and the receipt form in which the owner
 records the commitment identifier `workflow_fit_prepared_index.v1` and the
 prepared bundle's `index_digest` before execution (§2.1), per repetition; the two custody writers of §2.3 with their locations, writer
 identities, access-control lists, encryption and key custody, retention
-period and deletion rule; and the ratification of the boundary-side exchange
+period and deletion rule; **whether the §2.8 health-check canary records
+share the evidence custody store**, and whether that retention period and
+deletion rule apply to them; the **durable spent-commitment authority** of
+§2.2 — registry and location, the authority permitted to mark a commitment
+spent, the atomic check-and-mark operation, the exact point of consumption
+(before boundary startup unless stated otherwise), the behaviour when the
+registry is unavailable, and the crash-recovery rule where a commitment is
+marked spent but no provider call occurred; and the ratification of the
+boundary-side exchange
 writer, the runner retention amendment and the three new refusal codes as 4A
 amendments. The fail-closed behaviour is **ruled in §2.3**, not decided here:
 pre-run custody failure blocks preparation and preregistration; an in-run
@@ -406,10 +485,20 @@ runner amendment discarding the method's evidence after a post-attestation
 retention or evaluation failure and emitting `INCONCLUSIVE` with the exact
 stage code; (iv) the three refusal codes added to `PilotErrorCode`; (v) only
 if D1 selects option B, a separately ratified launch/connection port over the
-existing frame protocol; the benchmark-custody writer with the bounded
-health check of §2.8; `run` refusing a commitment already spent by a halted
-repetition (§2.2); and one preregistered run per repetition. The CI gate
-stays provider-free.
+existing frame protocol; the benchmark-custody writer with the runner-side
+bounded health check of §2.8; a **boundary-internal** exchange-writer health
+check whose `failure_scope` (`METHOD_LOCAL` / `REPETITION_WIDE`) is carried
+back with the typed refusal, which the merged frame protocol cannot express
+today `[V]`; the **repetition-level halt representation** of §2.8 — run-status
+halt field, unstarted methods without fabricated evidence, the narrowed
+verification equality, comparison suppression, and coverage and report
+rendering that separates an incomplete repetition from method-local
+incompleteness; the runner amendment preserving the **exact** refusal code and
+validating every reason string (§2.3); and `run` performing the atomic
+check-and-mark against the D5 spent-commitment registry before boundary
+startup, refusing a commitment already consumed (§2.2) — commissioned only
+once that registry is ratified. One preregistered run per repetition. The CI
+gate stays provider-free.
 
 **Acceptance obligations.** Each branch ruled above needs its own row, and no
 row may reach a provider:
@@ -432,7 +521,15 @@ row may reach a provider:
 | T14 | the child process environment equals the ratified allowlist exactly; no refusal payload, log line or retained record carries the credential, a prompt, a response or an expected answer |
 | T15 | the exception class reaches only the method's `run_status.json` reason and the `report.txt` line rendered from it — no lifecycle record, contract object or custody record carries it; the reason begins with the refusal code; a diagnostic needing a secret, prompt, response or expected answer is omitted; and `verify` still re-renders the report byte-identically |
 | T16 | a retention failure whose custody health check succeeds is method-local and later methods run; one whose health check fails, times out or cannot be performed stops the repetition; the health check is attempted exactly once and carries no benchmark content |
-| T17 | a halted repetition cannot be re-run under its own manifest and `index_digest` — `run` refuses the spent commitment — and its evidence survives the replacement repetition intact |
+| T17 | a halted repetition cannot be re-run under its own manifest and `index_digest` — `run` refuses the commitment the registry records as spent — and its evidence survives the replacement repetition intact |
+| T18 | the exchange-writer health check runs inside the boundary and its scope reaches the runner in the refusal; the runner holds no reference to that writer or its credential, and no import path exposes it |
+| T19 | the canary carries its own identifier, produces no capture record, does not change `llm_calls`, and never renders as a provider attempt |
+| T20 | a pre-run custody failure is never health-checked and never classified into a method: no runner, no lifecycle record, no `INCONCLUSIVE` |
+| T21 | after a repetition-wide halt, unstarted methods have no `MethodRun`, no execution record and no lifecycle state; `run_status.json` carries the halt and its fatal refusal; verification accepts the bundle |
+| T22 | after a repetition-wide halt no comparison request or result is created or rendered, no winner and no success summary appear, and each earlier method's evidence still verifies individually |
+| T23 | the report distinguishes an incomplete repetition from a method-local incompleteness |
+| T24 | a `RETENTION_WRITE_FAILED`, `RETENTION_VERIFY_FAILED` or `EVALUATION_FAILED` reaches the lifecycle record unchanged — never collapsed to `WORKFLOW_FAILED` or `CAPTURE_INCOMPLETE` — and a reason string that is not a string, lacks its code prefix, or carries anything beyond operation, method identity and exception class is refused |
+| T25 | the registry's check-and-mark is atomic and precedes boundary startup: a second `run` of the same commitment is refused, an unavailable registry refuses rather than proceeds, and a commitment marked spent before any provider call stays spent |
 
 ## 5. Explicitly excluded
 
@@ -501,6 +598,25 @@ and stand as rulings subject to the owner's correction.
 | 2 | when a custody failure becomes a service failure | **one bounded custody health check decides**: it succeeds → method-local; it fails, times out or cannot be performed → repetition-wide. Attempted once, never retried, carrying no benchmark content; bounded by the D4 timeout (§2.8) |
 | 3 | whether a halted repetition may be re-run under the same commitment | **no** — a fresh preregistration with a distinct `manifest_id` and its own index; the halted repetition's evidence is retained and reported, never overwritten, and `run` refuses the spent commitment (§2.2) |
 
-Acceptance obligations T15–T17 carry these branches. Ballot items remain five
-and remain `[R]`; nothing was ratified by any revision. No revision changed
-code, contract or CI gate, and none authorises a provider call.
+Acceptance obligations T15–T17 carry these branches.
+
+### Revision 6 (third-model review of the revision-5 selections, applied on owner instruction, 2026-09-03)
+
+An independent review confirmed the diagnostic selection, corrected the
+health-check mechanics, and found the halted-commitment ruling unenforceable
+against the merged repository. Every correction below is **forced by the
+revision-4 and revision-5 rulings**; one new owner choice is recorded as open,
+not decided.
+
+| # | Defect | Correction |
+|---|---|---|
+| 1 | the runner cannot health-check the boundary-side writer: that writer and its credential live inside the boundary process, and the merged protocol has no custody-health operation `[V]` | the process owning the writer performs the check — boundary internally, returning the refusal plus `failure_scope`; runner for benchmark custody only; the protocol carries the scope; the canary has its own identifier and is never a provider exchange (§2.8, §4) |
+| 2 | "refuse a spent commitment" has no authoritative state store: `run` consults no history, the prepared bundle is immutable, a local run directory binds no other machine `[V]` | the ruling stands and is marked `[G]` until the **durable spent-commitment authority** is ratified — registry, marking authority, atomic check-and-mark, consumption point, unavailability behaviour, crash recovery — balloted under D5 (§2.2, D5) |
+| 3 | §2.8 health-checked "any" retention failure, contradicting §2.3's pre-run block | the discriminator applies to **in-run** failures only; a pre-run failure blocks preparation with no health check and no method classification (§2.8) |
+| 4 | the merged result model cannot represent a repetition-wide halt: run status and lifecycle states must cover exactly the manifest's methods, and complete methods feed a comparison `[V]` | run-status halt field with the fatal refusal; unstarted methods without fabricated evidence; verification equality narrowed for a validated halt only; comparison suppressed; coverage and report separating an incomplete repetition from method-local incompleteness (§2.8, §4) |
+| 5 | the runner's generic mapping would collapse the new codes, and reason strings were unvalidated `[V]` | the amendment preserves the exact code and validates every reason string's type, code prefix and permitted content (§2.3, T24) |
+
+The **durable spent-commitment authority is the only new owner choice** this
+review introduces. Ballot items remain five and remain `[R]`; nothing was
+ratified by any revision. No revision changed code, contract or CI gate, and
+none authorises a provider call.
