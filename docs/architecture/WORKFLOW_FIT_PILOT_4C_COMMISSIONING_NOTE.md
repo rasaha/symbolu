@@ -1,6 +1,6 @@
 # Phase 4C — First Genuine Research-Only Workflow-Fit Pilot: Commissioning Note and Ballot
 
-**Revision 3.** Status: documentation only. **Nothing in this note authorises a
+**Revision 4.** Status: documentation only. **Nothing in this note authorises a
 provider call.** Until every ballot item in §3 is ratified by the owner, no
 code path in this repository may contact a provider, hold a credential, or
 run a real workflow behind the pilot boundary. Every output of a ratified 4C
@@ -54,15 +54,28 @@ reproduce. The prepared bundle therefore carries, and the preregistration
 receipt repeats, the commitment identifier
 `workflow_fit_prepared_index.v1`, defined as: SHA-256 per artifact; the
 index digest = `ugence_jcs.canonical_sha256_hex` over the sorted
-path-to-SHA-256 map; the prepared layout = the 4B prepared set plus
-`provider_configuration.json` and `experimental_design.json`. Every canonical
-provider-configuration value and every experimental-design parameter must be
-a prepared artifact under that layout, written by `prepare` before the
-commitment is recorded. `run` must refuse to start, and `verify` must refuse
-to pass, unless **both** the identifier and the recomputed digest equal the
-preregistered pair supplied to them. The scenario document used by 4B
-becomes a prepared artifact under the same rule. Experiment-side; no
-contract change.
+path-to-SHA-256 map; and **exactly** this prepared layout (owner ruling,
+revision 4) — the seven-file 4B prepared set `[V]`
+(`pipeline.py`, `PREPARED_LAYOUT`) plus two:
+
+```
+benchmark_manifest.json   catalog.json     preparation.json
+pilot_manifest.json       rule_set.json    provider_configuration.json
+advisory.json             case_set.json    experimental_design.json
+```
+
+`index.json` carries the commitment identifier, the artifact map and the
+`index_digest`, and is excluded from its own artifact map `[V]`
+(`bundle.py`, `write_index`). `experimental_design.json` is **the single
+selected and preregistered scenario**, not a set: the 4B `scenarios.json`
+fixture is an input to selection and is **not** part of the v1 layout. Every
+canonical provider-configuration value and every experimental-design
+parameter must be a prepared artifact under that layout, written by `prepare`
+before the commitment is recorded. `run` must refuse to start, and `verify`
+must refuse to pass, unless **both** the identifier and the recomputed digest
+equal the preregistered pair supplied to them. Any change to the algorithm,
+the canonicalisation, the path set or the layout requires a **new commitment
+identifier**; `v1` is never redefined. Experiment-side; no contract change.
 
 ### 2.2 Repetitions (resolves B2)
 
@@ -92,22 +105,61 @@ digest and the preregistered `index_digest`:
 - the **benchmark-custody writer**, experiment-side, retains the expected
   answers and the scorer's per-case verdicts keyed by case digest.
 
-Each writer has its own access-control list and named writer identity. Both
-fail closed, at two distinct moments:
+Each writer has its own access-control list and named writer identity.
+
+**Failure classification (owner ruling, revision 4).** A failure is
+classified by **the operation being performed**, never by Python exception
+class:
+
+| Operation that failed | Refusal code |
+|---|---|
+| writing a custody record | `RETENTION_WRITE_FAILED` |
+| confirming or reading back a retained record | `RETENTION_VERIFY_FAILED` |
+| evaluation or scoring | `EVALUATION_FAILED` |
+
+An evaluation failure must **never** be described as a retention failure. No
+generic `RETENTION_FAILED` code is used where the stage is known; the code
+revision 3 named is withdrawn. The three codes are additions to the governed
+refusal vocabulary (`errors.py`, `PilotErrorCode`) and are balloted as part
+of the 4A amendments in §4.
+
+**Exception boundary.** Catching `Exception` at each port call site is
+permitted, because the **call site** determines the category: the write call,
+the read-back call and the scorer call are distinct sites with distinct
+codes. `BaseException` is never caught. The concrete exception class is
+preserved as **non-authoritative diagnostic** information; it never carries
+secrets, prompts, responses or expected answers, and it never determines the
+refusal code.
+
+Both writers fail closed, at three distinct moments:
 
 - **Pre-run benchmark-custody failure.** Expected answers are retained by the
-  benchmark-custody writer before preregistration. A write that cannot be
-  confirmed **blocks preregistration and execution**: no manifest is
-  committed and no run exists, so nothing is marked `INCONCLUSIVE`.
-- **In-run retention failure.** A verdict-retention write or a boundary
-  exchange write that fails during a run must end that method's run
-  `INCONCLUSIVE` with a named refusal (`RETENTION_FAILED`), never a partial
-  record. The merged runner cannot do this: scoring happens after attestation
-  and outside the executor's exception handling (`runner.py`, `_run_method`),
-  so a scorer or retention exception today aborts the whole pilot without a
-  lifecycle record. A **narrow 4A runner amendment** (§4) must catch scorer
-  and retention exceptions after attestation, discard the attested record for
-  that method, and emit the `INCONCLUSIVE` transition with the named refusal.
+  benchmark-custody writer before preregistration. A write or read-back that
+  cannot be confirmed **blocks preparation and preregistration**: no manifest
+  is committed, no run exists and no lifecycle record exists, so nothing is
+  marked `INCONCLUSIVE`.
+- **In-run boundary exchange-custody failure**, during a provider attempt. An
+  exchange write or verification failure must: record the provider attempt in
+  boundary memory; mark the method run **fatally incomplete**; return the
+  typed refusal through the boundary protocol; **prevent the workflow from
+  retrying or making another provider call for that method**; issue **no**
+  execution record and **no** attestation for that method; and cause a direct
+  `PROPOSED` → `INCONCLUSIVE` transition carrying the exact retention refusal.
+  That direct transition is already permitted and already validates without an
+  engine result `[V]` (`contracts/lifecycle.py`, `_PERMITTED` and
+  `validate_lineage`: a refusal-carrying `INCONCLUSIVE` record has no
+  `result_digest`).
+- **Post-attestation failure.** A benchmark-verdict retention failure or an
+  evaluation failure after attestation must cause the runner to **discard that
+  method's record, attestation, claim, result, evaluation and observation from
+  the emitted evidence** and transition the method to `INCONCLUSIVE` with the
+  exact code. The merged runner cannot do this: scoring happens after
+  attestation and outside the executor's exception handling (`runner.py`,
+  `_run_method`), so such an exception today aborts the whole pilot without a
+  lifecycle record. A **narrow 4A runner amendment** (§4) supplies it.
+
+The scope of each failure — this method only, or the whole repetition — is
+§2.8.
 
 ### 2.4 Credential delivery (resolves M4)
 
@@ -116,15 +168,27 @@ fail closed, at two distinct moments:
 runner's environment (`pipeline.py`). **No environment mechanism makes a
 credential visible only to the provider factory**; any code in the boundary
 process can read it. The alternatives are put to ballot in D1 with their
-option-specific values. Option B is not implementable against the merged
-API: `run_pilot` constructs `BoundaryProcess` unconditionally and that class
-launches its own subprocess (`runner.py`, `boundary/process.py`), so an
-externally supervised boundary requires a **launch/connection port
-amendment** to 4A (§4), commissioned only if B is selected. In every option
-the boundary child process receives a **minimal environment allowlist
-derived from the selected option**: interpreter path, `PYTHONPATH`, locale,
-plus for A the workload-identity variables the source mechanism needs, for B
-nothing further, for C the single named variable; and nothing else.
+option-specific values.
+
+**Owner ruling (revision 4).** **Option A is recommended**: boundary-side
+retrieval through workload identity. No TCP credential port, HTTP credential
+protocol or any other new secret-transfer protocol is designed for this
+pilot; inventing one is excluded (§5). Option B is not implementable against
+the merged API — `run_pilot` constructs `BoundaryProcess` unconditionally and
+that class launches its own subprocess `[V]` (`runner.py`,
+`boundary/process.py`) — and remains available **only** through a separately
+specified launch/connection-port amendment that reuses the **existing pilot
+frame protocol** over the **supported Unix-socket or pipe transports** `[V]`
+(row A16d, `transport` on `run_pilot`). If B is later selected, its exact
+supervisor handoff and attachment mechanism must be ratified **before**
+implementation; no mechanism is specified here. Option C remains explicitly
+**non-isolating**.
+
+For whichever option is selected, the ballot must **name every environment
+key** admitted by the minimal child-process allowlist, and nothing else
+reaches the child. `PATH` and the interpreter executable are process
+prerequisites and **must not be described as a credential-isolation
+mechanism**.
 
 ### 2.5 Provider identity (resolves M5)
 
@@ -132,16 +196,23 @@ nothing further, for C the single named variable; and nothing else.
 (`boundary/frames.py`). A pinned `provider_configuration.json` proves what was
 **requested**, not what the provider **executed**. Configured identity is
 therefore requester-declared and unverified unless the provider returns an
-immutable deployment identity. **Representation and enforcement.** The
-provider factory must compare the identity the provider returns with the
-preregistered value **before** returning `ProviderResult`, and map the
-verified identity into `provider_id`; `CaptureRecord` is unchanged. On
-absence, mismatch, or inconsistency across attempts within a run, the
-boundary **hard-stops the run** with a named refusal
-(`PROVIDER_IDENTITY_UNVERIFIED`) as part of the boundary hard-stop amendment
-(§4); the refusal is never surfaced as an ordinary captured provider
-exception that a workflow could retry past. The acceptance policy is
-balloted in D1.
+immutable deployment identity.
+
+**Owner ruling (revision 4) — binding policy for the first genuine 4C
+pilot.** **Refuse any provider that cannot return an immutable deployment
+identity.** The provider factory must compare the returned immutable identity
+with the preregistered value **before** returning `ProviderResult`, map the
+verified identity into `provider_id` (`CaptureRecord` is unchanged), and
+require **the same identity on every attempt**. Absence, mismatch or
+cross-attempt inconsistency produces a **non-retryable**
+`PROVIDER_IDENTITY_UNVERIFIED` refusal — never an ordinary captured provider
+exception a workflow could retry past — and **stops the entire repetition**
+under §2.8, as part of the boundary hard-stop amendment (§4).
+
+Requester-declared provider identity is **not an accepted Phase 4C execution
+mode**. It remains documented as an excluded future research option (§5); it
+must not share the `provider_id` representation of a verified identity and
+must never appear as verified.
 
 ### 2.6 Quality unit and aggregation (resolves M6)
 
@@ -159,6 +230,26 @@ is refused by `prepare`; changing it requires a later 4A amendment.
 | Concurrency | runner sequential, one connection | sequential; change only by ballot |
 | Stochastic control | no seed or temperature concept anywhere | declared in `experimental_design.json` and applied by the provider factory (D4) |
 
+### 2.8 Partial-run policy (owner ruling, revision 4)
+
+The scope of a failure is decided by **what failed**, not by where in the run
+it happened. Ratified under D4.
+
+**A trust-infrastructure failure stops the entire repetition.** These are:
+provider-identity failure (§2.5); boundary exchange-custody failure (§2.3);
+benchmark-custody service failure (§2.3); and failure of the boundary itself.
+The failing method becomes `INCONCLUSIVE` with its exact refusal code.
+Methods not yet started produce **no fabricated lifecycle record and no
+result**. Evidence for already completed methods remains individually valid,
+but the repetition report is **labelled incomplete** and **may not present a
+comparative winner or a success figure**.
+
+**A method-local failure makes only that method `INCONCLUSIVE`**: execution
+failure, a call-ceiling breach, or an evaluation failure (`EVALUATION_FAILED`).
+Later methods may continue **only if** the boundary and **both** custody
+services remain healthy. Coverage reporting must expose the missing method,
+and no complete-set comparison may be claimed.
+
 ## 3. Ballot — five owner decisions `[R]`
 
 Each item lists the **concrete values the owner must supply at
@@ -171,20 +262,22 @@ complete decoding-parameter set (temperature, top-p, max output tokens, stop
 sequences, seed or "not supported"); and the credential-delivery
 option with its option-specific values:
 - A. the boundary retrieves the secret itself using workload identity
-  (**recommended**): the principal or role, the token audience, the secret
-  location, and the credential-source mechanism;
+  (**recommended, revision 4**): the principal or role, the token audience,
+  the secret location, and the credential-source mechanism;
 - B. an external supervisor injects it directly into the boundary process:
-  the supervisor identity, the handoff mechanism, and ratification of the
-  launch/connection port amendment (§2.4, §4) it requires;
+  the supervisor identity, the handoff mechanism, and **prior ratification**
+  of the separately specified launch/connection-port amendment over the
+  existing frame protocol and supported transports (§2.4, §4);
 - C. the runner inherits it under a tested non-reading, non-serialising
   convention, **explicitly labelled non-isolating**: the single
   environment-variable name.
-Identity policy, one of: accept requester-declared identity as unverified, or
-**refuse any provider that does not return an immutable deployment identity
-(recommended)**, enforced by the factory comparison and boundary hard stop of
-§2.5. In every option the credential never appears in arguments,
-manifests, logs, bundles, retention records or this repository, and the child
-process receives the §2.4 allowlist only.
+**Identity policy is ruled, not open (revision 4):** refuse any provider that
+cannot return an immutable deployment identity, enforced by the factory
+comparison and the boundary hard stop of §2.5, with the repetition-wide stop
+of §2.8. Requester-declared identity is not an available mode. In every
+option the credential never appears in arguments, manifests, logs, bundles,
+retention records or this repository, and the child process receives the
+§2.4 allowlist only — **every admitted environment key named in this item**.
 
 **D2. Benchmark and evaluation custody.**
 Values: named author and named approver of the cases and expected answers
@@ -217,39 +310,66 @@ pinned temperature); concurrency (sequential unless stated); run-level call
 ceiling and its scope (per run, per method, per case); spending ceiling with
 its pricing source, currency and the count it is derived from; timeout per
 provider call and who owns it (provider factory); retry policy, with every
-retry a captured attempt that counts in `llm_calls`; stop conditions and the
-partial-run policy (a ceiling breach ends the run `INCONCLUSIVE`); and case
+retry a captured attempt that counts in `llm_calls`; stop conditions; and case
 ordering (preregistered order, or a declared randomisation with its seed).
-The boundary-side hard stop at the call ceiling is a 4A amendment ratified
-by this item.
+The **partial-run policy is ruled in §2.8** (trust-infrastructure failure
+stops the repetition; a method-local failure, a ceiling breach included, ends
+only that method `INCONCLUSIVE`) and is ratified by this item, not re-decided
+in it. The boundary-side hard stop at the call ceiling is a 4A amendment
+ratified by this item.
 
 **D5. Preregistration and evidence retention.**
 Values: the preregistration medium and the receipt form in which the owner
 records the commitment identifier `workflow_fit_prepared_index.v1` and the
 prepared bundle's `index_digest` before execution (§2.1), per repetition; the two custody writers of §2.3 with their locations, writer
 identities, access-control lists, encryption and key custody, retention
-period and deletion rule; the fail-closed behaviour at both moments of §2.3
-(pre-run block, in-run `RETENTION_FAILED`); and the ratification of the
-boundary-side exchange writer and the runner retention amendment as 4A
-amendments.
+period and deletion rule; and the ratification of the boundary-side exchange
+writer, the runner retention amendment and the three new refusal codes as 4A
+amendments. The fail-closed behaviour is **ruled in §2.3**, not decided here:
+pre-run custody failure blocks preparation and preregistration; an in-run
+failure is classified by the operation that failed and carries
+`RETENTION_WRITE_FAILED`, `RETENTION_VERIFY_FAILED` or `EVALUATION_FAILED`,
+with the repetition scope of §2.8.
 Git keeps digests and the governed evidence objects only. Digest-only
 evidence is insufficient for later independent re-evaluation.
 
 ## 4. What ratification would commission `[I]`
 
 Only after all five items are ratified: `prepare` extended to write
-`provider_configuration.json` and `experimental_design.json` and to refuse
-non-`score.unit` or non-mean configuration; `run` and `verify` extended to
-take and enforce the preregistered commitment identifier and `index_digest`
-together; a boundary-side provider factory implementing the D1 option,
-decoding parameters and the §2.5 identity comparison; the **4A amendments**,
-each with acceptance rows and a spec §11 record: (i) boundary hard stop at
-the call ceiling and on `PROVIDER_IDENTITY_UNVERIFIED`; (ii) boundary-side
-exchange writer; (iii) runner amendment catching scorer and retention
-exceptions after attestation and emitting `INCONCLUSIVE` with
-`RETENTION_FAILED`; (iv) only if D1 selects option B, a launch/connection
-port so an externally supervised boundary can be attached; the
-benchmark-custody writer; and one preregistered run per repetition. The CI gate stays provider-free.
+`provider_configuration.json` and `experimental_design.json` under the exact
+§2.1 layout and to refuse non-`score.unit` or non-mean configuration; `run`
+and `verify` extended to take and enforce the preregistered commitment
+identifier and `index_digest` together; a boundary-side provider factory
+implementing the D1 option, decoding parameters and the §2.5 identity
+comparison; the **4A amendments**, each with acceptance rows and a spec §11
+record: (i) boundary hard stop at the call ceiling and on
+`PROVIDER_IDENTITY_UNVERIFIED`; (ii) boundary-side exchange writer; (iii)
+runner amendment discarding the method's evidence after a post-attestation
+retention or evaluation failure and emitting `INCONCLUSIVE` with the exact
+stage code; (iv) the three refusal codes added to `PilotErrorCode`; (v) only
+if D1 selects option B, a separately ratified launch/connection port over the
+existing frame protocol; the benchmark-custody writer; and one preregistered
+run per repetition. The CI gate stays provider-free.
+
+**Acceptance obligations.** Each branch ruled above needs its own row, and no
+row may reach a provider:
+
+| # | Obligation |
+|---|---|
+| T1 | `run` and `verify` refuse a correct `index_digest` under a different commitment identifier, and a correct identifier with a mismatched digest |
+| T2 | `prepare` refuses a prepared set that omits, or adds to, the nine-file §2.1 layout; `index.json` is absent from its own artifact map |
+| T3 | a pre-run benchmark-custody write failure leaves no manifest, no run and **no lifecycle record** |
+| T4 | a pre-run benchmark-custody read-back failure does the same |
+| T5 | a boundary exchange **write** failure during an attempt yields `RETENTION_WRITE_FAILED`, the attempt recorded in boundary memory, no execution record, no attestation, and a direct `PROPOSED` → `INCONCLUSIVE` record |
+| T6 | a boundary exchange **verification** failure yields `RETENTION_VERIFY_FAILED` on the same path |
+| T7 | after either, the workflow cannot make a further provider call for that method (the refusal is non-retryable) |
+| T8 | a post-attestation verdict-retention failure discards record, attestation, claim, result, evaluation and observation from the emitted evidence and transitions to `INCONCLUSIVE` with the retention code |
+| T9 | a scorer failure yields `EVALUATION_FAILED` — never a retention code — and discards the same evidence |
+| T10 | a trust-infrastructure failure stops the repetition: unstarted methods emit no lifecycle record and no result, and the report is labelled incomplete with no winner and no success figure |
+| T11 | a method-local failure leaves later methods runnable, and coverage exposes the missing method with no complete-set comparison |
+| T12 | absent, mismatched, or cross-attempt-inconsistent provider identity yields non-retryable `PROVIDER_IDENTITY_UNVERIFIED` and the §2.8 repetition stop |
+| T13 | a verified identity reaches `provider_id`; no requester-declared identity path exists |
+| T14 | the child process environment equals the ratified allowlist exactly; no refusal payload, log line or retained record carries the credential, a prompt, a response or an expected answer |
 
 ## 5. Explicitly excluded
 
@@ -258,7 +378,11 @@ any artifact; cross-run aggregation; advisor changes from pilot results;
 readiness composites; production eligibility, approval or configuration
 mutation; TEV integration; any quality unit or aggregation other than §2.6;
 any claim that a run measures reasoning quality beyond the declared
-benchmark.
+benchmark; **requester-declared provider identity as an execution mode**
+(§2.5 — an excluded future research option only); **any newly invented
+credential transport** — TCP credential port, HTTP credential protocol or
+other secret-transfer protocol (§2.4); and a generic `RETENTION_FAILED`
+refusal where the failing stage is known (§2.3).
 
 ## 6. Correction record
 
@@ -278,10 +402,29 @@ benchmark.
 
 | # | Defect | Resolution |
 |---|---|---|
-| B3 | In-run custody failure could abort without an `INCONCLUSIVE` record; pre-run and in-run failures conflated | pre-run failure blocks preregistration; in-run failure is `RETENTION_FAILED` via a narrow runner amendment commissioned in §4 (§2.3, D5) |
+| B3 | In-run custody failure could abort without an `INCONCLUSIVE` record; pre-run and in-run failures conflated | pre-run failure blocks preregistration; in-run failure is `RETENTION_FAILED` via a narrow runner amendment commissioned in §4 (§2.3, D5) — **the single code is superseded by the three stage codes of revision 4** |
 | B1 | Unversioned index promoted to a commitment | commitment identifier `workflow_fit_prepared_index.v1` with algorithm and layout pinned in bundle and receipt; `run`/`verify` check identifier and digest together (§2.1, D5) |
 | M4 | Option-specific values missing; option B unimplementable | values enumerated per option; launch/connection port amendment commissioned only if B is selected; allowlist derived from the option (§2.4, D1, §4) |
 | M5 | Returned identity had no representation or stop semantics | factory compares before returning, verified identity in `provider_id`, boundary hard stop `PROVIDER_IDENTITY_UNVERIFIED` (§2.5, D1, §4) |
 
-Ballot items remain five and remain `[R]`; nothing was ratified by either
-revision.
+### Revision 4 (owner rulings on the remaining design questions, 2026-09-03)
+
+The owner issued these on their own authority, in their own wording, as
+rulings rather than recommendations. They close the design questions the
+third review left open; they do **not** ratify D1–D5, which stay `[R]` and
+still require their concrete provider, benchmark, threshold, budget, identity
+and custody values.
+
+| # | Question left open | Owner ruling |
+|---|---|---|
+| B1 | which artifacts `workflow_fit_prepared_index.v1` covers | the nine named files of §2.1; `index.json` holds identifier, map and digest and is excluded from its own map; `experimental_design.json` is the single selected scenario and `scenarios.json` is not in v1; any layout or algorithm change takes a new identifier |
+| B3 | which exceptions trigger which refusal | classify by **the operation that failed**, never by exception class: `RETENTION_WRITE_FAILED`, `RETENTION_VERIFY_FAILED`, `EVALUATION_FAILED`; no generic `RETENTION_FAILED` where the stage is known; an evaluation failure is never a retention failure |
+| B3 | the exception boundary | `Exception` may be caught at each port call site because the site fixes the category; `BaseException` never; the concrete class is non-authoritative diagnostic information carrying no secret, prompt, response or expected answer |
+| B3 | in-run boundary custody behaviour | attempt recorded in boundary memory, method fatally incomplete, typed refusal returned, no further provider call for that method, no record and no attestation, direct `PROPOSED` → `INCONCLUSIVE` |
+| — | partial-run scope (new §2.8, ratified under D4) | trust-infrastructure failure stops the repetition with no fabricated lifecycle for unstarted methods and an incomplete-labelled report; a method-local failure ends only that method |
+| M4 | option B's connection mechanism | none is invented: no TCP credential port and no HTTP credential protocol; A recommended; B only via a separately ratified launch/connection-port amendment over the existing frame protocol and supported transports; C non-isolating; every allowlisted environment key named in D1; `PATH` and the interpreter are not isolation |
+| M5 | identity acceptance policy | binding: refuse any provider that cannot return an immutable deployment identity; same identity required on every attempt; requester-declared identity is not a 4C mode and never shares the verified `provider_id` representation |
+
+Ballot items remain five and remain `[R]`; nothing was ratified by any
+revision. Revision 4 changed no code, no contract and no CI gate, and
+authorises no provider call.
