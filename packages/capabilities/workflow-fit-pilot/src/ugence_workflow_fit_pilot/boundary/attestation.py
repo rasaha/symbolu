@@ -99,6 +99,7 @@ def issue_attestation(
     record_payload: Dict[str, Any],
     capture_records: Sequence[CaptureRecord],
     *,
+    manifest_digest: str,
     declaration: CaptureBoundaryDeclaration,
     record_issuer_identity: str,
     requester_identity: str,
@@ -107,16 +108,23 @@ def issue_attestation(
     """§4.3 step 5. Recomputes the record digest from its canonical payload and the telemetry
     from the capture records, refuses mismatch and self-attestation, and issues the envelope
     over the record digest with the supported subset of the declared fields. ``attested_at``
-    is the boundary's own instant, obtained here."""
+    is the boundary's own instant, obtained here.
+
+    ``manifest_digest`` is the boundary's preregistered run state (owner ruling, 2026-09-02,
+    spec §11): it must equal the manifest stamp in the record's ``capture_refs`` and every
+    capture record's stamp. A completed run with an empty capture set (zero calls in every
+    case) is attested over that stamp alone: ``llm_calls = 0``, no token usage,
+    ``capture_refs = (manifest_digest,)``. Completeness itself (every case begun and ended
+    exactly once, harness-observed counts equal, no workflow failure) is the boundary
+    server's RUN_END judgment, which gates every call of this function."""
     if not isinstance(record_payload, dict) or "record_digest" not in record_payload or "telemetry" not in record_payload:
         raise PilotError(PilotErrorCode.TELEMETRY_NOT_RECOMPUTED, "record payload must carry record_digest and telemetry")
     supplied_digest = record_payload["record_digest"]
     body = {k: v for k, v in record_payload.items() if k != "record_digest"}
     if digest_of(body) != supplied_digest:
         raise PilotError(PilotErrorCode.TELEMETRY_NOT_RECOMPUTED, "record_digest is not the digest of the supplied payload")
-    manifest_digest = capture_records[0].manifest_digest if capture_records else None
-    if manifest_digest is None:
-        raise PilotError(PilotErrorCode.TELEMETRY_NOT_RECOMPUTED, "no capture records")
+    if not isinstance(manifest_digest, str) or not manifest_digest:
+        raise PilotError(PilotErrorCode.TELEMETRY_NOT_RECOMPUTED, "the boundary's manifest digest is required")
     # Attribution: every capture record must belong to THIS record's method and invocation.
     method = record_payload.get("method") or {}
     run_id = record_payload.get("invocation_id")
