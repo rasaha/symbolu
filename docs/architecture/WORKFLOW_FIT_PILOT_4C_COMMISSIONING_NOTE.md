@@ -1,6 +1,6 @@
 # Phase 4C — First Genuine Research-Only Workflow-Fit Pilot: Commissioning Note and Ballot
 
-**Revision 12.** Status: documentation only. **Nothing in this note authorises a
+**Revision 13.** Status: documentation only. **Nothing in this note authorises a
 provider call.** Until every ballot item in §3 is ratified by the owner, no
 code path in this repository may contact a provider, hold a credential, or
 run a real workflow behind the pilot boundary.
@@ -531,6 +531,157 @@ configuration. The ruling above is therefore the only reading the merged code
 can represent — and nothing in the contracts *enforces* configuration fixity,
 which rests on the preregistered commitment covering the harness version.
 
+### 2.11 Calibration and confirmatory run architecture (owner ruling, revision 13)
+
+**The defect this resolves `[V]`.** A run role alone cannot separate the two
+kinds of run. `PilotStudyManifest.plan` is a `ResearchComparisonPlan`, whose
+`task_class` is a `TaskClassIdentity`, whose `comparison_policy.sufficiency.
+threshold` is a `GovernedThreshold` requiring a literal or a benchmark
+reference; the pilot loader additionally requires `Decimal(literal)` to parse.
+A calibration manifest built on that chain **cannot exist without a
+threshold**. `run_pilot` then calls `compare` whenever any run is complete, and
+`summary_permitted` is derived from record completeness — so a calibration run
+on the confirmatory path emits a comparison request, a comparison result,
+`EVALUATED` records, a coverage report and a success summary. The resolution is
+therefore structural: **calibration carries no comparison policy at all**, so
+there is no threshold to fake and no request the runner could construct.
+
+**Compatibility — both mechanisms, ratified.** A schema-version split answers
+*is this artifact eligible for a genuine 4C run*; a discriminated union answers
+*which role is this*. Neither alone suffices.
+
+| Schema | Role | Status |
+|---|---|---|
+| `workflow_fit_pilot.manifest.v1` | none | historical **mechanism validation only**; verifiable, **never** 4C-eligible, and **never** defaulted to `CONFIRMATORY` |
+| `workflow_fit_pilot.manifest.v2` | `CONFIRMATORY` | requires explicit `run_role` and complete `CalibrationProvenance` |
+| `workflow_fit_pilot.calibration_manifest.v1` | `CALIBRATION` | separate contract; no plan, no task class, no policy, no threshold |
+
+An absent, unknown or mismatched run role **fails closed**. A calibration
+manifest must not contain a comparison plan, task-class identity, comparison
+policy, governed threshold, advisory binding or multi-method role assignment.
+
+```
+PilotRunRole:
+  CALIBRATION
+  CONFIRMATORY
+```
+
+**`CalibrationManifest`** carries: schema version; manifest id; explicit
+`CALIBRATION` role; benchmark manifest; `CalibrationTaskBinding`; exactly one
+reasoning method (`linear_chain`); capture boundary; evaluator declaration;
+identity declaration; quality aggregation; usage scope; preregistration
+identity and instant; manifest digest.
+
+**`CalibrationTaskBinding`** carries `domain_ref`, `intended_outcome_ref`,
+`population_ref`, `benchmark_set_ref` and `profile_digest`. It is **descriptive
+binding only** and must never import a task class or comparison policy.
+
+**`CalibrationResult`** (`workflow_fit_pilot.calibration_result.v1`):
+`calibration_id`, `manifest_digest`, `evaluation_digest`, `attestation_digest`,
+`statistic_value`, `governed_unit`, `score_count`, `sample_index_digest`,
+`commitment_identifier`, `index_digest`, `verdict_custody_ref`, `formula_id`,
+`formula_version`, `issued_by`, `issued_at`, `calibration_result_digest`.
+Benchmark, method, evaluator, scoring and run fields are **not duplicated**:
+`QualityEvaluationRecord` already binds manifest digest, method, record digest,
+case-set digest, evaluator declaration digest, scoring-instruction digest,
+aggregation, claim digest, quality-result digest, independence and evaluator
+attribution `[V]`, and `QualityResult` carries the aggregate value `[V]`.
+
+Verification must establish that `statistic_value` **exactly equals** the
+`QualityResult.value` reachable through `evaluation_digest`; that
+`governed_unit` is `score.unit`; that `score_count` equals the benchmark case
+count; that evaluation and attestation lineage recompute; and that the
+commitment pair and sample-index digest match the prepared calibration
+artifacts. The aggregate can therefore never be detached from the scores and
+attestation beneath it.
+
+**`CalibrationProvenance`**, inside the confirmatory manifest digest:
+`calibration_result_digest`, `calibration_manifest_digest`,
+`calibration_commitment_identifier`, `calibration_index_digest`, `formula_id`,
+`formula_version`, `instantiated_literal`. The verifier must establish that the
+instantiated literal equals **both** the calibration statistic **and** the
+confirmatory task-class threshold, and that the formula identity and every
+named digest reconcile. **Any mismatch fails closed.**
+
+**Role behaviour.**
+
+| | `CALIBRATION` | `CONFIRMATORY` |
+|---|---|---|
+| Capture, attestation, custody, programmatic scoring | executed and governed | executed and governed |
+| Methods | `linear_chain` only | as assigned |
+| Comparison request / result | **none — unconstructible** | required |
+| `RESULT_ASSESSED` / `EVALUATED` | **forbidden** | permitted |
+| Coverage report | **not emitted** | emitted |
+| Success summary | **impossible** — no coverage artifact exists | derived as today |
+| Distinct artifact | `calibration_result.json` | comparison and coverage files |
+| Successful endpoint | `UNDER_TEST`, **only** when a valid `CalibrationResult` exists | `EVALUATED` |
+
+**A required 4A amendment, not a claim that this already works `[G]`.** The
+merged lifecycle model permits a chain to rest at `UNDER_TEST` — nothing forces
+progression `[V]` (`_PERMITTED`) — but it **cannot distinguish** a successfully
+completed calibration from a confirmatory run that merely stopped after
+`UNDER_TEST`. `UNDER_TEST` is **not** redefined as globally terminal. Making the
+role-specific endpoint safe requires a Phase 4A amendment that ties the
+endpoint to the presence of a valid `CalibrationResult`; until that amendment
+is commissioned, the distinction is not machine-enforced.
+
+**Accounting ceilings (baseline-only calibration).** Calibration 1 × 50 × 8 =
+**400**; three confirmatory repetitions 3 × 2 800 = **8 400**; combined
+**8 800**. Only the shared per-case cap of 8 is enforced; the rest is
+accounting.
+
+**Prepared-bundle identity.** Calibration prepared bundles use
+`workflow_fit_prepared_index.calibration.v1`. The revision-4 confirmatory
+identifier `workflow_fit_prepared_index.v1` and its **nine-path layout are
+unchanged**; calibration uses the **same path set** with a **different content
+model** for `pilot_manifest.json`, which is why it takes its own identifier.
+This neither renames nor reinterprets the revision-4 artifact, and creates no
+contradiction with the exact-layout ruling: that ruling fixes paths, and the
+paths are identical.
+
+**Threshold formula `calfloor.linear_chain.v1`.** Source statistic: the exact
+arithmetic-mean quality of `linear_chain` from the baseline-only calibration.
+Exact `Decimal` arithmetic; **no rounding** — with 50 binary cases every mean is
+an exact two-decimal value `[V]`. Confirmatory comparator `GTE`; **one
+universal threshold**, which is all the engine supports `[V]`. Malformed or
+non-binary scorer output is a **conformance failure**, not a score. Absent or
+inconclusive calibration **blocks threshold instantiation and confirmatory
+execution**; a replacement calibration requires a **fresh commitment** (§2.2).
+The instantiated literal and complete provenance must enter confirmatory
+preregistration **before** execution.
+
+**Self-reference, recorded.** In confirmatory runs the baseline is compared
+against a floor derived from its own calibration performance, so its own
+sufficiency verdict is definitionally self-referential and **must never be
+reported as evidence about baseline quality**.
+
+**Scorer `bbh-ld7.v2`**, superseding v1. Complete normative preimage, verbatim:
+
+```
+bbh-ld7.v2: LINES. Split the final response on U+000A only; from each line remove a single trailing U+000D if present. WHITESPACE means exactly the six characters U+0009, U+000A, U+000B, U+000C, U+000D and U+0020; no other character is whitespace for this procedure. SELECTION. A line is prefix-bearing when, after removing leading and trailing WHITESPACE, it begins with the four characters 'ANSWER:' compared using ASCII case folding only (A-Z to a-z; no other case mapping). If the response contains no prefix-bearing line the score is Decimal('0'). Otherwise select the LAST prefix-bearing line in the response; never fall back to any earlier line, even when the selected line's payload is malformed. NORMALIZATION. Take the selected line's text after the prefix; replace every maximal run of WHITESPACE with a single U+0020; remove leading and trailing U+0020; if and only if the result both begins with '(' and ends with ')', remove exactly one leading '(' and exactly one trailing ')'; remove leading and trailing U+0020 again; map ASCII lowercase a-z to uppercase A-Z and change nothing else. The normalized payload must be exactly one character and that character must be one of A B C D E F G, compared by Unicode code point; any non-ASCII character, including visually similar ones, fails this test. EXPECTED. Normalize the upstream target with the identical steps, so an upstream '(B)' normalizes to 'B'. SCORE. Return Decimal('1') when the normalized payload and the normalized expected value are equal as code-point sequences, and Decimal('0') in every other case, including a failed payload test. No partial credit. No semantic judgment. No prose fallback. No inspection of the case query.
+```
+
+UTF-8 byte length **1 703**; `ugence_jcs.canonical_sha256_hex` =
+**`84051a08da3451a91ef084777e8aecf1211d04d63eef26ff8a04530443b870e9`**, both
+recomputed from the text above. Essential behaviour: an `ANSWER:` prefix is
+**mandatory**; the **last** prefix-bearing line wins even when malformed;
+**there is no fallback** to an earlier line; payload must be exactly one ASCII
+character `A`–`G`; parenthesis and whitespace normalisation exactly as stated;
+missing, malformed, multi-character, punctuated, out-of-range and non-ASCII
+answers score zero. The final `scoring_instruction_digest` still composes this
+text with the benchmark manifest digest and the sufficiency rule id/version at
+`prepare` `[V]`.
+
+**Four additional refusal codes**, ratified in revision 13:
+`RUN_ROLE_INVALID`, `ROLE_ARTIFACT_INCONSISTENT`,
+`CALIBRATION_PROVENANCE_INVALID`, `CALIBRATION_STATISTIC_UNAVAILABLE`. Existing
+codes are reused where their semantics already apply — `SCHEMA_VERSION_UNSUPPORTED`,
+`MANIFEST_MISMATCH`, `MANIFEST_NOT_VALIDATED`, `STATE_TRANSITION_INVALID`,
+`RECORD_MISMATCH`, `QUALITY_EVALUATION_MISMATCH`, `ATTESTATION_MISMATCH`,
+`COUNT_INVALID`, `CAPTURE_INCOMPLETE` — and are not duplicated. A missing
+confirmatory threshold needs no code: `GovernedThreshold` already refuses
+construction `[V]`.
+
 ## 3. Ballot — five owner decisions `[R]`
 
 Each item lists the **concrete values the owner must supply at
@@ -728,7 +879,7 @@ decision.
 | D5 | single conditional append, never read-then-write; consumption immediately before boundary startup; unavailability fails closed; consumption terminal after a crash; a missing outcome entry never reopens a commitment |
 | D5 | canary written to the custody store it tests under a reserved prefix; excluded from evidence reads and case-digest addressing; separate retention and deletion policy |
 | D5 | customer-managed encryption, bounded: it protects retained evidence only when the runner, workflows and unrelated operators lack decrypt permission |
-| codes | seven additions selected (§4) |
+| codes | seven additions **owner-ratified in revision 10**; four calibration codes added in revision 13, eleven in total (§2.11, §4) |
 | codes | `"(budget exhausted)"` must become one shared runtime constant (§2.9, §4) |
 
 #### CONDITIONAL OWNER SELECTION — PROVIDER ROUTE (D1)
@@ -802,7 +953,7 @@ formula below are still open.
 | Selected indexes | 50 unique indexes in `[0, 249]`, derived, published ascending | mechanically derived |
 | Selected-index-list digest | `c521cdd75dc3b8c9e589835ade4b780ef26ba955d4077f5c7ad74e803be60682` | mechanically derived |
 | Execution order | ascending derived case-digest order | owner-selected; matches the merged runner `[V]` |
-| Scoring | `bbh-ld7.v1`, binary — see below | owner-ratified |
+| Scoring | **`bbh-ld7.v2`**, binary — §2.11; supersedes v1 (revision 13) | owner-ratified |
 | Evaluator kind | `PROGRAMMATIC` | **conditional**: final only after the implementation, complete procedure text, evaluator identity and version, and `scoring_instruction_digest` are inspected and fixed |
 | Expected answers | derived from the pinned upstream `target` fields; available only to the scorer | owner-selected |
 | External threshold | none presently established for this wrapped task and sample | owner-selected |
@@ -821,13 +972,9 @@ produces. Index order is the position in the `examples` array of the pinned
 file, zero-based, unfiltered. Ties break on ascending `i`. The derivation needs
 no benchmark content: it consumes only the seed and the index range.
 
-**`bbh-ld7.v1` scoring, binary.** Take the last line of the final response whose
-stripped form begins with `ANSWER:` (case-insensitive); remove the prefix;
-collapse internal whitespace; strip surrounding parentheses and whitespace;
-upper-case; require exactly one character in `A`–`G`. Normalise the expected
-target identically. Score `1` on exact equality, `0` otherwise. No partial
-credit, no semantic judgment, no prose fallback; absent or malformed output
-scores `0`.
+**Scoring is `bbh-ld7.v2`** (revision 13), whose complete normative preimage,
+byte length and digest are recorded in §2.11. It supersedes the v1 summary
+that stood here.
 
 **Open under D2–D3:** benchmark author and distinct approver; benchmark-custody
 URI with readers and writers; evaluator identity, version and actual
@@ -880,15 +1027,17 @@ record: (i) boundary hard stop at the call ceiling and on
 `PROVIDER_IDENTITY_UNVERIFIED`; (ii) boundary-side exchange writer; (iii)
 runner amendment discarding the method's evidence after a post-attestation
 retention or evaluation failure and emitting `INCONCLUSIVE` with the exact
-stage code; (iv) the **seven** refusal codes the owner selected in revision 10
-— `PROVIDER_IDENTITY_UNVERIFIED`, `RETENTION_WRITE_FAILED`,
+stage code; (iv) **eleven** owner-ratified refusal codes — the **seven ratified
+in revision 10** (`PROVIDER_IDENTITY_UNVERIFIED`, `RETENTION_WRITE_FAILED`,
 `RETENTION_VERIFY_FAILED`, `EVALUATION_FAILED`, `COMMITMENT_ALREADY_SPENT`,
-`COMMITMENT_REGISTRY_UNAVAILABLE`, `WORKFLOW_BUDGET_EXHAUSTED`. The three
-stage codes were owner-ratified in revision 4; revision 10 ratifies the
-remaining four names and the seven-code accounting. **The enum has not
-changed**: `errors.py` has **33** members today and contains none of the seven
-`[V]`; a future commissioned vocabulary would have **40**. `RETENTION_FAILED`
-stays withdrawn. (v) only
+`COMMITMENT_REGISTRY_UNAVAILABLE`, `WORKFLOW_BUDGET_EXHAUSTED`; the three stage
+codes came from revision 4) plus the **four ratified in revision 13** for the
+calibration architecture (`RUN_ROLE_INVALID`, `ROLE_ARTIFACT_INCONSISTENT`,
+`CALIBRATION_PROVENANCE_INVALID`, `CALIBRATION_STATISTIC_UNAVAILABLE`, §2.11).
+**The enum has not changed**: `errors.py` has **33** members today and contains
+none of the eleven `[V]`; a future commissioned vocabulary would have **44**.
+None of the eleven exists until implementation is separately commissioned.
+`RETENTION_FAILED` stays withdrawn. (v) only
 if D1 selects option B, a separately ratified launch/connection port over the
 existing frame protocol; the benchmark-custody writer with the runner-side
 bounded health check of §2.8; a **boundary-internal** exchange-writer health
@@ -1299,6 +1448,50 @@ contamination unestablished, with the canary expressing intent rather than
 compliance; digests giving integrity but not confidentiality, brute-forceable
 in seven trials here; call-count rather than token comparison; and the 2 800 /
 11 200 accounting ceilings with only the shared per-case cap enforced.
+
+### Revision 13 (calibration and confirmatory run architecture, 2026-09-03)
+
+**Source of authority.** An owner decision taken **after** revision 12, in the
+calibration-schema round. Earlier revision records stand unchanged.
+
+**Ratified.** The compatibility model and manifest architecture of §2.11 —
+schema-version split plus discriminated union, with v1 manifests confined to
+historical mechanism validation and never defaulting to `CONFIRMATORY`;
+`PilotRunRole`; `CalibrationManifest` and its descriptive
+`CalibrationTaskBinding`; the reduced `CalibrationResult` with its verification
+obligations; `CalibrationProvenance` inside the confirmatory manifest digest;
+the role behaviour matrix, including forbidden comparison, forbidden
+`RESULT_ASSESSED`/`EVALUATED`, absent coverage and impossible success summary
+under `CALIBRATION`; baseline-only accounting of 400 / 8 400 / **8 800**;
+`workflow_fit_prepared_index.calibration.v1`; `calfloor.linear_chain.v1` with
+its self-reference non-reporting constraint; `bbh-ld7.v2` superseding v1, its
+preimage inserted verbatim at 1 703 bytes with digest `84051a08…43b870e9`
+recomputed from the inserted text; and four additional refusal codes.
+
+**Recorded as a gap, not as working `[G]`.** The merged lifecycle model can rest
+at `UNDER_TEST` but cannot distinguish a completed calibration from a run that
+merely stopped there. `UNDER_TEST` is **not** redefined as globally terminal;
+tying the endpoint to a valid `CalibrationResult` is a **required Phase 4A
+amendment** that is not yet commissioned.
+
+**Attribution corrected.** The original seven refusal codes were **ratified in
+revision 10** and are no longer described as unratified. With revision 13's
+four, eleven codes are ratified in policy; the live enum remains **33** `[V]`
+and a future commissioned vocabulary would hold **44**.
+
+**Layout ruling preserved.** The revision-4 confirmatory identifier and its
+nine-path layout are unchanged. Calibration shares the path set under a
+distinct identifier because `pilot_manifest.json` holds a different contract
+type — no rename, no reinterpretation, no contradiction.
+
+**Vocabulary gap.** The governed token set lacks an accurate token for
+relational logical deduction or constraint satisfaction;
+`structural_characteristics` stays `[]` rather than carrying an inaccurate
+token. Whether `domain_ref` and `intended_outcome_ref` must come from a
+registered vocabulary remains open.
+
+**Status.** Revision 13 records architecture and policy only. It does **not**
+complete D1–D5 and does **not** commission implementation.
 
 **Still incomplete.** **D2 and D3 are not complete**, and neither is any other
 ballot item. Open: benchmark author and distinct approver; custody URI, readers
