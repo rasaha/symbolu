@@ -1,6 +1,6 @@
 # Phase 4C — First Genuine Research-Only Workflow-Fit Pilot: Commissioning Note and Ballot
 
-**Revision 4.** Status: documentation only. **Nothing in this note authorises a
+**Revision 5.** Status: documentation only. **Nothing in this note authorises a
 provider call.** Until every ballot item in §3 is ratified by the owner, no
 code path in this repository may contact a provider, hold a credential, or
 run a real workflow behind the pilot boundary. Every output of a ratified 4C
@@ -90,6 +90,19 @@ manifest digest, run identities, record identities and comparison request
 id). A repetition is a whole pilot run. Cross-run aggregation is **deferred to
 a later ballot**; 4C reports repetitions side by side without combining them.
 
+**Re-running a halted repetition (owner ruling, revision 5).** A repetition
+halted by a trust-infrastructure failure (§2.8) **may not be re-run under the
+same preregistered manifest and `index_digest`**. The replacement attempt is
+a new repetition: a fresh preregistration, a distinct `manifest_id` and its
+own prepared-bundle index under §2.1. The halted repetition's evidence is
+**retained and reported** — its `INCONCLUSIVE` method, its unstarted methods
+and its incomplete label — and is never deleted, overwritten or silently
+replaced by the successful attempt. Reusing the commitment would let an
+unfavourable partial run be discarded and re-rolled behind one preregistered
+identity, which is the precise thing preregistration exists to prevent. The
+same rule holds however the repetition was halted, including a halt with no
+provider call made.
+
 ### 2.3 Custody writers (resolves B3)
 
 The boundary sees provider prompts and responses; the experiment-side scorer
@@ -130,6 +143,26 @@ codes. `BaseException` is never caught. The concrete exception class is
 preserved as **non-authoritative diagnostic** information; it never carries
 secrets, prompts, responses or expected answers, and it never determines the
 refusal code.
+
+**Where the diagnostic is retained (owner ruling, revision 5).** In the
+**run report, carried by the non-evidential run-status artifact** — the
+method's `reasons` entry in `run_status.json`, which `report.txt` renders for
+an incomplete method. The mechanism is not free: `verify` re-renders
+`report.txt` from the bundle and demands byte equality, and rebuilds an
+incomplete method's `reasons` from `run_status.json` `[V]`
+(`pipeline.py`, `verify` and `_load_status`; `report.py`, `render`). A
+diagnostic held only in a log would therefore make a bundle unverifiable, so
+"report only, in no artifact" is not an available option. It stays
+non-evidential nonetheless: `run_status.json` is workspace tooling, not a
+governed contract, and the diagnostic does **not** enter governed evidence —
+a lifecycle record carries the refusal **code alone** in `refusal_codes` `[V]`
+(`contracts/lifecycle.py`), and no contract gains a diagnostic field. It is
+**not** written to either custody store: those are append-only evidence, and
+a writer that has just failed cannot be the recorder of its own failure. The
+reason string names the failing operation, the method and the exception
+class, and begins with the refusal code so the authoritative part is
+unambiguous; anything that cannot be rendered without a secret, a prompt, a
+response or an expected answer is **omitted rather than redacted**.
 
 Both writers fail closed, at three distinct moments:
 
@@ -250,6 +283,26 @@ Later methods may continue **only if** the boundary and **both** custody
 services remain healthy. Coverage reporting must expose the missing method,
 and no complete-set comparison may be claimed.
 
+**The discriminator (owner ruling, revision 5).** A retention write or
+verification failure does not classify itself; **a custody health check
+does**. On any `RETENTION_WRITE_FAILED` or `RETENTION_VERIFY_FAILED`, the
+runner performs **one bounded health check** against that custody service —
+an append and read-back of a record carrying no benchmark, prompt or response
+content — before deciding scope:
+
+- health check **succeeds** → the failure was record-scoped: **method-local**,
+  that method `INCONCLUSIVE` with its exact code, later methods may continue;
+- health check **fails, times out, or cannot be performed** → **service
+  failure**: the repetition stops under the rule above.
+
+The health check is itself a custody operation and is bounded by the D4
+timeout; it is attempted **once** and never retried, so a failing service
+cannot be probed into looking healthy. Its own failure is a service failure,
+never a fresh method-local one. The same discriminator applies to the
+boundary-side exchange writer, except that the boundary has already returned
+a non-retryable refusal for that method (§2.3), so a successful health check
+leaves the repetition running with that one method `INCONCLUSIVE`.
+
 ## 3. Ballot — five owner decisions `[R]`
 
 Each item lists the **concrete values the owner must supply at
@@ -314,8 +367,13 @@ retry a captured attempt that counts in `llm_calls`; stop conditions; and case
 ordering (preregistered order, or a declared randomisation with its seed).
 The **partial-run policy is ruled in §2.8** (trust-infrastructure failure
 stops the repetition; a method-local failure, a ceiling breach included, ends
-only that method `INCONCLUSIVE`) and is ratified by this item, not re-decided
-in it. The boundary-side hard stop at the call ceiling is a 4A amendment
+only that method `INCONCLUSIVE`; scope decided by the one bounded custody
+health check) and is ratified by this item, not re-decided in it. So is the
+§2.2 rule that a halted repetition is replaced by a **new** preregistration
+with a distinct `manifest_id`, never re-run under the same commitment — the
+repetition count this item fixes is a count of **preregistered** repetitions,
+and a halted one is not replaced within it. The D4 timeout bounds the health
+check. The boundary-side hard stop at the call ceiling is a 4A amendment
 ratified by this item.
 
 **D5. Preregistration and evidence retention.**
@@ -348,8 +406,10 @@ runner amendment discarding the method's evidence after a post-attestation
 retention or evaluation failure and emitting `INCONCLUSIVE` with the exact
 stage code; (iv) the three refusal codes added to `PilotErrorCode`; (v) only
 if D1 selects option B, a separately ratified launch/connection port over the
-existing frame protocol; the benchmark-custody writer; and one preregistered
-run per repetition. The CI gate stays provider-free.
+existing frame protocol; the benchmark-custody writer with the bounded
+health check of §2.8; `run` refusing a commitment already spent by a halted
+repetition (§2.2); and one preregistered run per repetition. The CI gate
+stays provider-free.
 
 **Acceptance obligations.** Each branch ruled above needs its own row, and no
 row may reach a provider:
@@ -370,6 +430,9 @@ row may reach a provider:
 | T12 | absent, mismatched, or cross-attempt-inconsistent provider identity yields non-retryable `PROVIDER_IDENTITY_UNVERIFIED` and the §2.8 repetition stop |
 | T13 | a verified identity reaches `provider_id`; no requester-declared identity path exists |
 | T14 | the child process environment equals the ratified allowlist exactly; no refusal payload, log line or retained record carries the credential, a prompt, a response or an expected answer |
+| T15 | the exception class reaches only the method's `run_status.json` reason and the `report.txt` line rendered from it — no lifecycle record, contract object or custody record carries it; the reason begins with the refusal code; a diagnostic needing a secret, prompt, response or expected answer is omitted; and `verify` still re-renders the report byte-identically |
+| T16 | a retention failure whose custody health check succeeds is method-local and later methods run; one whose health check fails, times out or cannot be performed stops the repetition; the health check is attempted exactly once and carries no benchmark content |
+| T17 | a halted repetition cannot be re-run under its own manifest and `index_digest` — `run` refuses the spent commitment — and its evidence survives the replacement repetition intact |
 
 ## 5. Explicitly excluded
 
@@ -425,6 +488,19 @@ and custody values.
 | M4 | option B's connection mechanism | none is invented: no TCP credential port and no HTTP credential protocol; A recommended; B only via a separately ratified launch/connection-port amendment over the existing frame protocol and supported transports; C non-isolating; every allowlisted environment key named in D1; `PATH` and the interpreter are not isolation |
 | M5 | identity acceptance policy | binding: refuse any provider that cannot return an immutable deployment identity; same identity required on every attempt; requester-declared identity is not a 4C mode and never shares the verified `provider_id` representation |
 
-Ballot items remain five and remain `[R]`; nothing was ratified by any
-revision. Revision 4 changed no code, no contract and no CI gate, and
-authorises no provider call.
+### Revision 5 (owner rulings on the three choices revision 4 surfaced, 2026-09-03)
+
+Revision 4 named three policy choices and deliberately left them unruled.
+The owner commissioned this revision to close them; the values below were
+selected to follow the fail-closed posture the earlier rulings established,
+and stand as rulings subject to the owner's correction.
+
+| # | Choice | Owner ruling |
+|---|---|---|
+| 1 | where the non-authoritative exception diagnostic is retained | **the run report, carried by the method's `reasons` in the non-evidential `run_status.json`** — the artifact `verify` re-renders `report.txt` from, so a log-only diagnostic would make the bundle unverifiable; never in governed evidence (`refusal_codes` carries the code alone), never in either custody store, omitted rather than redacted when it needs a secret, prompt, response or expected answer (§2.3) |
+| 2 | when a custody failure becomes a service failure | **one bounded custody health check decides**: it succeeds → method-local; it fails, times out or cannot be performed → repetition-wide. Attempted once, never retried, carrying no benchmark content; bounded by the D4 timeout (§2.8) |
+| 3 | whether a halted repetition may be re-run under the same commitment | **no** — a fresh preregistration with a distinct `manifest_id` and its own index; the halted repetition's evidence is retained and reported, never overwritten, and `run` refuses the spent commitment (§2.2) |
+
+Acceptance obligations T15–T17 carry these branches. Ballot items remain five
+and remain `[R]`; nothing was ratified by any revision. No revision changed
+code, contract or CI gate, and none authorises a provider call.
