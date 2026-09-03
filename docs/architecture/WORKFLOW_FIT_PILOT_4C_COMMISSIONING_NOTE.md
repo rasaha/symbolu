@@ -1,6 +1,6 @@
 # Phase 4C — First Genuine Research-Only Workflow-Fit Pilot: Commissioning Note and Ballot
 
-**Revision 14.** Status: documentation only. **Nothing in this note authorises a
+**Revision 15.** Status: documentation only. **Nothing in this note authorises a
 provider call.** Until every ballot item in §3 is ratified by the owner, no
 code path in this repository may contact a provider, hold a credential, or
 run a real workflow behind the pilot boundary.
@@ -707,15 +707,28 @@ against a floor derived from its own calibration performance, so its own
 sufficiency verdict is definitionally self-referential and **must never be
 reported as evidence about baseline quality**.
 
-**Scorer `bbh-ld7.v2`**, superseding v1. Complete normative preimage, verbatim:
+**Scorer `bbh-ld7.v3`**, superseding v2 (revision 15). **Why v2 was superseded:**
+its text described `'ANSWER:'` as "the four characters", which is false — the
+quoted prefix has **seven**. The literal was unambiguous and no implementation
+was ever misled, but a known contradiction may not stand inside a governed,
+digest-pinned procedure. **Exactly two semantic edits** produce v3 from v2: the
+procedure identifier `bbh-ld7.v2` → `bbh-ld7.v3`, and "the four characters
+`'ANSWER:'`" → "the seven characters `'ANSWER:'`". Nothing else in the wording,
+whitespace, punctuation or behaviour changed. **The scoring algorithm and every
+acceptance outcome are unchanged.**
+
+Complete v3 normative preimage, verbatim:
 
 ```
-bbh-ld7.v2: LINES. Split the final response on U+000A only; from each line remove a single trailing U+000D if present. WHITESPACE means exactly the six characters U+0009, U+000A, U+000B, U+000C, U+000D and U+0020; no other character is whitespace for this procedure. SELECTION. A line is prefix-bearing when, after removing leading and trailing WHITESPACE, it begins with the four characters 'ANSWER:' compared using ASCII case folding only (A-Z to a-z; no other case mapping). If the response contains no prefix-bearing line the score is Decimal('0'). Otherwise select the LAST prefix-bearing line in the response; never fall back to any earlier line, even when the selected line's payload is malformed. NORMALIZATION. Take the selected line's text after the prefix; replace every maximal run of WHITESPACE with a single U+0020; remove leading and trailing U+0020; if and only if the result both begins with '(' and ends with ')', remove exactly one leading '(' and exactly one trailing ')'; remove leading and trailing U+0020 again; map ASCII lowercase a-z to uppercase A-Z and change nothing else. The normalized payload must be exactly one character and that character must be one of A B C D E F G, compared by Unicode code point; any non-ASCII character, including visually similar ones, fails this test. EXPECTED. Normalize the upstream target with the identical steps, so an upstream '(B)' normalizes to 'B'. SCORE. Return Decimal('1') when the normalized payload and the normalized expected value are equal as code-point sequences, and Decimal('0') in every other case, including a failed payload test. No partial credit. No semantic judgment. No prose fallback. No inspection of the case query.
+bbh-ld7.v3: LINES. Split the final response on U+000A only; from each line remove a single trailing U+000D if present. WHITESPACE means exactly the six characters U+0009, U+000A, U+000B, U+000C, U+000D and U+0020; no other character is whitespace for this procedure. SELECTION. A line is prefix-bearing when, after removing leading and trailing WHITESPACE, it begins with the seven characters 'ANSWER:' compared using ASCII case folding only (A-Z to a-z; no other case mapping). If the response contains no prefix-bearing line the score is Decimal('0'). Otherwise select the LAST prefix-bearing line in the response; never fall back to any earlier line, even when the selected line's payload is malformed. NORMALIZATION. Take the selected line's text after the prefix; replace every maximal run of WHITESPACE with a single U+0020; remove leading and trailing U+0020; if and only if the result both begins with '(' and ends with ')', remove exactly one leading '(' and exactly one trailing ')'; remove leading and trailing U+0020 again; map ASCII lowercase a-z to uppercase A-Z and change nothing else. The normalized payload must be exactly one character and that character must be one of A B C D E F G, compared by Unicode code point; any non-ASCII character, including visually similar ones, fails this test. EXPECTED. Normalize the upstream target with the identical steps, so an upstream '(B)' normalizes to 'B'. SCORE. Return Decimal('1') when the normalized payload and the normalized expected value are equal as code-point sequences, and Decimal('0') in every other case, including a failed payload test. No partial credit. No semantic judgment. No prose fallback. No inspection of the case query.
 ```
 
-UTF-8 byte length **1 703**; `ugence_jcs.canonical_sha256_hex` =
-**`84051a08da3451a91ef084777e8aecf1211d04d63eef26ff8a04530443b870e9`**, both
-recomputed from the text above. Essential behaviour: an `ANSWER:` prefix is
+UTF-8 byte length **1 704**; `ugence_jcs.canonical_sha256_hex` =
+**`9cc587889c5b43dbc1f6ae796840d6af90cfe95c0e6e49cbe245f2ca5dfc1813`**, both
+recomputed from the text above, which is the v3 authority. The v2 digest
+`84051a08da3451a91ef084777e8aecf1211d04d63eef26ff8a04530443b870e9` over 1 703
+bytes is retained as **historical evidence only** and must not be used to pin a
+runtime constant. Essential behaviour, unchanged from v2: an `ANSWER:` prefix is
 **mandatory**; the **last** prefix-bearing line wins even when malformed;
 **there is no fallback** to an earlier line; payload must be exactly one ASCII
 character `A`–`G`; parenthesis and whitespace normalisation exactly as stated;
@@ -1005,7 +1018,7 @@ formula below are still open.
 | Selected indexes | 50 unique indexes in `[0, 249]`, derived, published ascending | mechanically derived |
 | Selected-index-list digest | `c521cdd75dc3b8c9e589835ade4b780ef26ba955d4077f5c7ad74e803be60682` | mechanically derived |
 | Execution order | ascending derived case-digest order | owner-selected; matches the merged runner `[V]` |
-| Scoring | **`bbh-ld7.v2`**, binary — §2.11; supersedes v1 (revision 13) | owner-ratified |
+| Scoring | **`bbh-ld7.v3`**, binary — §2.11; supersedes v2 (revision 15), which superseded v1 | owner-ratified |
 | Evaluator kind | `PROGRAMMATIC` | **conditional**: final only after the implementation, complete procedure text, evaluator identity and version, and `scoring_instruction_digest` are inspected and fixed |
 | Expected answers | derived from the pinned upstream `target` fields; available only to the scorer | owner-selected |
 | External threshold | none presently established for this wrapped task and sample | owner-selected |
@@ -1024,7 +1037,7 @@ produces. Index order is the position in the `examples` array of the pinned
 file, zero-based, unfiltered. Ties break on ascending `i`. The derivation needs
 no benchmark content: it consumes only the seed and the index range.
 
-**Scoring is `bbh-ld7.v2`** (revision 13), whose complete normative preimage,
+**Scoring is `bbh-ld7.v3`** (revision 15), whose complete normative preimage,
 byte length and digest are recorded in §2.11. It supersedes the v1 summary
 that stood here.
 
@@ -1590,6 +1603,34 @@ credential, pricing, custody, registry and retention facts block **genuine
 execution**, not deterministic implementation with fixtures and test doubles.
 **D1–D5 remain incomplete for a genuine pilot, and Phase 4C implementation is
 not commissioned by this documentation revision.**
+
+### Revision 15 (scorer erratum: `bbh-ld7.v3` supersedes v2, 2026-09-03)
+
+**Source of authority.** An owner ruling after slice-1 implementation surfaced
+a contradiction inside the governed procedure text. The revision-13 and
+revision-14 records stand unchanged.
+
+**The erratum.** `bbh-ld7.v2` described `'ANSWER:'` as "the four characters"
+when the quoted prefix has **seven**. The literal governed, so no
+implementation was misled and no acceptance outcome depended on the miscount —
+but a false statement inside a digest-pinned normative procedure is not
+allowed to stand.
+
+**The correction.** `bbh-ld7.v3` is v2 with **exactly two semantic edits**: the
+procedure identifier, and "four" → "seven". No other wording, whitespace,
+punctuation or behaviour changed. **The scoring algorithm and all acceptance
+outcomes are unchanged**, so no test expectation moves.
+
+**Authority values, recomputed from the inserted text (§2.11):** UTF-8 length
+**1 704**, digest
+**`9cc587889c5b43dbc1f6ae796840d6af90cfe95c0e6e49cbe245f2ca5dfc1813`**. The v2
+pair — 1 703 bytes, `84051a08…43b870e9` — is retained as **historical evidence
+only** and must never pin a runtime constant again.
+
+**Consequence for implementation.** The slice-1 scorer's shared procedure
+constant, its import-time length and digest guards, and the tests that name the
+procedure normatively move to v3 in the stacked implementation branch. Behaviour
+does not change.
 
 **Still incomplete.** **D2 and D3 are not complete**, and neither is any other
 ballot item. Open: benchmark author and distinct approver; custody URI, readers
