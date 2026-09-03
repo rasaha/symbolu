@@ -9,6 +9,7 @@ from .contracts.benchmark import BENCHMARK_MANIFEST_SCHEMA_VERSION, BenchmarkMan
 from .contracts.calibration import (
     CALIBRATION_GOVERNED_UNIT,
     CALIBRATION_RESULT_SCHEMA_VERSION,
+    CANONICAL_DECIMAL_GRAMMAR,
     CalibrationProvenance,
     CalibrationResult,
     PilotRunRole,
@@ -66,6 +67,7 @@ __all__ = [
     "__version__", "PilotError", "PilotErrorCode",
     "PILOT_MANIFEST_SCHEMA_VERSION", "PILOT_MANIFEST_SCHEMA_VERSION_V1", "PILOT_MANIFEST_SCHEMA_VERSION_V2",
     "SUPPORTED_MANIFEST_SCHEMA_VERSIONS", "CALIBRATION_RESULT_SCHEMA_VERSION", "CALIBRATION_GOVERNED_UNIT",
+    "CANONICAL_DECIMAL_GRAMMAR",
     "PilotRunRole", "CalibrationProvenance", "CalibrationResult", "PREREGISTRATION_DECLARED_UNVERIFIED", "ATTESTABLE_TELEMETRY_FIELDS", "LLM_CALLS_FIELD",
     "PilotRole", "PreregistrationStatus", "PilotMethodAssignment", "CaptureBoundaryDeclaration", "PilotStudyManifest", "ValidatedManifest", "admissible_methods", "validate_manifest",
     "BENCHMARK_MANIFEST_SCHEMA_VERSION", "BenchmarkManifest", "case_list_digest",
