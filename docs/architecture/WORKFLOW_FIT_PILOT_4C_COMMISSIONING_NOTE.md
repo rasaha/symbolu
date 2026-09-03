@@ -150,7 +150,9 @@ provider boundary.**
 **Rule — the two-writer design is PROPOSED, NOT RATIFIED** (assistant design,
 revisions 2–3; the owner's revision-4 instruction assumed it without ratifying
 it). Within it, the **pre-run custody block** and the **post-attestation
-discard** below are owner-ratified, being stated verbatim in that instruction.
+discard** below are likewise **PROPOSED — NOT RATIFIED**: the governing
+authority audit admits only the **in-boundary exchange-custody path** and its
+direct `PROPOSED` → `INCONCLUSIVE` transition as owner-ratified.
 Two append-only custody writers, each referencing the manifest digest and the
 preregistered `index_digest`:
 
@@ -326,7 +328,8 @@ is refused by `prepare`; changing it requires a later 4A amendment.
 ### 2.8 Partial-run policy (owner ruling, revision 4)
 
 The scope of a failure is decided by **what failed**, not by where in the run
-it happened. Ratified under D4.
+it happened. This partial-run policy is owner-ratified from revision 4; D4
+remains open and must supply its implementation controls.
 
 **A trust-infrastructure failure stops the entire repetition.** These are:
 provider-identity failure (§2.5); boundary exchange-custody failure (§2.3);
@@ -916,8 +919,10 @@ item; the enum size, stated as 34 from a `grep` that over-counted and now
 the largest present bounded path is **7**, so 7 suffices today and 8 is one
 call of headroom; the unlabelled T28; and the two-custody-writer design, an
 assistant design the revision-4 instruction assumed rather than ratified,
-though the pre-run block and post-attestation discard inside it are
-owner-ratified verbatim. A consolidated §3.1 now lists every candidate value
+and the pre-run block and post-attestation discard inside it are
+**PROPOSED — NOT RATIFIED** on the same authority, only the in-boundary
+exchange-custody path and its direct `PROPOSED` → `INCONCLUSIVE` transition
+being owner-ratified. A consolidated §3.1 now lists every candidate value
 as PROPOSED — NOT RATIFIED.
 
 Ballot items remain five and remain `[R]`; D1–D5 still need their provider,
