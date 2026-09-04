@@ -1,0 +1,125 @@
+{
+  "curated_api_module": "ugence_cloud_scaling_action_admission",
+  "distribution": "ugence-cloud-scaling-action-admission",
+  "namespace": "ugence_cloud_scaling_action_admission",
+  "note": "Machine-readable snapshot of the curated public API (ugence_cloud_scaling_action_admission.__all__). tests/packaging/test_packaging.py asserts this file equals the live package surface. Regenerate with scripts/generate_public_api.py when the curated API changes deliberately.",
+  "package_version": "0.1.0",
+  "symbols": {
+    "ADMISSION_PROFILE": {
+      "kind": "constant",
+      "value": "ugence.cloud-scaling.action-admission"
+    },
+    "ADMISSION_PROFILE_VERSION": {
+      "kind": "constant",
+      "value": "v1"
+    },
+    "ActionAdmissionConfigurationError": {
+      "kind": "class",
+      "methods": [
+        "add_note",
+        "with_traceback"
+      ]
+    },
+    "ActionAdmissionContractError": {
+      "kind": "class",
+      "methods": [
+        "add_note",
+        "with_traceback"
+      ]
+    },
+    "ActionAdmissionExactTypeError": {
+      "kind": "class",
+      "methods": [
+        "add_note",
+        "with_traceback"
+      ]
+    },
+    "BINDING_KIND_AUTHORIZATION_CANDIDATE": {
+      "kind": "constant",
+      "value": "cloud-scaling.authorization-candidate"
+    },
+    "BINDING_KIND_TARGET_SCOPE": {
+      "kind": "constant",
+      "value": "cloud-scaling.execution-target-scope"
+    },
+    "CANONICAL_ACTION_TYPES": {
+      "kind": "frozenset",
+      "values": [
+        "coordinated",
+        "no_change",
+        "scale_down",
+        "scale_up"
+      ]
+    },
+    "CapacityActionGate": {
+      "kind": "class",
+      "methods": [
+        "authorize"
+      ]
+    },
+    "CapacityAdmissionOutcome": {
+      "fields": [
+        "admitted_at",
+        "action",
+        "authorization",
+        "refusal",
+        "detail"
+      ],
+      "kind": "dataclass"
+    },
+    "CapacityAdmissionRequest": {
+      "fields": [
+        "tenant_id",
+        "envelope_id",
+        "target_scope",
+        "candidate_digest",
+        "session_id",
+        "satisfied_conditions"
+      ],
+      "kind": "dataclass"
+    },
+    "CloudScalingActionAdmission": {
+      "kind": "class",
+      "methods": [
+        "admit",
+        "production",
+        "reference"
+      ]
+    },
+    "CloudScalingActionAdmissionError": {
+      "kind": "class",
+      "methods": [
+        "add_note",
+        "with_traceback"
+      ]
+    },
+    "PURPOSE_CAPACITY_ACTION": {
+      "kind": "constant",
+      "value": "cloud_scaling.capacity_action"
+    },
+    "REQUIRED_ENVELOPE_BINDINGS": {
+      "kind": "tuple",
+      "values": [
+        "cloud-scaling.authorization-candidate",
+        "cloud-scaling.execution-target-scope"
+      ]
+    },
+    "__version__": {
+      "kind": "constant",
+      "value": "0.1.0"
+    },
+    "capacity_action_to_canonical": {
+      "kind": "function",
+      "parameters": [
+        "envelope",
+        "target_scope"
+      ]
+    },
+    "capacity_bounds_violations": {
+      "kind": "function",
+      "parameters": [
+        "target_scope"
+      ]
+    }
+  }
+}
