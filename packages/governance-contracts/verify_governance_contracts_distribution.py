@@ -33,7 +33,7 @@ _CHECK = r'''
 import dataclasses, importlib.util, json, sys
 
 import ugence_governance_contracts as g
-assert g.__version__ == "0.3.1", g.__version__
+assert g.__version__ == "0.4.0", g.__version__
 assert g.CONTRACT_VERSION == "1.0.0", g.CONTRACT_VERSION
 assert "site-packages" in g.__file__, g.__file__
 assert not any("/symbolu" in p or "governance_providers" in p for p in sys.path), sys.path
@@ -148,6 +148,40 @@ except SystemIdentityContractError:
 # No SystemManifest was minted.
 from ugence_governance_contracts import api as _api
 assert not any("systemmanifest" in _n.lower().replace("_", "") for _n in _api.__all__)
+
+# G7 / G8 neutral idempotency and validity families ship and enforce structure
+from ugence_governance_contracts.api import (
+    IdempotencyScope, IdempotencyKey, IdempotencyDisposition, IdempotencyResolution,
+    IdempotencyContractError, Validity, ValidityStatus, ValidityContractError)
+assert [m.value for m in IdempotencyScope] == ["GLOBAL", "ACTOR", "TARGET_RESOURCE", "ACTOR_AND_TARGET"]
+assert [m.value for m in ValidityStatus] == ["NOT_YET_VALID", "FRESH", "STALE", "EXPIRED"]
+_k = IdempotencyKey(key="k", scope=IdempotencyScope.ACTOR, actor="a")
+assert len(_k.canonical_digest()) == 64
+assert _k.canonical_digest() != IdempotencyKey(key="k", scope=IdempotencyScope.GLOBAL).canonical_digest()
+try:
+    IdempotencyKey(key="k", scope=IdempotencyScope.GLOBAL, actor="a")
+    raise SystemExit("idempotency scope guard did not fire")
+except IdempotencyContractError:
+    pass
+try:
+    IdempotencyResolution(key=_k, disposition=IdempotencyDisposition.DUPLICATE)
+    raise SystemExit("duplicate_of guard did not fire")
+except IdempotencyContractError:
+    pass
+assert IdempotencyResolution(key=_k, disposition=IdempotencyDisposition.UNKNOWN).is_determinate is False
+_v = Validity(issued_at=_dtc(2026, 9, 4, 10, 0, tzinfo=_tz.utc),
+              expires_at=_dtc(2026, 9, 4, 11, 0, tzinfo=_tz.utc),
+              stale_after=_dtc(2026, 9, 4, 10, 30, tzinfo=_tz.utc))
+assert _v.status_at(_dtc(2026, 9, 4, 10, 45, tzinfo=_tz.utc)) is ValidityStatus.STALE
+assert _v.status_at(_dtc(2026, 9, 4, 11, 0, tzinfo=_tz.utc)) is ValidityStatus.EXPIRED
+try:
+    _v.status_at(_dtc(2026, 9, 4, 10, 45))
+    raise SystemExit("a naive as_of was accepted")
+except ValidityContractError:
+    pass
+# The frozen provider contracts gained no field.
+assert [f.name for f in _dc.fields(ExecutionDispatchRequest)] == [
+    "action_type", "parameters", "idempotency_key", "correlation_id"]
 
 # NO unrelated Ugence package importable in this clean env
 for mod in ("governance_providers", "decision_governance", "actiongate_provider",

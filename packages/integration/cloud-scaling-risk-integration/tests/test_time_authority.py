@@ -12,11 +12,14 @@ Two separate properties are at stake and are tested separately:
 
 from __future__ import annotations
 
+import os
+import tempfile
 from datetime import datetime, timedelta, timezone
 
 import pytest
 
 from conftest import REC_TIME, VALIDITY_SECONDS, fixed_clock, reference_seam
+from risk_authority.persistence import SqliteRiskAuthorityStore
 from risk_authority.integrations import (
     SubjectRiskDisposition,
     SubjectRiskEvaluationRequestV2,
@@ -304,4 +307,7 @@ def _production_seam(*, now):
         evaluator_grant=grant,
         key_record=SigningKeyRecord("cs-key", SigningKey.from_seed(bytes(range(32)))),
         clock=lambda: now,
+        # Risk Authority 0.7.0 (durable persistence D-5): production mode stands only on a
+        # store that declares itself durable; the in-memory reference stores are refused.
+        persistence=SqliteRiskAuthorityStore(os.path.join(tempfile.mkdtemp(), "ra.sqlite")),
     )

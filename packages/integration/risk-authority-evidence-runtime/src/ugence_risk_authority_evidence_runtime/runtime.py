@@ -26,7 +26,7 @@ authority remains the RA-issued, Ed25519-signed ``RiskAuthorizationEnvelope``.
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Callable, Mapping, Optional
+from typing import Callable, Mapping, Optional, Any
 
 from risk_authority.api.dependencies import RiskAuthorityApplication
 from risk_authority.api.schemas import (
@@ -66,6 +66,7 @@ class RiskAuthorityEvidenceRuntime:
         decision_authority: Optional[DecisionAuthorityPort] = None,
         issuer: str = "ugence-risk-authority",
         application: Optional[RiskAuthorityApplication] = None,
+        persistence: Optional[Any] = None,
     ) -> None:
         if application is not None:
             # An explicitly supplied application MUST already be in production
@@ -93,6 +94,11 @@ class RiskAuthorityEvidenceRuntime:
                 control_assurance=control_assurance,
                 evidence_ingress=evidence_ingress,
                 decision_authority=decision_authority,
+                # Risk Authority 0.7.0 (durable persistence D-5): production mode stands
+                # only on a store that declares itself durable, e.g.
+                # ``SqliteRiskAuthorityStore(<file path>)``. The in-memory reference
+                # stores are refused by the application constructor.
+                persistence=persistence,
                 production_mode=True,
             )
         self._evidence_admission = evidence_admission

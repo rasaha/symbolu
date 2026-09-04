@@ -22,6 +22,7 @@ __all__ = [
     "ActionGateDecision",
     "AuthorityType",
     "GovernanceEventType",
+    "AuthorizationDisposition",
 ]
 
 
@@ -140,6 +141,18 @@ class ActionGateDecision(str, Enum):
     AUTHORIZED = "AUTHORIZED"
     DENIED = "DENIED"
     RETRY_STATE_CHANGED = "RETRY_STATE_CHANGED"
+
+
+class AuthorizationDisposition(str, Enum):
+    """How an ``ActionAuthorization`` was reached (Phase 5C, D-3).
+
+    ``ADMITTED`` is a fresh verdict; ``REPLAYED`` is the stored verdict for the same
+    ``(tenant, envelope, action digest)`` returned again, so a retried admission never
+    mints a second authority artifact and the execution key downstream stays stable.
+    """
+
+    ADMITTED = "ADMITTED"
+    REPLAYED = "REPLAYED"
 
 
 class AuthorityType(str, Enum):

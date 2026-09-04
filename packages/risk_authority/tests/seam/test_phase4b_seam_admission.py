@@ -59,6 +59,7 @@ from risk_authority.integrations.control_assurance import (
     bind_control_result,
 )
 from risk_authority.services.decision_authority import ReferenceDecisionAuthority
+from tests.scenario import durable_store
 
 from ..contract.test_subject_context_contracts import T0, adr_context, v2_request
 
@@ -242,6 +243,7 @@ def production_seam(*, controls=(), log=None, resolver=None, evidence_resolver=N
         evaluator_grant=_grant(),
         key_record=KEY,
         clock=clock if clock is not None else SpyClock(log),
+        persistence=durable_store(),
     )
     return seam, log
 

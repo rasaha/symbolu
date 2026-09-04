@@ -1,0 +1,271 @@
+{
+  "curated_api_module": "ugence_cloud_scaling_bounded_execution",
+  "distribution": "ugence-cloud-scaling-bounded-execution",
+  "namespace": "ugence_cloud_scaling_bounded_execution",
+  "note": "Machine-readable snapshot of the curated public API (ugence_cloud_scaling_bounded_execution.__all__). tests/packaging/test_packaging.py asserts this file equals the live package surface. Regenerate with scripts/generate_public_api.py when the curated API changes deliberately.",
+  "package_version": "0.1.0",
+  "symbols": {
+    "BarePolicyRollbackRefused": {
+      "kind": "class",
+      "methods": [
+        "add_note",
+        "with_traceback"
+      ]
+    },
+    "BoundedDispatch": {
+      "fields": [
+        "tenant_id",
+        "grant_id",
+        "reservation_id",
+        "authorization_id",
+        "target_scope",
+        "dispatch_request_id"
+      ],
+      "kind": "dataclass"
+    },
+    "BoundedDispatchOutcome": {
+      "fields": [
+        "dispatched_at",
+        "effective_mode",
+        "mode_reasons",
+        "record",
+        "observation",
+        "refusal",
+        "detail"
+      ],
+      "kind": "dataclass"
+    },
+    "BoundedExecutionConfigurationError": {
+      "kind": "class",
+      "methods": [
+        "add_note",
+        "with_traceback"
+      ]
+    },
+    "BoundedExecutionContractError": {
+      "kind": "class",
+      "methods": [
+        "add_note",
+        "with_traceback"
+      ]
+    },
+    "BoundedExecutionExactTypeError": {
+      "kind": "class",
+      "methods": [
+        "add_note",
+        "with_traceback"
+      ]
+    },
+    "BoundedExecutionRecord": {
+      "fields": [
+        "schema_version",
+        "record_id",
+        "tenant_id",
+        "grant_id",
+        "reservation_id",
+        "execution_key",
+        "target_scope_digest",
+        "envelope_id",
+        "authorized_action_digest",
+        "request_digest",
+        "attempt_id",
+        "external_request_id",
+        "effective_mode",
+        "mode_reasons",
+        "ops_outcome",
+        "business_outcome",
+        "finality",
+        "applied",
+        "pre_state",
+        "post_state",
+        "requested_magnitude",
+        "dispatched_at",
+        "observed_at",
+        "receipt_hash",
+        "denial_reason",
+        "disposition"
+      ],
+      "kind": "dataclass"
+    },
+    "BoundedExecutionRecordStore": {
+      "kind": "class",
+      "methods": [
+        "get",
+        "save"
+      ]
+    },
+    "BoundedExecutionSeam": {
+      "kind": "class",
+      "methods": [
+        "dispatch",
+        "posture_for",
+        "production",
+        "reference",
+        "rollback",
+        "rollback_target_for"
+      ]
+    },
+    "CloudScalingBoundedExecutionError": {
+      "kind": "class",
+      "methods": [
+        "add_note",
+        "with_traceback"
+      ]
+    },
+    "DEFAULT_DISPATCH_DEADLINE": {
+      "kind": "timedelta",
+      "seconds": 300.0
+    },
+    "DISPATCHABLE_ACTION_TYPES": {
+      "kind": "frozenset",
+      "values": [
+        "scale_down",
+        "scale_up"
+      ]
+    },
+    "DispatchRefusal": {
+      "kind": "enum",
+      "values": [
+        "GRANT_NOT_FOUND",
+        "GRANT_EXPIRED",
+        "GRANT_NOT_REDERIVED",
+        "AUTHORIZATION_NOT_FOUND",
+        "AUTHORIZATION_NOT_AUTHORIZED",
+        "ENVELOPE_NOT_FOUND",
+        "RESERVATION_NOT_FOUND",
+        "RESERVATION_NOT_RESERVED",
+        "LEASE_EXPIRED",
+        "TARGET_SCOPE_MISMATCH",
+        "TARGET_NOT_ADDRESSABLE",
+        "ACTION_NOT_DISPATCHABLE",
+        "EXECUTOR_INTEGRITY"
+      ]
+    },
+    "ExecutorParts": {
+      "fields": [
+        "config",
+        "backend",
+        "audit_sink",
+        "idempotency_store",
+        "readiness",
+        "outcome_recorder"
+      ],
+      "kind": "dataclass"
+    },
+    "ISSUER_ID": {
+      "kind": "constant",
+      "value": "ugence.cloud-scaling.bounded-execution"
+    },
+    "InMemoryBoundedExecutionRecordStore": {
+      "kind": "class",
+      "methods": [
+        "get",
+        "save"
+      ]
+    },
+    "LivePosture": {
+      "fields": [
+        "production_application",
+        "production_ledger",
+        "production_grant_store",
+        "production_broker",
+        "non_reference_grant_handle",
+        "backend_injected",
+        "readiness_required"
+      ],
+      "kind": "dataclass"
+    },
+    "OpsTarget": {
+      "fields": [
+        "cluster",
+        "namespace",
+        "resource"
+      ],
+      "kind": "dataclass"
+    },
+    "PROVIDER_ID": {
+      "kind": "constant",
+      "value": "ugence.cloud-scaling-operations"
+    },
+    "RECORD_SCHEMA_VERSION": {
+      "kind": "constant",
+      "value": "cloud-scaling-bounded-execution-record-1"
+    },
+    "RecordDisposition": {
+      "kind": "enum",
+      "values": [
+        "DISPATCHED",
+        "REPLAYED"
+      ]
+    },
+    "SIGNATURE_ALGORITHM": {
+      "kind": "constant",
+      "value": "hmac-sha256"
+    },
+    "__version__": {
+      "kind": "constant",
+      "value": "0.1.0"
+    },
+    "business_outcome_for": {
+      "kind": "function",
+      "parameters": [
+        "ops_outcome"
+      ]
+    },
+    "derive_record_id": {
+      "kind": "function",
+      "parameters": [
+        "tenant_id",
+        "grant_id",
+        "dispatch_request_id"
+      ]
+    },
+    "effect_observation_for": {
+      "kind": "function",
+      "parameters": [
+        "record"
+      ]
+    },
+    "finality_for": {
+      "kind": "function",
+      "parameters": [
+        "ops_outcome",
+        "applied_mode"
+      ]
+    },
+    "narrow_target_policy": {
+      "kind": "function",
+      "parameters": [
+        "config",
+        "target",
+        "max_magnitude",
+        "max_delta"
+      ]
+    },
+    "ops_action_for": {
+      "kind": "function",
+      "parameters": [
+        "action_type"
+      ]
+    },
+    "ops_target_for": {
+      "kind": "function",
+      "parameters": [
+        "target_scope"
+      ]
+    },
+    "resolve_effective_mode": {
+      "kind": "function",
+      "parameters": [
+        "requested",
+        "posture"
+      ]
+    },
+    "to_epoch": {
+      "kind": "function",
+      "parameters": [
+        "instant"
+      ]
+    }
+  }
+}

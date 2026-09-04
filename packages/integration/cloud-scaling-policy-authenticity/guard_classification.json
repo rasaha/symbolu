@@ -154,115 +154,115 @@
     "24": {
       "status": "SCORED",
       "module": "verified.py",
-      "line": 279,
+      "line": 284,
       "condition": "smuggled"
     },
     "25": {
       "status": "SCORED",
       "module": "verified.py",
-      "line": 296,
+      "line": 301,
       "condition": "not_a_field"
     },
     "26": {
       "status": "SCORED",
       "module": "verified.py",
-      "line": 356,
+      "line": 361,
       "condition": "isinstance(value, bool) or type(value) is not int"
     },
     "27": {
       "status": "SCORED",
       "module": "verified.py",
-      "line": 360,
+      "line": 365,
       "condition": "value < 0"
     },
     "28": {
       "status": "SCORED",
       "module": "verified.py",
-      "line": 446,
+      "line": 451,
       "condition": "self.construction_token is not _VERIFICATION_TOKEN"
     },
     "29": {
       "status": "SCORED",
       "module": "verified.py",
-      "line": 453,
+      "line": 458,
       "condition": "self.verification_profile != VERIFICATION_PROFILE"
     },
     "30": {
       "status": "SCORED",
       "module": "verified.py",
-      "line": 457,
+      "line": 462,
       "condition": "self.verification_profile_version != VERIFICATION_PROFILE_VERSION"
     },
     "31": {
       "status": "SCORED",
       "module": "verified.py",
-      "line": 461,
+      "line": 466,
       "condition": "self.policy_trust_anchor_owner != POLICY_TRUST_ANCHOR_OWNER"
     },
     "32": {
       "status": "SCORED",
       "module": "verified.py",
-      "line": 466,
+      "line": 471,
       "condition": "self.authority_protocol_id != POLICY_AUTHORITY_PROTOCOL_ID"
     },
     "33": {
       "status": "SCORED",
       "module": "verified.py",
-      "line": 471,
+      "line": 476,
       "condition": "self.authority_canonicalization_version != POLICY_AUTHORITY_CANONICALIZATION_VERSION"
     },
     "34": {
       "status": "SCORED",
       "module": "verified.py",
-      "line": 476,
+      "line": 481,
       "condition": "self.signature_alg not in SUPPORTED_SIGNATURE_ALGORITHMS"
     },
     "35": {
       "status": "SCORED",
       "module": "verified.py",
-      "line": 488,
+      "line": 493,
       "condition": "self.candidate_digest_fact is not None"
     },
     "36": {
       "status": "SCORED",
       "module": "verified.py",
-      "line": 495,
+      "line": 500,
       "condition": "self.capacity_bounds_fact is not None"
     },
     "37": {
       "status": "SCORED",
       "module": "verified.py",
-      "line": 496,
+      "line": 501,
       "condition": "type(self.capacity_bounds_fact) is not tuple"
     },
     "38": {
       "status": "SCORED",
       "module": "verified.py",
-      "line": 501,
+      "line": 506,
       "condition": "not self.capacity_bounds_fact"
     },
     "39": {
       "status": "SCORED",
       "module": "verified.py",
-      "line": 508,
+      "line": 513,
       "condition": "type(bound) is not VerifiedCapacityBound"
     },
     "40": {
       "status": "SCORED",
       "module": "verified.py",
-      "line": 516,
+      "line": 521,
       "condition": "len(set(selectors)) != len(selectors)"
     },
     "41": {
       "status": "SCORED",
       "module": "verified.py",
-      "line": 525,
+      "line": 530,
       "condition": "self.policy_content_digest != self.policy_body_digest"
     },
     "42": {
       "status": "SCORED",
       "module": "verified.py",
-      "line": 534,
+      "line": 539,
       "condition": "self.artifact_digest != expected"
     },
     "43": {
@@ -271,43 +271,43 @@
       "detail": "Measured: with the guard removed, both recorded names fall through to the verified-fact lookup and raise the same VerifiedPolicyArtifactIntegrityError ('is not a fact of a verification artifact'). The guard changes the diagnosis from 'not a fact' to 'a recorded fact, not a verified one' \u2014 which is the difference between a typo and a category error, and is why it is kept.",
       "evidence": "tests/test_guard_coverage.py::test_reading_a_recorded_fact_through_verified_fact_is_refused",
       "module": "verified.py",
-      "line": 675,
+      "line": 680,
       "condition": "name in RECORDED_FACT_NAMES"
     },
     "44": {
       "status": "SCORED",
       "module": "verified.py",
-      "line": 681,
+      "line": 686,
       "condition": "name not in VERIFIED_FACT_NAMES"
     },
     "45": {
       "status": "SCORED",
       "module": "verified.py",
-      "line": 695,
+      "line": 700,
       "condition": "name not in RECORDED_FACT_NAMES"
     },
     "46": {
       "status": "SCORED",
       "module": "verified.py",
-      "line": 737,
+      "line": 742,
       "condition": "type(value) is not VerifiedPolicyAuthenticity"
     },
     "47": {
       "status": "SCORED",
       "module": "verified.py",
-      "line": 751,
+      "line": 756,
       "condition": "value.construction_token is not _VERIFICATION_TOKEN"
     },
     "48": {
       "status": "SCORED",
       "module": "verified.py",
-      "line": 756,
+      "line": 761,
       "condition": "value.artifact_digest not in _MINTED_DIGESTS"
     },
     "49": {
       "status": "SCORED",
       "module": "verified.py",
-      "line": 763,
+      "line": 768,
       "condition": "value.artifact_digest != value.digest()"
     },
     "50": {
@@ -316,7 +316,7 @@
       "detail": "A fact cannot be both verified and recorded. Both operands are frozen sets defined in this module, in this distribution, so the intersection is empty in every program this package can be part of. Kept because it is what makes a mis-classified new field fail at import rather than ship as a fact that is digest-covered and unattested.",
       "evidence": "tests/test_guard_coverage.py::test_the_fact_partition_is_total_and_disjoint",
       "module": "verified.py",
-      "line": 775,
+      "line": 780,
       "condition": "VERIFIED_FACT_NAMES & RECORDED_FACT_NAMES"
     },
     "51": {
@@ -325,7 +325,7 @@
       "detail": "Every declared field of the artifact must be classified verified or recorded. Both sides are read from this module \u2014 the two frozen sets and `dataclasses.fields(VerifiedPolicyAuthenticity)` \u2014 so the comparison cannot be made true by anything outside this distribution.",
       "evidence": "tests/test_guard_coverage.py::test_the_fact_partition_is_total_and_disjoint",
       "module": "verified.py",
-      "line": 780,
+      "line": 785,
       "condition": "_PARTITIONED != _DECLARED"
     },
     "52": {

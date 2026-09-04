@@ -70,7 +70,7 @@ src/risk_authority/
   services/       risk engine, reference decision authority (+ port), envelope issuer/verifier, revocation
   crypto/         canonical serialization, sha-256 hashing, pure-Python Ed25519, key ring
   integrations/   ActionGate / TAP / PWC ports (+ reference ActionGate matching engine)
-  persistence/    repository contracts, in-memory reference, Postgres skeleton + DDL
+  persistence/    repository contracts (incl. authorizations), in-memory reference, durable SQLite store + codec, Postgres DDL
   api/            transport-neutral schemas, application facade, optional FastAPI routes
   observability/  governance-event bus, metrics
 tests/            unit · contract · integration · adversarial
@@ -359,6 +359,95 @@ Kubernetes invocation, no credential issuance, no effect verification, and no Ph
 behavior. The ADR's **D-4** purpose/domain identifiers remain **proposed, not owner-ratified**,
 so none are frozen into Risk Authority; Phase 4B is entirely domain-neutral and D-4 stays an
 explicit blocker for the adapter.
+
+## Phase 5 envelope issuance seam (v0.6.0)
+
+`EnvelopeIssuanceSeam` (`risk_authority.api`) is the **only** place a Phase 5 envelope is
+signed (ADR `docs/architecture/ADR_RISK_AUTHORITY_PHASE5_ENVELOPE_ISSUANCE_RATIFICATION.md`).
+It composes what the kernel already owns — the decision repository, `EnvelopeIssuer`,
+revocation epochs, the case ledger — around one new obligation: **issuance is conditioned on
+injected verification, performed at the seam's own instant, and the envelope commits to what
+was verified.**
+
+The act: one clock read (`issued_at`, and `not_before` equals it); the decision found by
+tenant and id and re-derived against the caller's `decision_digest`; refusal if it grants no
+authority or has expired; the injected `ArtifactVerificationPort` called with that instant as
+`as_of`; every required binding kind present, reporting `VERIFIED`, and carrying
+`resolved_as_of` equal to the instant (`INSTANT_MISMATCH` otherwise — the ratified 5B-2 rule);
+expiry capped at the decision's own; signing through an `EnvelopeSignerPort`; the verified
+digests carried as `EnvelopeBindings.artifact_bindings`. Every other path is a typed
+`EnvelopeIssuanceRefusal`. `EnvelopeIssuanceOutcome.executable` is a permanently-`False`
+property: an envelope is authority, never execution.
+
+| Path | Signer | Verification port | Application |
+|---|---|---|---|
+| `EnvelopeIssuanceSeam.production(...)` | must declare `is_production_authoritative = True`; `ReferenceEnvelopeSigner` refused | must declare `is_production_authoritative = True` | must be in production mode, standing on the durable store that holds the decision (v0.7.0); before durable persistence this meant the instance that evaluated it (D-5) |
+| `EnvelopeIssuanceSeam.reference(...)` | in-memory `ReferenceEnvelopeSigner` over a `SigningKeyRecord` | any | never a production application |
+
+Risk Authority names no domain's artifacts: the composition root declares the binding kinds
+it requires, and the cloud-scaling composition package (5B-4) projects its verifiers' outcomes
+onto the one word `VERIFIED`. The case-based `issue_envelope` and `authorize_action` stay
+contained in production mode; production ActionGate admission is 5C and credentials are 5X.
+
+**Not in this release:** HSM/KMS signer implementations (the port is their seam) and any
+`CanonicalAction` mapping for capacity actions. Durable persistence arrived in v0.7.0
+(next section), which lifts the same-instance restriction on the row above.
+
+## Durable persistence (v0.7.0)
+
+`ADR_RISK_AUTHORITY_DURABLE_PERSISTENCE_SCOPING.md` ratified five decisions; this release
+implements them without adding a dependency (stdlib `sqlite3`).
+
+| Decision | What ships |
+|---|---|
+| D-1 backend | `persistence.sqlite.SqliteRiskAuthorityStore(path)`: one file, WAL, `BEGIN IMMEDIATE` around every write, a `meta` schema row, and an append-only hash-linked `ledger_events` table with `verify_chain()`. Adapters for all seven repository ports plus `SqliteRevocationState` and `SqliteIdAllocator`. The Postgres skeleton stays as DDL documentation and still raises. |
+| D-2 codec | `persistence.codec`: a strict annotation-driven decoder (`decode_dataclass`) over the package's one canonical encoder. Unknown fields, missing required fields and wrong shapes are `PersistenceStorageError`; the domain type's own validation runs on read. The envelope signature is stored beside the canonical body. `RiskDecisionCase.snapshot()` / `from_snapshot()` replay the event list and refuse a broken `prev_digest` chain (`SnapshotIntegrityError`). |
+| D-3 identity | Decisions, envelopes, evidence and governance events refuse an existing id (`PersistenceConflictError`); a case re-save must be the same aggregate (identity fields equal, no events lost); grants and control results replace, as their ports specify. Ids come from a durable per-prefix counter, so a restart never re-mints one. |
+| D-4 revocation | Epoch advances and revocations are appended rows; `SqliteRevocationState` rebuilds the hot-path predicate on open, so issuance, `verify_envelope` and the RA-6 lifecycle writer share one durable state. |
+| D-5 posture | `production_mode=True` refuses any store that has not declared `is_production_authoritative = True`: the in-memory reference stores never do, and a `":memory:"` SQLite database does not either. Pass `persistence=SqliteRiskAuthorityStore("<file>")` to the application or to either `RiskEvaluationSeam` factory. Individual stores may not be mixed beside a bundle. |
+
+```python
+store = SqliteRiskAuthorityStore("/var/lib/ugence/risk-authority.sqlite")
+app = RiskAuthorityApplication(workflow_source=..., key_record=..., clock=..., persistence=store,
+                               evidence_admission=..., control_assurance=..., evidence_ingress=...,
+                               decision_authority=..., production_mode=True)
+```
+
+The acceptance test (`tests/integration/test_sqlite_persistence.py`) evaluates a decision,
+closes the store, reopens it under a fresh application and issues a Phase 5 envelope through
+`EnvelopeIssuanceSeam` that verifies; the distribution verifier repeats it from the wheel.
+Nothing in `persistence/` reads a clock: records carry their own instants and the ledger
+orders by sequence.
+
+**Gaps that survive:** multi-node consistency (single host, one writer at a time), HSM/KMS
+custody, and key rotation across restarts (the key ring is built from the one injected key,
+so an envelope signed under a rotated key is unverifiable after restart).
+
+## Phase 5C action admission seam (v0.8.0)
+
+`ADR_CLOUD_SCALING_PHASE5C_ACTION_ADMISSION_SCOPING.md` ratified five decisions; this
+release implements the Risk Authority half (D-1, D-3, D-4, D-5). The D-2 mapping from a
+capacity action to a `CanonicalAction` belongs to the `cloud-scaling-action-admission`
+composition package, which is not part of this release.
+
+| Decision | What ships |
+|---|---|
+| D-1 home | `ActionAdmissionSeam` in `risk_authority.api`, beside the issuance seam, is the only production path from an envelope to an `ActionAuthorization`. `authorize_action` stays contained in production mode. |
+| D-3 identity | `authorization_id = auth.v1:sha256(tenant_id, envelope_id, action_digest)`, derived, never allocated. A new `AuthorizationRepository` port (in-memory reference; SQLite adapter in the 0.7.0 store, refuse-on-existing unless the stored action digest matches) persists every verdict. Re-admitting the same triple returns the stored verdict with `disposition = REPLAYED` and emits nothing; a stored authorization naming another action is `AUTHORIZATION_CONFLICT`. |
+| D-4 posture | The seam reads its clock once, loads the envelope from the store and verifies signature, window, tenant and session binding, revocation and epoch **before** any port runs (`ENVELOPE_NOT_FOUND`, `ENVELOPE_INVALID`). `production(...)` refuses a reference-mode application, `ReferenceActionGate` and any subclass, and a port that has not declared `is_production_authoritative = True`. The port may answer `AUTHORIZED` or `DENIED` only; any other value, a result naming another id, envelope or action, or an exception is recorded as `DENIED`. |
+| D-5 containment | `ActionAuthorization.expires_at` is a `datetime` equal to the envelope's; `executable` is a permanently-`False` property; `disposition` is `ADMITTED` or `REPLAYED`. Admission emits `ACTION_AUTHORIZED` or `ACTION_DENIED`. 5X credentials and an execution reservation are still required before anything runs. |
+
+```python
+seam = ActionAdmissionSeam.production(app=app, gate=production_gate, clock=clock)
+outcome = seam.issue(ActionAdmissionRequest(
+    tenant_id=..., envelope_id=..., action=CanonicalAction(...), session_id=...))
+outcome.admitted      # True iff the verdict is AUTHORIZED
+outcome.replayed      # True iff a stored verdict was returned
+outcome.executable    # always False
+```
+
+**Not in this release:** the `cloud-scaling-action-admission` package (D-2), ACP and
+trajectory hooks, and the F-D scope dimensions the reference gate leaves unenforced.
 
 ## Verify the distribution
 

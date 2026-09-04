@@ -8,6 +8,7 @@ __all__ = [
     "AuthorityDeniedError",
     "MonotonicityViolationError",
     "ProductionContainmentError",
+    "SnapshotIntegrityError",
 ]
 
 
@@ -45,3 +46,7 @@ class MonotonicityViolationError(RiskAuthorityError):
     def __init__(self, reasons: "list[str]") -> None:
         self.reasons = list(reasons)
         super().__init__("; ".join(self.reasons) or "scope monotonicity violated")
+
+
+class SnapshotIntegrityError(RiskAuthorityError):
+    """A persisted case snapshot does not replay: its event chain or identity is broken."""

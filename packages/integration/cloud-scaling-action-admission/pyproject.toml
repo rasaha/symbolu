@@ -1,0 +1,56 @@
+# Ugence Cloud Scaling Action Admission — Cloud Scaling Phase 5C.
+#
+# A COMPOSITION package. It imports Risk Authority (the action admission seam, the
+# ActionGatePort and its public domain types), the Phase 5A authorization contracts (the
+# execution target scope, read-only) and the 5B-4 envelope-issuance package (binding kinds
+# and the digest projection). None of them imports this package.
+#
+# It owns NO authority and NO key. It holds no clock, no verifier, no credential and no
+# execution surface. It does not verify a signature (the kernel does), broker a credential
+# (5X), reserve or dispatch execution (5D), call a cloud provider or learn from an outcome.
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ugence-cloud-scaling-action-admission"
+dynamic = ["version"]
+description = "Ugence Cloud Scaling Action Admission — Phase 5C. Implements Risk Authority's ActionGatePort for capacity actions. An authorization is admission, not execution."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "Proprietary" }
+authors = [{ name = "Ugence Labs" }]
+keywords = ["cloud-scaling", "action-admission", "actiongate", "risk-authority", "ugence"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Operating System :: OS Independent",
+    "Typing :: Typed",
+]
+dependencies = [
+    "ugence-risk-authority>=0.8.0",
+    "ugence-cloud-scaling-authorization-contracts>=0.2.0",
+    "ugence-cloud-scaling-envelope-issuance>=0.1.0",
+]
+
+[project.optional-dependencies]
+test = ["pytest>=7.0"]
+dev = ["pytest>=7.0", "build>=1.0"]
+
+[tool.setuptools.dynamic]
+version = { attr = "ugence_cloud_scaling_action_admission.version.__version__" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["ugence_cloud_scaling_action_admission*"]
+
+[tool.setuptools.package-data]
+ugence_cloud_scaling_action_admission = ["py.typed"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+markers = [
+    "happy: a positive-control property — something the boundary must ADMIT",
+    "adversarial: an attack that must be REFUSED, or a dangerous capability that must be ABSENT",
+    "invariant: a structural, packaging or frozen-value regression anchor — neither attack nor success",
+]

@@ -1,14 +1,14 @@
 {
   "distribution": "ugence-policy-authority",
   "namespace": "ugence_policy_authority",
-  "package_version": "0.2.0",
+  "package_version": "0.3.0",
   "curated_api_module": "ugence_policy_authority.api",
   "authority_protocol": "ugence.policy-authority",
   "authority_protocol_version": "v0.1",
   "authority_protocol_id": "ugence.policy-authority/v0.1",
   "canonicalization_version": "ugence.policy-authority/canonicalization/v1",
   "unicode_posture": "REJECT_NON_NFC",
-  "note": "Machine-readable snapshot of the curated public API. Generated from the installed package; tests/packaging/test_public_api.py asserts equality including dataclass field ORDER and the exact value of every string constant. This is the SHARED, PLATFORM-WIDE Ugence Policy Authority (ADR docs/architecture/ADR_UGENCE_POLICY_AUTHORITY.md, P-1/P-10) \u2014 internal platform infrastructure, not a customer-facing module and not a UVI engine. UVI is its FIRST policy-family adapter (P-2), registered behind the PolicyFamilyAdapter protocol; the generic core imports and branches on no policy family. Organizational approval remains EXTERNAL (P-5): the authority verifies externally produced approval evidence through an injected boundary owned by the composition root, and the only shipped verifier is DenyAllApprovalVerifier. v0.1 REJECTS issuance of any artifact carrying a non-empty unstructured supersedes_ref (emptiness is supersedes_ref.strip()) with the stable reason SUPERSESSION_REFERENCE_UNSUPPORTED; there is no permissive supersession posture and structured successor references are deferred (P-6/P-7). Revocation is mandatory-signed, entitlement-authorized, and re-verified during resolution (P-8). Trust anchors are defensively copied and exposed read-only. The in-memory registry is reference-grade and PROCESS-LOCAL only. Constructing any public dataclass is NOT authenticity \u2014 only resolve_policy produces an authority-evaluated resolution. ACC-LC-IA (0.2.0): structured policy-version supersession. A successor declares its predecessor as a complete PolicyCoordinate (PolicyArtifactDescriptor.supersedes_coordinate) and ONE signed act - issue_policy - both admits the successor and appends a signed PolicySupersessionRecord to a third append-only store, after which the predecessor resolves as SUPERSEDED while its immutable issued record stays readable. Six admissibility refusals run at issuance step 4 before anything is signed or stored (self-reference, cross-tenant, cross-scope, absent, revoked, already superseded); a stored supersession is re-verified at every resolution and fails closed as SUPERSESSION_INTEGRITY_INVALID if it does not. There is no supersede_policy entry point: supersession is reachable only by issuing a successor. The non-empty UNSTRUCTURED supersedes_ref keeps being refused exactly as before - no existing refusal is relaxed. Suspension is not implemented (ACC-LC-3).",
+  "note": "Machine-readable snapshot of the curated public API. Generated from the installed package; tests/packaging/test_public_api.py asserts equality including dataclass field ORDER and the exact value of every string constant. This is the SHARED, PLATFORM-WIDE Ugence Policy Authority (ADR docs/architecture/ADR_UGENCE_POLICY_AUTHORITY.md, P-1/P-10) — internal platform infrastructure, not a customer-facing module and not a UVI engine. UVI is its FIRST policy-family adapter (P-2), registered behind the PolicyFamilyAdapter protocol; the generic core imports and branches on no policy family. Organizational approval remains EXTERNAL (P-5): the authority verifies externally produced approval evidence through an injected boundary owned by the composition root, and the only shipped verifier is DenyAllApprovalVerifier. v0.1 REJECTS issuance of any artifact carrying a non-empty unstructured supersedes_ref (emptiness is supersedes_ref.strip()) with the stable reason SUPERSESSION_REFERENCE_UNSUPPORTED; there is no permissive supersession posture and structured successor references are deferred (P-6/P-7). Revocation is mandatory-signed, entitlement-authorized, and re-verified during resolution (P-8). Trust anchors are defensively copied and exposed read-only. The in-memory registry is reference-grade and PROCESS-LOCAL only. Constructing any public dataclass is NOT authenticity — only resolve_policy produces an authority-evaluated resolution. ACC-LC-IA (0.2.0): structured policy-version supersession. A successor declares its predecessor as a complete PolicyCoordinate (PolicyArtifactDescriptor.supersedes_coordinate) and ONE signed act - issue_policy - both admits the successor and appends a signed PolicySupersessionRecord to a third append-only store, after which the predecessor resolves as SUPERSEDED while its immutable issued record stays readable. Six admissibility refusals run at issuance step 4 before anything is signed or stored (self-reference, cross-tenant, cross-scope, absent, revoked, already superseded); a stored supersession is re-verified at every resolution and fails closed as SUPERSESSION_INTEGRITY_INVALID if it does not. There is no supersede_policy entry point: supersession is reachable only by issuing a successor. The non-empty UNSTRUCTURED supersedes_ref keeps being refused exactly as before - no existing refusal is relaxed. Suspension is not implemented (ACC-LC-3). 0.3.0 closes ADR §15.7 under ratified decision D-3 (docs/architecture/ADR_UGENCE_GOVERNANCE_GAP_SEQUENCING_RATIFICATION.md, adopting Benchmark Registry ruling D-22 Posture B): SqlitePolicyRegistry is the durable single-node registry - stdlib sqlite3, WAL, every append inside BEGIN IMMEDIATE, exact-coordinate lookup only, append-only issuance/revocation/supersession tables guarded by triggers, one hash-linked ledger_events table, idempotent only for a canonically identical record, cross-tenant lookup the same miss. PolicyArtifactCodec is the family-owned rehydration port the core defines and never implements; UviPolicyArtifactCodec rebuilds the five UVI families from the same canonical structure their body digest is computed over, so trusted resolution succeeds from a cold start with every signature and digest re-checked. The consistency descriptor is a typed declaration with derived read-only claims: SINGLE_NODE_DURABLE claims durability, multi_process_coordination and cross_process_atomic_revocation on one host; distributed_strong_consistency and eventual_consistency_safety stay EXPLICITLY_DISCLAIMED in every scope. InMemoryPolicyRegistry stays the process-local test reference and is refused in production mode. No public resolution semantics and no signing behaviour changed.",
   "constants": {
     "AUTHORITY_PROTOCOL": "ugence.policy-authority",
     "AUTHORITY_PROTOCOL_ID": "ugence.policy-authority/v0.1",
@@ -19,6 +19,7 @@
     "POLICY_BODY_DIGEST_DOMAIN": "ugence.policy-authority/policy-body/v1",
     "REVOCATION_SIGNING_DOMAIN": "ugence.policy-authority/policy-revocation/v1",
     "SIGNATURE_ALG": "ed25519",
+    "SQLITE_REGISTRY_SCHEMA_VERSION": "ugence.policy-authority/registry-sqlite/v1",
     "SUPERSESSION_PREDECESSOR_INADMISSIBLE": "SUPERSESSION_PREDECESSOR_INADMISSIBLE",
     "SUPERSESSION_REFERENCE_UNSUPPORTED": "SUPERSESSION_REFERENCE_UNSUPPORTED",
     "SUPERSESSION_SIGNING_DOMAIN": "ugence.policy-authority/policy-supersession/v1",
@@ -172,6 +173,9 @@
     "PolicyApprovalError": {
       "kind": "exception"
     },
+    "PolicyArtifactCodec": {
+      "kind": "class"
+    },
     "PolicyArtifactDescriptor": {
       "kind": "dataclass",
       "fields": [
@@ -224,6 +228,32 @@
       "kind": "class"
     },
     "PolicyRegistryConflictError": {
+      "kind": "exception"
+    },
+    "PolicyRegistryConsistencyClaim": {
+      "kind": "enum",
+      "values": [
+        "CLAIMED_WITHIN_DECLARED_SCOPE",
+        "EXPLICITLY_DISCLAIMED"
+      ]
+    },
+    "PolicyRegistryConsistencyDescriptor": {
+      "kind": "dataclass",
+      "fields": [
+        "scope"
+      ]
+    },
+    "PolicyRegistryConsistencyScope": {
+      "kind": "enum",
+      "values": [
+        "PROCESS_LOCAL_ONLY",
+        "SINGLE_NODE_DURABLE"
+      ]
+    },
+    "PolicyRegistryProductionModeError": {
+      "kind": "exception"
+    },
+    "PolicyRegistryStorageError": {
       "kind": "exception"
     },
     "PolicyResolution": {
@@ -358,6 +388,10 @@
       "kind": "str_constant",
       "value": "ed25519"
     },
+    "SQLITE_REGISTRY_SCHEMA_VERSION": {
+      "kind": "str_constant",
+      "value": "ugence.policy-authority/registry-sqlite/v1"
+    },
     "SUPERSESSION_PREDECESSOR_INADMISSIBLE": {
       "kind": "str_constant",
       "value": "SUPERSESSION_PREDECESSOR_INADMISSIBLE"
@@ -386,6 +420,9 @@
         "seed"
       ]
     },
+    "SqlitePolicyRegistry": {
+      "kind": "class"
+    },
     "UVI_ADAPTER_ID": {
       "kind": "str_constant",
       "value": "ugence.uvi.policy-family/v1"
@@ -395,6 +432,9 @@
     },
     "UnsupportedSupersessionError": {
       "kind": "exception"
+    },
+    "UviPolicyArtifactCodec": {
+      "kind": "class"
     },
     "UviPolicyFamilyAdapter": {
       "kind": "class"
@@ -406,6 +446,9 @@
       ]
     },
     "canonical_bytes": {
+      "kind": "function"
+    },
+    "declared_consistency": {
       "kind": "function"
     },
     "default_uvi_adapters": {

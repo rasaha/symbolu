@@ -1,0 +1,175 @@
+{
+  "curated_api_module": "ugence_cloud_scaling_envelope_issuance",
+  "distribution": "ugence-cloud-scaling-envelope-issuance",
+  "namespace": "ugence_cloud_scaling_envelope_issuance",
+  "note": "Machine-readable snapshot of the curated public API (ugence_cloud_scaling_envelope_issuance.__all__). tests/packaging/test_packaging.py asserts this file equals the live package surface. Regenerate with scripts/generate_public_api.py when the curated API changes deliberately.",
+  "package_version": "0.1.0",
+  "symbols": {
+    "ArtifactBindingStatus": {
+      "kind": "enum",
+      "values": [
+        "VERIFIED",
+        "CANDIDATE_NOT_REDERIVED",
+        "PRODUCER_ATTESTATION_REFUSED",
+        "POLICY_AUTHENTICITY_REFUSED",
+        "ARTIFACT_INTEGRITY_FAILED",
+        "ARTIFACT_NOT_BOUND_TO_CANDIDATE",
+        "ARTIFACT_INSTANT_MISMATCH",
+        "VERIFIER_UNAVAILABLE"
+      ]
+    },
+    "BINDING_KIND_AUTHORIZATION_CANDIDATE": {
+      "kind": "constant",
+      "value": "cloud-scaling.authorization-candidate"
+    },
+    "BINDING_KIND_IDEMPOTENCY_KEY": {
+      "kind": "constant",
+      "value": "cloud-scaling.idempotency-key"
+    },
+    "BINDING_KIND_POLICY_AUTHENTICITY": {
+      "kind": "constant",
+      "value": "cloud-scaling.policy-authenticity"
+    },
+    "BINDING_KIND_PRODUCER_ATTESTATION": {
+      "kind": "constant",
+      "value": "cloud-scaling.producer-attestation"
+    },
+    "BINDING_KIND_TARGET_SCOPE": {
+      "kind": "constant",
+      "value": "cloud-scaling.execution-target-scope"
+    },
+    "COMPOSITION_PROFILE": {
+      "kind": "constant",
+      "value": "ugence.cloud-scaling.envelope-issuance"
+    },
+    "COMPOSITION_PROFILE_VERSION": {
+      "kind": "constant",
+      "value": "v1"
+    },
+    "CloudScalingArtifactVerification": {
+      "fields": [
+        "candidate",
+        "attestation",
+        "producer_verifier",
+        "policy_verifier",
+        "report"
+      ],
+      "kind": "dataclass"
+    },
+    "CloudScalingEnvelopeIssuance": {
+      "kind": "class",
+      "methods": [
+        "issue",
+        "production",
+        "reference"
+      ]
+    },
+    "CloudScalingEnvelopeIssuanceError": {
+      "kind": "class",
+      "methods": [
+        "add_note",
+        "with_traceback"
+      ]
+    },
+    "CloudScalingEnvelopeIssuanceOutcome": {
+      "fields": [
+        "issued",
+        "issued_at",
+        "envelope",
+        "refusal",
+        "detail",
+        "report"
+      ],
+      "kind": "dataclass"
+    },
+    "CloudScalingEnvelopeIssuanceRequest": {
+      "fields": [
+        "candidate",
+        "producer_attestation",
+        "audience",
+        "session_id",
+        "nonce",
+        "ttl"
+      ],
+      "kind": "dataclass"
+    },
+    "CloudScalingVerificationReport": {
+      "fields": [
+        "as_of",
+        "bindings",
+        "producer_outcome",
+        "policy_outcome",
+        "detail",
+        "composition_profile",
+        "composition_profile_version"
+      ],
+      "kind": "dataclass"
+    },
+    "EnvelopeIssuanceConfigurationError": {
+      "kind": "class",
+      "methods": [
+        "add_note",
+        "with_traceback"
+      ]
+    },
+    "EnvelopeIssuanceContractError": {
+      "kind": "class",
+      "methods": [
+        "add_note",
+        "with_traceback"
+      ]
+    },
+    "EnvelopeIssuanceExactTypeError": {
+      "kind": "class",
+      "methods": [
+        "add_note",
+        "with_traceback"
+      ]
+    },
+    "REFUSING_STATUSES": {
+      "kind": "frozenset",
+      "values": [
+        "ArtifactBindingStatus.ARTIFACT_INSTANT_MISMATCH",
+        "ArtifactBindingStatus.ARTIFACT_INTEGRITY_FAILED",
+        "ArtifactBindingStatus.ARTIFACT_NOT_BOUND_TO_CANDIDATE",
+        "ArtifactBindingStatus.CANDIDATE_NOT_REDERIVED",
+        "ArtifactBindingStatus.POLICY_AUTHENTICITY_REFUSED",
+        "ArtifactBindingStatus.PRODUCER_ATTESTATION_REFUSED",
+        "ArtifactBindingStatus.VERIFIER_UNAVAILABLE"
+      ]
+    },
+    "REQUIRED_BINDING_KINDS": {
+      "kind": "tuple",
+      "values": [
+        "cloud-scaling.authorization-candidate",
+        "cloud-scaling.policy-authenticity",
+        "cloud-scaling.producer-attestation",
+        "cloud-scaling.execution-target-scope",
+        "cloud-scaling.idempotency-key"
+      ]
+    },
+    "UpstreamVerifierUnavailableError": {
+      "kind": "class",
+      "methods": [
+        "add_note",
+        "with_traceback"
+      ]
+    },
+    "__version__": {
+      "kind": "constant",
+      "value": "0.1.0"
+    },
+    "bare_digest": {
+      "kind": "function",
+      "parameters": [
+        "value"
+      ]
+    },
+    "policy_coordinate_of": {
+      "kind": "function",
+      "parameters": [
+        "candidate"
+      ]
+    }
+  }
+}

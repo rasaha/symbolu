@@ -58,7 +58,9 @@ class ActionGatePort(Protocol):
 
 
 class ReferenceActionGate:
-    """Deterministic reference ActionGate."""
+    """Deterministic reference ActionGate. Never production (Phase 5C, D-4)."""
+
+    is_production_authoritative = False
 
     def __init__(self, verifier: Optional[EnvelopeVerifier] = None) -> None:
         self._verifier = verifier or EnvelopeVerifier()

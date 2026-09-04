@@ -5,6 +5,50 @@ All notable changes to this package are documented here. The surface snapshot in
 `tests/packaging/test_public_api.py`, including dataclass field order and the
 exact value of every string constant.
 
+## 0.3.0 — durable single-node registry (ADR §15.7, decision D-3)
+
+Closes the persistence deferral recorded in ADR §15.7, under decision D-3 of
+`docs/architecture/ADR_UGENCE_GOVERNANCE_GAP_SEQUENCING_RATIFICATION.md`
+(adopting Benchmark Registry ruling D-22 Posture B). Purely additive: ten new
+public names, none removed, no resolution semantics and no signing behaviour
+changed.
+
+### Added
+
+- **`SqlitePolicyRegistry`** — the durable registry behind the unchanged
+  `PolicyRegistry` seam: stdlib `sqlite3`, WAL, `BEGIN IMMEDIATE` around every
+  append, exact-coordinate lookup only, three append-only tables guarded by
+  triggers, a hash-linked `ledger_events` table with `verify_chain()`, idempotent
+  only for a canonically identical record, typed conflict otherwise, cross-tenant
+  lookup the same miss, successor plus supersession in one transaction.
+  `SQLITE_REGISTRY_SCHEMA_VERSION` is refused on mismatch.
+- **`PolicyArtifactCodec`** (core port) and **`UviPolicyArtifactCodec`** (adapter)
+  — family-owned rehydration of the opaque `IssuedPolicyRecord.policy`. The core
+  encodes records with its one canonical encoder and decodes them with a strict
+  annotation-driven dataclass decoder; the UVI codec rebuilds the five families.
+  A record the codec cannot rehydrate is a `PolicyRegistryStorageError`.
+- **`PolicyRegistryConsistencyScope`**, **`PolicyRegistryConsistencyClaim`**,
+  **`PolicyRegistryConsistencyDescriptor`**, **`declared_consistency`** — the
+  typed consistency declaration. `SINGLE_NODE_DURABLE` claims durability,
+  multi-process coordination and cross-process atomic revocation on one host;
+  distributed strong consistency and eventual-consistency safety are explicitly
+  disclaimed in every scope; the answers are derived properties, never fields.
+- **`PolicyRegistryStorageError`**, **`PolicyRegistryProductionModeError`**.
+
+### Changed
+
+- `InMemoryPolicyRegistry` accepts `production_mode` and refuses `True`; it
+  declares `PROCESS_LOCAL_ONLY`. Its constructor is otherwise unchanged.
+
+### Verified
+
+- Parity script against the in-memory reference (identical values and error
+  classes), cold-start trusted resolution for all five UVI families, revocation
+  on one connection visible to another at once, twelve forked processes racing
+  one identity slot (one stored, eleven typed conflicts) and twelve identical
+  writers (all idempotent, one row), append-only triggers, chain tamper
+  detection, and byte-identical store after every failed append.
+
 ## 0.2.0 — structured policy-version supersession (the `ACC-LC` round)
 
 The change set authorized as `ACC-LC-IA-2` (see

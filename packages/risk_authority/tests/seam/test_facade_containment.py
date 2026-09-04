@@ -26,6 +26,7 @@ from risk_authority.integrations.evaluation_contracts import (
     SeamContractError,
 )
 from risk_authority.services.decision_authority import ReferenceDecisionAuthority
+from tests.scenario import durable_store
 
 NOW = datetime(2026, 8, 12, 12, 0, 0, tzinfo=timezone.utc)
 KEY = SigningKeyRecord("k1", SigningKey.from_seed(bytes(range(32))))
@@ -68,7 +69,7 @@ def _prod_kwargs(**over):
         workflow_source=_src(), key_record=KEY, clock=lambda: NOW,
         evidence_admission=_ProdAdmission(), control_assurance=_ProdControlAssurance(),
         evidence_ingress=_ProdIngress(), decision_authority=_ProdDecisionAuthority(),
-        production_mode=True,
+        persistence=durable_store(), production_mode=True,
     )
     kw.update(over)
     return kw

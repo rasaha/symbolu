@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from typing import Optional
 
+from ..domain.actions import ActionAuthorization
 from ..domain.authority import AuthorityGrant
 from ..domain.controls import ControlResult
 from ..domain.decision import RiskDecision
@@ -25,6 +26,7 @@ __all__ = [
     "InMemoryControlResultRepository",
     "InMemoryEvidenceRepository",
     "InMemoryGovernanceEventStore",
+    "InMemoryAuthorizationRepository",
 ]
 
 
@@ -100,6 +102,27 @@ class InMemoryEvidenceRepository:
         self, tenant_id: str, evidence_id: str
     ) -> Optional[ControlEvidenceRecord]:
         return self._evidence.get((tenant_id, evidence_id))
+
+
+class InMemoryAuthorizationRepository:
+    def __init__(self) -> None:
+        self._authorizations: dict[tuple[str, str], ActionAuthorization] = {}
+
+    def save(self, authorization: ActionAuthorization) -> None:
+        key = (authorization.tenant_id, authorization.authorization_id)
+        stored = self._authorizations.get(key)
+        if stored is not None:
+            if stored.action_digest != authorization.action_digest:
+                from .errors import PersistenceConflictError
+
+                raise PersistenceConflictError(
+                    f"authorization {authorization.authorization_id!r} exists for tenant "
+                    f"{authorization.tenant_id!r} with another action digest")
+            return
+        self._authorizations[key] = authorization
+
+    def get(self, tenant_id: str, authorization_id: str) -> Optional[ActionAuthorization]:
+        return self._authorizations.get((tenant_id, authorization_id))
 
 
 class InMemoryGovernanceEventStore:

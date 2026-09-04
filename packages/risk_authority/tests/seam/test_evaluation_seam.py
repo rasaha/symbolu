@@ -44,6 +44,7 @@ from risk_authority.integrations.evaluation_contracts import (
     SubjectRiskNonDecisionReason,
 )
 from risk_authority.services.decision_authority import ReferenceDecisionAuthority
+from tests.scenario import durable_store
 
 NOW = datetime(2026, 8, 12, 12, 0, 0, tzinfo=timezone.utc)
 KEY = SigningKeyRecord("k1", SigningKey.from_seed(bytes(range(32))))
@@ -179,6 +180,7 @@ def _production_seam(controls=(), *, grant="default", evidence_admission="defaul
         evaluator_grant=_prod_grant() if grant == "default" else grant,
         key_record=KEY,
         clock=lambda: NOW,
+        persistence=durable_store(),
     )
     return RiskEvaluationSeam.production(**kw)
 

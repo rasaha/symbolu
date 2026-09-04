@@ -27,7 +27,7 @@ keywords = ["governance", "risk", "authority", "evidence", "control-assurance", 
 # (the TAP provider). No third-party runtime dependency of its own beyond what
 # those first-party wheels already declare.
 dependencies = [
-    "ugence-risk-authority>=0.1.0",
+    "ugence-risk-authority>=0.7.0",
     "ugence-tap-provider>=0.1.0",
     # Directly imported by the TAP Control-Assurance adapter + outcome mapping
     # (AssertionGovernanceRequest/Result/Coverage, AssertionGovernanceProvider).
