@@ -36,6 +36,7 @@ from typing import Any, Iterator, Optional
 
 from ..crypto.canonical import canonical_bytes, canonical_dumps
 from ..crypto.hashing import sha256_hex
+from ..domain.actions import ActionAuthorization
 from ..domain.authority import AuthorityGrant
 from ..domain.controls import ControlResult
 from ..domain.decision import RiskDecision
@@ -84,6 +85,9 @@ CREATE TABLE IF NOT EXISTS control_results (
 CREATE TABLE IF NOT EXISTS evidence (
     tenant_id TEXT NOT NULL, evidence_id TEXT NOT NULL, record_json TEXT NOT NULL,
     PRIMARY KEY (tenant_id, evidence_id));
+CREATE TABLE IF NOT EXISTS authorizations (
+    tenant_id TEXT NOT NULL, authorization_id TEXT NOT NULL, action_digest TEXT NOT NULL,
+    record_json TEXT NOT NULL, PRIMARY KEY (tenant_id, authorization_id));
 CREATE TABLE IF NOT EXISTS governance_events (
     seq INTEGER PRIMARY KEY AUTOINCREMENT, tenant_id TEXT NOT NULL, event_id TEXT NOT NULL,
     aggregate_id TEXT NOT NULL, record_json TEXT NOT NULL, UNIQUE (tenant_id, event_id));
@@ -117,6 +121,7 @@ _LEDGER_TABLES: dict[str, tuple[str, str, bool]] = {
     "controls": ("control_results", "case_id", True),
     "evidence": ("evidence", "evidence_id", False),
     "event": ("governance_events", "event_id", False),
+    "authorization": ("authorizations", "authorization_id", False),
     "revocation": ("revocation_events", "seq", False),
 }
 
@@ -162,6 +167,7 @@ class SqliteRiskAuthorityStore:
         self.controls = _ControlResultRepository(self)
         self.evidence = _EvidenceRepository(self)
         self.events = _GovernanceEventStore(self)
+        self.authorizations = _AuthorizationRepository(self)
         self.ids = SqliteIdAllocator(self)
         self.revocation = SqliteRevocationState(self)
 
@@ -400,6 +406,36 @@ class _GovernanceEventStore(_Adapter):
     def all(self) -> tuple[GovernanceEvent, ...]:
         rows = self._store._c().execute("SELECT record_json FROM governance_events ORDER BY seq").fetchall()
         return tuple(decode_record(GovernanceEvent, json.loads(r[0])) for r in rows)
+
+
+class _AuthorizationRepository(_Adapter):
+    """Phase 5C admissions (D-3): write-once per id; the same digest is idempotent."""
+
+    def save(self, authorization: ActionAuthorization) -> None:
+        if not isinstance(authorization, ActionAuthorization):
+            raise PersistenceStorageError("save requires an ActionAuthorization")
+        record_json = canonical_dumps(encode_record(authorization))
+        with self._store._tx() as c:
+            row = c.execute("SELECT action_digest FROM authorizations WHERE tenant_id=? AND "
+                            "authorization_id=?",
+                            (authorization.tenant_id, authorization.authorization_id)).fetchone()
+            if row is not None:
+                if row[0] != authorization.action_digest:
+                    raise PersistenceConflictError(
+                        f"authorizations: {authorization.authorization_id!r} exists for tenant "
+                        f"{authorization.tenant_id!r} with another action digest")
+                return
+            c.execute("INSERT INTO authorizations (tenant_id, authorization_id, action_digest, "
+                      "record_json) VALUES (?,?,?,?)",
+                      (authorization.tenant_id, authorization.authorization_id,
+                       authorization.action_digest, record_json))
+            self._store._append_ledger(
+                c, "authorization", f"{authorization.tenant_id}/{authorization.authorization_id}",
+                record_json.encode("utf-8"))
+
+    def get(self, tenant_id: str, authorization_id: str) -> Optional[ActionAuthorization]:
+        raw = self._store._load("authorizations", tenant_id, "authorization_id", authorization_id)
+        return None if raw is None else decode_record(ActionAuthorization, raw)
 
 
 class SqliteIdAllocator:

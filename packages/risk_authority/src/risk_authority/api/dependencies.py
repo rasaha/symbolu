@@ -49,6 +49,7 @@ from ..observability.metrics import Metrics
 from ..persistence.errors import PersistenceProductionModeError
 from ..persistence.repositories import (
     AuthorityRegistry,
+    AuthorizationRepository,
     ControlResultRepository,
     DecisionRepository,
     EnvelopeRepository,
@@ -57,6 +58,7 @@ from ..persistence.repositories import (
 )
 from ..persistence.in_memory import (
     InMemoryAuthorityRegistry,
+    InMemoryAuthorizationRepository,
     InMemoryControlResultRepository,
     InMemoryDecisionRepository,
     InMemoryEnvelopeRepository,
@@ -108,6 +110,7 @@ class RiskAuthorityApplication:
         controls: Optional[ControlResultRepository] = None,
         events: Optional[GovernanceEventStore] = None,
         revocation: Optional[RevocationState] = None,
+        authorizations: Optional[AuthorizationRepository] = None,
         persistence: Optional[Any] = None,
         event_bus: Optional[EventBus] = None,
         metrics: Optional[Metrics] = None,
@@ -203,7 +206,8 @@ class RiskAuthorityApplication:
             supplied = {name: value for name, value in (
                 ("cases", cases), ("decisions", decisions), ("envelopes", envelopes),
                 ("authority", authority), ("controls", controls), ("events", events),
-                ("revocation", revocation), ("ids", ids)) if value is not None}
+                ("revocation", revocation), ("ids", ids),
+                ("authorizations", authorizations)) if value is not None}
             if supplied:
                 raise PersistenceProductionModeError(
                     f"persistence bundle given beside individual stores {sorted(supplied)}; "
@@ -211,6 +215,7 @@ class RiskAuthorityApplication:
             cases, decisions, envelopes = persistence.cases, persistence.decisions, persistence.envelopes
             authority, controls, events = persistence.authority, persistence.controls, persistence.events
             revocation, ids = persistence.revocation, persistence.ids
+            authorizations = persistence.authorizations
         self.cases = cases or InMemoryRiskCaseRepository()
         self.decisions = decisions or InMemoryDecisionRepository()
         self.envelopes = envelopes or InMemoryEnvelopeRepository()
@@ -218,6 +223,7 @@ class RiskAuthorityApplication:
         self.controls = controls or InMemoryControlResultRepository()
         self.events = events or InMemoryGovernanceEventStore()
         self.revocation = revocation or RevocationState()
+        self.authorizations = authorizations or InMemoryAuthorizationRepository()
         self.event_bus = event_bus or EventBus()
         self.metrics = metrics or Metrics()
         self._ids = ids or _Ids()
@@ -227,7 +233,8 @@ class RiskAuthorityApplication:
             for name, store in (("cases", self.cases), ("decisions", self.decisions),
                                 ("envelopes", self.envelopes), ("authority", self.authority),
                                 ("controls", self.controls), ("events", self.events),
-                                ("revocation", self.revocation), ("ids", self._ids)):
+                                ("revocation", self.revocation), ("ids", self._ids),
+                                ("authorizations", self.authorizations)):
                 if getattr(store, "is_production_authoritative", False) is not True:
                     raise PersistenceProductionModeError(
                         f"production_mode=True requires a production-authoritative {name} "

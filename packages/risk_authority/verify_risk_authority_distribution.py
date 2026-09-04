@@ -34,7 +34,7 @@ import importlib.util, sys
 from datetime import datetime, timezone
 
 import risk_authority as ra
-assert ra.__version__ == "0.7.0", ra.__version__
+assert ra.__version__ == "0.8.0", ra.__version__
 assert "site-packages" in ra.__file__, ra.__file__
 assert not any("/symbolu" in p for p in sys.path), sys.path
 
@@ -460,6 +460,38 @@ reopened.close()
 assert not RiskAuthorityApplication(workflow_source=src, key_record=key, clock=lambda: now,
     persistence=SqliteRiskAuthorityStore(dpath)).verify_envelope("t", dout.envelope.envelope_id).valid
 print("ISOLATED SINGLE-WHEEL RISK-AUTHORITY DURABLE PERSISTENCE (v0.7.0) VERIFICATION OK")
+
+# --- Phase 5C action admission (v0.8.0): kernel verification, derived id, replay, containment
+from risk_authority.api import ActionAdmissionSeam, ActionAdmissionRequest, ActionAdmissionRefusal
+from risk_authority.domain.actions import CanonicalAction
+from risk_authority.domain.enums import AuthorizationDisposition
+from risk_authority.integrations.actiongate import ReferenceActionGate
+aact = CanonicalAction(tenant_id="t", actor_id="agent_finance_07", model_id="model_xyz", action_type="crm.read",
+    target_id="txn", purpose="CUSTOMER_REFUND_REVIEW", destination="internal://finance")
+aseam = ActionAdmissionSeam.reference(app=app, clock=lambda: now)
+a1 = aseam.issue(ActionAdmissionRequest(tenant_id="t", envelope_id=env.envelope_id, action=aact, session_id="s"))
+assert a1.admitted and a1.executable is False and a1.authorization.authorization_id.startswith("auth.v1:")
+assert a1.authorization.expires_at == env.expires_at
+a2 = aseam.issue(ActionAdmissionRequest(tenant_id="t", envelope_id=env.envelope_id, action=aact, session_id="s"))
+assert a2.replayed and a2.authorization.disposition is AuthorizationDisposition.REPLAYED
+assert aseam.issue(ActionAdmissionRequest(tenant_id="t", envelope_id=env.envelope_id, action=aact,
+    session_id="other")).refusal is ActionAdmissionRefusal.ENVELOPE_INVALID
+class _PG:
+    is_production_authoritative = True
+    def authorize(self, **kw): return ReferenceActionGate().authorize(**kw)
+try:
+    ActionAdmissionSeam.production(app=papp, gate=ReferenceActionGate(), clock=lambda: now)
+    raise AssertionError("production admission accepted the reference gate")
+except SeamConfigurationError:
+    pass
+assert ActionAdmissionSeam.production(app=papp, gate=_PG(), clock=lambda: now).is_production
+try:
+    papp.authorize_action(AuthorizeActionRequest(envelope_id="e", tenant_id="t",
+        actor_id="a", model_id="m", session_id="s", action_type="x", target_id="y", purpose="p"))
+    raise AssertionError("production authorized an action through the contained path")
+except ProductionContainmentError:
+    pass
+print("ISOLATED SINGLE-WHEEL RISK-AUTHORITY ACTION ADMISSION (v0.8.0) VERIFICATION OK")
 
 print("ISOLATED SINGLE-WHEEL RISK-AUTHORITY VERIFICATION OK")
 '''

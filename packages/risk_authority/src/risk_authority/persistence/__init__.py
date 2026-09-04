@@ -14,6 +14,7 @@ from .in_memory import (
     InMemoryDecisionRepository,
     InMemoryEnvelopeRepository,
     InMemoryEvidenceRepository,
+    InMemoryAuthorizationRepository,
     InMemoryGovernanceEventStore,
     InMemoryRiskCaseRepository,
 )
@@ -25,6 +26,7 @@ from .sqlite import (
 )
 from .repositories import (
     AuthorityRegistry,
+    AuthorizationRepository,
     ControlResultRepository,
     DecisionRepository,
     EnvelopeRepository,
@@ -48,6 +50,8 @@ __all__ = [
     "InMemoryControlResultRepository",
     "InMemoryEvidenceRepository",
     "InMemoryGovernanceEventStore",
+    "InMemoryAuthorizationRepository",
+    "AuthorizationRepository",
     "SqliteRiskAuthorityStore",
     "SqliteRevocationState",
     "SqliteIdAllocator",

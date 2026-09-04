@@ -3,6 +3,14 @@
 from __future__ import annotations
 
 from .dependencies import RiskAuthorityApplication
+from .action_admission_seam import (
+    AUTHORIZATION_ID_PREFIX,
+    ActionAdmissionOutcome,
+    ActionAdmissionRefusal,
+    ActionAdmissionRequest,
+    ActionAdmissionSeam,
+    derive_authorization_id,
+)
 from .evaluation_seam import RiskEvaluationSeam, SeamConfigurationError
 from .envelope_issuance_seam import (
     VERIFIED,
@@ -34,6 +42,12 @@ __all__ = [
     "VerifiedArtifactBinding",
     "ArtifactVerificationPort",
     "VERIFIED",
+    "ActionAdmissionSeam",
+    "ActionAdmissionRequest",
+    "ActionAdmissionOutcome",
+    "ActionAdmissionRefusal",
+    "AUTHORIZATION_ID_PREFIX",
+    "derive_authorization_id",
     "CreateCaseRequest",
     "ControlResultInput",
     "EvaluateRequest",

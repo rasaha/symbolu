@@ -9,10 +9,11 @@ binding, AC-07).
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Optional
 
 from ..crypto.hashing import digest
-from .enums import ActionGateDecision
+from .enums import ActionGateDecision, AuthorizationDisposition
 
 __all__ = ["CanonicalAction", "ActionAuthorization", "action_digest"]
 
@@ -54,8 +55,26 @@ class ActionAuthorization:
     tenant_id: str = ""
     reason_codes: tuple[str, ...] = ()
     trajectory_version: Optional[int] = None
-    expires_at: Optional[object] = None  # datetime; kept Optional for RA-4
+    #: The envelope's own expiry (Phase 5C, D-5); ``None`` only on the RA-4 reference path.
+    expires_at: Optional[datetime] = None
+    #: ``ADMITTED`` for a fresh verdict, ``REPLAYED`` when the stored verdict for the same
+    #: ``(tenant, envelope, action digest)`` was returned again (Phase 5C, D-3).
+    disposition: AuthorizationDisposition = AuthorizationDisposition.ADMITTED
+
+    def __post_init__(self) -> None:
+        if self.expires_at is not None and not isinstance(self.expires_at, datetime):
+            raise TypeError("ActionAuthorization.expires_at must be a datetime or None")
+        if not isinstance(self.decision, ActionGateDecision):
+            raise TypeError("ActionAuthorization.decision must be an ActionGateDecision")
+        if not isinstance(self.disposition, AuthorizationDisposition):
+            raise TypeError("ActionAuthorization.disposition must be an AuthorizationDisposition")
 
     @property
     def authorized(self) -> bool:
         return self.decision is ActionGateDecision.AUTHORIZED
+
+    @property
+    def executable(self) -> bool:
+        """Always ``False``: an authorization is admission, never execution (5X, 5D pending)."""
+
+        return False
