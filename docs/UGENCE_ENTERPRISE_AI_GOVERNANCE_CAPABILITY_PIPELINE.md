@@ -1328,9 +1328,64 @@ The single most important finding is stated first: **no package among the 45 dec
 | **Reference-grade** | Operative logic shipped with in-memory or reference adapters that are refused when `production_mode` is set; production adapters delegated. |
 | **CI-verified, pilot pending** | Implemented and CI-verified, and the README itself states that pilot or production validation remains pending. |
 | **Frozen** | Public API frozen at a major version; no phase ladder; validation described as synthetic or legacy-lineage. |
-| **Pilot-ready** | The package declares readiness for a bounded or controlled pilot. **No capability currently carries this tag.** |
+| **Pilot-ready** | The package declares readiness to **start** a bounded or controlled pilot with a client. **No capability currently carries this tag.** |
+| **Pilot-validated** | A pilot has **run** against this package lineage and its results are recorded. No capability carries it; several READMEs state the negative (`pilot_validated=false`, "Not pilot-validated"). |
+| **Production-certified** | Formal certification beyond pilot. No capability carries it; every README that mentions it states the negative. |
 
-## B.3 Status table
+## B.3 Canonical development pipeline
+
+The stage tags are not an arbitrary list. They sit at fixed points on one development cycle that every capability is expected to travel: contracts first, then an implemented kernel, then hardening, then a client pilot, then production. The research track runs beside that cycle and feeds evidence back into definition; it never enters the pilot band on its own. **Frozen** is an API-stability state that can be reached at any point from the kernel band onward, so it is drawn as a side state rather than a band.
+
+```mermaid
+flowchart LR
+    subgraph DEF["1 · Define contracts"]
+        CO["Contract-only<br/>3 capabilities"]
+    end
+    subgraph BUILD["2 · Build the kernel"]
+        CI["Core implemented<br/>19 capabilities"]
+        PIP["Phase in progress<br/>6 capabilities"]
+        LPD["Last phase done<br/>3 capabilities"]
+        EXP["Experimental kernel<br/>2 capabilities"]
+    end
+    subgraph HARDEN["3 · Harden for deployment"]
+        RG["Reference-grade<br/>4 capabilities"]
+        CIV["CI-verified, pilot pending<br/>2 capabilities"]
+    end
+    subgraph PILOT["4 · Client pilot"]
+        PR["Pilot-ready<br/>0 capabilities"]
+        PV["Pilot-validated<br/>0 capabilities"]
+    end
+    subgraph PROD["5 · Production"]
+        PC["Production-certified<br/>0 capabilities"]
+    end
+    subgraph RES["Research track (parallel lane)"]
+        RO["Research-only<br/>4 capabilities"]
+    end
+    FZ(["Frozen API<br/>2 capabilities"])
+
+    CO --> CI
+    CI --> PIP --> LPD
+    CI --> EXP
+    LPD --> RG
+    CI --> RG
+    RG --> CIV
+    CIV --> PR --> PV --> PC
+    EXP -. "evidence only" .-> CO
+    RO -. "evidence only" .-> CO
+    CI -. "API freeze" .-> FZ
+    LPD -. "API freeze" .-> FZ
+    PC -. "policy feedback" .-> CO
+```
+
+How to read it against the table in B.4:
+
+- **Bands 1–3 hold all 45 capabilities.** Nothing has crossed into band 4, which is the finding stated in B.1.
+- **Band 2 is where a package's own phase ladder lives.** "Phase in progress" and "Last phase done" describe position on that ladder; "Core implemented" means the package has no ladder left inside it. The cloud-scaling thread is the clearest example of a ladder that spans several packages, with Phases 1–5B landed and 5B-2, 5C, 5X, 5D and 6 still unbuilt.
+- **Band 3 is the step the Risk Authority runtimes and Agent Runtime have reached.** Reference-grade means the logic is operative but its production adapters are delegated; CI-verified, pilot pending means the README itself names pilot or production validation as the next step.
+- **Band 4 has two rungs.** Pilot-ready means the package declares fitness to start a controlled pilot with a client. Pilot-validated means a pilot has run and its results are recorded. The legacy Enterprise Validation Pilot sits near the second rung but ran over predecessor distributions, so it is cited as inferred and not counted.
+- **The research lane is not a shortcut.** Research-only and Experimental-kernel outputs reach the main cycle only as evidence for policy and contract revision, never as authority to deploy.
+
+## B.4 Status table
 
 Test counts are `def test_` occurrences under each package's `tests/` tree at the inspected commit; they indicate suite size, not coverage or pass state.
 
@@ -1382,7 +1437,7 @@ Test counts are `def test_` occurrences under each package's `tests/` tree at th
 | 44 | Agent Value Readiness | 0.4.1 | Experimental kernel | M-3R.1 to M-3R.3 done plus Trusted Readiness Orchestration; ROI, forecasting and deployment authorization deferred | Deterministic three-dimension readiness determination marked experimental, internal, advisory and non-financial; no allow-all verifier ships by design. | 542 |
 | 45 | Governed Value | 0.2.0 | Experimental kernel | GV-0 and GV-1 done; GV-2 evidence and GV-4 authority layers do not exist | Reported-value calculation kernel over caller-reported inputs; every figure carries `REPORTED` evidence status and `UNVERIFIED` authority status. | 42 |
 
-## B.4 Distribution by stage
+## B.5 Distribution by stage
 
 | Stage tag | Count | Capabilities |
 |---|---:|---|
@@ -1396,8 +1451,10 @@ Test counts are `def test_` occurrences under each package's `tests/` tree at th
 | Experimental kernel | 2 | 44, 45 |
 | Frozen | 2 | 23, 31 |
 | Pilot-ready | 0 | none |
+| Pilot-validated | 0 | none |
+| Production-certified | 0 | none |
 
-## B.5 Reading the table
+## B.6 Reading the table
 
 1. **The accountability chain is implemented but not piloted.** Every Core-required capability from Appendix A is at least Core implemented, and the four Risk Authority runtime packages are reference-grade with production adapters delegated rather than absent. What is missing is a bounded pilot of the current package lineage; the only pilot evidence is the legacy Enterprise Validation Pilot over predecessor distributions.
 2. **Cloud scaling is the deepest phase ladder and the clearest gap.** Phases 1–5B are landed across six packages, but envelope issuance (5B-2), production ActionGate admission (5C), the Credential Broker (5X), bounded execution (5D) and effect verification (6) are all named and unbuilt. Live infrastructure mutation is structurally blocked until 5X.
