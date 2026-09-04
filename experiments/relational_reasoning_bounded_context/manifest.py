@@ -37,28 +37,46 @@ def source_hashes() -> dict:
             for n in _MODULES if (here / n).exists()}
 
 
-def config_digest() -> str:
-    payload = {
+def config_payload(arm: str = C.ARM_ABS) -> dict:
+    """Everything the protocol lock binds for `arm`: representation/sequence capacity, parameter counts,
+    caps, gates, reserved seeds, the arm's positional mechanism and its FROZEN TRAINING RECIPE (batch,
+    updates, lr, betas, wd, clip, dataset size). Changing any of these changes the digest and invalidates
+    every signed authorization for the arm (closes gap [G] in BTRR_SMOKE_CALIBRATION_LOG.md)."""
+    spec = C.ARMS[arm]
+    return {
+        "arm": arm, "arm_name": spec["name"],
+        "positional_mechanism": spec["positional_mechanism"], "rope_theta": spec["rope_theta"],
         "vocab_size": C.VOCAB_SIZE, "input_token_limit": C.INPUT_TOKEN_LIMIT,
         "output_token_limit": C.OUTPUT_TOKEN_LIMIT, "max_seq_len": C.MAX_SEQ_LEN,
-        "expected_total_params": C.EXPECTED_TOTAL_PARAMS,
-        "expected_reasoning_block_params": C.EXPECTED_REASONING_BLOCK_PARAMS,
+        "d_model": C.D_MODEL, "n_layers": C.N_LAYERS, "n_heads": C.N_HEADS, "d_ff": C.D_FF,
+        "expected_total_params": spec["expected_total_params"],
+        "expected_reasoning_block_params": spec["expected_reasoning_block_params"],
+        "train_recipe": {
+            "batch_size": C.BATCH_SIZE, "max_updates": spec["max_updates"],
+            "learning_rate": C.LEARNING_RATE, "beta1": C.BETA1, "beta2": C.BETA2,
+            "weight_decay": C.WEIGHT_DECAY, "gradient_clip": C.GRADIENT_CLIP,
+            "n_train_per_split": spec["n_train_per_split"],
+        },
         "caps": dict(C.CAPS), "numeric_gates": dict(C.NUMERIC_GATES),
-        "reserved": {"smoke": sorted(C.SMOKE_SEEDS), "dev": sorted(C.DEVELOPMENT_SEEDS),
-                     "final": sorted(C.FINAL_SEEDS)},
+        "p0": {"subtask_gate": C.P0_SUBTASK_GATE, "block_threshold": C.P0_BLOCK_THRESHOLD},
+        "reserved": {role: sorted(seeds) for role, seeds in spec["seeds"].items()},
     }
-    return _sha(json.dumps(payload, sort_keys=True))
+
+
+def config_digest(arm: str = C.ARM_ABS) -> str:
+    return _sha(json.dumps(config_payload(arm), sort_keys=True))
 
 
 def tokenizer_vocab_digest() -> str:
     return _sha(json.dumps(list(LEXEMES)))
 
 
-def build_manifest() -> dict:
+def build_manifest(arm: str = C.ARM_ABS) -> dict:
     return {
+        "arm": arm, "arm_name": C.ARMS[arm]["name"], "arm_ratified": bool(C.ARMS[arm]["ratified"]),
         "provenance": PROVENANCE,
         "schema_serializer_version": SCHEMA_SERIALIZER_VERSION,
-        "config_digest": config_digest(),
+        "config_digest": config_digest(arm),
         "tokenizer_vocab_digest": tokenizer_vocab_digest(),
         "source_hashes": source_hashes(),
         "execution": "BTRR_EXECUTION_NOT_AUTHORIZED",

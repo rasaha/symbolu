@@ -10,6 +10,7 @@ train/final identity pools by role, R12 exactly one valid path, PATH_DISCOVERY g
 """
 from __future__ import annotations
 
+import hashlib
 import random
 from typing import Callable
 
@@ -23,27 +24,67 @@ SPLITS = ("R1", "R2", "R3", "R4", "R5", "R6", "R7", "R8", "R9", "R10", "R11", "R
 P0_SUBTASKS = ("B1", "B2", "B3", "B4", "B5", "B6", "B7")
 
 _RISK = ("LOW", "MEDIUM", "HIGH", "CRITICAL")
+# F13: answer-bearing attributes are drawn UNIFORMLY so no split has a constant gold answer and the
+# query-only / majority-class baselines collapse to chance (preregistration §9).
+_REGIONS = ("EU", "NA", "APAC", "LATAM")
 _STATUS = ("ACTIVE", "EXPIRED", "PENDING")
-_ROLE_ALPHABET = {"train": "ABCDEFGH", "dev": "ACEGJLNP", "final": "JKLMNPQR", "unit": "STUVWXYZ"}
+
+# Shared identifier vocabulary, marker-free pool partition. Every role draws ids from the SAME letters, so
+# a held-out identity is a new combination of trained tokens with no token or per-position pattern absent
+# from training. Train/dev/final/unit disjointness comes from an INVISIBLE partition of the combination
+# space: an id belongs to the pool selected by a stable hash of the id string (rejection-sampled at
+# minting), never from a visible marker.
+# F16: ids are LETTERS ONLY. Opaque ids must not share a token class with high-frequency context tokens:
+# with a trailing digit, the correct digit was one of ~7 identical digit tokens per context (nine-digit
+# amounts), and every content-addressed copy run got all letters right and the digit wrong (B1 exact
+# 0.125 -> 1.0 on the same episodes once the digit slot was removed; calibration log run 8).
+# History: disjoint *alphabets* gave 0.0 validity; a role-specific trailing *digit* leaked the pool
+# (F14); a shared trailing digit capped every copy subtask (F16). All three were generator artifacts.
+_ID_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ"
+_ID_LEN = 6
+_POOL_BUCKETS = 8
+_ROLE_BUCKETS = {"train": (0, 1, 2, 3), "dev": (4, 5), "final": (6,), "unit": (7,)}
 
 
-def _rng(seed: int, split: str, index: int) -> random.Random:
-    return random.Random((int(seed) * 1_000_003 + hash(split) % 9973) * 131 + index)
+def _stable_hash(text: str) -> int:
+    """Process-independent string hash. Python's builtin ``hash(str)`` is salted per interpreter
+    (PYTHONHASHSEED), so it must never seed a scientific RNG: the same (seed, split, index, role) would
+    yield different episodes in different processes, silently breaking deterministic replay across runs."""
+    return int.from_bytes(hashlib.sha256(text.encode("utf-8")).digest()[:8], "big")
+
+
+def pool_of(identifier: str) -> str:
+    """Which identity pool an ID string belongs to (invisible partition; pure function of the string)."""
+    b = _stable_hash("pool:" + identifier) % _POOL_BUCKETS
+    for role, buckets in _ROLE_BUCKETS.items():
+        if b in buckets:
+            return role
+    raise AssertionError("unreachable: every bucket is assigned")
+
+
+def _rng(seed: int, split: str, index: int, role: str = "unit") -> random.Random:
+    r = (int(seed) * 1_000_003 + _stable_hash(split) % 9973) * 131 + index
+    return random.Random(r * 17 + (_stable_hash(role) % 7919))   # role partitions the episode/identity stream
 
 
 class _Mint:
-    """Role-scoped opaque 6-char id minter; disjoint letter alphabets => disjoint pools across roles."""
+    """Opaque 6-letter id minter (F16: no digit slot); the id is accepted only if the invisible hash
+    partition assigns it to this minter's role => strictly disjoint train/dev/final/unit pools that are
+    token- and position-distribution identical. Ids never collide with a frozen lexeme or an outcome."""
 
     def __init__(self, rng: random.Random, role: str) -> None:
         self.rng = rng
-        self.alpha = _ROLE_ALPHABET.get(role, _ROLE_ALPHABET["unit"])
+        self.role = role if role in _ROLE_BUCKETS else "unit"
+        self.buckets = set(_ROLE_BUCKETS[self.role])
         self.seen: set[str] = set()
 
     def new(self, prefix: str = "") -> str:
+        from .tokenizer import LEXEMES  # torch-free; ids must never tokenize as a single lexeme
+        n = min(_ID_LEN, CAPS["max_id_len"]) - len(prefix)
         while True:
-            body = "".join(self.rng.choice(self.alpha) for _ in range(max(2, 5 - len(prefix))))
-            cand = (prefix + body)[: CAPS["max_id_len"]]
-            if len(cand) >= 2 and cand not in self.seen and cand not in OUTCOME_VOCAB:
+            cand = prefix + "".join(self.rng.choice(_ID_ALPHABET) for _ in range(max(1, n)))
+            if (len(cand) >= 2 and cand not in self.seen and cand not in OUTCOME_VOCAB and cand not in LEXEMES
+                    and _stable_hash("pool:" + cand) % _POOL_BUCKETS in self.buckets):
                 self.seen.add(cand)
                 return cand
 
@@ -55,9 +96,10 @@ def _amount(rng: random.Random) -> str:
 # ---------- R-split generators ----------
 
 def _gen_direct(rng, mint, tenant, split):  # R1
-    ents = [Entity("vendor", mint.new(), tenant, (("region", "EU"), ("amount", _amount(rng))))]
+    ents = [Entity("vendor", mint.new(), tenant, (("region", rng.choice(_REGIONS)), ("amount", _amount(rng))))]
     for _ in range(rng.randint(5, 11)):
-        ents.append(Entity("vendor", mint.new(), tenant, (("amount", _amount(rng)),)))
+        ents.append(Entity("vendor", mint.new(), tenant,
+                           (("region", rng.choice(_REGIONS)), ("amount", _amount(rng)))))
     root = ents[0]
     attr_v = dict(root.attributes)["region"]
     q = ReasoningQuery("resolve_attribute", "NOT_APPLICABLE", root.entity_id,
@@ -73,7 +115,7 @@ def _chain(rng, mint, tenant, hops):
     types = ["contract", "vendor", "department"]
     prev = ents[0]
     for i in range(hops):
-        nxt = Entity(types[i], mint.new(), tenant, (("region", "EU"),))
+        nxt = Entity(types[i], mint.new(), tenant, (("region", rng.choice(_REGIONS)),))
         ents.append(nxt)
         rels.append(Relation(rtypes[i], prev.entity_id, nxt.entity_id, tenant))
         prev = nxt
@@ -87,7 +129,7 @@ def _gen_path(rng, mint, tenant, split, given: bool, hops: int):  # R2/R3 given,
         # confusable distractor relations from root to wrong targets
         if len(rels) < CAPS["max_relations"] and rng.random() < 0.5:
             rels.append(Relation(rtypes[0], ents[0].entity_id, ents[-1].entity_id, tenant))
-    tail_attr = dict(tail.attributes).get("region", "EU")
+    tail_attr = dict(tail.attributes)["region"]
     mode = "PATH_GIVEN" if given else "PATH_DISCOVERY"
     q = ReasoningQuery("resolve_path_target", mode, ents[0].entity_id,
                        relation_chain=tuple(rtypes) if given else (),
@@ -102,11 +144,13 @@ def _gen_path(rng, mint, tenant, split, given: bool, hops: int):  # R2/R3 given,
     return ents, rels, [], [], [], Constraints(hops, False, False), q, gold
 
 
-def _events_for(rng, mint, tenant, entity_id, etype, k):
+def _events_for(rng, mint, tenant, entity_id, etype, k, seq_start=1):
+    # seq_start lets distractor entities carry HIGHER sequence numbers than the target's latest, so the
+    # 'global-most-recent' shortcut (pick the newest event anywhere) is a losing strategy and temporal
+    # reasoning must be entity-scoped. seq_start<=80 keeps sequences within the 2-digit cap.
     vocab = _RISK if etype == "risk" else _STATUS
-    evs = []
-    for s in range(1, k + 1):
-        evs.append(Event(mint.new(), entity_id, etype, s, vocab[rng.randrange(len(vocab))], tenant))
+    evs = [Event(mint.new(), entity_id, etype, seq_start + i, vocab[rng.randrange(len(vocab))], tenant)
+           for i in range(k)]
     latest = max(evs, key=lambda e: e.sequence)
     return evs, latest
 
@@ -119,7 +163,7 @@ def _gen_temporal(rng, mint, tenant, split):  # R5 latest-state
     while len(ents) < rng.randint(6, 12):
         d = Entity("vendor", mint.new(), tenant, (("amount", _amount(rng)),))
         ents.append(d)
-        de, _ = _events_for(rng, mint, tenant, d.entity_id, "risk", CAPS["max_events_per_entity"])
+        de, _ = _events_for(rng, mint, tenant, d.entity_id, "risk", CAPS["max_events_per_entity"], seq_start=rng.randint(10, 80))
         evs += de
     q = ReasoningQuery("latest_event_value", "NOT_APPLICABLE", ents[0].entity_id,
                        requested_property="latest_state", event_type="risk")
@@ -134,7 +178,7 @@ def _gen_rel_temporal(rng, mint, tenant, split, given: bool):  # R6 given / R7 d
     while len(ents) < rng.randint(6, 12):
         d = Entity("vendor", mint.new(), tenant, (("amount", _amount(rng)),))
         ents.append(d)
-        de, _ = _events_for(rng, mint, tenant, d.entity_id, "risk", 2)
+        de, _ = _events_for(rng, mint, tenant, d.entity_id, "risk", 2, seq_start=rng.randint(10, 80))
         evs += de
     mode = "PATH_GIVEN" if given else "PATH_DISCOVERY"
     q = ReasoningQuery("path_then_latest", mode, ents[0].entity_id,
@@ -149,7 +193,7 @@ def _gen_rel_temporal(rng, mint, tenant, split, given: bool):  # R6 given / R7 d
 def _make_policy(rng, mint, tenant, latest_risk, amount_val):
     thresh = str(min(int(amount_val) - 1, 999_999_999)) if int(amount_val) > 1 else "0"
     applies = latest_risk == "HIGH" and int(amount_val) > int(thresh)
-    outcome = "VP_APPROVAL_REQUIRED"
+    outcome = OUTCOME_VOCAB[rng.randrange(len(OUTCOME_VOCAB))]   # uniform; independent of policy_id
     conds = (Condition("risk", "EQ", "HIGH"), Condition("amount", "GT", thresh))
     pol = Policy(mint.new(), conds, outcome, tenant)
     # distractor policies with different outcomes (policy_id independent of outcome)
@@ -158,14 +202,16 @@ def _make_policy(rng, mint, tenant, latest_risk, amount_val):
 
 def _gen_policy(rng, mint, tenant, split):  # R8 facts pre-resolved
     amt = _amount(rng)
-    ents = [Entity("vendor", mint.new(), tenant, (("risk", "HIGH"), ("amount", amt)))]
+    root_risk = "HIGH" if rng.random() < 0.5 else rng.choice(("LOW", "MEDIUM", "CRITICAL"))  # F13
+    ents = [Entity("vendor", mint.new(), tenant, (("risk", root_risk), ("amount", amt)))]
     for _ in range(rng.randint(5, 11)):
-        ents.append(Entity("vendor", mint.new(), tenant, (("amount", _amount(rng)),)))
-    pol, applies, outcome = _make_policy(rng, mint, tenant, "HIGH", amt)
+        ents.append(Entity("vendor", mint.new(), tenant, (("risk", rng.choice(_RISK)), ("amount", _amount(rng)))))
+    pol, applies, outcome = _make_policy(rng, mint, tenant, root_risk, amt)
     pols = [pol]
-    for _ in range(rng.randint(0, CAPS["max_policies"] - 1)):
+    # F13: at least one distractor policy, so "outcome of the only policy" is never a structure-blind answer
+    for _ in range(rng.randint(1, CAPS["max_policies"] - 1)):
         pols.append(Policy(mint.new(), (Condition("risk", "EQ", "LOW"),),
-                           OUTCOME_VOCAB[rng.randrange(1, len(OUTCOME_VOCAB))], tenant))
+                           OUTCOME_VOCAB[rng.randrange(len(OUTCOME_VOCAB))], tenant))
     q = ReasoningQuery("apply_policy", "NOT_APPLICABLE", ents[0].entity_id,
                        requested_property="approval_requirement", policy_scope="vendor_risk")
     gold = ReasoningOutput(outcome if applies else None,
@@ -189,14 +235,14 @@ def _gen_composite(rng, mint, tenant, split, confusable: bool):  # R9 / R12
     while len(ents) < min(CAPS["max_entities"], 4 + ndist):
         d = Entity("vendor", mint.new(), tenant, (("amount", _amount(rng)),))
         ents.append(d)
-        de, _ = _events_for(rng, mint, tenant, d.entity_id, "risk", 2)
+        de, _ = _events_for(rng, mint, tenant, d.entity_id, "risk", 2, seq_start=rng.randint(10, 80))
         evs += de
         if confusable and len(rels) < CAPS["max_relations"]:
             rels.append(Relation(rtypes[0], ents[0].entity_id, d.entity_id, tenant))  # wrong branch, dead-ends
-    for _ in range(rng.randint(0, 2)):
+    for _ in range(rng.randint(1, 2)):   # F13: >= 1 distractor policy (see _gen_policy)
         if len(pols) < CAPS["max_policies"]:
             pols.append(Policy(mint.new(), (Condition("risk", "EQ", "LOW"),),
-                               OUTCOME_VOCAB[rng.randrange(1, len(OUTCOME_VOCAB))], tenant))
+                               OUTCOME_VOCAB[rng.randrange(len(OUTCOME_VOCAB))], tenant))
     evd = [Evidence(mint.new(), "supports", latest.event_id, tenant),
            Evidence(mint.new(), "supports",
                     f"{ents[0].entity_id}|{rtypes[0]}|{rels[0].target_entity_id}", tenant)]
@@ -285,8 +331,8 @@ def generate_episode(split: str, seed: int, index: int, role: str = "unit",
     if split not in _DISPATCH:
         raise ValueError(f"unknown split {split}")
     assert_generation_allowed(seed, authorization_token)  # fail-closed BEFORE any cohort materializes
-    rng = _rng(seed, split, index)
-    tenant = "T" + "".join(rng.choice(_ROLE_ALPHABET.get(role, "STUVWXYZ")) for _ in range(3))
+    rng = _rng(seed, split, index, role)
+    tenant = "T" + "".join(rng.choice(_ID_ALPHABET) for _ in range(3))
     mint = _Mint(rng, role)
     ents, rels, evs, pols, evd, cons, q, gold = _DISPATCH[split](rng, mint, tenant, split)
     ctx = ReasoningContext(context_id=mint.new("C"), tenant_id=tenant, query=q,
