@@ -40,6 +40,8 @@ SwiGLU backbone; output-only CE; greedy decoding). Total params **394,752**; rea
 No filename substitutions were required. `torch` is imported lazily inside `model.py`/`trainer.py` only;
 the package imports torch-free.
 
+Opaque ids are 6 letters from a 24-letter alphabet (F16), hash-partitioned into disjoint train/dev/final/unit pools (F14).
+
 ## Sibling arm BTRR-RoPE (draft; not ratified, not signed, not executed)
 `config.ARMS` registers the frozen parent arm `ABS` and the draft sibling `ROPE` (positional mechanism only:
 learned absolute table → parameter-free rotary; 144,896 params; own budget 15000 × 400/split; own seeds

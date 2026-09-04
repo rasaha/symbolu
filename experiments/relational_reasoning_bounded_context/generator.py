@@ -29,16 +29,19 @@ _RISK = ("LOW", "MEDIUM", "HIGH", "CRITICAL")
 _REGIONS = ("EU", "NA", "APAC", "LATAM")
 _STATUS = ("ACTIVE", "EXPIRED", "PENDING")
 
-# Shared identifier vocabulary, marker-free pool partition. Every role draws ID bodies from the SAME
-# letters and the SAME trailing-digit set, so a held-out identity is a new combination of trained tokens
-# with no token or per-position pattern absent from training. Train/dev/final/unit disjointness comes from
-# an INVISIBLE partition of the combination space: an ID belongs to the pool selected by a stable hash of
-# the ID string (rejection-sampled at minting), never from a visible marker.
-# History: disjoint *alphabets* gave 0.0 validity (never-trained characters); a role-specific trailing
-# *digit* (train 0/1/2, final 6/7/8) let the model copy the letters but emit a training-pool digit
-# (`DTWXX7` -> `DTWXX1`), because no training ID ever ended in 6/7/8. Both were held-out artifacts.
+# Shared identifier vocabulary, marker-free pool partition. Every role draws ids from the SAME letters, so
+# a held-out identity is a new combination of trained tokens with no token or per-position pattern absent
+# from training. Train/dev/final/unit disjointness comes from an INVISIBLE partition of the combination
+# space: an id belongs to the pool selected by a stable hash of the id string (rejection-sampled at
+# minting), never from a visible marker.
+# F16: ids are LETTERS ONLY. Opaque ids must not share a token class with high-frequency context tokens:
+# with a trailing digit, the correct digit was one of ~7 identical digit tokens per context (nine-digit
+# amounts), and every content-addressed copy run got all letters right and the digit wrong (B1 exact
+# 0.125 -> 1.0 on the same episodes once the digit slot was removed; calibration log run 8).
+# History: disjoint *alphabets* gave 0.0 validity; a role-specific trailing *digit* leaked the pool
+# (F14); a shared trailing digit capped every copy subtask (F16). All three were generator artifacts.
 _ID_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ"
-_ID_DIGITS = "0123456789"
+_ID_LEN = 6
 _POOL_BUCKETS = 8
 _ROLE_BUCKETS = {"train": (0, 1, 2, 3), "dev": (4, 5), "final": (6,), "unit": (7,)}
 
@@ -65,9 +68,9 @@ def _rng(seed: int, split: str, index: int, role: str = "unit") -> random.Random
 
 
 class _Mint:
-    """Opaque <=6-char id minter: shared-alphabet body + shared trailing digit; the id is accepted only if
-    the invisible hash partition assigns it to this minter's role => strictly disjoint train/dev/final/unit
-    pools that are token- and position-distribution identical."""
+    """Opaque 6-letter id minter (F16: no digit slot); the id is accepted only if the invisible hash
+    partition assigns it to this minter's role => strictly disjoint train/dev/final/unit pools that are
+    token- and position-distribution identical. Ids never collide with a frozen lexeme or an outcome."""
 
     def __init__(self, rng: random.Random, role: str) -> None:
         self.rng = rng
@@ -76,10 +79,11 @@ class _Mint:
         self.seen: set[str] = set()
 
     def new(self, prefix: str = "") -> str:
+        from .tokenizer import LEXEMES  # torch-free; ids must never tokenize as a single lexeme
+        n = min(_ID_LEN, CAPS["max_id_len"]) - len(prefix)
         while True:
-            body = "".join(self.rng.choice(_ID_ALPHABET) for _ in range(max(1, 5 - len(prefix))))
-            cand = (prefix + body)[: CAPS["max_id_len"] - 1] + self.rng.choice(_ID_DIGITS)
-            if (len(cand) >= 2 and cand not in self.seen and cand not in OUTCOME_VOCAB
+            cand = prefix + "".join(self.rng.choice(_ID_ALPHABET) for _ in range(max(1, n)))
+            if (len(cand) >= 2 and cand not in self.seen and cand not in OUTCOME_VOCAB and cand not in LEXEMES
                     and _stable_hash("pool:" + cand) % _POOL_BUCKETS in self.buckets):
                 self.seen.add(cand)
                 return cand

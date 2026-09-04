@@ -8,6 +8,12 @@ operator-reported `[V]` against the pasted output, not re-executed here.
 Effective authority remains Amendment 002 (`config_digest`
 `ba73d7bc6df4699dd0ddbd1e6dae79341fccd74b474f231e8857a20a22ffcfe3`, unchanged by every commit below).
 
+## Status after run 8 (supersedes the "capacity floor" reading below where they conflict)
+F16 (letters-only ids) removes the cap on fixed-position copying. The open base-capability question is now
+specifically variable-position copy of a once-occurring id (B3/B4), which run 6 achieved letter-perfect and
+run 8 did not. Neither arm's frozen budget has been re-evaluated post-F16; the ABS frozen budget (2000
+updates) still never learns the output format, so ABS at the frozen recipe remains BLOCKED regardless.
+
 ## Load-bearing question
 Can the frozen recipe (394,752 params, batch 8, **≤ 2000 updates**) establish the P0 base-capability
 gate (≥ 0.98 on each of B1–B7)? **No.** No explored configuration up to 15× the frozen budget does, and
@@ -33,6 +39,25 @@ budget amendment is not supported by this evidence.
 P0 gold id appears verbatim in its input. The digit failure is model-side. `[I]` The failure shape differs
 from BTRR-ABS run 6 (id-shaped babble): the RoPE model copies all five letters of the queried id and treats
 the last character as unpredictable. Single smoke run; H1/H1′ are decided on development seeds only.
+
+### Trailing-digit diagnostic (run 8) and character-level rescoring of runs 6–7
+Offline rescoring (`run.rescore_predictions_file`, commit `44419413`) of the stored predictions overturned the
+"collapsed / babble" reading of ABS run 6: every copy subtask had all letters right and only the trailing
+digit wrong.
+| run | arm | regime | B1 all-but-last / exact | B4 all-but-last / exact | B3 first-char / mean prefix |
+|---|---|---|---|---|---|
+| 6 | ABS | 1500×30000, 5 letters+digit | 1.00 / 0.125 | 1.00 / 0.125 | 0.75 / 2.25 |
+| 7 | RoPE | 400×15000, 5 letters+digit | 0.88 / 0.125 | 0.00 / 0.00 | 1.00 / 1.13 |
+| **8** | ABS | 1500×30000, **6 letters** (same episodes as run 6 except the last id character) | 1.00 / **1.00** | 0.00 / 0.00 | 0.00 / 0.00 |
+
+Run 8 full P0: validity 0.979; B1 1.0, B2 0.75, B3 0, B4 0, B5 0.75, B6 0.88, B7 1.0; loss 0.68 at 30k, still falling.
+- `[V]` F16: the digit slot capped every fixed-position copy subtask in both arms (B1 0.125 → 1.0 on the same
+  episodes). The "capacity floor" reading of runs 5–7 was premature; it was a generator artifact.
+- `[V]` Variable-position copy (B3/B4) is the remaining base-capability blocker and it is unstable across runs:
+  present letter-perfect in run 6 (B4), absent in run 8 under otherwise identical conditions. One run per
+  configuration cannot bound it; development seeds can.
+- `[V]` A CPU three-condition diagnostic on fixture 883003 (700 P0-only examples, 6000 updates) was inconclusive:
+  all conditions memorized (loss 0.04) and produced malformed held-out output. Not evidence for or against F16.
 
 Fixture-only learnability diagnostic (`overfit_diagnostic`, seed 883003, eval-on-train, 15 examples):
 validity / answer / P0 = 1.0 / 1.0 / 1.0 at both 2000 and 4000 updates (CPU). The train→generate

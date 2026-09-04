@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from .. import (base_capability as bc, gates as G, generator as gen, manifest as MAN,
                 metrics as M, output, replay as RP, shortcuts as SC, verdict as V)
+from ..config import OUTCOME_VOCAB
 from ..execution import ExecutionNotAuthorized
 from ..schema_ext import ReasoningOutput
 
@@ -247,7 +248,7 @@ def test_F12_flag_is_the_only_shape_difference():
     from ..serializer import serialize_input
     def shape(ctx):
         t = serialize_input(ctx)
-        return re.sub(r"\b\d+\b", "#", re.sub(r"\b[A-Z][A-Z]{3,5}\d\b|\bT[A-Z]{3}\b", "@", t))
+        return re.sub(r"\b\d+\b", "#", re.sub(r"\b(?!ABSENT\b|MEDIUM\b|ACTIVE\b)[A-Z]{6}\b|\bT[A-Z]{3}\b", "@", t))
     a = shape(bc.generate_p0_episode("B1", FIXT, 0)); b = shape(bc.generate_p0_episode("B7", FIXT, 0))
     assert a != b
     assert a.replace(bc.FLAG_PRESENT, bc.FLAG_ABSENT).count("ABSENT") == 1
@@ -282,8 +283,33 @@ def test_F14_no_visible_marker_between_pools():
     tr, fi, dv = _pool_ids("train", 600), _pool_ids("final", 600), _pool_ids("dev", 600)
     pos = lambda ids: {(k, ch) for i in ids for k, ch in enumerate(i)}
     assert pos(fi) <= pos(tr) and pos(dv) <= pos(tr)
-    assert {i[-1] for i in fi} == {i[-1] for i in tr} == set(gen._ID_DIGITS)
+    assert {i[-1] for i in fi} == {i[-1] for i in tr} == set(gen._ID_ALPHABET)
     assert all(len(i) <= 6 for i in tr | fi | dv)
+
+
+# ---- F16: opaque ids are letters only (no token class shared with high-frequency context tokens) ----
+def test_F16_ids_are_letters_only_and_never_lexemes():
+    from dataclasses import fields
+    from ..tokenizer import LEXEMES, LEXEME_START, BTRRTokenizer
+    tok = BTRRTokenizer()
+    ids = _pool_ids("train", 400) | _pool_ids("final", 400)
+    for i in ids:
+        assert i.isalpha() and i.isupper() and 2 <= len(i) <= 6, i
+        assert i not in LEXEMES and i not in OUTCOME_VOCAB, i
+        assert all(t < LEXEME_START or tok.decode([t]) != i for t in tok.encode(i)), i   # never one lexeme token
+    # every entity / event / evidence / context id in real episodes is letters-only as well
+    for s in ("R1", "R9", "R12"):
+        for c in gen.generate_split(s, FIXT, 4, "final"):
+            for x in [c.context_id] + [e.entity_id for e in c.entities] + [v.event_id for v in c.events] \
+                    + [getattr(d, fields(type(d))[0].name) for d in c.evidence] + [p.policy_id for p in c.policies]:
+                assert x.isalpha(), x
+    for sub in bc.P0_SUBTASKS:
+        for c in bc.generate_p0(sub, FIXT, 3, "final"):
+            a = c.authoritative_output.answer
+            if a and a not in OUTCOME_VOCAB and a not in ("LOW", "MEDIUM", "HIGH", "CRITICAL"):
+                assert a.isalpha() and not any(ch.isdigit() for ch in a), (sub, a)
+
+
 
 # ---- F15: is_valid_output must return False (not raise) on schema-cap violations ----
 def test_F15_is_valid_output_never_raises_on_cap_violation():
