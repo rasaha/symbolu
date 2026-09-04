@@ -179,6 +179,49 @@ def test_F7_manifest_has_digests():
     assert man["schema_serializer_version"] == MAN.SCHEMA_SERIALIZER_VERSION
 
 
+# ---- F11: generator determinism must not depend on the interpreter's hash salt ----
+_XPROC_SNIPPET = (
+    "from experiments.relational_reasoning_bounded_context.generator import generate_episode\n"
+    "from experiments.relational_reasoning_bounded_context.base_capability import generate_p0_episode\n"
+    "out=[]\n"
+    "for role in ('train','dev','final','unit'):\n"
+    "    c=generate_episode('R9',883001,2,role); b=generate_p0_episode('B3',883001,1,role)\n"
+    "    out.append((c.context_id,c.tenant_id,c.fact_hash(),b.context_id,b.fact_hash()))\n"
+    "print(repr(out))\n"
+)
+
+def test_F11_generator_deterministic_across_processes():
+    """Episodes for (seed, split, index, role) must be byte-identical across interpreters with different
+    PYTHONHASHSEED values. Builtin hash(str) is salted per process; seeding the RNG from it made the
+    generator silently non-reproducible across runs (in-process replay checks could not detect this)."""
+    import os, pathlib, subprocess, sys
+    repo_root = pathlib.Path(__file__).resolve().parents[3]
+    outs = []
+    for salt in ("0", "1", "424242"):
+        env = dict(os.environ, PYTHONHASHSEED=salt)
+        r = subprocess.run([sys.executable, "-c", _XPROC_SNIPPET], cwd=repo_root, env=env,
+                           capture_output=True, text=True, timeout=120)
+        assert r.returncode == 0, r.stderr
+        outs.append(r.stdout.strip())
+    assert len(set(outs)) == 1, outs
+    # in-process reference must agree with the subprocesses too
+    rows = []
+    for role in ("train", "dev", "final", "unit"):
+        c = gen.generate_episode("R9", 883001, 2, role); b = bc.generate_p0_episode("B3", 883001, 1, role)
+        rows.append((c.context_id, c.tenant_id, c.fact_hash(), b.context_id, b.fact_hash()))
+    assert repr(rows) == outs[0]
+
+def test_F11_no_salted_hash_in_generator_source():
+    import pathlib, re
+    src = (pathlib.Path(gen.__file__)).read_text()
+    bare = [m for m in re.finditer(r"(?<![\w.])hash\(", src)]
+    # allow only the docstring mention inside _stable_hash; no executable call sites
+    for m in bare:
+        line = src[: m.start()].count("\n") + 1
+        text = src.splitlines()[line - 1]
+        assert text.lstrip().startswith(('"""', "#")) or "``hash(str)``" in text, f"bare hash() at line {line}: {text}"
+
+
 def main() -> int:
     tests = [v for k, v in sorted(globals().items()) if k.startswith("test_") and callable(v)]
     passed = failed = 0

@@ -10,6 +10,7 @@ train/final identity pools by role, R12 exactly one valid path, PATH_DISCOVERY g
 """
 from __future__ import annotations
 
+import hashlib
 import random
 from typing import Callable
 
@@ -36,9 +37,16 @@ _ROLE_DIGIT = {"train": "012", "dev": "345", "final": "678", "unit": "9"}
 _ROLE_ALPHABET = {r: _ID_ALPHABET for r in _ROLE_DIGIT}  # back-compat: shared alphabet for all roles
 
 
+def _stable_hash(text: str) -> int:
+    """Process-independent string hash. Python's builtin ``hash(str)`` is salted per interpreter
+    (PYTHONHASHSEED), so it must never seed a scientific RNG: the same (seed, split, index, role) would
+    yield different episodes in different processes, silently breaking deterministic replay across runs."""
+    return int.from_bytes(hashlib.sha256(text.encode("utf-8")).digest()[:8], "big")
+
+
 def _rng(seed: int, split: str, index: int, role: str = "unit") -> random.Random:
-    r = (int(seed) * 1_000_003 + hash(split) % 9973) * 131 + index
-    return random.Random(r * 17 + (hash(role) % 7919))   # role partitions the episode/identity stream
+    r = (int(seed) * 1_000_003 + _stable_hash(split) % 9973) * 131 + index
+    return random.Random(r * 17 + (_stable_hash(role) % 7919))   # role partitions the episode/identity stream
 
 
 class _Mint:
