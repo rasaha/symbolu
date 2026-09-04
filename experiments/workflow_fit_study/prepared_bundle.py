@@ -97,6 +97,11 @@ _API_TOKEN = "api"
 
 _TOKEN_SPLIT = re.compile(r"[^a-z0-9]+")
 
+# ``package.module:function``. Identical to the shape the 4B loader already enforces
+# (``experiments/workflow_fit_reference_pilot/loaders.py``, ``_FACTORY``), reused here so a
+# prepared bundle cannot commit a provider_factory of any other shape.
+_FACTORY_PATH = re.compile(r"^[A-Za-z_][\w.]*:[A-Za-z_]\w*$")
+
 
 def _is_credential_key(key: Any) -> bool:
     tokens = [t for t in _TOKEN_SPLIT.split(str(key).lower()) if t]
@@ -181,13 +186,24 @@ def _safe_rel_path(root: Path, rel: str) -> Path:
 @dataclass(frozen=True)
 class ProviderConfiguration:
     """D1 remains unratified; this carries only a dotted factory-path reference, never a
-    credential, matching the existing provider_factory convention (4B loaders.py)."""
+    credential, matching the existing provider_factory convention (4B loaders.py).
+
+    The shape is *enforced*, not merely documented. Without it a credential-shaped string
+    passed as ``provider_factory`` would be written into ``provider_configuration.json`` and
+    permanently committed by ``index_digest`` — the exact outcome D1 forbids ("the credential
+    never appears in … bundles"). The credential-key scan cannot catch this: it inspects key
+    names, and here the secret would be a *value* under a legitimate key."""
 
     provider_factory: str
 
     def __post_init__(self) -> None:
         if not isinstance(self.provider_factory, str) or not self.provider_factory.strip():
             raise PreparedBundleError("ProviderConfiguration.provider_factory must be a non-blank string")
+        if not _FACTORY_PATH.match(self.provider_factory):
+            raise PreparedBundleError(
+                "ProviderConfiguration.provider_factory must be a dotted factory path "
+                "'package.module:function'; a value of any other shape is refused rather than committed"
+            )
 
 
 @dataclass(frozen=True)

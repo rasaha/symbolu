@@ -417,6 +417,46 @@ def test_legitimate_fields_containing_credential_substrings_are_not_flagged(tmp_
     assert result.index_digest
 
 
+# --------------------------------------------------------------------------- provider configuration
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        # F1a: a credential-shaped value must never reach provider_configuration.json, where
+        # index_digest would commit it permanently. The credential-key scan cannot catch this
+        # — the secret would be a *value* under the legitimate key `provider_factory`.
+        "sk-ant-api03-NOTAREALKEY-000000000000000000",
+        "sk-proj-NOTAREALKEY-0000000000",
+        "",
+        "   ",
+        "no-colon",
+        "pkg.mod:",
+        ":func",
+        "pkg mod:func",
+        "pkg.mod:func:extra",
+        ".mod:func",
+        "1pkg:func",
+        "pkg/mod:func",
+    ],
+)
+def test_provider_factory_of_any_non_dotted_path_shape_is_refused(value):
+    with pytest.raises(B.PreparedBundleError):
+        B.ProviderConfiguration(provider_factory=value)
+
+
+@pytest.mark.parametrize("value", ["tests.fake_provider:factory", "pkg.mod:func", "_private.mod:_func", "a:b"])
+def test_legitimate_dotted_factory_paths_are_accepted(value):
+    assert B.ProviderConfiguration(provider_factory=value).provider_factory == value
+
+
+def test_a_credential_shaped_factory_never_reaches_a_prepared_artifact(tmp_path):
+    """The refusal happens at construction, so no bundle is ever written to inspect."""
+    with pytest.raises(B.PreparedBundleError):
+        B.ProviderConfiguration(provider_factory="sk-ant-api03-NOTAREALKEY-000000000000000000")
+    assert not tmp_path.exists() or not any(tmp_path.iterdir())
+
+
 # --------------------------------------------------------------------------- custody-reference treatment
 
 
