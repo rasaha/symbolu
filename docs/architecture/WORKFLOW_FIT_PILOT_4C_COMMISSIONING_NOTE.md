@@ -1799,3 +1799,67 @@ by building. It authorises slice 3A's prepared-bundle subsystem only. It does
 **not** authorise runner changes, custody writes, `CalibrationResult`
 construction, confirmatory provenance traversal, a genuine pilot, or any
 provider call. D1–D5 remain incomplete.
+
+### Revision 18 (slice-3A residual obligations after merge, 2026-09-04)
+
+Slice 3A merged as PR #1583 (merge commit `acd2e92d5`). Three blocking findings
+were raised by successive independent adversarial reviews and closed on the
+branch before merge: **F1** (the credential-key scan had been narrowed to exact
+name matching while fixing a false positive, letting `openai_api_key` through —
+replaced with token-boundary matching, `8c66669c3`); **F1a** (`ProviderConfiguration`
+documented a dotted `package.module:function` shape that nothing enforced, so a
+credential passed as `provider_factory` would be committed by `index_digest` —
+`fd42fd756`); **F1b** (that guard did not survive the round trip: `verify()`
+never parsed `provider_configuration.json`, so a hand-written bundle could carry
+a credential-shaped `provider_factory` and verify — `ff3b685b2`).
+
+The following are **carried forward as open obligations**, not resolved by that
+merge. Recording them here is not closure.
+
+1. **`[G]` Free-form prepared fields still accept credential-shaped values —
+   a gate on any genuine run.** `verdict_custody_ref`, `execution_order_rule`,
+   `formula_id` and `formula_version` are unconstrained strings. Each accepts a
+   credential-shaped value, each reaches a prepared artifact
+   (`experimental_design.json`, and via that `preparation.json` and
+   `case_set.json`), and `verify()` accepts all of them. The credential-key scan
+   cannot catch this: it inspects key *names*, and here the secret would be a
+   *value* under a legitimate key. Unlike `provider_factory`, none of these
+   fields has a documented shape to enforce, so the F1a/F1b remedy does not
+   transfer; closing this requires either per-field grammars or value-side
+   scanning, both deliberately out of slice-3A scope. **No run with a real
+   credential may be performed until this is closed.** It is not a slice-3A
+   defect and did not block the merge.
+
+2. **`[V]` `_FACTORY_PATH` inherits two laxities from the 4B precedent.**
+   `experiments/workflow_fit_study/prepared_bundle.py` reuses the regex from
+   `experiments/workflow_fit_reference_pilot/loaders.py` (`_FACTORY`) verbatim.
+   Python's `$` matches before a trailing newline, so
+   `"pkg.mod:func\n"` is accepted; and `\w` is Unicode-aware, so `pkg.möd:fünc`
+   is accepted. Both are **symmetric across writer and reader** — the reader
+   accepts exactly what the writer accepts — and neither admits a credential
+   shape, since real key formats contain hyphens, which the regex refuses.
+   Tightening to `\Z` and `(?a)` would diverge from the shared 4B convention, so
+   this is to be revisited **only alongside the 4B loader**, not unilaterally in
+   the 4C bundle.
+
+3. **`[G]` The F1b tests assert refusal without matching the refusing guard.**
+   `test_a_hand_written_credential_shaped_factory_is_refused_on_read` and
+   `test_a_provider_configuration_of_any_other_shape_is_refused_on_read` use
+   bare `pytest.raises(PreparedBundleError)` with no `match=`. Execution shows
+   the six cases are refused by three different guards, and one — the payload
+   carrying an extra `api_key` — is caught by the pre-existing credential-key
+   scan rather than by the factory-path guard, so that case would still pass
+   with F1b reverted. Five of the six do fail without the fix, so the suite is
+   non-vacuous as regression evidence; the imprecision is in what one case
+   *claims* to prove. To be corrected when the file is next touched.
+
+**Process note `[V]`.** The F1b review was a same-session self-review by the
+model that authored the fix. Its factual claims are settled by the repository
+(executed probes, AST structure, definition-level byte hashes) rather than by
+recollection, which the working agreement accepts for facts. The judgment call —
+whether the guard sits at the right layer — was not independently checked, and
+the merge proceeded on the owner's decision with that limitation stated.
+
+**Status.** This revision records outcomes and open obligations. It authorises
+nothing new: slice 3B remains uncommissioned, D1–D5 remain incomplete, and
+obligation 1 above stands as a hard gate on any genuine run.
