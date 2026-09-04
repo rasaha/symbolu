@@ -371,7 +371,15 @@ def test_expected_answers_never_enter_any_prepared_artifact(tmp_path):
             assert forbidden not in text
 
 
-@pytest.mark.parametrize("key", ["api_key", "apikey", "secret", "token", "password", "credential", "authorization", "bearer", "API_KEY"])
+@pytest.mark.parametrize(
+    "key",
+    [
+        "api_key", "apikey", "secret", "token", "password", "credential", "authorization", "bearer", "API_KEY",
+        # F1: realistic compounds whole-key equality used to miss entirely.
+        "openai_api_key", "OPENAI_API_KEY", "access_token", "refresh_token", "auth_token", "id_token",
+        "client_secret", "api_secret", "credentials", "api-key", "x-api-key", "apiKey", "Authorization", "Bearer",
+    ],
+)
 def test_credential_like_keys_are_refused(tmp_path, key):
     manifest = slice2._calibration_manifest()
     preparation = {"usage_label": "RESEARCH_ONLY", key: "x"}
@@ -380,6 +388,21 @@ def test_credential_like_keys_are_refused(tmp_path, key):
             tmp_path / "bundle", manifest=manifest, benchmark=manifest.benchmark, catalog=pf.catalog(), rule_set=pf.rule_set(), advisory=None,
             case_set=_case_set(manifest), provider_configuration=_provider_configuration(), experimental_design=_calibration_design(manifest), preparation=preparation,
         )
+
+
+@pytest.mark.parametrize(
+    "key",
+    [
+        "matched_tokens", "matched_tokens_note",
+        # This repository's own governed telemetry names on ExecutionTelemetry: a plain
+        # `token` membership rule would refuse every execution bundle that carries them.
+        "token_usage", "token_count", "token_count_basis", "token_usage_availability",
+        "max_tokens", "input_tokens", "output_tokens", "total_tokens",
+        "primary_key", "sort_key", "policy_ref", "execution_order_rule", "sampling_algorithm_id",
+    ],
+)
+def test_legitimate_governance_field_names_are_not_flagged(key):
+    assert not B._is_credential_key(key)
 
 
 def test_legitimate_fields_containing_credential_substrings_are_not_flagged(tmp_path):

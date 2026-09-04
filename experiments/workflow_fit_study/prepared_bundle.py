@@ -31,6 +31,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import re
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, Mapping, Optional, Tuple
@@ -66,18 +67,47 @@ PREPARED_PATHS: Tuple[str, ...] = (
     "rule_set.json",
 )
 
-_CREDENTIAL_KEYS = ("api_key", "apikey", "secret", "token", "password", "credential", "authorization", "bearer")
+# Token-boundary matching, not raw substring and not whole-key equality. A key is normalised
+# to lowercase and split on every non-alphanumeric run, then judged on its *tokens*:
+#
+# - a raw substring scan flags legitimate governed fields whose names merely contain one of
+#   these words (``matched_tokens`` contains ``token``);
+# - whole-key equality misses every realistic compound (``openai_api_key``, ``access_token``,
+#   ``client_secret``, the plural ``credentials``, the hyphenated ``api-key``).
+#
+# Token equality avoids both: ``matched_tokens`` tokenises to {matched, tokens} and ``tokens``
+# is not ``token``, while ``access_token`` tokenises to {access, token} and is caught.
+_CREDENTIAL_TOKENS = frozenset(
+    ("apikey", "authorization", "bearer", "credential", "credentials", "password", "secret")
+)
 
-# Exact key names only, case-insensitive on the whole key: a substring match would also flag
-# legitimate governed fields that merely contain one of these words (``matched_tokens``,
-# ``token_usage``, ``resolution:requester-asserted:...``). ``_credential_key_variants`` widens
-# each base word to its common separator-joined and compound spellings without matching an
-# unrelated word that happens to contain it as a substring.
-def _credential_key_variants(word: str) -> Tuple[str, ...]:
-    return (word, f"{word}_key", f"{word}-key", f"api_{word}", f"api-{word}")
+# ``token`` needs the trailing-position rule rather than plain membership. This repository's
+# own governed telemetry uses it as a *leading* qualifier — ``token_usage``,
+# ``token_count_basis``, ``token_usage_availability`` on ``ExecutionTelemetry`` — while every
+# credential spelling puts it last (``token``, ``access_token``, ``refresh_token``,
+# ``auth_token``, ``id_token``). Plain membership would refuse legitimate artifacts as soon as
+# an execution bundle carries telemetry.
+_TRAILING_CREDENTIAL_TOKENS = frozenset(("token",))
+
+# ``key`` alone is far too common to flag on its own (``sort_key``, ``primary_key``); it is a
+# credential marker only alongside ``api``, which covers ``api_key``, ``api-key`` and
+# ``openai_api_key`` alike.
+_KEY_TOKEN = "key"
+_API_TOKEN = "api"
+
+_TOKEN_SPLIT = re.compile(r"[^a-z0-9]+")
 
 
-_CREDENTIAL_KEY_NAMES = frozenset(v for w in _CREDENTIAL_KEYS for v in _credential_key_variants(w))
+def _is_credential_key(key: Any) -> bool:
+    tokens = [t for t in _TOKEN_SPLIT.split(str(key).lower()) if t]
+    if not tokens:
+        return False
+    unique = set(tokens)
+    if unique & _CREDENTIAL_TOKENS:
+        return True
+    if tokens[-1] in _TRAILING_CREDENTIAL_TOKENS:
+        return True
+    return _KEY_TOKEN in unique and _API_TOKEN in unique
 
 _UINT64_EXCLUSIVE_MAX = 2**64
 
@@ -120,7 +150,7 @@ def _scan_for_credentials(obj: Any, *, where: str = "$") -> None:
     depth. Applied to every artifact before it is written and after it is read."""
     if isinstance(obj, Mapping):
         for k, v in obj.items():
-            if str(k).lower() in _CREDENTIAL_KEY_NAMES:
+            if _is_credential_key(k):
                 raise PreparedBundleError(f"{where}: credential-like key {k!r} is never accepted in a prepared artifact")
             _scan_for_credentials(v, where=f"{where}.{k}")
     elif isinstance(obj, (list, tuple)):
