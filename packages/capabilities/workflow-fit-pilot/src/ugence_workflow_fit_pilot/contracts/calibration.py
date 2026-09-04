@@ -77,6 +77,75 @@ _CANONICAL_DECIMAL = re.compile(r"^-?(?:0|[1-9][0-9]*)(?:\.[0-9]*[1-9])?$")
 CANONICAL_DECIMAL_GRAMMAR = _CANONICAL_DECIMAL.pattern
 
 
+def canonical_decimal_rendering(value: Any, name: str = "value") -> str:
+    """Derive the canonical Phase 4C spelling of a decimal that some other contract produced.
+
+    **This derives; it does not normalise.** ``require_canonical_decimal`` refuses a
+    caller-supplied, digest-bound string in a non-canonical spelling, and that rule is
+    unchanged — normalising such a value would move a digest behind the caller's back. This
+    function serves the opposite case, the one revision 16 named as slice 3's obligation:
+    establishing "that the canonical string **derived from** the reachable
+    ``QualityResult.value`` equals the calibration statistic". The reachable value belongs to
+    ``MetricClaim``/``QualityResult``, whose looser spelling revision 16 explicitly declines to
+    constrain retroactively, so the 4C spelling has to be derived rather than demanded.
+
+    Why not fix it at the source instead: ``runner._mean`` feeds ``MetricClaim.value`` and
+    ``QualityResult``. Making it emit the canonical spelling would impose Phase 4C's rule on
+    those contracts — the retroactive imposition revision 16 forbids — and would move
+    ``quality_result_digest`` and ``observation_digest`` for existing v1 and 4B runs.
+
+    Accepts a ``Decimal`` or a decimal string. A ``float`` is refused: it would not round-trip.
+    The result always satisfies ``require_canonical_decimal``."""
+    if isinstance(value, bool) or isinstance(value, float):
+        raise ContractError(
+            ContractErrorCode.DECIMAL_UNPARSEABLE,
+            f"{name} must be a Decimal or a decimal string, not {type(value).__name__}; a float would not round-trip",
+        )
+    if isinstance(value, Decimal):
+        parsed = value
+    elif isinstance(value, str):
+        try:
+            parsed = Decimal(value.strip())
+        except InvalidOperation:
+            raise ContractError(ContractErrorCode.DECIMAL_UNPARSEABLE, f"{name} is not a decimal: {value!r}") from None
+    else:
+        raise ContractError(
+            ContractErrorCode.DECIMAL_UNPARSEABLE,
+            f"{name} must be a Decimal or a decimal string, not {type(value).__name__}",
+        )
+    if not parsed.is_finite():
+        raise ContractError(ContractErrorCode.DECIMAL_UNPARSEABLE, f"{name} must be finite; got {value!r}")
+    # ``f`` is fixed-point and never emits an exponent, which the grammar forbids.
+    text = format(parsed, "f")
+    if "." in text:
+        text = text.rstrip("0").rstrip(".")
+    if text in ("", "-", "-0"):
+        text = "0"
+    # Fail-closed tripwire, not a pinned guard: with the grammar as ratified no input makes
+    # the derivation above produce a non-canonical string, so no test can distinguish this
+    # line from its absence. It exists so that a future change to the grammar or to the
+    # derivation fails here rather than handing a caller a string the contracts then refuse.
+    require_canonical_decimal(text, name)
+    return text
+
+
+def require_matching_canonical_rendering(statistic_value: str, quality_value: Any, name: str) -> str:
+    """Slice 3's obligation, executable: the calibration statistic must equal the canonical
+    rendering of the reachable ``QualityResult.value``, by exact code-point equality.
+
+    Returns the agreed rendering so a caller cannot use this as a boolean and discard which
+    string actually matched."""
+    require_canonical_decimal(statistic_value, name)
+    derived = canonical_decimal_rendering(quality_value, f"{name} source")
+    if statistic_value != derived:
+        raise ContractError(
+            ContractErrorCode.DECIMAL_UNPARSEABLE,
+            f"{name} is {statistic_value!r} but the canonical rendering of the reachable "
+            f"quality value is {derived!r}; they must be equal code point for code point",
+        )
+    return derived
+
+
 def require_canonical_decimal(value: Any, name: str) -> Decimal:
     """A finite decimal in the single canonical spelling ratified in revision 16.
 
@@ -199,6 +268,8 @@ __all__ = [
     "CALIBRATION_RESULT_SCHEMA_VERSION",
     "CALIBRATION_GOVERNED_UNIT",
     "CANONICAL_DECIMAL_GRAMMAR",
+    "canonical_decimal_rendering",
+    "require_matching_canonical_rendering",
     "PilotRunRole",
     "CalibrationProvenance",
     "CalibrationResult",

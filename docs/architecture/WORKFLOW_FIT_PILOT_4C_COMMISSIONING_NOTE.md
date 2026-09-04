@@ -2613,6 +2613,10 @@ is precisely the per-caller reimplementation the canonical-decimal ruling exists
 as exposing the gap rather than filling it. **Closing this needs a governed canonicaliser in
 the pilot package, and is not commissioned here.**
 
+> **Closed by revision 31.** `contracts/calibration.py` gains
+> `canonical_decimal_rendering` and `require_matching_canonical_rendering`; the integration
+> test now uses them instead of its local copy.
+
 **What the test is worth, stated plainly.** One of its tests does real integration work: the
 first executed 3A → gated run → result → endpoint chain, and the only thing that would catch a
 broken calibration branch outside the unit suites. The others are a tamper-shape test of the
@@ -2645,3 +2649,49 @@ the prepared benchmark **by construction of the pilot fixtures**, not by a gover
 additionally binds the expected-answer digest. A future Phase 4C pipeline needs a **governed
 case-digest scheme**; that is pre-existing and is now carried forward alongside G3 and the
 canonical-rendering gap.
+
+### Revision 31 (the governed canonicaliser: closing the canonical-rendering gap, 2026-09-04)
+
+Revision 30 recorded that no production function renders a `QualityResult.value` into the
+canonical grammar, so the runner's `"1.0"` could not construct a `CalibrationResult`. This
+closes it. A preflight established the design from the repository; **no new ruling was
+required**, and one obvious alternative is **forbidden**.
+
+**Fixing at source is forbidden `[V]`.** `runner._mean` feeds `MetricClaim.value` and
+`QualityResult`. Revision 16 states its rule "is **not** imposed retroactively on
+`MetricClaim.value`, `GovernedThreshold.literal_value` in any other governance contract".
+Making `_mean` emit the canonical spelling would be exactly that imposition, and would move
+`quality_result_digest` and `observation_digest` for existing v1 and 4B runs. The rendering
+therefore belongs at the Phase 4C boundary, not at the producer.
+
+**Derivation was already sanctioned `[V]`.** Revision 16 obliges slice 3 to establish "that
+the canonical string **derived from** the reachable `QualityResult.value` equals the
+calibration statistic". A deriver is what the note asked for.
+
+**It does not soften revision 16 `[V]`.** `require_canonical_decimal` still refuses a
+caller-supplied, digest-bound string in a non-canonical spelling — a test asserts that
+`require_canonical_decimal("1.0", …)` still raises after the deriver exists. Refusing a
+supplied value and deriving a spelling from a reachable one are different acts on different
+objects; conflating them is what would have moved a digest behind a caller's back.
+
+**What was added `[V]`.** `canonical_decimal_rendering(value, name)` accepts a `Decimal` or a
+decimal string, refuses `float`, `bool`, `None`, non-finite and unparseable input, and derives
+the ratified spelling — `format(…, "f")` never emits an exponent, then trailing fractional
+zeros are stripped and every zero renders as `"0"`. `require_matching_canonical_rendering`
+makes slice 3's obligation executable: it validates the supplied statistic, derives the
+rendering, and requires code-point equality, returning the agreed string so it cannot be used
+as a discarded boolean. Both are exported from `api`.
+
+**One line no test pins, recorded rather than dressed up `[G]`.** The deriver ends by calling
+`require_canonical_decimal` on its own output. With the grammar as ratified, no input makes
+the derivation produce a non-canonical string, so removing that line fails **nothing** — a
+stub confirms 262 tests still pass. It is a fail-closed tripwire for a future change to the
+grammar or the derivation, and the code says so. The two guards that can be pinned are:
+stripping trailing zeros (13 tests fail without it) and the equality comparison (1).
+
+**Status.** The canonical-rendering gap is **closed**. Two items remain carried forward: **G3**
+(open by construction until a Phase 4C pipeline exists) and the **governed case-digest scheme**
+(the recomputation agrees with the prepared benchmark by fixture construction, not by rule).
+D1–D5 remain incomplete, the custody endpoint remains unbound, real custody adapters and
+genuine execution remain blocked, and no provider call, credential access or genuine
+calibration is permitted by this revision.

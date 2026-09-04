@@ -19,7 +19,6 @@ from __future__ import annotations
 
 import json
 import sys
-from decimal import Decimal
 from pathlib import Path
 
 import pytest
@@ -39,6 +38,10 @@ from experiments.workflow_fit_study import prepared_bundle as B  # noqa: E402
 from experiments.workflow_fit_study.bbh_sample import index_list_digest, select_indexes  # noqa: E402
 from ugence_workflow_fit_pilot._canon import digest_of  # noqa: E402
 from ugence_workflow_fit_pilot.api import PilotCase  # noqa: E402
+from ugence_workflow_fit_pilot.contracts.calibration import (  # noqa: E402
+    canonical_decimal_rendering,
+    require_matching_canonical_rendering,
+)
 
 PROVIDER_FACTORY = "stub_provider:make_provider"
 CUSTODY_REF = "memory://workflow-fit-test/integration/rep0"
@@ -80,26 +83,6 @@ def _load_cases(case_dir: Path, benchmark):
     if tuple(sorted(c.case_digest for c in cases)) != benchmark.case_digests:
         raise AssertionError("cases at the supplied path do not reproduce the prepared benchmark manifest")
     return cases
-
-
-def _canonical_decimal(value: str) -> str:
-    """Render a `QualityResult.value` in the canonical grammar `CalibrationResult` requires.
-
-    **This is a gap, not a helper (revision 30, `[G]`).** `contracts/calibration.py`'s module
-    docstring already obliges slice 3 to "check the canonical rendering of the reachable
-    `QualityResult.value`", and no production function does that rendering. The runner produces
-    `"1.0"`; revision 16's grammar forbids a trailing fractional zero, so
-    `CalibrationResult(statistic_value="1.0")` raises `DECIMAL_UNPARSEABLE`. Until a governed
-    canonicaliser exists, no caller can get from a real run to a `CalibrationResult` without
-    writing this themselves — which is exactly the kind of per-caller reimplementation the
-    canonical-decimal ruling was meant to prevent.
-
-    This test-local version exists to expose that gap, not to fill it."""
-    d = Decimal(value)
-    text = format(d, "f")
-    if "." in text:
-        text = text.rstrip("0").rstrip(".")
-    return "0" if text in ("", "-", "-0") else text
 
 
 def _prepared_calibration_bundle(out_dir: Path, manifest):
@@ -262,7 +245,7 @@ def test_a_calibration_result_is_built_from_the_run_and_ends_the_calibration(tmp
         # From the run, not fabricated.
         evaluation_digest=run.evaluation.evaluation_digest,
         attestation_digest=run.attestation.envelope_digest,
-        statistic_value=_canonical_decimal(str(run.quality_result.value)),
+        statistic_value=canonical_decimal_rendering(run.quality_result.value),
         score_count=len(case_digests), formula_id="calfloor.linear_chain", formula_version="1",
         issued_by="tester", issued_at=datetime(2026, 1, 1, tzinfo=timezone.utc),
     )
@@ -274,9 +257,12 @@ def test_a_calibration_result_is_built_from_the_run_and_ends_the_calibration(tmp
     # Run-sourced fields — the link revision 29 asserted without having.
     assert calibration.evaluation_digest == run.evaluation.evaluation_digest
     assert calibration.attestation_digest == run.attestation.envelope_digest
-    assert calibration.statistic_value == _canonical_decimal(str(run.quality_result.value))
-    # The gap made explicit: the run's own rendering is not accepted as-is.
+    # Revision 31: the governed renderer, not a test-local one. The gap this test surfaced is
+    # closed, and the run's own spelling is still not accepted as-is.
+    assert calibration.statistic_value == canonical_decimal_rendering(run.quality_result.value)
     assert str(run.quality_result.value) != calibration.statistic_value
+    require_matching_canonical_rendering(
+        calibration.statistic_value, run.quality_result.value, "statistic_value")
     assert port.written_references() == (CUSTODY_REF,)
 
     # Slice 3B-0: with that result, the UNDER_TEST record is a completed calibration.
