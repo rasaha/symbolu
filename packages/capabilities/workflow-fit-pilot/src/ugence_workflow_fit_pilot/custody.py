@@ -10,9 +10,10 @@ D5-approved adapter can do that, and none exists.
 
 **Failure classification is by operation, never by exception class** (§2.3, owner ruling,
 revision 4). The write call and the read-back call are distinct sites with distinct codes:
-``RETENTION_WRITE_FAILED`` and ``RETENTION_VERIFY_FAILED``. Both are ratified names
-(revision 10); revision 20 ruling 4 forbids adding a code without a ballot, so this module
-adds none.
+``RETENTION_WRITE_FAILED`` and ``RETENTION_VERIFY_FAILED``. ``write_and_verify`` *enforces*
+this by wrapping each call site, rather than trusting an adapter to choose the right code —
+an adapter is untrusted code and may raise anything. Both names are ratified (revision 10);
+revision 20 ruling 4 forbids adding a code without a ballot, so this module adds none.
 
 This module deliberately does **not** re-validate ``custody_ref`` syntax. The obligation-4
 grammar (revision 19) lives with the prepared bundle, which commits the reference under
@@ -92,14 +93,36 @@ def write_and_verify(port: VerdictCustodyPort, record: VerdictCustodyRecord) -> 
     """Write, then read back and compare — the two-step revision 17 requires before a
     ``CalibrationResult`` may treat custody as established.
 
-    The two calls are separate sites so a failure is classified by the operation that failed
-    (§2.3): a write failure is never reported as a verification failure, and the reverse.
+    **The call site determines the category, not the adapter** (§2.3, owner ruling, revision
+    4; correction recorded in revision 23). Each call is wrapped so that whatever an adapter
+    raises — a ``PilotError`` carrying the *other* code, or a bare ``OSError`` carrying none —
+    is re-raised with the code belonging to the operation that was being performed, chained
+    from the original so the cause is not lost. Before this correction the classification was
+    delegated to the adapter, and revision 21 wrongly claimed otherwise.
+
+    ``BaseException`` is never caught: a ``KeyboardInterrupt`` or ``SystemExit`` is not a
+    retention failure.
+
     Returns the verified ``record_digest``."""
-    written = port.write(record)
+    try:
+        written = port.write(record)
+    except Exception as e:
+        raise PilotError(
+            PilotErrorCode.RETENTION_WRITE_FAILED,
+            f"custody write failed: {type(e).__name__}: {e}",
+        ) from e
     if written != record.record_digest:
         raise PilotError(PilotErrorCode.RETENTION_WRITE_FAILED, "custody writer returned a digest for other content")
-    stored = port.read_back(record.custody_ref)
-    if stored.record_digest != record.record_digest:
+    try:
+        stored = port.read_back(record.custody_ref)
+    except Exception as e:
+        raise PilotError(
+            PilotErrorCode.RETENTION_VERIFY_FAILED,
+            f"custody read-back failed: {type(e).__name__}: {e}",
+        ) from e
+    # Identity and equality, not digest equality alone: a non-conforming adapter can return
+    # any object carrying a matching ``record_digest`` attribute.
+    if not isinstance(stored, VerdictCustodyRecord) or stored != record:
         raise PilotError(PilotErrorCode.RETENTION_VERIFY_FAILED, "custody read-back does not reproduce the written record")
     return stored.record_digest
 

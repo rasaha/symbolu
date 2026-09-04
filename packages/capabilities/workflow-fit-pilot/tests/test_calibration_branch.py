@@ -71,10 +71,12 @@ def test_the_three_digests_stay_strictly_distinct():
 
 
 def test_prepared_facts_require_real_digests_and_a_reference():
+    from ugence_reasoning_method_governance.errors import ContractError
+
     manifest = slice2._calibration_manifest()
-    with pytest.raises(Exception):
+    with pytest.raises(ContractError, match="64 lowercase hex characters"):
         _facts(manifest, index_digest="short")
-    with pytest.raises(Exception):
+    with pytest.raises(ContractError, match="must be a non-blank string"):
         _facts(manifest, verdict_custody_ref="   ")
 
 

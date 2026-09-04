@@ -9,6 +9,7 @@ from typing import List
 from ugence_reasoning_method_governance.api import FitOutcome
 
 from .contracts.coverage import success_summary
+from .errors import PilotError, PilotErrorCode
 from .runner import PilotRunResult
 
 FORBIDDEN_RENDERINGS = ("verified", "trusted", "qualified", "success")
@@ -19,6 +20,20 @@ def _outcome_line(method_id: str, outcome: FitOutcome) -> str:
 
 
 def render(result: PilotRunResult) -> str:
+    if result.coverage is None:
+        # Slice 3B-2 made PilotRunResult.coverage Optional and left this reader unchanged, so
+        # a calibration result crashed here with AttributeError. Recorded and corrected in
+        # revision 23. Refusing closed is right: this renderer's whole shape — the coverage
+        # line, the success summary, the outcome lines — is confirmatory, and a calibration
+        # report is a slice-3B output-bundle concern that is not commissioned. It must not
+        # silently render a partial one. ROLE_ARTIFACT_INCONSISTENT, not a new code
+        # (revision 20 ruling 4): the artifact this role produced is not the one this
+        # renderer consumes.
+        raise PilotError(
+            PilotErrorCode.ROLE_ARTIFACT_INCONSISTENT,
+            "render() builds a confirmatory report and a CALIBRATION run carries no coverage; "
+            "calibration output bundles are not commissioned",
+        )
     m = result.manifest
     lines: List[str] = [
         f"RESEARCH-ONLY PILOT REPORT manifest={m.manifest_digest} preregistration_status={m.preregistration_status.value}",

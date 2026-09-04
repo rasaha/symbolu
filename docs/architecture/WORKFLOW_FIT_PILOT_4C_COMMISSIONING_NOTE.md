@@ -2136,3 +2136,71 @@ calibration or confirmatory run.
 **Status.** Slices 3B-0, 3B-1 and 3B-2 are complete. What remains blocked is unchanged and
 unchanged in kind: D1–D5 incomplete, the custody endpoint unbound, real custody adapters and
 genuine execution blocked, no provider call, no credential access, no genuine calibration.
+
+### Revision 23 (independent-review corrections to slices 3B-1 and 3B-2, 2026-09-04)
+
+An independent adversarial review of the 3B stack — run on a **different model**, not a
+same-session self-review, after five self-reviews of earlier slices had missed defects of
+exactly this kind — returned NOT APPROVED. This revision records the corrections. It **rules
+nothing new**.
+
+**Withdrawn: revision 21's `[V]` claim about failure classification.** Revision 21 asserted
+that `write_and_verify` classifies by call site so a write failure is "never one reported as
+the other". **That was false.** The function wrapped neither call, so classification was
+delegated entirely to whatever an adapter chose to raise: an adapter raising
+`RETENTION_VERIFY_FAILED` from `write()` surfaced as a verify failure from the write site,
+and a bare `OSError` from either side surfaced unclassified. §2.3 rules that *"the call site
+determines the category"*, which the code did not do.
+
+**Corrected `[V]`.** `write_and_verify` now wraps each call site and re-raises any `Exception`
+with that site's code, chained from the original so the cause survives. `BaseException` is
+never caught — an interrupt is not a retention outcome. Read-back verification now requires
+`isinstance(stored, VerdictCustodyRecord)` **and** `stored == record`, not digest equality
+alone, since any object can carry a matching attribute. Eight tests cover this, asserting by
+error code and by `__cause__`.
+
+**Withdrawn: revision 22's claim about custody in the suite.** Revision 22 said "every result
+built in the suite uses `InMemoryVerdictCustody`". **False**: two helpers in
+`tests/contracts/test_run_role_and_calibration.py` build `CalibrationResult` objects with no
+custody at all. Ruling 3 is unaffected — neither is genuine evidence — but the claim was
+wrong and is withdrawn.
+
+**Corrected: a reader broken by slice 3B-2 `[V]`.** Making `PilotRunResult.coverage` optional
+changed the writer and left `report.render` unchanged, so rendering a calibration result
+raised `AttributeError` — the same writer/reader asymmetry F1b closed for `provider_factory`,
+repeated. `render` now refuses a calibration result closed, with
+`ROLE_ARTIFACT_INCONSISTENT` (no new code, ruling 4). Refusing is correct rather than
+conservative: the renderer's whole shape is confirmatory, and calibration output bundles are
+not commissioned.
+
+**Corrected: the calibration branch is now proven by behaviour `[V]`.** Revision 22's `[V]`
+rested on an AST assertion. A real CALIBRATION manifest now executes through the boundary with
+the stub provider in `tests/pilot/test_end_to_end.py`, asserting that the methods complete,
+the states are exactly `PROPOSED → UNDER_TEST`, `request`/`result`/`coverage` are `None`,
+`outcomes` is empty, lineage replays, the Phase 4C entry point admits it, and `render` refuses
+it.
+
+**Corrected: a vacuous test.** Dropping the `is_v2` clause from `is_calibration_run` failed
+none of the 204 tests, because a constructor-built v1 always has `run_role=None` and the
+clause never decides. The test now tampers a v1 manifest with a smuggled role, which is the
+only case distinguishing the two implementations. Three bare `pytest.raises` calls now assert
+an error code or message.
+
+**Carried forward, not closed `[G]`.**
+
+1. **`revalidate_role` is applied at one site only.** `run_phase_4c_pilot` calls it;
+   `validate_lineage` — the replay verifier — does not, and `is_calibration_run` reads
+   `run_role` directly. A v2 manifest tampered from CONFIRMATORY to CALIBRATION is therefore
+   trusted by `transition`, `validate_lineage`, `require_calibration_endpoint` and a direct
+   `run_pilot` call. The F4 obligation text names a *verifier*; the replay verifier does not
+   yet re-run role validation.
+2. **`build_calibration_result` reconciles neither `score_count` against the number of
+   verdicts in the custody record, nor the verdicts' case digests against the benchmark case
+   set** (it never sees the manifest).
+3. **`run_phase_4c_pilot` has no non-test caller**, so the F3 gate is opt-in; nothing pins
+   that a future Phase 4C pipeline chooses it over `run_pilot`.
+
+**Status.** Slices 3B-0, 3B-1 and 3B-2 stand as commissioned, with the corrections above. D1–D5
+remain incomplete, the custody endpoint remains unbound, real custody adapters and genuine
+execution remain blocked, and no provider call, credential access or genuine calibration is
+permitted by this revision.

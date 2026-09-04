@@ -323,4 +323,4 @@ def _run_method(conn: BoundaryConnection, manifest: PilotStudyManifest, method: 
     return MethodRun(method, True, (), captures, record, attestation, claim, quality_result, evaluation, observation, diagnostics)
 
 
-__all__ = ["PilotCase", "ExecutionOutcome", "WorkflowExecutorPort", "QualityScorerPort", "PilotIdentity", "MethodRun", "PilotRunResult", "run_pilot", "check_evaluator_identity", "QUALITY_UNIT", "QUALITY_METRIC_ID"]
+__all__ = ["PilotCase", "ExecutionOutcome", "WorkflowExecutorPort", "QualityScorerPort", "PilotIdentity", "MethodRun", "PilotRunResult", "run_pilot", "run_phase_4c_pilot", "check_evaluator_identity", "QUALITY_UNIT", "QUALITY_METRIC_ID"]
