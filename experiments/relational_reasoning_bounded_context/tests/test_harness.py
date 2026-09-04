@@ -104,6 +104,27 @@ def test_answer_and_p0_accuracy_helpers():
     assert R.answer_accuracy([(c, "garbage") for c in ctxs]) == 0.0
 
 
+def test_p0_failure_profile_and_predictions_dump(tmp_dir="/tmp/claude-0/-home-user-symbolu/2ec1335e-f6de-58ee-b0b2-cf1663a48120/scratchpad/predtest"):
+    import json, pathlib, shutil
+    from ..schema_ext import ReasoningOutput
+    cohorts = DS.eval_cohorts_p0(FIXT, 2, role="unit")
+    gold = DS.gold_predictions(cohorts)
+    prof = R.p0_failure_profile(gold["B1"]); assert prof["correct"] == 2 and sum(prof.values()) == 2
+    b1 = cohorts["B1"]
+    abst = [(c, serialize_output(ReasoningOutput(None, (), (), "INSUFFICIENT_EVIDENCE"))) for c in b1]
+    assert R.p0_failure_profile(abst)["abstained"] == 2
+    other_id = [(c, serialize_output(ReasoningOutput(
+        next(e.entity_id for e in c.entities if e.entity_id != c.query.root_entity_id), (), (), "SUPPORTED")))
+        for c in b1]
+    assert R.p0_failure_profile(other_id)["in_context_wrong"] == 2
+    assert R.p0_failure_profile([(c, "garbage") for c in b1])["invalid"] == 2
+    shutil.rmtree(tmp_dir, ignore_errors=True)
+    path = R.write_predictions(gold, tmp_dir, role="fixture", seed=FIXT)
+    rows = [json.loads(l) for l in pathlib.Path(path).read_text().splitlines()]
+    assert len(rows) == 14 and all(r["valid"] and r["gold"] == r["pred"] for r in rows)
+    shutil.rmtree(tmp_dir, ignore_errors=True)
+
+
 def main() -> int:
     tests = [v for k, v in sorted(globals().items()) if k.startswith("test_") and callable(v)]
     p = f = 0

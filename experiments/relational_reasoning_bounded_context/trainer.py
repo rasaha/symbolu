@@ -28,10 +28,13 @@ class FrozenCheckpoint:
 
 
 def train_checkpoint(seed: int, examples, *, authorization_token: str | None = None,
-                     max_updates: int = MAX_UPDATES) -> FrozenCheckpoint:
+                     max_updates: int = MAX_UPDATES, loss_log: list | None = None,
+                     log_every: int = 100) -> FrozenCheckpoint:
     """Train ONE checkpoint for `seed`, then freeze. Raises before any effect on reserved seeds.
 
     `examples` = list of {"input": str, "output": str}. Returns a FrozenCheckpoint. Requires torch.
+    `loss_log` (optional) receives (step, mean_loss_over_last_log_every_updates) tuples: instrumentation
+    only; it changes nothing about the recipe, the sampling stream, or the checkpoint.
     """
     assert_generation_allowed(seed, authorization_token)  # centralized two-key guard; fail-closed
     import torch
@@ -58,6 +61,7 @@ def train_checkpoint(seed: int, examples, *, authorization_token: str | None = N
 
     rng = random.Random(int(seed))
     step = 0
+    acc_loss = 0.0
     while step < max_updates:
         batch = [data[rng.randrange(len(data))] for _ in range(BATCH_SIZE)]
         maxlen = max(len(ids) for ids, _ in batch)
@@ -73,6 +77,11 @@ def train_checkpoint(seed: int, examples, *, authorization_token: str | None = N
         opt.zero_grad(); loss.backward()
         torch.nn.utils.clip_grad_norm_(model.parameters(), GRADIENT_CLIP)
         opt.step(); step += 1
+        if loss_log is not None:
+            acc_loss += float(loss.detach())
+            if step % log_every == 0 or step == max_updates:
+                n = log_every if step % log_every == 0 else step % log_every
+                loss_log.append((step, acc_loss / n)); acc_loss = 0.0
 
     model.eval()
     return FrozenCheckpoint(model, dev)

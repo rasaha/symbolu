@@ -20,7 +20,8 @@ from .base_capability import p0_gate
 from .config import MAX_SEQ_LEN, OUTPUT_MARKER, OUTPUT_TOKEN_LIMIT
 from .eval import NON_ADMISSIBLE
 from .execution import assert_generation_allowed
-from .output import parse_output
+from .serializer import serialize_input
+from .output import is_valid_output, parse_output, serialize_output
 
 
 def _safe(text: str):
@@ -49,12 +50,35 @@ def answer_accuracy(preds: list) -> float:
     return ok / len(preds)
 
 
+def p0_failure_profile(preds: list) -> dict:
+    """Categorize each P0 prediction (diagnostic; not a gate): invalid / abstained / copied_query_root /
+    in_context_wrong (answer is some other visible id or token) / correct / other."""
+    prof = {"correct": 0, "invalid": 0, "abstained": 0, "copied_query_root": 0, "in_context_wrong": 0,
+            "other": 0}
+    for ctx, text in preds:
+        p = _safe(text); g = ctx.authoritative_output
+        if p is None:
+            prof["invalid"] += 1
+        elif p.answer == g.answer and p.status == g.status:
+            prof["correct"] += 1
+        elif p.answer is None:
+            prof["abstained"] += 1
+        elif p.answer == ctx.query.root_entity_id:
+            prof["copied_query_root"] += 1
+        elif p.answer in set(serialize_input(ctx).replace("\n", " ").split(" ")):
+            prof["in_context_wrong"] += 1
+        else:
+            prof["other"] += 1
+    return prof
+
+
 def assemble_report(*, seed: int, role: str, checkpoint_digest: str,
                     p0_predictions: dict, r_predictions: dict, protocol_valid: bool = True,
                     training: dict | None = None, environment: dict | None = None,
                     git_sha: str | None = None, replay_verified: bool | None = None) -> dict:
     """Score predictions into the full smoke report. Torch-free (works on any predicted-text source)."""
     p0_acc = {sub: p0_accuracy(preds) for sub, preds in p0_predictions.items()}
+    p0_profile = {sub: p0_failure_profile(preds) for sub, preds in p0_predictions.items()}
     p0 = p0_gate(p0_acc)
     established = p0["established"]
 
@@ -88,7 +112,8 @@ def assemble_report(*, seed: int, role: str, checkpoint_digest: str,
         "schema_serializer_version": MAN.SCHEMA_SERIALIZER_VERSION,
         "provenance": MAN.PROVENANCE,
         "training": training or {}, "protocol_valid": protocol_valid, "replay_verified": replay_verified,
-        "p0": {"per_subtask": p0_acc, "gate": p0}, "reasoning_admissible": established,
+        "p0": {"per_subtask": p0_acc, "gate": p0, "failure_profile": p0_profile},
+        "reasoning_admissible": established,
         "structured_output_validity": m.get("structured_output_validity"),
         "per_split_answer_accuracy": per_split,
         "discovery": {"R4": per_split.get("R4"), "R7": per_split.get("R7"), "ok": discovery_ok},
@@ -167,8 +192,9 @@ def run_experiment(seed: int, *, role_train: str = "train", role_eval: str = "fi
     tok = BTRRTokenizer()
     examples = (DS.build_examples(seed, n_train, role_train, authorization_token)
                 + DS.build_p0_examples(seed, n_train, role_train, authorization_token))
+    loss_log: list = []
     frozen = train_checkpoint(seed, examples, authorization_token=authorization_token,
-                              max_updates=max_updates or MAX_UPDATES)
+                              max_updates=max_updates or MAX_UPDATES, loss_log=loss_log)
     d0 = frozen.digest()
 
     p0_cohorts = DS.eval_cohorts_p0(seed, n_eval, role_eval, authorization_token)
@@ -188,11 +214,29 @@ def run_experiment(seed: int, *, role_train: str = "train", role_eval: str = "fi
                              p0_predictions=p0_predictions, r_predictions=r_predictions,
                              protocol_valid=protocol_valid,
                              training={"completed": True, "max_updates": max_updates or MAX_UPDATES,
-                                       "n_train_per_split": n_train, "n_eval_per_split": n_eval},
+                                       "n_train_per_split": n_train, "n_eval_per_split": n_eval,
+                                       "n_train_examples": len(examples),
+                                       "loss_curve": [(s, round(l, 4)) for s, l in loss_log]},
                              environment=env, git_sha=git_sha, replay_verified=protocol_valid)
     if out_dir:
         report["report_path"] = write_report(report, out_dir)
+        report["predictions_path"] = write_predictions(
+            {**p0_predictions, **r_predictions}, out_dir, role=_role_for(seed), seed=seed)
     return report
+
+
+def write_predictions(cohorts: dict, out_dir: str | pathlib.Path, *, role: str, seed: int) -> str:
+    """One JSON line per evaluated example: split, query, gold, and the raw generated text (diagnostic)."""
+    d = pathlib.Path(out_dir); d.mkdir(parents=True, exist_ok=True)
+    path = d / f"predictions_{role}_{seed}.jsonl"
+    with path.open("w") as fh:
+        for key, preds in cohorts.items():
+            for ctx, text in preds:
+                fh.write(json.dumps({"cohort": key, "split": ctx.split, "context_id": ctx.context_id,
+                                     "query_root": ctx.query.root_entity_id,
+                                     "gold": serialize_output(ctx.authoritative_output),
+                                     "pred": text, "valid": is_valid_output(text)}) + "\n")
+    return str(path)
 
 
 def overfit_diagnostic(*, seed: int = 883000, per_split: int = 2, updates: int = 4000,
