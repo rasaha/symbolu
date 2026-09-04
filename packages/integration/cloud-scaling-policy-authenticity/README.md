@@ -139,15 +139,23 @@ When 5B-1 closes R-4 and 5B-2 closes R-2, the corresponding fact is **promoted**
 verified half — which moves the artifact digest, because the frame a fact sits in is part of
 what that digest commits to.
 
-## The open residual you must read before deploying
+## The instant, and what it now proves
 
-**R-2 — whose clock supplies `as_of` is unsettled, and this implementation proceeds with
-`as_of` injected and unvalidated**, by explicit owner authorization. Five gates in the
-resolution depend on it, so a determination reached at an attacker-chosen instant can resolve
-a policy that is revoked, expired or not yet effective *now*. Binding `as_of` to a trusted
-time source is 5B-2's envelope-issuance work. `TEMPORAL_OUTCOMES` names the members that
-instant can move, and `resolved_as_of_fact` sits in the artifact's **recorded** half so the
-artifact itself says the instant was not verified.
+**R-2 is closed as narrowed** (5B-2 part 2; ratified again in
+`docs/architecture/ADR_CLOUD_SCALING_PHASE5B2_TRUSTED_INSTANT_RATIFICATION.md`). Its
+original name, "whose clock supplies `as_of`", overstated it: the instant was already
+type-checked, round-tripped against the resolution, and unable to resurrect a revoked or
+out-of-window policy. What was open was that no gate compared it to the candidate's own six
+carried timestamps; gate 13 closed that under four typed refusals. `TEMPORAL_OUTCOMES` names
+the members the instant can move.
+
+`resolved_as_of_fact` **stays in the recorded half by ruling.** This package reads no clock
+and never will; the instant is whatever the caller injects, now bounded but not attested.
+The trusted clock is Risk Authority's composition-root-injected clock, whose production seam
+already refuses a caller-supplied instant. Binding the instant is Risk Authority Phase 5
+signed envelope issuance: one clock read supplies `as_of`, the artifact's recorded instant
+must equal the envelope's `issued_at`, and the envelope's signature is what attests it. No
+standalone trusted-time-source component exists or is planned.
 
 **R-4** is likewise visible in the artifact's shape rather than only in its prose:
 `candidate_digest_fact` is in the recorded half because nothing reconciled it.

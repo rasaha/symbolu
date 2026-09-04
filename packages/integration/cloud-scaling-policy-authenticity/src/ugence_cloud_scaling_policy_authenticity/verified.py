@@ -25,9 +25,11 @@ is that instant, and it is named ``…_fact`` because this package read no clock
 **Whose clock supplied it is not settled** — ADR residual R-2, left open and explicitly
 authorized to remain open for this implementation. The consequence, stated rather than
 buried: an authenticity determination reached at an attacker-chosen ``as_of`` can resolve a
-policy that is revoked, expired or not yet effective *now*. Binding ``as_of`` to a trusted
-time source is 5B-2's envelope-issuance work. Until then, a consumer must treat
-:attr:`resolved_as_of_fact` as an **unvalidated input**, not as a verified fact about time.
+policy that is revoked, expired or not yet effective *now*. Gate 13 bounds the instant
+against the candidate's own carried validity (R-2, closed as narrowed); attesting it is Risk
+Authority Phase 5 envelope issuance, whose clock supplies ``as_of`` and whose signature binds
+it. A consumer must treat :attr:`resolved_as_of_fact` as a **recorded, bounded input**, not as
+a verified fact about time.
 
 A historical answer can never appear here
 ------------------------------------------
@@ -211,7 +213,10 @@ VERIFIED_FACT_NAMES: "frozenset[str]" = frozenset(
 #: time the artifact digest and the profile version moved with it, which is exactly what a
 #: promotion is supposed to look like:
 #:
-#: * ``resolved_as_of_fact`` — open residual **R-2**: the instant is injected and unvalidated.
+#: * ``resolved_as_of_fact`` — **stays recorded by ruling** (5B-2 ratification). R-2 closed as
+#:   narrowed: gate 13 bounds the instant against the candidate's carried validity, but no
+#:   leaf can attest it. Binding is Risk Authority Phase 5 envelope issuance, where the
+#:   issuer's clock supplies ``as_of`` and the envelope signature attests the instant.
 #: * ``trust_configuration_digest`` — **self-reported by the resolution port.** The port is the
 #:   seam to the authority, so any check this package could make would be the port vouching for
 #:   itself: a wrapper delegating to a genuine ``PolicyAuthorityResolutionPort`` while reporting

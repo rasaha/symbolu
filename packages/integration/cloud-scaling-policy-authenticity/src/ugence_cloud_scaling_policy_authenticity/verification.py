@@ -78,9 +78,9 @@ refusal. The only shipped "no trust configured" posture is
 No clock
 --------
 ``as_of`` is an injected timezone-aware instant. Nothing here reads a wall clock, and a naive
-datetime is refused rather than assumed UTC. Whose clock supplies it is ADR residual **R-2**,
-open, and this implementation proceeds with ``as_of`` injected and **unvalidated** by explicit
-owner authorization. A determination is therefore only as honest as the instant it was handed.
+datetime is refused rather than assumed UTC. R-2 is **closed as narrowed**: gate 13 bounds the
+instant against the candidate's carried validity; it stays a recorded fact by ruling, and binding
+it to Risk Authority's clock is Phase 5 envelope issuance. Honesty is bounded by the instant.
 """
 
 from __future__ import annotations
