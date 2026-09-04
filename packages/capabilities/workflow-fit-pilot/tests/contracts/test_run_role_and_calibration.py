@@ -590,3 +590,122 @@ def test_f3_eligibility_is_expressible_but_not_enforced_at_any_entry_point():
     assert callers == [], f"require_phase_4c_eligible is now called by {callers}; F3 enforcement must be recorded"
     with pytest.raises(PilotError):
         pf.manifest().require_phase_4c_eligible()
+
+
+# --------------------------------------------------------------------------- slice 3B-0: lifecycle endpoint
+
+
+def _calibration_result_for(manifest, **overrides):
+    from datetime import datetime, timezone
+
+    from ugence_workflow_fit_pilot.contracts.calibration import CalibrationResult
+
+    kwargs = dict(
+        schema_version="workflow_fit_pilot.calibration_result.v1",
+        calibration_id="cal.1", manifest_digest=manifest.manifest_digest,
+        evaluation_digest="b" * 64, attestation_digest="c" * 64,
+        statistic_value="0.62", governed_unit="score.unit", score_count=50,
+        sample_index_digest="d" * 64, commitment_identifier="workflow_fit_prepared_index.calibration.v1",
+        index_digest="e" * 64, verdict_custody_ref="memory://workflow-fit-test/endpoint",
+        formula_id="calfloor.linear_chain", formula_version="1", issued_by="tester",
+        issued_at=datetime(2026, 1, 1, tzinfo=timezone.utc),
+    )
+    kwargs.update(overrides)
+    return CalibrationResult(**kwargs)
+
+
+def _under_test_record(manifest):
+    from datetime import datetime, timezone
+
+    from ugence_workflow_fit_pilot.contracts.lifecycle import LifecycleEvent, propose, transition
+
+    method = manifest.methods[0].method
+    at = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    proposed = propose(manifest, method, recorded_by="tester", recorded_at=at)
+    return transition(proposed, LifecycleEvent.OBSERVATION_VALIDATED, manifest=manifest, recorded_by="tester", recorded_at=at)
+
+
+def test_is_calibration_run_never_reinterprets_a_v1_manifest():
+    from ugence_workflow_fit_pilot.contracts.lifecycle import is_calibration_run
+
+    assert is_calibration_run(_calibration_manifest()) is True
+    assert is_calibration_run(_confirmatory_manifest()) is False
+    assert is_calibration_run(pf.manifest()) is False  # v1: no committed role
+
+
+def test_a_calibration_run_at_under_test_with_a_bound_result_is_a_completed_calibration():
+    from ugence_workflow_fit_pilot.contracts.lifecycle import require_calibration_endpoint
+
+    manifest = _calibration_manifest()
+    require_calibration_endpoint(
+        _under_test_record(manifest), manifest=manifest, calibration_result=_calibration_result_for(manifest)
+    )
+
+
+def test_a_calibration_run_at_under_test_without_a_result_is_not_a_completed_calibration():
+    from ugence_workflow_fit_pilot.contracts.lifecycle import require_calibration_endpoint
+
+    manifest = _calibration_manifest()
+    with pytest.raises(PilotError) as e:
+        require_calibration_endpoint(_under_test_record(manifest), manifest=manifest, calibration_result=None)
+    assert e.value.code is PilotErrorCode.ROLE_ARTIFACT_INCONSISTENT
+
+
+def test_a_calibration_result_for_another_manifest_does_not_end_this_run():
+    from ugence_workflow_fit_pilot.contracts.lifecycle import require_calibration_endpoint
+
+    manifest = _calibration_manifest()
+    other = _calibration_result_for(manifest, manifest_digest="f" * 64)
+    with pytest.raises(PilotError) as e:
+        require_calibration_endpoint(_under_test_record(manifest), manifest=manifest, calibration_result=other)
+    assert e.value.code is PilotErrorCode.MANIFEST_MISMATCH
+
+
+def test_a_proposed_record_is_not_a_completed_calibration():
+    from datetime import datetime, timezone
+
+    from ugence_workflow_fit_pilot.contracts.lifecycle import propose, require_calibration_endpoint
+
+    manifest = _calibration_manifest()
+    proposed = propose(manifest, manifest.methods[0].method, recorded_by="t", recorded_at=datetime(2026, 1, 1, tzinfo=timezone.utc))
+    with pytest.raises(PilotError, match="ends successfully at UNDER_TEST"):
+        require_calibration_endpoint(proposed, manifest=manifest, calibration_result=_calibration_result_for(manifest))
+
+
+def test_the_endpoint_rule_does_not_apply_to_a_confirmatory_run():
+    from ugence_workflow_fit_pilot.contracts.lifecycle import require_calibration_endpoint
+
+    manifest = _confirmatory_manifest()
+    with pytest.raises(PilotError, match="applies only to a v2 manifest committed to CALIBRATION"):
+        require_calibration_endpoint(_under_test_record(manifest), manifest=manifest, calibration_result=None)
+
+
+def test_a_calibration_run_never_emits_result_assessed():
+    from ugence_workflow_fit_pilot.contracts.lifecycle import LifecycleEvent, transition
+
+    manifest = _calibration_manifest()
+    with pytest.raises(PilotError, match="never emits RESULT_ASSESSED and never becomes EVALUATED"):
+        transition(
+            _under_test_record(manifest), LifecycleEvent.RESULT_ASSESSED, manifest=manifest,
+            result=None, recorded_by="t", recorded_at=_under_test_record(manifest).recorded_at,
+        )
+
+
+def test_a_hand_built_evaluated_record_on_a_calibration_manifest_fails_replay():
+    """transition() would never produce it; validate_lineage refuses it on replay too."""
+    from dataclasses import replace as dc_replace
+
+    from ugence_workflow_fit_pilot.contracts.lifecycle import PilotConfigurationState, validate_lineage
+
+    from ugence_reasoning_method_governance.api import FitOutcome
+
+    manifest = _calibration_manifest()
+    under_test = _under_test_record(manifest)
+    # A bare state swap is refused by the record constructor, so the forgery is built with the
+    # full EVALUATED shape it demands. Only the run role then stands between it and replay.
+    forged = dc_replace(
+        under_test, state=PilotConfigurationState.EVALUATED,
+        fit_outcome=FitOutcome.SUFFICIENT_PARETO_EFFICIENT, result_digest="a" * 64, state_digest="",
+    )
+    with pytest.raises(PilotError, match="never becomes EVALUATED"):
+        validate_lineage([forged], [manifest])

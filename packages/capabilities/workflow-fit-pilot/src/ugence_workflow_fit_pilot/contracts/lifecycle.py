@@ -12,6 +12,7 @@ from ugence_reasoning_method_governance.api import ContractError, ContractErrorC
 
 from .._canon import digest_of, require_digest, require_member, require_nonblank, require_str_tuple, require_tzaware, settle_digest
 from ..errors import PilotError, PilotErrorCode
+from .calibration import CalibrationResult, PilotRunRole
 from .manifest import PilotRole, PilotStudyManifest, sorted_roles
 
 PILOT_STATE_SCHEMA_VERSION = "workflow_fit_pilot.state.v1"
@@ -87,6 +88,57 @@ def derive_revision_scope(predecessor: PilotStudyManifest, successor: PilotStudy
         else:
             raise PilotError(PilotErrorCode.REVISION_WITHOUT_CHANGE, "successor manifest does not differ from the predecessor")
     return tuple(sorted(scopes, key=_SCOPE_ORDER.index))
+
+
+def is_calibration_run(manifest: PilotStudyManifest) -> bool:
+    """A v1 manifest carries no committed role and is never a calibration run. v1 manifests
+    are never silently reinterpreted (revision 20)."""
+    return bool(manifest.is_v2) and manifest.run_role is PilotRunRole.CALIBRATION
+
+
+def require_calibration_endpoint(
+    record: PilotConfigurationStateRecord,
+    *,
+    manifest: PilotStudyManifest,
+    calibration_result: Optional[CalibrationResult],
+) -> None:
+    """Phase 4A amendment, slice 3B-0 (revision 20 ruling 2). Recorded as a `[G]` since
+    revision 13: the merged lifecycle can rest at ``UNDER_TEST`` but cannot by itself
+    distinguish a completed calibration from a run that merely stopped there. This ties the
+    endpoint to the artifact.
+
+    A CALIBRATION run ends **successfully** at ``UNDER_TEST`` only when a valid
+    ``CalibrationResult`` binding this manifest exists. It never reaches ``EVALUATED``, which
+    ``transition`` and ``validate_lineage`` enforce separately.
+
+    **What this does not establish.** A ``CalibrationResult`` here is *constructed and bound*,
+    not *custody-verified*. Revision 17 requires both a verifying prepared bundle and a
+    successful custody write before a result is genuine evidence; the custody port is slice
+    3B-1 and real adapters remain blocked on D5. Passing this check is therefore necessary,
+    never sufficient, for a genuine calibration."""
+    if not is_calibration_run(manifest):
+        raise PilotError(
+            PilotErrorCode.STATE_TRANSITION_INVALID,
+            "require_calibration_endpoint applies only to a v2 manifest committed to CALIBRATION",
+        )
+    if record.manifest_digest != manifest.manifest_digest:
+        raise PilotError(PilotErrorCode.MANIFEST_MISMATCH, "record belongs to another manifest")
+    if record.state is not PilotConfigurationState.UNDER_TEST:
+        raise PilotError(
+            PilotErrorCode.STATE_TRANSITION_INVALID,
+            f"a CALIBRATION run ends successfully at UNDER_TEST, not {record.state.value}",
+        )
+    if calibration_result is None or not isinstance(calibration_result, CalibrationResult):
+        # ROLE_ARTIFACT_INCONSISTENT, not a new code: revision 20 ruling 4 confirms the
+        # refusal vocabulary is ratified as it stands, and no code may be added without a
+        # ballot. The CALIBRATION role requires this artifact and it is absent or of the
+        # wrong type, which is what this code names.
+        raise PilotError(
+            PilotErrorCode.ROLE_ARTIFACT_INCONSISTENT,
+            "a CALIBRATION run resting at UNDER_TEST is a completed calibration only with a CalibrationResult",
+        )
+    if calibration_result.manifest_digest != manifest.manifest_digest:
+        raise PilotError(PilotErrorCode.MANIFEST_MISMATCH, "CalibrationResult belongs to another manifest")
 
 
 @dataclass(frozen=True)
@@ -211,6 +263,15 @@ def transition(
         scope = derive_revision_scope(manifest, successor_manifest)
         return PilotConfigurationStateRecord(state=PilotConfigurationState.REVISED, fit_outcome=None, refusal_codes=(), result_digest=None,
                                              successor_manifest_digest=successor_manifest.manifest_digest, revision_scope=scope, **common)
+    # Revision 20 ruling 2: a CALIBRATION run never emits RESULT_ASSESSED and never becomes
+    # EVALUATED. Checked before the state and result checks so the refusal names the run role
+    # rather than a missing ReadinessComparisonResult — under CALIBRATION no such result can
+    # exist, since revision 13 makes comparison unconstructible for that role.
+    if event is LifecycleEvent.RESULT_ASSESSED and is_calibration_run(manifest):
+        raise PilotError(
+            PilotErrorCode.STATE_TRANSITION_INVALID,
+            "a CALIBRATION run never emits RESULT_ASSESSED and never becomes EVALUATED",
+        )
     if event is LifecycleEvent.OBSERVATION_VALIDATED:
         if st is not PilotConfigurationState.PROPOSED:
             raise PilotError(PilotErrorCode.STATE_TRANSITION_INVALID, f"OBSERVATION_VALIDATED is not permitted from {st.value}")
@@ -263,6 +324,13 @@ def validate_lineage(records: Iterable[PilotConfigurationStateRecord], manifests
     for r in recs:
         if r.manifest_digest not in mans:
             raise PilotError(PilotErrorCode.LINEAGE_INCOMPLETE, "record names an unsupplied manifest")
+        if r.state is PilotConfigurationState.EVALUATED and is_calibration_run(mans[r.manifest_digest]):
+            # Revision 20 ruling 2, on replay: a hand-built EVALUATED record on a CALIBRATION
+            # manifest is refused even though transition() would never have produced it.
+            raise PilotError(
+                PilotErrorCode.STATE_TRANSITION_INVALID,
+                "a CALIBRATION run never becomes EVALUATED",
+            )
         if r.result_digest is not None:
             res = ress.get(r.result_digest)
             if res is None:
@@ -319,4 +387,5 @@ def validate_lineage(records: Iterable[PilotConfigurationStateRecord], manifests
 __all__ = [
     "PILOT_STATE_SCHEMA_VERSION", "APPROVAL_STATUS_NONE", "PilotConfigurationState", "RevisionScope", "LifecycleEvent",
     "comparison_request_id", "derive_revision_scope", "PilotConfigurationStateRecord", "propose", "transition", "validate_lineage",
+    "is_calibration_run", "require_calibration_endpoint",
 ]
