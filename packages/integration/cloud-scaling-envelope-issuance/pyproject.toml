@@ -1,0 +1,64 @@
+# Ugence Cloud Scaling Envelope Issuance — Cloud Scaling Phase 5B-4.
+#
+# A COMPOSITION package. It imports Risk Authority (the Phase 5 issuance seam and its public
+# API), the Phase 5A authorization contracts (the candidate, read-only), the Phase 5B-0A and
+# 5B-0B verifiers, and the Policy Authority's public PolicyCoordinate type. None of them
+# imports this package.
+#
+# It owns NO authority and NO key. It holds no clock, no policy, no trust store, no nonce
+# ledger and no execution surface. It does not admit an action through ActionGate (5C),
+# broker a credential (5X), call a cloud provider, scale anything, verify an effect or learn
+# from an outcome.
+#
+# Build:   python -m build packages/integration/cloud-scaling-envelope-issuance
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ugence-cloud-scaling-envelope-issuance"
+dynamic = ["version"]
+description = "Ugence Cloud Scaling Envelope Issuance — Phase 5B-4. Composes the verified ladder into Risk Authority's Phase 5 issuance seam. An envelope is authority, not execution."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "Proprietary" }
+authors = [{ name = "Ugence Labs" }]
+keywords = ["cloud-scaling", "envelope-issuance", "risk-authority", "composition", "ugence"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Operating System :: OS Independent",
+    "Typing :: Typed",
+]
+# Five first-party dependencies and no third-party runtime dependency. There is deliberately
+# NO dependency on the Cloud Scaling Controller, Decision Authority, ActionGate, a Credential
+# Broker, Cloud Scaling Operations, a cloud SDK or a Kubernetes client.
+dependencies = [
+    "ugence-risk-authority>=0.6.0",
+    "ugence-cloud-scaling-authorization-contracts>=0.2.0",
+    "ugence-cloud-scaling-policy-authenticity>=0.9.0",
+    "ugence-cloud-scaling-producer-attestation>=0.2.0",
+    "ugence-policy-authority>=0.3.0",
+]
+
+[project.optional-dependencies]
+test = ["pytest>=7.0"]
+dev = ["pytest>=7.0", "build>=1.0"]
+
+[tool.setuptools.dynamic]
+version = { attr = "ugence_cloud_scaling_envelope_issuance.version.__version__" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["ugence_cloud_scaling_envelope_issuance*"]
+
+[tool.setuptools.package-data]
+ugence_cloud_scaling_envelope_issuance = ["py.typed"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+markers = [
+    "happy: a positive-control property — something the boundary must ADMIT",
+    "adversarial: an attack that must be REFUSED, or a dangerous capability that must be ABSENT",
+    "invariant: a structural, packaging or frozen-value regression anchor — neither attack nor success",
+]

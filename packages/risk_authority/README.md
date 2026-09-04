@@ -390,7 +390,7 @@ onto the one word `VERIFIED`. The case-based `issue_envelope` and `authorize_act
 contained in production mode; production ActionGate admission is 5C and credentials are 5X.
 
 **Not in this release:** HSM/KMS signer implementations (the port is their seam), durable
-decision or envelope persistence (wave 1 follow-up), the 5B-4 composition package, and any
+decision or envelope persistence (wave 1 follow-up) and any
 `CanonicalAction` mapping for capacity actions.
 
 ## Verify the distribution
