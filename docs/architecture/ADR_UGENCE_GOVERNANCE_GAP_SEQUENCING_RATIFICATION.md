@@ -9,8 +9,25 @@ needs its own package-level implementation authority before code changes.
 In what order should the eighteen recommendations from the external governance-gap
 assessment be built? **Close the seams existing packages already reserve on the
 minimum production path first; create a new package only where no package owns the
-noun.** Five of the recommended "new" packages are existing milestones under other
-names, so the platform grows by six packages, not thirteen.
+noun.** Five of the thirteen recommended "new" packages are existing milestones under
+other names, so the capability count grows by seven, plus one partial, not thirteen.
+
+## Count
+
+Of the assessment's twenty items (thirteen new packages, seven extensions):
+
+| Disposition | Items | Count |
+|---|---|---|
+| New capability package | approval workflow, authority directory, portfolio registry (contracts-only), incident orchestrator, privacy and egress, vendor risk, adversarial assurance | 7 |
+| Partly new | lifecycle authority: only the promotion state machine is new; Model Selection's `ExecutableRegistry` and the Agent Constitution lifecycle already hold the registries | 1 |
+| Folded into an existing milestone | credential broker, execution lease, control plane, audit ledger, integration hub, benchmark authority, Policy Authority persistence, live attestation, signed effects, value attribution, agent-runtime pilot, regulatory obligation mapping | 12 |
+
+Capability count moves from 45 to 52, or 53 if the lifecycle state machine ships
+separately. Physical package count may rise by up to three more without adding a
+capability, because the cloud-scaling ladder ships one integration package per phase
+(5A, 5B-0A and 5B-0B each did `[V]`): a Phase 5X package, the execution ledger that
+`NEXT_PHASES.md` names as owner of phase G with no package behind it, and the
+control-plane composition root.
 
 ## Ratified owner decisions
 
@@ -33,7 +50,7 @@ Evidence labels: `[V]` verified against the cited file, `[I]` inferred.
 | Idempotency and expiry contracts | existing | governance-contracts evolution phase, gaps G7 and G8 `[V]` | 1 |
 | Durable Policy Authority | existing | ADR_UGENCE_POLICY_AUTHORITY §15.7 under D-3 `[V]` | 1 |
 | Envelope issuance, ActionGate admission | existing | Risk Authority Phase 5; cloud-scaling 5B-2 and 5C `[V]` | 1 |
-| Human approval and exception workflow | **new package** | feeds Decision Authority under D-2 | 2 |
+| Human approval and exception workflow | **new package** | feeds Decision Authority under D-2; reuses the Policy Workflow Compiler `HumanApprovalRecord` shape, which records approval but runs no queue or state machine `[V]` | 2 |
 | Organizational authority directory | **new package** | consumed by approval workflow and Risk Authority; identity proof stays with the IdP | 2 |
 | AI portfolio registry | **new package** | contracts-only slice under D-5 | 2 |
 | Unified audit ledger | existing | gap G4 plus durable-audit shape under D-4 `[V]` | 3 |
@@ -48,6 +65,8 @@ Evidence labels: `[V]` verified against the cited file, `[I]` inferred.
 | Signed external-effect verification | existing | RA-8 successor milestone; Trusted Evidence Authority DD-10b custody `[V]` | 5 |
 | Live agent attestation | existing | Agent Constitution Conformance reference-map gap `[V]` | 5 |
 | Value baseline and attribution | existing | Governed Value GV-2 evidence and GV-4 authority layers `[V]` | 5 |
+| Agent Runtime production validation | existing | README names pilot and production validation as the next step `[V]` | 5 |
+| Regulatory obligation mapping | existing | Policy Workflow Compiler extension; not in its `NEXT_PHASES.md`, so it needs a package-level scoping first `[V]` | 4 |
 | Maturity ledger | already exists | pipeline document Appendix B; keep it current, add nothing `[V]` | — |
 | Research capabilities as controls | no action | research lane stays outside the pilot band `[V]` | — |
 
