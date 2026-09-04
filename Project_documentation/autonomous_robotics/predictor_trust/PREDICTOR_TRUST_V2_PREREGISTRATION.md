@@ -182,3 +182,56 @@ the large expected effect sizes.
     FA 0.00, ALL-family delay 6.30 (strict tick 6.96), common-mode false
     detection 0.00. All four conditions met → **`A1_ADOPT`**. Detail:
     `ROBOTICS_LLT_KALMAN_TRUST_RESULTS.md` §7.
+
+* **A2 — realistic-noise pilot (preregistered before scoring). The
+  real-sensor gate is NOT discharged by this amendment.** Written and
+  committed before any A2 bundle was scored.
+  * *Data availability (verified at preregistration).* `NuScenesAdapter` is
+    scaffolding that raises `NotImplementedError`; no nuScenes/KITTI data is
+    on disk; `nuscenes.org` is unreachable from this environment. A2
+    therefore uses the repository's `RealisticNoiseAdapter`
+    (`symbolu_robotics/bcvf_autonomous/datasets/synthetic_realistic.py`:
+    AR(1) correlated noise α=0.8 σ=0.02, 2 % outlier frames at 5×) and is
+    labelled **synthetic-realistic**. Whatever the outcome, the verdict
+    carries the header label `REAL_SENSOR_GATE_NOT_DISCHARGED`.
+  * *No tuning.* Every system runs its frozen configuration:
+    `DeterministicBaseline` (§3), `LLTKalman-A1` (`A1_CONFIG`), `BCVF`
+    (`margin_threshold=1.5, window=12`), `Fusion(LLT-A1+BCVF)`. Seeds
+    200..229 (30 per family), never used anywhere before. Metrics:
+    `metrics.py` unchanged.
+  * *Sub-corpus R1 — corpus families on realistic noise.* M=3, T=100 ticks,
+    dt=0.1, 5 m/s straight path. Nominal streams are built by applying the
+    adapter's own `_apply_correlated_noise` and `_apply_outlier_frames` to
+    the straight path, plus bench-side dropouts: per predictor, with
+    probability 0.2, one 5-tick hold with `valid_mask=False` at a seeded
+    position in ticks 5..T−10. The 14 `fault_corpus` families are then
+    injected with the corpus's own magnitudes, targets, and onsets
+    (`gaussian_noise` = realistic nominal with no injection;
+    `precise_biased` target = adapter noise at σ×0.1). Labels
+    (`truth_label`, `onset_tick`, `harm_class`, `bcvf_visible`) are the
+    corpus's. Longer benign exposure (100 vs 50 ticks) is intentional.
+  * *Sub-corpus R2 — adapter-native scenes.* M=4 (M1..M4), T=400, the
+    per-step state stream is each predictor's first-horizon-step forecast
+    `traj[t, 0, :]`. Families: `gps_multipath`, `map_misalignment`,
+    `constant_bias_sanity` (harmful, target M4 = index 3; onsets 50, 50, 0),
+    `camera_degradation` (zero-mean jitter σ=0.6 m in a 50-tick window:
+    scored as a **variance fault**, reported separately, excluded from the
+    recall aggregate; the rate at which M4 is at least DEGRADED is reported
+    as the relevant response), and `benign_native` (adapter noise pipeline
+    with no injection; benign). Note: in this adapter `gps_multipath` and
+    `map_misalignment` share identical injection code; both rows are
+    reported and the duplication is stated.
+  * *Covariance arm.* Not applicable: the adapter reports no per-predictor
+    covariance, so `R_t` comes from `forgetting_obs_noise` only. Logged as
+    `[G]`.
+  * *Decision rule.* On the R1 ALL-family aggregate, C1: A1 recall ≥
+    baseline recall; C2: A1 false_alarm_rate ≤ baseline false_alarm_rate;
+    C3: A1 common_mode_false_detection_rate = 0.00; C4: A1 delay < baseline
+    delay; C5 (H2 reproduces): BCVF false_alarm_rate ≥ 2× baseline
+    false_alarm_rate OR BCVF recall < baseline recall. On R2, C6: A1 detects
+    each of the three harmful native families with attribution to M4 at
+    rate ≥ 0.90; C7: A1 `benign_native` detected_rate ≤ 0.05.
+    `A2_REPRODUCES` if C1–C7 all hold; `A2_PARTIAL` if C1–C5 hold but C6 or
+    C7 fails, or C6–C7 hold but any of C1–C5 fails; `A2_FAILS` otherwise.
+    No threshold is changed after scoring; a failure is reported as a
+    failure.
