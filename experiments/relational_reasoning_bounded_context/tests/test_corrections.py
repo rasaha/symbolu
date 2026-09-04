@@ -222,6 +222,39 @@ def test_F11_no_salted_hash_in_generator_source():
         assert text.lstrip().startswith(('"""', "#")) or "``hash(str)``" in text, f"bare hash() at line {line}: {text}"
 
 
+# ---- F12: B7 must carry the preregistered trivial VISIBLE "absent" flag ----
+def test_F12_b7_visible_absent_flag():
+    """Preregistered B7 = abstain when a trivial visible flag says 'absent' (chance 0.5). B1/B5 inputs carry
+    the flag PRESENT and B7 ABSENT on the queried entity, so the labels are no longer contradictory over
+    byte-shaped-identical inputs."""
+    from ..serializer import serialize_input
+    for role in ("unit", "train", "final"):
+        for i in range(3):
+            b1 = bc.generate_p0_episode("B1", FIXT, i, role); b5 = bc.generate_p0_episode("B5", FIXT, i, role)
+            b7 = bc.generate_p0_episode("B7", FIXT, i, role)
+            for ctx, flag in ((b1, bc.FLAG_PRESENT), (b5, bc.FLAG_PRESENT), (b7, bc.FLAG_ABSENT)):
+                root = next(e for e in ctx.entities if e.entity_id == ctx.query.root_entity_id)
+                assert dict(root.attributes)[bc.FLAG_KEY] == flag, (ctx.split, root)
+                line = next(l for l in serialize_input(ctx).splitlines()
+                            if l.startswith("ENT ") and ctx.query.root_entity_id in l)
+                assert line.endswith(f"{bc.FLAG_KEY} {flag}"), line
+            assert b7.authoritative_output.status == "INSUFFICIENT_EVIDENCE" and b7.authoritative_output.answer is None
+            assert b1.authoritative_output.answer == b1.query.root_entity_id
+
+def test_F12_flag_is_the_only_shape_difference():
+    """Masking ids/amounts, a B1 and a B7 input differ exactly in the flag token (no other cue)."""
+    import re
+    from ..serializer import serialize_input
+    def shape(ctx):
+        t = serialize_input(ctx)
+        return re.sub(r"\b\d+\b", "#", re.sub(r"\b[A-Z][A-Z]{3,5}\d\b|\bT[A-Z]{3}\b", "@", t))
+    a = shape(bc.generate_p0_episode("B1", FIXT, 0)); b = shape(bc.generate_p0_episode("B7", FIXT, 0))
+    assert a != b
+    assert a.replace(bc.FLAG_PRESENT, bc.FLAG_ABSENT).count("ABSENT") == 1
+    # same number of ENT rows can differ (6..12 entities are drawn per episode); the flag is the discriminating token
+    assert bc.FLAG_PRESENT in a and bc.FLAG_ABSENT not in a and bc.FLAG_ABSENT in b and bc.FLAG_PRESENT not in b
+
+
 def main() -> int:
     tests = [v for k, v in sorted(globals().items()) if k.startswith("test_") and callable(v)]
     passed = failed = 0

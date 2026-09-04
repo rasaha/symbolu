@@ -31,17 +31,18 @@ semantic was changed. Execution remains fail-closed.
 | Preserved BindingSlots/E1/KDA verdicts co-emitted; forbidden never emitted | PASS |
 | Execution lock (EXECUTION_AUTHORIZATION.md unsigned) | PASS |
 
-## Post-smoke corrections (F11)
+## Post-smoke corrections (F11–F12)
 | Finding | Correction | Test evidence | Status |
 |---|---|---|---|
 | **F11** generator RNG seeded from the salted builtin `hash(str)` (`_rng` used `hash(split)`/`hash(role)`); the same (seed, split, index, role) produced different episodes in different interpreters (PYTHONHASHSEED), so the "deterministic generator" was not reproducible across runs and the in-process replay check could not see it | `generator._stable_hash` (sha256-derived) replaces both call sites; `config_digest` does not cover generator source, so existing authorization signatures stay valid; no gate/cap/seed/architecture value changed | `test_F11_*` (2): byte-identical episodes and `fact_hash` across subprocesses with PYTHONHASHSEED 0/1/424242 and vs the in-process reference; no bare `hash(` call site in generator source | **CLOSED** (`b16e4e4c`) |
+| **F12** B7 ("instructed trivial abstention") generated no visible flag: its input was byte-shaped identically to B1/B5 (same query, same entity list) with the contradictory label INSUFFICIENT_EVIDENCE, so the preregistered B7 ("abstain when a trivial visible flag says 'absent'", chance 0.5) was unlearnable and poisoned B1/B5 | `base_capability`: the queried entity carries `target_attribute PRESENT` (B1, B5) or `target_attribute ABSENT` (B7) as a visible attribute (within `max_attributes_per_entity`); gold outputs unchanged; RNG consumption unchanged | `test_F12_*` (2): flag present on the queried entity and serialized ENT row for all roles; B1 vs B7 differ only in the flag token | **CLOSED** |
 
 Note: any run produced before `b16e4e4c` (including the seed-8100 smoke calibration runs) is internally
 consistent within its process but not bit-reproducible from its seed; runs on development/final seeds must use
 code at or after this commit.
 
 ## Test totals
-`tests/test_btrr.py` 28 + `tests/test_corrections.py` 20 + `tests/test_auth_mechanism.py` 12 + `tests/test_harness.py` 8 = **68 tests, all passing** (stdlib runner; no
+`tests/test_btrr.py` 28 + `tests/test_corrections.py` 22 + `tests/test_auth_mechanism.py` 12 + `tests/test_harness.py` 8 = **70 tests, all passing** (stdlib runner; no
 pytest/torch; fixture seeds 883000–883004 only; no reserved scientific seed consumed).
 
 ## PyTorch runtime status (F10) — CLOSED
