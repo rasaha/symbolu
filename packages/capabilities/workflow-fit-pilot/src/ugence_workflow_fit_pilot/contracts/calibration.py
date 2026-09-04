@@ -94,12 +94,20 @@ def canonical_decimal_rendering(value: Any, name: str = "value") -> str:
     those contracts — the retroactive imposition revision 16 forbids — and would move
     ``quality_result_digest`` and ``observation_digest`` for existing v1 and 4B runs.
 
-    Accepts a ``Decimal`` or a decimal string. A ``float`` is refused: it would not round-trip.
-    The result always satisfies ``require_canonical_decimal``."""
+    Accepts a ``Decimal`` or a decimal string. The **string grammar is Python's ``Decimal``
+    grammar**, which is broader than this module's canonical one: a leading ``+``, underscores,
+    Unicode decimal digits, surrounding whitespace and bare ``.5`` / ``5.`` are all *derived*,
+    not refused. That breadth is acceptable only because the input is a **reachable** value
+    produced by another contract, never a digest-bound one a caller supplied — those still go
+    through ``require_canonical_decimal``, which refuses every one of those spellings.
+
+    A ``float`` is refused: it would not round-trip. The result always satisfies
+    ``require_canonical_decimal``."""
     if isinstance(value, bool) or isinstance(value, float):
         raise ContractError(
             ContractErrorCode.DECIMAL_UNPARSEABLE,
-            f"{name} must be a Decimal or a decimal string, not {type(value).__name__}; a float would not round-trip",
+            f"{name} must be a Decimal or a decimal string, not {type(value).__name__}"
+            + ("; a float would not round-trip" if isinstance(value, float) else ""),
         )
     if isinstance(value, Decimal):
         parsed = value
@@ -133,8 +141,13 @@ def require_matching_canonical_rendering(statistic_value: str, quality_value: An
     """Slice 3's obligation, executable: the calibration statistic must equal the canonical
     rendering of the reachable ``QualityResult.value``, by exact code-point equality.
 
-    Returns the agreed rendering so a caller cannot use this as a boolean and discard which
-    string actually matched."""
+    Returns the agreed rendering so the caller need not derive it again.
+
+    **Refusal-code imprecision, recorded as F5's is (`[G]`).** An inequality here raises
+    ``DECIMAL_UNPARSEABLE``, and nothing is unparseable — both operands parsed. No
+    ``ContractErrorCode`` member names "two canonical decimals disagree", and revision 20
+    ruling 4 forbids adding one without a ballot, so the closest ratified code is retained and
+    the imprecision is documented rather than repaired."""
     require_canonical_decimal(statistic_value, name)
     derived = canonical_decimal_rendering(quality_value, f"{name} source")
     if statistic_value != derived:
