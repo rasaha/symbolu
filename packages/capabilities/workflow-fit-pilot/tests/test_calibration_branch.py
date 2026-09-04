@@ -222,3 +222,55 @@ def test_confirmatory_and_v1_runs_keep_the_comparison_path():
     assert is_calibration_run(slice2._calibration_manifest()) is True
     assert is_calibration_run(slice2._confirmatory_manifest()) is False
     assert is_calibration_run(pf.manifest()) is False
+
+
+# --------------------------------------------------------------------------- slice 3B-3: G5 and G3
+
+
+def test_a_calibration_run_executes_without_the_agentic_tree(tmp_path):
+    """G5. `tests/pilot/test_end_to_end.py` proves the calibration branch behaviourally, but
+    sits behind a module-level importorskip on the agentic tree, so on a minimal install the
+    branch fell back to the AST assertion alone. This gives the same behavioural coverage
+    through FakeExecutor, which imports nothing outside this package's own fixtures."""
+    import pilot_fixtures as pf
+    from ugence_workflow_fit_pilot.contracts.lifecycle import PilotConfigurationState, validate_lineage
+    from ugence_workflow_fit_pilot.runner import run_phase_4c_pilot, run_pilot
+
+    manifest = slice2._calibration_manifest()
+    kwargs = dict(
+        catalog=pf.catalog(), rule_set=pf.rule_set(), advisory=None, cases=pf.cases(),
+        executor=pf.FakeExecutor({"linear_chain": 1}), scorer=pf.KeywordScorer(),
+        identity=pf.IDENTITY, provider_factory="stub_provider:make_provider",
+        now=pf.clock(), boundary_env=pf.boundary_env(),
+    )
+
+    res = run_pilot(manifest, **kwargs)
+    assert all(r.complete for r in res.runs), [(r.method.method_id, r.reasons) for r in res.runs]
+    assert res.request is None and res.result is None and res.coverage is None and res.outcomes == {}
+    assert [s.state for s in res.states] == [PilotConfigurationState.PROPOSED, PilotConfigurationState.UNDER_TEST]
+    validate_lineage(res.states, [manifest])
+
+    gated = run_phase_4c_pilot(manifest, **kwargs)
+    assert gated.request is None and gated.coverage is None
+
+
+def test_the_phase_4c_study_never_calls_the_ungated_runner():
+    """G3 tripwire. `run_pilot` is ungated by ruling and stays available for historical
+    mechanism-validation tests, so nothing structurally forces a future Phase 4C pipeline to
+    choose `run_phase_4c_pilot`.
+
+    This is **vacuously true today**: `experiments/workflow_fit_study` contains no runner call
+    at all, because the Phase 4C pipeline does not exist yet. It is a tripwire for when it
+    does, not evidence that the gate is mandatory — G3 stays open until a pipeline exists and
+    calls the gated entry point."""
+    import ast
+    import pathlib
+
+    study = pathlib.Path(__file__).resolve().parents[4] / "experiments" / "workflow_fit_study"
+    assert study.is_dir(), study
+    offenders = []
+    for path in sorted(study.rglob("*.py")):
+        for node in ast.walk(ast.parse(path.read_text())):
+            if isinstance(node, ast.Call) and getattr(node.func, "id", None) == "run_pilot":
+                offenders.append(f"{path.name}:{node.lineno}")
+    assert offenders == [], f"Phase 4C study calls the ungated run_pilot at {offenders}; use run_phase_4c_pilot"

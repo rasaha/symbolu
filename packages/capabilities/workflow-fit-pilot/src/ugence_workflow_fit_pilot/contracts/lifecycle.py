@@ -272,6 +272,21 @@ def transition(
             PilotErrorCode.STATE_TRANSITION_INVALID,
             "a CALIBRATION run never emits RESULT_ASSESSED and never becomes EVALUATED",
         )
+    if result is not None and is_calibration_run(manifest):
+        # Slice 3B-3, closing carried-forward item G4. Revision 13 forbids *comparison* under
+        # CALIBRATION, not merely assessment, and a ``ReadinessComparisonResult`` is comparison
+        # evidence — so no calibration record may carry one, whatever the event. Guarding only
+        # RESULT_ASSESSED left INCONCLUSIVE-with-a-result constructible, which was narrower
+        # than the ruling.
+        #
+        # The ``capture_refusal`` path stays open: a calibration run whose capture fails must
+        # still reach INCONCLUSIVE, and that path supplies no result. This refusal is placed
+        # before the state and result checks so it names the run role rather than a downstream
+        # symptom.
+        raise PilotError(
+            PilotErrorCode.STATE_TRANSITION_INVALID,
+            "a CALIBRATION run carries no ReadinessComparisonResult; comparison is forbidden for that role",
+        )
     if event is LifecycleEvent.OBSERVATION_VALIDATED:
         if st is not PilotConfigurationState.PROPOSED:
             raise PilotError(PilotErrorCode.STATE_TRANSITION_INVALID, f"OBSERVATION_VALIDATED is not permitted from {st.value}")
@@ -330,6 +345,13 @@ def validate_lineage(records: Iterable[PilotConfigurationStateRecord], manifests
             raise PilotError(
                 PilotErrorCode.STATE_TRANSITION_INVALID,
                 "a CALIBRATION run never becomes EVALUATED",
+            )
+        if r.result_digest is not None and is_calibration_run(mans[r.manifest_digest]):
+            # G4 on replay: a hand-built calibration record naming an engine result is refused
+            # even though transition() would never have produced one.
+            raise PilotError(
+                PilotErrorCode.STATE_TRANSITION_INVALID,
+                "a CALIBRATION record names no engine result; comparison is forbidden for that role",
             )
         if r.result_digest is not None:
             res = ress.get(r.result_digest)

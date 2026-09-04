@@ -766,3 +766,80 @@ def test_a_hand_built_evaluated_record_on_a_calibration_manifest_fails_replay():
     )
     with pytest.raises(PilotError, match="never becomes EVALUATED"):
         validate_lineage([forged], [manifest])
+
+
+# --------------------------------------------------------------------------- slice 3B-3: G4
+
+
+class _NotAResult:
+    """A stand-in for a ReadinessComparisonResult. G4 refuses on the run role before any
+    field of the result is read, so the guard must fire without a real engine result — which
+    is the point: under CALIBRATION no such result can legitimately exist."""
+
+    result_digest = "e" * 64
+    assessments = ()
+    refusals = ()
+
+
+def test_a_calibration_run_carries_no_comparison_result_whatever_the_event():
+    """G4. Revision 13 forbids comparison for the role, not merely assessment. Guarding only
+    RESULT_ASSESSED left INCONCLUSIVE-with-a-result constructible, narrower than the ruling."""
+    from ugence_workflow_fit_pilot.contracts.lifecycle import LifecycleEvent, transition
+
+    manifest = _calibration_manifest()
+    record = _under_test_record(manifest)
+    # The message is asserted, not just the code: without the G4 guard the INCONCLUSIVE case
+    # still raises STATE_TRANSITION_INVALID from the downstream "requires the
+    # ReadinessComparisonResult" check, so a code-only assertion would pass either way and
+    # prove nothing. The first version of this test did exactly that.
+    for event, message in (
+        (LifecycleEvent.RESULT_INCONCLUSIVE, "carries no ReadinessComparisonResult"),
+        (LifecycleEvent.RESULT_ASSESSED, "never emits RESULT_ASSESSED"),
+    ):
+        with pytest.raises(PilotError, match=message) as e:
+            transition(record, event, manifest=manifest, result=_NotAResult(),
+                       recorded_by="t", recorded_at=record.recorded_at)
+        assert e.value.code is PilotErrorCode.STATE_TRANSITION_INVALID
+
+
+def test_a_calibration_capture_refusal_still_reaches_inconclusive():
+    """The capture_refusal path supplies no result and must stay open: a calibration run whose
+    capture fails still has to reach INCONCLUSIVE. G4 must not close this."""
+    from ugence_workflow_fit_pilot.contracts.lifecycle import LifecycleEvent, PilotConfigurationState, transition
+
+    manifest = _calibration_manifest()
+    record = _under_test_record(manifest)
+    out = transition(record, LifecycleEvent.RESULT_INCONCLUSIVE, manifest=manifest,
+                     capture_refusal=PilotErrorCode.CAPTURE_INCOMPLETE.value,
+                     recorded_by="t", recorded_at=record.recorded_at)
+    assert out.state is PilotConfigurationState.INCONCLUSIVE
+    assert out.result_digest is None
+    assert out.refusal_codes == (PilotErrorCode.CAPTURE_INCOMPLETE.value,)
+
+
+def test_a_confirmatory_run_still_accepts_a_comparison_result():
+    """G4 must not touch the confirmatory path; only the role decides."""
+    from ugence_workflow_fit_pilot.contracts.lifecycle import LifecycleEvent, transition
+
+    manifest = _confirmatory_manifest()
+    record = _under_test_record(manifest)
+    # Refused for a *result-shaped* reason, not for the run role — proving the G4 guard is
+    # not what fires here.
+    with pytest.raises(PilotError, match="requires the ReadinessComparisonResult"):
+        transition(record, LifecycleEvent.RESULT_INCONCLUSIVE, manifest=manifest, result=None,
+                   recorded_by="t", recorded_at=record.recorded_at)
+
+
+def test_a_hand_built_calibration_record_naming_an_engine_result_fails_replay():
+    """G4 on replay, for a state transition() would never have produced."""
+    from dataclasses import replace as dc_replace
+
+    from ugence_workflow_fit_pilot.contracts.lifecycle import PilotConfigurationState, validate_lineage
+
+    manifest = _calibration_manifest()
+    forged = dc_replace(
+        _under_test_record(manifest), state=PilotConfigurationState.INCONCLUSIVE,
+        fit_outcome=None, refusal_codes=("CAPTURE_INCOMPLETE",), result_digest="e" * 64, state_digest="",
+    )
+    with pytest.raises(PilotError, match="names no engine result"):
+        validate_lineage([forged], [manifest])

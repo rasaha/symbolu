@@ -2281,3 +2281,60 @@ now stated as what was commissioned rather than as a verified property.
 **Status.** Unchanged in kind: D1–D5 incomplete, the custody endpoint unbound, real custody
 adapters and genuine execution blocked, no provider call, no credential access, no genuine
 calibration.
+
+### Revision 25 (slice 3B-3: carried-forward items G4 and G5 closed, G3 narrowed, 2026-09-04)
+
+A read-only preflight over revision 24's five carried-forward `[G]` items found three settled
+by the repository and two requiring owner rulings. This slice closes the settled ones. It
+**rules nothing new**, and does **not** touch G1 or G2.
+
+**G4 — closed `[V]`.** Revision 13 forbids **comparison** under `CALIBRATION`, not merely
+assessment, and a `ReadinessComparisonResult` is comparison evidence. Guarding only
+`RESULT_ASSESSED` left `INCONCLUSIVE`-carrying-a-result constructible, which was narrower
+than the ruling. `transition` now refuses **any** event supplying a result under that role,
+placed before the state and result checks so the refusal names the run role rather than a
+downstream symptom; `validate_lineage` refuses a record naming an engine result on replay.
+
+The `capture_refusal` path stays open, and a test pins it: a calibration run whose capture
+fails must still reach `INCONCLUSIVE`, and that path supplies no result. A second test pins
+that the confirmatory path is untouched — it fails for a result-shaped reason, not for the
+run role, proving the G4 guard is not what fires there.
+
+**G5 — closed `[V]`.** `tests/pilot/test_end_to_end.py` proves the calibration branch
+behaviourally but sits behind a module-level `importorskip` on the `agentic` tree, which is
+present in this repository but is **not a declared dependency** of the pilot package — so on
+a minimal install the branch fell back to the AST assertion alone. A second behavioural test
+in `tests/test_calibration_branch.py` now runs the same calibration through the boundary
+using `pilot_fixtures.FakeExecutor`, importing nothing outside this package's own fixtures.
+That module carries no skip guard and no `agentic` or `experiments` import.
+
+**G3 — narrowed, not closed `[G]`.** A tripwire test asserts that
+`experiments/workflow_fit_study` contains no call to the ungated `run_pilot`. It is
+**vacuously true today** — the Phase 4C pipeline does not exist, so there is no runner call
+to find — and the test says so in its own docstring. It is a tripwire for when that pipeline
+is built, **not** evidence that the F3 gate is mandatory. G3 stays open until a Phase 4C
+pipeline exists and calls the gated entry point.
+
+**A vacuous test caught before merge `[V]`.** The first G4 transition test asserted only the
+error code. Without the guard, the INCONCLUSIVE case still raises `STATE_TRANSITION_INVALID`
+from the downstream "requires the `ReadinessComparisonResult`" check, so the test passed
+either way and proved nothing — stubbing the guard failed **zero** of 223 tests. It now
+asserts the message per event and fails when the guard is removed. Recorded because it is the
+same obligation-3 failure mode revision 19 named and revisions 23–24 corrected twice.
+
+**Still open, awaiting owner rulings — unchanged by this slice.**
+
+1. **G1.** `revalidate_role` is applied only at `run_phase_4c_pilot`. Extending it to
+   `validate_lineage` follows from F4's own text; whether `is_calibration_run` — a cheap
+   predicate called inside `transition` and `validate_lineage` — is a **trust boundary**
+   (revalidating, at the cost of a manifest rebuild and digest recompute per call) or a
+   **convenience** is a design ruling the repository does not settle.
+2. **G2.** Wiring the reconciliation is mechanical; what to reconcile is not. The note ties
+   `score_count` to the **benchmark case count** and says nothing about custody verdict
+   count, and for a CALIBRATION run the sample is 50 of 250 — so whether the authoritative
+   case set is the benchmark's full set or the sampled subset is unsettled.
+
+**Status.** Five carried-forward items become two closed, one narrowed, two open. D1–D5 remain
+incomplete, the custody endpoint remains unbound, real custody adapters and genuine execution
+remain blocked, and no provider call, credential access or genuine calibration is permitted by
+this revision.
