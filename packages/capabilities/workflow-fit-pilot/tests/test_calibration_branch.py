@@ -38,6 +38,7 @@ def _facts(manifest, **overrides) -> VerifiedPreparedFacts:
         commitment_identifier="workflow_fit_prepared_index.calibration.v1",
         index_digest=INDEX, sample_index_digest=SAMPLE,
         verdict_custody_ref=REF, manifest_digest=manifest.manifest_digest,
+        case_digests=(CASE_A, CASE_B),
     )
     kwargs.update(overrides)
     return VerifiedPreparedFacts(**kwargs)
@@ -54,7 +55,8 @@ def _build(manifest, port, *, facts=None, record=None, **overrides):
     kwargs = dict(
         prepared=facts or _facts(manifest), custody=port, custody_record=record or _custody_record(manifest),
         calibration_id="cal.1", evaluation_digest="3" * 64, attestation_digest="4" * 64,
-        statistic_value="0.62", score_count=50, formula_id="calfloor.linear_chain",
+        # G2a: score_count must equal the number of verdicts in the custody record.
+        statistic_value="0.62", score_count=2, formula_id="calfloor.linear_chain",
         formula_version="1", issued_by="tester", issued_at=AT,
     )
     kwargs.update(overrides)
@@ -323,3 +325,75 @@ def test_a_confirmatory_run_accepts_a_real_comparison_result():
     out = transition(under_test, event, manifest=manifest, result=res.result, recorded_by="t", recorded_at=at)
     assert out.result_digest == res.result.result_digest
     assert out.state in (PilotConfigurationState.EVALUATED, PilotConfigurationState.INCONCLUSIVE)
+
+
+# --------------------------------------------------------------------------- revision 27: G1 and G2
+
+
+def test_score_count_must_equal_the_custody_verdict_count():
+    """G2a. Catches a truncated or partial custody write before any result is built."""
+    manifest = slice2._calibration_manifest()
+    port = InMemoryVerdictCustody()
+    with pytest.raises(PilotError, match="holds 2 verdicts but score_count is 3") as e:
+        _build(manifest, port, score_count=3)
+    assert e.value.code is PilotErrorCode.RETENTION_VERIFY_FAILED
+    assert port.written_references() == ()  # refused before writing
+
+
+def test_custody_verdicts_must_cover_exactly_the_prepared_case_set():
+    """G2b. The sampled subset the run executed is authoritative — neither a different set of
+    the same size nor a partial cover is accepted."""
+    manifest = slice2._calibration_manifest()
+    other = "c" * 64
+    for facts, record in (
+        # right count, wrong case
+        (_facts(manifest, case_digests=(CASE_A, other)), _custody_record(manifest)),
+        # verdicts cover only part of the prepared set: three cases prepared, two scored
+        (_facts(manifest, case_digests=(CASE_A, CASE_B, other)), _custody_record(manifest)),
+    ):
+        port = InMemoryVerdictCustody()
+        with pytest.raises(PilotError) as e:
+            _build(manifest, port, facts=facts, record=record,
+                   score_count=len(record.verdicts))
+        assert e.value.code is PilotErrorCode.RETENTION_VERIFY_FAILED
+        assert port.written_references() == ()
+
+
+def test_prepared_facts_require_a_non_empty_duplicate_free_case_set():
+    manifest = slice2._calibration_manifest()
+    with pytest.raises(PilotError, match="non-empty case set"):
+        _facts(manifest, case_digests=())
+    with pytest.raises(PilotError, match="repeats a case"):
+        _facts(manifest, case_digests=(CASE_A, CASE_A))
+
+
+def test_validate_lineage_re_runs_role_validation_on_every_supplied_manifest():
+    """G1b. The replay verifier no longer trusts run_role: a v1 manifest whose role was set by
+    circumventing the frozen dataclass keeps a digest that still verifies, and is refused here."""
+    import pilot_fixtures as pf
+    from ugence_workflow_fit_pilot.contracts.calibration import PilotRunRole
+    from ugence_workflow_fit_pilot.contracts.lifecycle import propose, validate_lineage
+
+    v1 = pf.manifest()
+    record = propose(v1, v1.methods[0].method, recorded_by="t", recorded_at=pf.NOW)
+    validate_lineage([record], [v1])  # untampered: replays cleanly
+
+    object.__setattr__(v1, "run_role", PilotRunRole.CALIBRATION)
+    with pytest.raises(PilotError) as e:
+        validate_lineage([record], [v1])
+    assert e.value.code is PilotErrorCode.RUN_ROLE_INVALID
+
+
+def test_is_calibration_run_stays_a_cheap_field_read():
+    """G1a ruling: the predicate is a convenience, not a trust boundary. Pinned so a later
+    change cannot quietly make it revalidate — the cost would fall on every transition and
+    every record replayed."""
+    import ast
+    import inspect
+    import textwrap
+
+    from ugence_workflow_fit_pilot.contracts import lifecycle
+
+    tree = ast.parse(textwrap.dedent(inspect.getsource(lifecycle.is_calibration_run)))
+    called = {n.func.attr for n in ast.walk(tree) if isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute)}
+    assert "revalidate_role" not in called

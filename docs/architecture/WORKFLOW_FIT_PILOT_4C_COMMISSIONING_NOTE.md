@@ -2397,3 +2397,48 @@ required for any test asserting a refusal, not as a review-time backstop.
 rulings. D1–D5 remain incomplete, the custody endpoint remains unbound, real custody adapters
 and genuine execution remain blocked, and no provider call, credential access or genuine
 calibration is permitted.
+
+### Revision 27 (owner rulings on G1 and G2, and their implementation, 2026-09-04)
+
+The two carried-forward items revision 25 left open are ruled and closed. Each ruling below
+is an **owner ruling `[R]`**; the implementation notes are `[V]`.
+
+**G1a — `is_calibration_run` is a convenience, not a trust boundary.** It reads `run_role`
+directly and stays O(1). The trust boundary is the Phase 4C entry point and `validate_lineage`,
+not every predicate call: revalidating inside the predicate would make `transition`
+O(manifest) and cost a manifest rebuild plus digest recompute for every record replayed. The
+consequence is accepted knowingly — a tampered manifest handed straight to `transition` is
+trusted there, and the replay verifier is what catches it.
+
+**G1b — `validate_lineage` re-runs role validation, once per distinct manifest.** F4's
+obligation names a *verifier*, and this is it. The v1 digest payload excludes the role fields,
+so recomputing that digest proves nothing about them. Cost is proportional to manifests, not
+records. This closes G1's substance: a v1 manifest whose role was set by circumventing the
+frozen dataclass keeps a digest that still verifies and is now refused on replay.
+
+**G2a — the custody verdict count must equal `score_count`, exactly.** `score_count` is the
+number of cases scored and the custody record holds one verdict per scored case. A truncated
+or partial custody write is refused **before** any write is attempted.
+
+**G2b — the authoritative case set is the sampled subset, not the full benchmark.** For a
+CALIBRATION run the sample is 50 of 250, and custody verdicts must cover **exactly** the case
+set the prepared bundle committed — neither a different set of the same size nor a partial
+cover. Since `build_calibration_result` never sees the manifest, those digests are carried on
+`VerifiedPreparedFacts.case_digests`, which is required, non-empty and duplicate-free.
+
+**Implementation `[V]`.** `validate_lineage` revalidates each supplied manifest before
+replaying. `build_calibration_result` performs both reconciliations before
+`write_and_verify`, so a mismatch never reaches the custody store — tests assert
+`written_references() == ()`. A test pins that `is_calibration_run` does **not** call
+`revalidate_role`, so the G1a ruling cannot be quietly reversed by a later change. Every new
+guard was stubbed and fails one test each.
+
+**What this does not do.** It binds no endpoint, ACL, writer identity, encryption, retention
+or deletion policy; those remain D5. It does not make `InMemoryVerdictCustody` genuine
+evidence, and it does not authorise a run. **G3 remains narrowed and open** — the tripwire is
+vacuous until a Phase 4C pipeline exists and calls the gated entry point.
+
+**Status.** Of revision 24's five carried-forward items: G4 and G5 closed in revision 25,
+G1 and G2 closed here, **G3 alone remains open**. D1–D5 remain incomplete, the custody
+endpoint remains unbound, real custody adapters and genuine execution remain blocked, and no
+provider call, credential access or genuine calibration is permitted by this revision.
