@@ -140,3 +140,38 @@ the large expected effect sizes.
   thresholds, metrics, and decision rules are unchanged, and their committed
   numbers remain byte-stable. Results and an exploratory (non-frozen) verdict:
   `ROBOTICS_LLT_KALMAN_TRUST_RESULTS.md`.
+
+* **A1 — LLT-Kalman amendment: time-varying noise estimate (preregistered
+  before scoring).** Written and committed before any A1 configuration was
+  scored on evaluation seeds.
+  * *Hypothesis.* The `calibration_drift` false alarms of the frozen
+    LLT-Kalman variant (TEST-only FA 0.10, all from that family) are caused
+    by the whole-episode per-axis noise estimate under-scaling late variance
+    growth. An exponentially forgetting robust noise estimate removes them
+    without giving back the detection-delay gain.
+  * *Single changed component.* `_robust_obs_noise` (one R per axis per
+    episode) is replaced, when `noise_forgetting` is set, by a causal
+    estimate: a short causal MAD warm-up over the first `noise_warmup` fresh
+    first differences, then `s_t^2 = λ s_{t-1}^2 + (1-λ) clip(e_t^2, 0,
+    noise_clip · s_{t-1}^2)` with `e_t` the drift-compensated first difference
+    scaled by `1/sqrt(2)`. The Kalman filter consumes `R_t = max(s_t,
+    scale_floor)^2` per tick; `Q` stays a ratio of the current `R_t`.
+    Nothing else in the detector changes.
+  * *Carried over frozen, not swept.* `bias_sustain=4`, `bias_min_m=0.20`,
+    `scale_floor=0.05`, `p0_ratio=10`, `noise_warmup=6`, `noise_clip=9.0`,
+    `stale_frac`, `abstain_suspect_frac`, and the global rule.
+  * *Sweep (TUNE families, seeds 0..19 only).* Grid: `q_level_ratio ∈ {0.003,
+    0.01, 0.03}`, `q_slope_ratio ∈ {0.0003, 0.001, 0.003}`, `cusum_k ∈ {2.0,
+    2.5}`, `cusum_h ∈ {6, 8, 12}`, `bias_z ∈ {3, 4, 6}`, `noise_forgetting λ
+    ∈ {0.80, 0.90, 0.95}`. Selection rule identical to the A0 sweep: zero
+    TUNE false alarms, TUNE recall and attribution 1.0, then minimum
+    strict-tick mean delay, ties to larger `cusum_h` then `bias_z`. Recorded
+    in `results/llt_kalman_tune_A1.json`.
+  * *Decision rule (evaluation seeds 100..149).* `A1_ADOPT` only if, for the
+    frozen A1 config: TEST-only recall = 1.00 AND TEST-only false_alarm_rate
+    ≤ 0.02 (the baseline's) AND ALL-family detection_delay_ticks ≤ 8.0 under
+    the default tick policy AND common_mode_false_detection_rate = 0.00.
+    Otherwise `A1_REJECT`, with the strict-tick delay and per-family rows
+    reported regardless. The A0 frozen config and its committed rows are not
+    modified; A1 is reported as additional systems `LLTKalman-A1` and
+    `Fusion(LLT-A1+BCVF)`.
