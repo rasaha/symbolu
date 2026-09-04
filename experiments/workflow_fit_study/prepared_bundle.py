@@ -451,7 +451,9 @@ def verify(
 ) -> VerifiedPreparedBundle:
     """Reject an unknown identifier; enforce identifier/role consistency; require exactly the
     nine paths (no extra, missing, renamed or symlinked); recompute every file digest and the
-    index digest; reconstruct and fully re-validate the manifest (forcing its own role
+    index digest; re-validate the provider configuration's factory-path shape on read, so the
+    reader never accepts a shape the writer refuses; reconstruct and fully re-validate the
+    manifest (forcing its own role
     invariants, not trusting a carried digest); recompute the sampled indexes from algorithm,
     seed and population for a CALIBRATION bundle; verify every cross-file binding."""
     root = Path(root)
@@ -489,6 +491,13 @@ def verify(
 
     for rel, raw in raw_by_path.items():
         _scan_for_credentials(_loads(raw), where=rel)
+
+    # F1b: parse provider_configuration.json here rather than trusting that whatever wrote the
+    # bundle went through ``prepare``. Reconstructing through the real ``ProviderConfiguration``
+    # constructor re-applies the factory-path guard on read, so the reader cannot accept a shape
+    # the writer refuses — otherwise a hand-written credential-shaped provider_factory, re-indexed
+    # so every digest agrees, would verify and be permanently committed by index_digest.
+    _load_provider_configuration(_loads(raw_by_path["provider_configuration.json"]))
 
     manifest = PilotStudyManifest(**_rebuild_manifest_kwargs(_loads(raw_by_path["pilot_manifest.json"])))
     validate_manifest(manifest, catalog=catalog, rule_set=rule_set, advisory=advisory)

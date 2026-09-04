@@ -457,6 +457,39 @@ def test_a_credential_shaped_factory_never_reaches_a_prepared_artifact(tmp_path)
     assert not tmp_path.exists() or not any(tmp_path.iterdir())
 
 
+def test_a_hand_written_credential_shaped_factory_is_refused_on_read(tmp_path):
+    """F1b: the writer's guard is worthless if the reader does not re-apply it. A bundle whose
+    provider_configuration.json was written by hand — never through prepare — and then re-indexed
+    so every digest agrees must still be refused, or index_digest would commit the credential."""
+    out = tmp_path / "bundle"
+    _prepare_calibration(out)
+    (out / "provider_configuration.json").write_text(
+        json.dumps({"provider_factory": "sk-ant-api03-NOTAREALKEY-000000000000000000"}, indent=2, sort_keys=True) + "\n"
+    )
+    _reindex(out)
+    with pytest.raises(B.PreparedBundleError):
+        B.verify(out, catalog=pf.catalog(), rule_set=pf.rule_set(), advisory=None)
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        {},
+        {"provider_factory": "pkg.mod:func", "api_key": "sk-ant-api03-NOTAREALKEY-000000000000000000"},
+        {"factory": "pkg.mod:func"},
+        {"provider_factory": ["pkg.mod:func"]},
+        [{"provider_factory": "pkg.mod:func"}],
+    ],
+)
+def test_a_provider_configuration_of_any_other_shape_is_refused_on_read(tmp_path, payload):
+    out = tmp_path / "bundle"
+    _prepare_calibration(out)
+    (out / "provider_configuration.json").write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n")
+    _reindex(out)
+    with pytest.raises(B.PreparedBundleError):
+        B.verify(out, catalog=pf.catalog(), rule_set=pf.rule_set(), advisory=None)
+
+
 # --------------------------------------------------------------------------- custody-reference treatment
 
 
