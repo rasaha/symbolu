@@ -766,3 +766,69 @@ def test_a_hand_built_evaluated_record_on_a_calibration_manifest_fails_replay():
     )
     with pytest.raises(PilotError, match="never becomes EVALUATED"):
         validate_lineage([forged], [manifest])
+
+
+# --------------------------------------------------------------------------- slice 3B-3: G4
+
+
+class _NotAResult:
+    """A stand-in for a ReadinessComparisonResult. G4 refuses on the run role before any
+    field of the result is read, so the guard must fire without a real engine result — which
+    is the point: under CALIBRATION no such result can legitimately exist."""
+
+    result_digest = "e" * 64
+    assessments = ()
+    refusals = ()
+
+
+def test_a_calibration_run_carries_no_comparison_result_for_any_event():
+    """G4. Revision 13 forbids comparison for the role, not merely assessment. Iterates every
+    LifecycleEvent member, so no event can quietly sit outside the guard — SUPERSEDED did,
+    until revision 26 hoisted the guard above it.
+
+    The message is asserted, not just the code: without the G4 guard the INCONCLUSIVE case
+    still raises STATE_TRANSITION_INVALID from the downstream "requires the
+    ReadinessComparisonResult" check, so a code-only assertion would pass either way and prove
+    nothing. The first version of this test did exactly that."""
+    from ugence_workflow_fit_pilot.contracts.lifecycle import LifecycleEvent, transition
+
+    manifest = _calibration_manifest()
+    record = _under_test_record(manifest)
+    successor = _calibration_manifest(manifest_id="manifest.pilot.hard.successor")
+    for event in LifecycleEvent:
+        # RESULT_ASSESSED is refused earlier, by the revision-20 guard naming that event.
+        message = "never emits RESULT_ASSESSED" if event is LifecycleEvent.RESULT_ASSESSED else "carries no ReadinessComparisonResult"
+        with pytest.raises(PilotError, match=message) as e:
+            transition(record, event, manifest=manifest, result=_NotAResult(),
+                       successor_manifest=successor, recorded_by="t", recorded_at=record.recorded_at)
+        assert e.value.code is PilotErrorCode.STATE_TRANSITION_INVALID
+
+
+def test_a_calibration_capture_refusal_still_reaches_inconclusive():
+    """The capture_refusal path supplies no result and must stay open: a calibration run whose
+    capture fails still has to reach INCONCLUSIVE. G4 must not close this."""
+    from ugence_workflow_fit_pilot.contracts.lifecycle import LifecycleEvent, PilotConfigurationState, transition
+
+    manifest = _calibration_manifest()
+    record = _under_test_record(manifest)
+    out = transition(record, LifecycleEvent.RESULT_INCONCLUSIVE, manifest=manifest,
+                     capture_refusal=PilotErrorCode.CAPTURE_INCOMPLETE.value,
+                     recorded_by="t", recorded_at=record.recorded_at)
+    assert out.state is PilotConfigurationState.INCONCLUSIVE
+    assert out.result_digest is None
+    assert out.refusal_codes == (PilotErrorCode.CAPTURE_INCOMPLETE.value,)
+
+
+def test_a_hand_built_calibration_record_naming_an_engine_result_fails_replay():
+    """G4 on replay, for a state transition() would never have produced."""
+    from dataclasses import replace as dc_replace
+
+    from ugence_workflow_fit_pilot.contracts.lifecycle import PilotConfigurationState, validate_lineage
+
+    manifest = _calibration_manifest()
+    forged = dc_replace(
+        _under_test_record(manifest), state=PilotConfigurationState.INCONCLUSIVE,
+        fit_outcome=None, refusal_codes=("CAPTURE_INCOMPLETE",), result_digest="e" * 64, state_digest="",
+    )
+    with pytest.raises(PilotError, match="names no engine result"):
+        validate_lineage([forged], [manifest])

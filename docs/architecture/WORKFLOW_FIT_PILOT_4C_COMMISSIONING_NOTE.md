@@ -2281,3 +2281,119 @@ now stated as what was commissioned rather than as a verified property.
 **Status.** Unchanged in kind: D1–D5 incomplete, the custody endpoint unbound, real custody
 adapters and genuine execution blocked, no provider call, no credential access, no genuine
 calibration.
+
+### Revision 25 (slice 3B-3: carried-forward items G4 and G5 closed, G3 narrowed, 2026-09-04)
+
+A read-only preflight over revision 24's five carried-forward `[G]` items found three settled
+by the repository and two requiring owner rulings. This slice closes the settled ones. It
+**rules nothing new**, and does **not** touch G1 or G2.
+
+**G4 — closed `[V]`.** Revision 13 forbids **comparison** under `CALIBRATION`, not merely
+assessment, and a `ReadinessComparisonResult` is comparison evidence. Guarding only
+`RESULT_ASSESSED` left `INCONCLUSIVE`-carrying-a-result constructible, which was narrower
+than the ruling. `transition` now refuses **any** event supplying a result under that role,
+placed before the state and result checks so the refusal names the run role rather than a
+downstream symptom; `validate_lineage` refuses a record naming an engine result on replay.
+
+> **Corrected by revision 26 — retained for the record.** "Any event" was **not** literally
+> true as first written: the guard sat *below* the `SUPERSEDED` block, so a result supplied
+> with `SUPERSEDED` was accepted (harmlessly — a `REVISED` record carries no result). The
+> guard now sits above it, after the `RESULT_ASSESSED` guard, and the test iterates every
+> `LifecycleEvent` member.
+
+The `capture_refusal` path stays open, and a test pins it: a calibration run whose capture
+fails must still reach `INCONCLUSIVE`, and that path supplies no result. A second test pins
+that the confirmatory path is untouched.
+
+> **Corrected by revision 26 — retained for the record.** That test passed `result=None`, so
+> the G4 guard (`result is not None and …`) could not fire for *any* role: it asserted a
+> refusal while claiming to show acceptance, and "proving the G4 guard is not what fires
+> there" was true only trivially. It is replaced by one that obtains a real
+> `ReadinessComparisonResult` through the boundary and asserts the transition **succeeds**.
+> The confirmatory path was in fact pinned all along — by fourteen other tests, as a
+> role-blind stub of the guard shows.
+
+**G5 — closed `[V]`.** `tests/pilot/test_end_to_end.py` proves the calibration branch
+behaviourally but sits behind a module-level `importorskip` on the `agentic` tree, which is
+present in this repository but is **not a declared dependency** of the pilot package — so on
+a minimal install the branch fell back to the AST assertion alone. A second behavioural test
+in `tests/test_calibration_branch.py` now runs the same calibration through the boundary
+using `pilot_fixtures.FakeExecutor`, importing nothing outside this package's own fixtures.
+That module carries no skip guard and no `agentic` or `experiments` import.
+
+**G3 — narrowed, not closed `[G]`.** A tripwire test asserts that
+`experiments/workflow_fit_study` contains no call to the ungated `run_pilot`.
+
+> **Corrected by revision 26 — retained for the record.** The walk matched `ast.Name` only,
+> so it asserted no *bare-name* call: `runner.run_pilot(...)`, `api.run_pilot(...)`, an
+> aliased import and a rebound variable all passed it. It now also follows `ImportFrom`
+> aliases, simple rebindings, and any attribute call named `run_pilot`; all five forms are
+> probed. It is
+**vacuously true today** — the Phase 4C pipeline does not exist, so there is no runner call
+to find — and the test says so in its own docstring. It is a tripwire for when that pipeline
+is built, **not** evidence that the F3 gate is mandatory. G3 stays open until a Phase 4C
+pipeline exists and calls the gated entry point.
+
+**A vacuous test caught before merge `[V]`.** The first G4 transition test asserted only the
+error code. Without the guard, the INCONCLUSIVE case still raises `STATE_TRANSITION_INVALID`
+from the downstream "requires the `ReadinessComparisonResult`" check, so the test passed
+either way and proved nothing — stubbing the guard failed **zero** of 223 tests. It now
+asserts the message per event and fails when the guard is removed. Recorded because it is the
+same obligation-3 failure mode revision 19 named and revisions 23–24 corrected twice.
+
+**Still open, awaiting owner rulings — unchanged by this slice.**
+
+1. **G1.** `revalidate_role` is applied only at `run_phase_4c_pilot`. Extending it to
+   `validate_lineage` follows from F4's own text; whether `is_calibration_run` — a cheap
+   predicate called inside `transition` and `validate_lineage` — is a **trust boundary**
+   (revalidating, at the cost of a manifest rebuild and digest recompute per call) or a
+   **convenience** is a design ruling the repository does not settle.
+2. **G2.** Wiring the reconciliation is mechanical; what to reconcile is not. The note ties
+   `score_count` to the **benchmark case count** and says nothing about custody verdict
+   count, and for a CALIBRATION run the sample is 50 of 250 — so whether the authoritative
+   case set is the benchmark's full set or the sampled subset is unsettled.
+
+**Status.** Five carried-forward items become two closed, one narrowed, two open. D1–D5 remain
+incomplete, the custody endpoint remains unbound, real custody adapters and genuine execution
+remain blocked, and no provider call, credential access or genuine calibration is permitted by
+this revision.
+
+### Revision 26 (independent-review corrections to slice 3B-3, 2026-09-04)
+
+An independent adversarial review of slice 3B-3 returned CONDITIONALLY APPROVED: G4 and G5
+closed by code and pinned by non-vacuous tests, with three sentences of revision 25
+overstating by one notch and one new test vacuous for its stated purpose. This closes all
+four. It **rules nothing new**, and G1 and G2 remain untouched and open.
+
+1. **"Any event" made true `[V]`.** The G4 guard sat below the `SUPERSEDED` block, so a
+   result supplied with `SUPERSEDED` was accepted — harmless, since a `REVISED` record
+   carries no result, but not what revision 25 claimed. The guard now sits above it and
+   below the `RESULT_ASSESSED` guard, which keeps that event's more specific message. The
+   test iterates **every** `LifecycleEvent` member rather than two.
+2. **A vacuous confirmatory test replaced `[V]`.** It passed `result=None`, so the G4 guard
+   could not fire for any role; it asserted a refusal while claiming to show acceptance. The
+   replacement runs a confirmatory manifest through the boundary, obtains a real
+   `ReadinessComparisonResult`, and asserts the transition **succeeds** with a matching
+   `result_digest`. The confirmatory path was pinned regardless — a role-blind stub of the
+   guard fails fourteen other tests.
+3. **The G3 tripwire widened `[V]`.** It matched `ast.Name` only, so `runner.run_pilot(...)`,
+   `api.run_pilot(...)`, `from … import run_pilot as rp` and a rebound `f = rp` all passed.
+   It now follows `ImportFrom` aliases and simple rebindings and flags any attribute call
+   named `run_pilot`. All five forms are probed in a scratch worktree; each fails the
+   tripwire, and a clean tree passes. **G3 is still narrowed, not closed** — the tripwire
+   remains vacuous until a Phase 4C pipeline exists.
+4. **Three sentences of revision 25 annotated in place**, per the revision-19 form, with the
+   original text retained.
+
+**Two vacuous tests in one slice, recorded `[G]`.** One was caught by the author before
+push, one by review. Both asserted an outcome that the surrounding code produced anyway, so
+neither pinned what its name claimed. This is the same failure mode revision 19 named as
+obligation 3 and revisions 23 and 24 each corrected; it has now recurred in four consecutive
+slices, always found by adversarial checking rather than by writing the test. The practice
+that catches it — stub the guard, confirm the test fails — is cheap and should be treated as
+required for any test asserting a refusal, not as a review-time backstop.
+
+**Status.** Unchanged in kind: G4 and G5 closed, G3 narrowed, G1 and G2 open on owner
+rulings. D1–D5 remain incomplete, the custody endpoint remains unbound, real custody adapters
+and genuine execution remain blocked, and no provider call, credential access or genuine
+calibration is permitted.

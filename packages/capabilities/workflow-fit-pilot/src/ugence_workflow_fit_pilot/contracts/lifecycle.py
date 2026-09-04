@@ -257,6 +257,27 @@ def transition(
     common = dict(schema_version=PILOT_STATE_SCHEMA_VERSION, manifest_digest=manifest.manifest_digest, method=predecessor.method, roles=predecessor.roles,
                   predecessor_state_digest=predecessor.state_digest, predecessor_manifest_digest=None, usage_scope=USAGE_SCOPE_RESEARCH_ONLY, approval_status=APPROVAL_STATUS_NONE,
                   recorded_by=recorded_by, recorded_at=recorded_at)
+    if event is LifecycleEvent.RESULT_ASSESSED and is_calibration_run(manifest):
+        raise PilotError(
+            PilotErrorCode.STATE_TRANSITION_INVALID,
+            "a CALIBRATION run never emits RESULT_ASSESSED and never becomes EVALUATED",
+        )
+    if result is not None and is_calibration_run(manifest):
+        # Slice 3B-3, closing carried-forward item G4. Revision 13 forbids *comparison* under
+        # CALIBRATION, not merely assessment, and a ``ReadinessComparisonResult`` is comparison
+        # evidence — so no calibration record may carry one, whatever the event. Guarding only
+        # RESULT_ASSESSED left INCONCLUSIVE-with-a-result constructible, which was narrower
+        # than the ruling.
+        #
+        # The ``capture_refusal`` path stays open: a calibration run whose capture fails must
+        # still reach INCONCLUSIVE, and that path supplies no result. This refusal is placed
+        # before the state and result checks so it names the run role rather than a downstream
+        # symptom, and above the SUPERSEDED block so *every* event is covered — revision 25
+        # claimed 'any event' while the guard sat below it, which revision 26 corrects.
+        raise PilotError(
+            PilotErrorCode.STATE_TRANSITION_INVALID,
+            "a CALIBRATION run carries no ReadinessComparisonResult; comparison is forbidden for that role",
+        )
     if event is LifecycleEvent.SUPERSEDED:
         if successor_manifest is None:
             raise PilotError(PilotErrorCode.STATE_TRANSITION_INVALID, "SUPERSEDED requires the successor manifest")
@@ -267,11 +288,6 @@ def transition(
     # EVALUATED. Checked before the state and result checks so the refusal names the run role
     # rather than a missing ReadinessComparisonResult — under CALIBRATION no such result can
     # exist, since revision 13 makes comparison unconstructible for that role.
-    if event is LifecycleEvent.RESULT_ASSESSED and is_calibration_run(manifest):
-        raise PilotError(
-            PilotErrorCode.STATE_TRANSITION_INVALID,
-            "a CALIBRATION run never emits RESULT_ASSESSED and never becomes EVALUATED",
-        )
     if event is LifecycleEvent.OBSERVATION_VALIDATED:
         if st is not PilotConfigurationState.PROPOSED:
             raise PilotError(PilotErrorCode.STATE_TRANSITION_INVALID, f"OBSERVATION_VALIDATED is not permitted from {st.value}")
@@ -330,6 +346,13 @@ def validate_lineage(records: Iterable[PilotConfigurationStateRecord], manifests
             raise PilotError(
                 PilotErrorCode.STATE_TRANSITION_INVALID,
                 "a CALIBRATION run never becomes EVALUATED",
+            )
+        if r.result_digest is not None and is_calibration_run(mans[r.manifest_digest]):
+            # G4 on replay: a hand-built calibration record naming an engine result is refused
+            # even though transition() would never have produced one.
+            raise PilotError(
+                PilotErrorCode.STATE_TRANSITION_INVALID,
+                "a CALIBRATION record names no engine result; comparison is forbidden for that role",
             )
         if r.result_digest is not None:
             res = ress.get(r.result_digest)
