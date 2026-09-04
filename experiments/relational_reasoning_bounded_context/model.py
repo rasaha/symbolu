@@ -8,15 +8,19 @@ from __future__ import annotations
 
 import hashlib
 
-from .config import (D_FF, D_MODEL, DROPOUT, EXPECTED_REASONING_BLOCK_PARAMS, EXPECTED_TOTAL_PARAMS,
-                     MAX_SEQ_LEN, N_HEADS, N_LAYERS, VOCAB_SIZE, backbone_param_count)
+from .config import (ARM_ABS, ARMS, D_FF, D_MODEL, DROPOUT, EXPECTED_REASONING_BLOCK_PARAMS,
+                     EXPECTED_TOTAL_PARAMS, MAX_SEQ_LEN, N_HEADS, N_LAYERS, VOCAB_SIZE, arm_param_count,
+                     backbone_param_count)
 
 
-def analytic_parameter_count() -> tuple[int, int]:
-    """(total, reasoning_block) params, computed torch-free from the frozen config."""
-    total, blocks = backbone_param_count(VOCAB_SIZE, MAX_SEQ_LEN)
-    assert total == EXPECTED_TOTAL_PARAMS, (total, EXPECTED_TOTAL_PARAMS)
-    assert blocks == EXPECTED_REASONING_BLOCK_PARAMS, (blocks, EXPECTED_REASONING_BLOCK_PARAMS)
+def analytic_parameter_count(arm: str = ARM_ABS) -> tuple[int, int]:
+    """(total, reasoning_block) params, computed torch-free from the frozen config of `arm`."""
+    total, blocks = arm_param_count(arm)
+    spec = ARMS[arm]
+    assert total == spec["expected_total_params"], (arm, total, spec["expected_total_params"])
+    assert blocks == spec["expected_reasoning_block_params"], (arm, blocks)
+    if arm == ARM_ABS:
+        assert (total, blocks) == (EXPECTED_TOTAL_PARAMS, EXPECTED_REASONING_BLOCK_PARAMS)
     return total, blocks
 
 
@@ -25,19 +29,25 @@ def reasoning_block_delta_vs_original() -> int:
     return backbone_param_count(VOCAB_SIZE, MAX_SEQ_LEN)[1] - backbone_param_count(200, 1024)[1]
 
 
-def build_model(initialization_seed: int):
-    """Build the torch model (lazy import). Asserts the runtime param count matches the analytic count."""
+def build_model(initialization_seed: int, arm: str = ARM_ABS):
+    """Build the torch model for `arm` (lazy import). ABS (default) is byte-identical to the pre-arm
+    build. Asserts the runtime param count matches the arm's analytic count."""
     import torch  # lazy
     from symbolu_neural.clean_softmax.backbone import BackboneConfig, SoftmaxTransformerLM
 
+    spec = ARMS[arm]
+    kwargs = {}
+    if spec["positional_mechanism"] == "rope":
+        kwargs = {"positional": "rope", "rope_theta": float(spec["rope_theta"])}
     with torch.random.fork_rng(devices=[]):
         torch.manual_seed(int(initialization_seed))
         model = SoftmaxTransformerLM(BackboneConfig(
             vocab_size=VOCAB_SIZE, d_model=D_MODEL, n_layers=N_LAYERS, n_heads=N_HEADS,
-            d_ff=D_FF, max_seq=MAX_SEQ_LEN, dropout=DROPOUT))
+            d_ff=D_FF, max_seq=MAX_SEQ_LEN, dropout=DROPOUT, **kwargs))
     total = sum(p.numel() for p in model.parameters())
-    if total != EXPECTED_TOTAL_PARAMS:
-        raise AssertionError(f"runtime param count {total} != expected {EXPECTED_TOTAL_PARAMS}")
+    if total != spec["expected_total_params"]:
+        raise AssertionError(f"{spec['name']}: runtime param count {total} != expected "
+                             f"{spec['expected_total_params']}")
     return model
 
 

@@ -73,7 +73,7 @@ def p0_failure_profile(preds: list) -> dict:
 
 
 def assemble_report(*, seed: int, role: str, checkpoint_digest: str,
-                    p0_predictions: dict, r_predictions: dict, protocol_valid: bool = True,
+                    p0_predictions: dict, r_predictions: dict, protocol_valid: bool = True, arm: str = "ABS",
                     training: dict | None = None, environment: dict | None = None,
                     git_sha: str | None = None, replay_verified: bool | None = None) -> dict:
     """Score predictions into the full smoke report. Torch-free (works on any predicted-text source)."""
@@ -107,8 +107,9 @@ def assemble_report(*, seed: int, role: str, checkpoint_digest: str,
     report = {
         "schema": "btrr/smoke_report/v1",
         "environment": environment, "git_sha": git_sha,
+        "arm": arm, "arm_name": MAN.C.ARMS[arm]["name"], "arm_ratified": bool(MAN.C.ARMS[arm]["ratified"]),
         "seed": seed, "role": role, "checkpoint_digest": checkpoint_digest,
-        "config_digest": MAN.config_digest(), "tokenizer_vocab_digest": MAN.tokenizer_vocab_digest(),
+        "config_digest": MAN.config_digest(arm), "tokenizer_vocab_digest": MAN.tokenizer_vocab_digest(),
         "schema_serializer_version": MAN.SCHEMA_SERIALIZER_VERSION,
         "provenance": MAN.PROVENANCE,
         "training": training or {}, "protocol_valid": protocol_valid, "replay_verified": replay_verified,
@@ -175,16 +176,17 @@ def generate_predictions(frozen, contexts, tokenizer=None) -> list:
 def run_experiment(seed: int, *, role_train: str = "train", role_eval: str = "final",
                    authorization_token: str | None = None, n_train: int = 6, n_eval: int = 12,
                    max_updates: int | None = None, out_dir: str | None = None,
-                   git_sha: str | None = None) -> dict:
+                   git_sha: str | None = None, arm: str = "ABS") -> dict:
     """Full train->freeze->P0->R1-R12->score->report for a seed. Fail-closed; requires torch.
 
     Guards BEFORE any torch import or cohort materialization. Reserved seeds run only with valid two-key
     authorization; fixture seeds (883000-883004) run ungated for implementation smoke of the pipeline.
     """
     assert_generation_allowed(seed, authorization_token)   # fail-closed before anything
+    from .config import frozen_run_params
+    n_train, max_updates = frozen_run_params(arm, seed, n_train, max_updates)   # admissibility, per arm
     import torch
     from . import dataset as DS
-    from .config import MAX_UPDATES
     from .replay import replay_matches
     from .tokenizer import BTRRTokenizer
     from .trainer import train_checkpoint
@@ -194,7 +196,7 @@ def run_experiment(seed: int, *, role_train: str = "train", role_eval: str = "fi
                 + DS.build_p0_examples(seed, n_train, role_train, authorization_token))
     loss_log: list = []
     frozen = train_checkpoint(seed, examples, authorization_token=authorization_token,
-                              max_updates=max_updates or MAX_UPDATES, loss_log=loss_log)
+                              max_updates=max_updates, loss_log=loss_log, arm=arm)
     d0 = frozen.digest()
 
     p0_cohorts = DS.eval_cohorts_p0(seed, n_eval, role_eval, authorization_token)
@@ -210,10 +212,10 @@ def run_experiment(seed: int, *, role_train: str = "train", role_eval: str = "fi
 
     env = {"torch": torch.__version__, "cuda": torch.cuda.is_available(),
            "device": (torch.cuda.get_device_name(0) if torch.cuda.is_available() else "cpu")}
-    report = assemble_report(seed=seed, role=_role_for(seed), checkpoint_digest=d0,
+    report = assemble_report(seed=seed, role=_role_for(seed), checkpoint_digest=d0, arm=arm,
                              p0_predictions=p0_predictions, r_predictions=r_predictions,
                              protocol_valid=protocol_valid,
-                             training={"completed": True, "max_updates": max_updates or MAX_UPDATES,
+                             training={"completed": True, "max_updates": max_updates,
                                        "n_train_per_split": n_train, "n_eval_per_split": n_eval,
                                        "n_train_examples": len(examples),
                                        "loss_curve": [(s, round(l, 4)) for s, l in loss_log]},
@@ -240,7 +242,7 @@ def write_predictions(cohorts: dict, out_dir: str | pathlib.Path, *, role: str, 
 
 
 def overfit_diagnostic(*, seed: int = 883000, per_split: int = 2, updates: int = 4000,
-                       role: str = "unit") -> dict:
+                       role: str = "unit", arm: str = "ABS") -> dict:
     """Learnability check (FIXTURES ONLY): train on a tiny set and evaluate on the SAME episodes.
 
     Decides bug-vs-scale for a 0.0-validity smoke. If eval-on-train structured validity climbs toward 1.0,
@@ -261,7 +263,7 @@ def overfit_diagnostic(*, seed: int = 883000, per_split: int = 2, updates: int =
     p0_cohorts = {sub: list(generate_p0(sub, seed, 1, role)) for sub in P0_SUBTASKS}
     examples = ([DS.example_from_ctx(c) for cs in r_cohorts.values() for c in cs]
                 + [DS.example_from_ctx(c) for cs in p0_cohorts.values() for c in cs])
-    frozen = train_checkpoint(seed, examples, max_updates=updates)
+    frozen = train_checkpoint(seed, examples, max_updates=updates, arm=arm)
 
     r_ctx = [c for cs in r_cohorts.values() for c in cs]
     p0_ctx = [c for cs in p0_cohorts.values() for c in cs]
@@ -269,7 +271,7 @@ def overfit_diagnostic(*, seed: int = 883000, per_split: int = 2, updates: int =
     p0_preds = generate_predictions(frozen, p0_ctx, tok)
     allp = r_preds + p0_preds
     return {
-        "mode": "eval_on_train (memorization/learnability)",
+        "mode": "eval_on_train (memorization/learnability)", "arm": arm,
         "seed": seed, "n_train_examples": len(examples), "updates": updates,
         "structured_output_validity": sum(is_valid_output(t) for _, t in allp) / len(allp),
         "answer_accuracy": answer_accuracy(r_preds),
@@ -281,11 +283,6 @@ def overfit_diagnostic(*, seed: int = 883000, per_split: int = 2, updates: int =
 
 
 def _role_for(seed: int) -> str:
-    from .config import DEVELOPMENT_SEEDS, FINAL_SEEDS, SMOKE_SEEDS
-    if seed in SMOKE_SEEDS:
-        return "smoke"
-    if seed in DEVELOPMENT_SEEDS:
-        return "development"
-    if seed in FINAL_SEEDS:
-        return "final"
-    return "fixture"
+    from .config import arm_of_seed
+    owner = arm_of_seed(seed)
+    return owner[1] if owner is not None else "fixture"

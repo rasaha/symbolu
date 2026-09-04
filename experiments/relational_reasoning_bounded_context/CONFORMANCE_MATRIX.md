@@ -44,8 +44,22 @@ Note: any run produced before `b16e4e4c` (including the seed-8100 smoke calibrat
 consistent within its process but not bit-reproducible from its seed; runs on development/final seeds must use
 code at or after this commit.
 
+## Sibling arm BTRR-RoPE (implementation landed; arm NOT ratified, NOT signed, NOT executed)
+Per `BTRR_ROPE_SIBLING_ARM_PREREGISTRATION_DRAFT.md`. Owner decisions [2]–[5] were left unfilled; the
+recommended defaults are implemented and isolated (F13 is its own commit; budget/dataset values sit in
+`config.ARMS["ROPE"]` and the companion JSON).
+| Item | Implementation | Test evidence | Status |
+|---|---|---|---|
+| backbone opt-in positional flag | `BackboneConfig.positional ∈ {learned_absolute (default), rope}`, `rope_theta`; rotary on Q/K per head (half-split, θ 10 000, all pairs, both layers, parameter-free); ABS path byte-identical | `test_rope_runtime.test_abs_build_byte_identical` (digests recorded before the change, seeds 883000/883001); norm-preserving, position-dependent, relative-only dot products; forward at 3904 | landed |
+| arm registry | `config.ARMS` (ABS ratified / ROPE draft), `RESERVED_SEED_ARM_ROLES`, `arm_of_seed`, `arm_param_count` (144,896 / 131,392), `frozen_run_params` (dev/final overrides of budget or dataset size raise; smoke/fixtures may calibrate; a seed runs only under its own arm) | `test_arms` (8) | landed |
+| per-arm guard | `execution.record_path_for(arm)`; `guard_seed` resolves (arm, role) and checks the arm's record against `config_digest(arm)`; ROPE seeds 8200 / 8201–8203 / 81700–81704 fail closed | `test_arms.test_rope_seeds_fail_closed_everywhere` | landed |
+| digest extension | `manifest.config_payload(arm)` binds arm, positional mechanism, architecture dims, **training recipe incl. `n_train_per_split`**, P0 gates, per-arm seeds. **The BTRR-ABS digest changed** (`ba73d7bc…` → `c75b203a…`); the ABS smoke record must be re-signed by the owner | `test_arms.test_config_digest_binds_arm_and_train_recipe` | landed; closes `[G]` |
+| companion JSON | `BTRR_ROPE_SIBLING_ARM_PREREGISTRATION.json` (`ratified:false`), values mirror config | `test_arms.test_companion_json_matches_config` | draft |
+| record | `BTRR_ROPE_EXECUTION_AUTHORIZATION_RECORD.json`, every role `authorized:false` | `test_arms.test_rope_record_unsigned_and_scoped` | unsigned |
+| run path | `run_experiment(..., arm=)`, `train_checkpoint(..., arm=)`, `build_model(seed, arm)`, report carries `arm`/`arm_ratified`/per-arm digest | `test_rope_runtime.test_rope_arm_end_to_end_on_fixture` (5 updates, fixture 883003) | landed |
+
 ## Test totals
-`tests/test_btrr.py` 28 + `tests/test_corrections.py` 28 + `tests/test_auth_mechanism.py` 12 + `tests/test_harness.py` 9 = **77 tests, all passing** (stdlib runner; no
+`tests/test_btrr.py` 28 + `tests/test_corrections.py` 28 + `tests/test_auth_mechanism.py` 12 + `tests/test_harness.py` 9 + `tests/test_arms.py` 8 + `tests/test_rope_runtime.py` 5 (torch; skips without it) = **90 tests, all passing** (stdlib runner; no
 pytest/torch; fixture seeds 883000–883004 only; no reserved scientific seed consumed).
 
 ## PyTorch runtime status (F10) — CLOSED

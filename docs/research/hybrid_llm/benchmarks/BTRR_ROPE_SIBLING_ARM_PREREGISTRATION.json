@@ -1,0 +1,83 @@
+{
+  "schema": "btrr/sibling_arm_preregistration/v1",
+  "arm": "ROPE",
+  "name": "BTRR-RoPE",
+  "status": "DRAFT \u2014 NOT RATIFIED. Values mirror config.ARMS['ROPE']; the owner ratifies by setting ratified=true here AND in config.py in one commit, then signs BTRR_ROPE_EXECUTION_AUTHORIZATION_RECORD.json.",
+  "ratified": false,
+  "parent_arm": {
+    "arm": "ABS",
+    "name": "BTRR-ABS",
+    "closed_on": "BTRR_SMOKE_CALIBRATION_LOG.md (13d445a5)",
+    "verdict_at_frozen_recipe": "RELATIONAL_REASONING_BLOCKED_BY_BASE_CAPABILITY"
+  },
+  "draft_document": "BTRR_ROPE_SIBLING_ARM_PREREGISTRATION_DRAFT.md",
+  "single_difference": {
+    "positional_mechanism": "rope",
+    "rope_theta": 10000.0,
+    "rotary": "half-split, all 8 pairs of the 16-dim head, both layers, parameter-free, no scaling",
+    "parent_positional_mechanism": "learned_absolute"
+  },
+  "parameters": {
+    "expected_total_params": 144896,
+    "expected_reasoning_block_params": 131392,
+    "token_embedding_params": 13504,
+    "position_params": 0
+  },
+  "preserved_verbatim": [
+    "tokenizer (80 lexemes, vocab 211)",
+    "generator incl. F11\u2013F15 (F13 assumed ratified)",
+    "P0 B1\u2013B7",
+    "R1\u2013R12",
+    "caps",
+    "numeric gates",
+    "verdict precedence",
+    "forbidden and always-preserved verdicts",
+    "single-checkpoint invariant",
+    "d_model 64 / 2 layers / 4 heads / FFN 256 / RMSNorm / dropout 0 / weight-tied head",
+    "output-only CE, greedy EOS-terminated decoding",
+    "AdamW 3e-4 \u03b2 0.9/0.95 wd 0.01 clip 1.0 batch 8",
+    "two-key fail-closed execution guard"
+  ],
+  "train_recipe": {
+    "batch_size": 8,
+    "max_updates": 15000,
+    "learning_rate": 0.0003,
+    "beta1": 0.9,
+    "beta2": 0.95,
+    "weight_decay": 0.01,
+    "gradient_clip": 1.0,
+    "n_train_per_split": 400
+  },
+  "budget_option": "(a) matched point \u2014 DRAFT; option (b) = RoPE smoke calibration first, then freeze",
+  "reserved_seeds": {
+    "smoke": [
+      8200
+    ],
+    "development": [
+      8201,
+      8202,
+      8203
+    ],
+    "final": [
+      81700,
+      81701,
+      81702,
+      81703,
+      81704
+    ]
+  },
+  "hypotheses": {
+    "H1": "At the frozen budget BTRR-RoPE clears the P0 gate (>=0.98 on each of B1\u2013B7, block 0.95) on >=2 of 3 development seeds; falsified if <=1.",
+    "H1_prime": "Mean B3+B4 across the 3 development seeds >=0.50 for BTRR-RoPE and <=0.25 for BTRR-ABS at the same budget/generator; falsified otherwise.",
+    "H2": "Conditional on H1: R1\u2013R12 gates and verdict precedence apply unchanged; no prediction."
+  },
+  "comparison_rule": "Decided on the three development seeds only; one checkpoint per seed; report per-subtask P0, failure profile, loss curve for every run; no claim from a single run.",
+  "closure": "If H1 fails on development seeds the arm closes on that record without final execution.",
+  "preconditions": [
+    "F13 ratified",
+    "backbone opt-in positional flag with ABS digest-preservation test green",
+    "companion JSON frozen + config_digest computed",
+    "record signed"
+  ],
+  "config_digest_at_draft": "392d72863c4836e6bc010459086671ccea6630ab87fdc5d17927512d04868ee9"
+}

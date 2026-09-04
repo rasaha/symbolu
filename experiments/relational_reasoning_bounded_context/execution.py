@@ -24,12 +24,17 @@ import os
 import pathlib
 from dataclasses import dataclass
 
-from .config import RESERVED_SEED_ROLES, UNIT_FIXTURE_SEEDS
+from .config import ARM_ABS, ARMS, RESERVED_SEED_ARM_ROLES, RESERVED_SEED_ROLES, UNIT_FIXTURE_SEEDS
 
-# Canonical committed record path (repo_root/docs/research/hybrid_llm/benchmarks/...).
-RECORD_PATH = (pathlib.Path(__file__).resolve().parents[2]
-               / "docs/research/hybrid_llm/benchmarks/BTRR_EXECUTION_AUTHORIZATION_RECORD.json")
+# Canonical committed record paths (repo_root/docs/research/hybrid_llm/benchmarks/...), one per arm.
+_BENCHMARKS_DIR = pathlib.Path(__file__).resolve().parents[2] / "docs/research/hybrid_llm/benchmarks"
+RECORD_PATH = _BENCHMARKS_DIR / ARMS[ARM_ABS]["record_file"]          # BTRR-ABS (parent arm)
 OPERATOR_TOKEN_ENV = "BTRR_EXEC_TOKEN"
+
+
+def record_path_for(arm: str) -> pathlib.Path:
+    """Committed authorization record for `arm`; each arm has its own record and token hash."""
+    return _BENCHMARKS_DIR / ARMS[arm]["record_file"]
 
 
 class ExecutionNotAuthorized(PermissionError):
@@ -57,7 +62,7 @@ def load_signed_record(path: str | os.PathLike | None = None) -> dict | None:
 
 
 def _evaluate_authorization(role: str, seed: int, supplied_token: str | None,
-                            record: dict | None) -> GrantedAuthorization:
+                            record: dict | None, arm: str = ARM_ABS) -> GrantedAuthorization:
     """Pure two-key evaluation (no I/O). Returns a grant or raises. Never self-authorizes: the caller
     cannot supply a grant, only the record (owner key) and token (operator key), both of which are
     checked here against the current frozen protocol."""
@@ -71,9 +76,10 @@ def _evaluate_authorization(role: str, seed: int, supplied_token: str | None,
         raise ExecutionNotAuthorized(f"seed {seed} is outside the authorized scope for {role}")
     # protocol binding: the authorization must match the current frozen protocol/config digest
     from . import manifest  # lazy; manifest imports config+tokenizer only (no cycle)
-    if entry.get("protocol_lock_digest") != manifest.config_digest():
+    if entry.get("protocol_lock_digest") != manifest.config_digest(arm):
         raise ExecutionNotAuthorized(
-            f"seed {seed}: authorization was signed for a different frozen protocol (config drift)")
+            f"seed {seed} ({ARMS[arm]['name']}): authorization was signed for a different frozen protocol "
+            f"(config drift)")
     expires_at = entry.get("expires_at")
     if expires_at:
         try:
@@ -96,11 +102,12 @@ def guard_seed(seed: int, token: str | None = None) -> GrantedAuthorization:
     Non-reserved seeds (fixtures included) are ungated. Reserved seeds require the two-key check against
     the committed record + operator token. There is NO bypass flag: the record comes only from the
     canonical committed path, and the token is checked by hash."""
-    role = RESERVED_SEED_ROLES.get(int(seed))
-    if role is None:
+    owner = RESERVED_SEED_ARM_ROLES.get(int(seed))
+    if owner is None:
         return GrantedAuthorization("non_reserved", True)
+    arm, role = owner
     supplied = token if token is not None else os.environ.get(OPERATOR_TOKEN_ENV)
-    return _evaluate_authorization(role, int(seed), supplied, load_signed_record())
+    return _evaluate_authorization(role, int(seed), supplied, load_signed_record(record_path_for(arm)), arm)
 
 
 def assert_generation_allowed(seed: int, token: str | None = None) -> int:

@@ -29,7 +29,7 @@ class FrozenCheckpoint:
 
 def train_checkpoint(seed: int, examples, *, authorization_token: str | None = None,
                      max_updates: int = MAX_UPDATES, loss_log: list | None = None,
-                     log_every: int = 100) -> FrozenCheckpoint:
+                     log_every: int = 100, arm: str = "ABS") -> FrozenCheckpoint:
     """Train ONE checkpoint for `seed`, then freeze. Raises before any effect on reserved seeds.
 
     `examples` = list of {"input": str, "output": str}. Returns a FrozenCheckpoint. Requires torch.
@@ -37,13 +37,17 @@ def train_checkpoint(seed: int, examples, *, authorization_token: str | None = N
     only; it changes nothing about the recipe, the sampling stream, or the checkpoint.
     """
     assert_generation_allowed(seed, authorization_token)  # centralized two-key guard; fail-closed
+    from .config import arm_of_seed
+    owner = arm_of_seed(seed)
+    if owner is not None and owner[0] != arm:
+        raise ValueError(f"seed {seed} is reserved for arm {owner[0]}, not {arm}")
     import torch
     from .model import build_model
     from .tokenizer import BTRRTokenizer
 
     tok = BTRRTokenizer()
     dev = "cuda" if torch.cuda.is_available() else "cpu"
-    model = build_model(seed).to(dev)
+    model = build_model(seed, arm).to(dev)
     model.train()
     opt = torch.optim.AdamW(model.parameters(), lr=LEARNING_RATE, betas=(BETA1, BETA2),
                             weight_decay=WEIGHT_DECAY)

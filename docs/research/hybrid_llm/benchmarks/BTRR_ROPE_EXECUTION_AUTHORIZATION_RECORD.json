@@ -1,0 +1,47 @@
+{
+  "schema": "btrr/execution_authorization_record/v1",
+  "arm": "ROPE",
+  "status": "UNSIGNED \u2014 every role authorized:false. Execution of BTRR-RoPE reserved seeds remains closed.",
+  "note": "Sibling-arm record for BTRR-RoPE (seeds 8200 / 8201\u20138203 / 81700\u201381704). Same two-key mechanism as BTRR_EXECUTION_AUTHORIZATION_RECORD.json; protocol_lock_digest must equal manifest.config_digest('ROPE'). Signing this record does not authorize any BTRR-ABS seed and vice versa. Do not sign before the sibling preregistration is ratified.",
+  "roles": {
+    "smoke": {
+      "authorized": false,
+      "authorized_by": null,
+      "date": null,
+      "scope_seeds": [
+        8200
+      ],
+      "token_sha256": null,
+      "protocol_lock_digest": null,
+      "expires_at": null
+    },
+    "development": {
+      "authorized": false,
+      "authorized_by": null,
+      "date": null,
+      "scope_seeds": [
+        8201,
+        8202,
+        8203
+      ],
+      "token_sha256": null,
+      "protocol_lock_digest": null,
+      "expires_at": null
+    },
+    "final": {
+      "authorized": false,
+      "authorized_by": null,
+      "date": null,
+      "scope_seeds": [
+        81700,
+        81701,
+        81702,
+        81703,
+        81704
+      ],
+      "token_sha256": null,
+      "protocol_lock_digest": null,
+      "expires_at": null
+    }
+  }
+}

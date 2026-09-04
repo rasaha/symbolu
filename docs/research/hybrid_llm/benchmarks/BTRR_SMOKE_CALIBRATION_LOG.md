@@ -50,7 +50,7 @@ machinery is sound.
 - `[V]` Run 5 vs run 6: same seed, more data and 2× the updates, lower training loss, and B1 fell from
   0.88 to 0.12. One run per configuration is a sample of size one; copy-circuit formation in a 2-layer
   model is trajectory-dependent. Calibration numbers above must not be read as monotone in budget.
-- `[G]` `config_digest` binds vocab, limits, params, caps, gates and seeds but **not** the training recipe
+- `[G]` (closed by the sibling-arm commit: `manifest.config_payload` now binds the training recipe; the ABS digest changed and the smoke record must be re-signed) `config_digest` bound vocab, limits, params, caps, gates and seeds but **not** the training recipe
   (`max_updates`, lr, batch). A budget amendment would not change the protocol-lock digest.
 
 ## Owner decisions

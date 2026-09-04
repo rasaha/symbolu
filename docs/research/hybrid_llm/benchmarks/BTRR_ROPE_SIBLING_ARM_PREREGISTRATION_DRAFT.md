@@ -9,6 +9,12 @@ Parent arm: BTRR (`BTRR-ABS` hereafter), preregistration `626a897a` → blocker 
 BTRR-ABS is closed on its calibration record as `RELATIONAL_REASONING_BLOCKED_BY_BASE_CAPABILITY` at the
 frozen recipe, without final-seed execution. Nothing in this document reopens, amends, or re-scores it.
 
+**Implementation status (post-draft):** §5 is implemented behind `config.ARMS` with `ratified: False`
+(see CONFORMANCE_MATRIX.md "Sibling arm"). Owner decisions [2]–[5] were unfilled at implementation time;
+the recommended defaults (budget option (a) 15000 × 400/split, seeds 8200 / 8201–8203 / 81700–81704, F13
+applied, digest extended) are in place and each is reversible in review. Still nothing is ratified,
+signed, or executed on a reserved seed.
+
 ## 1. Scientific question (one sentence)
 Does changing the positional mechanism alone, learned absolute position table → parameter-free rotary
 position embedding on Q/K, let the same bounded reasoning architecture acquire variable-position

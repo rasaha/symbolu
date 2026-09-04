@@ -25,8 +25,28 @@ class RMSNorm(nn.Module):
         return self.g * x * torch.rsqrt(x.pow(2).mean(-1, keepdim=True) + self.eps)
 
 
+def rope_cos_sin(L: int, dk: int, theta: float, device, dtype):
+    """Rotary position tables (parameter-free). Half-split convention: dims [0, dk/2) pair with
+    [dk/2, dk); frequency i = theta^(-2i/dk). Returns cos, sin of shape [1, 1, L, dk]."""
+    assert dk % 2 == 0
+    inv = 1.0 / (theta ** (torch.arange(0, dk, 2, device=device, dtype=torch.float32) / dk))
+    t = torch.arange(L, device=device, dtype=torch.float32)
+    freqs = torch.outer(t, inv)                                  # [L, dk/2]
+    emb = torch.cat([freqs, freqs], dim=-1)                      # [L, dk]
+    return emb.cos().to(dtype)[None, None], emb.sin().to(dtype)[None, None]
+
+
+def apply_rope(x: torch.Tensor, cos: torch.Tensor, sin: torch.Tensor) -> torch.Tensor:
+    """Rotate the last dim of x [B, H, L, dk] by position (norm-preserving)."""
+    half = x.shape[-1] // 2
+    x1, x2 = x[..., :half], x[..., half:]
+    rotated = torch.cat([-x2, x1], dim=-1)
+    return x * cos + rotated * sin
+
+
 class CausalSelfAttention(nn.Module):
-    def __init__(self, d: int, n_heads: int, dropout: float = 0.0):
+    def __init__(self, d: int, n_heads: int, dropout: float = 0.0, rope: bool = False,
+                 rope_theta: float = 10000.0):
         super().__init__()
         assert d % n_heads == 0
         self.h = n_heads
@@ -34,6 +54,8 @@ class CausalSelfAttention(nn.Module):
         self.qkv = nn.Linear(d, 3 * d, bias=False)
         self.proj = nn.Linear(d, d, bias=False)
         self.drop = dropout
+        self.rope = rope                    # opt-in; default False keeps the vanilla baseline byte-identical
+        self.rope_theta = rope_theta
 
     def forward(self, x):
         B, L, d = x.shape
@@ -41,6 +63,9 @@ class CausalSelfAttention(nn.Module):
         q = q.view(B, L, self.h, self.dk).transpose(1, 2)
         k = k.view(B, L, self.h, self.dk).transpose(1, 2)
         v = v.view(B, L, self.h, self.dk).transpose(1, 2)
+        if self.rope:
+            cos, sin = rope_cos_sin(L, self.dk, self.rope_theta, x.device, q.dtype)
+            q, k = apply_rope(q, cos, sin), apply_rope(k, cos, sin)
         o = F.scaled_dot_product_attention(           # standard softmax attention
             q, k, v, is_causal=True,
             dropout_p=self.drop if self.training else 0.0)
@@ -63,10 +88,11 @@ class CausalBlock(nn.Module):
     """Pre-norm causal transformer block. Reused by backbone and (causally) by
     the entropy-gated refinement core so refinement never leaks future tokens."""
 
-    def __init__(self, d: int, n_heads: int, d_ff: int, dropout: float = 0.0):
+    def __init__(self, d: int, n_heads: int, d_ff: int, dropout: float = 0.0, rope: bool = False,
+                 rope_theta: float = 10000.0):
         super().__init__()
         self.n1 = RMSNorm(d)
-        self.attn = CausalSelfAttention(d, n_heads, dropout)
+        self.attn = CausalSelfAttention(d, n_heads, dropout, rope=rope, rope_theta=rope_theta)
         self.n2 = RMSNorm(d)
         self.ff = SwiGLU(d, d_ff)
 
@@ -85,16 +111,23 @@ class BackboneConfig:
     d_ff: int = 512
     max_seq: int = 256
     dropout: float = 0.0
+    positional: str = "learned_absolute"   # "learned_absolute" (default, vanilla) | "rope" (opt-in)
+    rope_theta: float = 10000.0
 
 
 class SoftmaxTransformerLM(nn.Module):
     def __init__(self, cfg: BackboneConfig):
         super().__init__()
         self.cfg = cfg
+        if cfg.positional not in ("learned_absolute", "rope"):
+            raise ValueError(f"unknown positional mechanism {cfg.positional!r}")
+        use_rope = cfg.positional == "rope"
         self.tok = nn.Embedding(cfg.vocab_size, cfg.d_model)
-        self.pos = nn.Embedding(cfg.max_seq, cfg.d_model)
+        # learned absolute table (vanilla) or none (rope: positions enter only via Q/K rotation)
+        self.pos = None if use_rope else nn.Embedding(cfg.max_seq, cfg.d_model)
         self.blocks = nn.ModuleList(
-            CausalBlock(cfg.d_model, cfg.n_heads, cfg.d_ff, cfg.dropout)
+            CausalBlock(cfg.d_model, cfg.n_heads, cfg.d_ff, cfg.dropout,
+                        rope=use_rope, rope_theta=cfg.rope_theta)
             for _ in range(cfg.n_layers))
         self.norm = RMSNorm(cfg.d_model)
         self.head = nn.Linear(cfg.d_model, cfg.vocab_size, bias=False)
@@ -108,10 +141,16 @@ class SoftmaxTransformerLM(nn.Module):
         elif isinstance(m, nn.Embedding):
             nn.init.normal_(m.weight, std=0.02)
 
-    def hidden(self, ids: torch.Tensor) -> torch.Tensor:
+    def _embed(self, ids: torch.Tensor) -> torch.Tensor:
         B, L = ids.shape
-        pos = torch.arange(L, device=ids.device).unsqueeze(0)
-        x = self.tok(ids) + self.pos(pos)
+        x = self.tok(ids)
+        if self.pos is not None:
+            pos = torch.arange(L, device=ids.device).unsqueeze(0)
+            x = x + self.pos(pos)
+        return x
+
+    def hidden(self, ids: torch.Tensor) -> torch.Tensor:
+        x = self._embed(ids)
         for blk in self.blocks:
             x = blk(x)
         return self.norm(x)                                # [B,L,d]
@@ -120,9 +159,7 @@ class SoftmaxTransformerLM(nn.Module):
         """Additive accessor (no behavior change): returns per-layer hidden states
         [post-block-1, ..., post-block-N, final-normed]. Index -1 == hidden().
         Used by the layer-wise probe and the optional control-layer tap."""
-        B, L = ids.shape
-        pos = torch.arange(L, device=ids.device).unsqueeze(0)
-        x = self.tok(ids) + self.pos(pos)
+        x = self._embed(ids)
         outs = []
         for blk in self.blocks:
             x = blk(x)
