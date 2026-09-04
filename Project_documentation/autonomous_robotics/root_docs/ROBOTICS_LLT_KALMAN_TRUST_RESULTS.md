@@ -5,10 +5,12 @@
 **Code/data:** `robotics_reliability_bench/llt_kalman_trust.py`,
 `detectors.py::LLTKalmanDetector`, `tune_llt_kalman.py`,
 `results/llt_kalman_tune.json`, `results/incremental_value.json`.
-**Status:** evaluation-only. No production path modified. Two stages: **A0**
-(§2–§6) was added after `PREDICTOR_TRUST_V2_PREREGISTRATION.md` and is
-exploratory; **A1** (§7) was preregistered as amendment §7 A1 before scoring
-and carries a frozen decision rule. Headline verdict: **`A1_ADOPT`**.
+**Status:** evaluation-only. No production path modified. Three stages:
+**A0** (§2–§6) was added after `PREDICTOR_TRUST_V2_PREREGISTRATION.md` and
+is exploratory; **A1** (§7) was preregistered and passed its decision rule
+(`A1_ADOPT`) on the white-noise corpus; **A2** (§8), a preregistered
+realistic-noise pilot, **failed** (`A2_FAILS`) and scopes `A1_ADOPT` to
+white noise. The real-sensor gate is **not discharged**.
 
 ---
 
@@ -18,13 +20,15 @@ Does the temporal channel that beat second-order BCVF in the cyber kill study
 (`cyber_security/kill_study/detectors.py::llt_cusum_raw`, arm I) sharpen the
 robotics deterministic baseline when ported into the predictor-trust layer?
 
-**Answer:** yes, once the noise model is time-varying. A0 (whole-episode
-noise estimate) cut detection delay by roughly two-thirds at equal recall,
-attribution, and common-mode handling, but traded the baseline's
-`noisy_unbiased` false alarms for `calibration_drift` false alarms. The
-preregistered amendment A1 (forgetting noise estimate) removes that
-regression: recall 1.00, false-alarm 0.000, common-mode 0.00, delay 6.3
-ticks vs the baseline's 17.0, on held-out seeds. `[V]`
+**Answer:** on white noise, yes; on correlated noise, not as frozen. A1
+(forgetting noise estimate) dominates the baseline on the held-out
+straight-line corpus: recall 1.00, false-alarm 0.000, common-mode 0.00,
+delay 6.3 vs 17.0 ticks. `[V]` On the realistic-noise pilot (AR(1)
+α=0.8), A1's false-alarm rate rises to 0.222 against the baseline's 0.156,
+its attribution falls to 0.50, and it flags 83 % of benign 400-tick
+scenes; the preregistered verdict is `A2_FAILS`. `[V]` The cause is the
+difference-based noise estimate plus the short sustain, both of which are
+over-confident under correlated wander (§8.4). `[I]`
 
 ## 2. What was ported
 
@@ -182,14 +186,114 @@ equal recall, attribution, and common-mode handling; false-alarm 0.000 vs
   vs 6.3), concentrated in `slow_bias` and `accelerating`. The
   `AUGMENT_PREDICTOR_TRUST` position is unchanged in kind.
 
-## 8. Next step
+---
 
-Carry A1 into the real-sensor pilot as the primary predictor-trust
-statistic, with the same TUNE/TEST discipline. Where the predictor stack
-reports calibrated covariance, feed it as `R_t` directly and re-run; the
-forgetting estimator is the fallback when no covariance is reported.
+## 8. Amendment A2 — realistic-noise pilot (preregistered; `A2_FAILS`)
 
-## 9. Caveats (binding)
+**Header label: `REAL_SENSOR_GATE_NOT_DISCHARGED`.** Preregistered in the
+preregistration §7 A2 (commit `1ef40fd0`) before any bundle was scored.
+Code/data: `robotics_reliability_bench/a2_realistic_pilot.py`,
+`results/a2_realistic_pilot.json`, `test_a2_realistic_pilot.py`.
+
+### 8.1 Why this is not a real-sensor pilot `[V]`
+
+`NuScenesAdapter` is scaffolding that raises `NotImplementedError`; no
+nuScenes or KITTI data exists on disk; `nuscenes.org` is unreachable from
+the execution environment. The pilot therefore uses the repository's
+`RealisticNoiseAdapter` (AR(1) correlated noise α=0.8, σ=0.02 on all three
+axes; 2 % outlier frames at 5×) plus bench-side dropouts. It is
+**synthetic-realistic**, and the migration gate "real-sensor pilot" remains
+open. `[G]`
+
+### 8.2 Setup `[V]`
+
+No tuning: every system ran its frozen configuration on fresh seeds
+200..229 (30 per family), scored by `metrics.py` unchanged.
+R1 = the 14 corpus families injected on realistic nominal streams (M=3,
+T=100, dropouts P=0.2). R2 = adapter-native scenes (M=4, T=400).
+Covariance arm: not applicable, the adapter reports none. `[G]`
+
+### 8.3 Results `[V]`
+
+R1 aggregate (all families):
+
+| system | recall | false-alarm | common-mode false-det | delay | attribution |
+|---|---|---|---|---|---|
+| Deterministic baseline | 1.00 | 0.156 | 0.00 | 18.0 | 0.67 |
+| **LLT-Kalman A1** | 1.00 | **0.222** | **0.233** | 6.6 | **0.50** |
+| BCVF standalone | 0.20 | 0.667 | 0.00 | 12.3 | 0.19 |
+| Fusion (LLT-A1 + BCVF) | 1.00 | 0.222 | 0.233 | 6.4 | 0.50 |
+
+R2 (adapter-native), A1 vs baseline:
+
+| family | baseline det / attr / delay | A1 det / attr / delay |
+|---|---|---|
+| gps_multipath | 1.00 / 1.00 / 18.3 | 1.00 / **0.43** / 10.0 |
+| map_misalignment (same injection as above) | 1.00 / 1.00 / 18.2 | 1.00 / **0.17** / 10.2 |
+| constant_bias_sanity | 1.00 / 1.00 / 18.0 | 1.00 / **0.37** / 3.0 |
+| camera_degradation (variance fault; M4 ≥ DEGRADED rate) | 1.00 | 1.00 |
+| **benign_native** (T=400) FA | 0.00 | **0.83** |
+
+Decision rule: C1 recall ✅, C2 false-alarm ❌ (0.222 > 0.156), C3
+common-mode ❌ (0.233), C4 delay ✅, C5 H2-reproduces ✅ (BCVF recall 0.20,
+FA 0.667), C6 native attribution ❌, C7 native benign ❌. **`A2_FAILS`.**
+Frozen thresholds were not changed after scoring.
+
+### 8.4 Mechanism (post-hoc diagnostic, no tuning) `[I]`
+
+Ablation on benign R1-style streams, A1 suspect-any rate over 30 seeds:
+iid noise 0.00; **AR(1) only 0.20**; outliers only 0.00; AR(1)+outliers
+0.23; AR(1)+outliers at T=400 0.80. The baseline is 0.00 in every cell.
+`[V]` So the failure is correlated noise, not heavy tails or dropouts.
+
+Why: A1 estimates `R_t` from first differences, which under AR(1) measures
+the innovation scale, not the stationary wander (median `R_t` σ=0.05 at
+the floor vs stationary 0.029 m on y; 0.078 m-equivalent on heading after
+the 2.5 lever arm, with excursions to 0.6). With a small `Q`, the Kalman
+level state follows a slow correlated excursion as if it were an offset;
+it crosses the 0.20 m physical floor on the lever-scaled heading axis,
+`z ≥ 4` is trivially met, and `bias_sustain=4` confirms it in four ticks.
+Every false SUSPECT is a `bias(0.21–0.29 m)` on that mechanism. The
+baseline's 12-tick window, sustain 8, and pooled scale average the same
+wander out. `[I]` Spurious SUSPECTs on two predictors then trigger the
+global no-trusted-majority ABSTAIN, which is what collapses attribution
+(A1 abstain rate 0.4–0.57 on harm families) and produces the
+common-mode false detections on `all_wrong`. `[V]`
+
+The baseline is not immune either: `noisy_unbiased` FA rises to 0.40 and
+attribution falls to 0.67 on the same streams. `[V]` BCVF collapses
+outright (recall 0.20). `[V]`
+
+### 8.5 What this changes `[I]`
+
+* **`A1_ADOPT` (§7) is scoped to white noise.** On correlated noise the
+  A1 statistic is over-confident and should not be the primary PTR-V2
+  statistic as frozen. The synthetic held-out win (§7.3) was real but
+  narrow: the A1 corpus and the realistic adapter differ exactly on the
+  axis that matters.
+* The two knobs that bought A1's delay win, `bias_sustain=4` and a
+  difference-based `R_t`, are the two that fail under AR(1). This is the
+  expected trade, now measured.
+* Nothing here supports or refutes any real-sensor claim. `[G]`
+
+### 8.6 Recommended next amendment (A3, to be preregistered)
+
+Model the correlated noise instead of averaging over it: augment the LLT
+state with an AR(1) noise component (level, slope, coloured-noise state),
+so the level test's posterior variance is calibrated under correlated
+wander, and apply the physical bias floor per axis (heading in radians,
+not lever-scaled). Keep `bias_sustain`, `bias_z`, `bias_min_m` frozen.
+Tune on the A1 TUNE families **plus** an AR(1) benign family (TUNE only),
+then require A2's C1–C7 on fresh seeds before any adoption claim. Do not
+re-tune A1 against the A2 seeds.
+
+## 9. Next step
+
+Preregister and run A3 as described in §8.6. The real-sensor pilot remains
+blocked on dataset access (`NuScenesAdapter` implementation and an
+authenticated nuScenes-mini download), which no amendment here discharges.
+
+## 10. Caveats (binding)
 
 * Synthetic straight-line SE(2), M=3, H=50, 50 eval seeds per family. No
   real-sensor claim.

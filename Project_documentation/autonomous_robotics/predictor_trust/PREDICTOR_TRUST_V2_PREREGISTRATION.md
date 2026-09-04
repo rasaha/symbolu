@@ -235,3 +235,14 @@ the large expected effect sizes.
     C7 fails, or C6–C7 hold but any of C1–C5 fails; `A2_FAILS` otherwise.
     No threshold is changed after scoring; a failure is reported as a
     failure.
+  * *Outcome (appended after scoring; rule not edited).* R1 aggregate,
+    baseline vs A1: recall 1.00 vs 1.00; false-alarm 0.156 vs 0.222;
+    common-mode false-det 0.00 vs 0.233; delay 18.0 vs 6.6; attribution
+    0.67 vs 0.50. BCVF recall 0.20, FA 0.667. R2: A1 attribution on the
+    three harmful native families 0.43 / 0.17 / 0.37; A1 `benign_native`
+    detected 0.83. Conditions: C1 ✅ C2 ❌ C3 ❌ C4 ✅ C5 ✅ C6 ❌ C7 ❌ →
+    **`A2_FAILS`** under `REAL_SENSOR_GATE_NOT_DISCHARGED`. Post-hoc
+    diagnostic (no tuning): the failure is AR(1)-correlated noise alone
+    (A1 benign suspect rate 0.20 with AR(1) only, 0.00 with outliers only;
+    baseline 0.00 in both). `A1_ADOPT` is therefore scoped to white noise.
+    Detail: `ROBOTICS_LLT_KALMAN_TRUST_RESULTS.md` §8.
