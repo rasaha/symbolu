@@ -8,10 +8,11 @@ operator-reported `[V]` against the pasted output, not re-executed here.
 Effective authority remains Amendment 002 (`config_digest`
 `ba73d7bc6df4699dd0ddbd1e6dae79341fccd74b474f231e8857a20a22ffcfe3`, unchanged by every commit below).
 
-## Status after run 8 (supersedes the "capacity floor" reading below where they conflict)
-F16 (letters-only ids) removes the cap on fixed-position copying. The open base-capability question is now
-specifically variable-position copy of a once-occurring id (B3/B4), which run 6 achieved letter-perfect and
-run 8 did not. Neither arm's frozen budget has been re-evaluated post-F16; the ABS frozen budget (2000
+## Status after runs 8–10 (supersedes the "capacity floor" reading below where they conflict)
+F16 (letters-only ids) removes the cap on fixed-position copying. Runs 8–10 show every P0 primitive is
+reachable but no checkpoint reaches all of them: B3/B4 range 0–1.0 across trajectories that differ only in
+dataset size. Post-F16 the base-capability blocker is reliability of circuit formation at 64-d / 2 layers,
+not the existence of the capability. Neither arm's frozen budget has been re-evaluated post-F16; the ABS frozen budget (2000
 updates) still never learns the output format, so ABS at the frozen recipe remains BLOCKED regardless.
 
 ## Load-bearing question
@@ -58,6 +59,24 @@ Run 8 full P0: validity 0.979; B1 1.0, B2 0.75, B3 0, B4 0, B5 0.75, B6 0.88, B7
   configuration cannot bound it; development seeds can.
 - `[V]` A CPU three-condition diagnostic on fixture 883003 (700 P0-only examples, 6000 updates) was inconclusive:
   all conditions memorized (loss 0.04) and produced malformed held-out output. Not evidence for or against F16.
+
+### Post-F16 variance probe (runs 9–10; smoke seed 8100, ABS, 30000 updates, dataset size perturbed)
+Same seed and recipe as run 8; only `n_train_per_split` differs, which changes the training trajectory.
+| run | n_train | validity | B1 | B2 | B3 | B4 | B5 | B6 | B7 | B3 exact / prefix | B4 exact / prefix |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| 8 | 1500 | 0.979 | 1.0 | .75 | 0 | 0 | .75 | .88 | 1.0 | 0 / 0.0 | 0 / 1.4 |
+| 9 | 1400 | 0.927 | 1.0 | .75 | **1.0** | **.88** | 1.0 | .38 | 1.0 | 1.0 / 6.0 | .88 / 6.0 |
+| 10 | 1600 | 1.000 | .50 | .75 | .12 | .62 | .75 | .25 | 1.0 | .12 / 0.8 | .62 / 4.9 |
+
+- `[V]` Every P0 primitive is within reach of the frozen architecture at this budget: each subtask reaches
+  ≥ 0.88 in at least one run (B1, B3, B5, B7 reach 1.0; B4 0.88; B6 0.88; B2 0.75 max).
+- `[V]` No single checkpoint clears the gate (≥ 0.98 on every subtask). Variable-position copy (B3/B4) ranges
+  0–1.0 across three trajectories that differ only in dataset size; B6 (read one categorical value) ranges
+  0.25–0.88. The base-capability failure post-F16 is **reliability of circuit formation**, not capacity.
+- `[I]` `n_eval = 8` per subtask gives ±0.35 confidence intervals; these numbers rank runs, they do not
+  estimate pass rates. Any further calibration should use `n_eval ≥ 64` (evaluation is generation only).
+- Frozen-recipe status unchanged: at 2000 updates the format is never learned, so BTRR-ABS at the frozen
+  recipe remains `RELATIONAL_REASONING_BLOCKED_BY_BASE_CAPABILITY`.
 
 Fixture-only learnability diagnostic (`overfit_diagnostic`, seed 883003, eval-on-train, 15 examples):
 validity / answer / P0 = 1.0 / 1.0 / 1.0 at both 2000 and 4000 updates (CPU). The train→generate
