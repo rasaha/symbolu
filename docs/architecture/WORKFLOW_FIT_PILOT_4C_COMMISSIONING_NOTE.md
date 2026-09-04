@@ -1923,19 +1923,17 @@ pre-existing non-blank guard was removed from its parametrize list rather than
 left to assert a refusal this ruling did not cause. The three earlier F1b tests
 named in revision 18 are unchanged and still carry that imprecision.
 
-4. **`[G]` A credential embedded in a well-formed URI is still accepted —
-   carried forward, not closed.** The structural ruling refuses a bare credential
-   but not one carried inside a URI's userinfo, path, query or fragment. All three
-   of `https://user:<key>@host/p`, `https://host/<key>` and `memory://x#<key>` are
-   accepted by the writer, accepted by `verify()`, and committed by `index_digest`
-   `[V]`. **A scheme allowlist would not close this** — every one of those values
-   carries a legitimate scheme — so it is not an argument for revisiting ruling 1.
-   Closing it needs a **separate owner ruling** on whether a custody reference may
-   carry userinfo or opaque path, query and fragment segments at all; that question
-   is about what a custody reference is permitted to *be*, which D5 has not yet
-   settled, and it is not answered here. Until it is ruled, **no genuine run may
-   supply a `verdict_custody_ref` from an untrusted source**, and the field's
-   contents are not evidence that no credential was committed.
+**Obligation 4, as it was raised — superseded by the ruling below; retained for the
+record and no longer a description of current behaviour.** The structural ruling
+refused a bare credential but not one carried inside a URI's userinfo, path, query or
+fragment: `https://user:<key>@host/p`, `https://host/<key>` and `memory://x#<key>` were
+all accepted by the writer, accepted by `verify()`, and committed by `index_digest`
+`[V]`. A scheme allowlist would not have closed this — every one of those values carries
+a legitimate scheme — so it was never an argument for revisiting ruling 1. Closing it
+needed a separate owner ruling on whether a custody reference may carry userinfo or
+opaque path, query and fragment segments at all. **That ruling was given and is recorded
+immediately below**; two of the three shapes are now refused and the third is addressed
+by ruling 6.
 
 **Obligation 4 — ruled. `verdict_custody_ref` is a non-secret locator and must never be
 used to transport credentials `[R]`.** For **every** URI scheme, until D5 ratifies a
@@ -1983,6 +1981,7 @@ traversal segments and length. What remains open is not a defect but ruling 6's 
 limit: syntax cannot prove a permitted path carries no secret, so **no genuine run may take
 `verdict_custody_ref` from an untrusted source**, and the field's contents are never
 evidence that no credential was committed.
+
 This authorises no run: D1–D5 remain incomplete, the custody endpoint remains
 unbound, slice 3B remains uncommissioned, and no provider call, credential access
 or genuine calibration is permitted by this revision.
