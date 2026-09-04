@@ -17,7 +17,8 @@ from typing import Dict, List
 
 from robotics_reliability_bench import fault_corpus as fc
 from robotics_reliability_bench.detectors import (BaselineDetector, BCVFDetector,
-                                                  FusionDetector)
+                                                  FusionDetector, LLTKalmanDetector)
+from robotics_reliability_bench.llt_kalman_trust import LLTKalmanConfig
 from robotics_reliability_bench.metrics import aggregate, score_family
 
 RESULTS = os.path.join(os.path.dirname(__file__), "results")
@@ -39,10 +40,21 @@ def run() -> Dict:
     baseline = BaselineDetector()
     bcvf = BCVFDetector(margin_threshold=BCVF_MARGIN_THRESHOLD, window=DETECTOR_WINDOW)
     fusion = FusionDetector(baseline, bcvf)
-    detectors = [baseline, bcvf, fusion]
+    # LLT-Kalman cross-domain variant (added after the original prereg; its
+    # thresholds were tuned on TUNE families / seeds 0..19 only — see
+    # results/llt_kalman_tune.json). Two tick policies are reported: the
+    # default lets a same-predictor CUSUM crossing set the detection tick
+    # (FusionDetector semantics); "strict" counts bias confirmation only.
+    llt = LLTKalmanDetector()
+    llt_strict = LLTKalmanDetector(LLTKalmanConfig(cusum_accelerates_tick=False),
+                                   name="LLTKalman(strict-tick)")
+    llt_fusion = FusionDetector(llt, bcvf)
+    llt_fusion.name = "Fusion(LLT+BCVF)"
+    detectors = [baseline, bcvf, fusion, llt, llt_strict, llt_fusion]
 
     out: Dict = {"eval_seeds": EVAL_SEEDS,
                  "bcvf_margin_threshold": BCVF_MARGIN_THRESHOLD,
+                 "llt_kalman_config": {k: v for k, v in vars(llt.det.cfg).items()},
                  "tune_families": fc.TUNE_FAMILIES,
                  "test_families": fc.TEST_FAMILIES,
                  "per_detector": {}}
