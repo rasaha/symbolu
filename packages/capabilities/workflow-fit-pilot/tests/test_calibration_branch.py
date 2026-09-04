@@ -341,20 +341,24 @@ def test_score_count_must_equal_the_custody_verdict_count():
 
 
 def test_custody_verdicts_must_cover_exactly_the_prepared_case_set():
-    """G2b. The sampled subset the run executed is authoritative — neither a different set of
-    the same size nor a partial cover is accepted."""
+    """G2b. The sampled subset the run executed is authoritative. All three directions are
+    pinned — a different set of the same size, verdicts missing a prepared case, and verdicts
+    covering *more* than was prepared. The third matters: without it, weakening the check to a
+    superset comparison ships green (revision 28)."""
     manifest = slice2._calibration_manifest()
     other = "c" * 64
-    for facts, record in (
+    cases = (
         # right count, wrong case
-        (_facts(manifest, case_digests=(CASE_A, other)), _custody_record(manifest)),
-        # verdicts cover only part of the prepared set: three cases prepared, two scored
-        (_facts(manifest, case_digests=(CASE_A, CASE_B, other)), _custody_record(manifest)),
-    ):
+        (_facts(manifest, case_digests=(CASE_A, other)), _custody_record(manifest), 2),
+        # three cases prepared, two scored: verdicts are a strict subset
+        (_facts(manifest, case_digests=(CASE_A, CASE_B, other)), _custody_record(manifest), 2),
+        # one case prepared, two scored: verdicts are a strict superset
+        (_facts(manifest, case_digests=(CASE_A,)), _custody_record(manifest), 2),
+    )
+    for facts, record, score_count in cases:
         port = InMemoryVerdictCustody()
-        with pytest.raises(PilotError) as e:
-            _build(manifest, port, facts=facts, record=record,
-                   score_count=len(record.verdicts))
+        with pytest.raises(PilotError, match="do not cover exactly the case set") as e:
+            _build(manifest, port, facts=facts, record=record, score_count=score_count)
         assert e.value.code is PilotErrorCode.RETENTION_VERIFY_FAILED
         assert port.written_references() == ()
 
@@ -384,16 +388,32 @@ def test_validate_lineage_re_runs_role_validation_on_every_supplied_manifest():
     assert e.value.code is PilotErrorCode.RUN_ROLE_INVALID
 
 
-def test_is_calibration_run_stays_a_cheap_field_read():
-    """G1a ruling: the predicate is a convenience, not a trust boundary. Pinned so a later
-    change cannot quietly make it revalidate — the cost would fall on every transition and
-    every record replayed."""
-    import ast
-    import inspect
-    import textwrap
+def test_is_calibration_run_stays_a_cheap_field_read(monkeypatch):
+    """G1a ruling: the predicate is a convenience, not a trust boundary — pinned behaviourally.
 
-    from ugence_workflow_fit_pilot.contracts import lifecycle
+    Revision 27 pinned this by parsing the function for a `revalidate_role` attribute call,
+    which caught only the obvious form: a module-level helper, a `getattr` call and an inline
+    `dataclasses.replace` rebuild all slipped past it (revision 28). Counting actual calls and
+    asserting the predicate trusts the field closes every form."""
+    import pilot_fixtures as pf
+    from ugence_workflow_fit_pilot.contracts.calibration import PilotRunRole
+    from ugence_workflow_fit_pilot.contracts.lifecycle import is_calibration_run
+    from ugence_workflow_fit_pilot.contracts.manifest import PilotStudyManifest
 
-    tree = ast.parse(textwrap.dedent(inspect.getsource(lifecycle.is_calibration_run)))
-    called = {n.func.attr for n in ast.walk(tree) if isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute)}
-    assert "revalidate_role" not in called
+    calls = []
+    original = PilotStudyManifest.revalidate_role
+    monkeypatch.setattr(
+        PilotStudyManifest, "revalidate_role",
+        lambda self: (calls.append(self.manifest_digest), original(self))[1],
+    )
+    for manifest in (slice2._calibration_manifest(), slice2._confirmatory_manifest(), pf.manifest()):
+        is_calibration_run(manifest)
+    assert calls == [], "is_calibration_run must not revalidate: it is a convenience by ruling"
+
+    # And it trusts the field: a v2 CONFIRMATORY manifest tampered to CALIBRATION reads as a
+    # calibration run. That is the accepted consequence of G1a, not a defect — validate_lineage
+    # is what refuses it.
+    tampered = slice2._confirmatory_manifest()
+    object.__setattr__(tampered, "run_role", PilotRunRole.CALIBRATION)
+    assert is_calibration_run(tampered) is True
+    assert calls == []

@@ -2407,8 +2407,13 @@ is an **owner ruling `[R]`**; the implementation notes are `[V]`.
 directly and stays O(1). The trust boundary is the Phase 4C entry point and `validate_lineage`,
 not every predicate call: revalidating inside the predicate would make `transition`
 O(manifest) and cost a manifest rebuild plus digest recompute for every record replayed. The
-consequence is accepted knowingly — a tampered manifest handed straight to `transition` is
-trusted there, and the replay verifier is what catches it.
+consequence is accepted knowingly: a tampered manifest is trusted wherever the field is read
+without revalidation — `transition`, `require_calibration_endpoint`, and a direct `run_pilot`
+call — and the replay verifier is what catches it.
+
+> **Extended by revision 28 — retained for the record.** As first written this named only
+> `transition`. Revision 23's G1 record named `require_calibration_endpoint` and a direct
+> `run_pilot` call as well; the same ruling covers all of them and the list is now complete.
 
 **G1b — `validate_lineage` re-runs role validation, once per distinct manifest.** F4's
 obligation names a *verifier*, and this is it. The v1 digest payload excludes the role fields,
@@ -2423,14 +2428,22 @@ or partial custody write is refused **before** any write is attempted.
 **G2b — the authoritative case set is the sampled subset, not the full benchmark.** For a
 CALIBRATION run the sample is 50 of 250, and custody verdicts must cover **exactly** the case
 set the prepared bundle committed — neither a different set of the same size nor a partial
-cover. Since `build_calibration_result` never sees the manifest, those digests are carried on
+cover. *(Revision 28: true of the code from the start, but the test was one
+direction short — it omitted verdicts covering **more** than was prepared, so weakening the
+check to a superset comparison shipped green. All three directions are now pinned.)* Since `build_calibration_result` never sees the manifest, those digests are carried on
 `VerifiedPreparedFacts.case_digests`, which is required, non-empty and duplicate-free.
 
 **Implementation `[V]`.** `validate_lineage` revalidates each supplied manifest before
 replaying. `build_calibration_result` performs both reconciliations before
 `write_and_verify`, so a mismatch never reaches the custody store — tests assert
 `written_references() == ()`. A test pins that `is_calibration_run` does **not** call
-`revalidate_role`, so the G1a ruling cannot be quietly reversed by a later change. Every new
+`revalidate_role`, so the G1a ruling cannot be quietly reversed by a later change.
+
+> **Corrected by revision 28 — retained for the record.** "Cannot be quietly reversed" was too
+> strong: the pin parsed the function for a `revalidate_role` **attribute call**, catching a
+> direct call and a call through the class, but a module-level helper, a `getattr` call and an
+> inline `dataclasses.replace` rebuild all passed it. The pin is now behavioural — it counts
+> actual calls and asserts the predicate trusts the field — and all three forms fail it. Every new
 guard was stubbed and fails one test each.
 
 **What this does not do.** It binds no endpoint, ACL, writer identity, encryption, retention
@@ -2442,3 +2455,46 @@ vacuous until a Phase 4C pipeline exists and calls the gated entry point.
 G1 and G2 closed here, **G3 alone remains open**. D1–D5 remain incomplete, the custody
 endpoint remains unbound, real custody adapters and genuine execution remain blocked, and no
 provider call, credential access or genuine calibration is permitted by this revision.
+
+### Revision 28 (independent-review corrections to revision 27, 2026-09-04)
+
+An independent adversarial review of revision 27 returned CONDITIONALLY APPROVED: all four
+rulings implemented as stated and surviving every attack, with two claims outrunning the
+tests behind them and one consequence recorded less completely than revision 23 had it. This
+closes all three. It **rules nothing new**.
+
+**Confirmed under attack `[V]`, worth recording because it was doubted.** `frozenset` is the
+correct comparison for G2b: both sides are validated 64-lowercase-hex and duplicate-free by
+construction, so set equality *is* multiset equality, and the record's verdict order is
+already forced ascending. An ordered comparison would add nothing and would wrongly refuse a
+prepared set given in a different order. Ten attack shapes — uppercase hex, padded digests,
+list-not-tuple, empty, duplicated, superset, subset, disjoint — are all refused, and nothing
+is written on any of them.
+
+**Corrected: the G1a pin was partly theatre `[V]`.** It parsed `is_calibration_run` for a
+`revalidate_role` attribute call. That caught a direct call and a call through the class, but
+a module-level helper, a `getattr` call and an inline `dataclasses.replace` rebuild all
+passed it — three ordinary forms. The pin is now behavioural: it counts actual calls to
+`revalidate_role` across a calibration, a confirmatory and a v1 manifest and asserts zero,
+then asserts the predicate reads a tampered v2 CONFIRMATORY→CALIBRATION manifest as a
+calibration run, which is the ruling's accepted consequence made explicit. All three bypass
+forms now fail it.
+
+**Corrected: the G2b test was one direction short `[V]`.** The code refused verdicts covering
+*more* than the prepared set from the start; the test did not, so weakening the check to a
+superset comparison failed **zero** of 228 tests. All three directions — different set of the
+same size, strict subset, strict superset — are now pinned, each with a message match, and
+both weakenings now fail.
+
+**Corrected: the G1a consequence, restored in full.** Revision 23 named
+`require_calibration_endpoint` and a direct `run_pilot` call alongside `transition` as sites
+that trust `run_role`. Revision 27 named only `transition`. The same ruling covers all of
+them; the record now says so.
+
+**Three claims annotated in place** per the revision-19 form, with the original text
+retained.
+
+**Status.** Unchanged in kind: G1 and G2 closed, **G3 alone remains open** and vacuous until
+a Phase 4C pipeline exists. D1–D5 remain incomplete, the custody endpoint remains unbound,
+real custody adapters and genuine execution remain blocked, and no provider call, credential
+access or genuine calibration is permitted.
