@@ -21,6 +21,9 @@ Scoped and ratified by `docs/architecture/ADR_UGENCE_APPROVAL_WORKFLOW_SCOPING.m
 - Two adapters (D-4): `InMemoryApprovalWorkflowStore`, refused in production mode,
   and `SqliteApprovalWorkflowStore` — WAL, `BEGIN IMMEDIATE`, a unique consumption
   key, and one append-only hash-linked `ledger_events` table.
+- Composition-root integration tests for the Decision Authority seam
+  (`complete_review` + `VersionedRef(kind="approval")`), skipped when pydantic is
+  absent so the default suite runs dependency-free.
 - Neighbours unmodified: Decision Authority 1.0.0, Policy Workflow Compiler,
   cloud-scaling-operations 0.2.0, execution-reservation 0.1.0 (its ledger shape is
   copied, never imported).

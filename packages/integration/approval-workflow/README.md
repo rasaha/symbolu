@@ -142,6 +142,13 @@ if outcome.is_consumed:
     decision_cases.complete_review(case_id="case_1", task_id="rev_1", actor=approver_id)
 ```
 
+`tests/integration/test_decision_authority_seam.py` proves this end to end against the
+real kernel: a granted approval clears a `SECONDARY_APPROVAL` task and readiness
+passes, while a lapsed, already-consumed, ungranted or changed-subject approval
+produces no `complete_review` call at all and the case stays blocked on
+`REQUIRED_REVIEW_OUTSTANDING`. Those tests are the only place the kernel is imported;
+they skip when pydantic is absent, so the default suite stays dependency-free.
+
 ## ServiceNow and Jira
 
 Mirrors are **written from the ledger and never read back into it**. A mirror
