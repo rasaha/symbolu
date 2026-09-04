@@ -1,0 +1,202 @@
+{
+  "schema": "e1s/preregistration/v1",
+  "arm": "E1-S",
+  "ratified": true,
+  "ratified_on": "2026-09-04",
+  "ratified_by": "rakeshmohan888@gmail.com (session instruction: 'Implement what is recommended')",
+  "draft_document": "EXPLICIT_KEY_ADDRESSING_SCALEUP_PREREGISTRATION_DRAFT.md",
+  "owner_decisions": {
+    "1": "ratified",
+    "2": "ladder {32,128,512}, primary 512",
+    "3": "dev 6100-6102, final 6140-6144, fixtures 886000-886004",
+    "4": "gates carried unchanged from E1 (strictly harder) + G8",
+    "5": "two-key execution guard (BTRR mechanism)"
+  },
+  "e1_source_sha256": {
+    "models.py": "bb30b388baffc6f03b4877efd47a65a3b01826a91d57021b325bdf939bc703c8",
+    "task.py": "25471a88b292a5c9f42bee6a732838cbe507097ed5b26f9edfb084da298bd79d"
+  },
+  "vocab": {
+    "VOCAB": 226,
+    "N_ST": 10,
+    "N_REL": 10,
+    "N_OT": 8,
+    "SYN": 3,
+    "ID_PRIMS": 96,
+    "N_VALUES": 32,
+    "N_FILLER": 12,
+    "KLEN": 6,
+    "QLEN": 9,
+    "PAD": 0,
+    "SEP": 1
+  },
+  "densities": [
+    32,
+    128,
+    512
+  ],
+  "anchor_density": 32,
+  "primary_density": 512,
+  "recipe": {
+    "D": 64,
+    "steps": 1200,
+    "tau": 0.07,
+    "train_no_match_frac": 0.3,
+    "batch": 48,
+    "lr": 0.001,
+    "train_episodes": 1500,
+    "train_seed_for_episodes": 7,
+    "eval_n_per_split": 200
+  },
+  "profiles": {
+    "balanced": [
+      0.1875,
+      0.1875,
+      0.25
+    ],
+    "hard_names": [
+      0.125,
+      0.125,
+      0.5625
+    ],
+    "same_entity": [
+      0.4375,
+      0.125,
+      0.1875
+    ],
+    "stable": [
+      0.0625,
+      0.0625,
+      0.0625
+    ]
+  },
+  "splits": {
+    "G1_unseen_identity": [
+      0.0,
+      1,
+      "balanced",
+      "seen"
+    ],
+    "G2_paraphrase": [
+      0.0,
+      2,
+      "balanced",
+      "seen"
+    ],
+    "G3_hard_names": [
+      0.0,
+      1,
+      "hard_names",
+      "seen"
+    ],
+    "G4_same_entity_diff_attr": [
+      0.0,
+      1,
+      "same_entity",
+      "seen"
+    ],
+    "G5_recombined": [
+      0.0,
+      1,
+      "balanced",
+      "seen"
+    ],
+    "G6_no_match": [
+      1.0,
+      1,
+      "balanced",
+      "seen"
+    ],
+    "G7_stable": [
+      0.0,
+      1,
+      "stable",
+      "seen"
+    ],
+    "G8_unseen_composition": [
+      0.0,
+      1,
+      "balanced",
+      "held_out"
+    ]
+  },
+  "gates": {
+    "G1_unseen_identity_min_addr": 0.8,
+    "G2_paraphrase_min_addr": 0.8,
+    "G3_hard_names_min_addr": 0.8,
+    "G4_same_entity_diff_attr_min_addr": 0.75,
+    "G5_recombined_min_addr": 0.8,
+    "G8_unseen_composition_min_addr": 0.8,
+    "nomatch_max_false_accept": 0.3,
+    "nomatch_min_recall": 0.7,
+    "nomatch_min_precision": 0.7,
+    "nomatch_max_confident_false_accept": 0.2,
+    "valid_max_false_reject": 0.15,
+    "min_answer_availability": 0.8,
+    "min_ordinary_retrieval_accuracy": 0.7,
+    "min_improvement_over_b0": 0.5,
+    "min_oracle_key_value_accuracy": 0.99,
+    "max_oracle_to_predicted_gap": 0.3,
+    "min_G7_stable_addr": 0.9,
+    "worst_seed_min_G1_addr": 0.7,
+    "structure_blind_margin": 0.1,
+    "lexical_overlap_max_accuracy": 0.3
+  },
+  "seeds": {
+    "development": [
+      6100,
+      6101,
+      6102
+    ],
+    "final": [
+      6140,
+      6141,
+      6142,
+      6143,
+      6144
+    ],
+    "fixtures": [
+      886000,
+      886001,
+      886002,
+      886003,
+      886004
+    ]
+  },
+  "final_seeds_required_to_pass": 4,
+  "expected_e1_params": 22848,
+  "b0_params_by_density": {
+    "32": 31072,
+    "128": 37216,
+    "512": 61792
+  },
+  "hypotheses": {
+    "H1": "K=512 passes every carried gate on >=4/5 final seeds",
+    "H2": "no-match false-accept <=0.30 and confident false-accept <=0.20 at K=512 on >=4/5 seeds",
+    "H3": "G1 and G8 addressing >=0.80 at K=512"
+  },
+  "verdicts": [
+    "EXPLICIT_KEY_SCALEUP_VALIDATED",
+    "EXPLICIT_KEY_SCALEUP_DENSITY_LIMITED",
+    "EXPLICIT_KEY_SCALEUP_NOMATCH_FAILED",
+    "EXPLICIT_KEY_SCALEUP_NOT_VALIDATED",
+    "SHORTCUT_OR_LEAKAGE_DETECTED",
+    "EXPLICIT_KEY_DETERMINISM_NOT_ESTABLISHED",
+    "EXPLICIT_KEY_PROTOCOL_VIOLATED"
+  ],
+  "preserved": [
+    "ORIGINAL_BINDINGSLOTS_NEURAL_ROUTING_UNRESOLVED",
+    "E1_TEMPORAL_TRANSFER_PARTIAL",
+    "KDA_VALIDATION_BLOCKED"
+  ],
+  "forbidden": [
+    "BINDINGSLOTS_RESOLVED",
+    "E1_FOLLOW_ON_RESEARCH_ELIGIBLE",
+    "E1_STRUCTURAL_TRANSFER_CONFIRMED",
+    "E1_TEMPORAL_TRANSFER_VALIDATED",
+    "ENTERPRISE_READY",
+    "KDA_VALIDATION_ELIGIBLE",
+    "PRODUCTION_READY"
+  ],
+  "config_digest": "add2f89842c22bd951e49f1216c801426463ebc959b110f7b53913464ab6b5ec"
+}

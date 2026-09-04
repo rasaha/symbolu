@@ -1,7 +1,8 @@
-# Explicit-Key Addressing Scale-Up (E1-S) — Preregistration (DRAFT, requires ratification)
+# Explicit-Key Addressing Scale-Up (E1-S) — Preregistration (RATIFIED 2026-09-04)
 
-**Status: DRAFT. Authorizes nothing. No code exists for this line; no seed is reserved, consumed, or
-signed by this document.** Roadmap item 2 of `HYBRID_LLM_ENTERPRISE_RELATIONAL_REASONING_V1_1.md` scaled
+**Status: RATIFIED by the owner on 2026-09-04 with the recommended defaults (decisions 1–5 below). Implemented at
+`experiments/explicit_key_scaleup/` (fixtures only); companion `E1S_PREREGISTRATION.json` carries the frozen values and
+`config_digest`; `E1S_EXECUTION_AUTHORIZATION_RECORD.json` is UNSIGNED. No reserved seed has been consumed.** Roadmap item 2 of `HYBRID_LLM_ENTERPRISE_RELATIONAL_REASONING_V1_1.md` scaled
 up; status-matrix row "Explicit-key semantic addressing → Enterprise/real-model transfer (unauth.)".
 Owner instruction 2026-09-04: start this line after closing both BTRR arms.
 
@@ -78,7 +79,7 @@ B0 ≥ 0.50; oracle value ≥ 0.99; oracle gap ≤ 0.30; G7 stability ≥ 0.90; 
 compensation: every gate must pass at a density level for that level to pass. Owner decision [4] may
 instead rescale the B0-improvement gate, since B0's chance floor falls with K.
 
-## 7. Verdict vocabulary (new tokens; precedence inherited)
+## 7. Verdict vocabulary (new tokens; precedence: leakage/shortcut → determinism → protocol/anchor → VALIDATED → NOMATCH_FAILED at the primary density → DENSITY_LIMITED → NOT_VALIDATED; no-match precedes density-limited because the anchor guarantees a passing lower level)
 `EXPLICIT_KEY_SCALEUP_VALIDATED` (K = 512 passes on ≥ 4/5) · `EXPLICIT_KEY_SCALEUP_DENSITY_LIMITED`
 (passes at a lower level, fails at 512; the ceiling is reported) · `EXPLICIT_KEY_SCALEUP_NOMATCH_FAILED`
 (H2 fails while addressing passes) · `EXPLICIT_KEY_SCALEUP_NOT_VALIDATED` · `SHORTCUT_OR_LEAKAGE_DETECTED`

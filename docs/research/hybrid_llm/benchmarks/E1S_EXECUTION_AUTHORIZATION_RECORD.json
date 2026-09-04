@@ -1,0 +1,36 @@
+{
+  "schema": "e1s/execution_authorization_record/v1",
+  "arm": "E1-S",
+  "status": "UNSIGNED \u2014 every role authorized:false. E1-S reserved seeds fail closed.",
+  "note": "Two-key mechanism (see experiments/explicit_key_scaleup/execution.py). To authorize a role the OWNER sets authorized:true, authorized_by, date, token_sha256 (sha256 of a plaintext token generated out-of-band, never committed), protocol_lock_digest = experiments.explicit_key_scaleup.manifest.config_digest(), optional expires_at, and COMMITS it. The operator supplies the plaintext via env E1S_EXEC_TOKEN. Development seeds calibrate near-miss profiles and confirm the K=32 anchor; final seeds run once, post-lock.",
+  "roles": {
+    "development": {
+      "authorized": false,
+      "authorized_by": null,
+      "date": null,
+      "scope_seeds": [
+        6100,
+        6101,
+        6102
+      ],
+      "token_sha256": null,
+      "protocol_lock_digest": null,
+      "expires_at": null
+    },
+    "final": {
+      "authorized": false,
+      "authorized_by": null,
+      "date": null,
+      "scope_seeds": [
+        6140,
+        6141,
+        6142,
+        6143,
+        6144
+      ],
+      "token_sha256": null,
+      "protocol_lock_digest": null,
+      "expires_at": null
+    }
+  }
+}
