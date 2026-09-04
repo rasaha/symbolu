@@ -26,7 +26,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Callable, Optional
+from typing import Callable, Optional, Any
 
 from ..domain.authority import AuthorityGrant
 from ..domain.enums import AuthorityType, RiskClass, RiskOutcome, RiskRecommendation
@@ -143,6 +143,7 @@ class RiskEvaluationSeam:
         key_record,
         clock: Callable[[], datetime],
         revocation: Optional[RevocationState] = None,
+        persistence: Optional[Any] = None,
     ) -> "RiskEvaluationSeam":
         """Build a production seam. Fails closed on any reference-grade dependency.
 
@@ -180,6 +181,7 @@ class RiskEvaluationSeam:
             evidence_ingress=evidence_ingress,
             decision_authority=decision_authority,
             revocation=revocation,
+            persistence=persistence,
             production_mode=True,
         )
         app.authority.add_grant(evaluator_grant)
@@ -202,6 +204,7 @@ class RiskEvaluationSeam:
         policy_resolver: Optional[PolicyResolverPort] = None,
         evidence_resolver: Optional[TrustedControlEvidenceResolverPort] = None,
         evaluator_principal_id: str = "ra-reference-evaluator",
+        persistence: Optional[Any] = None,
     ) -> "RiskEvaluationSeam":
         """Build a REFERENCE/conformance seam (visibly labelled; never production).
 
@@ -213,6 +216,7 @@ class RiskEvaluationSeam:
             workflow_source=workflow_source,
             key_record=key_record,
             clock=clock,
+            persistence=persistence,
             production_mode=False,
         )
 

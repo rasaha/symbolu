@@ -34,7 +34,7 @@ import importlib.util, sys
 from datetime import datetime, timezone
 
 import risk_authority as ra
-assert ra.__version__ == "0.6.0", ra.__version__
+assert ra.__version__ == "0.7.0", ra.__version__
 assert "site-packages" in ra.__file__, ra.__file__
 assert not any("/symbolu" in p for p in sys.path), sys.path
 
@@ -158,9 +158,25 @@ class _PDA:
     def issue_decision(self, **k): return self._i.issue_decision(**k)
 
 psrc = InMemoryWorkflowIRSource(); psrc.register(swf)
+import os, tempfile
+from risk_authority.persistence import (SqliteRiskAuthorityStore, PersistenceProductionModeError,
+    PersistenceConflictError)
+def _durable():
+    return SqliteRiskAuthorityStore(os.path.join(tempfile.mkdtemp(), "risk-authority.sqlite"))
 pkw = dict(workflow_source=psrc, key_record=key, clock=lambda: now,
            evidence_admission=_PA(), control_assurance=_PA(), evidence_ingress=_PA(),
-           production_mode=True)
+           persistence=_durable(), production_mode=True)
+# production_mode=True over the in-memory reference stores fails closed (durable persistence D-5)
+try:
+    RiskAuthorityApplication(decision_authority=_PDA(), **{**pkw, "persistence": None})
+    raise AssertionError("production accepted the in-memory reference stores")
+except PersistenceProductionModeError:
+    pass
+try:
+    RiskAuthorityApplication(decision_authority=_PDA(), **{**pkw, "persistence": SqliteRiskAuthorityStore(":memory:")})
+    raise AssertionError("production accepted an in-memory SQLite database")
+except PersistenceProductionModeError:
+    pass
 # production_mode=True with no Decision Authority fails closed
 try:
     RiskAuthorityApplication(decision_authority=None, **pkw)
@@ -377,7 +393,7 @@ vgrant = AuthorityGrant(principal_id="prod-evaluator", tenant_id="tnt-acme",
 vprod = RiskEvaluationSeam.production(workflow_source=vsrc, policy_resolver=_PSAR(),
     evidence_resolver=_PEv(), evidence_admission=_PA(), control_assurance=_PA(),
     evidence_ingress=_PA(), decision_authority=_PDA(), evaluator_grant=vgrant,
-    key_record=key, clock=lambda: vnow)
+    key_record=key, clock=lambda: vnow, persistence=_durable())
 _caller_time = vt0 + timedelta(minutes=1)
 _tr = vprod.evaluate(SubjectRiskEvaluationRequestV2.from_dict(
     {**vreq.to_canonical_dict(), "evaluation_time": "2026-08-13T04:01:00.000000Z"}))
@@ -399,6 +415,51 @@ except SeamConfigurationError:
 # (f) v1 remains byte-for-byte intact after the widening.
 assert sreq.digest() == SubjectRiskEvaluationRequest.from_dict(sreq.to_canonical_dict()).digest()
 print("ISOLATED SINGLE-WHEEL RISK-AUTHORITY v2 SEAM ADMISSION (PHASE 4B) VERIFICATION OK")
+
+
+# --- Durable persistence (v0.7.0): evaluate, close, reopen in a fresh application, issue --
+from risk_authority.api import EnvelopeIssuanceSeam, EnvelopeIssuanceRequest, VERIFIED, VerifiedArtifactBinding
+from risk_authority.crypto.canonical import to_canonical_obj
+from risk_authority.crypto.hashing import digest as _dg
+dpath = os.path.join(tempfile.mkdtemp(), "risk-authority.sqlite")
+dstore = SqliteRiskAuthorityStore(dpath)
+assert dstore.is_production_authoritative is True
+dapp = RiskAuthorityApplication(workflow_source=src, key_record=key, clock=lambda: now, persistence=dstore)
+dapp.authority.add_grant(AuthorityGrant(principal_id="risk-office-prod", tenant_id="t",
+    authority_type=AuthorityType.RISK_APPROVAL, domains=("FINANCE",),
+    allowed_risk_classes=(RiskClass.HIGH,), max_autonomy=2, delegated_by="ero", grantable_scope=scope))
+dapp.create_case(CreateCaseRequest(tenant_id="t", case_id="rdc_durable", subject_id="agent_finance_07",
+    model_id="model_xyz", purpose="CUSTOMER_REFUND_REVIEW", domain="FINANCE", jurisdictions=("US",),
+    tools=("crm.read", "refund.prepare"), autonomy_level=2, data_classes=("CUSTOMER_PII",),
+    workflow_ir_id="finance-ai-risk", inherent_risk=RiskClass.HIGH, residual_risk=RiskClass.MEDIUM))
+dev = dapp.evaluate("t", "rdc_durable", EvaluateRequest(
+    control_results=(ControlResultInput("MODEL_PROVENANCE_VALID", "PASS"),)))
+ddec = dapp.issue_decision("t", "rdc_durable", dev, DecisionRequest(principal_id="risk-office-prod", requested_scope=scope))
+assert dstore.verify_chain()
+dstore.close()
+reopened = SqliteRiskAuthorityStore(dpath)
+fresh = RiskAuthorityApplication(workflow_source=src, key_record=key, clock=lambda: now, persistence=reopened)
+assert fresh.decisions.get("t", ddec.decision_id) == ddec
+try:
+    fresh.decisions.save(ddec)
+    raise AssertionError("durable store overwrote a decision")
+except PersistenceConflictError:
+    pass
+class _V:
+    is_production_authoritative = True
+    def verify(self, *, as_of): return (VerifiedArtifactBinding("k", "a" * 64, VERIFIED, as_of),)
+dseam = EnvelopeIssuanceSeam.reference(app=fresh, key_record=key, verification=_V(), clock=lambda: now,
+    required_binding_kinds=("k",))
+dout = dseam.issue(EnvelopeIssuanceRequest(tenant_id="t", decision_id=ddec.decision_id,
+    decision_digest=_dg(to_canonical_obj(ddec)), audience="a", session_id="s", nonce="n"))
+assert dout.issued and dout.executable is False, (dout.refusal, dout.detail)
+assert fresh.verify_envelope("t", dout.envelope.envelope_id).valid
+assert reopened.verify_chain() and reopened.ids.next("rae") != dout.envelope.envelope_id
+reopened.revocation.advance_epoch("t")
+reopened.close()
+assert not RiskAuthorityApplication(workflow_source=src, key_record=key, clock=lambda: now,
+    persistence=SqliteRiskAuthorityStore(dpath)).verify_envelope("t", dout.envelope.envelope_id).valid
+print("ISOLATED SINGLE-WHEEL RISK-AUTHORITY DURABLE PERSISTENCE (v0.7.0) VERIFICATION OK")
 
 print("ISOLATED SINGLE-WHEEL RISK-AUTHORITY VERIFICATION OK")
 '''

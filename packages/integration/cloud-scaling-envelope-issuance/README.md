@@ -66,8 +66,9 @@ never a pass. A decision that has expired or drifted refuses before any verifier
 application, the reference envelope signer, a signer that has not opted in with
 `is_production_authoritative = True`, and either verifier built outside `production_mode`.
 `reference(...)` refuses a production application. The seam repeats its own gates on every
-act. Production issuance is possible only in the application instance that evaluated the
-decision, because Risk Authority's decision and envelope repositories are in-memory (ADR D-5).
+act. A production application must stand on Risk Authority's durable store
+(`SqliteRiskAuthorityStore`, Risk Authority 0.7.0); any application over the store that holds
+the decision may issue, which lifts the same-instance restriction ADR D-5 recorded.
 
 ## What it does not do
 

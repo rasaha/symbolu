@@ -47,6 +47,7 @@ from .envelope import (
 from .errors import (
     AuthorityDeniedError,
     IllegalTransitionError,
+    SnapshotIntegrityError,
     MonotonicityViolationError,
     RiskAuthorityError,
 )
@@ -61,6 +62,7 @@ from .evidence import (
 from .risk_case import (
     ALLOWED_TRANSITIONS,
     RequestedCapabilities,
+    RiskCaseSnapshot,
     RiskDecisionCase,
 )
 from .scope import Scope, subset_violations
@@ -122,6 +124,7 @@ __all__ = [
     "action_digest",
     # case
     "RiskDecisionCase",
+    "RiskCaseSnapshot",
     "RequestedCapabilities",
     "ALLOWED_TRANSITIONS",
     # events
@@ -130,6 +133,7 @@ __all__ = [
     # errors
     "RiskAuthorityError",
     "IllegalTransitionError",
+    "SnapshotIntegrityError",
     "AuthorityDeniedError",
     "MonotonicityViolationError",
 ]

@@ -70,7 +70,7 @@ src/risk_authority/
   services/       risk engine, reference decision authority (+ port), envelope issuer/verifier, revocation
   crypto/         canonical serialization, sha-256 hashing, pure-Python Ed25519, key ring
   integrations/   ActionGate / TAP / PWC ports (+ reference ActionGate matching engine)
-  persistence/    repository contracts, in-memory reference, Postgres skeleton + DDL
+  persistence/    repository contracts, in-memory reference, durable SQLite store + codec, Postgres DDL
   api/            transport-neutral schemas, application facade, optional FastAPI routes
   observability/  governance-event bus, metrics
 tests/            unit · contract · integration · adversarial
@@ -381,7 +381,7 @@ property: an envelope is authority, never execution.
 
 | Path | Signer | Verification port | Application |
 |---|---|---|---|
-| `EnvelopeIssuanceSeam.production(...)` | must declare `is_production_authoritative = True`; `ReferenceEnvelopeSigner` refused | must declare `is_production_authoritative = True` | must be in production mode — the instance that evaluated the decision, since repositories are in-memory (D-5) |
+| `EnvelopeIssuanceSeam.production(...)` | must declare `is_production_authoritative = True`; `ReferenceEnvelopeSigner` refused | must declare `is_production_authoritative = True` | must be in production mode, standing on the durable store that holds the decision (v0.7.0); before durable persistence this meant the instance that evaluated it (D-5) |
 | `EnvelopeIssuanceSeam.reference(...)` | in-memory `ReferenceEnvelopeSigner` over a `SigningKeyRecord` | any | never a production application |
 
 Risk Authority names no domain's artifacts: the composition root declares the binding kinds
@@ -389,9 +389,39 @@ it requires, and the cloud-scaling composition package (5B-4) projects its verif
 onto the one word `VERIFIED`. The case-based `issue_envelope` and `authorize_action` stay
 contained in production mode; production ActionGate admission is 5C and credentials are 5X.
 
-**Not in this release:** HSM/KMS signer implementations (the port is their seam), durable
-decision or envelope persistence (wave 1 follow-up) and any
-`CanonicalAction` mapping for capacity actions.
+**Not in this release:** HSM/KMS signer implementations (the port is their seam) and any
+`CanonicalAction` mapping for capacity actions. Durable persistence arrived in v0.7.0
+(next section), which lifts the same-instance restriction on the row above.
+
+## Durable persistence (v0.7.0)
+
+`ADR_RISK_AUTHORITY_DURABLE_PERSISTENCE_SCOPING.md` ratified five decisions; this release
+implements them without adding a dependency (stdlib `sqlite3`).
+
+| Decision | What ships |
+|---|---|
+| D-1 backend | `persistence.sqlite.SqliteRiskAuthorityStore(path)`: one file, WAL, `BEGIN IMMEDIATE` around every write, a `meta` schema row, and an append-only hash-linked `ledger_events` table with `verify_chain()`. Adapters for all seven repository ports plus `SqliteRevocationState` and `SqliteIdAllocator`. The Postgres skeleton stays as DDL documentation and still raises. |
+| D-2 codec | `persistence.codec`: a strict annotation-driven decoder (`decode_dataclass`) over the package's one canonical encoder. Unknown fields, missing required fields and wrong shapes are `PersistenceStorageError`; the domain type's own validation runs on read. The envelope signature is stored beside the canonical body. `RiskDecisionCase.snapshot()` / `from_snapshot()` replay the event list and refuse a broken `prev_digest` chain (`SnapshotIntegrityError`). |
+| D-3 identity | Decisions, envelopes, evidence and governance events refuse an existing id (`PersistenceConflictError`); a case re-save must be the same aggregate (identity fields equal, no events lost); grants and control results replace, as their ports specify. Ids come from a durable per-prefix counter, so a restart never re-mints one. |
+| D-4 revocation | Epoch advances and revocations are appended rows; `SqliteRevocationState` rebuilds the hot-path predicate on open, so issuance, `verify_envelope` and the RA-6 lifecycle writer share one durable state. |
+| D-5 posture | `production_mode=True` refuses any store that has not declared `is_production_authoritative = True`: the in-memory reference stores never do, and a `":memory:"` SQLite database does not either. Pass `persistence=SqliteRiskAuthorityStore("<file>")` to the application or to either `RiskEvaluationSeam` factory. Individual stores may not be mixed beside a bundle. |
+
+```python
+store = SqliteRiskAuthorityStore("/var/lib/ugence/risk-authority.sqlite")
+app = RiskAuthorityApplication(workflow_source=..., key_record=..., clock=..., persistence=store,
+                               evidence_admission=..., control_assurance=..., evidence_ingress=...,
+                               decision_authority=..., production_mode=True)
+```
+
+The acceptance test (`tests/integration/test_sqlite_persistence.py`) evaluates a decision,
+closes the store, reopens it under a fresh application and issues a Phase 5 envelope through
+`EnvelopeIssuanceSeam` that verifies; the distribution verifier repeats it from the wheel.
+Nothing in `persistence/` reads a clock: records carry their own instants and the ledger
+orders by sequence.
+
+**Gaps that survive:** multi-node consistency (single host, one writer at a time), HSM/KMS
+custody, and key rotation across restarts (the key ring is built from the one injected key,
+so an envelope signed under a rotated key is unverifiable after restart).
 
 ## Verify the distribution
 

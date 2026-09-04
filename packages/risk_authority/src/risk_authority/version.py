@@ -11,4 +11,7 @@ from __future__ import annotations
 #: the ``EnvelopeSignerPort`` and the additive ``EnvelopeBindings.artifact_bindings``. Additive
 #: for every existing caller; an envelope minted from this version carries one more binding key,
 #: which moves its canonical signing payload.
-__version__ = "0.6.0"
+#: ``0.7.0`` is durable persistence (ADR_RISK_AUTHORITY_DURABLE_PERSISTENCE_SCOPING D-1 … D-5):
+#: the SQLite store, the strict codec, durable ids and revocation, and production mode
+#: refusing the in-memory reference stores.
+__version__ = "0.7.0"

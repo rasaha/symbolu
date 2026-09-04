@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import os
+import tempfile
 from datetime import datetime, timezone
 
 import pytest
@@ -11,6 +13,7 @@ from risk_authority.crypto import SigningKey, SigningKeyRecord
 from risk_authority.domain import WorkflowIR, WorkflowStatus
 from risk_authority.domain.errors import ProductionContainmentError
 from risk_authority.integrations import InMemoryWorkflowIRSource
+from risk_authority.persistence import SqliteRiskAuthorityStore
 from risk_authority.services import ReferenceEnvelopeSigner
 from risk_authority.services.decision_authority import ReferenceDecisionAuthority
 from ugence_cloud_scaling_policy_authenticity import PolicyAuthenticityVerifier
@@ -62,6 +65,7 @@ def production_app() -> RiskAuthorityApplication:
         workflow_source=source, key_record=KEY_RECORD, clock=lambda: NOW,
         evidence_admission=_Admission(), control_assurance=_ControlAssurance(),
         evidence_ingress=_Ingress(), decision_authority=_DecisionAuthority(),
+        persistence=SqliteRiskAuthorityStore(os.path.join(tempfile.mkdtemp(), "ra.sqlite")),
         production_mode=True,
     )
 

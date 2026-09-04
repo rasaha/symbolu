@@ -17,7 +17,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime
 from itertools import count
-from typing import Callable, Mapping, Optional
+from typing import Callable, Mapping, Optional, Any
 
 from ..crypto.keys import KeyRing, SigningKeyRecord
 from ..domain.actions import ActionAuthorization, CanonicalAction
@@ -46,6 +46,15 @@ from ..integrations.pwc import WorkflowIRSource
 from ..integrations.tap import EvidenceAdmissionPort
 from ..observability.events import EventBus
 from ..observability.metrics import Metrics
+from ..persistence.errors import PersistenceProductionModeError
+from ..persistence.repositories import (
+    AuthorityRegistry,
+    ControlResultRepository,
+    DecisionRepository,
+    EnvelopeRepository,
+    GovernanceEventStore,
+    RiskCaseRepository,
+)
 from ..persistence.in_memory import (
     InMemoryAuthorityRegistry,
     InMemoryControlResultRepository,
@@ -92,13 +101,14 @@ class RiskAuthorityApplication:
         key_record: SigningKeyRecord,
         clock: Callable[[], datetime],
         issuer: str = "ugence-risk-authority",
-        cases: Optional[InMemoryRiskCaseRepository] = None,
-        decisions: Optional[InMemoryDecisionRepository] = None,
-        envelopes: Optional[InMemoryEnvelopeRepository] = None,
-        authority: Optional[InMemoryAuthorityRegistry] = None,
-        controls: Optional[InMemoryControlResultRepository] = None,
-        events: Optional[InMemoryGovernanceEventStore] = None,
+        cases: Optional[RiskCaseRepository] = None,
+        decisions: Optional[DecisionRepository] = None,
+        envelopes: Optional[EnvelopeRepository] = None,
+        authority: Optional[AuthorityRegistry] = None,
+        controls: Optional[ControlResultRepository] = None,
+        events: Optional[GovernanceEventStore] = None,
         revocation: Optional[RevocationState] = None,
+        persistence: Optional[Any] = None,
         event_bus: Optional[EventBus] = None,
         metrics: Optional[Metrics] = None,
         ids: Optional[_Ids] = None,
@@ -186,6 +196,21 @@ class RiskAuthorityApplication:
         self._key_record = key_record
         self._key_ring = KeyRing.from_records([key_record])
         self._clock = clock
+        # A persistence bundle (e.g. ``SqliteRiskAuthorityStore``) supplies every store at
+        # once; individual stores may not be mixed in beside it, so a deployment cannot
+        # end up half durable by accident.
+        if persistence is not None:
+            supplied = {name: value for name, value in (
+                ("cases", cases), ("decisions", decisions), ("envelopes", envelopes),
+                ("authority", authority), ("controls", controls), ("events", events),
+                ("revocation", revocation), ("ids", ids)) if value is not None}
+            if supplied:
+                raise PersistenceProductionModeError(
+                    f"persistence bundle given beside individual stores {sorted(supplied)}; "
+                    "supply one or the other")
+            cases, decisions, envelopes = persistence.cases, persistence.decisions, persistence.envelopes
+            authority, controls, events = persistence.authority, persistence.controls, persistence.events
+            revocation, ids = persistence.revocation, persistence.ids
         self.cases = cases or InMemoryRiskCaseRepository()
         self.decisions = decisions or InMemoryDecisionRepository()
         self.envelopes = envelopes or InMemoryEnvelopeRepository()
@@ -196,6 +221,20 @@ class RiskAuthorityApplication:
         self.event_bus = event_bus or EventBus()
         self.metrics = metrics or Metrics()
         self._ids = ids or _Ids()
+        if self._production_mode:
+            # ADR durable persistence D-5: production mode never stands on a store that
+            # has not declared itself durable. The in-memory reference stores never do.
+            for name, store in (("cases", self.cases), ("decisions", self.decisions),
+                                ("envelopes", self.envelopes), ("authority", self.authority),
+                                ("controls", self.controls), ("events", self.events),
+                                ("revocation", self.revocation), ("ids", self._ids)):
+                if getattr(store, "is_production_authoritative", False) is not True:
+                    raise PersistenceProductionModeError(
+                        f"production_mode=True requires a production-authoritative {name} "
+                        f"store (is_production_authoritative=True); {type(store).__name__} is "
+                        "the in-memory reference, or never declared itself durable. Inject "
+                        "persistence=SqliteRiskAuthorityStore(<file path>) (ADR durable "
+                        "persistence, D-5).")
 
         self._engine = RiskEngine()
         # Reference ruler behind DecisionAuthorityPort by default; production adapts

@@ -60,6 +60,7 @@ from risk_authority.integrations.control_assurance import (
     bind_control_result,
 )
 from risk_authority.services.decision_authority import ReferenceDecisionAuthority
+from tests.scenario import durable_store
 
 from ..contract.test_subject_context_contracts import REC_DIGEST, T0, adr_context
 
@@ -205,6 +206,7 @@ def audited_production_seam():
             max_autonomy=5, delegated_by="root", grantable_scope=SCOPE),
         key_record=KEY,
         clock=lambda: TRUSTED_NOW,
+        persistence=durable_store(),
     )
 
     # The two authority-granting surfaces the seam must never reach. Counting them here
