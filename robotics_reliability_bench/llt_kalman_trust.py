@@ -60,14 +60,14 @@ class LLTKalmanConfig:
     ``results/llt_kalman_tune.json`` and the results note."""
     lever_arm: float = 2.5            # rad -> m homogenisation for heading
     scale_floor: float = 0.05         # m; floor on per-predictor obs-noise std
-    q_level_ratio: float = 0.01       # Q_level = ratio * R  (scale-free)
+    q_level_ratio: float = 0.003      # Q_level = ratio * R  (scale-free)
     q_slope_ratio: float = 0.001      # Q_slope = ratio * R  (scale-free)
     p0_ratio: float = 10.0            # P0 = ratio * R * I
     cusum_k: float = 2.0              # slack on surprise magnitude (null ~1.6)
-    cusum_h: float = 8.0              # CUSUM threshold -> DEGRADED / early tick
+    cusum_h: float = 12.0             # CUSUM threshold -> DEGRADED / early tick
     bias_z: float = 4.0               # |level| / sqrt(P_level) -> significant
     bias_min_m: float = 0.20          # m; min physical offset to call it a bias
-    bias_sustain: int = 8             # consecutive fresh ticks the test must hold
+    bias_sustain: int = 4             # consecutive fresh ticks the test must hold
     stale_frac: float = 0.3           # fraction missing -> predictor ABSTAIN
     abstain_suspect_frac: float = 0.5 # >= this frac SUSPECT -> global ABSTAIN
     cusum_accelerates_tick: bool = True

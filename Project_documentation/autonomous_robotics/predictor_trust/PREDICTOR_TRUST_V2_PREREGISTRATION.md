@@ -129,3 +129,14 @@ the large expected effect sizes.
 ## 7. Deviations (append-only, post-hoc)
 
 *(none at preregistration commit)*
+
+* **D1 — additional systems under test (post-hoc extension).** Three
+  detectors not listed in §2 were added to `run_incremental_value.py`:
+  `LLTKalman`, `LLTKalman(strict-tick)`, and `Fusion(LLT+BCVF)`
+  (`robotics_reliability_bench/llt_kalman_trust.py`). Their thresholds were
+  tuned on TUNE families / seeds 0..19 only (`results/llt_kalman_tune.json`)
+  and frozen before TEST scoring; a TEST-family false positive seen during
+  test authoring was not used to adjust them. The three frozen systems, their
+  thresholds, metrics, and decision rules are unchanged, and their committed
+  numbers remain byte-stable. Results and an exploratory (non-frozen) verdict:
+  `ROBOTICS_LLT_KALMAN_TRUST_RESULTS.md`.

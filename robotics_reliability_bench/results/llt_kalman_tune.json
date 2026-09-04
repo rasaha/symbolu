@@ -1,0 +1,588 @@
+{
+  "tune_families": [
+    "gaussian_noise",
+    "constant_bias",
+    "linear_drift",
+    "accelerating",
+    "noisy_unbiased"
+  ],
+  "tune_seeds": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    14,
+    15,
+    16,
+    17,
+    18,
+    19
+  ],
+  "grid": {
+    "q_level_ratio": [
+      0.003,
+      0.01,
+      0.03
+    ],
+    "q_slope_ratio": [
+      0.0003,
+      0.001,
+      0.003
+    ],
+    "cusum_k": [
+      2.0,
+      2.5
+    ],
+    "cusum_h": [
+      6.0,
+      8.0,
+      12.0
+    ],
+    "bias_z": [
+      3.0,
+      4.0,
+      6.0
+    ],
+    "bias_sustain": [
+      4,
+      6,
+      8
+    ]
+  },
+  "n_configs": 486,
+  "n_survivors": 372,
+  "selection_rule": "benign_fa==0 and recall==1 and attr==1; then min strict-tick mean delay; then larger cusum_h, bias_z",
+  "chosen": {
+    "benign_fa": 0.0,
+    "recall": 1.0,
+    "attr": 1.0,
+    "mean_delay": 8.283333333333333,
+    "per_family": {
+      "gaussian_noise": {
+        "detected_rate": 0.0,
+        "attribution_acc": null,
+        "mean_delay": null,
+        "fault_active": false
+      },
+      "constant_bias": {
+        "detected_rate": 1.0,
+        "attribution_acc": 1.0,
+        "mean_delay": 3.0,
+        "fault_active": true
+      },
+      "linear_drift": {
+        "detected_rate": 1.0,
+        "attribution_acc": 1.0,
+        "mean_delay": 7.85,
+        "fault_active": true
+      },
+      "accelerating": {
+        "detected_rate": 1.0,
+        "attribution_acc": 1.0,
+        "mean_delay": 14.0,
+        "fault_active": true
+      },
+      "noisy_unbiased": {
+        "detected_rate": 0.0,
+        "attribution_acc": null,
+        "mean_delay": null,
+        "fault_active": false
+      }
+    },
+    "params": {
+      "q_level_ratio": 0.003,
+      "q_slope_ratio": 0.001,
+      "cusum_k": 2.0,
+      "cusum_h": 12.0,
+      "bias_z": 4.0,
+      "bias_sustain": 4
+    }
+  },
+  "top10": [
+    {
+      "benign_fa": 0.0,
+      "recall": 1.0,
+      "attr": 1.0,
+      "mean_delay": 8.283333333333333,
+      "per_family": {
+        "gaussian_noise": {
+          "detected_rate": 0.0,
+          "attribution_acc": null,
+          "mean_delay": null,
+          "fault_active": false
+        },
+        "constant_bias": {
+          "detected_rate": 1.0,
+          "attribution_acc": 1.0,
+          "mean_delay": 3.0,
+          "fault_active": true
+        },
+        "linear_drift": {
+          "detected_rate": 1.0,
+          "attribution_acc": 1.0,
+          "mean_delay": 7.85,
+          "fault_active": true
+        },
+        "accelerating": {
+          "detected_rate": 1.0,
+          "attribution_acc": 1.0,
+          "mean_delay": 14.0,
+          "fault_active": true
+        },
+        "noisy_unbiased": {
+          "detected_rate": 0.0,
+          "attribution_acc": null,
+          "mean_delay": null,
+          "fault_active": false
+        }
+      },
+      "params": {
+        "q_level_ratio": 0.003,
+        "q_slope_ratio": 0.001,
+        "cusum_k": 2.0,
+        "cusum_h": 12.0,
+        "bias_z": 4.0,
+        "bias_sustain": 4
+      }
+    },
+    {
+      "benign_fa": 0.0,
+      "recall": 1.0,
+      "attr": 1.0,
+      "mean_delay": 8.283333333333333,
+      "per_family": {
+        "gaussian_noise": {
+          "detected_rate": 0.0,
+          "attribution_acc": null,
+          "mean_delay": null,
+          "fault_active": false
+        },
+        "constant_bias": {
+          "detected_rate": 1.0,
+          "attribution_acc": 1.0,
+          "mean_delay": 3.0,
+          "fault_active": true
+        },
+        "linear_drift": {
+          "detected_rate": 1.0,
+          "attribution_acc": 1.0,
+          "mean_delay": 7.85,
+          "fault_active": true
+        },
+        "accelerating": {
+          "detected_rate": 1.0,
+          "attribution_acc": 1.0,
+          "mean_delay": 14.0,
+          "fault_active": true
+        },
+        "noisy_unbiased": {
+          "detected_rate": 0.0,
+          "attribution_acc": null,
+          "mean_delay": null,
+          "fault_active": false
+        }
+      },
+      "params": {
+        "q_level_ratio": 0.003,
+        "q_slope_ratio": 0.001,
+        "cusum_k": 2.5,
+        "cusum_h": 12.0,
+        "bias_z": 4.0,
+        "bias_sustain": 4
+      }
+    },
+    {
+      "benign_fa": 0.0,
+      "recall": 1.0,
+      "attr": 1.0,
+      "mean_delay": 8.283333333333333,
+      "per_family": {
+        "gaussian_noise": {
+          "detected_rate": 0.0,
+          "attribution_acc": null,
+          "mean_delay": null,
+          "fault_active": false
+        },
+        "constant_bias": {
+          "detected_rate": 1.0,
+          "attribution_acc": 1.0,
+          "mean_delay": 3.0,
+          "fault_active": true
+        },
+        "linear_drift": {
+          "detected_rate": 1.0,
+          "attribution_acc": 1.0,
+          "mean_delay": 7.85,
+          "fault_active": true
+        },
+        "accelerating": {
+          "detected_rate": 1.0,
+          "attribution_acc": 1.0,
+          "mean_delay": 14.0,
+          "fault_active": true
+        },
+        "noisy_unbiased": {
+          "detected_rate": 0.0,
+          "attribution_acc": null,
+          "mean_delay": null,
+          "fault_active": false
+        }
+      },
+      "params": {
+        "q_level_ratio": 0.003,
+        "q_slope_ratio": 0.003,
+        "cusum_k": 2.0,
+        "cusum_h": 12.0,
+        "bias_z": 4.0,
+        "bias_sustain": 4
+      }
+    },
+    {
+      "benign_fa": 0.0,
+      "recall": 1.0,
+      "attr": 1.0,
+      "mean_delay": 8.283333333333333,
+      "per_family": {
+        "gaussian_noise": {
+          "detected_rate": 0.0,
+          "attribution_acc": null,
+          "mean_delay": null,
+          "fault_active": false
+        },
+        "constant_bias": {
+          "detected_rate": 1.0,
+          "attribution_acc": 1.0,
+          "mean_delay": 3.0,
+          "fault_active": true
+        },
+        "linear_drift": {
+          "detected_rate": 1.0,
+          "attribution_acc": 1.0,
+          "mean_delay": 7.85,
+          "fault_active": true
+        },
+        "accelerating": {
+          "detected_rate": 1.0,
+          "attribution_acc": 1.0,
+          "mean_delay": 14.0,
+          "fault_active": true
+        },
+        "noisy_unbiased": {
+          "detected_rate": 0.0,
+          "attribution_acc": null,
+          "mean_delay": null,
+          "fault_active": false
+        }
+      },
+      "params": {
+        "q_level_ratio": 0.003,
+        "q_slope_ratio": 0.003,
+        "cusum_k": 2.5,
+        "cusum_h": 12.0,
+        "bias_z": 4.0,
+        "bias_sustain": 4
+      }
+    },
+    {
+      "benign_fa": 0.0,
+      "recall": 1.0,
+      "attr": 1.0,
+      "mean_delay": 8.283333333333333,
+      "per_family": {
+        "gaussian_noise": {
+          "detected_rate": 0.0,
+          "attribution_acc": null,
+          "mean_delay": null,
+          "fault_active": false
+        },
+        "constant_bias": {
+          "detected_rate": 1.0,
+          "attribution_acc": 1.0,
+          "mean_delay": 3.0,
+          "fault_active": true
+        },
+        "linear_drift": {
+          "detected_rate": 1.0,
+          "attribution_acc": 1.0,
+          "mean_delay": 7.85,
+          "fault_active": true
+        },
+        "accelerating": {
+          "detected_rate": 1.0,
+          "attribution_acc": 1.0,
+          "mean_delay": 14.0,
+          "fault_active": true
+        },
+        "noisy_unbiased": {
+          "detected_rate": 0.0,
+          "attribution_acc": null,
+          "mean_delay": null,
+          "fault_active": false
+        }
+      },
+      "params": {
+        "q_level_ratio": 0.01,
+        "q_slope_ratio": 0.001,
+        "cusum_k": 2.0,
+        "cusum_h": 12.0,
+        "bias_z": 4.0,
+        "bias_sustain": 4
+      }
+    },
+    {
+      "benign_fa": 0.0,
+      "recall": 1.0,
+      "attr": 1.0,
+      "mean_delay": 8.283333333333333,
+      "per_family": {
+        "gaussian_noise": {
+          "detected_rate": 0.0,
+          "attribution_acc": null,
+          "mean_delay": null,
+          "fault_active": false
+        },
+        "constant_bias": {
+          "detected_rate": 1.0,
+          "attribution_acc": 1.0,
+          "mean_delay": 3.0,
+          "fault_active": true
+        },
+        "linear_drift": {
+          "detected_rate": 1.0,
+          "attribution_acc": 1.0,
+          "mean_delay": 7.85,
+          "fault_active": true
+        },
+        "accelerating": {
+          "detected_rate": 1.0,
+          "attribution_acc": 1.0,
+          "mean_delay": 14.0,
+          "fault_active": true
+        },
+        "noisy_unbiased": {
+          "detected_rate": 0.0,
+          "attribution_acc": null,
+          "mean_delay": null,
+          "fault_active": false
+        }
+      },
+      "params": {
+        "q_level_ratio": 0.01,
+        "q_slope_ratio": 0.001,
+        "cusum_k": 2.5,
+        "cusum_h": 12.0,
+        "bias_z": 4.0,
+        "bias_sustain": 4
+      }
+    },
+    {
+      "benign_fa": 0.0,
+      "recall": 1.0,
+      "attr": 1.0,
+      "mean_delay": 8.283333333333333,
+      "per_family": {
+        "gaussian_noise": {
+          "detected_rate": 0.0,
+          "attribution_acc": null,
+          "mean_delay": null,
+          "fault_active": false
+        },
+        "constant_bias": {
+          "detected_rate": 1.0,
+          "attribution_acc": 1.0,
+          "mean_delay": 3.0,
+          "fault_active": true
+        },
+        "linear_drift": {
+          "detected_rate": 1.0,
+          "attribution_acc": 1.0,
+          "mean_delay": 7.85,
+          "fault_active": true
+        },
+        "accelerating": {
+          "detected_rate": 1.0,
+          "attribution_acc": 1.0,
+          "mean_delay": 14.0,
+          "fault_active": true
+        },
+        "noisy_unbiased": {
+          "detected_rate": 0.0,
+          "attribution_acc": null,
+          "mean_delay": null,
+          "fault_active": false
+        }
+      },
+      "params": {
+        "q_level_ratio": 0.01,
+        "q_slope_ratio": 0.003,
+        "cusum_k": 2.0,
+        "cusum_h": 12.0,
+        "bias_z": 4.0,
+        "bias_sustain": 4
+      }
+    },
+    {
+      "benign_fa": 0.0,
+      "recall": 1.0,
+      "attr": 1.0,
+      "mean_delay": 8.283333333333333,
+      "per_family": {
+        "gaussian_noise": {
+          "detected_rate": 0.0,
+          "attribution_acc": null,
+          "mean_delay": null,
+          "fault_active": false
+        },
+        "constant_bias": {
+          "detected_rate": 1.0,
+          "attribution_acc": 1.0,
+          "mean_delay": 3.0,
+          "fault_active": true
+        },
+        "linear_drift": {
+          "detected_rate": 1.0,
+          "attribution_acc": 1.0,
+          "mean_delay": 7.85,
+          "fault_active": true
+        },
+        "accelerating": {
+          "detected_rate": 1.0,
+          "attribution_acc": 1.0,
+          "mean_delay": 14.0,
+          "fault_active": true
+        },
+        "noisy_unbiased": {
+          "detected_rate": 0.0,
+          "attribution_acc": null,
+          "mean_delay": null,
+          "fault_active": false
+        }
+      },
+      "params": {
+        "q_level_ratio": 0.01,
+        "q_slope_ratio": 0.003,
+        "cusum_k": 2.5,
+        "cusum_h": 12.0,
+        "bias_z": 4.0,
+        "bias_sustain": 4
+      }
+    },
+    {
+      "benign_fa": 0.0,
+      "recall": 1.0,
+      "attr": 1.0,
+      "mean_delay": 8.283333333333333,
+      "per_family": {
+        "gaussian_noise": {
+          "detected_rate": 0.0,
+          "attribution_acc": null,
+          "mean_delay": null,
+          "fault_active": false
+        },
+        "constant_bias": {
+          "detected_rate": 1.0,
+          "attribution_acc": 1.0,
+          "mean_delay": 3.0,
+          "fault_active": true
+        },
+        "linear_drift": {
+          "detected_rate": 1.0,
+          "attribution_acc": 1.0,
+          "mean_delay": 7.85,
+          "fault_active": true
+        },
+        "accelerating": {
+          "detected_rate": 1.0,
+          "attribution_acc": 1.0,
+          "mean_delay": 14.0,
+          "fault_active": true
+        },
+        "noisy_unbiased": {
+          "detected_rate": 0.0,
+          "attribution_acc": null,
+          "mean_delay": null,
+          "fault_active": false
+        }
+      },
+      "params": {
+        "q_level_ratio": 0.03,
+        "q_slope_ratio": 0.0003,
+        "cusum_k": 2.0,
+        "cusum_h": 12.0,
+        "bias_z": 4.0,
+        "bias_sustain": 4
+      }
+    },
+    {
+      "benign_fa": 0.0,
+      "recall": 1.0,
+      "attr": 1.0,
+      "mean_delay": 8.283333333333333,
+      "per_family": {
+        "gaussian_noise": {
+          "detected_rate": 0.0,
+          "attribution_acc": null,
+          "mean_delay": null,
+          "fault_active": false
+        },
+        "constant_bias": {
+          "detected_rate": 1.0,
+          "attribution_acc": 1.0,
+          "mean_delay": 3.0,
+          "fault_active": true
+        },
+        "linear_drift": {
+          "detected_rate": 1.0,
+          "attribution_acc": 1.0,
+          "mean_delay": 7.85,
+          "fault_active": true
+        },
+        "accelerating": {
+          "detected_rate": 1.0,
+          "attribution_acc": 1.0,
+          "mean_delay": 14.0,
+          "fault_active": true
+        },
+        "noisy_unbiased": {
+          "detected_rate": 0.0,
+          "attribution_acc": null,
+          "mean_delay": null,
+          "fault_active": false
+        }
+      },
+      "params": {
+        "q_level_ratio": 0.03,
+        "q_slope_ratio": 0.0003,
+        "cusum_k": 2.5,
+        "cusum_h": 12.0,
+        "bias_z": 4.0,
+        "bias_sustain": 4
+      }
+    }
+  ],
+  "frozen_config": {
+    "lever_arm": 2.5,
+    "scale_floor": 0.05,
+    "q_level_ratio": 0.003,
+    "q_slope_ratio": 0.001,
+    "p0_ratio": 10.0,
+    "cusum_k": 2.0,
+    "cusum_h": 12.0,
+    "bias_z": 4.0,
+    "bias_min_m": 0.2,
+    "bias_sustain": 4,
+    "stale_frac": 0.3,
+    "abstain_suspect_frac": 0.5,
+    "cusum_accelerates_tick": true
+  }
+}

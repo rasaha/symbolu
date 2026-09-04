@@ -59,9 +59,13 @@ def test_robust_noise_ignores_offset_and_drift():
 # ---- detector behaviour on the corpus -------------------------------------
 
 @pytest.mark.parametrize("seed", range(5))
-def test_benign_families_are_not_suspect(seed):
+def test_tune_benign_families_are_not_suspect(seed):
+    """Asserted on TUNE benign families only. ``calibration_drift`` is a
+    held-out TEST family: its false-alarm rate under the frozen config is
+    reported by ``run_incremental_value``, not pinned here, so the frozen
+    thresholds are never adjusted against TEST behaviour."""
     det = LLTKalmanTrust()
-    for fam in ("gaussian_noise", "noisy_unbiased", "calibration_drift"):
+    for fam in ("gaussian_noise", "noisy_unbiased"):
         b = fc.generate(fam, seed=seed)
         d = det.evaluate(b.trajectories, b.valid_masks)
         assert d.flagged is None, (fam, seed, d.reason)
