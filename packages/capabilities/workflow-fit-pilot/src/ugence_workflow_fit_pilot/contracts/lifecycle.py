@@ -257,16 +257,6 @@ def transition(
     common = dict(schema_version=PILOT_STATE_SCHEMA_VERSION, manifest_digest=manifest.manifest_digest, method=predecessor.method, roles=predecessor.roles,
                   predecessor_state_digest=predecessor.state_digest, predecessor_manifest_digest=None, usage_scope=USAGE_SCOPE_RESEARCH_ONLY, approval_status=APPROVAL_STATUS_NONE,
                   recorded_by=recorded_by, recorded_at=recorded_at)
-    if event is LifecycleEvent.SUPERSEDED:
-        if successor_manifest is None:
-            raise PilotError(PilotErrorCode.STATE_TRANSITION_INVALID, "SUPERSEDED requires the successor manifest")
-        scope = derive_revision_scope(manifest, successor_manifest)
-        return PilotConfigurationStateRecord(state=PilotConfigurationState.REVISED, fit_outcome=None, refusal_codes=(), result_digest=None,
-                                             successor_manifest_digest=successor_manifest.manifest_digest, revision_scope=scope, **common)
-    # Revision 20 ruling 2: a CALIBRATION run never emits RESULT_ASSESSED and never becomes
-    # EVALUATED. Checked before the state and result checks so the refusal names the run role
-    # rather than a missing ReadinessComparisonResult — under CALIBRATION no such result can
-    # exist, since revision 13 makes comparison unconstructible for that role.
     if event is LifecycleEvent.RESULT_ASSESSED and is_calibration_run(manifest):
         raise PilotError(
             PilotErrorCode.STATE_TRANSITION_INVALID,
@@ -282,11 +272,22 @@ def transition(
         # The ``capture_refusal`` path stays open: a calibration run whose capture fails must
         # still reach INCONCLUSIVE, and that path supplies no result. This refusal is placed
         # before the state and result checks so it names the run role rather than a downstream
-        # symptom.
+        # symptom, and above the SUPERSEDED block so *every* event is covered — revision 25
+        # claimed 'any event' while the guard sat below it, which revision 26 corrects.
         raise PilotError(
             PilotErrorCode.STATE_TRANSITION_INVALID,
             "a CALIBRATION run carries no ReadinessComparisonResult; comparison is forbidden for that role",
         )
+    if event is LifecycleEvent.SUPERSEDED:
+        if successor_manifest is None:
+            raise PilotError(PilotErrorCode.STATE_TRANSITION_INVALID, "SUPERSEDED requires the successor manifest")
+        scope = derive_revision_scope(manifest, successor_manifest)
+        return PilotConfigurationStateRecord(state=PilotConfigurationState.REVISED, fit_outcome=None, refusal_codes=(), result_digest=None,
+                                             successor_manifest_digest=successor_manifest.manifest_digest, revision_scope=scope, **common)
+    # Revision 20 ruling 2: a CALIBRATION run never emits RESULT_ASSESSED and never becomes
+    # EVALUATED. Checked before the state and result checks so the refusal names the run role
+    # rather than a missing ReadinessComparisonResult — under CALIBRATION no such result can
+    # exist, since revision 13 makes comparison unconstructible for that role.
     if event is LifecycleEvent.OBSERVATION_VALIDATED:
         if st is not PilotConfigurationState.PROPOSED:
             raise PilotError(PilotErrorCode.STATE_TRANSITION_INVALID, f"OBSERVATION_VALIDATED is not permitted from {st.value}")

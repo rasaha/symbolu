@@ -270,7 +270,56 @@ def test_the_phase_4c_study_never_calls_the_ungated_runner():
     assert study.is_dir(), study
     offenders = []
     for path in sorted(study.rglob("*.py")):
-        for node in ast.walk(ast.parse(path.read_text())):
-            if isinstance(node, ast.Call) and getattr(node.func, "id", None) == "run_pilot":
+        tree = ast.parse(path.read_text())
+        # Revision 26: bare-name matching alone let `runner.run_pilot(...)`,
+        # `api.run_pilot(...)`, an aliased import and a rebound variable through. Collect the
+        # local names bound to run_pilot, then flag calls through any of them or through any
+        # attribute access named run_pilot.
+        aliases = {"run_pilot"}
+        for node in ast.walk(tree):
+            if isinstance(node, ast.ImportFrom):
+                aliases |= {a.asname or a.name for a in node.names if a.name == "run_pilot"}
+            elif isinstance(node, ast.Assign) and isinstance(node.value, ast.Name) and node.value.id in aliases:
+                aliases |= {t.id for t in node.targets if isinstance(t, ast.Name)}
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.Call):
+                continue
+            f = node.func
+            hit = (isinstance(f, ast.Name) and f.id in aliases) or (isinstance(f, ast.Attribute) and f.attr == "run_pilot")
+            if hit:
                 offenders.append(f"{path.name}:{node.lineno}")
     assert offenders == [], f"Phase 4C study calls the ungated run_pilot at {offenders}; use run_phase_4c_pilot"
+
+
+def test_a_confirmatory_run_accepts_a_real_comparison_result():
+    """Revision 26. The test this replaces passed `result=None`, so the G4 guard could not
+    fire for any role and it asserted a refusal while claiming to show acceptance — vacuous
+    for its stated purpose. This obtains a real ReadinessComparisonResult by running a
+    confirmatory manifest through the boundary, and asserts the transition SUCCEEDS."""
+    import pilot_fixtures as pf
+    from ugence_workflow_fit_pilot.contracts.lifecycle import (
+        LifecycleEvent, PilotConfigurationState, propose, transition,
+    )
+    from ugence_reasoning_method_governance.api import ReadinessComparisonResult
+    from ugence_workflow_fit_pilot.runner import run_pilot
+
+    manifest = slice2._confirmatory_manifest()
+    res = run_pilot(
+        manifest, catalog=pf.catalog(), rule_set=pf.rule_set(), advisory=pf.advisory(manifest.plan.task_class),
+        cases=pf.cases(), executor=pf.FakeExecutor({m.method.method_id: 1 for m in manifest.methods}),
+        scorer=pf.KeywordScorer(), identity=pf.IDENTITY, provider_factory="stub_provider:make_provider",
+        now=pf.clock(), boundary_env=pf.boundary_env(),
+    )
+    assert isinstance(res.result, ReadinessComparisonResult)
+
+    method = manifest.methods[0].method
+    at = res.states[0].recorded_at
+    under_test = transition(
+        propose(manifest, method, recorded_by="t", recorded_at=at),
+        LifecycleEvent.OBSERVATION_VALIDATED, manifest=manifest, recorded_by="t", recorded_at=at,
+    )
+    outcome = next((a.outcome for a in res.result.assessments if a.method == method), None)
+    event = LifecycleEvent.RESULT_ASSESSED if outcome is not None and outcome.name.startswith(("SUFFICIENT", "INSUFFICIENT")) else LifecycleEvent.RESULT_INCONCLUSIVE
+    out = transition(under_test, event, manifest=manifest, result=res.result, recorded_by="t", recorded_at=at)
+    assert out.result_digest == res.result.result_digest
+    assert out.state in (PilotConfigurationState.EVALUATED, PilotConfigurationState.INCONCLUSIVE)
