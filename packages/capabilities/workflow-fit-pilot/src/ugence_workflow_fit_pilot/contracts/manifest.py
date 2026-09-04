@@ -236,13 +236,38 @@ class PilotStudyManifest:
         Phase 4C run: they carry no committed role, and inferring one would be exactly
         the silent upgrade revision 14 forbids.
 
-        **F3, slice-3 obligation (revision 16).** Nothing in this package calls this
-        method: it makes ineligibility *expressible*, not *enforced*. Until slice 3 calls
-        it from the run entry point, a v1 manifest is refused only by callers that ask."""
+        **F3 — enforced since slice 3B-1 (revision 20).** ``run_phase_4c_pilot`` calls this
+        before delegating, so a v1 manifest is now refused by the Phase 4C run entry point
+        rather than only by callers that ask. ``run_pilot`` itself is deliberately unchanged
+        and stays available for historical mechanism-validation tests."""
         if not self.is_v2:
             raise PilotError(
                 PilotErrorCode.RUN_ROLE_INVALID,
                 f"{self.schema_version} is historical mechanism validation and is not eligible for a Phase 4C run",
+            )
+        return self
+
+    def revalidate_role(self) -> "PilotStudyManifest":
+        """**F4 — constructor-based role revalidation (slice 3B-1, revision 20).**
+
+        The v1 digest payload excludes ``run_role`` and ``calibration_provenance``, so a v1
+        object whose role field was set by circumventing the frozen dataclass keeps a digest
+        that still verifies. Recomputing that digest therefore proves nothing about the role,
+        which is why revision 16 recorded F4 as an obligation to *re-run the validation*
+        rather than trust the digest.
+
+        This rebuilds the manifest through its own constructor, which re-runs the role
+        invariants in ``__post_init__``, and requires the freshly settled digest to equal the
+        one carried. A tampered v1-with-a-role is refused by the role validation; a tampered
+        digest-bearing field is refused by the digest comparison. Returns the manifest when
+        both hold, so it can be used inline."""
+        from dataclasses import replace as _replace
+
+        rebuilt = _replace(self, manifest_digest="")
+        if rebuilt.manifest_digest != self.manifest_digest:
+            raise PilotError(
+                PilotErrorCode.MANIFEST_MISMATCH,
+                "manifest_digest does not cover the manifest's own content",
             )
         return self
 

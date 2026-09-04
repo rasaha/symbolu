@@ -13,6 +13,7 @@ from decimal import Decimal
 
 import pytest
 from ugence_governance_contracts.api import BenchmarkReference
+from ugence_workflow_fit_pilot._canon import digest_of
 import ugence_workflow_fit_pilot
 from ugence_reasoning_method_governance.api import (
     ComparisonPolicy,
@@ -570,13 +571,13 @@ def test_v1_decimal_behaviour_is_unchanged():
     assert legacy.plan.task_class.comparison_policy.sufficiency.threshold.literal_value == "0.900"
 
 
-# --------------------------------------------------------------------------- F3 / F4 remain slice-3
+# --------------------------------------------------------------------------- F3 / F4 enforcement (slice 3B-1)
 
 
-def test_f3_eligibility_is_expressible_but_not_enforced_at_any_entry_point():
-    """Guards against overclaiming. require_phase_4c_eligible() refuses a v1 manifest, but
-    nothing in the package calls it, so a v1 artifact is not yet refused by the runner.
-    When slice 3 wires it into the run entry point this test is the one to update."""
+def test_f3_eligibility_is_now_enforced_at_the_phase_4c_entry_point():
+    """The inverse of the slice-2 test that pinned F3 as unenforced. Slice 3B-1 wires
+    require_phase_4c_eligible into run_phase_4c_pilot, so the caller list must be non-empty
+    and must name the runner."""
     import ast
     import pathlib
 
@@ -587,9 +588,55 @@ def test_f3_eligibility_is_expressible_but_not_enforced_at_any_entry_point():
             called = isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)
             if called and node.func.attr == "require_phase_4c_eligible":
                 callers.append(path.name)
-    assert callers == [], f"require_phase_4c_eligible is now called by {callers}; F3 enforcement must be recorded"
+    assert "runner.py" in callers, f"F3 is not enforced at the run entry point; callers={callers}"
     with pytest.raises(PilotError):
         pf.manifest().require_phase_4c_eligible()
+
+
+def test_run_pilot_itself_stays_ungated_for_historical_mechanism_validation():
+    """Revision 20: run_pilot remains available for historical tests. The gate lives in the
+    separately named Phase 4C entry point, so this must not become an alias."""
+    import inspect
+
+    from ugence_workflow_fit_pilot.runner import run_phase_4c_pilot, run_pilot
+
+    assert run_phase_4c_pilot is not run_pilot
+    assert "require_phase_4c_eligible" not in inspect.getsource(run_pilot)
+    assert "require_phase_4c_eligible" in inspect.getsource(run_phase_4c_pilot)
+
+
+def test_the_phase_4c_entry_point_refuses_a_v1_manifest_before_starting_a_boundary():
+    """A v1 manifest is refused, never upgraded. Refusal happens before any boundary process
+    exists, so the absence of executor/scorer arguments cannot be what raises."""
+    from ugence_workflow_fit_pilot.runner import run_phase_4c_pilot
+
+    with pytest.raises(PilotError) as e:
+        run_phase_4c_pilot(pf.manifest())
+    assert e.value.code is PilotErrorCode.RUN_ROLE_INVALID
+
+
+def test_f4_role_revalidation_refuses_a_v1_manifest_carrying_a_smuggled_role():
+    """F4: the v1 digest payload excludes run_role, so a tampered v1 object keeps a digest
+    that still verifies. Re-running the role validation through the constructor catches it;
+    recomputing the digest alone would not."""
+    v1 = pf.manifest()
+    object.__setattr__(v1, "run_role", PilotRunRole.CALIBRATION)
+    # The tampered object still passes a naive digest recomputation, which is the whole point.
+    assert v1.manifest_digest == digest_of(v1, exclude=("manifest_digest", "run_role", "calibration_provenance"))
+    with pytest.raises(PilotError):
+        v1.revalidate_role()
+
+
+def test_f4_role_revalidation_accepts_untampered_manifests():
+    for manifest in (pf.manifest(), _calibration_manifest(), _confirmatory_manifest()):
+        assert manifest.revalidate_role() is manifest
+
+
+def test_f4_role_revalidation_refuses_a_tampered_digest_bearing_field():
+    v2 = _calibration_manifest()
+    object.__setattr__(v2, "manifest_id", "manifest.pilot.tampered")
+    with pytest.raises(PilotError, match="does not cover the manifest's own content"):
+        v2.revalidate_role()
 
 
 # --------------------------------------------------------------------------- slice 3B-0: lifecycle endpoint
