@@ -246,3 +246,54 @@ the large expected effect sizes.
     (A1 benign suspect rate 0.20 with AR(1) only, 0.00 with outliers only;
     baseline 0.00 in both). `A1_ADOPT` is therefore scoped to white noise.
     Detail: `ROBOTICS_LLT_KALMAN_TRUST_RESULTS.md` §8.
+
+* **A3 — LLT-Kalman amendment: coloured-noise state (preregistered before
+  scoring).** Written and committed before any A3 configuration was scored
+  on evaluation seeds. The real-sensor gate remains **not discharged**.
+  * *Hypothesis.* A1's false alarms under AR(1) noise (A2 §8.4) come from
+    an uncoloured observation model: the level posterior variance is
+    under-estimated when the residual noise is autocorrelated. Modelling
+    the coloured component as a state calibrates the level test and
+    removes the A2 false alarms without giving back recall.
+  * *Single changed component.* When `coloured_noise=True`, the per-axis
+    LLT state becomes `[level, slope, c]` with `F=[[1,1,0],[0,1,0],[0,0,φ]]`,
+    `H=[1,0,1]`, `Q=diag(q_level, q_slope, q_c)`, `R=scale_floor²`. The
+    coloured-noise parameters are estimated **causally per axis from the
+    filter's own innovations** with forgetting factor `rho_forgetting`:
+    `φ̂` = clipped lag-1 autocorrelation of the innovations in `[0, phi_max]`,
+    `σ̂_n²` = forgetting innovation variance with the A1 clip (`noise_clip`),
+    `q_c = σ̂_n² (1−φ̂²)`. Warm-up: `φ̂=0`, `σ̂_n²` from the A1 causal MAD
+    over the first `noise_warmup` differences. All other channels (CUSUM,
+    level bias test, states, global rule) unchanged. `coloured_noise=False`
+    reproduces A1 exactly (pinned by test).
+  * *Carried over frozen, not swept.* `bias_sustain=4`, `bias_z=4.0`,
+    `bias_min_m=0.20` (applied on the lever-scaled axes exactly as A1;
+    the per-axis-floor idea in the A2 note is **dropped** because at
+    0.20 m / 2.5 it is numerically identical and would only be a hidden
+    re-tune), `scale_floor=0.05`, `p0_ratio=10`, `noise_forgetting=0.9`,
+    `noise_warmup=6`, `noise_clip=9.0`, `cusum_k=2.0`, `stale_frac`,
+    `abstain_suspect_frac`, global rule.
+  * *TUNE set (seeds 0..19 only).* The five A1 TUNE families **plus** two
+    realistic-noise families built by `a2_realistic_pilot.r1_bundle` on
+    seeds 0..19 (never the A2 seeds 200..229): `ar1_benign`
+    (= R1 `gaussian_noise`, benign) and `ar1_constant_bias`
+    (= R1 `constant_bias`, harmful). Selection rule as A0/A1: zero false
+    alarms on every TUNE benign family, recall and attribution 1.0 on every
+    TUNE harm family, then minimum strict-tick mean delay, ties to larger
+    `cusum_h` then larger `phi_max`. Grid: `q_level_ratio ∈ {0.003, 0.01,
+    0.03}`, `q_slope_ratio ∈ {0.001, 0.003}`, `phi_max ∈ {0.8, 0.9, 0.95}`,
+    `rho_forgetting ∈ {0.90, 0.95, 0.98}`, `cusum_h ∈ {8, 12}` (108
+    configs). Recorded in `results/llt_kalman_tune_A3.json`; frozen as
+    `A3_CONFIG`. If no config survives the hard rule, A3 is reported as
+    `A3_NO_SURVIVOR` and nothing is scored on evaluation seeds.
+  * *Decision rule.* The A2 pilot (`a2_realistic_pilot.py`, both
+    sub-corpora, same metrics) is re-run with `LLTKalman-A3` in place of
+    A1 on **fresh seeds 300..329** (never the A2 seeds). C1–C7 exactly as
+    A2, applied to A3. Plus C8 (no regression on the original corpus): on
+    evaluation seeds 100..149 of `fault_corpus`, A3 TEST-only recall = 1.00,
+    TEST-only false_alarm_rate ≤ 0.02, ALL-family delay ≤ 8.0.
+    `A3_ADOPT` if C1–C8 all hold; `A3_PARTIAL` if C1–C7 hold but C8 fails,
+    or C8 holds with C1–C5 holding but C6/C7 failing; `A3_FAILS` otherwise.
+    No threshold is changed after scoring. A1/A0 frozen configs and every
+    committed results row stay untouched; A2's results file is not
+    regenerated.
