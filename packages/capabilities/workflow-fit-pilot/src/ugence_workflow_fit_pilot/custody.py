@@ -177,12 +177,26 @@ class VerifiedPreparedFacts:
     sample_index_digest: str
     verdict_custody_ref: str
     manifest_digest: str
+    case_digests: Tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
         require_nonblank(self.commitment_identifier, "VerifiedPreparedFacts.commitment_identifier")
         require_nonblank(self.verdict_custody_ref, "VerifiedPreparedFacts.verdict_custody_ref")
         for name in ("index_digest", "sample_index_digest", "manifest_digest"):
             require_digest(getattr(self, name), f"VerifiedPreparedFacts.{name}")
+        # G2b (revision 27 ruling): the authoritative case set for a CALIBRATION custody
+        # record is the *sampled subset* the run actually executed and scored — the prepared
+        # bundle's own case set — not the full benchmark. These digests are carried here
+        # because ``build_calibration_result`` never sees the manifest.
+        if not isinstance(self.case_digests, tuple) or not self.case_digests:
+            raise PilotError(
+                PilotErrorCode.ROLE_ARTIFACT_INCONSISTENT,
+                "VerifiedPreparedFacts.case_digests must be the non-empty case set the prepared bundle committed",
+            )
+        for d in self.case_digests:
+            require_digest(d, "VerifiedPreparedFacts.case_digests[]")
+        if len(set(self.case_digests)) != len(self.case_digests):
+            raise PilotError(PilotErrorCode.ROLE_ARTIFACT_INCONSISTENT, "VerifiedPreparedFacts.case_digests repeats a case")
         if len({self.index_digest, self.sample_index_digest}) != 2:
             raise PilotError(
                 PilotErrorCode.ROLE_ARTIFACT_INCONSISTENT,
@@ -229,6 +243,21 @@ def build_calibration_result(
         raise PilotError(
             PilotErrorCode.RETENTION_VERIFY_FAILED,
             "custody record does not bind the prepared bundle's manifest and index digests",
+        )
+    # G2a (revision 27 ruling): score_count is the number of cases scored and the custody
+    # record holds one verdict per scored case, so they must be exactly equal. Catches a
+    # truncated or partial custody write before any result is built.
+    if len(custody_record.verdicts) != score_count:
+        raise PilotError(
+            PilotErrorCode.RETENTION_VERIFY_FAILED,
+            f"custody record holds {len(custody_record.verdicts)} verdicts but score_count is {score_count}",
+        )
+    # G2b: the verdicts must cover exactly the prepared bundle's case set — the sampled
+    # subset actually executed — neither a different 50 nor a partial cover.
+    if frozenset(c for c, _ in custody_record.verdicts) != frozenset(prepared.case_digests):
+        raise PilotError(
+            PilotErrorCode.RETENTION_VERIFY_FAILED,
+            "custody verdicts do not cover exactly the case set the prepared bundle committed",
         )
     write_and_verify(custody, custody_record)
     return CalibrationResult(

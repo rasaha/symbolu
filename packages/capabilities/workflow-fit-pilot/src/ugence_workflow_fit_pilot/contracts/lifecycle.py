@@ -332,10 +332,24 @@ def validate_lineage(records: Iterable[PilotConfigurationStateRecord], manifests
     revision scope that differs from the derivation, an incomplete supersession, or an
     EVALUATED / INCONCLUSIVE record whose named engine result is not supplied or does not
     give this method the recorded outcome and refusals. A state can therefore not be
-    reached by hand-building a record around a fabricated result digest."""
+    reached by hand-building a record around a fabricated result digest.
+
+    Re-runs each supplied manifest's role validation before replaying (G1b, revision 27), so
+    a manifest whose role was set by circumventing the frozen dataclass is refused here even
+    though its digest still verifies."""
     recs = list(records)
     by_digest: Dict[str, PilotConfigurationStateRecord] = {r.state_digest: r for r in recs}
     mans: Dict[str, PilotStudyManifest] = {m.manifest_digest: m for m in manifests}
+    # G1b (revision 27 ruling): the replay verifier re-runs each manifest's role validation
+    # rather than trusting ``run_role``. F4's obligation names a *verifier*, and this is it —
+    # the v1 digest payload excludes the role fields, so recomputing that digest proves
+    # nothing about them. Once per distinct manifest, not per record: the cost is
+    # proportional to manifests, and every record below reads its manifest from ``mans``.
+    #
+    # ``is_calibration_run`` deliberately stays a cheap field read (G1a ruling): the trust
+    # boundary is the Phase 4C entry point and this function, not every predicate call.
+    for m in mans.values():
+        m.revalidate_role()
     ress: Dict[str, ReadinessComparisonResult] = {x.result_digest: x for x in results}
     for r in recs:
         if r.manifest_digest not in mans:
