@@ -89,6 +89,14 @@ def test_run_experiment_fails_closed_on_reserved_seed():
             pass
 
 
+def test_overfit_diagnostic_fails_closed_on_reserved_seed():
+    for s in (8100, 81600):
+        try:
+            R.overfit_diagnostic(seed=s); assert False, s
+        except ExecutionNotAuthorized:
+            pass
+
+
 def test_answer_and_p0_accuracy_helpers():
     ctxs = DS.eval_cohorts_r(FIXT, 3, role="unit")["R1"]
     perfect = [(c, serialize_output(c.authoritative_output)) for c in ctxs]

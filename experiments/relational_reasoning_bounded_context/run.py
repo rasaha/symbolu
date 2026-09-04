@@ -195,6 +195,47 @@ def run_experiment(seed: int, *, role_train: str = "train", role_eval: str = "fi
     return report
 
 
+def overfit_diagnostic(*, seed: int = 883000, per_split: int = 2, updates: int = 4000,
+                       role: str = "unit") -> dict:
+    """Learnability check (FIXTURES ONLY): train on a tiny set and evaluate on the SAME episodes.
+
+    Decides bug-vs-scale for a 0.0-validity smoke. If eval-on-train structured validity climbs toward 1.0,
+    the train+generate machinery works and low held-out performance is scale/task-difficulty (scale up for
+    dev/final). If it stays ~0, there is a generation/training defect to fix before any evidence run.
+    Uses only fixture seeds (ungated); consumes no reserved scientific seed.
+    """
+    assert_generation_allowed(seed)  # fixture -> ungated; reserved seeds still raise here
+    from . import dataset as DS
+    from .base_capability import P0_SUBTASKS, generate_p0
+    from .generator import generate_split
+    from .output import is_valid_output
+    from .tokenizer import BTRRTokenizer
+    from .trainer import train_checkpoint
+
+    tok = BTRRTokenizer()
+    r_cohorts = {s: list(generate_split(s, seed, per_split, role)) for s in ("R1", "R2", "R5", "R8")}
+    p0_cohorts = {sub: list(generate_p0(sub, seed, 1, role)) for sub in P0_SUBTASKS}
+    examples = ([DS.example_from_ctx(c) for cs in r_cohorts.values() for c in cs]
+                + [DS.example_from_ctx(c) for cs in p0_cohorts.values() for c in cs])
+    frozen = train_checkpoint(seed, examples, max_updates=updates)
+
+    r_ctx = [c for cs in r_cohorts.values() for c in cs]
+    p0_ctx = [c for cs in p0_cohorts.values() for c in cs]
+    r_preds = generate_predictions(frozen, r_ctx, tok)
+    p0_preds = generate_predictions(frozen, p0_ctx, tok)
+    allp = r_preds + p0_preds
+    return {
+        "mode": "eval_on_train (memorization/learnability)",
+        "seed": seed, "n_train_examples": len(examples), "updates": updates,
+        "structured_output_validity": sum(is_valid_output(t) for _, t in allp) / len(allp),
+        "answer_accuracy": answer_accuracy(r_preds),
+        "p0_answer_accuracy": answer_accuracy(p0_preds),
+        "checkpoint_digest": frozen.digest(),
+        "interpretation": ("validity -> ~1.0 means train+generate works (0.0 held-out is scale/difficulty); "
+                           "validity stuck ~0 means a generation/training defect to fix before dev/final"),
+    }
+
+
 def _role_for(seed: int) -> str:
     from .config import DEVELOPMENT_SEEDS, FINAL_SEEDS, SMOKE_SEEDS
     if seed in SMOKE_SEEDS:
