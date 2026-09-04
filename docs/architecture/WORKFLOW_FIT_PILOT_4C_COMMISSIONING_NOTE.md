@@ -2498,3 +2498,55 @@ retained.
 a Phase 4C pipeline exists. D1–D5 remain incomplete, the custody endpoint remains unbound,
 real custody adapters and genuine execution remain blocked, and no provider call, credential
 access or genuine calibration is permitted.
+
+### Revision 29 (owner rulings: no Phase 4C pipeline yet; a Phase 4C integration test instead, 2026-09-04)
+
+A preflight on closing G3 raised a concern about the task rather than a blocker: **G3 is a
+tripwire for a future pipeline bypassing the F3 gate, not a defect to clear.** Building a
+pipeline *in order to* close G3 inverts cause and effect — the pipeline should be built when
+a run needs it, and G3 should close as a side effect. Against that stood a real argument: the
+point where slices 3A and 3B meet had never been exercised together. Three owner rulings
+`[R]` settle it.
+
+1. **No Phase 4C pipeline module yet — a narrower integration test instead.** It catches
+   integration defects without creating a production surface that has no genuine user until
+   D1 and D5 land. **G3 therefore stays open**, and this revision closes nothing: a test adds
+   no production caller of `run_phase_4c_pilot`, so the tripwire remains vacuous.
+2. **Cases reach a run through a caller-supplied external path.** BBH prompts and targets
+   never enter the repository. The test writes synthetic cases to a temporary directory and
+   loads them back through that path, so the mechanism is exercised rather than bypassed.
+3. **The custody step is reached and stops, rather than omitted.** The blocker is expressed
+   in executable form, not only in prose.
+
+**What the integration test establishes `[V]`.** For the first time, end to end: a prepared
+bundle is written and verified (3A); cases are loaded from an external path and **proved to
+reproduce the prepared benchmark manifest** before anything runs; the gated entry point admits
+the v2 CALIBRATION manifest (3B-1); the calibration branch produces no comparison, no coverage
+and no outcomes, resting at `UNDER_TEST` (3B-2); lineage replays; and a `CalibrationResult`
+built over the test-only double carries only digests that came from the verified bundle.
+
+The bundle commits the **same** provider factory the run uses, and the test asserts that
+equality — the check 4B performs at `pipeline.py:263`, which nothing in 4C had.
+
+**Ruling 3, implemented as an inventory assertion `[V]`.** There is no production
+`VerdictCustodyPort` implementation to refuse with, so the test asserts the inventory
+instead: the only implementation in the tree is `InMemoryVerdictCustody`, test-only by
+revision 20 ruling 3. If a real adapter appears, the test fails and says that D5 must have
+bound its endpoint, ACLs, identities, encryption and retention first. Asserting a refusal the
+package does not raise would have been theatre.
+
+**Two limitations, recorded rather than glossed `[G]`.**
+
+1. **The case-reproduction check has no production home.** 4B performs it inside its pipeline
+   (`pipeline.py:261`); with no 4C pipeline it lives in test scaffolding, so it constrains
+   nothing a future pipeline must do. When the pipeline is built, that check belongs in it —
+   and this test should then assert the pipeline performs it, not perform it itself.
+2. **The integration test pins less than it exercises.** Stubbing the calibration branch fails
+   it; stubbing the G2b case-set reconciliation or slice 3A's provider read-path guard does
+   **not**. Those are pinned by their own unit tests, and the integration test's job is the
+   wiring — but it should not be mistaken for a second line of defence over the guards it
+   happens to traverse.
+
+**Status.** G3 remains open by ruling and by construction. D1–D5 remain incomplete, the
+custody endpoint remains unbound, real custody adapters and genuine execution remain blocked,
+and no provider call, credential access or genuine calibration is permitted by this revision.
