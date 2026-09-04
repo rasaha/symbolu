@@ -68,8 +68,9 @@ no network client and no `ugence_storygraph`.
 
 One SQLite adapter implements all three plus Decision Authority's
 `ExecutionRepository`. Every instant is a caller input; no method reads a clock.
-`release` is legal only from an abandoned pre-dispatch `RESERVED` or from
-`RECONCILED_FAILURE`; from `DISPATCHED` or `OUTCOME_UNCERTAIN` it is a typed
+`release` is legal only from a pre-dispatch `RESERVED` (voluntary, or abandoned
+after its lease lapsed) or from `RECONCILED_FAILURE`; from `DISPATCHED`,
+`OUTCOME_UNCERTAIN` or any observed or reconciled-success state it is a typed
 refusal.
 
 Receipt integrity is verified through the public surface: the adapter rebuilds a
@@ -121,8 +122,12 @@ or blocks, and UNKNOWN already fails closed.
 Prerequisites scenarios 11–18 and 26–38 run against the SQLite adapter, including a
 multi-process test proving exactly one ACQUIRED. Scenarios 19–25 run for the
 derived lifecycle reads the package owns; event *detection* stays with the
-Workflow Service. The Decision Authority conformance suite runs unchanged against
-the adapter as an `ExecutionRepository`.
+Workflow Service. Decision Authority conformance is proved behaviourally: the
+kernel's conformance kit asserts repositories are kernel types by module, which a
+foreign adapter cannot satisfy by construction, so one operation sequence runs
+against the kernel's `InMemoryExecutionRepository` and both adapters and must yield
+identical values and exception classes, and each adapter must satisfy the
+runtime-checkable `ExecutionRepository` protocol.
 
 One prohibition: the package never dispatches, observes an external system, or
 mints authority; CLEAR plus ACQUIRED is still not execution.
