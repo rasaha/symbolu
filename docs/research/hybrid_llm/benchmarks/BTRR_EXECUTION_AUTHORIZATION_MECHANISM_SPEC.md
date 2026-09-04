@@ -1,9 +1,13 @@
-# BTRR Execution-Authorization Mechanism — Proposal Spec (DRAFT, not approved)
+# BTRR Execution-Authorization Mechanism — Spec (IMPLEMENTED; authorizes nothing)
 
-**Status: `BTRR_EXEC_AUTH_MECHANISM_SPEC_DRAFT`.** This document is a *reviewable proposal only*. It
-authorizes nothing, contains no token, signs no record, and changes no code. Adopting it is a separate,
-owner-approved implementation task. Until then, execution stays `BTRR_EXECUTION_NOT_AUTHORIZED` and every
-reserved seed remains fail-closed.
+**Status: `BTRR_EXEC_AUTH_MECHANISM_IMPLEMENTED`.** The mechanism below is now implemented in
+`experiments/relational_reasoning_bounded_context/execution.py` (two-key `guard_seed`, `load_signed_record`,
+`_evaluate_authorization`), with the record template
+`docs/research/hybrid_llm/benchmarks/BTRR_EXECUTION_AUTHORIZATION_RECORD.json` (shipped **unsigned** — every
+role `authorized:false`) and tests `tests/test_auth_mechanism.py`. Implementing it **authorizes nothing**:
+no token exists, no record is signed, no seed was run. Execution stays `BTRR_EXECUTION_NOT_AUTHORIZED` and
+every reserved seed remains fail-closed. Signing a record + supplying the operator token is a separate,
+deliberate owner/operator action.
 
 Provenance it must bind to: original preregistration `626a897a…` · Amendment 001 `9e6168f9…` ·
 Amendment 002 `a84cc8ee…` · corrected implementation `e4dace0e…`. Preserved regardless of outcome:
