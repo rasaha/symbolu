@@ -3,8 +3,9 @@
 **Reference-grade and process-local, not production persistence.**
 :class:`InMemoryPolicyRegistry` exists so the issuance and resolution semantics
 are executable and testable end to end. It has no durability, no replication,
-no cross-process visibility, and no operational story. Production persistence
-and distributed concurrency are deferred (ADR §15.7).
+no cross-process visibility, and no operational story. Production
+persistence is :class:`~.registry_sqlite.SqlitePolicyRegistry` (ADR §15.7,
+closed under decision D-3); distributed concurrency remains disclaimed.
 
 What it *does* guarantee, and what it deliberately does not:
 
@@ -34,7 +35,8 @@ from typing import Optional, Protocol, runtime_checkable
 
 from .adapters import PolicyCoordinate
 from .canonical import canonical_bytes
-from .errors import PolicyRegistryConflictError
+from .consistency import PolicyRegistryConsistencyDescriptor, PolicyRegistryConsistencyScope
+from .errors import PolicyRegistryConflictError, PolicyRegistryProductionModeError
 from .records import (
     IssuedPolicyRecord,
     PolicyRevocationRecord,
@@ -106,10 +108,21 @@ class InMemoryPolicyRegistry:
     """Process-local, append-only, lock-guarded reference registry.
 
     Not for production use. See the module docstring for the exact scope of the
-    atomicity guarantee.
+    atomicity guarantee. Asking for ``production_mode=True`` is refused: the
+    durable registry is :class:`~.registry_sqlite.SqlitePolicyRegistry`.
     """
 
-    def __init__(self) -> None:
+    #: Declared consistency: process-local atomicity and read-after-write only.
+    consistency = PolicyRegistryConsistencyDescriptor(
+        PolicyRegistryConsistencyScope.PROCESS_LOCAL_ONLY
+    )
+
+    def __init__(self, *, production_mode: bool = False) -> None:
+        if production_mode:
+            raise PolicyRegistryProductionModeError(
+                "InMemoryPolicyRegistry is the process-local test reference and is refused "
+                "in production mode; use SqlitePolicyRegistry on a file path"
+            )
         # Re-entrant so a compound operation may call a guarded read.
         self._lock = threading.RLock()
         self._issued: dict[PolicyCoordinate, IssuedPolicyRecord] = {}
