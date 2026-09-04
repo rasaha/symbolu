@@ -8,6 +8,7 @@ from .decision_authority import (
     DecisionAuthorityPort,
     ReferenceDecisionAuthority,
 )
+from .envelope_signer import EnvelopeSignerPort, ReferenceEnvelopeSigner
 from .envelope_issuer import (
     DEFAULT_ENVELOPE_TTL,
     EnvelopeIssuer,
@@ -40,6 +41,8 @@ __all__ = [
     "ReferenceDecisionAuthority",
     "DEFAULT_DECISION_TTL",
     "EnvelopeIssuer",
+    "EnvelopeSignerPort",
+    "ReferenceEnvelopeSigner",
     "DEFAULT_ENVELOPE_TTL",
     "validate_envelope_subset",
     "EnvelopeVerifier",

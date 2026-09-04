@@ -16,12 +16,14 @@ from ..crypto.keys import SigningKeyRecord
 from ..crypto.signing import SIGNATURE_ALG
 from ..domain.decision import RiskDecision
 from ..domain.envelope import (
+    ArtifactBinding,
     EnvelopeBindings,
     EnvelopeConditions,
     RiskAuthorizationEnvelope,
 )
 from ..domain.errors import MonotonicityViolationError, RiskAuthorityError
 from ..domain.scope import Scope, subset_violations
+from .envelope_signer import EnvelopeSignerPort
 from .revocation import RevocationState
 
 __all__ = ["EnvelopeIssuer", "validate_envelope_subset", "DEFAULT_ENVELOPE_TTL"]
@@ -54,7 +56,7 @@ class EnvelopeIssuer:
         model_id: str,
         session_id: str,
         nonce: str,
-        key_record: SigningKeyRecord,
+        key_record: Optional[SigningKeyRecord] = None,
         revocation_state: RevocationState,
         now: datetime,
         model_digest: str = "",
@@ -62,12 +64,20 @@ class EnvelopeIssuer:
         conditions: Optional[EnvelopeConditions] = None,
         ttl: timedelta = DEFAULT_ENVELOPE_TTL,
         not_before: Optional[datetime] = None,
+        signer: Optional[EnvelopeSignerPort] = None,
+        artifact_bindings: tuple[ArtifactBinding, ...] = (),
     ) -> RiskAuthorizationEnvelope:
         """Issue a signed envelope derived monotonically from ``decision``.
 
         Refuses to issue if the decision does not grant authority, or if the
-        requested envelope scope exceeds the decision scope.
+        requested envelope scope exceeds the decision scope. Exactly one of
+        ``key_record`` (legacy in-process key) or ``signer`` (Phase 5
+        :class:`EnvelopeSignerPort`) must be supplied; the issuer computes the
+        signing payload either way and the signer never sees other bytes.
         """
+
+        if (key_record is None) == (signer is None):
+            raise RiskAuthorityError("issue requires exactly one of key_record or signer")
 
         if not decision.grants_authority:
             raise RiskAuthorityError(
@@ -111,12 +121,20 @@ class EnvelopeIssuer:
                 evidence_snapshot_digest=decision.evidence_snapshot_digest,
                 model_digest=model_digest or decision.model_digest,
                 authority_epoch=epoch,
+                artifact_bindings=tuple(artifact_bindings),
             ),
-            key_id=key_record.key_id,
-            signature_alg=SIGNATURE_ALG,
+            key_id=signer.key_id if signer is not None else key_record.key_id,
+            signature_alg=signer.signature_alg if signer is not None else SIGNATURE_ALG,
         )
 
-        signature = key_record.signing_key.sign(unsigned.signing_payload())
+        payload = unsigned.signing_payload()
+        if signer is not None:
+            signature = signer.sign(payload)
+            if not isinstance(signature, (bytes, bytearray)) or not signature:
+                raise RiskAuthorityError("signer returned an empty or non-bytes signature")
+            signature = bytes(signature)
+        else:
+            signature = key_record.signing_key.sign(payload)
 
         from dataclasses import replace
 

@@ -39,6 +39,7 @@ from .enums import (
     WorkflowStatus,
 )
 from .envelope import (
+    ArtifactBinding,
     EnvelopeBindings,
     EnvelopeConditions,
     RiskAuthorizationEnvelope,
@@ -113,6 +114,7 @@ __all__ = [
     # decision / envelope / actions
     "RiskDecision",
     "RiskAuthorizationEnvelope",
+    "ArtifactBinding",
     "EnvelopeConditions",
     "EnvelopeBindings",
     "CanonicalAction",

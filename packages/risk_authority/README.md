@@ -360,6 +360,39 @@ behavior. The ADR's **D-4** purpose/domain identifiers remain **proposed, not ow
 so none are frozen into Risk Authority; Phase 4B is entirely domain-neutral and D-4 stays an
 explicit blocker for the adapter.
 
+## Phase 5 envelope issuance seam (v0.6.0)
+
+`EnvelopeIssuanceSeam` (`risk_authority.api`) is the **only** place a Phase 5 envelope is
+signed (ADR `docs/architecture/ADR_RISK_AUTHORITY_PHASE5_ENVELOPE_ISSUANCE_RATIFICATION.md`).
+It composes what the kernel already owns — the decision repository, `EnvelopeIssuer`,
+revocation epochs, the case ledger — around one new obligation: **issuance is conditioned on
+injected verification, performed at the seam's own instant, and the envelope commits to what
+was verified.**
+
+The act: one clock read (`issued_at`, and `not_before` equals it); the decision found by
+tenant and id and re-derived against the caller's `decision_digest`; refusal if it grants no
+authority or has expired; the injected `ArtifactVerificationPort` called with that instant as
+`as_of`; every required binding kind present, reporting `VERIFIED`, and carrying
+`resolved_as_of` equal to the instant (`INSTANT_MISMATCH` otherwise — the ratified 5B-2 rule);
+expiry capped at the decision's own; signing through an `EnvelopeSignerPort`; the verified
+digests carried as `EnvelopeBindings.artifact_bindings`. Every other path is a typed
+`EnvelopeIssuanceRefusal`. `EnvelopeIssuanceOutcome.executable` is a permanently-`False`
+property: an envelope is authority, never execution.
+
+| Path | Signer | Verification port | Application |
+|---|---|---|---|
+| `EnvelopeIssuanceSeam.production(...)` | must declare `is_production_authoritative = True`; `ReferenceEnvelopeSigner` refused | must declare `is_production_authoritative = True` | must be in production mode — the instance that evaluated the decision, since repositories are in-memory (D-5) |
+| `EnvelopeIssuanceSeam.reference(...)` | in-memory `ReferenceEnvelopeSigner` over a `SigningKeyRecord` | any | never a production application |
+
+Risk Authority names no domain's artifacts: the composition root declares the binding kinds
+it requires, and the cloud-scaling composition package (5B-4) projects its verifiers' outcomes
+onto the one word `VERIFIED`. The case-based `issue_envelope` and `authorize_action` stay
+contained in production mode; production ActionGate admission is 5C and credentials are 5X.
+
+**Not in this release:** HSM/KMS signer implementations (the port is their seam), durable
+decision or envelope persistence (wave 1 follow-up), the 5B-4 composition package, and any
+`CanonicalAction` mapping for capacity actions.
+
 ## Verify the distribution
 
 ```
