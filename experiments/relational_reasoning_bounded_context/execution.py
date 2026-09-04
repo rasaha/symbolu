@@ -106,6 +106,10 @@ def guard_seed(seed: int, token: str | None = None) -> GrantedAuthorization:
     if owner is None:
         return GrantedAuthorization("non_reserved", True)
     arm, role = owner
+    if ARMS[arm].get("status") == "CLOSED":
+        raise ExecutionNotAuthorized(
+            f"seed {seed}: arm {ARMS[arm]['name']} is CLOSED on its calibration record; reserved-seed execution "
+            f"is not permitted without an owner-ratified reopening (config.ARMS status)")
     supplied = token if token is not None else os.environ.get(OPERATOR_TOKEN_ENV)
     return _evaluate_authorization(role, int(seed), supplied, load_signed_record(record_path_for(arm)), arm)
 

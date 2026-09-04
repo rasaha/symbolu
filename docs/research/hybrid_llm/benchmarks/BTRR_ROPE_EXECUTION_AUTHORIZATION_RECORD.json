@@ -43,5 +43,6 @@
       "protocol_lock_digest": null,
       "expires_at": null
     }
-  }
+  },
+  "arm_status": "CLOSED \u2014 owner closed the arm on BTRR_SMOKE_CALIBRATION_LOG.md (2026-09-04). execution.guard_seed refuses every reserved seed of a CLOSED arm regardless of this record. Signed entries below are retained as audit history only."
 }

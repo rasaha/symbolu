@@ -192,6 +192,7 @@ ARMS: Final = MappingProxyType({
                                    "final": FINAL_SEEDS}),
         "record_file": "BTRR_EXECUTION_AUTHORIZATION_RECORD.json",
         "preregistration": "BOUNDED_TYPED_RELATIONAL_REASONING_PREREGISTRATION.md", "ratified": True,
+        "status": "CLOSED",   # owner closed the arm on BTRR_SMOKE_CALIBRATION_LOG.md (2026-09-04); no further reserved-seed execution
     }),
     ARM_ROPE: MappingProxyType({
         "name": "BTRR-RoPE", "positional_mechanism": "rope", "rope_theta": 10000.0,
@@ -201,6 +202,7 @@ ARMS: Final = MappingProxyType({
                                    "final": ROPE_FINAL_SEEDS}),
         "record_file": "BTRR_ROPE_EXECUTION_AUTHORIZATION_RECORD.json",
         "preregistration": "BTRR_ROPE_SIBLING_ARM_PREREGISTRATION.json", "ratified": False,
+        "status": "CLOSED",   # closed on the same record (smoke run 7); never ratified, evidence tiers never signed
     }),
 })
 RESERVED_SEED_ARM_ROLES: Final = MappingProxyType({

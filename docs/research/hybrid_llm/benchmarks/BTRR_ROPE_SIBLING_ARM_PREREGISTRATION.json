@@ -2,7 +2,7 @@
   "schema": "btrr/sibling_arm_preregistration/v1",
   "arm": "ROPE",
   "name": "BTRR-RoPE",
-  "status": "DRAFT \u2014 NOT RATIFIED. Values mirror config.ARMS['ROPE']; the owner ratifies by setting ratified=true here AND in config.py in one commit, then signs BTRR_ROPE_EXECUTION_AUTHORIZATION_RECORD.json.",
+  "status": "CLOSED on the smoke record (run 7) without ratification; never executed on development or final seeds.",
   "ratified": false,
   "parent_arm": {
     "arm": "ABS",
@@ -72,7 +72,7 @@
     "H2": "Conditional on H1: R1\u2013R12 gates and verdict precedence apply unchanged; no prediction."
   },
   "comparison_rule": "Decided on the three development seeds only; one checkpoint per seed; report per-subtask P0, failure profile, loss curve for every run; no claim from a single run.",
-  "closure": "If H1 fails on development seeds the arm closes on that record without final execution.",
+  "closure": "If H1 fails on development seeds the arm closes on that record without final execution. CLOSED 2026-09-04 by owner instruction.",
   "preconditions": [
     "F13 ratified",
     "backbone opt-in positional flag with ABS digest-preservation test green",

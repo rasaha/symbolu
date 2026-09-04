@@ -1,4 +1,11 @@
-# BTRR smoke-tier calibration log (seed 8100)
+# BTRR smoke-tier calibration log (seeds 8100 / 8200)
+
+**CLOSURE (2026-09-04, owner instruction).** Both arms are closed on this record: BTRR-ABS as
+`RELATIONAL_REASONING_BLOCKED_BY_BASE_CAPABILITY` at the frozen recipe and *capable but unreliable* above it
+(runs 8–10); BTRR-RoPE on smoke run 7 without ratification. `config.ARMS[*]["status"] = "CLOSED"` and
+`execution.guard_seed` refuses every reserved seed of both arms. F13 and F16 stand as the generator state on
+which the closure record was produced. No development or final seed was ever consumed. Successor line:
+`EXPLICIT_KEY_ADDRESSING_SCALEUP` (see docs/research/hybrid_llm/benchmarks/).
 
 **Status:** calibration only. Seed 8100 is the smoke seed; nothing here is admissible evidence. No
 development (8101–8103) or final (81600–81604) seed has been consumed. All numbers below were produced on

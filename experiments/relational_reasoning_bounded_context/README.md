@@ -1,5 +1,8 @@
 # Bounded Typed Relational Reasoning (BTRR) — implementation
 
+**Both arms (ABS, RoPE) are CLOSED (2026-09-04).** Reserved seeds fail closed unconditionally; see
+`CONFORMANCE_MATRIX.md` and `docs/research/hybrid_llm/benchmarks/BTRR_SMOKE_CALIBRATION_LOG.md`.
+
 **Implementation only. Execution is NOT authorized.** Reserved scientific seeds (smoke `8100`,
 development `8101–8103`, final `81600–81604`) fail closed until `EXECUTION_AUTHORIZATION.md` is signed.
 Implementation tests use only inadmissible unit-fixture seeds `883000–883004`; their results are

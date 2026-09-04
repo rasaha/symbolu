@@ -1,4 +1,6 @@
-# BTRR-RoPE — Sibling-arm preregistration (DRAFT, requires ratification)
+# BTRR-RoPE — Sibling-arm preregistration (DRAFT — **CLOSED 2026-09-04**, never ratified)
+
+**Closure.** Closed by owner instruction on the smoke record (calibration log run 7): the positional change moved where copying fails, not whether it fails reliably. Development and final roles were never signed. Retained as the record of the ablation design.
 
 **Status: DRAFT. Authorizes nothing. Not effective until the owner ratifies it, a companion JSON is
 frozen, a `config_digest` is computed for this arm, and an execution-authorization record for this arm is

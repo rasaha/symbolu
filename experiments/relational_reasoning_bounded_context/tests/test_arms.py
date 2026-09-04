@@ -16,11 +16,31 @@ BENCH = pathlib.Path(__file__).resolve().parents[3] / "docs/research/hybrid_llm/
 def test_registry_consistency():
     assert set(C.ARMS) == {"ABS", "ROPE"}
     assert C.ARMS["ABS"]["positional_mechanism"] == "learned_absolute" and C.ARMS["ABS"]["ratified"] is True
+    assert {spec["status"] for spec in C.ARMS.values()} == {"CLOSED"}
     assert C.ARMS["ROPE"]["positional_mechanism"] == "rope" and C.ARMS["ROPE"]["ratified"] is False
     assert C.ARMS["ABS"]["max_updates"] == C.MAX_UPDATES == 2000
     assert C.arm_param_count("ABS") == (394_752, 131_392)
     assert C.arm_param_count("ROPE") == (144_896, 131_392)
     assert C.arm_param_count("ROPE")[0] == 394_752 - 3904 * 64
+
+def test_both_arms_closed_and_fail_closed_even_with_a_signed_record():
+    import hashlib, json, os
+    from ..execution import _evaluate_authorization, guard_seed
+    assert C.ARMS["ABS"]["status"] == "CLOSED" and C.ARMS["ROPE"]["status"] == "CLOSED"
+    # the two-key evaluation still works in isolation (audit of historical signatures) ...
+    tok = "closure-test-token"
+    rec = {"roles": {"smoke": {"authorized": True, "scope_seeds": [8100], "expires_at": None,
+                               "token_sha256": hashlib.sha256(tok.encode()).hexdigest(),
+                               "protocol_lock_digest": MAN.config_digest("ABS")}}}
+    assert _evaluate_authorization("smoke", 8100, tok, rec, "ABS").authorized
+    # ... but the guard refuses every reserved seed of a CLOSED arm before consulting any record or token
+    for s in (8100, 8101, 81600, 8200, 8201, 81700):
+        try:
+            guard_seed(s, tok); assert False, s
+        except ExecutionNotAuthorized as exc:
+            assert "CLOSED" in str(exc), exc
+    assert guard_seed(FIXT).authorized
+
 
 def test_seed_blocks_disjoint_and_classified():
     abs_seeds = {s for seeds in C.ARMS["ABS"]["seeds"].values() for s in seeds}

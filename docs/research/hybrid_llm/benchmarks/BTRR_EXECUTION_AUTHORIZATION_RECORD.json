@@ -1,13 +1,15 @@
 {
   "schema": "btrr/execution_authorization_record/v1",
-  "status": "UNSIGNED — every role authorized:false. Execution remains BTRR_EXECUTION_NOT_AUTHORIZED.",
+  "status": "UNSIGNED \u2014 every role authorized:false. Execution remains BTRR_EXECUTION_NOT_AUTHORIZED.",
   "note": "To authorize a role an OWNER edits this entry (authorized:true, authorized_by, date, scope_seeds, token_sha256 = sha256 of a plaintext token generated out-of-band, protocol_lock_digest = current experiments.relational_reasoning_bounded_context.manifest.config_digest(), optional expires_at) and COMMITS it. The plaintext token is delivered to the operator out-of-band (never committed) and supplied at run time via env BTRR_EXEC_TOKEN. Both keys are required. Authorizing one role does not authorize the others.",
   "roles": {
     "smoke": {
       "authorized": false,
       "authorized_by": null,
       "date": null,
-      "scope_seeds": [8100],
+      "scope_seeds": [
+        8100
+      ],
       "token_sha256": null,
       "protocol_lock_digest": null,
       "expires_at": null
@@ -16,7 +18,11 @@
       "authorized": false,
       "authorized_by": null,
       "date": null,
-      "scope_seeds": [8101, 8102, 8103],
+      "scope_seeds": [
+        8101,
+        8102,
+        8103
+      ],
       "token_sha256": null,
       "protocol_lock_digest": null,
       "expires_at": null
@@ -25,10 +31,17 @@
       "authorized": false,
       "authorized_by": null,
       "date": null,
-      "scope_seeds": [81600, 81601, 81602, 81603, 81604],
+      "scope_seeds": [
+        81600,
+        81601,
+        81602,
+        81603,
+        81604
+      ],
       "token_sha256": null,
       "protocol_lock_digest": null,
       "expires_at": null
     }
-  }
+  },
+  "arm_status": "CLOSED \u2014 owner closed the arm on BTRR_SMOKE_CALIBRATION_LOG.md (2026-09-04). execution.guard_seed refuses every reserved seed of a CLOSED arm regardless of this record. Signed entries below are retained as audit history only."
 }
