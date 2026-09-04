@@ -33,12 +33,12 @@ sys.path.insert(0, HERE)
 import diagrams as DG  # noqa: E402
 
 SRC = os.path.join(ROOT, "docs", "UGENCE_ENTERPRISE_AI_GOVERNANCE_CAPABILITY_PIPELINE.md")
-VERSION = "1.0"
+VERSION = "1.1"
 DATE = "4 September 2026"
 BASE = f"UGENCE_ENTERPRISE_AI_GOVERNANCE_CAPABILITY_PIPELINE_v{VERSION}"
 OUT_DOCX = os.path.join(ROOT, "docs", BASE + ".docx")
 COPYRIGHT = "© 2026 Ugence Labs. All rights reserved."
-CLASSIFICATION = "Confidential · Ugence Labs internal working document"
+CLASSIFICATION = "Confidential and proprietary · Shared with prospective partners for evaluation"
 TITLE = "Ugence Enterprise AI Governance Capability Pipeline"
 SUBTITLE = "Repository-Based Capability Map, Development Status and Competitive Cross-Check"
 
@@ -572,7 +572,7 @@ def setup_section(sec, landscape=False, first_page_blank=False):
     for tw in (4680, 9360):
         fp.paragraph_format.tab_stops.add_tab_stop(Twips(tw), WD_TAB_ALIGNMENT.CLEAR)
     fp.paragraph_format.tab_stops.add_tab_stop(Mm(width), WD_TAB_ALIGNMENT.RIGHT)
-    r = fp.add_run(f"{COPYRIGHT}  ·  {CLASSIFICATION}  ·  ugence.ai")
+    r = fp.add_run(f"{COPYRIGHT}  ·  Confidential and proprietary  ·  For partnership evaluation only")
     r.font.size = Pt(8)
     r.font.color.rgb = FAINT
     r = fp.add_run("\tPage ")
@@ -695,11 +695,12 @@ cover_par(f"ugence.ai  ·  Version {VERSION}  ·  {DATE}", 11, GREY, after=16)
 # document control table
 ctrl = [
     ("Document", TITLE),
-    ("Edition", f"Version {VERSION} (docx edition of the repository markdown)"),
+    ("Edition", f"Version {VERSION} · Partner evaluation edition"),
     ("Date", DATE),
     ("Source of truth", "docs/UGENCE_ENTERPRISE_AI_GOVERNANCE_CAPABILITY_PIPELINE.md in rasaha/symbolu (merged in PR #1584, commit 8c6e5ec6)"),
     ("Scope", "45 platform capabilities under packages/; the two packaged business-solution examples are excluded"),
     ("Classification", CLASSIFICATION),
+    ("Intended recipients", "Prospective clients and development partners evaluating a partnership with Ugence Labs"),
     ("Owner", "Ugence Labs"),
 ]
 t = doc.add_table(rows=0, cols=2)
@@ -732,9 +733,12 @@ cover_par(
     after=8,
 )
 cover_par(
-    f"{COPYRIGHT} This document and the architecture it describes are the property of Ugence Labs. "
-    "No part may be reproduced, distributed or disclosed without prior written permission. Product and company names "
-    "cited as competitor analogues are trademarks of their respective owners and are referenced for comparison only.",
+    f"{COPYRIGHT} This document and the architecture it describes are the confidential and proprietary property of "
+    "Ugence Labs. It is provided to the recipient solely to evaluate a development partnership with Ugence Labs and may be "
+    "shared within the recipient's evaluation team for that purpose only. It may not otherwise be reproduced, distributed "
+    "or disclosed without prior written permission. It is not an offer and creates no obligation on either party. Product "
+    "and company names cited as competitor analogues are trademarks of their respective owners and are referenced for "
+    "comparison only.",
     8.5,
     FAINT,
     after=0,
@@ -763,6 +767,7 @@ for vals in [
     ("0.2", "2026-09-04", "Ugence Labs", "Appendix B added: development status of the 45 capabilities with stage tags, evidence and canonical pipeline diagram."),
     ("0.3", "2026-09-04", "Ugence Labs", "Body text cross-checked against package source; five claims corrected in place; competitor supplement and Appendix C added."),
     ("1.0", "2026-09-04", "Ugence Labs", "First docx edition with cover sheet, document control, figures and copyright footer."),
+    ("1.1", "2026-09-04", "Ugence Labs", "Partner evaluation edition: confidentiality wording aligned to distribution to prospective clients and partners."),
 ]:
     row = rev.add_row()
     for ci, v in enumerate(vals):
