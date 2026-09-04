@@ -60,7 +60,7 @@ from .contracts.observation import (
 )
 from .errors import PilotError, PilotErrorCode
 from .report import FORBIDDEN_RENDERINGS, render
-from .custody import InMemoryVerdictCustody, VerdictCustodyPort, VerdictCustodyRecord, write_and_verify
+from .custody import InMemoryVerdictCustody, VerdictCustodyPort, VerdictCustodyRecord, VerifiedPreparedFacts, build_calibration_result, write_and_verify
 from .runner import ExecutionOutcome, MethodRun, PilotCase, PilotIdentity, PilotRunResult, QualityScorerPort, WorkflowExecutorPort, check_evaluator_identity, run_phase_4c_pilot, run_pilot
 from .version import __version__
 
@@ -82,6 +82,6 @@ __all__ = [
     "canonical_order", "recompute_telemetry", "supported_attested_fields", "record_canonical_payload", "envelope_id_for", "issue_attestation",
     "BoundaryConnection", "GatewayStubClient", "BoundaryProcess", "STDIO_ENDPOINT", "UNIX_SOCKETS_AVAILABLE",
     "PilotCase", "ExecutionOutcome", "WorkflowExecutorPort", "QualityScorerPort", "PilotIdentity", "MethodRun", "PilotRunResult", "run_pilot", "run_phase_4c_pilot", "check_evaluator_identity",
-    "VerdictCustodyRecord", "VerdictCustodyPort", "write_and_verify", "InMemoryVerdictCustody",
+    "VerdictCustodyRecord", "VerdictCustodyPort", "write_and_verify", "InMemoryVerdictCustody", "VerifiedPreparedFacts", "build_calibration_result",
     "render", "FORBIDDEN_RENDERINGS",
 ]

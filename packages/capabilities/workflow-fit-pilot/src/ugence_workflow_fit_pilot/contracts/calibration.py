@@ -15,16 +15,20 @@ Cross-artifact traversal (statistic against the reachable ``QualityResult``, lit
 against the confirmatory threshold) belongs to the verifier slice, not to these value
 objects.
 
-**Slice-3 obligations recorded here, not implemented here** (revision 16):
+**F3 and F4 — recorded in revision 16, implemented in slice 3B-1** (revision 21):
 
-- **F3.** ``PilotStudyManifest.require_phase_4c_eligible()`` exists but no execution
-  entry point calls it. A v1 manifest is refused *by that method*, which is not the
-  same as being refused *by the runner*. Slice 3 must call it at the run entry point.
-- **F4.** ``run_role`` and ``calibration_provenance`` are excluded from the **v1**
-  digest payload, so a v1 object whose role was set by circumventing the frozen
-  dataclass keeps a digest that still verifies. No public construction path produces
-  such an object and the package has no manifest deserialiser, but a slice-3 verifier
-  must re-run ``_validate_run_role()`` rather than trust a recomputed v1 digest alone.
+- **F3, enforced.** ``run_phase_4c_pilot`` calls
+  ``PilotStudyManifest.require_phase_4c_eligible()`` before delegating, so a v1 manifest
+  is refused *by the entry point*, not only by callers that ask. ``run_pilot`` stays
+  ungated by ruling, for historical mechanism-validation tests.
+- **F4, enforced at the entry point; `[G]` not at replay.** ``run_role`` and
+  ``calibration_provenance`` are excluded from the **v1** digest payload, so a v1 object
+  whose role was set by circumventing the frozen dataclass keeps a digest that still
+  verifies. ``PilotStudyManifest.revalidate_role()`` re-runs the role invariants through
+  the constructor rather than trusting that digest, and ``run_phase_4c_pilot`` calls it.
+  It is **not** applied by ``validate_lineage``, the replay verifier, nor by
+  ``is_calibration_run``, which read ``run_role`` directly — carried forward in
+  revision 23.
 - Slice 3 compares ``statistic_value``, ``instantiated_literal`` and the confirmatory
   threshold literal by **exact code-point equality** over the canonical form below, and
   must check the canonical rendering of the reachable ``QualityResult.value`` against

@@ -589,8 +589,9 @@ def test_f3_eligibility_is_now_enforced_at_the_phase_4c_entry_point():
             if called and node.func.attr == "require_phase_4c_eligible":
                 callers.append(path.name)
     assert "runner.py" in callers, f"F3 is not enforced at the run entry point; callers={callers}"
-    with pytest.raises(PilotError):
+    with pytest.raises(PilotError) as e:
         pf.manifest().require_phase_4c_eligible()
+    assert e.value.code is PilotErrorCode.RUN_ROLE_INVALID
 
 
 def test_run_pilot_itself_stays_ungated_for_historical_mechanism_validation():
@@ -623,8 +624,9 @@ def test_f4_role_revalidation_refuses_a_v1_manifest_carrying_a_smuggled_role():
     object.__setattr__(v1, "run_role", PilotRunRole.CALIBRATION)
     # The tampered object still passes a naive digest recomputation, which is the whole point.
     assert v1.manifest_digest == digest_of(v1, exclude=("manifest_digest", "run_role", "calibration_provenance"))
-    with pytest.raises(PilotError):
+    with pytest.raises(PilotError) as e:
         v1.revalidate_role()
+    assert e.value.code is PilotErrorCode.RUN_ROLE_INVALID
 
 
 def test_f4_role_revalidation_accepts_untampered_manifests():
@@ -673,11 +675,19 @@ def _under_test_record(manifest):
 
 
 def test_is_calibration_run_never_reinterprets_a_v1_manifest():
+    """The is_v2 clause is defence in depth, and this test proves it rather than assuming it.
+    A constructor-built v1 always has run_role=None, so the clause never decides for one —
+    dropping it would fail nothing. The tampered v1 below is the only case that distinguishes
+    the two implementations (revision 23)."""
     from ugence_workflow_fit_pilot.contracts.lifecycle import is_calibration_run
 
     assert is_calibration_run(_calibration_manifest()) is True
     assert is_calibration_run(_confirmatory_manifest()) is False
-    assert is_calibration_run(pf.manifest()) is False  # v1: no committed role
+
+    v1 = pf.manifest()
+    assert is_calibration_run(v1) is False  # v1: no committed role
+    object.__setattr__(v1, "run_role", PilotRunRole.CALIBRATION)
+    assert is_calibration_run(v1) is False, "the is_v2 clause must refuse a smuggled role on a v1 manifest"
 
 
 def test_a_calibration_run_at_under_test_with_a_bound_result_is_a_completed_calibration():
