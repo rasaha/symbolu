@@ -33,6 +33,7 @@ def compute(cohort: list[tuple[ReasoningContext, str]]) -> dict:
     if n == 0:
         return {"n": 0}
     valid = ans = ent = path = latest = policy = 0
+    ent_applicable = latest_applicable = policy_applicable = 0   # sub-metric denominators
     ev_tp = ev_fp = ev_fn = 0
     abst_correct = abst_total = false_abst = answerable = 0
     hall_e = hall_r = hall_v = 0
@@ -48,11 +49,25 @@ def compute(cohort: list[tuple[ReasoningContext, str]]) -> dict:
         answerable += int(is_answerable)
         if not is_answerable:
             abst_total += 1
+        # applicability denominators (from gold; independent of prediction validity)
+        ge = _nodes("Entity:", g.reasoning_path)
+        gv = _nodes("Event:", g.reasoning_path)
+        gp = _nodes("Policy:", g.reasoning_path)
+        policy_applies = bool(gp) or g.status == "POLICY_NOT_APPLICABLE"
+        if ge:
+            ent_applicable += 1
+        if gv:
+            latest_applicable += 1
+        if policy_applies:
+            policy_applicable += 1
         if p is None:
             if ctx.split == "R9":
                 r9["n"] += 1; r9["invalid"] += 1
             continue
         valid += 1
+        pe = _nodes("Entity:", p.reasoning_path)
+        pv = _nodes("Event:", p.reasoning_path)
+        pp = _nodes("Policy:", p.reasoning_path)
         # answer
         if p.answer == g.answer:
             ans += 1
@@ -61,20 +76,17 @@ def compute(cohort: list[tuple[ReasoningContext, str]]) -> dict:
             abst_correct += 1
         if is_answerable and p.status == "INSUFFICIENT_EVIDENCE":
             false_abst += 1
-        # entity selection (first entity node)
-        ge, pe = _nodes("Entity:", g.reasoning_path), _nodes("Entity:", p.reasoning_path)
+        # entity selection (first entity node; applicable episodes only)
         if ge and pe and ge[0] == pe[0]:
             ent += 1
         # exact ordered path
         if tuple(p.reasoning_path) == tuple(g.reasoning_path):
             path += 1
-        # latest event node
-        gv, pv = _nodes("Event:", g.reasoning_path), _nodes("Event:", p.reasoning_path)
+        # latest event node (applicable episodes only)
         if gv and pv and gv[-1] == pv[-1]:
             latest += 1
-        # policy correctness (status + policy node)
-        gp, pp = _nodes("Policy:", g.reasoning_path), _nodes("Policy:", p.reasoning_path)
-        if p.status == g.status and gp == pp:
+        # policy correctness (applicable episodes only)
+        if policy_applies and p.status == g.status and gp == pp:
             policy += 1
         # evidence precision/recall
         gset, pset = set(g.evidence_ids), set(p.evidence_ids)
@@ -124,10 +136,10 @@ def compute(cohort: list[tuple[ReasoningContext, str]]) -> dict:
         "n": n,
         "structured_output_validity": rate(valid),
         "final_answer_accuracy": rate(ans),
-        "entity_selection": rate(ent),
+        "entity_selection": (ent / ent_applicable) if ent_applicable else 1.0,
         "relation_path_exact_ordered": rate(path),
-        "latest_event": rate(latest),
-        "policy_condition": rate(policy),
+        "latest_event": (latest / latest_applicable) if latest_applicable else 1.0,
+        "policy_condition": (policy / policy_applicable) if policy_applicable else 1.0,
         "evidence_precision": prec,
         "evidence_recall": rec,
         "abstention_accuracy": (abst_correct / abst_total) if abst_total else 1.0,

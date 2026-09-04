@@ -102,11 +102,13 @@ def _gen_path(rng, mint, tenant, split, given: bool, hops: int):  # R2/R3 given,
     return ents, rels, [], [], [], Constraints(hops, False, False), q, gold
 
 
-def _events_for(rng, mint, tenant, entity_id, etype, k):
+def _events_for(rng, mint, tenant, entity_id, etype, k, seq_start=1):
+    # seq_start lets distractor entities carry HIGHER sequence numbers than the target's latest, so the
+    # 'global-most-recent' shortcut (pick the newest event anywhere) is a losing strategy and temporal
+    # reasoning must be entity-scoped. seq_start<=80 keeps sequences within the 2-digit cap.
     vocab = _RISK if etype == "risk" else _STATUS
-    evs = []
-    for s in range(1, k + 1):
-        evs.append(Event(mint.new(), entity_id, etype, s, vocab[rng.randrange(len(vocab))], tenant))
+    evs = [Event(mint.new(), entity_id, etype, seq_start + i, vocab[rng.randrange(len(vocab))], tenant)
+           for i in range(k)]
     latest = max(evs, key=lambda e: e.sequence)
     return evs, latest
 
@@ -119,7 +121,7 @@ def _gen_temporal(rng, mint, tenant, split):  # R5 latest-state
     while len(ents) < rng.randint(6, 12):
         d = Entity("vendor", mint.new(), tenant, (("amount", _amount(rng)),))
         ents.append(d)
-        de, _ = _events_for(rng, mint, tenant, d.entity_id, "risk", CAPS["max_events_per_entity"])
+        de, _ = _events_for(rng, mint, tenant, d.entity_id, "risk", CAPS["max_events_per_entity"], seq_start=rng.randint(10, 80))
         evs += de
     q = ReasoningQuery("latest_event_value", "NOT_APPLICABLE", ents[0].entity_id,
                        requested_property="latest_state", event_type="risk")
@@ -134,7 +136,7 @@ def _gen_rel_temporal(rng, mint, tenant, split, given: bool):  # R6 given / R7 d
     while len(ents) < rng.randint(6, 12):
         d = Entity("vendor", mint.new(), tenant, (("amount", _amount(rng)),))
         ents.append(d)
-        de, _ = _events_for(rng, mint, tenant, d.entity_id, "risk", 2)
+        de, _ = _events_for(rng, mint, tenant, d.entity_id, "risk", 2, seq_start=rng.randint(10, 80))
         evs += de
     mode = "PATH_GIVEN" if given else "PATH_DISCOVERY"
     q = ReasoningQuery("path_then_latest", mode, ents[0].entity_id,
@@ -189,7 +191,7 @@ def _gen_composite(rng, mint, tenant, split, confusable: bool):  # R9 / R12
     while len(ents) < min(CAPS["max_entities"], 4 + ndist):
         d = Entity("vendor", mint.new(), tenant, (("amount", _amount(rng)),))
         ents.append(d)
-        de, _ = _events_for(rng, mint, tenant, d.entity_id, "risk", 2)
+        de, _ = _events_for(rng, mint, tenant, d.entity_id, "risk", 2, seq_start=rng.randint(10, 80))
         evs += de
         if confusable and len(rels) < CAPS["max_relations"]:
             rels.append(Relation(rtypes[0], ents[0].entity_id, d.entity_id, tenant))  # wrong branch, dead-ends
