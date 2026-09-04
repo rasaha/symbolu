@@ -24,6 +24,16 @@ budget amendment is not supported by this evidence.
 | 5 | `11e1d1d7` | 400 | 15000 | 0.875 | .88 | .88 | 0 | 0 | .75 | .62 | 1.0 | first fair copy measurement (F14 fixed); loss 0.66, flattening |
 | 6 | `11e1d1d7` | 1500 | 30000 | 1.000 | .12 | 0 | .12 | .12 | .12 | .62 | 1.0 | loss 0.49 still falling; B1 collapsed vs run 5 |
 
+### BTRR-RoPE sibling arm, smoke seed 8200 (matched point; arm implemented at `56c77fa2`, not ratified)
+| # | arm | n_train | updates | validity | B1 | B2 | B3 | B4 | B5 | B6 | B7 | note |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| 7 | RoPE | 400 | 15000 | 1.000 | .12 | 0 | 0 | 0 | .12 | 0 | 1.0 | loss 0.62 at 15k (flat from 12k); B1 predictions letter-exact with a wrong trailing digit only (`UELMA0`→`UELMA2`, `RUQVK5`→`RUQVK9`; answer and path disagree on the digit) |
+
+`[V]` Data-side check on fixtures: trailing digits are uniform (≈0.10 each) in train and final pools; every
+P0 gold id appears verbatim in its input. The digit failure is model-side. `[I]` The failure shape differs
+from BTRR-ABS run 6 (id-shaped babble): the RoPE model copies all five letters of the queried id and treats
+the last character as unpredictable. Single smoke run; H1/H1′ are decided on development seeds only.
+
 Fixture-only learnability diagnostic (`overfit_diagnostic`, seed 883003, eval-on-train, 15 examples):
 validity / answer / P0 = 1.0 / 1.0 / 1.0 at both 2000 and 4000 updates (CPU). The train→generate
 machinery is sound.
