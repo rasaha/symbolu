@@ -225,3 +225,98 @@ def test_a1_time_varying_R_keeps_faults_attributed():
         b = fc.generate(fam, seed=0)
         d = det.evaluate(b.trajectories, b.valid_masks)
         assert d.flagged == b.truth_label, (fam, d.reason)
+
+
+# ---- amendment A3: coloured-noise state ------------------------------------
+
+def _ar1(rng, phi, sigma, n):
+    c = np.zeros(n)
+    inn = sigma * np.sqrt(1.0 - phi * phi)
+    for t in range(1, n):
+        c[t] = phi * c[t - 1] + rng.normal(0.0, inn)
+    return c
+
+
+def test_a3_identity_with_a1_when_off():
+    from robotics_reliability_bench.llt_kalman_trust import A1_CONFIG
+    import dataclasses
+    a = LLTKalmanTrust(A1_CONFIG)
+    b = LLTKalmanTrust(dataclasses.replace(A1_CONFIG, coloured_noise=False,
+                                           phi_max=0.5, rho_forgetting=0.8))
+    for fam in ("constant_bias", "calibration_drift", "abrupt_jump"):
+        x = fc.generate(fam, seed=2)
+        assert [r.suspicion for r in a.evaluate(x.trajectories).per_predictor] == \
+               [r.suspicion for r in b.evaluate(x.trajectories).per_predictor]
+
+
+def test_a3_estimator_recovers_ar1_and_white():
+    from robotics_reliability_bench.llt_kalman_trust import A1_CONFIG, coloured_noise_params
+    import dataclasses
+    cfg = dataclasses.replace(A1_CONFIG, coloured_noise=True, phi_max=0.95, rho_forgetting=0.95)
+    rng = np.random.default_rng(0)
+    H = 600
+    c = _ar1(rng, 0.8, 0.08, H)
+    s2, ph = coloured_noise_params(c, np.ones(H, dtype=bool), cfg)
+    assert 0.55 < float(np.median(ph[150:])) <= 0.95          # coloured -> high phi
+    w = rng.normal(0.0, 0.05, H)
+    s2w, phw = coloured_noise_params(w, np.ones(H, dtype=bool), cfg)
+    assert float(np.median(phw[150:])) < 0.2                  # white -> phi ~ 0
+    assert abs(float(np.sqrt(np.median(s2w[150:]))) - 0.05) < 0.02
+
+
+def test_a3_estimator_invariant_to_offset_and_drift():
+    from robotics_reliability_bench.llt_kalman_trust import A1_CONFIG, coloured_noise_params
+    import dataclasses
+    cfg = dataclasses.replace(A1_CONFIG, coloured_noise=True, phi_max=0.95, rho_forgetting=0.95)
+    rng = np.random.default_rng(1)
+    H = 400
+    c = _ar1(rng, 0.8, 0.08, H)
+    fresh = np.ones(H, dtype=bool)
+    s0, p0 = coloured_noise_params(c, fresh, cfg)
+    s1, p1 = coloured_noise_params(c + 3.0, fresh, cfg)
+    assert np.allclose(s0, s1) and np.allclose(p0, p1)
+    s2, p2 = coloured_noise_params(c + 0.05 * np.arange(H), fresh, cfg)
+    assert abs(float(np.median(p2[150:])) - float(np.median(p0[150:]))) < 0.25
+
+
+def test_a3_filter_calibrates_level_variance_under_ar1():
+    """The point of A3: under coloured noise the level posterior std must be
+    materially larger than A1's, and the bias test must not fire."""
+    from robotics_reliability_bench.llt_kalman_trust import (
+        A1_CONFIG, coloured_noise_params, forgetting_obs_noise, llt_filter_axis,
+        llt_filter_axis_coloured)
+    import dataclasses
+    rng = np.random.default_rng(3)
+    H = 1500
+    c = _ar1(rng, 0.8, 0.083, H)
+    fresh = np.ones(H, dtype=bool)
+    a1 = llt_filter_axis(c, fresh, forgetting_obs_noise(c, fresh, A1_CONFIG) ** 2, A1_CONFIG)
+    cfg = dataclasses.replace(A1_CONFIG, coloured_noise=True, phi_max=0.95, rho_forgetting=0.95)
+    s2, ph = coloured_noise_params(c, fresh, cfg)
+    a3 = llt_filter_axis_coloured(c, fresh, s2, ph, cfg)
+    assert np.sqrt(a3.level_var[200:]).mean() > 1.8 * np.sqrt(a1.level_var[200:]).mean()
+    z3 = np.abs(a3.level) / np.sqrt(np.maximum(a3.level_var, 1e-12))
+    assert not np.any((np.abs(a3.level[200:]) >= 0.2) & (z3[200:] >= 4))
+
+
+def test_a3_still_attributes_bias_on_white_noise():
+    from robotics_reliability_bench.llt_kalman_trust import A1_CONFIG
+    import dataclasses
+    det = LLTKalmanTrust(dataclasses.replace(A1_CONFIG, coloured_noise=True))
+    for fam in ("constant_bias", "precise_biased", "linear_drift"):
+        b = fc.generate(fam, seed=0)
+        assert det.evaluate(b.trajectories).flagged == b.truth_label, fam
+
+
+def test_a3_sweep_artifact_records_no_survivor():
+    import json, os
+    from robotics_reliability_bench.llt_kalman_trust import A3_CONFIG
+    path = os.path.join(os.path.dirname(fc.__file__), "results", "llt_kalman_tune_A3.json")
+    if not os.path.exists(path):
+        pytest.skip("A3 sweep not run")
+    d = json.load(open(path))
+    assert d["amendment"] == "A3"
+    if d["n_survivors"] == 0:
+        assert d["chosen"] is None and A3_CONFIG is None   # nothing may be frozen
+    else:
+        assert A3_CONFIG is not None

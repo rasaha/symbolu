@@ -64,10 +64,29 @@ GRID_A1 = {
 }
 A1_FIXED = {"bias_sustain": 4}
 
+# Amendment A3 (preregistered): coloured-noise state. bias_sustain, bias_z,
+# cusum_k, noise_forgetting frozen; phi_max / rho_forgetting swept. The TUNE
+# set adds two realistic-noise families (seeds 0..19 only).
+GRID_A3 = {
+    "q_level_ratio": [0.003, 0.01, 0.03],
+    "q_slope_ratio": [0.001, 0.003],
+    "phi_max": [0.8, 0.9, 0.95],
+    "rho_forgetting": [0.90, 0.95, 0.98],
+    "cusum_h": [8.0, 12.0],
+}
+A3_FIXED = {"bias_sustain": 4, "bias_z": 4.0, "cusum_k": 2.0,
+            "noise_forgetting": 0.9, "coloured_noise": True}
+A3_EXTRA_TUNE = {"ar1_benign": "gaussian_noise", "ar1_constant_bias": "constant_bias"}
 
-def _corpus() -> Dict[str, List[fc.FaultBundle]]:
-    return {fam: [fc.generate(fam, seed=s) for s in TUNE_SEEDS]
-            for fam in fc.TUNE_FAMILIES}
+
+def _corpus(amendment: str = "A0") -> Dict[str, List[fc.FaultBundle]]:
+    corpus = {fam: [fc.generate(fam, seed=s) for s in TUNE_SEEDS]
+              for fam in fc.TUNE_FAMILIES}
+    if amendment == "A3":
+        from robotics_reliability_bench.a2_realistic_pilot import r1_bundle
+        for key, fam in A3_EXTRA_TUNE.items():
+            corpus[key] = [r1_bundle(fam, s) for s in TUNE_SEEDS]
+    return corpus
 
 
 def evaluate(cfg: LLTKalmanConfig, corpus) -> Dict:
@@ -90,12 +109,13 @@ def evaluate(cfg: LLTKalmanConfig, corpus) -> Dict:
 
 
 _CORPUS = None
+_AMENDMENT = "A0"
 
 
 def _eval_params(params: Dict) -> Dict:
     global _CORPUS
     if _CORPUS is None:
-        _CORPUS = _corpus()
+        _CORPUS = _corpus(_AMENDMENT)
     cfg = LLTKalmanConfig(cusum_accelerates_tick=False, **params)  # STRICT tick
     res = evaluate(cfg, _CORPUS)
     res["params"] = params
@@ -104,12 +124,16 @@ def _eval_params(params: Dict) -> Dict:
 
 def main() -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--amendment", choices=["A0", "A1"], default="A0")
+    ap.add_argument("--amendment", choices=["A0", "A1", "A3"], default="A0")
     ap.add_argument("--jobs", type=int, default=max(1, (os.cpu_count() or 2) - 1))
     args = ap.parse_args()
-    grid, fixed, out_name = ((GRID_A1, A1_FIXED, "llt_kalman_tune_A1.json")
-                             if args.amendment == "A1"
-                             else (GRID, {}, "llt_kalman_tune.json"))
+    global _AMENDMENT
+    _AMENDMENT = args.amendment          # inherited by forked pool workers
+    grid, fixed, out_name = {
+        "A0": (GRID, {}, "llt_kalman_tune.json"),
+        "A1": (GRID_A1, A1_FIXED, "llt_kalman_tune_A1.json"),
+        "A3": (GRID_A3, A3_FIXED, "llt_kalman_tune_A3.json"),
+    }[args.amendment]
 
     os.makedirs(RESULTS, exist_ok=True)
     keys = list(grid)
@@ -120,8 +144,9 @@ def main() -> int:
 
     survivors = [r for r in records
                  if r["benign_fa"] == 0.0 and r["recall"] == 1.0 and r["attr"] == 1.0]
-    survivors.sort(key=lambda r: (r["mean_delay"],
-                                  -r["params"]["cusum_h"], -r["params"]["bias_z"]))
+    survivors.sort(key=lambda r: (r["mean_delay"], -r["params"]["cusum_h"],
+                                  -r["params"].get("bias_z", 0.0),
+                                  -r["params"].get("phi_max", 0.0)))
     chosen = survivors[0] if survivors else None
 
     out = {"amendment": args.amendment,
@@ -130,7 +155,7 @@ def main() -> int:
            "n_configs": len(records), "n_survivors": len(survivors),
            "selection_rule": ("benign_fa==0 and recall==1 and attr==1; "
                               "then min strict-tick mean delay; then larger "
-                              "cusum_h, bias_z"),
+                              "cusum_h, bias_z, phi_max"),
            "chosen": chosen,
            "top10": survivors[:10],
            "frozen_config": (asdict(LLTKalmanConfig(**chosen["params"]))

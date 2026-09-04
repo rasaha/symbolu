@@ -75,6 +75,10 @@ class LLTKalmanConfig:
     noise_forgetting: Optional[float] = None  # lambda in (0,1); None -> A0 behaviour
     noise_warmup: int = 6             # causal MAD warm-up over first fresh diffs
     noise_clip: float = 9.0           # clip e^2 at clip * s^2 (robust to one jump)
+    # --- amendment A3: coloured-noise state (False = A1 behaviour)
+    coloured_noise: bool = False      # augment state with an AR(1) noise component
+    phi_max: float = 0.9              # clip on the causal AR(1) coefficient estimate
+    rho_forgetting: float = 0.95      # forgetting for the variance / lag-1 autocov
 
 
 # Frozen A1 configuration — the TUNE-only sweep's choice
@@ -86,6 +90,10 @@ A1_CONFIG = LLTKalmanConfig(
     q_level_ratio=0.01, q_slope_ratio=0.003, cusum_k=2.0, cusum_h=12.0,
     bias_z=4.0, bias_min_m=0.20, bias_sustain=4,
     noise_forgetting=0.9, noise_warmup=6, noise_clip=9.0)
+
+# Frozen A3 configuration (set after the TUNE-only sweep in
+# results/llt_kalman_tune_A3.json; None until frozen).
+A3_CONFIG: Optional[LLTKalmanConfig] = None
 
 
 @dataclass
@@ -145,6 +153,115 @@ def forgetting_obs_noise(r: np.ndarray, fresh: np.ndarray,
         lo, hi = idx[j] + 1, (idx[j + 1] + 1 if j + 1 < idx.size else H)
         out[lo:hi] = np.sqrt(s2)
     return out
+
+
+def coloured_noise_params(r: np.ndarray, fresh: np.ndarray,
+                          cfg: LLTKalmanConfig):
+    """Amendment A3: causal per-axis (sigma_n^2[t], phi[t]) of the residual noise.
+
+    IMPLEMENTATION DEVIATION (logged in the preregistration A3 outcome): the
+    preregistered text estimated phi from the *innovations*; a filter that
+    models the coloured state whitens its own innovations, so phi is not
+    identifiable from them.  The estimate therefore uses FIRST DIFFERENCES of
+    the residual (as A1 does for the noise scale), decided on TUNE data before
+    any evaluation seed was scored.  A constant offset is invisible to
+    differences and a linear drift's constant mean is cancelled by the
+    mean-corrected moments.
+
+    For pure AR(1) noise, Corr(dn_t, dn_{t-1}) = -(1-phi)/2 and
+    Var(dn) = 2 sigma_n^2 (1-phi), hence phi = 1 + 2 rho_d (clipped to
+    [0, phi_max]) and sigma_n^2 = Var(dn) / (2 (1-phi)).  White noise gives
+    rho_d = -1/2 -> phi = 0 and sigma_n^2 = Var(dn)/2, i.e. exactly A1.  An
+    additive white component biases phi downward (conservative on colour);
+    a three-moment AR(1)+white solve was tried and rejected because the lag-2
+    autocovariance is not causally estimable at these window lengths.
+
+    Moments are forgetting means (``rho_forgetting``) of dr, dr^2 and
+    dr_t*dr_{t-1}: gamma(0) = E[dr^2] - m^2, gamma(1) = E[dr dr_prev] - m^2.
+    Each squared increment is clipped at ``noise_clip`` * gamma(0) (A1's
+    clip).  ``scale_floor`` is applied ONLY to the emitted sigma_n^2, never
+    inside the ratio.
+    """
+    rho = float(cfg.rho_forgetting)
+    H = r.shape[0]
+    floor2 = cfg.scale_floor ** 2
+    sig2 = np.full(H, floor2, dtype=np.float64)
+    phi = np.zeros(H, dtype=np.float64)
+    idx = np.flatnonzero(fresh)
+    if idx.size < 2:
+        return sig2, phi
+    dr = np.diff(r[idx])
+    k = min(cfg.noise_warmup, dr.size)
+    warm = dr[:k]
+    m = float(np.mean(warm))
+    mad = float(np.median(np.abs(warm - np.median(warm))))
+    g0_warm = max((1.4826 * mad) ** 2, 1e-12)
+    q = g0_warm + m * m                       # E[dr^2]
+    a = m * m - 0.5 * g0_warm                 # E[dr dr_prev]; white-noise prior
+    dr_prev: Optional[float] = None
+
+    def _emit(lo, hi, m_, q_, a_):
+        g0 = max(q_ - m_ * m_, 1e-12)
+        rho_d = (a_ - m_ * m_) / g0
+        ph = min(max(1.0 + 2.0 * rho_d, 0.0), cfg.phi_max)
+        sig2[lo:hi] = max(g0 / (2.0 * (1.0 - ph)), floor2)
+        phi[lo:hi] = ph
+
+    _emit(0, idx[min(k, idx.size - 1)] + 1, m, q, a)
+    for j in range(k, dr.size):
+        x = float(dr[j])
+        g0 = max(q - m * m, 1e-12)
+        cap = m * m + cfg.noise_clip * g0
+        m = rho * m + (1.0 - rho) * x
+        q = rho * q + (1.0 - rho) * min(x * x, cap)
+        if dr_prev is not None and idx[j] == idx[j - 1] + 1:     # consecutive ticks only
+            a = rho * a + (1.0 - rho) * min(max(x * dr_prev, -cap), cap)
+        dr_prev = x
+        lo, hi = idx[j] + 1, (idx[j + 1] + 1 if j + 1 < idx.size else H)
+        _emit(lo, hi, m, q, a)
+    return sig2, phi
+
+
+def llt_filter_axis_coloured(r: np.ndarray, fresh: np.ndarray, sig2: np.ndarray,
+                             phi: np.ndarray, cfg: LLTKalmanConfig) -> AxisFilterTrace:
+    """Amendment A3: LLT Kalman with an AR(1) coloured-noise state.
+
+    State ``[level, slope, c]``, ``F=[[1,1,0],[0,1,0],[0,0,phi_t]]``,
+    ``H=[1,0,1]``, ``Q=diag(q_level_ratio*sig2, q_slope_ratio*sig2,
+    sig2*(1-phi^2))``, ``R=scale_floor^2`` (as preregistered).  Slow
+    correlated wander is
+    absorbed by ``c`` (stationary variance sig2), so the *level* posterior
+    variance is calibrated under coloured noise and the bias test reads a
+    level that excludes the coloured excursion.
+    """
+    H = r.shape[0]
+    Hm = np.array([1.0, 0.0, 1.0])
+    I3 = np.eye(3)
+    R = cfg.scale_floor ** 2
+    first = np.flatnonzero(fresh)
+    x = np.array([float(r[first[0]]) if first.size else 0.0, 0.0, 0.0])
+    P = np.diag([cfg.p0_ratio * sig2[0], cfg.p0_ratio * sig2[0], sig2[0]])
+    level = np.zeros(H)
+    level_var = np.zeros(H)
+    nis = np.full(H, np.nan)
+    for t in range(H):
+        s2, ph = float(sig2[t]), float(phi[t])
+        F = np.array([[1.0, 1.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, ph]])
+        Q = np.diag([cfg.q_level_ratio * s2, cfg.q_slope_ratio * s2, s2 * (1.0 - ph * ph)])
+        xp = F @ x
+        Pp = F @ P @ F.T + Q
+        if fresh[t]:
+            y = float(r[t]) - float(Hm @ xp)
+            S = float(Hm @ Pp @ Hm) + R
+            K = (Pp @ Hm) / S
+            x = xp + K * y
+            P = (I3 - np.outer(K, Hm)) @ Pp
+            nis[t] = (y * y) / S
+        else:
+            x, P = xp, Pp
+        level[t] = x[0]
+        level_var[t] = P[0, 0]
+    return AxisFilterTrace(level=level, level_var=level_var, nis=nis)
 
 
 def llt_filter_axis(r: np.ndarray, fresh: np.ndarray, R,
@@ -221,6 +338,11 @@ class LLTKalmanTrust:
             # --- per-axis LLT Kalman -------------------------------------
             traces: List[AxisFilterTrace] = []
             for a in range(3):
+                if cfg.coloured_noise:                # A3: coloured-noise state
+                    sig2, phi = coloured_noise_params(signed[m, :, a], fresh, cfg)
+                    traces.append(llt_filter_axis_coloured(signed[m, :, a], fresh,
+                                                           sig2, phi, cfg))
+                    continue
                 if cfg.noise_forgetting is None:      # A0: one R per episode
                     sigma = _robust_obs_noise(signed[m, :, a], fresh, cfg.scale_floor)
                     R = sigma * sigma

@@ -5,12 +5,14 @@
 **Code/data:** `robotics_reliability_bench/llt_kalman_trust.py`,
 `detectors.py::LLTKalmanDetector`, `tune_llt_kalman.py`,
 `results/llt_kalman_tune.json`, `results/incremental_value.json`.
-**Status:** evaluation-only. No production path modified. Three stages:
+**Status:** evaluation-only. No production path modified. Four stages:
 **A0** (§2–§6) was added after `PREDICTOR_TRUST_V2_PREREGISTRATION.md` and
 is exploratory; **A1** (§7) was preregistered and passed its decision rule
 (`A1_ADOPT`) on the white-noise corpus; **A2** (§8), a preregistered
 realistic-noise pilot, **failed** (`A2_FAILS`) and scopes `A1_ADOPT` to
-white noise. The real-sensor gate is **not discharged**.
+white noise; **A3** (§9), a preregistered coloured-noise model, produced
+**no surviving configuration** on TUNE data (`A3_NO_SURVIVOR`) and was not
+scored. The real-sensor gate is **not discharged**.
 
 ---
 
@@ -287,13 +289,88 @@ Tune on the A1 TUNE families **plus** an AR(1) benign family (TUNE only),
 then require A2's C1–C7 on fresh seeds before any adoption claim. Do not
 re-tune A1 against the A2 seeds.
 
-## 9. Next step
+---
 
-Preregister and run A3 as described in §8.6. The real-sensor pilot remains
-blocked on dataset access (`NuScenesAdapter` implementation and an
-authenticated nuScenes-mini download), which no amendment here discharges.
+## 9. Amendment A3 — coloured-noise state (preregistered; `A3_NO_SURVIVOR`)
 
-## 10. Caveats (binding)
+**Header label: `REAL_SENSOR_GATE_NOT_DISCHARGED`.** Preregistered in the
+preregistration §7 A3 (commit `756f939c`) before any scoring. Code:
+`llt_kalman_trust.py::coloured_noise_params`, `llt_filter_axis_coloured`,
+`LLTKalmanConfig.coloured_noise / phi_max / rho_forgetting`;
+`tune_llt_kalman.py --amendment A3`; `results/llt_kalman_tune_A3.json`.
+
+### 9.1 What was built `[V]`
+
+Per-axis state `[level, slope, c]` with `c` an AR(1) coloured-noise
+component (`F=[[1,1,0],[0,1,0],[0,0,φ]]`, `H=[1,0,1]`,
+`Q_c = σ_n²(1−φ²)`, `R = scale_floor²`). `φ̂, σ̂_n²` are estimated causally
+per axis from mean-corrected forgetting moments of the residual's first
+differences (deviation from the preregistered "innovations" wording,
+logged; innovations of a filter that models `c` are whitened, so `φ` is
+not identifiable from them). `coloured_noise=False` reproduces A1 exactly
+(pinned). On pure AR(1) noise the mechanism works as designed: level
+posterior std rises from 0.027 to 0.096 and the bias test never fires
+where A1 fires on 1.2 % of ticks (pinned by test). `[V]`
+
+### 9.2 Sweep (TUNE only, seeds 0..19) `[V]`
+
+108 configs; the TUNE set added `ar1_benign` and `ar1_constant_bias`
+(realistic-noise R1 bundles on seeds 0..19). **Zero survivors.** Grid
+corners: `ar1_benign` false-alarm 0.15–0.30, `noisy_unbiased` 0.05,
+`ar1_constant_bias` attribution 0.55–0.85, recall 1.00 throughout. Per the
+preregistered rule nothing was scored on evaluation seeds and `A3_CONFIG`
+remains `None`.
+
+### 9.3 Why (diagnostic, TUNE data) `[I]`
+
+Every false SUSPECT traced is on the **heading axis**, at `σ̂_n` pinned to
+the 0.05 floor with `φ̂` between 0.0 and 0.4, although the heading
+residual's true wander is ~0.08 m-equivalent with `φ≈0.8`. The residual is
+taken against the *median of three AR(1) streams* and carries 2 % outlier
+frames; both add a white component. Under AR(1)+white the two-moment
+estimate assigns the mixture a lower `φ` and a lower `σ_n`, so the
+coloured state is too small to absorb the real excursion, the level takes
+it, and with `bias_sustain=4` frozen a four-tick crossing of the 0.20 m
+floor on the lever-scaled heading axis is confirmed. A three-moment
+AR(1)+white solve is the textbook fix and was tried: the lag-2
+autocovariance is ~8 % of lag-0 here and is not estimable causally within
+the ~20-sample forgetting window (`φ̂=0.46` on pure AR(1) 0.8), so it was
+rejected on TUNE data before any scoring. `[V]` for the numbers, `[I]` for
+the reading.
+
+### 9.4 What this means `[I]`
+
+* A calibrated coloured-noise model **would** fix the A2 failure — the
+  pure-AR(1) result shows it — but its parameters are not causally
+  identifiable at the timescales `bias_sustain=4` imposes. The knob that
+  bought A1's delay win is the knob that makes the noise model
+  unidentifiable.
+* With `bias_sustain` frozen, A3 cannot succeed on this data; the honest
+  reading is that the sustain length, not the noise model, is the binding
+  constraint under correlated noise. That is a re-tune of a frozen A1
+  parameter and therefore a new amendment, not something A3 may do.
+* The deterministic baseline's 12-tick window and 8-tick sustain are doing
+  exactly this job implicitly. `[I]`
+* Nothing here bears on real sensors. `[G]`
+
+### 9.5 Recommended next amendment (A4, to be preregistered)
+
+Keep the A1 white-noise filter and instead make the **decision** robust to
+correlated noise: sweep `bias_sustain ∈ {4, 6, 8, 12}` jointly with an
+effective-sample-size correction to the level test
+(`SE_eff = SE·√((1+φ̂)/(1−φ̂))` with the two-moment `φ̂`), tune on the A3
+TUNE set, and require A2's C1–C8 on fresh seeds 400..429. Accept up front
+that the delay win will shrink; the question A4 answers is whether any
+LLT-Kalman variant beats the baseline under correlated noise at all.
+
+## 10. Next step
+
+Preregister and run A4 as described in §9.5, or stop here and carry the
+frozen deterministic baseline forward as PTR-V2's primary statistic with
+A1 recorded as a white-noise-only accelerator. The real-sensor pilot
+remains blocked on dataset access, which no amendment here discharges.
+
+## 11. Caveats (binding)
 
 * Synthetic straight-line SE(2), M=3, H=50, 50 eval seeds per family. No
   real-sensor claim.

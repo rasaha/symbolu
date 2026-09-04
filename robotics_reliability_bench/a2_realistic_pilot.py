@@ -21,6 +21,7 @@ Writes ``results/a2_realistic_pilot.json``.
 """
 from __future__ import annotations
 
+import argparse
 import json
 import os
 from dataclasses import replace
@@ -35,13 +36,15 @@ from robotics_reliability_bench.detectors import (BaselineDetector, BCVFDetector
                                                   FusionDetector, LLTKalmanDetector)
 from robotics_reliability_bench.fault_corpus import (FaultBundle, HARM_BENIGN,
                                                      HARM_COMMON, HARM_STATE)
-from robotics_reliability_bench.llt_kalman_trust import A1_CONFIG
+from robotics_reliability_bench.llt_kalman_trust import (A1_CONFIG, A3_CONFIG,
+                                                         LLTKalmanConfig)
 from robotics_reliability_bench.metrics import aggregate, score_family
 from robotics_reliability_bench.run_incremental_value import (BCVF_MARGIN_THRESHOLD,
-                                                             DETECTOR_WINDOW)
+                                                             DETECTOR_WINDOW, EVAL_SEEDS)
 
 RESULTS = os.path.join(os.path.dirname(__file__), "results")
 A2_SEEDS = list(range(200, 230))          # fresh; never used in any tuning
+A3_SEEDS = list(range(300, 330))          # fresh again; never the A2 seeds
 R1_M, R1_T, DT, V = 3, 100, 0.1, 5.0
 DROPOUT_P, DROPOUT_LEN = 0.2, 5
 R2_STEPS = 400
@@ -202,12 +205,13 @@ R2_FAMILIES = ["gps_multipath", "map_misalignment", "constant_bias_sanity",
 
 # ---- scoring -----------------------------------------------------------------
 
-def _systems() -> List:
+def _systems(llt_config: Optional[LLTKalmanConfig] = None,
+             llt_name: str = "LLTKalman-A1") -> List:
     baseline = BaselineDetector()
-    a1 = LLTKalmanDetector(A1_CONFIG, name="LLTKalman-A1")
+    a1 = LLTKalmanDetector(llt_config or A1_CONFIG, name=llt_name)
     bcvf = BCVFDetector(margin_threshold=BCVF_MARGIN_THRESHOLD, window=DETECTOR_WINDOW)
     fus = FusionDetector(a1, bcvf)
-    fus.name = "Fusion(LLT-A1+BCVF)"
+    fus.name = f"Fusion({llt_name.replace('LLTKalman-', 'LLT-')}+BCVF)"
     return [baseline, a1, bcvf, fus]
 
 
@@ -238,17 +242,18 @@ def _round(d: Dict) -> Dict:
     return {k: (round(v, 4) if isinstance(v, float) else v) for k, v in d.items()}
 
 
-def run() -> Dict:
-    r1 = {fam: [r1_bundle(fam, s) for s in A2_SEEDS] for fam in fc.FAMILIES}
-    r2 = {fam: [r2_bundle(fam, s) for s in A2_SEEDS] for fam in R2_FAMILIES}
-    out: Dict = {"amendment": "A2", "real_sensor_gate_discharged": False,
-                 "data_source": DATA_SOURCE, "seeds": A2_SEEDS,
+def run(seeds: List[int] = A2_SEEDS, llt_config: Optional[LLTKalmanConfig] = None,
+        llt_name: str = "LLTKalman-A1", amendment: str = "A2") -> Dict:
+    r1 = {fam: [r1_bundle(fam, s) for s in seeds] for fam in fc.FAMILIES}
+    r2 = {fam: [r2_bundle(fam, s) for s in seeds] for fam in R2_FAMILIES}
+    out: Dict = {"amendment": amendment, "real_sensor_gate_discharged": False,
+                 "data_source": DATA_SOURCE, "seeds": seeds, "llt_system": llt_name,
                  "r1": {"M": R1_M, "T": R1_T, "dropout_p": DROPOUT_P, "dropout_len": DROPOUT_LEN},
                  "r2": {"M": 4, "T": R2_STEPS, "families": R2_FAMILIES,
                         "note": "gps_multipath and map_misalignment share identical "
                                 "injection code in RealisticNoiseAdapter"},
                  "per_detector": {}}
-    for det in _systems():
+    for det in _systems(llt_config, llt_name):
         r1_scores = [score_family(det, b) for b in r1.values()]
         r2_all = {fam: score_family(det, b) for fam, b in r2.items()}
         r2_scores = [s for fam, s in r2_all.items() if fam != "camera_degradation"]
@@ -269,13 +274,30 @@ def run() -> Dict:
             "r2_camera_degradation_m4_degraded_or_worse_rate":
                 None if cam_deg is None else round(cam_deg, 3),
         }
-    out["verdict"] = _verdict(out)
+    out["verdict"] = _verdict(out, llt_name)
     return out
 
 
-def _verdict(out: Dict) -> Dict:
+def original_corpus_check(llt_config: LLTKalmanConfig, llt_name: str) -> Dict:
+    """A3 condition C8: no regression on the original fault_corpus held-out
+    seeds 100..149 (TEST-only recall/FA, ALL-family delay)."""
+    det = LLTKalmanDetector(llt_config, name=llt_name)
+    scores = [score_family(det, [fc.generate(f, seed=s) for s in EVAL_SEEDS])
+              for f in fc.FAMILIES]
+    agg_all = aggregate(scores)
+    agg_test = aggregate([s for s in scores if s.family in fc.TEST_FAMILIES])
+    ok = (agg_test["fault_detection_recall"] == 1.0
+          and agg_test["false_alarm_rate"] <= 0.02
+          and agg_all["detection_delay_ticks"] <= 8.0)
+    return {"eval_seeds": EVAL_SEEDS, "aggregate_all": _round(agg_all),
+            "aggregate_test_only": _round(agg_test),
+            "per_family": {s.family: _fam_row(s) for s in scores},
+            "C8_no_regression": bool(ok)}
+
+
+def _verdict(out: Dict, llt_name: str = "LLTKalman-A1") -> Dict:
     pd = out["per_detector"]
-    b, a, v = pd["DeterministicBaseline"], pd["LLTKalman-A1"], pd["BCVF"]
+    b, a, v = pd["DeterministicBaseline"], pd[llt_name], pd["BCVF"]
     ba, aa, va = b["r1_aggregate"], a["r1_aggregate"], v["r1_aggregate"]
     c = {
         "C1_recall": aa["fault_detection_recall"] >= ba["fault_detection_recall"],
@@ -312,13 +334,46 @@ def _print(out: Dict) -> None:
     print("VERDICT:", json.dumps(out["verdict"]))
 
 
+def _a3_verdict(out: Dict) -> Dict:
+    """A3 label from C1–C7 (pilot, fresh seeds) and C8 (original corpus)."""
+    c = dict(out["verdict"]["conditions"])
+    c["C8_no_regression"] = out["original_corpus_check"]["C8_no_regression"]
+    r1_ok = all(c[k] for k in ("C1_recall", "C2_false_alarm", "C3_common_mode_zero",
+                              "C4_delay", "C5_H2_reproduces"))
+    r2_ok = c["C6_native_harm_attributed"] and c["C7_native_benign"]
+    c8 = c["C8_no_regression"]
+    if r1_ok and r2_ok and c8:
+        label = "A3_ADOPT"
+    elif (r1_ok and r2_ok and not c8) or (c8 and r1_ok and not r2_ok):
+        label = "A3_PARTIAL"
+    else:
+        label = "A3_FAILS"
+    return {"header": "REAL_SENSOR_GATE_NOT_DISCHARGED", "conditions": c, "label": label}
+
+
 def main() -> int:
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--amendment", choices=["A2", "A3"], default="A2")
+    args = ap.parse_args()
     os.makedirs(RESULTS, exist_ok=True)
-    out = run()
-    path = os.path.join(RESULTS, "a2_realistic_pilot.json")
+    if args.amendment == "A2":
+        out = run()
+        path = os.path.join(RESULTS, "a2_realistic_pilot.json")
+    else:
+        if A3_CONFIG is None:
+            raise SystemExit("A3_CONFIG is not frozen; run the A3 tune sweep first")
+        out = run(seeds=A3_SEEDS, llt_config=A3_CONFIG, llt_name="LLTKalman-A3",
+                  amendment="A3")
+        out["original_corpus_check"] = original_corpus_check(A3_CONFIG, "LLTKalman-A3")
+        out["verdict"] = _a3_verdict(out)
+        path = os.path.join(RESULTS, "a3_realistic_pilot.json")
     with open(path, "w") as f:
         json.dump(out, f, indent=2)
     _print(out)
+    if "original_corpus_check" in out:
+        c8 = out["original_corpus_check"]
+        print("C8 original corpus:", c8["aggregate_test_only"], "delay_all=",
+              c8["aggregate_all"]["detection_delay_ticks"], "->", c8["C8_no_regression"])
     print(f"wrote {path}")
     return 0
 

@@ -297,3 +297,27 @@ the large expected effect sizes.
     No threshold is changed after scoring. A1/A0 frozen configs and every
     committed results row stay untouched; A2's results file is not
     regenerated.
+  * *Implementation deviation (decided on TUNE data, before any evaluation
+    seed was scored).* The preregistered text estimated `φ̂` from the
+    filter's innovations. A filter that models the coloured state whitens
+    its own innovations, so `φ` is not identifiable from them; the
+    implementation estimates `φ̂` and `σ̂_n²` from mean-corrected forgetting
+    moments of the residual's **first differences** (`φ = 1 + 2ρ_d`,
+    `σ_n² = Var(d)/(2(1−φ))`, white noise ⇒ the A1 estimator). A
+    three-moment AR(1)+white solve was also tried and rejected on TUNE
+    data: the lag-2 autocovariance is not causally estimable at these
+    window lengths (`φ̂ = 0.46` on pure AR(1) 0.8). `R = scale_floor²` as
+    preregistered.
+  * *Outcome (appended after the sweep; rule not edited).* **108 configs,
+    0 survivors → `A3_NO_SURVIVOR`.** Nothing was scored on evaluation
+    seeds 300..329 or 100..149, and `A3_CONFIG` stays `None`. Every config
+    fails the hard rule on `ar1_benign` (false-alarm 0.15–0.30 across the
+    grid corners) and most also on `noisy_unbiased` (0.05) and
+    `ar1_constant_bias` attribution (0.55–0.85). Diagnosis in
+    `ROBOTICS_LLT_KALMAN_TRUST_RESULTS.md` §9: the coloured state is
+    verified to calibrate the level variance on pure AR(1) noise, but on the
+    realistic pipeline (median consensus of three AR(1) streams plus outlier
+    frames) the causal two-moment estimate collapses toward `φ̂≈0` at the
+    noise floor on the heading axis, and with `bias_sustain=4` frozen the
+    0.20 m floor is crossed by lever-scaled heading wander. The real-sensor
+    gate remains not discharged.
