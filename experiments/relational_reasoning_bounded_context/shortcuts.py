@@ -38,19 +38,33 @@ def _most_recent_serialized_event(ctx: ReasoningContext):
     return sorted(ctx.events, key=lambda e: e.event_id)[-1]
 
 
+def _query_signature(c: ReasoningContext) -> tuple:
+    q = c.query
+    return (q.operation, q.path_mode, q.requested_property, q.event_type, q.policy_scope,
+            tuple(q.relation_chain))
+
+
 def predict(kind: str, contexts: list[ReasoningContext]) -> list[tuple[ReasoningContext, str]]:
     """Deterministic structure-blind prediction for each context (no reasoning over structure)."""
-    # majority_class needs a cohort-level statistic
-    maj_status = Counter(c.authoritative_output.status for c in contexts).most_common(1)[0][0] \
-        if contexts else "SUPPORTED"
+    # F13: query_only and majority_class are REAL structure-blind predictors fitted on the cohort's gold
+    # (an optimistic upper bound for a predictor that sees only the query / only the label marginal, i.e.
+    # the conservative direction for a shortcut detector). Previously both emitted a token that is never
+    # a gold answer and were 0.0 by construction.
+    maj_pair = Counter((c.authoritative_output.answer, c.authoritative_output.status)
+                       for c in contexts).most_common(1)[0][0] if contexts else (None, "SUPPORTED")
+    by_query: dict = {}
+    for c in contexts:
+        by_query.setdefault(_query_signature(c), Counter())[
+            (c.authoritative_output.answer, c.authoritative_output.status)] += 1
     out = []
     for c in contexts:
-        if kind == "query_only":
-            text = _out("NO_ACTION", status="SUPPORTED")                       # sees only the query
+        if kind == "query_only":                                              # sees only the query fields
+            a, st = by_query[_query_signature(c)].most_common(1)[0][0]
+            text = _out(a, status=st)
         elif kind == "shuffled_context":
-            text = _out("NO_ACTION", status="SUPPORTED")                       # structure broken
+            text = _out("NO_ACTION", status="SUPPORTED")                       # structure broken (placeholder)
         elif kind == "majority_class":
-            text = _out(None if maj_status == "INSUFFICIENT_EVIDENCE" else "NO_ACTION", status=maj_status)
+            text = _out(maj_pair[0], status=maj_pair[1])
         elif kind == "most_recent_token":
             ev = _most_recent_serialized_event(c)
             text = _out(ev.value if ev else "NO_ACTION",

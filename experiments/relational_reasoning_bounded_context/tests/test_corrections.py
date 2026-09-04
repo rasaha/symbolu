@@ -293,6 +293,51 @@ def test_F15_is_valid_output_never_raises_on_cap_violation():
     assert output.is_valid_output("garbage") is False
 
 
+# ---- F13: no constant gold answers; real query-only / majority-class baselines ----
+def test_F13_no_split_has_a_constant_answerable_gold():
+    from collections import Counter
+    for s in ("R1", "R2", "R3", "R4", "R8", "R9", "R12"):
+        ans = Counter(c.authoritative_output.answer for c in gen.generate_split(s, FIXT, 48, "unit"))
+        assert len(ans) >= 3 and ans.most_common(1)[0][1] <= 30, (s, ans)   # no answer > 62% of cohort
+    st = Counter(c.authoritative_output.status for c in gen.generate_split("R8", FIXT, 48, "unit"))
+    assert st["POLICY_NOT_APPLICABLE"] >= 10 and st["SUPPORTED"] >= 10, st
+
+def test_F13_constant_emitter_trips_shortcut_and_fails_answer_gates():
+    """A per-operation constant emitter (previously passed R1-R4/R9/R12 answer gates with
+    shortcut_detected=False on the constant-answer generator) must now be caught."""
+    from .. import dataset as DS, run as R
+    from ..serializer import serialize_input  # noqa: F401
+    r_coh = DS.eval_cohorts_r(FIXT, 12, "unit"); p0_coh = DS.eval_cohorts_p0(FIXT, 12, "unit")
+    def const(ctx):
+        op = ctx.query.operation
+        if op in ("resolve_attribute", "resolve_path_target"):
+            return output.serialize_output(ReasoningOutput("EU", (f"Entity:{ctx.query.root_entity_id}",), (), "SUPPORTED"))
+        if op == "apply_policy":
+            return output.serialize_output(ReasoningOutput("VP_APPROVAL_REQUIRED", (f"Entity:{ctx.query.root_entity_id}",), (), "SUPPORTED"))
+        return output.serialize_output(ReasoningOutput("LOW", (f"Entity:{ctx.query.root_entity_id}",), (), "SUPPORTED"))
+    rep = R.assemble_report(seed=FIXT, role="fixture", checkpoint_digest="0" * 64,
+                            p0_predictions=DS.gold_predictions(p0_coh),
+                            r_predictions={s: [(c, const(c)) for c in cs] for s, cs in r_coh.items()})
+    g = rep["gates"]
+    assert not any(g[k]["pass"] for k in ("R1_direct_attribute", "R2_path_given_1hop",
+                                          "R3_path_given_multihop", "R4_path_discovery_multihop",
+                                          "R9_composite_final_answer")), g
+    assert rep["shortcut_detected"] is True
+    assert rep["structure_blind_baselines"]["query_only"] > 0.0
+
+def test_F13_query_only_and_majority_are_real_predictors_but_perfect_model_is_not_flagged():
+    ctxs = [c for s in ("R1", "R5", "R8", "R9", "R10") for c in gen.generate_split(s, FIXT, 8, "unit")]
+    qo = SC.baseline_accuracy("query_only", ctxs); mc = SC.baseline_accuracy("majority_class", ctxs)
+    assert 0.0 < qo < 0.9 and 0.0 < mc < 0.9, (qo, mc)
+    assert not SC.run_suite(ctxs, model_metric=1.0)["shortcut_detected"]
+    # on a synthetic constant-answer cohort the query-only predictor must reach 1.0 (it can now detect it)
+    r1 = gen.generate_split("R1", FIXT, 8, "unit")
+    forced = [c.__class__(**{**c.__dict__, "authoritative_output":
+                             ReasoningOutput("EU", c.authoritative_output.reasoning_path, (), "SUPPORTED")})
+              for c in r1]
+    assert SC.baseline_accuracy("query_only", forced) == 1.0
+
+
 def main() -> int:
     tests = [v for k, v in sorted(globals().items()) if k.startswith("test_") and callable(v)]
     passed = failed = 0

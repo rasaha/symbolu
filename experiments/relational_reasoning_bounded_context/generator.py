@@ -24,6 +24,9 @@ SPLITS = ("R1", "R2", "R3", "R4", "R5", "R6", "R7", "R8", "R9", "R10", "R11", "R
 P0_SUBTASKS = ("B1", "B2", "B3", "B4", "B5", "B6", "B7")
 
 _RISK = ("LOW", "MEDIUM", "HIGH", "CRITICAL")
+# F13: answer-bearing attributes are drawn UNIFORMLY so no split has a constant gold answer and the
+# query-only / majority-class baselines collapse to chance (preregistration §9).
+_REGIONS = ("EU", "NA", "APAC", "LATAM")
 _STATUS = ("ACTIVE", "EXPIRED", "PENDING")
 
 # Shared identifier vocabulary, marker-free pool partition. Every role draws ID bodies from the SAME
@@ -89,9 +92,10 @@ def _amount(rng: random.Random) -> str:
 # ---------- R-split generators ----------
 
 def _gen_direct(rng, mint, tenant, split):  # R1
-    ents = [Entity("vendor", mint.new(), tenant, (("region", "EU"), ("amount", _amount(rng))))]
+    ents = [Entity("vendor", mint.new(), tenant, (("region", rng.choice(_REGIONS)), ("amount", _amount(rng))))]
     for _ in range(rng.randint(5, 11)):
-        ents.append(Entity("vendor", mint.new(), tenant, (("amount", _amount(rng)),)))
+        ents.append(Entity("vendor", mint.new(), tenant,
+                           (("region", rng.choice(_REGIONS)), ("amount", _amount(rng)))))
     root = ents[0]
     attr_v = dict(root.attributes)["region"]
     q = ReasoningQuery("resolve_attribute", "NOT_APPLICABLE", root.entity_id,
@@ -107,7 +111,7 @@ def _chain(rng, mint, tenant, hops):
     types = ["contract", "vendor", "department"]
     prev = ents[0]
     for i in range(hops):
-        nxt = Entity(types[i], mint.new(), tenant, (("region", "EU"),))
+        nxt = Entity(types[i], mint.new(), tenant, (("region", rng.choice(_REGIONS)),))
         ents.append(nxt)
         rels.append(Relation(rtypes[i], prev.entity_id, nxt.entity_id, tenant))
         prev = nxt
@@ -121,7 +125,7 @@ def _gen_path(rng, mint, tenant, split, given: bool, hops: int):  # R2/R3 given,
         # confusable distractor relations from root to wrong targets
         if len(rels) < CAPS["max_relations"] and rng.random() < 0.5:
             rels.append(Relation(rtypes[0], ents[0].entity_id, ents[-1].entity_id, tenant))
-    tail_attr = dict(tail.attributes).get("region", "EU")
+    tail_attr = dict(tail.attributes)["region"]
     mode = "PATH_GIVEN" if given else "PATH_DISCOVERY"
     q = ReasoningQuery("resolve_path_target", mode, ents[0].entity_id,
                        relation_chain=tuple(rtypes) if given else (),
@@ -185,7 +189,7 @@ def _gen_rel_temporal(rng, mint, tenant, split, given: bool):  # R6 given / R7 d
 def _make_policy(rng, mint, tenant, latest_risk, amount_val):
     thresh = str(min(int(amount_val) - 1, 999_999_999)) if int(amount_val) > 1 else "0"
     applies = latest_risk == "HIGH" and int(amount_val) > int(thresh)
-    outcome = "VP_APPROVAL_REQUIRED"
+    outcome = OUTCOME_VOCAB[rng.randrange(len(OUTCOME_VOCAB))]   # uniform; independent of policy_id
     conds = (Condition("risk", "EQ", "HIGH"), Condition("amount", "GT", thresh))
     pol = Policy(mint.new(), conds, outcome, tenant)
     # distractor policies with different outcomes (policy_id independent of outcome)
@@ -194,14 +198,16 @@ def _make_policy(rng, mint, tenant, latest_risk, amount_val):
 
 def _gen_policy(rng, mint, tenant, split):  # R8 facts pre-resolved
     amt = _amount(rng)
-    ents = [Entity("vendor", mint.new(), tenant, (("risk", "HIGH"), ("amount", amt)))]
+    root_risk = "HIGH" if rng.random() < 0.5 else rng.choice(("LOW", "MEDIUM", "CRITICAL"))  # F13
+    ents = [Entity("vendor", mint.new(), tenant, (("risk", root_risk), ("amount", amt)))]
     for _ in range(rng.randint(5, 11)):
-        ents.append(Entity("vendor", mint.new(), tenant, (("amount", _amount(rng)),)))
-    pol, applies, outcome = _make_policy(rng, mint, tenant, "HIGH", amt)
+        ents.append(Entity("vendor", mint.new(), tenant, (("risk", rng.choice(_RISK)), ("amount", _amount(rng)))))
+    pol, applies, outcome = _make_policy(rng, mint, tenant, root_risk, amt)
     pols = [pol]
-    for _ in range(rng.randint(0, CAPS["max_policies"] - 1)):
+    # F13: at least one distractor policy, so "outcome of the only policy" is never a structure-blind answer
+    for _ in range(rng.randint(1, CAPS["max_policies"] - 1)):
         pols.append(Policy(mint.new(), (Condition("risk", "EQ", "LOW"),),
-                           OUTCOME_VOCAB[rng.randrange(1, len(OUTCOME_VOCAB))], tenant))
+                           OUTCOME_VOCAB[rng.randrange(len(OUTCOME_VOCAB))], tenant))
     q = ReasoningQuery("apply_policy", "NOT_APPLICABLE", ents[0].entity_id,
                        requested_property="approval_requirement", policy_scope="vendor_risk")
     gold = ReasoningOutput(outcome if applies else None,
@@ -229,10 +235,10 @@ def _gen_composite(rng, mint, tenant, split, confusable: bool):  # R9 / R12
         evs += de
         if confusable and len(rels) < CAPS["max_relations"]:
             rels.append(Relation(rtypes[0], ents[0].entity_id, d.entity_id, tenant))  # wrong branch, dead-ends
-    for _ in range(rng.randint(0, 2)):
+    for _ in range(rng.randint(1, 2)):   # F13: >= 1 distractor policy (see _gen_policy)
         if len(pols) < CAPS["max_policies"]:
             pols.append(Policy(mint.new(), (Condition("risk", "EQ", "LOW"),),
-                               OUTCOME_VOCAB[rng.randrange(1, len(OUTCOME_VOCAB))], tenant))
+                               OUTCOME_VOCAB[rng.randrange(len(OUTCOME_VOCAB))], tenant))
     evd = [Evidence(mint.new(), "supports", latest.event_id, tenant),
            Evidence(mint.new(), "supports",
                     f"{ents[0].entity_id}|{rtypes[0]}|{rels[0].target_entity_id}", tenant)]
