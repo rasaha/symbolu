@@ -161,3 +161,67 @@ def test_fusion_over_llt_never_invents_detection():
     b = fc.generate("gaussian_noise", seed=0)
     out = fusion.detect(b)
     assert out.detected is False and out.flagged is None
+
+
+# ---- amendment A1: forgetting noise estimate --------------------------------
+
+def test_forgetting_noise_tracks_variance_growth():
+    """A1 must raise R_t when the noise grows late in the episode (the
+    calibration_drift mechanism) whereas A0 returns one number."""
+    from robotics_reliability_bench.llt_kalman_trust import forgetting_obs_noise
+    rng = np.random.default_rng(0)
+    H = 80
+    sig = np.where(np.arange(H) < 40, 0.02, 0.20)
+    r = rng.normal(0.0, 1.0, size=H) * sig
+    fresh = np.ones(H, dtype=bool)
+    s = forgetting_obs_noise(r, fresh, LLTKalmanConfig(noise_forgetting=0.9,
+                                                       scale_floor=0.005))
+    assert s.shape == (H,)
+    assert np.all(np.isfinite(s)) and np.all(s > 0)
+    assert s[75:].mean() > 3.0 * s[20:38].mean()
+
+
+def test_forgetting_noise_is_robust_to_one_jump():
+    """One abrupt step must not launder itself into 'noise': the estimate may
+    bump for a step but must return near the pre-jump level."""
+    from robotics_reliability_bench.llt_kalman_trust import forgetting_obs_noise
+    rng = np.random.default_rng(1)
+    H = 80
+    r = rng.normal(0.0, 0.05, size=H)
+    r[40:] += 1.0
+    fresh = np.ones(H, dtype=bool)
+    s = forgetting_obs_noise(r, fresh, LLTKalmanConfig(noise_forgetting=0.9))
+    assert s[70:].mean() < 2.0 * s[20:38].mean()
+
+
+def test_forgetting_noise_handles_missing_and_short_inputs():
+    from robotics_reliability_bench.llt_kalman_trust import forgetting_obs_noise
+    cfg = LLTKalmanConfig(noise_forgetting=0.9)
+    H = 30
+    r = np.zeros(H)
+    fresh = np.zeros(H, dtype=bool)
+    fresh[3] = True                                   # a single fresh tick
+    s = forgetting_obs_noise(r, fresh, cfg)
+    assert s.shape == (H,) and np.all(s == cfg.scale_floor)
+    fresh = np.ones(H, dtype=bool)
+    fresh[10:20] = False
+    s = forgetting_obs_noise(np.linspace(0, 1, H), fresh, cfg)
+    assert np.all(np.isfinite(s)) and np.all(s >= cfg.scale_floor)
+
+
+def test_a1_a0_identical_when_forgetting_unset():
+    """noise_forgetting=None must reproduce the frozen A0 path exactly."""
+    det_a0 = LLTKalmanTrust(LLTKalmanConfig())
+    det_a0b = LLTKalmanTrust(LLTKalmanConfig(noise_forgetting=None))
+    for fam in ("constant_bias", "calibration_drift", "abrupt_jump"):
+        b = fc.generate(fam, seed=2)
+        a = det_a0.evaluate(b.trajectories); c = det_a0b.evaluate(b.trajectories)
+        assert [r.suspicion for r in a.per_predictor] == [r.suspicion for r in c.per_predictor]
+
+
+def test_a1_time_varying_R_keeps_faults_attributed():
+    det = LLTKalmanTrust(LLTKalmanConfig(noise_forgetting=0.9))
+    for fam in ("constant_bias", "linear_drift", "accelerating", "precise_biased"):
+        b = fc.generate(fam, seed=0)
+        d = det.evaluate(b.trajectories, b.valid_masks)
+        assert d.flagged == b.truth_label, (fam, d.reason)

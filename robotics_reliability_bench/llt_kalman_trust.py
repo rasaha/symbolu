@@ -71,6 +71,16 @@ class LLTKalmanConfig:
     stale_frac: float = 0.3           # fraction missing -> predictor ABSTAIN
     abstain_suspect_frac: float = 0.5 # >= this frac SUSPECT -> global ABSTAIN
     cusum_accelerates_tick: bool = True
+    # --- amendment A1: time-varying noise estimate (None = A0 whole-episode)
+    noise_forgetting: Optional[float] = None  # lambda in (0,1); None -> A0 behaviour
+    noise_warmup: int = 6             # causal MAD warm-up over first fresh diffs
+    noise_clip: float = 9.0           # clip e^2 at clip * s^2 (robust to one jump)
+
+
+# Frozen A1 configuration (set after the TUNE-only sweep in
+# results/llt_kalman_tune_A1.json; None until frozen). The A0 defaults above
+# are NOT modified so the committed A0 rows stay reproducible.
+A1_CONFIG: Optional["LLTKalmanConfig"] = None
 
 
 @dataclass
@@ -95,7 +105,44 @@ def _robust_obs_noise(r: np.ndarray, fresh: np.ndarray, floor: float) -> float:
     return max(1.4826 * mad / np.sqrt(2.0), floor)
 
 
-def llt_filter_axis(r: np.ndarray, fresh: np.ndarray, R: float,
+def forgetting_obs_noise(r: np.ndarray, fresh: np.ndarray,
+                         cfg: LLTKalmanConfig) -> np.ndarray:
+    """Amendment A1: causal, exponentially forgetting robust noise std, (H,).
+
+    Warm-up: causal MAD over the first ``noise_warmup`` fresh first
+    differences (the A0 estimator restricted to the prefix). Thereafter
+    ``s_t^2 = lam * s_{t-1}^2 + (1 - lam) * clip(e_t^2, 0, clip * s_{t-1}^2)``
+    where ``e_t = (dr_t - m_t) / sqrt(2)`` and ``m_t`` is an EWMA of the first
+    differences (removes a constant drift increment). Clipping makes one
+    jump inflate ``s`` by at most ``clip`` in variance for one step, so an
+    abrupt fault is not laundered into "noise". Ticks before the first fresh
+    difference carry the warm-up value; non-fresh ticks hold the last value.
+    """
+    lam = float(cfg.noise_forgetting)
+    H = r.shape[0]
+    idx = np.flatnonzero(fresh)
+    out = np.full(H, cfg.scale_floor, dtype=np.float64)
+    if idx.size < 2:
+        return out
+    dr = np.diff(r[idx])                     # fresh-to-fresh first differences
+    k = min(cfg.noise_warmup, dr.size)
+    warm = dr[:k]
+    mad = float(np.median(np.abs(warm - np.median(warm))))
+    s2 = max(1.4826 * mad / np.sqrt(2.0), cfg.scale_floor) ** 2
+    m = float(np.median(warm))
+    # warm-up value applies to every tick up to and including the k-th diff
+    out[: idx[min(k, idx.size - 1)] + 1] = np.sqrt(s2)
+    for j in range(k, dr.size):
+        m = lam * m + (1.0 - lam) * float(dr[j])
+        e2 = ((float(dr[j]) - m) ** 2) / 2.0
+        s2 = lam * s2 + (1.0 - lam) * min(e2, cfg.noise_clip * s2)
+        s2 = max(s2, cfg.scale_floor ** 2)
+        lo, hi = idx[j] + 1, (idx[j + 1] + 1 if j + 1 < idx.size else H)
+        out[lo:hi] = np.sqrt(s2)
+    return out
+
+
+def llt_filter_axis(r: np.ndarray, fresh: np.ndarray, R,
                     cfg: LLTKalmanConfig) -> AxisFilterTrace:
     """Local-linear-trend Kalman filter on one residual axis.
 
@@ -103,26 +150,32 @@ def llt_filter_axis(r: np.ndarray, fresh: np.ndarray, R: float,
     slope (legitimate or faulty linear drift) is absorbed into the slope
     state so innovations are white under it, while the *level* state tracks
     the current offset — which is what the bias channel reads.
+
+    ``R`` is either a scalar (A0: one observation variance per episode) or an
+    ``(H,)`` array of per-tick variances (A1). ``Q`` is a ratio of the current
+    ``R_t`` so the filter stays scale-free.
     """
     H = r.shape[0]
+    R_t = np.broadcast_to(np.asarray(R, dtype=np.float64), (H,))
     F = np.array([[1.0, 1.0], [0.0, 1.0]])
-    Q = np.array([[cfg.q_level_ratio * R, 0.0], [0.0, cfg.q_slope_ratio * R]])
     I2 = np.eye(2)
 
     # initialise at the first fresh observation (or 0 if none), zero slope
     first = np.flatnonzero(fresh)
     x = np.array([float(r[first[0]]) if first.size else 0.0, 0.0])
-    P = I2 * (cfg.p0_ratio * R)
+    P = I2 * (cfg.p0_ratio * R_t[0])
 
     level = np.zeros(H)
     level_var = np.zeros(H)
     nis = np.full(H, np.nan)
     for t in range(H):
+        Rt = float(R_t[t])
+        Q = np.array([[cfg.q_level_ratio * Rt, 0.0], [0.0, cfg.q_slope_ratio * Rt]])
         xp = F @ x
         Pp = F @ P @ F.T + Q
         if fresh[t]:
             y = float(r[t]) - xp[0]
-            S = Pp[0, 0] + R
+            S = Pp[0, 0] + Rt
             K = Pp[:, 0] / S                         # (2,)
             x = xp + K * y
             P = (I2 - np.outer(K, np.array([1.0, 0.0]))) @ Pp
@@ -163,8 +216,12 @@ class LLTKalmanTrust:
             # --- per-axis LLT Kalman -------------------------------------
             traces: List[AxisFilterTrace] = []
             for a in range(3):
-                sigma = _robust_obs_noise(signed[m, :, a], fresh, cfg.scale_floor)
-                traces.append(llt_filter_axis(signed[m, :, a], fresh, sigma * sigma, cfg))
+                if cfg.noise_forgetting is None:      # A0: one R per episode
+                    sigma = _robust_obs_noise(signed[m, :, a], fresh, cfg.scale_floor)
+                    R = sigma * sigma
+                else:                                 # A1: per-tick R_t
+                    R = forgetting_obs_noise(signed[m, :, a], fresh, cfg) ** 2
+                traces.append(llt_filter_axis(signed[m, :, a], fresh, R, cfg))
 
             # --- change channel: CUSUM on innovation surprise ------------
             # surprise_t = sqrt(sum_axes NIS_t)  (~ sqrt(chi2_3) under null)
