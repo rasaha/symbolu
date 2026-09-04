@@ -1985,3 +1985,64 @@ evidence that no credential was committed.
 This authorises no run: D1–D5 remain incomplete, the custody endpoint remains
 unbound, slice 3B remains uncommissioned, and no provider call, credential access
 or genuine calibration is permitted by this revision.
+
+### Revision 20 (owner rulings: slice-3B preflight decisions and implementation order, 2026-09-04)
+
+The slice-3B preflight established that the custody endpoint is unbound at D5 and that four
+further items blocked commissioning. The owner ruled that all five can be settled **without**
+D5 endpoint details. Each below is an **owner ruling `[R]`**.
+
+1. **Custody port — build now.** Define `VerdictCustodyPort` and a deterministic in-memory
+   test double. D5 later binds the real endpoint, ACLs, writer identities, encryption,
+   retention and deletion policy. This revision binds none of them.
+2. **Lifecycle — the Phase 4A amendment comes first**, as a separate prerequisite change
+   before runner branching. A calibration ends successfully at `UNDER_TEST` **only when a
+   valid, verified `CalibrationResult` exists**; it must never emit `RESULT_ASSESSED` and
+   never become `EVALUATED`. This closes the `[G]` recorded in revision 13.
+3. **`CalibrationResult` with the fake custody double — tests only.** Construction using the
+   in-memory double is permitted **solely in tests**. It is never genuine custody evidence and
+   never authorises a real calibration or confirmatory run.
+4. **Refusal codes — already ratified.** The original seven were owner-ratified in revision 10
+   and the four calibration names in revision 13; their presence in `PilotErrorCode` is
+   legitimate. D1–D5 remain incomplete because several codes' **runtime enforcement** is still
+   missing, **not** because their names are unratified. No code may be added without a ballot.
+5. **Path residue — retain the trust-boundary control.** Maximum segment length is **not** to
+   be used as secret detection: it would reject legitimate hashes and identifiers while
+   missing shorter secrets. D5 must eventually bind custody references to approved schemes,
+   authorities and namespaces, or to a registry. Revision 19 ruling 6 stands unchanged.
+
+**Commissioned implementation order.**
+
+- **Slice 3B-0** — the narrow Phase 4A lifecycle amendment (ruling 2).
+- **Slice 3B-1** — F3 entry-point eligibility gate, F4 constructor-based role revalidation,
+  the custody port and its test double.
+- **Slice 3B-2** — the calibration runner branch and test-only `CalibrationResult` production.
+- Real custody adapters and genuine execution **remain blocked until D5**.
+
+**Entry point.** The existing `run_pilot` stays available for historical
+mechanism-validation tests. A **separately named Phase 4C entry point** invokes
+`require_phase_4c_eligible()` before delegating. A v1 manifest is **never** silently
+reinterpreted.
+
+**Slice 3B-0 as implemented `[V]`.** `contracts/lifecycle.py` gains `is_calibration_run`
+(false for a v1 manifest, which carries no committed role) and `require_calibration_endpoint`,
+which refuses a non-`UNDER_TEST` record, a missing or wrongly-typed `CalibrationResult`, and a
+result bound to another manifest. `transition` refuses `RESULT_ASSESSED` under `CALIBRATION`
+**before** its state and result checks, so the refusal names the run role rather than a
+missing `ReadinessComparisonResult` — under `CALIBRATION` no such result can exist, revision 13
+having made comparison unconstructible for that role. `validate_lineage` refuses a hand-built
+`EVALUATED` record on a calibration manifest on replay.
+
+**Two limits recorded, not papered over `[G]`.** First, `require_calibration_endpoint`
+establishes that a `CalibrationResult` is *constructed and manifest-bound*, **not**
+*custody-verified*; revision 17 requires a verifying prepared bundle **and** a successful
+custody write before a result is genuine evidence, and the custody port is slice 3B-1 with
+real adapters blocked on D5. Passing this check is necessary, never sufficient. Second, the
+absent-result refusal uses **`ROLE_ARTIFACT_INCONSISTENT`** rather than a new code: ruling 4
+forbids additions without a ballot, and that code names what has gone wrong — the CALIBRATION
+role requires an artifact that is absent or of the wrong type.
+
+**Status.** This revision authorises slices 3B-0, 3B-1 and 3B-2 as scoped above and nothing
+more. D1–D5 remain incomplete, the custody endpoint remains unbound, real custody adapters and
+genuine execution remain blocked, and no provider call, credential access or genuine
+calibration is permitted by this revision.
