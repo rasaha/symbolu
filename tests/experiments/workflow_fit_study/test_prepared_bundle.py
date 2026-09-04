@@ -519,6 +519,33 @@ def test_verdict_custody_ref_of_any_non_uri_shape_is_refused(value):
         B.ExperimentalDesign(**_design_kwargs(verdict_custody_ref=value))
 
 
+# Revision 19, obligation 4: these pin a KNOWN BOUNDARY of the structural ruling; they do
+# not endorse it. The ruling refuses a bare credential but not one embedded inside an
+# otherwise well-formed URI, so each of these is accepted today and committed by
+# index_digest. A scheme allowlist would not change that — every scheme here is legitimate.
+# When a separate owner ruling settles whether a custody reference may carry userinfo or
+# opaque path/query/fragment segments, these tests are the ones that must flip to refusal.
+@pytest.mark.parametrize(
+    "value",
+    [
+        "https://user:" + SECRET + "@host.invalid/p",
+        "https://host.invalid/" + SECRET,
+        "memory://workflow-fit-test/x#" + SECRET,
+    ],
+)
+def test_a_credential_embedded_in_a_well_formed_uri_is_currently_accepted(tmp_path, value):
+    design_ok = B.ExperimentalDesign(**_design_kwargs(verdict_custody_ref=value))
+    assert design_ok.verdict_custody_ref == value
+    manifest = slice2._calibration_manifest()
+    out = tmp_path / "bundle"
+    _prepare_calibration(out, manifest=manifest, experimental_design=_calibration_design(manifest, verdict_custody_ref=value))
+    verified = B.verify(out, catalog=pf.catalog(), rule_set=pf.rule_set(), advisory=None)
+    # The boundary in full: the value survives preparation AND verification, and index_digest
+    # commits it. Recorded so the gap cannot be mistaken for closed.
+    assert verified.verdict_custody_ref == value
+    assert json.loads((out / "experimental_design.json").read_text())["verdict_custody_ref"] == value
+
+
 @pytest.mark.parametrize("value", ["memory://workflow-fit-test/x", "https://example.invalid/a/b", "s3+custody://bucket/key"])
 def test_well_formed_custody_uris_are_accepted(value):
     assert B.ExperimentalDesign(**_design_kwargs(verdict_custody_ref=value)).verdict_custody_ref == value

@@ -1883,10 +1883,11 @@ existing usage.
    registry endpoint at D5 ratification and declines to name it, on the stated
    ground that "a plausible-looking URI in a governance document would be a
    fabricated `[V]`"; an allowlist ratified today would encode exactly that. The
-   structural constraint nonetheless refuses every credential shape, since no key
-   format carries `://`. **This ruling does not ratify any scheme, endpoint or
-   custody medium**, and the test-only `memory://workflow-fit-test/…` form remains
-   what revision 17 made it: never valid evidence for a genuine run.
+   structural constraint refuses a **bare** credential, since no key format carries
+   `://` — but see obligation 4 below: it does **not** refuse a credential embedded
+   inside an otherwise well-formed URI. **This ruling does not ratify any scheme,
+   endpoint or custody medium**, and the test-only `memory://workflow-fit-test/…`
+   form remains what revision 17 made it: never valid evidence for a genuine run.
 2. **`execution_order_rule` — exact match on `ascending_case_digest`.** The owner
    ratifies this as the sole intended value. The field had **zero occurrences**
    in this note before now; its only prior appearance anywhere was a test
@@ -1922,7 +1923,29 @@ pre-existing non-blank guard was removed from its parametrize list rather than
 left to assert a refusal this ruling did not cause. The three earlier F1b tests
 named in revision 18 are unchanged and still carry that imprecision.
 
-**Status.** Obligation 1 is **closed for these four fields**. This authorises no
-run: D1–D5 remain incomplete, the custody endpoint remains unbound, slice 3B
-remains uncommissioned, and no provider call, credential access or genuine
-calibration is permitted by this revision.
+4. **`[G]` A credential embedded in a well-formed URI is still accepted —
+   carried forward, not closed.** The structural ruling refuses a bare credential
+   but not one carried inside a URI's userinfo, path, query or fragment. All three
+   of `https://user:<key>@host/p`, `https://host/<key>` and `memory://x#<key>` are
+   accepted by the writer, accepted by `verify()`, and committed by `index_digest`
+   `[V]`. **A scheme allowlist would not close this** — every one of those values
+   carries a legitimate scheme — so it is not an argument for revisiting ruling 1.
+   Closing it needs a **separate owner ruling** on whether a custody reference may
+   carry userinfo or opaque path, query and fragment segments at all; that question
+   is about what a custody reference is permitted to *be*, which D5 has not yet
+   settled, and it is not answered here. Until it is ruled, **no genuine run may
+   supply a `verdict_custody_ref` from an untrusted source**, and the field's
+   contents are not evidence that no credential was committed.
+
+**On the record of this correction.** Revision 19 as first written asserted that
+the structural constraint "refuses every credential shape". That was false in the
+case above, and the overstatement originated in the assistant-drafted option text
+the owner ratified from, not in the owner's ruling. The ruling itself stands
+unchanged; only the claim made for it is corrected. The four guards are unmodified.
+
+**Status.** Obligation 1 is **closed for these four fields against a bare
+credential value**, and **not closed** against a credential embedded in a
+well-formed `verdict_custody_ref` URI, which obligation 4 above carries forward.
+This authorises no run: D1–D5 remain incomplete, the custody endpoint remains
+unbound, slice 3B remains uncommissioned, and no provider call, credential access
+or genuine calibration is permitted by this revision.
