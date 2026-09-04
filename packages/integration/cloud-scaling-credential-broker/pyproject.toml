@@ -1,0 +1,60 @@
+# Ugence Cloud Scaling Credential Broker — Cloud Scaling Phase 5X.
+#
+# A COMPOSITION package. It imports Risk Authority (the application and public domain
+# types), the Phase 5A authorization contracts (the execution target scope, read-only), the
+# 5C action-admission package (the fixed action mapping), the execution-reservation
+# package (reservations, read-only) and governance-contracts (Validity). None of them
+# imports this package.
+#
+# It holds NO secret, NO key, NO clock and NO execution surface. It never loads a
+# credential from the environment or a file, never calls a cloud provider or Kubernetes,
+# never dispatches or executes (5D). os, sys, secrets, socket, time, subprocess, urllib,
+# http and every cloud SDK are banned structurally.
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ugence-cloud-scaling-credential-broker"
+dynamic = ["version"]
+description = "Ugence Cloud Scaling Credential Broker — Phase 5X. A grant is a handle, not execution."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "Proprietary" }
+authors = [{ name = "Ugence Labs" }]
+keywords = ["cloud-scaling", "credential-broker", "least-privilege", "risk-authority", "ugence"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Operating System :: OS Independent",
+    "Typing :: Typed",
+]
+dependencies = [
+    "ugence-risk-authority>=0.8.0",
+    "ugence-cloud-scaling-authorization-contracts>=0.2.0",
+    "ugence-cloud-scaling-action-admission>=0.1.0",
+    "ugence-execution-reservation>=0.1.0",
+    "ugence-governance-contracts>=0.4.0",
+]
+
+[project.optional-dependencies]
+test = ["pytest>=7.0"]
+dev = ["pytest>=7.0", "build>=1.0"]
+
+[tool.setuptools.dynamic]
+version = { attr = "ugence_cloud_scaling_credential_broker.version.__version__" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["ugence_cloud_scaling_credential_broker*"]
+
+[tool.setuptools.package-data]
+ugence_cloud_scaling_credential_broker = ["py.typed"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+markers = [
+    "happy: a positive-control property — something the boundary must ADMIT",
+    "adversarial: an attack that must be REFUSED, or a dangerous capability that must be ABSENT",
+    "invariant: a structural, packaging or frozen-value regression anchor — neither attack nor success",
+]
