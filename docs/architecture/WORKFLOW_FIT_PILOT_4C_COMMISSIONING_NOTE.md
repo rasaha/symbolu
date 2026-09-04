@@ -2613,6 +2613,10 @@ is precisely the per-caller reimplementation the canonical-decimal ruling exists
 as exposing the gap rather than filling it. **Closing this needs a governed canonicaliser in
 the pilot package, and is not commissioned here.**
 
+> **Closed by revision 31.** `contracts/calibration.py` gains
+> `canonical_decimal_rendering` and `require_matching_canonical_rendering`; the integration
+> test now uses them instead of its local copy.
+
 **What the test is worth, stated plainly.** One of its tests does real integration work: the
 first executed 3A → gated run → result → endpoint chain, and the only thing that would catch a
 broken calibration branch outside the unit suites. The others are a tamper-shape test of the
@@ -2645,3 +2649,64 @@ the prepared benchmark **by construction of the pilot fixtures**, not by a gover
 additionally binds the expected-answer digest. A future Phase 4C pipeline needs a **governed
 case-digest scheme**; that is pre-existing and is now carried forward alongside G3 and the
 canonical-rendering gap.
+
+### Revision 31 (the governed canonicaliser: closing the canonical-rendering gap, 2026-09-04)
+
+Revision 30 recorded that no production function renders a `QualityResult.value` into the
+canonical grammar, so the runner's `"1.0"` could not construct a `CalibrationResult`. This
+closes it. A preflight established the design from the repository; **no new ruling was
+required**, and one obvious alternative is **forbidden**.
+
+**Fixing at source was rejected — a design choice, not a prohibition `[I]`.** `runner._mean`
+feeds `MetricClaim.value` and `QualityResult`, and the boundary placement was chosen over
+making `_mean` canonical. The ground is producer stability: `_mean` is the **shared** runner's,
+used by v1 and 4B as well as Phase 4C, and altering what it emits would change future run
+renderings relative to past ones. The shared runner is not Phase 4C's to change.
+
+> **This paragraph as first written claimed more, and was wrong on both counts —
+> corrected in place, retained for the record.** It asserted `[V]` that the alternative was
+> *forbidden* by revision 16 and that it *would move* `quality_result_digest` and
+> `observation_digest` for existing v1 and 4B runs. Neither holds. Revision 16 constrains what
+> `MetricClaim.value` and `GovernedThreshold.literal_value` **accept**, not what a producer
+> **emits**; changing the runner imposes nothing on those contracts. And nothing in the tree
+> moves: an independent review made `_mean` canonical in a scratch worktree and the pilot suite
+> (262) and the 4B reference-pilot suite (47) both passed unchanged, because the repository
+> holds **no committed run artifact carrying a quality value** — the 4B tests verify bundles
+> they generate in the same run. The design is the safer one and stands on the ground stated
+> above; reading the note as forbidding the alternative was reading it to suit the choice
+> already made.
+
+**Derivation was already sanctioned `[V]`.** Revision 16 obliges slice 3 to establish "that
+the canonical string **derived from** the reachable `QualityResult.value` equals the
+calibration statistic". A deriver is what the note asked for.
+
+**It does not soften revision 16 `[V]`.** `require_canonical_decimal` still refuses a
+caller-supplied, digest-bound string in a non-canonical spelling — a test asserts that
+`require_canonical_decimal("1.0", …)` still raises after the deriver exists. Refusing a
+supplied value and deriving a spelling from a reachable one are different acts on different
+objects; conflating them is what would have moved a digest behind a caller's back.
+
+**What was added `[V]`.** `canonical_decimal_rendering(value, name)` accepts a `Decimal` or a
+decimal string, refuses `float`, `bool`, `None`, non-finite and unparseable input, and derives
+the ratified spelling — `format(…, "f")` never emits an exponent, then trailing fractional
+zeros are stripped and every zero renders as `"0"`. `require_matching_canonical_rendering`
+makes slice 3's obligation executable: it validates the supplied statistic, derives the
+rendering, and requires code-point equality, returning the agreed string so it cannot be used
+as a discarded boolean. Both are exported from `api`.
+
+**One line no test pins, recorded rather than dressed up `[G]`.** The deriver ends by calling
+`require_canonical_decimal` on its own output. With the grammar as ratified, no input makes
+the derivation produce a non-canonical string, so removing that line fails **nothing** — a
+stub confirms 262 tests still pass. It is a fail-closed tripwire for a future change to the
+grammar or the derivation, and the code says so. The guards that can be pinned are: stripping
+trailing zeros (**14** tests fail without it — 13 in the pilot suite and one in the integration
+file; revision 31 first reported 13), the equality comparison (1), the zero mapping (3), the
+`float`/`bool` refusal (1), the matcher's statistic pre-validation (1) and the trailing-`.`
+strip (8).
+
+**Status.** The canonical-rendering gap is **closed**. Two items remain carried forward: **G3**
+(open by construction until a Phase 4C pipeline exists) and the **governed case-digest scheme**
+(the recomputation agrees with the prepared benchmark by fixture construction, not by rule).
+D1–D5 remain incomplete, the custody endpoint remains unbound, real custody adapters and
+genuine execution remain blocked, and no provider call, credential access or genuine
+calibration is permitted by this revision.

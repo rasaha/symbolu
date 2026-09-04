@@ -832,3 +832,92 @@ def test_a_hand_built_calibration_record_naming_an_engine_result_fails_replay():
     )
     with pytest.raises(PilotError, match="names no engine result"):
         validate_lineage([forged], [manifest])
+
+
+# --------------------------------------------------------------------------- revision 31: canonical rendering
+
+
+@pytest.mark.parametrize(
+    ("source", "expected"),
+    [
+        ("1.0", "1"), ("1.00", "1"), ("1", "1"), ("0.50", "0.5"), ("0.5", "0.5"),
+        ("0.0", "0"), ("-0.0", "0"), ("-0", "0"), ("0", "0"),
+        ("100", "100"), ("1E+2", "100"), ("1e-3", "0.001"),
+        ("-1.50", "-1.5"), ("0.620", "0.62"),
+        ("1E+30", "1" + "0" * 30),
+    ],
+)
+def test_canonical_rendering_derives_the_ratified_spelling(source, expected):
+    from decimal import Decimal
+
+    from ugence_workflow_fit_pilot.contracts.calibration import canonical_decimal_rendering
+
+    assert canonical_decimal_rendering(source) == expected
+    assert canonical_decimal_rendering(Decimal(source)) == expected
+
+
+@pytest.mark.parametrize(
+    "source", ["1.0", "0.50", "1E+2", "-0.0", "1e-9", "0.620", "-1.50", "1E+30", "3.14159265358979323846"]
+)
+def test_every_rendering_satisfies_the_validator(source):
+    """The round trip that makes the function safe: whatever it derives is a value
+    `require_canonical_decimal` accepts, so it can never hand a caller a string the contracts
+    would then refuse."""
+    from ugence_workflow_fit_pilot.contracts.calibration import (
+        canonical_decimal_rendering, require_canonical_decimal,
+    )
+
+    rendered = canonical_decimal_rendering(source)
+    require_canonical_decimal(rendered, "rendered")
+
+
+@pytest.mark.parametrize(
+    ("bad", "message"),
+    [
+        (1.0, "not float; a float would not round-trip"),
+        (True, "not bool"),
+        (None, "not NoneType"),
+        ("NaN", "must be finite"),
+        ("Infinity", "must be finite"),
+        ("-Infinity", "must be finite"),
+        ("not a number", "is not a decimal"),
+        ("", "is not a decimal"),
+    ],
+)
+def test_canonical_rendering_refuses_what_cannot_be_rendered(bad, message):
+    from ugence_reasoning_method_governance.errors import ContractError
+
+    from ugence_workflow_fit_pilot.contracts.calibration import canonical_decimal_rendering
+
+    with pytest.raises(ContractError, match=message):
+        canonical_decimal_rendering(bad)
+
+
+def test_a_derived_rendering_never_normalises_a_supplied_value():
+    """Revision 16 stands: the validator still refuses a non-canonical string a caller
+    supplies. Deriving a spelling from a *reachable* value is a different act, and adding the
+    deriver must not soften the refusal."""
+    from ugence_reasoning_method_governance.errors import ContractError
+
+    from ugence_workflow_fit_pilot.contracts.calibration import require_canonical_decimal
+
+    with pytest.raises(ContractError, match="must be a canonical decimal string"):
+        require_canonical_decimal("1.0", "supplied")
+
+
+def test_the_statistic_must_equal_the_canonical_rendering_of_the_reachable_value():
+    """Slice 3's obligation from revision 16, now executable."""
+    from decimal import Decimal
+
+    from ugence_reasoning_method_governance.errors import ContractError
+
+    from ugence_workflow_fit_pilot.contracts.calibration import require_matching_canonical_rendering
+
+    assert require_matching_canonical_rendering("1", Decimal("1.0"), "statistic_value") == "1"
+    assert require_matching_canonical_rendering("0.62", "0.620", "statistic_value") == "0.62"
+
+    with pytest.raises(ContractError, match="they must be equal code point for code point"):
+        require_matching_canonical_rendering("0.63", Decimal("0.62"), "statistic_value")
+    # A non-canonical statistic is refused by the validator before any comparison happens.
+    with pytest.raises(ContractError, match="must be a canonical decimal string"):
+        require_matching_canonical_rendering("1.0", Decimal("1.0"), "statistic_value")
