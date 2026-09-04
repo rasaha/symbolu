@@ -290,7 +290,7 @@ These packages do not represent a single business step. They provide the common 
 
 **Package:** `packages/capabilities/model-selection`  
 **Sequence alignment:** **Define → Propose**.  
-**Pipeline role:** Selects an eligible model and provider from an approved set under deterministic policy constraints. It owns eligibility and selection, not request routing or provider execution.
+**Pipeline role:** Selects an eligible model and provider from an approved set under deterministic policy constraints. It owns eligibility and selection, not request routing or provider execution. The package now brands itself **Model Authority**: its canonical public contract is a `ModelAuthorizationDecision` with dispositions `ALLOW`, `DENY`, `HOLD` and `ESCALATE`, and the selection-era names survive only as deprecated aliases.
 
 **Why it is necessary:**
 
@@ -352,7 +352,7 @@ These packages do not represent a single business step. They provide the common 
 
 **Package:** `packages/providers/tap`  
 **Sequence alignment:** **Verify**.  
-**Pipeline role:** Evaluates whether a material assertion is supported, unsupported, constrained or indeterminate by supplied evidence. TAP governs claims in the assessment path and never authorizes an action.
+**Pipeline role:** Evaluates whether a material assertion is supported, unsupported, constrained or indeterminate by supplied evidence; the provider's native outcome set carries a fifth `UNKNOWN` state that is mapped fail-safe to indeterminate. TAP governs claims in the assessment path and never authorizes an action.
 
 **Why it is necessary:**
 
@@ -438,7 +438,7 @@ These packages do not represent a single business step. They provide the common 
 
 **Package:** `packages/risk_authority`  
 **Sequence alignment:** **Verify → Decide → Authorize**.  
-**Pipeline role:** Applies non-compensatory control evaluation and converts an approved governance decision into cryptographically bound, scoped, time-bound and revocable machine authority for exact-action enforcement.
+**Pipeline role:** Applies non-compensatory control evaluation and converts an approved governance decision into cryptographically bound, scoped, time-bound and revocable machine authority for exact-action enforcement. Envelope issuance, Ed25519 signing, expiry and revocation are implemented on the reference path; with `production_mode` set, issuance and exact-action authorization fail closed as unimplemented Phase 5 work, so production integration currently stops at a non-executable `RiskDecision`.
 
 **Why it is necessary:**
 
@@ -488,7 +488,7 @@ These packages do not represent a single business step. They provide the common 
 
 **Package:** `packages/providers/actiongate`  
 **Sequence alignment:** **Authorize**.  
-**Pipeline role:** Evaluates whether the exact proposed action is authorized by the supplied authority, policy, risk, evidence and decision context. It returns an authorization outcome but never dispatches or executes the action.
+**Pipeline role:** Evaluates whether the exact proposed action is authorized by the supplied authority, policy, risk, evidence and decision context. It returns one of four outcomes through the neutral action-governance contract (authorized, authorized with constraints, denied, indeterminate) but never dispatches or executes the action.
 
 **Why it is necessary:**
 
@@ -528,7 +528,7 @@ These packages do not represent a single business step. They provide the common 
 
 **Package:** `packages/capabilities/cloud-scaling-operations`  
 **Sequence alignment:** **Execute**.  
-**Pipeline role:** Performs controlled Kubernetes or ArgoCD scaling operations after external authorization, with dry-run as the default posture. It is the domain actuation layer and does not create its own authority.
+**Pipeline role:** Performs controlled Kubernetes or ArgoCD scaling operations after external authorization, with dry-run as the default of four execution modes (dry-run, simulation, shadow, live). It is the domain actuation layer and does not create its own authority.
 
 **Why it is necessary:**
 
@@ -604,7 +604,7 @@ These packages do not represent a single business step. They provide the common 
 
 **Package:** `packages/governed-value`  
 **Sequence alignment:** **Measure → Define**.  
-**Pipeline role:** Calculates net governed value per authorized action using explicit evidence, authority and outcome classifications. It measures value after governance rather than treating an unverified forecast as realized ROI.
+**Pipeline role:** Calculates net governed value per governed action along explicit evidence, authority and outcome classification axes. The current kernel scores caller-reported inputs, fixes every result at `REPORTED` evidence status and `UNVERIFIED` authority status, and does not yet bind to an authorization artifact. It is designed to measure value after governance rather than treat an unverified forecast as realized ROI.
 
 **Why it is necessary:**
 
@@ -731,7 +731,7 @@ Cloud Scaling Authorization Contracts bind the exact recommendation, risk result
 
 ActionGate checks the exact action: the authorized actor, service, environment, operation, present replica count, target replica count, constraints and validity window. Authority to increase the payments service from 120 to 180 replicas cannot be reused to scale another service, change a different environment, increase to 240 replicas or perform an unrelated infrastructure operation.
 
-An `ALLOW` outcome means the exact action matches supplied authority. It does not mean the operation has been dispatched, remains safe under changing conditions or has succeeded.
+An `AUTHORIZED` outcome (the provider's native `ALLOW`, mapped through the neutral action-governance contract alongside `AUTHORIZED_WITH_CONSTRAINTS`, `DENIED` and `INDETERMINATE`) means the exact action matched the supplied authority and context. It does not mean the operation has been dispatched, remains safe under changing conditions or has succeeded.
 
 ### A.2.7 Clear: the platform rechecks the live operational world
 
@@ -878,7 +878,7 @@ Required supporting foundations are Governance Contracts, Governance Provider Fr
 
 **What it solves:** Supplies neutral, reusable request/result and evidence/execution contracts without granting authority to the shared layer.
 
-**Competitor analogue:**
+**Competitor analogue:** [Model Context Protocol](https://modelcontextprotocol.io/specification/) standardizes tool, resource and prompt contracts between LLM applications and servers, and [Agent2Agent](https://a2a-protocol.org/latest/) (Linux Foundation) standardizes agent discovery and task exchange. Both are open protocol standards rather than products, and neither defines evidence, decision, authority or execution-result contracts.
 
 ### A.7.2 Governance Provider Framework
 
@@ -888,13 +888,15 @@ Required supporting foundations are Governance Contracts, Governance Provider Fr
 
 **Competitor analogue:** [Portkey AI Gateway](https://docs.portkey.ai/docs/product/ai-gateway) provides a partial analogue for provider routing, fallbacks and gateway controls; it is not equivalent to Ugence's separated evidence and action-authority contracts.
 
+**Additional analogues (cross-check supplement):** [Cloudflare AI Gateway](https://developers.cloudflare.com/ai-gateway/) fronts multiple model providers with rate limits, caching and cost budgets, a gateway-level analogue for provider composition rather than for evidence or action-governance provider contracts.
+
 ### A.7.3 JSON Canonicalization Scheme
 
 **The problem:** Equivalent JSON can serialize differently, breaking exact identity, signatures, comparison and replay.
 
 **What it solves:** Produces deterministic canonical bytes and bare hashes so all stages can bind to the same exact artifact.
 
-**Competitor analogue:**
+**Competitor analogue:** [Sigstore](https://docs.sigstore.dev/logging/overview/) signs artifact digests and records them in a tamper-evident log, and [OPA signed bundles](https://www.openpolicyagent.org/docs/management-bundles) hash bundle files into a `.signatures.json`. Both depend on stable digests but neither is a canonicalization scheme for parsed JSON; no commercial product analogue was established.
 
 ### A.7.4 Benchmark Registry Contracts
 
@@ -904,6 +906,8 @@ Required supporting foundations are Governance Contracts, Governance Provider Fr
 
 **Competitor analogue:** [LangSmith Evaluation](https://docs.langchain.com/langsmith/evaluation) provides datasets, experiment comparison and evaluation workflows, but not the same digest-bound benchmark-authority model.
 
+**Additional analogues (cross-check supplement):** [Stanford HELM](https://crfm.stanford.edu/helm/) standardizes scenarios and metrics across models, and [W&B Registry](https://docs.wandb.ai/models/registry) assigns immutable versions and lineage to artifacts; neither binds a benchmark identity to tenant, population, metric and period coordinates.
+
 ### A.7.5 UVI Policy Contracts
 
 **The problem:** Readiness and value claims become incomparable or gameable when geography, intended outcome, evidence requirements and thresholds are implicit.
@@ -912,6 +916,8 @@ Required supporting foundations are Governance Contracts, Governance Provider Fr
 
 **Competitor analogue:** [IBM watsonx.governance](https://www.ibm.com/products/watsonx-governance) partially overlaps through AI lifecycle, risk, control and accountability records.
 
+**Additional analogues (cross-check supplement):** [OneTrust AI Governance](https://www.onetrust.com/solutions/ai-governance/) and [Holistic AI](https://www.holisticai.com/ai-governance-platform) inventory AI systems and assess them against frameworks such as the NIST AI RMF and the EU AI Act, partial overlaps for assessment context rather than immutable value-policy shapes.
+
 ### A.7.6 Policy Authority
 
 **The problem:** Editable policies and local configuration cannot prove which approved version governed an action or whether it was revoked.
@@ -919,6 +925,8 @@ Required supporting foundations are Governance Contracts, Governance Provider Fr
 **What it solves:** Issues, signs, registers, resolves and revokes exact policy artifacts shared across the platform.
 
 **Competitor analogue:** [Credo AI Policy Packs](https://docs.sdk.credo.ai/core-concepts/policy-packs) translate governance requirements into reusable policy controls; [Open Policy Agent](https://openpolicyagent.org/) provides policy-as-code evaluation. Neither source establishes the same signed multi-family issuance and revocation architecture described here.
+
+**Additional analogues (cross-check supplement):** [Amazon Verified Permissions](https://aws.amazon.com/verified-permissions/) centralizes Cedar policy management with versioned policy stores, and [Cerbos](https://www.cerbos.dev/features-benefits-and-use-cases/agentic-authorization) manages policies through a policy administration plane; both are partial analogues for issuance and resolution without the signed multi-family revocation model.
 
 ### A.7.7 Policy Workflow Compiler
 
@@ -936,13 +944,15 @@ Required supporting foundations are Governance Contracts, Governance Provider Fr
 
 **Competitor analogue:** [Amazon Bedrock AgentCore Identity](https://aws.amazon.com/blogs/machine-learning/introducing-amazon-bedrock-agentcore-identity-securing-agentic-ai-at-scale/) and [AgentCore Policy](https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/policy.html) partially overlap through agent identity and externalized fine-grained permissions, but do not document the same signed constitution vocabulary.
 
+**Additional analogues (cross-check supplement):** [Auth0 for AI Agents](https://www.okta.com/newsroom/press-releases/auth0-platform-innovation/) (Okta) adds agent authentication, fine-grained authorization and asynchronous approval to the identity layer, a partial analogue for role bounds expressed as identity permissions.
+
 ### A.7.9 Agent Constitution Activation
 
 **The problem:** An issued constitution is not operationally useful until its exact references and composition dependencies are activated safely.
 
 **What it solves:** Performs preflight, derives governed reference mappings and records key-material-free activation receipts.
 
-**Competitor analogue:**
+**Competitor analogue:** [Microsoft Entra Agent ID](https://learn.microsoft.com/en-us/entra/agent-id/what-is-microsoft-entra-agent-id) provisions agent identities from blueprints with lifecycle governance, and [Workday Agent System of Record](https://www.workday.com/en-us/artificial-intelligence/agent-system-of-record.html) registers, configures, activates and deactivates agents. Both are partial analogues for the activation lifecycle; neither derives governed reference maps from a signed constitution or issues key-material-free activation receipts.
 
 ### A.7.10 Cloud Scaling Capacity-Bounds Policy
 
@@ -952,13 +962,15 @@ Required supporting foundations are Governance Contracts, Governance Provider Fr
 
 **Competitor analogue:** [Sedai Kubernetes Optimization](https://sedai.io/platform/kubernetes) describes safe optimization against workload behavior and SLOs, while [Open Policy Agent](https://openpolicyagent.org/docs/policy-language) can express infrastructure constraints. The Ugence module specifically binds capacity ceilings to its policy-authority path.
 
+**Additional analogues (cross-check supplement):** [Kyverno](https://kyverno.io/docs/policy-types/cluster-policy/verify-images/sigstore/) enforces Kubernetes admission policies, including signed-artifact checks, a partial analogue for cluster-side limits expressed as policy.
+
 ### A.7.11 Strategy-Permission Policy
 
 **The problem:** An agent may select an inappropriate reasoning procedure without an organization-governed permission boundary.
 
 **What it solves:** Defines the signed set of reasoning strategies a governed role may declare, without authorizing tools, compute or action.
 
-**Competitor analogue:**
+**Competitor analogue:** [NVIDIA NeMo Guardrails](https://docs.nvidia.com/nemo/guardrails/latest/user-guides/guardrails-process.html) constrains dialog flows and actions through Colang rails, and [DSPy](https://dspy.ai/) makes reasoning modules such as chain-of-thought and ReAct explicit program choices. Neither expresses a signed, versioned and revocable permission over which reasoning strategies a governed role may declare.
 
 ### A.7.12 Agent Constitution Conformance
 
@@ -974,7 +986,7 @@ Required supporting foundations are Governance Contracts, Governance Provider Fr
 
 **What it solves:** Produces typed, identity-bound candidates and advisories with explicit evidence needs, abstention and escalation states.
 
-**Competitor analogue:**
+**Competitor analogue:** [HumanLayer](https://www.humanlayer.dev/) gates tool calls behind human approval routed over Slack or email, and [LangGraph human-in-the-loop](https://docs.langchain.com/oss/python/langchain/human-in-the-loop) interrupts let a reviewer approve, edit or reject a proposed tool call. Both implement propose-then-approve at the tool-call layer without typed candidates, evidence requests, abstention states or identity-bound advisories.
 
 ### A.7.14 Strategy-Permission Runtime Resolver
 
@@ -982,7 +994,7 @@ Required supporting foundations are Governance Contracts, Governance Provider Fr
 
 **What it solves:** Resolves the exact signed policy through Policy Authority and fails closed on tenant, scope, lifecycle, approval or reference mismatch.
 
-**Competitor analogue:**
+**Competitor analogue:** [Cerbos](https://www.cerbos.dev/features-benefits-and-use-cases/agentic-authorization) and [Amazon Verified Permissions](https://docs.aws.amazon.com/verifiedpermissions/latest/userguide/what-is-avp.html) (Cedar) resolve externalized policy at runtime for agent actions. They are partial analogues for runtime policy resolution, but they answer allow or deny on an action rather than resolve a signed set of permitted reasoning strategies with tenant, scope and lifecycle checks.
 
 ### A.7.15 Agent Workforce Composer
 
@@ -990,7 +1002,7 @@ Required supporting foundations are Governance Contracts, Governance Provider Fr
 
 **What it solves:** Determines eligibility, ranks qualified agents, composes bounded teams and proposes least-privilege permissions and fallbacks.
 
-**Competitor analogue:**
+**Competitor analogue:** [CrewAI](https://crewai.com/) composes role-based agent crews, [Microsoft Agent Framework](https://learn.microsoft.com/en-us/agent-framework/overview/) supplies sequential, concurrent, handoff and group-chat orchestration patterns, and [Workday Agent System of Record](https://www.workday.com/en-us/artificial-intelligence/agent-system-of-record.html) registers and governs an agent workforce. None documents hard-constraint eligibility with complete elimination accounting or least-privilege permission proposals.
 
 ### A.7.16 Reasoning Method Governance
 
@@ -1000,13 +1012,15 @@ Required supporting foundations are Governance Contracts, Governance Provider Fr
 
 **Competitor analogue:** [LangSmith Evaluation](https://docs.langchain.com/langsmith/evaluation-concepts) provides a framework for measuring agent quality from predeployment testing through production monitoring, a partial analogue for evaluation vocabulary and workflow.
 
+**Additional analogues (cross-check supplement):** [Braintrust](https://www.braintrust.dev/docs/platform/experiments) records experiments as immutable, comparable eval runs, a partial analogue for the evidence and comparison vocabulary.
+
 ### A.7.17 Reasoning Method Advisor
 
 **The problem:** Developers may choose reasoning methods by fashion, intuition or an LLM's unexamined preference.
 
 **What it solves:** Deterministically identifies zero, one or many qualifying methods from governed task characteristics and explains every inclusion and exclusion.
 
-**Competitor analogue:**
+**Competitor analogue:** [DSPy](https://dspy.ai/) optimizers search over instructions and demonstrations for a declared module, and [Braintrust experiments](https://www.braintrust.dev/docs/platform/experiments) compare configurations empirically. Both are optimization or evaluation tools, not a deterministic rule-derived advisor that explains every inclusion and exclusion and refuses to manufacture a winner.
 
 ### A.7.18 Readiness Comparison
 
@@ -1015,6 +1029,8 @@ Required supporting foundations are Governance Contracts, Governance Provider Fr
 **What it solves:** Provides a deterministic research comparison over declared quality and resource dimensions without manufacturing authority.
 
 **Competitor analogue:** [LangSmith Evaluation](https://docs.langchain.com/langsmith/evaluation) supports experiment comparison, datasets and regression evaluation, but does not document Ugence's authority-separated readiness contract.
+
+**Additional analogues (cross-check supplement):** [Braintrust experiments](https://www.braintrust.dev/docs/platform/experiments) and [Datadog LLM Observability](https://docs.datadoghq.com/llm_observability/) evaluations compare configurations on quality and operational metrics without an authority-separated readiness contract.
 
 ### A.7.19 Trusted Workflow-Fit Pilot
 
@@ -1032,6 +1048,8 @@ Required supporting foundations are Governance Contracts, Governance Provider Fr
 
 **Competitor analogue:** [Portkey AI Gateway](https://docs.portkey.ai/docs/product/ai-gateway) supports a model catalog, conditional routing and provider fallbacks, partially overlapping selection and routing.
 
+**Additional analogues (cross-check supplement):** [Not Diamond](https://docs.notdiamond.ai/docs/what-is-model-routing), [Amazon Bedrock Intelligent Prompt Routing](https://docs.aws.amazon.com/bedrock/latest/userguide/prompt-routing.html) and the [Microsoft Foundry model router](https://learn.microsoft.com/en-us/azure/foundry/openai/concepts/model-router) select a model per request, with the Foundry router supporting model subsets that restrict routing to approved models. All three combine selection with routing and execution, which the Ugence capability deliberately separates.
+
 ### A.7.21 LLM Steering Controller
 
 **The problem:** Static model routing creates cost, latency, reliability and policy failures when conditions change.
@@ -1040,13 +1058,15 @@ Required supporting foundations are Governance Contracts, Governance Provider Fr
 
 **Competitor analogue:** [Portkey Conditional Routing](https://docs.portkey.ai/docs/product/ai-gateway/conditional-routing) routes requests to provider targets under custom conditions and supports fallbacks through its gateway.
 
+**Additional analogues (cross-check supplement):** [Not Diamond](https://docs.notdiamond.ai/docs/what-is-model-routing), [Amazon Bedrock Intelligent Prompt Routing](https://docs.aws.amazon.com/bedrock/latest/userguide/prompt-routing.html) and the [Microsoft Foundry model router](https://learn.microsoft.com/en-us/azure/foundry/openai/concepts/model-router) are learned or managed routers that also execute the call; the Ugence controller produces only an advisory recommendation.
+
 ### A.7.22 Context Minimization
 
 **The problem:** Agents often receive more sensitive, costly and distracting context than the task requires.
 
 **What it solves:** Removes unnecessary context while protecting required units and preserving a declared equivalence condition, with measurable token accounting.
 
-**Competitor analogue:**
+**Competitor analogue:** [LLMLingua](https://www.microsoft.com/en-us/research/project/llmlingua/) (Microsoft Research) compresses prompts with a small language model, and [Private AI](https://docs.private-ai.com/privategpt/pgpt-headless/) and [Presidio](https://microsoft.github.io/presidio/) detect and redact personal data before LLM calls. These are partial analogues for token reduction and sensitive-data removal; none preserves a caller-declared equivalence condition with fail-closed refusal.
 
 ### A.7.23 StoryGraph
 
@@ -1056,6 +1076,8 @@ Required supporting foundations are Governance Contracts, Governance Provider Fr
 
 **Competitor analogue:** [Amazon Bedrock AgentCore's multi-action policy controls](https://aws.amazon.com/blogs/machine-learning/control-agent-behaviors-and-cost-beyond-a-single-action-new-capabilities-in-amazon-bedrock-agentcore/) describe controls over agent behavior and cost beyond one stateless action, a partial analogue to sequence-aware control.
 
+**Additional analogues (cross-check supplement):** [Lakera Guard](https://www.lakera.ai/prompt-defense) detects direct and indirect prompt injection across agent interactions, and [Zenity](https://zenity.io/platform) and [Noma Security](https://noma.security/platform/runtime-protection/) monitor and enforce on agent tool calls at runtime; these overlap threat detection on behavior sequences rather than policy-defined sequence-risk evidence.
+
 ### A.7.24 Cloud Scaling Controller
 
 **The problem:** Reactive manual scaling is slow, while an autonomous optimizer that also executes creates excessive authority concentration.
@@ -1063,6 +1085,8 @@ Required supporting foundations are Governance Contracts, Governance Provider Fr
 **What it solves:** Generates deterministic, explainable scaling advice with no mutation capability.
 
 **Competitor analogue:** [Sedai](https://sedai.io/) provides autonomous cloud and Kubernetes optimization; [CAST AI](https://cast.ai/kubernetes-cost-optimization/) provides Kubernetes cost optimization and autoscaling. Both overlap the operational domain, while Ugence deliberately separates recommendation from authorization and execution.
+
+**Additional analogues (cross-check supplement):** [StormForge Optimize Live](https://stormforge.io/) and [PerfectScale by DoiT](https://www.doit.com/perfectscale-kubernetes/) rightsize Kubernetes workloads autonomously, and [Karpenter](https://karpenter.sh/) provisions nodes in response to unscheduled pods; all three recommend and act inside one component.
 
 ### A.7.25 TAP
 
@@ -1072,13 +1096,15 @@ Required supporting foundations are Governance Contracts, Governance Provider Fr
 
 **Competitor analogue:** [Portkey Guardrails](https://docs.portkey.ai/docs/product/guardrails) can verify LLM inputs and outputs against configured checks; [Credo AI](https://www.credo.ai/) records governance evidence. These partially overlap but do not document TAP's separate assertion-governance outcome model.
 
+**Additional analogues (cross-check supplement):** [Vectara HHEM](https://docs.vectara.com/docs/hallucination-and-evaluation/hallucination-evaluation), [Patronus Lynx](https://docs.patronus.ai/docs/evaluation_api/lynx) and [Cleanlab TLM](https://help.cleanlab.ai/tlm/) score whether a response is supported by its context or is trustworthy, and [Guardrails AI](https://guardrailsai.com/hub) packages such checks as validators. These produce probabilistic scores rather than typed supported, unsupported, constrained or indeterminate outcomes with a fail-safe unknown state.
+
 ### A.7.26 Trusted Evidence Authority
 
 **The problem:** A signature, evidence reference or claimed provenance is not enough to establish current trust.
 
 **What it solves:** Verifies evidence identity, trust anchors, key entitlement, revocation, scope and signing frames and issues independently re-verifiable receipts.
 
-**Competitor analogue:**
+**Competitor analogue:** [Sigstore](https://docs.sigstore.dev/logging/overview/) (cosign and Rekor) signs artifacts and attestations and records them in a transparency log, and [SPIFFE/SPIRE](https://spiffe.io/docs/latest/spiffe-about/overview/) issues short-lived, rotated workload identities. Both are partial analogues for signature trust, key validity and provenance; neither issues an evidence-verification receipt bound to scope and revocation of the evidence itself.
 
 ### A.7.27 Benchmark Registry Authority
 
@@ -1086,7 +1112,7 @@ Required supporting foundations are Governance Contracts, Governance Provider Fr
 
 **What it solves:** Defines the lifecycle and trust boundary for future authoritative benchmark handling while honestly withholding capabilities not yet implemented.
 
-**Competitor analogue:**
+**Competitor analogue:** [MLflow Model Registry](https://mlflow.org/docs/latest/ml/model-registry/) and [W&B Registry](https://docs.wandb.ai/models/registry) version and govern artifacts with lineage, and [Stanford HELM](https://crfm.stanford.edu/helm/) publishes standardized benchmark leaderboards. These are partial analogues for versioned registries and benchmark publication; none establishes digest-bound benchmark admission, trusted resolution and revocation as an authority.
 
 ### A.7.28 Risk Authority Evidence Runtime
 
@@ -1104,13 +1130,15 @@ Required supporting foundations are Governance Contracts, Governance Provider Fr
 
 **Competitor analogue:** [Amazon Bedrock AgentCore Identity](https://aws.amazon.com/blogs/machine-learning/introducing-amazon-bedrock-agentcore-identity-securing-agentic-ai-at-scale/) provides agent identity and controlled resource access, a partial producer-identity analogue.
 
+**Additional analogues (cross-check supplement):** [Sigstore](https://docs.sigstore.dev/logging/overview/) attestations bind a producer identity to an artifact through a transparency log, and [SPIFFE/SPIRE](https://spiffe.io/docs/latest/spiffe-about/overview/) attests workload identity at runtime; both are close analogues for producer authenticity without binding to an authorization candidate.
+
 ### A.7.30 Cloud Scaling Policy Authenticity
 
 **The problem:** A recommendation can cite an expired, revoked, mismatched or fabricated capacity policy.
 
 **What it solves:** Verifies that the referenced policy is the exact trusted Policy Authority artifact applicable to the candidate.
 
-**Competitor analogue:**
+**Competitor analogue:** [OPA signed bundles](https://www.openpolicyagent.org/docs/management-bundles) activate a policy only after signature verification against a configured key, and [Kyverno](https://kyverno.io/docs/policy-types/cluster-policy/verify-images/sigstore/) verifies Sigstore signatures on images and OCI artifacts. Both are close analogues for policy-artifact authenticity; neither reconciles tenant, scope, coordinate and time window against a specific authorization candidate.
 
 ### A.7.31 Decision Authority
 
@@ -1120,6 +1148,8 @@ Required supporting foundations are Governance Contracts, Governance Provider Fr
 
 **Competitor analogue:** [IBM watsonx.governance Model Risk Governance](https://dataplatform.cloud.ibm.com/docs/content/svc-watsonxgov/wxgov_mrg_example_workflow.html?audience=wdp&context=wx) documents staged model-governance workflows through deployment approval, a partial governance-approval analogue.
 
+**Additional analogues (cross-check supplement):** [ServiceNow AI Control Tower](https://www.servicenow.com/products/ai-control-tower.html) assigns human managers to oversee agents, and [OneTrust AI Governance](https://www.onetrust.com/solutions/ai-governance/) automates approval and attestation workflows; both are partial analogues for accountable approval without a bounded, scoped, time-limited binding decision record.
+
 ### A.7.32 Risk Authority
 
 **The problem:** Human approval is not directly machine-enforceable and can be broadened or reused after conditions change.
@@ -1127,6 +1157,8 @@ Required supporting foundations are Governance Contracts, Governance Provider Fr
 **What it solves:** Converts an approved decision into scoped, time-bound, revocable and cryptographically bound machine authority after mandatory controls pass.
 
 **Competitor analogue:** [AgentCore Policy](https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/policy.html) provides fine-grained permissions based on identity and tool-input parameters. It overlaps runtime policy enforcement but does not document the same decision-derived authorization-envelope chain.
+
+**Additional analogues (cross-check supplement):** [Holistic AI](https://www.holisticai.com/ai-governance-platform) and [OneTrust AI Governance](https://www.onetrust.com/solutions/ai-governance/) assess AI risk against regulatory frameworks, and [Amazon Verified Permissions](https://docs.aws.amazon.com/verifiedpermissions/latest/userguide/what-is-avp.html) and [Cerbos](https://www.cerbos.dev/features-benefits-and-use-cases/agentic-authorization) enforce machine-readable authorization; none converts a risk determination into a signed, expiring, revocable authority envelope.
 
 ### A.7.33 Cloud Scaling Risk Integration
 
@@ -1142,7 +1174,7 @@ Required supporting foundations are Governance Contracts, Governance Provider Fr
 
 **What it solves:** Binds them into one exact, digestible capacity-action candidate that explicitly grants nothing.
 
-**Competitor analogue:**
+**Competitor analogue:** [HCP Terraform run tasks](https://developer.hashicorp.com/terraform/cloud-docs/workspaces/settings/run-tasks) gate a specific plan before apply with an external pass or fail, and [Argo Rollouts analysis](https://argo-rollouts.readthedocs.io/en/stable/features/analysis/) binds promotion of a specific rollout step to metric results. Both are partial analogues for binding one exact change to an approval, without a candidate object that unifies recommendation, risk result, producer identity and policy references.
 
 ### A.7.35 Risk Authority Runtime Composition
 
@@ -1160,6 +1192,8 @@ Required supporting foundations are Governance Contracts, Governance Provider Fr
 
 **Competitor analogue:** [AgentCore Policy](https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/policy.html) intercepts agent tool calls and evaluates fine-grained permissions outside the reasoning loop; [OPA](https://openpolicyagent.org/docs/philosophy) provides general action/resource authorization policy. These are the closest documented overlaps.
 
+**Additional analogues (cross-check supplement):** [Cerbos](https://www.cerbos.dev/features-benefits-and-use-cases/agentic-authorization) and [Amazon Verified Permissions](https://docs.aws.amazon.com/verifiedpermissions/latest/userguide/what-is-avp.html) evaluate principal, action, resource and context per request, and [Zenity](https://zenity.io/platform) enforces on agent actions at decision time; these are the closest commercial overlaps for exact-action checks.
+
 ### A.7.37 Action Clearance
 
 **The problem:** Conditions can change after authorization but before execution.
@@ -1167,6 +1201,8 @@ Required supporting foundations are Governance Contracts, Governance Provider Fr
 **What it solves:** Rechecks trusted current-state signals and may hold, escalate or block without creating or broadening authority.
 
 **Competitor analogue:** [OPA external-data guidance](https://openpolicyagent.org/docs/external-data) supports context-aware policy decisions using current external state, a partial analogue; the cited source does not describe Ugence's separate post-authorization clearance stage.
+
+**Additional analogues (cross-check supplement):** [ServiceNow Change Management blackout and maintenance schedules](https://www.servicenow.com/docs/bundle/zurich-it-service-management/page/product/change-management/task/t_CreateBlkoutMaintSched.html) encode freeze windows and detect scheduling conflicts, a partial analogue for the freeze and conflict signals Action Clearance consumes.
 
 ### A.7.38 Agent Runtime
 
@@ -1176,6 +1212,8 @@ Required supporting foundations are Governance Contracts, Governance Provider Fr
 
 **Competitor analogue:** [Amazon Bedrock AgentCore](https://aws.amazon.com/bedrock/agentcore/) provides managed agent runtime, identity, gateway and observability capabilities; the Ugence package is a domain-neutral kernel with an explicitly external governance boundary.
 
+**Additional analogues (cross-check supplement):** [Temporal](https://temporal.io/solutions/ai) provides durable execution with retries, timeouts and replay for agent workflows, [LangGraph](https://docs.langchain.com/oss/python/langchain/human-in-the-loop) adds checkpointing and interrupts, and [Microsoft Agent Framework](https://learn.microsoft.com/en-us/agent-framework/overview/) and [CrewAI](https://crewai.com/) supply orchestration runtimes; none documents an external fail-closed governance boundary on consequential transitions.
+
 ### A.7.39 Cloud Scaling Operations
 
 **The problem:** A recommendation requires controlled domain actuation, but embedding credentials and mutation inside the recommender defeats governance separation.
@@ -1183,6 +1221,8 @@ Required supporting foundations are Governance Contracts, Governance Provider Fr
 **What it solves:** Executes externally authorized Kubernetes or ArgoCD changes with a dry-run-first posture.
 
 **Competitor analogue:** [Sedai Kubernetes Optimization](https://sedai.io/platform/kubernetes) performs autonomous production optimization; [CAST AI](https://cast.ai/kubernetes-cost-optimization/) automates Kubernetes optimization and scaling.
+
+**Additional analogues (cross-check supplement):** [Argo Rollouts](https://argo-rollouts.readthedocs.io/en/stable/features/analysis/) performs progressive Kubernetes delivery with metric-gated promotion, and [Karpenter](https://karpenter.sh/) actuates node capacity; both mutate infrastructure under their own control loops rather than under an external authorization.
 
 ### A.7.40 Risk Authority Status Runtime
 
@@ -1192,6 +1232,8 @@ Required supporting foundations are Governance Contracts, Governance Provider Fr
 
 **Competitor analogue:** [AgentCore Identity](https://aws.amazon.com/blogs/machine-learning/introducing-amazon-bedrock-agentcore-identity-securing-agentic-ai-at-scale/) provides agent access control and identity infrastructure, a partial lifecycle analogue; the cited material does not establish the same authorization-epoch design.
 
+**Additional analogues (cross-check supplement):** [SPIFFE/SPIRE](https://spiffe.io/docs/latest/spiffe-about/overview/) bounds identity lifetime through short-lived, automatically rotated credentials, and [Auth0 Token Vault](https://auth0.com/blog/auth0-token-vault-secure-token-exchange-for-ai-agents/) manages token refresh and exchange for agents; both are partial analogues for post-issuance lifecycle without authority-epoch propagation.
+
 ### A.7.41 Risk Authority Runtime Assurance
 
 **The problem:** A workflow can diverge from the authorized trajectory even when individual provider calls succeed.
@@ -1199,6 +1241,8 @@ Required supporting foundations are Governance Contracts, Governance Provider Fr
 **What it solves:** Observes trajectory and routes material drift back into authority reassessment without minting authority itself.
 
 **Competitor analogue:** [LangSmith Observability](https://docs.langchain.com/langsmith/observability) records agent traces for debugging, quality monitoring and evaluation; [AgentCore Observability](https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/observability-configure.html) emits runtime traces and metrics. These overlap observation, not the full authority-reassessment path.
+
+**Additional analogues (cross-check supplement):** [Datadog LLM Observability](https://docs.datadoghq.com/llm_observability/) traces and evaluates agent runs, and [Noma Security](https://noma.security/platform/runtime-protection/), [Zenity](https://zenity.io/platform) and [ServiceNow AI Control Tower](https://www.servicenow.com/products/ai-control-tower.html) detect off-policy agent behavior and can stop an agent; these overlap observation and interruption, not routing drift back into authority reassessment.
 
 ### A.7.42 Risk Authority Execution Assurance
 
@@ -1208,6 +1252,8 @@ Required supporting foundations are Governance Contracts, Governance Provider Fr
 
 **Competitor analogue:** [Sedai Kubernetes Optimization](https://sedai.io/platform/kubernetes) tracks workload behavior, application performance, cost drivers and SLO impact, a partial operational-effect analogue; Ugence binds effect reconciliation back to authority.
 
+**Additional analogues (cross-check supplement):** [Harness Continuous Verification](https://developer.harness.io/docs/continuous-delivery/verify/verify-deployments-with-the-verify-step/) verifies a deployment against metrics and logs and can roll back automatically, and [Argo Rollouts analysis](https://argo-rollouts.readthedocs.io/en/stable/features/analysis/) aborts a rollout on failed metric queries; both are close analogues for reconciling intended and observed effect in the delivery domain.
+
 ### A.7.43 Context-Minimization Token-Accounting Runtime
 
 **The problem:** Estimated token use can understate actual provider consumption and weaken shared budget enforcement.
@@ -1215,6 +1261,8 @@ Required supporting foundations are Governance Contracts, Governance Provider Fr
 **What it solves:** Converts provider-attempt telemetry into reconciled context/token records and settles budgets from measured use.
 
 **Competitor analogue:** [Portkey's agent gateway controls](https://docs.portkey.ai/docs/product/coding-agent) log cost, tokens, latency and actor and support budget/rate limits, a close operational accounting overlap.
+
+**Additional analogues (cross-check supplement):** [Helicone](https://docs.helicone.ai/guides/cookbooks/cost-tracking) and [Langfuse](https://langfuse.com/docs/observability/features/token-and-cost-tracking) attribute token usage and cost per request and span with budget alerts, and [Cloudflare AI Gateway](https://developers.cloudflare.com/ai-gateway/features/rate-limiting/) enforces cost-based budgets at the gateway; all are close operational analogues for measured accounting.
 
 ### A.7.44 Agent Value Readiness
 
@@ -1224,6 +1272,8 @@ Required supporting foundations are Governance Contracts, Governance Provider Fr
 
 **Competitor analogue:** [IBM watsonx.governance](https://www.ibm.com/products/watsonx-governance/model-governance) tracks model facts, lifecycle performance and risk management, a partial readiness-governance overlap.
 
+**Additional analogues (cross-check supplement):** [ServiceNow AI Control Tower](https://www.servicenow.com/products/ai-control-tower.html) and [Holistic AI](https://www.holisticai.com/ai-governance-platform) track AI assets, risk posture and governance status, partial analogues for adoption and capability readiness without a deterministic multidimensional determination.
+
 ### A.7.45 Governed Value
 
 **The problem:** Forecast savings, reported benefits and observed realized value are often collapsed into one optimistic ROI figure.
@@ -1231,6 +1281,8 @@ Required supporting foundations are Governance Contracts, Governance Provider Fr
 **What it solves:** Attributes net governed value to authorized actions while preserving evidence, authority and outcome classifications.
 
 **Competitor analogue:** [Sedai Cloud Cost Optimization](https://sedai.io/solution/cloud-cost-optimization) ties cloud savings to optimization actions and audit receipts, a close domain overlap; Ugence's capability is intended as a cross-domain governance accounting kernel.
+
+**Additional analogues (cross-check supplement):** [ServiceNow AI Control Tower](https://www.servicenow.com/products/ai-control-tower.html) consolidates ROI, productivity, cost avoidance and risk-reduction metrics per AI asset, and [Workday Agent System of Record](https://www.workday.com/en-us/artificial-intelligence/agent-system-of-record.html) measures agents like investments; both report value without separating reported, modeled and observed evidence classes.
 
 ## A.8 Essential deployment stack versus later enhancements
 
@@ -1302,8 +1354,18 @@ The cited products demonstrate that parts of the Ugence architecture have market
 - Portkey overlaps model routing, gateway guardrails, observability and token/cost controls.
 - LangSmith overlaps agent tracing, evaluation, datasets and deployment-pipeline testing.
 - Sedai and CAST AI overlap autonomous cloud or Kubernetes optimization and execution.
+- StormForge, PerfectScale and Karpenter add further Kubernetes rightsizing and autoscaling overlap, again combining recommendation with actuation.
+- Microsoft Entra Agent ID, Okta/Auth0 for AI agents, SPIFFE/SPIRE and Workday Agent System of Record overlap agent identity, provisioning, activation and credential lifecycle.
+- Zenity, Noma Security and Lakera overlap runtime agent security, tool-call enforcement and injection detection.
+- Vectara HHEM, Patronus Lynx, Cleanlab TLM and Guardrails AI overlap assertion and faithfulness scoring in the assessment path.
+- Not Diamond, Amazon Bedrock Intelligent Prompt Routing and the Microsoft Foundry model router overlap model selection and routing.
+- Cloudflare AI Gateway, Helicone, Langfuse, Datadog LLM Observability and Braintrust overlap gateway controls, token accounting, tracing and evaluation.
+- Sigstore, OPA signed bundles and Kyverno overlap artifact and policy authenticity; Harness Continuous Verification, Argo Rollouts and HCP Terraform run tasks overlap change gating and effect verification.
+- ServiceNow AI Control Tower, OneTrust AI Governance and Holistic AI overlap AI inventory, approval workflow, risk assessment and value reporting.
+- Temporal, LangGraph, Microsoft Agent Framework, CrewAI and HumanLayer overlap agent runtime, orchestration and human approval.
+- Model Context Protocol and Agent2Agent overlap contract standardization for tools and agent interoperability.
 
-The comparison should not claim that a blank competitor field proves uniqueness. It means only that no sufficiently close analogue was established from the limited official-source review used for this appendix. The more defensible Ugence distinction is architectural: the repository separates proposal, assertion verification, binding business decision, risk-derived machine authority, exact-action authorization, operational clearance, execution coordination, runtime assurance, effect reconciliation and governed-value measurement into explicit non-collapsible responsibilities.
+The comparison should not claim that a blank competitor field proves uniqueness. It means only that no sufficiently close analogue was established from the limited official-source review used for this appendix, as supplemented by the cross-check in Appendix C. The more defensible Ugence distinction is architectural: the repository separates proposal, assertion verification, binding business decision, risk-derived machine authority, exact-action authorization, operational clearance, execution coordination, runtime assurance, effect reconciliation and governed-value measurement into explicit non-collapsible responsibilities.
 
 # Appendix B — Development Status of the 45 Capabilities
 
@@ -1461,3 +1523,46 @@ Test counts are `def test_` occurrences under each package's `tests/` tree at th
 3. **Three capabilities are contracts without engines.** Benchmark Registry Contracts, UVI Policy Contracts and Benchmark Registry Authority ship typed shapes whose authority fields are permanently false by construction. They should not be presented as operational registries or authorities.
 4. **The reasoning-method thread is research-only end to end.** Capabilities 16–19 are commissioned under an owner-ratified research ballot and label every output non-approval-bearing; Phase 4C of the workflow-fit pilot is actively landing but does not change that label.
 5. **Version numbers and README phase text drift in places.** Cloud Scaling Authorization Contracts is at 0.7.0 while its README narrates 0.1.0 to 0.2.0; Cloud Scaling Controller's header says 0.3.0 while its Phase 3 section says 0.4.0; Agent Runtime's Status section stops at 0.5.0 while its Maturity block reaches 0.6.0 and the distribution is 0.7.0. The Version column above reports the distribution's `__version__` at the inspected commit.
+
+# Appendix C — Cross-Check Log and Competitor Supplement
+
+## C.1 Method
+
+Sixteen factual claims in Sections 4–13 and Appendix A were checked against package source and READMEs under `packages/` at the inspected commit, following the repository rule that code and package documentation outrank explanatory prose. Verdicts use the working-agreement labels: `[V]` verified, `[I]` inferred, `[G]` gap. Where a claim was contradicted or partial, the body text was corrected in place and the correction is recorded here so the change is auditable.
+
+## C.2 Claim-by-claim results
+
+| # | Claim in document | Verdict | Evidence | Action taken |
+|---:|---|---|---|---|
+| 1 | Package count of 47 and two excluded business-solution packages | `[V]` | 47 `pyproject.toml` under `packages/`; `packages/products/` holds `ai-hiring` and `procurement` | None |
+| 2 | ActionGate returns an `ALLOW` outcome meaning the exact action matches authority (A.2.6) | Contradicted on naming | Native `ActionGateOutcome` is ALLOW / DENY / ALLOW_WITH_CONSTRAINTS / UNKNOWN in `providers/actiongate/.../core.py`; the public framework outcome is AUTHORIZED / AUTHORIZED_WITH_CONSTRAINTS / DENIED / INDETERMINATE in `mapping/result.py` | A.2.6 and §36 corrected to the framework outcome names |
+| 3 | TAP classifies assertions as supported, unsupported, constrained or indeterminate (§25) | Partial | Native `TapOutcome` adds UNKNOWN, mapped fail-safe to INDETERMINATE (`providers/tap/.../core/__init__.py`, `mapping/result.py`) | §25 now names the fifth native state |
+| 4 | Action Clearance statuses and precedence (§37, A.2.7) | `[V]` | `ClearanceStatus` and `STATUS_PRECEDENCE` in `action-clearance/.../models/enums.py` | None |
+| 5 | Risk Authority converts a decision into signed, scoped, time-bound, revocable machine authority (§32) | Partial, materially | `EnvelopeIssuer`, Ed25519 signing, 30-minute default TTL and revocation exist; in `production_mode` issuance and authorization raise `ProductionContainmentError` as Phase 5 work (`risk_authority/README.md`, `api/dependencies.py`) | §32 now states the reference-path versus production-mode split |
+| 6 | Agent Constitution Policy states permitted dispositions, review actions and tool scopes (§8) | `[V]` | Three bound fields on `AgentConstitutionPolicy` in `agent-constitution-policy/.../policy.py` | None |
+| 7 | StoryGraph is deterministic, policy-defined and advisory (§23) | `[V]` | README authority boundary; determinism stated in `storygraph/.../model.py` | None |
+| 8 | Governed Value calculates value per authorized action using authority classification (§45) | Contradicted | Scorer pins `EvidenceStatus.REPORTED` and `AuthorityStatus.UNVERIFIED` (`governed-value/.../services/scorer.py`); no authorization or envelope reference exists in the package | §45 corrected; A.2.10 and A.5 row 45 remain as stated design intent for the illustrative scenario |
+| 9 | Cloud Scaling Operations performs Kubernetes or ArgoCD operations with dry-run default (§39) | `[V]` with omission | Executors exist; `ExecutionMode.DRY_RUN` is default among DRY_RUN, SIMULATION, SHADOW, LIVE (`contracts.py`) | §39 now names the four modes |
+| 10 | Model Selection selects an eligible model under policy (§20) | Stale framing | Package brands itself Model Authority; `ModelAuthorizationDecision` with ALLOW / DENY / HOLD / ESCALATE is canonical (`model-selection/.../authority.py`) | §20 now records the Model Authority contract |
+| 11 | Agent Runtime fails closed when governance is not configured (§38) | `[V]` | `UnconfiguredGovernanceHook` default in `agent-runtime/.../config.py`; fail-closed branches in `runtime/engine.py` | None |
+| 12 | Context Minimization preserves a caller-defined equivalence condition with token accounting (§22) | `[V]` | `EquivalenceStatus`, `OracleRequiredError`, `token_accounting.py` | None |
+| 13 | Policy Workflow Compiler emits Workflow IR, assurance specs, capability requirements, audit schemas and content-addressed artifacts (§7) | `[V]` | `CompilationResult` fields and `CapabilityRequirement` in `policy-workflow-compiler/.../compiler.py`, `semantics/contracts.py` | None |
+| 14 | Agentic Proposer may propose, request evidence, abstain or escalate (§13) | `[V]` | `CandidateDisposition` in `agentic-proposer/.../vocabulary.py` | None |
+| 15 | Agent Workforce Composer explains eliminated candidates and proposes least-privilege permissions and fallbacks (§15) | `[V]` | `EliminationReason`, `permissions.py`, `fallback.py` | None |
+| 16 | Decision Authority records delegated authority with scope, conditions and validity (§31) | `[V]` | `AuthorityType.DELEGATED_POLICY`, `decision_scope`, `expires_at` in `decision-authority/.../services/` | None |
+
+Two further observations from the check, not tied to a single claim:
+
+- **Version drift between READMEs and distributions** was already recorded in B.6 and is not repeated here.
+- **The Enterprise Validation Pilot** cited in B.1 ran over predecessor distributions (`decision-governance`, `dgm-tap-provider`, `dgm-actiongate-provider`). The current packages keep those names as compatibility distributions, so the lineage is documented, but the pilot result is `[I]` for the current code, not `[V]`.
+
+## C.3 Competitor supplement
+
+Thirteen entries in A.7 previously carried an empty competitor field: 1, 3, 9, 11, 13, 14, 15, 17, 22, 26, 27, 30 and 34. Each now cites the nearest product or open standard found, with the boundary of the overlap stated. Twenty-six further entries received an "Additional analogues" line where the original review cited only one vendor family. A.9 lists the new vendor groups.
+
+Sourcing rules for the supplement:
+
+- Every cited page was located through web search on the day of the check and is an official vendor, documentation or standards page. Direct page fetches were blocked by the session's network policy for most vendor domains, so page content was confirmed from search excerpts rather than a full read. Descriptions are therefore kept to what those excerpts support.
+- Open-source projects and open standards (for example DSPy, Presidio, Karpenter, MCP, A2A, SPIFFE) are labelled as such in the text and are included because they are the closest functional analogue, not because they are commercial competitors.
+- A cited analogue overlaps one function of a capability. None was found to reproduce the platform's separation of proposal, verification, decision, machine authority, exact-action authorization, clearance, execution, assurance and value measurement, and the caveat in A.9 about blank fields applies equally to the supplement.
+
