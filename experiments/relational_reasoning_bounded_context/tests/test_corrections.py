@@ -255,6 +255,44 @@ def test_F12_flag_is_the_only_shape_difference():
     assert bc.FLAG_PRESENT in a and bc.FLAG_ABSENT not in a and bc.FLAG_ABSENT in b and bc.FLAG_PRESENT not in b
 
 
+# ---- F14: identity pools are disjoint by an invisible partition, not by a visible marker ----
+def _pool_ids(role, n=300):
+    import random
+    m = gen._Mint(random.Random(7), role)
+    return {m.new() for _ in range(n)} | {m.new("C") for _ in range(n // 4)}
+
+def test_F14_pools_disjoint_and_hash_partitioned():
+    pools = {r: _pool_ids(r) for r in ("train", "dev", "final", "unit")}
+    for r, ids in pools.items():
+        assert ids and all(gen.pool_of(i) == r for i in ids)
+    roles = list(pools)
+    for i, a in enumerate(roles):
+        for b in roles[i + 1:]:
+            assert not (pools[a] & pools[b]), (a, b)
+    # end-to-end: episode entity ids of train vs final never overlap and classify to their role
+    tr = {e.entity_id for c in gen.generate_split("R9", FIXT, 6, "train") for e in c.entities}
+    fi = {e.entity_id for c in gen.generate_split("R9", FIXT, 6, "final") for e in c.entities}
+    assert tr and fi and not (tr & fi)
+    assert all(gen.pool_of(i) == "train" for i in tr) and all(gen.pool_of(i) == "final" for i in fi)
+
+def test_F14_no_visible_marker_between_pools():
+    """Every (position, character) pair in held-out ids occurs in training ids (no never-seen token pattern),
+    and the trailing-digit sets coincide. The previous design (train ids ending 0/1/2, final 6/7/8) failed
+    this: the model copied the letters and emitted a training-pool digit."""
+    tr, fi, dv = _pool_ids("train", 600), _pool_ids("final", 600), _pool_ids("dev", 600)
+    pos = lambda ids: {(k, ch) for i in ids for k, ch in enumerate(i)}
+    assert pos(fi) <= pos(tr) and pos(dv) <= pos(tr)
+    assert {i[-1] for i in fi} == {i[-1] for i in tr} == set(gen._ID_DIGITS)
+    assert all(len(i) <= 6 for i in tr | fi | dv)
+
+# ---- F15: is_valid_output must return False (not raise) on schema-cap violations ----
+def test_F15_is_valid_output_never_raises_on_cap_violation():
+    too_long = '{"answer":"X","reasoning_path":[' + ",".join(['"Entity:A1"'] * 64) + '],"evidence_ids":[],"status":"SUPPORTED"}'
+    assert output.is_valid_output(too_long) is False
+    assert output.is_valid_output('{"answer":"X","reasoning_path":[],"evidence_ids":[],"status":"SUPPORTED"}') is True
+    assert output.is_valid_output("garbage") is False
+
+
 def main() -> int:
     tests = [v for k, v in sorted(globals().items()) if k.startswith("test_") and callable(v)]
     passed = failed = 0

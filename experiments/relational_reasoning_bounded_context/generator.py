@@ -26,15 +26,18 @@ P0_SUBTASKS = ("B1", "B2", "B3", "B4", "B5", "B6", "B7")
 _RISK = ("LOW", "MEDIUM", "HIGH", "CRITICAL")
 _STATUS = ("ACTIVE", "EXPIRED", "PENDING")
 
-# Shared identifier vocabulary. All roles draw ID *bodies* from the SAME letters, so a held-out identity
-# is a new combination of TRAINED tokens (the intended unseen-identity generalization test) rather than
-# never-seen characters. A role-specific trailing DIGIT (digits are well-trained tokens, seen in every
-# amount/sequence) guarantees strict train/dev/final/unit pool disjointness without a token-distribution
-# gap. (Earlier disjoint-*alphabet* pools made held-out eval depend on characters the model never trained
-# -> 0.0 validity; this is the corrected design.)
+# Shared identifier vocabulary, marker-free pool partition. Every role draws ID bodies from the SAME
+# letters and the SAME trailing-digit set, so a held-out identity is a new combination of trained tokens
+# with no token or per-position pattern absent from training. Train/dev/final/unit disjointness comes from
+# an INVISIBLE partition of the combination space: an ID belongs to the pool selected by a stable hash of
+# the ID string (rejection-sampled at minting), never from a visible marker.
+# History: disjoint *alphabets* gave 0.0 validity (never-trained characters); a role-specific trailing
+# *digit* (train 0/1/2, final 6/7/8) let the model copy the letters but emit a training-pool digit
+# (`DTWXX7` -> `DTWXX1`), because no training ID ever ended in 6/7/8. Both were held-out artifacts.
 _ID_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ"
-_ROLE_DIGIT = {"train": "012", "dev": "345", "final": "678", "unit": "9"}
-_ROLE_ALPHABET = {r: _ID_ALPHABET for r in _ROLE_DIGIT}  # back-compat: shared alphabet for all roles
+_ID_DIGITS = "0123456789"
+_POOL_BUCKETS = 8
+_ROLE_BUCKETS = {"train": (0, 1, 2, 3), "dev": (4, 5), "final": (6,), "unit": (7,)}
 
 
 def _stable_hash(text: str) -> int:
@@ -44,26 +47,37 @@ def _stable_hash(text: str) -> int:
     return int.from_bytes(hashlib.sha256(text.encode("utf-8")).digest()[:8], "big")
 
 
+def pool_of(identifier: str) -> str:
+    """Which identity pool an ID string belongs to (invisible partition; pure function of the string)."""
+    b = _stable_hash("pool:" + identifier) % _POOL_BUCKETS
+    for role, buckets in _ROLE_BUCKETS.items():
+        if b in buckets:
+            return role
+    raise AssertionError("unreachable: every bucket is assigned")
+
+
 def _rng(seed: int, split: str, index: int, role: str = "unit") -> random.Random:
     r = (int(seed) * 1_000_003 + _stable_hash(split) % 9973) * 131 + index
     return random.Random(r * 17 + (_stable_hash(role) % 7919))   # role partitions the episode/identity stream
 
 
 class _Mint:
-    """Opaque 6-char id minter: shared-alphabet body + role-specific trailing digit => strictly disjoint
-    train/dev/final/unit pools whose tokens are all in the trained vocabulary."""
+    """Opaque <=6-char id minter: shared-alphabet body + shared trailing digit; the id is accepted only if
+    the invisible hash partition assigns it to this minter's role => strictly disjoint train/dev/final/unit
+    pools that are token- and position-distribution identical."""
 
     def __init__(self, rng: random.Random, role: str) -> None:
         self.rng = rng
-        self.body = _ID_ALPHABET
-        self.digit = _ROLE_DIGIT.get(role, _ROLE_DIGIT["unit"])
+        self.role = role if role in _ROLE_BUCKETS else "unit"
+        self.buckets = set(_ROLE_BUCKETS[self.role])
         self.seen: set[str] = set()
 
     def new(self, prefix: str = "") -> str:
         while True:
-            body = "".join(self.rng.choice(self.body) for _ in range(max(1, 5 - len(prefix))))
-            cand = (prefix + body)[: CAPS["max_id_len"] - 1] + self.rng.choice(self.digit)
-            if len(cand) >= 2 and cand not in self.seen and cand not in OUTCOME_VOCAB:
+            body = "".join(self.rng.choice(_ID_ALPHABET) for _ in range(max(1, 5 - len(prefix))))
+            cand = (prefix + body)[: CAPS["max_id_len"] - 1] + self.rng.choice(_ID_DIGITS)
+            if (len(cand) >= 2 and cand not in self.seen and cand not in OUTCOME_VOCAB
+                    and _stable_hash("pool:" + cand) % _POOL_BUCKETS in self.buckets):
                 self.seen.add(cand)
                 return cand
 
