@@ -24,25 +24,37 @@ P0_SUBTASKS = ("B1", "B2", "B3", "B4", "B5", "B6", "B7")
 
 _RISK = ("LOW", "MEDIUM", "HIGH", "CRITICAL")
 _STATUS = ("ACTIVE", "EXPIRED", "PENDING")
-_ROLE_ALPHABET = {"train": "ABCDEFGH", "dev": "ACEGJLNP", "final": "JKLMNPQR", "unit": "STUVWXYZ"}
+
+# Shared identifier vocabulary. All roles draw ID *bodies* from the SAME letters, so a held-out identity
+# is a new combination of TRAINED tokens (the intended unseen-identity generalization test) rather than
+# never-seen characters. A role-specific trailing DIGIT (digits are well-trained tokens, seen in every
+# amount/sequence) guarantees strict train/dev/final/unit pool disjointness without a token-distribution
+# gap. (Earlier disjoint-*alphabet* pools made held-out eval depend on characters the model never trained
+# -> 0.0 validity; this is the corrected design.)
+_ID_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ"
+_ROLE_DIGIT = {"train": "012", "dev": "345", "final": "678", "unit": "9"}
+_ROLE_ALPHABET = {r: _ID_ALPHABET for r in _ROLE_DIGIT}  # back-compat: shared alphabet for all roles
 
 
-def _rng(seed: int, split: str, index: int) -> random.Random:
-    return random.Random((int(seed) * 1_000_003 + hash(split) % 9973) * 131 + index)
+def _rng(seed: int, split: str, index: int, role: str = "unit") -> random.Random:
+    r = (int(seed) * 1_000_003 + hash(split) % 9973) * 131 + index
+    return random.Random(r * 17 + (hash(role) % 7919))   # role partitions the episode/identity stream
 
 
 class _Mint:
-    """Role-scoped opaque 6-char id minter; disjoint letter alphabets => disjoint pools across roles."""
+    """Opaque 6-char id minter: shared-alphabet body + role-specific trailing digit => strictly disjoint
+    train/dev/final/unit pools whose tokens are all in the trained vocabulary."""
 
     def __init__(self, rng: random.Random, role: str) -> None:
         self.rng = rng
-        self.alpha = _ROLE_ALPHABET.get(role, _ROLE_ALPHABET["unit"])
+        self.body = _ID_ALPHABET
+        self.digit = _ROLE_DIGIT.get(role, _ROLE_DIGIT["unit"])
         self.seen: set[str] = set()
 
     def new(self, prefix: str = "") -> str:
         while True:
-            body = "".join(self.rng.choice(self.alpha) for _ in range(max(2, 5 - len(prefix))))
-            cand = (prefix + body)[: CAPS["max_id_len"]]
+            body = "".join(self.rng.choice(self.body) for _ in range(max(1, 5 - len(prefix))))
+            cand = (prefix + body)[: CAPS["max_id_len"] - 1] + self.rng.choice(self.digit)
             if len(cand) >= 2 and cand not in self.seen and cand not in OUTCOME_VOCAB:
                 self.seen.add(cand)
                 return cand
@@ -102,11 +114,13 @@ def _gen_path(rng, mint, tenant, split, given: bool, hops: int):  # R2/R3 given,
     return ents, rels, [], [], [], Constraints(hops, False, False), q, gold
 
 
-def _events_for(rng, mint, tenant, entity_id, etype, k):
+def _events_for(rng, mint, tenant, entity_id, etype, k, seq_start=1):
+    # seq_start lets distractor entities carry HIGHER sequence numbers than the target's latest, so the
+    # 'global-most-recent' shortcut (pick the newest event anywhere) is a losing strategy and temporal
+    # reasoning must be entity-scoped. seq_start<=80 keeps sequences within the 2-digit cap.
     vocab = _RISK if etype == "risk" else _STATUS
-    evs = []
-    for s in range(1, k + 1):
-        evs.append(Event(mint.new(), entity_id, etype, s, vocab[rng.randrange(len(vocab))], tenant))
+    evs = [Event(mint.new(), entity_id, etype, seq_start + i, vocab[rng.randrange(len(vocab))], tenant)
+           for i in range(k)]
     latest = max(evs, key=lambda e: e.sequence)
     return evs, latest
 
@@ -119,7 +133,7 @@ def _gen_temporal(rng, mint, tenant, split):  # R5 latest-state
     while len(ents) < rng.randint(6, 12):
         d = Entity("vendor", mint.new(), tenant, (("amount", _amount(rng)),))
         ents.append(d)
-        de, _ = _events_for(rng, mint, tenant, d.entity_id, "risk", CAPS["max_events_per_entity"])
+        de, _ = _events_for(rng, mint, tenant, d.entity_id, "risk", CAPS["max_events_per_entity"], seq_start=rng.randint(10, 80))
         evs += de
     q = ReasoningQuery("latest_event_value", "NOT_APPLICABLE", ents[0].entity_id,
                        requested_property="latest_state", event_type="risk")
@@ -134,7 +148,7 @@ def _gen_rel_temporal(rng, mint, tenant, split, given: bool):  # R6 given / R7 d
     while len(ents) < rng.randint(6, 12):
         d = Entity("vendor", mint.new(), tenant, (("amount", _amount(rng)),))
         ents.append(d)
-        de, _ = _events_for(rng, mint, tenant, d.entity_id, "risk", 2)
+        de, _ = _events_for(rng, mint, tenant, d.entity_id, "risk", 2, seq_start=rng.randint(10, 80))
         evs += de
     mode = "PATH_GIVEN" if given else "PATH_DISCOVERY"
     q = ReasoningQuery("path_then_latest", mode, ents[0].entity_id,
@@ -189,7 +203,7 @@ def _gen_composite(rng, mint, tenant, split, confusable: bool):  # R9 / R12
     while len(ents) < min(CAPS["max_entities"], 4 + ndist):
         d = Entity("vendor", mint.new(), tenant, (("amount", _amount(rng)),))
         ents.append(d)
-        de, _ = _events_for(rng, mint, tenant, d.entity_id, "risk", 2)
+        de, _ = _events_for(rng, mint, tenant, d.entity_id, "risk", 2, seq_start=rng.randint(10, 80))
         evs += de
         if confusable and len(rels) < CAPS["max_relations"]:
             rels.append(Relation(rtypes[0], ents[0].entity_id, d.entity_id, tenant))  # wrong branch, dead-ends
@@ -285,8 +299,8 @@ def generate_episode(split: str, seed: int, index: int, role: str = "unit",
     if split not in _DISPATCH:
         raise ValueError(f"unknown split {split}")
     assert_generation_allowed(seed, authorization_token)  # fail-closed BEFORE any cohort materializes
-    rng = _rng(seed, split, index)
-    tenant = "T" + "".join(rng.choice(_ROLE_ALPHABET.get(role, "STUVWXYZ")) for _ in range(3))
+    rng = _rng(seed, split, index, role)
+    tenant = "T" + "".join(rng.choice(_ID_ALPHABET) for _ in range(3))
     mint = _Mint(rng, role)
     ents, rels, evs, pols, evd, cons, q, gold = _DISPATCH[split](rng, mint, tenant, split)
     ctx = ReasoningContext(context_id=mint.new("C"), tenant_id=tenant, query=q,

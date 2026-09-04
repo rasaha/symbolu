@@ -35,8 +35,40 @@ semantic was changed. Execution remains fail-closed.
 `tests/test_btrr.py` 28 + `tests/test_corrections.py` 18 = **46 tests, all passing** (stdlib runner; no
 pytest/torch; fixture seeds 883000–883004 only; no reserved scientific seed consumed).
 
-## PyTorch runtime status (F10)
-torch is absent in the builder environment. Runtime model execution is **NOT** claimed verified. Retained:
-analytic parameter assertions (`config`/`model.analytic_parameter_count`), lazy torch imports
-(`model.py`, `trainer.py`). **Outstanding:** actual model-runtime verification (build_model /
-parameter_digest / training) pending a torch-capable environment. torch was not installed or vendored.
+## PyTorch runtime status (F10) — CLOSED
+
+Runtime model execution is now **verified** on a torch-capable GPU (previously the builder environment had
+no torch, so this was marked pending). The RunPod mechanical-verification heredoc (fixture seed 883000
+only; no reserved scientific seed; no smoke/dev/final run) passed every check.
+
+- **Environment:** RunPod, NVIDIA **RTX 6000 Ada (48 GB)**, driver 595.91.07; **torch 2.4.1+cu121**
+  (`torch.version.cuda == 12.1`), CUDA available, fp32 + bf16 supported; Python 3.12.
+- **Repo state:** branch `claude/symbolu-bindingslots-audit-rps9xe`, pinned to the corrected
+  implementation commit `e4dace0e3552ea6bf5572ecdff4fc5768ee7e2cc`; `28 + 18 = 46` tests pass;
+  `EXECUTION_AUTHORIZATION.md` unsigned; reserved seeds fail-closed.
+
+| Runtime check | Result |
+|---|---|
+| Model instantiation | PASS |
+| Total params == 394,752 (runtime) | PASS |
+| Reasoning-block params == 131,392 (runtime) | PASS |
+| Analytic == runtime param count | PASS |
+| Weight tying (head ↔ token embedding) | PASS |
+| Forward pass / logits dims `(1, L, 211)` | PASS |
+| Output-only CE masking / finite loss (≈ ln 211, untrained) | PASS |
+| Backward + optimizer step + parameter change | PASS |
+| Checkpoint save/reload | PASS |
+| Identical parameter digest after reload | PASS |
+| Greedy generation bounded by output_token_limit (384) | PASS |
+| 2901-token cap-saturated input (== proven max) forwards | PASS |
+| Near-3904 sequence (== max_seq) forwards | PASS |
+| Same-checkpoint P0→R invariant (digest identical) | PASS |
+
+Artifact: `/workspace/btrr_runtime_verify.log` (retained on the pod). The `torch.load`
+`weights_only=False` FutureWarning is a benign torch 2.4 deprecation notice on a self-produced
+checkpoint — not a defect. This runtime verification is a mechanical-plumbing check on a
+freshly-initialized model; it is **not** a trained or scientific result.
+
+**Still locked (unchanged):** the smoke experiment (seed 8100) remains
+`BTRR_SMOKE_AUTHORIZATION_MECHANISM_MISSING`; execution authorization is unsigned; no reserved scientific
+seed was consumed.

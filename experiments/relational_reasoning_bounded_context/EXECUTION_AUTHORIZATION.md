@@ -7,6 +7,22 @@ occur.
 
 This file authorizes **nothing** by existing. It records the gate; it does not open it.
 
+## Authorization mechanism (implemented — two-key, fail-closed)
+Per `BTRR_EXECUTION_AUTHORIZATION_MECHANISM_SPEC.md`, `guard_seed` now requires BOTH keys for a reserved
+seed; neither alone suffices, and there is no bypass flag:
+1. **Owner key (in git):** an entry in `docs/research/hybrid_llm/benchmarks/BTRR_EXECUTION_AUTHORIZATION_RECORD.json`
+   with `authorized:true`, the seed in `scope_seeds`, `token_sha256` = SHA-256 of a plaintext token
+   generated out-of-band, `protocol_lock_digest` = current
+   `experiments.relational_reasoning_bounded_context.manifest.config_digest()`, and (optionally)
+   `expires_at`. Signing = an owner commits that edit; git history is the audit trail.
+2. **Operator key (out of git):** the plaintext token supplied at run time via env `BTRR_EXEC_TOKEN`
+   (or the `token=` argument), matched by hash against the record.
+
+The committed record ships **unsigned** (every role `authorized:false`, hashes null), so execution stays
+closed. Authorizing one role does not authorize the others; changing the frozen protocol/config revokes
+any authorization (digest mismatch). Signing this file (below) and the JSON record are the two owner
+surfaces; both must be completed, and the operator token supplied, for a reserved seed to run.
+
 ## What is gated
 - Reserved seeds: smoke `8100`; development `8101, 8102, 8103`; final `81600, 81601, 81602, 81603, 81604`.
 - Any operation that trains a BTRR checkpoint, evaluates P0 or R1–R12 on a reserved seed, or reads a

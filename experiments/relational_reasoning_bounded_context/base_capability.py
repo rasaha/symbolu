@@ -10,7 +10,7 @@ import random
 
 from .config import P0_BLOCK_THRESHOLD, P0_SUBTASK_GATE
 from .execution import assert_generation_allowed
-from .generator import P0_SUBTASKS, _Mint, _amount, _rng, _ROLE_ALPHABET
+from .generator import P0_SUBTASKS, _ID_ALPHABET, _Mint, _amount, _rng
 from .schema_ext import (Constraints, Entity, Evidence, Event, ReasoningContext,
                          ReasoningOutput, ReasoningQuery)
 from .serializer import assert_zero_truncation
@@ -25,8 +25,8 @@ def generate_p0_episode(subtask: str, seed: int, index: int, role: str = "unit",
     if subtask not in P0_SUBTASKS:
         raise ValueError(f"unknown P0 subtask {subtask}")
     assert_generation_allowed(seed, authorization_token)  # fail-closed BEFORE any P0 cohort materializes
-    rng = _rng(seed, "P0:" + subtask, index)
-    tenant = "T" + "".join(rng.choice(_ROLE_ALPHABET.get(role, "STUVWXYZ")) for _ in range(3))
+    rng = _rng(seed, "P0:" + subtask, index, role)
+    tenant = "T" + "".join(rng.choice(_ID_ALPHABET) for _ in range(3))
     mint = _Mint(rng, role)
     ents = _entities(rng, mint, tenant, rng.randint(6, 12))
     events: list[Event] = []
