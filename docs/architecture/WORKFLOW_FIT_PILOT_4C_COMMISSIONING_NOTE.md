@@ -1863,3 +1863,125 @@ the merge proceeded on the owner's decision with that limitation stated.
 **Status.** This revision records outcomes and open obligations. It authorises
 nothing new: slice 3B remains uncommissioned, D1–D5 remain incomplete, and
 obligation 1 above stands as a hard gate on any genuine run.
+
+### Revision 19 (owner rulings: obligation-1 field shapes, 2026-09-04)
+
+Revision 18 recorded, as an open obligation, that four free-form prepared fields
+accept credential-shaped values and reach a prepared artifact, where
+`index_digest` would commit them permanently. The credential-key scan cannot
+catch any of them: it inspects key *names*, and here the secret would be a
+*value* under a legitimate key. A preflight established that three of the four
+had **no shape the repository settles**, and that inventing one would have been a
+fabricated `[V]`. The owner therefore ratified the four shapes below. Each is an
+**owner ruling `[R]`**, not an assistant proposal and not an inference from
+existing usage.
+
+1. **`verdict_custody_ref` — structural URI constraint only.** The value must be
+   a well-formed absolute URI: a scheme starting with a letter, `://`, and a
+   non-empty remainder containing no whitespace or control characters. The scheme
+   is **deliberately not allowlisted.** §2.2 binds the concrete custody and
+   registry endpoint at D5 ratification and declines to name it, on the stated
+   ground that "a plausible-looking URI in a governance document would be a
+   fabricated `[V]`"; an allowlist ratified today would encode exactly that. The
+   structural constraint refuses a **bare** credential, since no key format carries
+   `://` — but see obligation 4 below: it does **not** refuse a credential embedded
+   inside an otherwise well-formed URI. **This ruling does not ratify any scheme,
+   endpoint or custody medium**, and the test-only `memory://workflow-fit-test/…`
+   form remains what revision 17 made it: never valid evidence for a genuine run.
+2. **`execution_order_rule` — exact match on `ascending_case_digest`.** The owner
+   ratifies this as the sole intended value. The field had **zero occurrences**
+   in this note before now; its only prior appearance anywhere was a test
+   fixture literal, which is why the shape could not be derived and had to be
+   ruled.
+3. **`formula_id` — the split is ratified; pinned by exact match to
+   `calfloor.linear_chain`.** The owner ratifies the decomposition of this note's
+   `calfloor.linear_chain.v1` (§2.1) into an id and a version composing as
+   `<id>.v<version>`. That decomposition previously existed **only** in
+   implementation fixtures and was never ratified here; this revision makes it
+   governed rather than incidental.
+4. **`formula_version` — a bare positive integer.** One or more digits, no
+   leading zeros, no `v` prefix, no dotted form. This matches every value in
+   evidence and composes with ruling 3 to reproduce `calfloor.linear_chain.v1`.
+
+**Enforcement `[V]`.** All four are enforced in
+`experiments/workflow_fit_study/prepared_bundle.py` at construction, and
+re-validated on read: `verify()` reconstructs the design through
+`_load_experimental_design`, which calls the real `ExperimentalDesign`
+constructor, so the reader cannot accept a shape the writer refuses. This is the
+same asymmetry F1b closed for `provider_factory`, and it is closed here by
+construction rather than by a second copy of each rule.
+
+**Obligation 2 is untouched and not reproduced.** `_FACTORY_PATH` keeps the 4B
+precedent's `$` and Unicode-`\w` laxity by the revision-18 ruling. The two
+regexes written fresh here anchor with `\Z` and exclude control characters, so
+the laxity is **not** propagated into new code.
+
+**Obligation 3 is narrowed, not closed.** Every test added by this revision
+asserts the refusing guard **by message**, so no case can pass for an unintended
+reason. The one candidate that would have been refused earlier by the
+pre-existing non-blank guard was removed from its parametrize list rather than
+left to assert a refusal this ruling did not cause. The three earlier F1b tests
+named in revision 18 are unchanged and still carry that imprecision.
+
+**Obligation 4, as it was raised — superseded by the ruling below; retained for the
+record and no longer a description of current behaviour.** The structural ruling
+refused a bare credential but not one carried inside a URI's userinfo, path, query or
+fragment: `https://user:<key>@host/p`, `https://host/<key>` and `memory://x#<key>` were
+all accepted by the writer, accepted by `verify()`, and committed by `index_digest`
+`[V]`. A scheme allowlist would not have closed this — every one of those values carries
+a legitimate scheme — so it was never an argument for revisiting ruling 1. Closing it
+needed a separate owner ruling on whether a custody reference may carry userinfo or
+opaque path, query and fragment segments at all. **That ruling was given and is recorded
+immediately below**; two of the three shapes are now refused and the third is addressed
+by ruling 6.
+
+**Obligation 4 — ruled. `verdict_custody_ref` is a non-secret locator and must never be
+used to transport credentials `[R]`.** For **every** URI scheme, until D5 ratifies a
+narrower scheme and endpoint allowlist:
+
+1. **Userinfo is forbidden.** Any URI whose parsed authority contains a username,
+   password or other content before `@` is refused.
+2. **Query and fragment components are forbidden.**
+3. **Percent-encoding is forbidden.**
+4. **The path**, when present, may use only ASCII letters, digits, `/`, `-`, `_`, `.` and
+   `~`; must stay within a documented maximum length; and must contain no empty interior,
+   `.` or `..` segments. The documented maximum is **255 characters**
+   (`_MAX_CUSTODY_REF_LENGTH`) — a documented bound, not a derived one.
+5. **Applied at construction and repeated on read**, so a bundle read from disk is held to
+   the same rules as one being written.
+6. **These are syntax restrictions and prove nothing about content.** They do **not**
+   establish that an allowed-looking path contains no secret, and no code or document may
+   claim they do. A genuine run must obtain `verdict_custody_ref` from a trusted,
+   D5-approved configuration or registry; a reference supplied by an untrusted source
+   remains prohibited.
+
+**Provisional, and versioned when replaced.** These all-scheme restrictions stand in for an
+allowlist that does not yet exist. A future D5 ratification may replace them with approved
+schemes, authorities and reference forms. That replacement **must be versioned**: it takes a
+new commitment identifier and must never silently reinterpret an existing prepared bundle.
+
+**What ruling 6 costs, made concrete `[V]`.** A credential whose format is ASCII letters,
+digits and hyphens — the common `sk-…` shape — is a **valid path segment** under ruling 4
+and is therefore still accepted as `https://custody.invalid/<key>`. Refusing it would mean
+banning hyphens from locator paths, which ruling 4 permits. This is not a gap in the
+implementation; it is exactly the residue ruling 6 names, and the test suite asserts the
+acceptance explicitly so it can never be mistaken for an oversight. Of the three shapes
+revision 19 previously pinned as open, two (userinfo, fragment) are now refused and this
+third remains accepted **by ruling**.
+
+**On the record of this correction.** Revision 19 as first written asserted that
+the structural constraint "refuses every credential shape". That was false in the
+case above, and the overstatement originated in the assistant-drafted option text
+the owner ratified from, not in the owner's ruling. The ruling itself stands
+unchanged; only the claim made for it is corrected. The four guards are unmodified.
+
+**Status.** Obligation 1 is **closed for these four fields**, and obligation 4 is
+**ruled and enforced** for userinfo, query, fragment, percent-encoding, path charset,
+traversal segments and length. What remains open is not a defect but ruling 6's stated
+limit: syntax cannot prove a permitted path carries no secret, so **no genuine run may take
+`verdict_custody_ref` from an untrusted source**, and the field's contents are never
+evidence that no credential was committed.
+
+This authorises no run: D1–D5 remain incomplete, the custody endpoint remains
+unbound, slice 3B remains uncommissioned, and no provider call, credential access
+or genuine calibration is permitted by this revision.

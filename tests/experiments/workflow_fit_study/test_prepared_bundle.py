@@ -217,7 +217,7 @@ def test_noncanonical_decimal_representation_of_an_index_fails_construction():
             execution_order_rule="ascending_case_digest", verdict_custody_ref="memory://x",
             sampling_algorithm_id="bbh_hash_rank_select", sampling_algorithm_version="1",
             seed="1", population_size=5, sample_size=2, selected_indexes=("00", "1"),
-            sample_index_digest=index_list_digest((0, 1)), formula_id="f", formula_version="1",
+            sample_index_digest=index_list_digest((0, 1)), formula_id="calfloor.linear_chain", formula_version="1",
         )
 
 
@@ -487,6 +487,210 @@ def test_a_provider_configuration_of_any_other_shape_is_refused_on_read(tmp_path
     (out / "provider_configuration.json").write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n")
     _reindex(out)
     with pytest.raises(B.PreparedBundleError):
+        B.verify(out, catalog=pf.catalog(), rule_set=pf.rule_set(), advisory=None)
+
+
+
+# --------------------------------------------------------------------------- revision-19 field shapes
+
+
+SECRET = "sk-ant-api03-NOTAREALKEY-000000000000000000"
+
+
+def _design_kwargs(**overrides):
+    """A minimal CONFIRMATORY design; overrides isolate the one field under test."""
+    kwargs = dict(
+        manifest_id="m", manifest_digest="a" * 64, run_role="CONFIRMATORY",
+        benchmark_id="b", benchmark_version="1", benchmark_content_digest="a" * 64,
+        execution_order_rule="ascending_case_digest",
+        verdict_custody_ref="memory://workflow-fit-test/shape",
+    )
+    kwargs.update(overrides)
+    return kwargs
+
+
+@pytest.mark.parametrize(
+    ("value", "message"),
+    [
+        (SECRET, "must be a well-formed absolute URI"),
+        ("sk-proj-NOTAREALKEY-0000000000", "must be a well-formed absolute URI"),
+        ("no-scheme", "must be a well-formed absolute URI"),
+        ("memory:/x", "must be a well-formed absolute URI"),
+        ("://x", "must be a well-formed absolute URI"),
+        ("1scheme://x", "must be a well-formed absolute URI"),
+        ("memory://", "must name a non-empty authority"),
+        ("memory://x\n", "must not contain whitespace or control characters"),
+        ("memory://x\x00y", "must not contain whitespace or control characters"),
+        ("memory://x y", "must not contain whitespace or control characters"),
+        (" memory://x", "must not contain whitespace or control characters"),
+    ],
+)
+def test_verdict_custody_ref_of_any_non_uri_shape_is_refused(value, message):
+    with pytest.raises(B.PreparedBundleError, match=message):
+        B.ExperimentalDesign(**_design_kwargs(verdict_custody_ref=value))
+
+
+# Revision 19, obligation-4 ruling: verdict_custody_ref is a non-secret locator and must
+# never transport a credential. These three shapes were accepted before the ruling and are
+# refused now; they are the ones the earlier boundary-pinning tests pinned as open.
+@pytest.mark.parametrize(
+    ("value", "message"),
+    [
+        ("https://user:" + SECRET + "@host.invalid/p", "must not carry userinfo"),
+        ("memory://workflow-fit-test/x#" + SECRET, "must not carry a fragment"),
+    ],
+)
+def test_a_credential_embedded_in_a_well_formed_uri_is_now_refused(tmp_path, value, message):
+    with pytest.raises(B.PreparedBundleError, match=message):
+        B.ExperimentalDesign(**_design_kwargs(verdict_custody_ref=value))
+    # And the same refusal on read: a bundle hand-written with the value, re-indexed so every
+    # digest agrees, must not verify.
+    manifest = slice2._calibration_manifest()
+    out = tmp_path / "bundle"
+    _prepare_calibration(out, manifest=manifest)
+    payload = json.loads((out / "experimental_design.json").read_text())
+    payload["verdict_custody_ref"] = value
+    (out / "experimental_design.json").write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n")
+    _reindex(out)
+    with pytest.raises(B.PreparedBundleError, match=message):
+        B.verify(out, catalog=pf.catalog(), rule_set=pf.rule_set(), advisory=None)
+
+
+def test_a_key_shaped_path_segment_is_still_accepted_by_ruling_6(tmp_path):
+    """Obligation-4 ruling 6, made executable. A credential whose format is letters, digits
+    and hyphens is a VALID path segment under ruling 4's charset, so it is still accepted.
+    Refusing it would mean banning hyphens from locator paths, which the ruling permits.
+    This is the case ruling 6 exists for: syntax restrictions never prove a path carries no
+    secret, and only a trusted, D5-approved source for verdict_custody_ref does."""
+    value = "https://custody.invalid/" + SECRET
+    assert B.ExperimentalDesign(**_design_kwargs(verdict_custody_ref=value)).verdict_custody_ref == value
+
+
+@pytest.mark.parametrize(
+    ("value", "message"),
+    [
+        # userinfo, in every spelling
+        ("https://user@host.invalid/p", "must not carry userinfo"),
+        ("https://user:pw@host.invalid", "must not carry userinfo"),
+        ("memory://@host/p", "must not carry userinfo"),
+        # query and fragment
+        ("https://host.invalid/p?k=v", "must not carry a query component"),
+        ("https://host.invalid/p#frag", "must not carry a fragment component"),
+        ("https://host.invalid/p?", "must not carry a query component"),
+        # percent-encoding
+        ("https://host.invalid/%73%65%63", "must not use percent-encoding"),
+        ("https://host.invalid/a%2Fb", "must not use percent-encoding"),
+        # traversal and empty segments
+        ("https://host.invalid/a/../b", "must not contain empty, '.' or '..' segments"),
+        ("https://host.invalid/a/./b", "must not contain empty, '.' or '..' segments"),
+        ("https://host.invalid/a//b", "must not contain empty, '.' or '..' segments"),
+        ("https://host.invalid/a/", "must not contain empty, '.' or '..' segments"),
+        # path charset
+        ("https://host.invalid/a b", "must not contain whitespace"),
+        ("https://host.invalid/a:b", "path may use only ASCII letters"),
+        ("https://host.invalid/a+b", "path may use only ASCII letters"),
+        ("https://host.invalid/café", "path may use only ASCII letters"),
+        # structure
+        ("https:///p", "must name a non-empty authority"),
+        ("no-scheme/p", "must be a well-formed absolute URI"),
+        ("1scheme://host", "must be a well-formed absolute URI"),
+    ],
+)
+def test_custody_reference_syntax_restrictions(value, message):
+    with pytest.raises(B.PreparedBundleError, match=message):
+        B.ExperimentalDesign(**_design_kwargs(verdict_custody_ref=value))
+
+
+def test_custody_reference_longer_than_the_documented_maximum_is_refused():
+    over = "memory://h/" + ("a" * (B._MAX_CUSTODY_REF_LENGTH - 10))
+    assert len(over) > B._MAX_CUSTODY_REF_LENGTH
+    with pytest.raises(B.PreparedBundleError, match="exceeds the documented maximum length"):
+        B.ExperimentalDesign(**_design_kwargs(verdict_custody_ref=over))
+
+
+def test_custody_reference_at_exactly_the_documented_maximum_is_accepted():
+    at = "memory://h/" + ("a" * (B._MAX_CUSTODY_REF_LENGTH - len("memory://h/")))
+    assert len(at) == B._MAX_CUSTODY_REF_LENGTH
+    assert B.ExperimentalDesign(**_design_kwargs(verdict_custody_ref=at)).verdict_custody_ref == at
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        "memory://workflow-fit-test/calibration/rep0",
+        "memory://h",
+        "https://custody.invalid/verdicts/run-1/rep_0",
+        "s3+custody://bucket/a.b~c-d_e",
+        "memory://host:8080/p",
+    ],
+)
+def test_permitted_simple_locator_paths_are_accepted(value):
+    assert B.ExperimentalDesign(**_design_kwargs(verdict_custody_ref=value)).verdict_custody_ref == value
+
+
+@pytest.mark.parametrize("value", ["memory://workflow-fit-test/x", "https://example.invalid/a/b", "s3+custody://bucket/key"])
+def test_well_formed_custody_uris_are_accepted(value):
+    assert B.ExperimentalDesign(**_design_kwargs(verdict_custody_ref=value)).verdict_custody_ref == value
+
+
+# "" is omitted: it is refused earlier by the pre-existing non-blank guard, which has its
+# own test. Listing it here would assert a refusal this ruling did not cause.
+@pytest.mark.parametrize("value", [SECRET, "descending_case_digest", "ascending_case_digest ", "Ascending_Case_Digest", "ascending_case_digest\n"])
+def test_execution_order_rule_other_than_the_ratified_value_is_refused(value):
+    with pytest.raises(B.PreparedBundleError, match="execution_order_rule must be exactly"):
+        B.ExperimentalDesign(**_design_kwargs(execution_order_rule=value))
+
+
+def _calibration_kwargs(**overrides):
+    indexes = select_indexes(seed=RATIFIED_SEED, population_size=POPULATION, sample_size=SAMPLE)
+    kwargs = _design_kwargs(
+        run_role="CALIBRATION",
+        sampling_algorithm_id="bbh_hash_rank_select", sampling_algorithm_version="1",
+        seed=str(RATIFIED_SEED), population_size=POPULATION, sample_size=SAMPLE,
+        selected_indexes=tuple(str(i) for i in indexes), sample_index_digest=index_list_digest(indexes),
+        formula_id="calfloor.linear_chain", formula_version="1",
+    )
+    kwargs.update(overrides)
+    return kwargs
+
+
+@pytest.mark.parametrize("value", [SECRET, "calfloor.linear_chain.v1", "calfloor_linear_chain", "CALFLOOR.LINEAR_CHAIN", "calfloor.linear_chain\n", "other"])
+def test_formula_id_other_than_the_ratified_value_is_refused(value):
+    with pytest.raises(B.PreparedBundleError, match="formula_id must be exactly"):
+        B.ExperimentalDesign(**_calibration_kwargs(formula_id=value))
+
+
+@pytest.mark.parametrize("value", [SECRET, "v1", "1.0", "01", "0", "-1", "1\n", "one"])
+def test_formula_version_of_any_non_integer_shape_is_refused(value):
+    with pytest.raises(B.PreparedBundleError, match="formula_version must be a bare positive integer"):
+        B.ExperimentalDesign(**_calibration_kwargs(formula_version=value))
+
+
+@pytest.mark.parametrize("value", ["1", "2", "10"])
+def test_bare_positive_integer_formula_versions_are_accepted(value):
+    assert B.ExperimentalDesign(**_calibration_kwargs(formula_version=value)).formula_version == value
+
+
+@pytest.mark.parametrize(
+    ("field", "value", "message"),
+    [
+        ("verdict_custody_ref", SECRET, "verdict_custody_ref must be a well-formed absolute URI"),
+        ("execution_order_rule", SECRET, "execution_order_rule must be exactly"),
+        ("formula_id", SECRET, "formula_id must be exactly"),
+        ("formula_version", SECRET, "formula_version must be a bare positive integer"),
+    ],
+)
+def test_a_hand_written_credential_shaped_field_is_refused_on_read(tmp_path, field, value, message):
+    """Obligation 1: the writer's guard is worthless if the reader does not re-apply it. A
+    hand-written experimental_design.json, re-indexed so every digest agrees, must still be
+    refused \u2014 otherwise index_digest would commit the credential permanently."""
+    out = tmp_path / "bundle"
+    _prepare_calibration(out)
+    payload = json.loads((out / "experimental_design.json").read_text())
+    payload[field] = value
+    (out / "experimental_design.json").write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n")
+    _reindex(out)
+    with pytest.raises(B.PreparedBundleError, match=message):
         B.verify(out, catalog=pf.catalog(), rule_set=pf.rule_set(), advisory=None)
 
 
