@@ -1195,7 +1195,7 @@ def _measure_under_a_drifted_authority(
     init = authority / "__init__.py"
     init.write_text(
         init.read_text(encoding="utf-8").replace(
-            '__version__ = "0.2.0"', '__version__ = "0.3.0"'
+            '__version__ = "0.3.0"', '__version__ = "0.4.0"'
         ),
         encoding="utf-8",
     )
@@ -1359,7 +1359,7 @@ def _verify_under_a_drifted_validity_flag(tmp_path, *, neutralise_guard):
     init = authority / "__init__.py"
     init.write_text(
         init.read_text(encoding="utf-8").replace(
-            '__version__ = "0.2.0"', '__version__ = "0.3.0"'
+            '__version__ = "0.3.0"', '__version__ = "0.4.0"'
         ),
         encoding="utf-8",
     )
@@ -1852,7 +1852,7 @@ def test_the_protocol_separation_holds_under_a_policy_authority_that_renamed_its
         "policy-authority-0.3.0",
         _upstream("ugence_policy_authority"),
         (
-            ("__init__.py", '__version__ = "0.2.0"', '__version__ = "0.3.0"'),
+            ("__init__.py", '__version__ = "0.3.0"', '__version__ = "0.4.0"'),
             (
                 "core/statuses.py",
                 'AUTHORITY_PROTOCOL = "ugence.policy-authority"',
@@ -1895,7 +1895,7 @@ def test_the_digest_domains_stay_apart_under_an_authority_that_adopted_this_ones
         "policy-authority-0.3.0",
         _upstream("ugence_policy_authority"),
         (
-            ("__init__.py", '__version__ = "0.2.0"', '__version__ = "0.3.0"'),
+            ("__init__.py", '__version__ = "0.3.0"', '__version__ = "0.4.0"'),
             (
                 "core/canonical.py",
                 'POLICY_BODY_DIGEST_DOMAIN = "ugence.policy-authority/policy-body/v1"',
@@ -1938,7 +1938,7 @@ def test_the_entitlements_stay_distinct_under_an_authority_that_collapsed_them(t
         "policy-authority-0.3.0",
         _upstream("ugence_policy_authority"),
         (
-            ("__init__.py", '__version__ = "0.2.0"', '__version__ = "0.3.0"'),
+            ("__init__.py", '__version__ = "0.3.0"', '__version__ = "0.4.0"'),
             (
                 "core/statuses.py",
                 '    REVOKE_POLICY = "REVOKE_POLICY"',
