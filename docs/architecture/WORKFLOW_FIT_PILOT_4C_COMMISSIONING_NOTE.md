@@ -2540,14 +2540,14 @@ equality — the check 4B performs at `pipeline.py:263`, which nothing in 4C had
 **Ruling 3, implemented as an inventory assertion `[V]`.** There is no production
 `VerdictCustodyPort` implementation to refuse with, so the test asserts the inventory
 instead: the only implementation in the tree is `InMemoryVerdictCustody`, test-only by
-revision 20 ruling 3.
+revision 20 ruling 3. If a real adapter appears, the test fails and says that D5 must have
+bound its endpoint, ACLs, identities, encryption and retention first. Asserting a refusal the
+package does not raise would have been theatre.
 
 > **Corrected by revision 30 — retained for the record.** "In the tree" overstated the scan,
 > which covers `custody.py`'s namespace only: an adapter defined in a sibling module and never
 > imported there, or a subclass of the double defined elsewhere, is not detected. It is a
-> reminder, not a control, and the test now says so. If a real adapter appears, the test fails and says that D5 must have
-bound its endpoint, ACLs, identities, encryption and retention first. Asserting a refusal the
-package does not raise would have been theatre.
+> reminder, not a control, and the test now says so.
 
 **Two limitations, recorded rather than glossed `[G]`.**
 
@@ -2555,13 +2555,21 @@ package does not raise would have been theatre.
    (`pipeline.py:261`); with no 4C pipeline it lives in test scaffolding, so it constrains
    nothing a future pipeline must do. When the pipeline is built, that check belongs in it —
    and this test should then assert the pipeline performs it, not perform it itself.
-2. **The integration test pins less than it exercises** — and far less than first recorded.
-   Revision 30 re-derived the full matrix against the tightened test: of eight guards it
-   traverses, it detects **one**. Stubbing the calibration branch fails it. Stubbing the F3
-   gate, `revalidate_role`, G2a, G2b, `write_and_verify`'s read-back comparison, slice 3A's
-   provider read-path guard, or slice 3B-0's endpoint check does **not**. Each is pinned by its
-   own unit test; the integration test proves the pieces connect and nothing more. It is not a
-   second line of defence, and revision 29's two-item version of this list understated it.
+2. **The integration test pins less than it exercises.** Stubbing the calibration branch fails
+   it; stubbing the G2b case-set reconciliation or slice 3A's provider read-path guard does
+   **not**. Those are pinned by their own unit tests, and the integration test's job is the
+   wiring — but it should not be mistaken for a second line of defence over the guards it
+   happens to traverse.
+
+> **Corrected by revision 30 — retained for the record.** This two-item list understated the
+> gap. Re-derived against the tightened test: of the eight guards named here and below it
+> detects **one** — the calibration branch. The F3 gate, `revalidate_role`, G2a, G2b,
+> `write_and_verify`'s read-back comparison, slice 3A's provider read-path guard and slice
+> 3B-0's endpoint check are all undetected. The file in fact traverses more than eight —
+> slice 3A's `index_digest` and case-set checks, the endpoint's manifest-digest check, G1b's
+> replay revalidation, `run_phase_4c_pilot` aliased to `run_pilot`, and the canonical-decimal
+> grammar itself — and detects none of those either. The count understates traversal, not
+> detection.
 
 **Status.** G3 remains open by ruling and by construction. D1–D5 remain incomplete, the
 custody endpoint remains unbound, real custody adapters and genuine execution remain blocked,
@@ -2575,7 +2583,10 @@ of what the test pins was understated. The reviewer's summary is worth recording
 substance: the blocking problem was the note, not the code — in the revision whose stated
 purpose was to be narrower and more honest than a pipeline.
 
-**Corrections `[V]`.** The four claims are annotated in place above; the test is tightened:
+**Corrections `[V]`.** All four claims are annotated in place above — including limitation 2,
+which revision 30 first *replaced* rather than annotated, inconsistent with the revision-19
+form and with this sentence; the original text is restored with the re-derivation beneath it.
+The test is tightened:
 
 1. **The loader now recomputes.** It reads only `case_id`, `query` and `context` — the case
    file no longer carries a digest column at all — and recomputes each digest from content
@@ -2594,9 +2605,11 @@ written it.** `contracts/calibration.py`'s module docstring already obliges slic
 the canonical rendering of the reachable `QualityResult.value`". **No production function
 performs that rendering.** The runner produces `"1.0"`; revision 16's canonical grammar forbids
 a trailing fractional zero, so `CalibrationResult(statistic_value="1.0")` raises
-`DECIMAL_UNPARSEABLE`. There is therefore **no path from a real run to a `CalibrationResult`**
-without the caller writing their own canonicaliser — precisely the per-caller reimplementation
-the canonical-decimal ruling exists to prevent. The test contains a local one, clearly labelled
+`DECIMAL_UNPARSEABLE`. The runner therefore does **not guarantee** a canonical rendering: a run
+whose mean is already canonical (`0.75`, `1`) constructs a `CalibrationResult` directly, while
+one whose scorer carries a trailing zero — as the pilot fixture's `Decimal("1.0")` does —
+cannot. No path works for *all* runs without the caller writing their own canonicaliser, which
+is precisely the per-caller reimplementation the canonical-decimal ruling exists to prevent. The test contains a local one, clearly labelled
 as exposing the gap rather than filling it. **Closing this needs a governed canonicaliser in
 the pilot package, and is not commissioned here.**
 
@@ -2610,3 +2623,25 @@ one file; it is not a safety net, and revision 29 implied more.
 rendering gap above is **new and carried forward**. D1–D5 remain incomplete, the custody
 endpoint remains unbound, real custody adapters and genuine execution remain blocked, and no
 provider call, credential access or genuine calibration is permitted by this revision.
+
+**Second-review corrections, recorded `[V]`.** A re-review of revision 30 returned
+CONDITIONALLY APPROVED and found three note-level slips, all closed above: the
+canonical-rendering paragraph overstated ("no path from a real run" — a run whose mean is
+already canonical constructs directly); the ruling-3 annotation was inserted mid-paragraph,
+splitting revision 29's closing sentences so they read as part of the annotation; and
+limitation 2 was replaced rather than annotated while this revision claimed otherwise.
+
+It also confirmed two things worth recording because they were reasoned about rather than
+measured: `format(Decimal, "f")` never emits an exponent, and the test-local canonicaliser is
+accepted by `require_canonical_decimal` for every probed value including `1E+30`, a 31-place
+fraction, `-0.0` and `0.50`. And it settled the standing question — **keep the file**: tests 1
+and 4 now form the only executed 3A → gated run → result → endpoint chain in the repository,
+and building it surfaced the canonical-rendering defect, which is the strongest case a
+cross-slice test can make for itself.
+
+One gap it disclosed that this revision had not: the recomputed case-digest scheme agrees with
+the prepared benchmark **by construction of the pilot fixtures**, not by a governed rule.
+`BenchmarkManifest` constrains `case_digests` only to sorted unique 64-hex, and 4B's scheme
+additionally binds the expected-answer digest. A future Phase 4C pipeline needs a **governed
+case-digest scheme**; that is pre-existing and is now carried forward alongside G3 and the
+canonical-rendering gap.
