@@ -21,10 +21,15 @@ Each cycle:
 
 The orchestrator is the production counterpart to ShadowRunner:
   - ShadowRunner: observe-only, compares controller vs HPA
-  - Orchestrator: full lifecycle, creates recommendations, executes on approval
+  - Orchestrator: full lifecycle, creates recommendations, records approvals
 
-Human approval is still required for execution by default. Set
-auto_approve_threshold to enable autonomous scaling at high confidence.
+Nothing this loop does mutates infrastructure
+(ADR_CLOUD_SCALING_OPERATIONS_ORCHESTRATOR_CONTAINMENT_SCOPING): approval — manual
+or by ``auto_approve_threshold`` — records a decision and returns the recommendation
+with no execution result. The recommendation engine refuses a non-DRY_RUN actuator at
+construction, so no path from this loop reaches the Kubernetes API. Live scaling is
+dispatched only through the governed ladder into ``ControlledScalingExecutor`` with an
+external ``ExecutionAuthorization``.
 """
 
 import time
@@ -99,6 +104,10 @@ class OrchestratorConfig:
 _CONFIDENCE_ORDER = {"none": 0, "low": 1, "medium": 2, "high": 3}
 
 
+class AutoApprovalRefused(RuntimeError):
+    """auto_approve_threshold was combined with a non-dry-run actuator."""
+
+
 @dataclass
 class OrchestrationCycleResult:
     """Result of one full orchestration cycle (L0→L7)."""
@@ -112,7 +121,7 @@ class OrchestrationCycleResult:
     # L4: Recommendation result
     recommend: Optional[RecommendCycleResult] = None
 
-    # L5: Execution (if auto-approved)
+    # L5: Approval (if auto-approved). Recorded only — nothing executes.
     auto_approved: bool = False
     approved_recommendation: Optional[Recommendation] = None
 
@@ -145,7 +154,7 @@ class ProductionOrchestrator:
     Usage — auto-approve high-confidence:
         config = OrchestratorConfig(auto_approve_threshold="high")
         orch = ProductionOrchestrator(config)
-        orch.run()  # Automatically executes high-confidence recommendations
+        orch.run()  # Automatically records approval of high-confidence recommendations
     """
 
     def __init__(
@@ -160,13 +169,15 @@ class ProductionOrchestrator:
         # ever drive a non-mutating (dry-run) actuator. A live actuator combined with
         # auto-approval is refused at construction. Authorized live mutation must go
         # through ControlledScalingExecutor with an external ExecutionAuthorization.
+        # Since the containment ruling this is the second line: RecommendEngine itself
+        # refuses any non-DRY_RUN actuator, auto-approved or not.
         if self.config.auto_approve_threshold is not None:
             rec_cfg = getattr(self.config, "recommend", None)
             act_cfg = getattr(rec_cfg, "actuator", None) if rec_cfg is not None else None
             if act_cfg is not None:
                 from ugence_cloud_scaling_operations.action.k8s_actuator import ActuatorMode
                 if getattr(act_cfg, "mode", None) != ActuatorMode.DRY_RUN:
-                    raise RuntimeError(
+                    raise AutoApprovalRefused(
                         "auto_approve_threshold may not drive a live actuator: an "
                         "auto-approved recommendation cannot authorize its own mutation. "
                         "Use ControlledScalingExecutor with an external "
@@ -339,13 +350,8 @@ class ProductionOrchestrator:
             cycle_duration=duration,
         )
 
-        # Export execution/rollback/feedback events
-        if auto_approved and approved_rec is not None:
-            exec_result = approved_rec.execution_result
-            if exec_result is not None:
-                self.exporter.record_execution(exec_result.success)
-                self.otel_exporter.record_execution(exec_result.success)
-
+        # Export rollback/feedback events. Approval carries no execution result
+        # (containment ruling, D-3), so there is no execution event to export here.
         for rv in rollback_verdicts:
             if hasattr(rv, 'verdict') and rv.verdict.value in ("degraded", "rolled_back"):
                 self.exporter.record_rollback()
@@ -450,10 +456,11 @@ class ProductionOrchestrator:
         by: str = "",
         reason: str = "",
     ) -> Optional[Recommendation]:
-        """Approve a pending recommendation for execution.
+        """Approve a pending recommendation. Nothing is executed.
 
-        Delegates to the recommend engine's approve flow:
-        Policy check → Actuator → Rollback watch → Outcome tracking.
+        Delegates to the recommend engine, which records the decision and returns
+        the recommendation with ``execution_result`` left ``None`` (containment
+        ruling, D-3). Execution is the governed ladder's, never this loop's.
         """
         return self.recommend_engine.approve(recommendation_id, by=by, reason=reason)
 

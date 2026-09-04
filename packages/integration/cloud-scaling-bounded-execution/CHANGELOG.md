@@ -1,5 +1,11 @@
 # Changelog — ugence-cloud-scaling-bounded-execution
 
+## Unreleased
+
+- Pin raised to Cloud Scaling Operations `>=0.2.0` (orchestrator containment ruling); the
+  import-boundary test's forbidden operations set gains `action.k8s_actuator`,
+  `action.gate_actuator` and `recommend`. No code change.
+
 ## 0.1.0 — Phase 5D, initial release
 
 - `BoundedExecutionSeam` with production/reference factories: the only path from a

@@ -24,9 +24,13 @@ BANNED_ENVIRONMENT = {"os", "sys", "secrets", "socket", "time", "subprocess", "u
 BANNED_CLOUD = {"boto3", "botocore", "kubernetes", "azure", "google", "oci", "hvac", "requests", "httpx", "aiohttp",
                 "ugence_cloud_scaling_controller", "ugence_trusted_evidence_authority", "ugence_policy_authority",
                 "ugence_action_clearance", "ugence_cloud_scaling_action_admission"}
-#: Operations surfaces this package must never reach: the Kubernetes client, the orchestrator loop and the CLI.
+#: Operations surfaces this package must never reach: the Kubernetes client, the orchestrator loop, the CLI, and
+#: (orchestrator containment ruling, D-4) the recommendation loop's actuators and the recommend pipeline.
 FORBIDDEN_OPS_MODULES = {"ugence_cloud_scaling_operations.k8s_executor", "ugence_cloud_scaling_operations.orchestrator",
-                         "ugence_cloud_scaling_operations.cli", "ugence_cloud_scaling_operations.gate_executor"}
+                         "ugence_cloud_scaling_operations.cli", "ugence_cloud_scaling_operations.gate_executor",
+                         "ugence_cloud_scaling_operations.action.k8s_actuator",
+                         "ugence_cloud_scaling_operations.action.gate_actuator",
+                         "ugence_cloud_scaling_operations.recommend"}
 FORBIDDEN_RA_MODULES = {"risk_authority.crypto.signing", "risk_authority.crypto.keys", "risk_authority.services",
                         "risk_authority.api.dependencies", "risk_authority.persistence", "risk_authority.integrations"}
 FORBIDDEN_CALLS = {"authorize_action", "issue_envelope", "reserve_once", "materialize", "put_receipt", "revoke_receipt",
@@ -84,7 +88,7 @@ def test_declared_dependencies_equal_the_ratified_set():
                         "ugence-cloud-scaling-credential-broker", "ugence-execution-reservation",
                         "ugence-risk-authority-execution-assurance", "ugence-decision-authority",
                         "ugence-governance-contracts", "ugence-cloud-scaling-operations"}
-    assert "ugence-cloud-scaling-operations>=0.1.2" in text
+    assert "ugence-cloud-scaling-operations>=0.2.0" in text
     for sdk in ("boto3", "kubernetes", "azure", "google", "hvac", "requests"):
         assert sdk not in block.lower()
 

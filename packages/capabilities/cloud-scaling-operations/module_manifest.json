@@ -2,7 +2,7 @@
   "module_name": "cloud-scaling-operations",
   "distribution_name": "ugence-cloud-scaling-operations",
   "import_namespace": "ugence_cloud_scaling_operations",
-  "version": "0.1.2",
+  "version": "0.2.0",
   "maturity": "alpha",
   "authority_class": "CONTROLLED_EXECUTION",
   "execution_capability": "INFRASTRUCTURE_MUTATION",
@@ -20,53 +20,104 @@
   ],
   "advisory_dependency_range": ">=0.4.0,<0.5",
   "optional_dependencies": {
-    "kubernetes": ["kubernetes>=26.1.0"],
-    "metrics": ["prometheus-client>=0.16.0"],
-    "otel": ["opentelemetry-api>=1.20.0", "opentelemetry-sdk>=1.20.0", "opentelemetry-exporter-otlp>=1.20.0"],
-    "config": ["PyYAML>=6.0"],
-    "dev": ["pytest>=7.0", "build>=1.0", "pip-audit>=2.6"]
+    "kubernetes": [
+      "kubernetes>=26.1.0"
+    ],
+    "metrics": [
+      "prometheus-client>=0.16.0"
+    ],
+    "otel": [
+      "opentelemetry-api>=1.20.0",
+      "opentelemetry-sdk>=1.20.0",
+      "opentelemetry-exporter-otlp>=1.20.0"
+    ],
+    "config": [
+      "PyYAML>=6.0"
+    ],
+    "dev": [
+      "pytest>=7.0",
+      "build>=1.0",
+      "pip-audit>=2.6"
+    ]
   },
-  "execution_modes": ["dry_run", "simulation", "shadow", "live"],
+  "execution_modes": [
+    "dry_run",
+    "simulation",
+    "shadow",
+    "live"
+  ],
   "mutation_entrypoints": [
     "ugence_cloud_scaling_operations.executors.ControlledScalingExecutor.execute (LIVE)",
     "ugence_cloud_scaling_operations.gate_executor.GateExecutor.sync (LIVE)"
   ],
   "public_api": [
-    "ExecutionAuthorization", "ExecutionRequest", "ExecutionResult", "ExecutionReceipt",
-    "ExecutionDenied", "ExecutionIntegrityError", "ExecutionMode",
-    "ControlledScalingExecutor", "KubernetesScalingExecutor", "GateExecutor",
-    "RollbackCoordinator", "ReadinessEvaluator", "OutcomeRecorder",
-    "OperationsConfig", "TargetPolicy", "AuthorityVerifier", "IdempotencyStore",
-    "AuditSink", "__version__"
+    "ExecutionAuthorization",
+    "ExecutionRequest",
+    "ExecutionResult",
+    "ExecutionReceipt",
+    "ExecutionDenied",
+    "ExecutionIntegrityError",
+    "ExecutionMode",
+    "ControlledScalingExecutor",
+    "KubernetesScalingExecutor",
+    "GateExecutor",
+    "RollbackCoordinator",
+    "ReadinessEvaluator",
+    "OutcomeRecorder",
+    "OperationsConfig",
+    "TargetPolicy",
+    "AuthorityVerifier",
+    "IdempotencyStore",
+    "AuditSink",
+    "__version__"
   ],
   "authority_model": {
     "state_transitions": [
-      "ADVISORY_RECOMMENDATION", "POLICY_AND_SAFETY_EVALUATION",
-      "HUMAN_OR_EXTERNAL_GOVERNANCE_APPROVAL", "EXECUTION_AUTHORIZATION",
-      "READINESS_CHECK", "CONTROLLED_EXECUTION", "OUTCOME_AND_AUDIT"
+      "ADVISORY_RECOMMENDATION",
+      "POLICY_AND_SAFETY_EVALUATION",
+      "HUMAN_OR_EXTERNAL_GOVERNANCE_APPROVAL",
+      "EXECUTION_AUTHORIZATION",
+      "READINESS_CHECK",
+      "CONTROLLED_EXECUTION",
+      "OUTCOME_AND_AUDIT"
     ],
     "prohibited_paths": [
       "recommendation -> direct actuator call",
       "confidence threshold -> automatic mutation",
       "internal auto-approval -> production execution",
+      "manual approval -> actuator call",
+      "rollback monitor -> unattended revert",
       "webhook receipt -> mutation without authorization",
       "orchestrator tick -> mutation without authorization"
     ],
-    "auto_approval_disposition": "auto_approve_threshold is refused when it would drive a non-dry-run actuator (hard runtime guard in the orchestrator); the supported live path (ControlledScalingExecutor) requires a separate external ExecutionAuthorization."
+    "auto_approval_disposition": "auto_approve_threshold records an approval and executes nothing. RecommendEngine refuses any non-DRY_RUN ActuatorConfig at construction (whichever loop builds it) and RollbackMonitor refuses a rollback function not declared non-mutating; the orchestrator's own guard remains as a second line. The supported live path (ControlledScalingExecutor) requires a separate external ExecutionAuthorization and is reached only through the governed ladder (ADR_CLOUD_SCALING_OPERATIONS_ORCHESTRATOR_CONTAINMENT_SCOPING).",
+    "approval_disposition": "ProductionOrchestrator.approve and RecommendEngine.approve are non-mutating: they record the decision and return the recommendation with execution_result None. No policy check, actuator call, rollback watch or outcome record follows.",
+    "actuator_disposition": "K8sActuator takes an injected client or none and loads no kubeconfig or in-cluster configuration; GateActuator has one mode (dry_run), no ArgoCD URL and no bearer token. ArgoCD access lives only with the authority-gated GateExecutor."
   },
   "legacy_imports": {
     "monorepo_only": [
       "cloud_scaling_operations.*",
-      "cloud_controller.action.*", "cloud_controller.orchestrator", "cloud_controller.main",
-      "cloud_controller.recommend.engine", "cloud_controller.recommend.approval",
+      "cloud_controller.action.*",
+      "cloud_controller.orchestrator",
+      "cloud_controller.main",
+      "cloud_controller.recommend.engine",
+      "cloud_controller.recommend.approval",
       "cloud_controller.recommend.webhook",
-      "symbolu.cloud_controller.action.*", "symbolu.cloud_controller.orchestrator"
+      "symbolu.cloud_controller.action.*",
+      "symbolu.cloud_controller.orchestrator"
     ],
     "note": "Legacy operational namespaces are monorepo-only compatibility surfaces (object identity preserved); not part of the distributed wheel and not a stable API."
   },
   "forbidden_core_dependencies": [
-    "kubernetes", "boto3", "botocore", "azure", "google-cloud",
-    "prometheus-client", "opentelemetry-sdk", "fastapi", "uvicorn"
+    "kubernetes",
+    "boto3",
+    "botocore",
+    "azure",
+    "google-cloud",
+    "prometheus-client",
+    "opentelemetry-sdk",
+    "fastapi",
+    "uvicorn"
   ],
   "reference_store_limitations": "InMemoryIdempotencyStore and InMemoryAuditSink are process-local reference implementations; they are NOT durable and NOT sufficient for multi-process production deployment.",
   "known_limitations": [
@@ -74,7 +125,8 @@
     "Dry-run is default; LIVE requires external authorization, target allowlists, credentials, readiness, audit sink, and idempotency storage.",
     "In-memory idempotency/audit stores are not production-durable; exactly-once across distributed processes is NOT guaranteed.",
     "Not live-cluster validated; not production certified. No cost/reliability/safety claim established by packaging tests.",
-    "Kubernetes/ArgoCD/webhook/metrics/OTLP integrations may require optional extras or injected clients."
+    "Kubernetes/ArgoCD/webhook/metrics/OTLP integrations may require optional extras or injected clients.",
+    "The orchestrator's approved recommendations are recorded only; the handoff into the governed ladder (5A candidate) is not built in this package."
   ],
   "provenance_policy": "Build revision generated at build/verification time from GITHUB_SHA or `git rev-parse HEAD` into artifacts/build_provenance.json (CI-generated). No self-referential commit SHA is stored here.",
   "source_baseline_commit": "379a6366894fd2eead9460c29f4865fb1c3990de"

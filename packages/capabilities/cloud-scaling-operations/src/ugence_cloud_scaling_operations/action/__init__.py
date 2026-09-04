@@ -1,8 +1,9 @@
 """Action layer — actuators, policy, rollback, readiness, outcome tracking.
 
 Modules:
-  - K8sActuator: Scales deployments via K8s API (replica patch or HPA metric)
-  - GateActuator: Controls deployment gates via ArgoCD or admission webhooks
+  - K8sActuator: Reference scaling actuator over an injected client; dry-run by
+    default, refused by the recommendation engine in any mutating mode
+  - GateActuator: Dry-run recorder of deployment-gate decisions (no ArgoCD access)
   - PolicyEngine: Customer-configurable safety limits (max replicas, blackout windows)
   - RollbackMonitor: Auto-reverts scaling if metrics degrade post-action
   - ReadinessChecker: Exposes system readiness for ArgoCD pre-hooks
@@ -23,6 +24,7 @@ from ugence_cloud_scaling_operations.action.gate_actuator import (
     GateActuator,
 )
 from ugence_cloud_scaling_operations.action.rollback import (
+    MutatingRollbackRefused,
     RollbackConfig,
     RollbackMonitor,
     RollbackVerdict,
@@ -68,6 +70,7 @@ __all__ = [
     "GateResult",
     "GateActuator",
     # Rollback
+    "MutatingRollbackRefused",
     "RollbackConfig",
     "RollbackMonitor",
     "RollbackVerdict",

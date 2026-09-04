@@ -238,14 +238,18 @@ jobs:
               f"baselines={report['baselines']}"
           )
           problems = []
-          if report["baselines"] != {"1": 157}:
+          # Re-measured for 0.2.0 (orchestrator containment ruling): the suite grew to
+          # 179 with tests/boundaries/test_orchestrator_containment.py, and the three
+          # containment guards (engine, rollback monitor, service entrypoint) raise the
+          # inventory to 58 and the killed count to 54.
+          if report["baselines"] != {"1": 179}:
               problems.append(
-                  f"baseline collected {report['baselines']}, expected {{'1': 157}}"
+                  f"baseline collected {report['baselines']}, expected {{'1': 179}}"
               )
-          if report["inventory_total"] != 55:
-              problems.append(f"inventory is {report['inventory_total']}, not 55")
-          if len(report["killed"]) != 51:
-              problems.append(f"{len(report['killed'])} sites killed, not 51")
+          if report["inventory_total"] != 58:
+              problems.append(f"inventory is {report['inventory_total']}, not 58")
+          if len(report["killed"]) != 54:
+              problems.append(f"{len(report['killed'])} sites killed, not 54")
           if report["message_only_kills"]:
               problems.append(
                   f"message-only kills: {report['message_only_kills']}; the extension "
@@ -253,9 +257,9 @@ jobs:
               )
           expected = [
               "cli.py:229",
-              "main.py:279",
-              "main.py:336",
-              "main.py:337",
+              "main.py:282",
+              "main.py:339",
+              "main.py:340",
           ]
           if excluded != expected:
               problems.append(f"excluded sites are {excluded}, not {expected}")

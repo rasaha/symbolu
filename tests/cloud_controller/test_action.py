@@ -1,14 +1,16 @@
 """Unit tests for Stage 5 — Action Layer (K8s Actuator + Gate Actuator).
 
 Tests cover:
-- K8sActuator: dry_run, scale_patch (mocked), history, retry logic
-- GateActuator: dry_run, ArgoCD sync (mocked), admission policy
-- Engine integration: approve() triggers actuator execution
+- K8sActuator: dry_run, scale_patch through an injected client only, history, retries
+- GateActuator: dry_run, its one mode; no ArgoCD access, no token
+- Engine integration: approve() records the decision and executes nothing; a
+  mutating actuator is refused at engine construction
+  (ADR_CLOUD_SCALING_OPERATIONS_ORCHESTRATOR_CONTAINMENT_SCOPING)
 """
 
 import time
 import pytest
-from unittest.mock import MagicMock, patch, PropertyMock
+from unittest.mock import MagicMock
 
 from symbolu.cloud_controller.action.k8s_actuator import (
     ActuatorConfig,
@@ -155,26 +157,23 @@ class TestK8sActuatorHistory:
         assert len(actuator.history) == 5
 
     def test_reset_clears_state(self):
-        """Reset should clear history and client state."""
+        """Reset should clear history."""
         actuator = K8sActuator()
         actuator.scale("svc", "ns", 5, 7)
         assert len(actuator.history) == 1
         actuator.reset()
         assert len(actuator.history) == 0
-        assert actuator._initialized is False
 
 
 # ============================================================
-# K8s Actuator — Scale Patch (mocked K8s client)
+# K8s Actuator — Scale Patch (injected client only)
 # ============================================================
 
 class TestK8sActuatorScalePatch:
     def test_scale_patch_success(self):
-        """Successful K8s API call should return success."""
-        actuator = K8sActuator(ActuatorConfig(mode=ActuatorMode.SCALE_PATCH))
+        """A successful call through the injected client returns success."""
         mock_api = MagicMock()
-        actuator._apps_api = mock_api
-        actuator._initialized = True
+        actuator = K8sActuator(ActuatorConfig(mode=ActuatorMode.SCALE_PATCH), apps_api=mock_api)
 
         result = actuator.scale("api-gw", "prod", 5, 7)
         assert result.success is True
@@ -189,15 +188,13 @@ class TestK8sActuatorScalePatch:
             max_retries=2,
             retry_delay_seconds=0.01,  # Fast for tests
         )
-        actuator = K8sActuator(config)
         mock_api = MagicMock()
         # Fail first, succeed second
         mock_api.patch_namespaced_deployment_scale.side_effect = [
             ConnectionError("timeout"),
             None,  # success
         ]
-        actuator._apps_api = mock_api
-        actuator._initialized = True
+        actuator = K8sActuator(config, apps_api=mock_api)
 
         result = actuator.scale("api-gw", "prod", 5, 7)
         assert result.success is True
@@ -210,26 +207,33 @@ class TestK8sActuatorScalePatch:
             max_retries=1,
             retry_delay_seconds=0.01,
         )
-        actuator = K8sActuator(config)
         mock_api = MagicMock()
         mock_api.patch_namespaced_deployment_scale.side_effect = ConnectionError("down")
-        actuator._apps_api = mock_api
-        actuator._initialized = True
+        actuator = K8sActuator(config, apps_api=mock_api)
 
         result = actuator.scale("api-gw", "prod", 5, 7)
         assert result.success is False
         assert "Failed after" in result.error
         assert result.retries == 1
 
-    def test_scale_patch_no_client_fails(self):
-        """Should fail gracefully when K8s client unavailable."""
+    def test_scale_patch_without_injected_client_fails_closed(self):
+        """No client is ever discovered: without one, scale_patch fails closed."""
         actuator = K8sActuator(ActuatorConfig(mode=ActuatorMode.SCALE_PATCH))
-        actuator._initialized = True
-        actuator._apps_api = None
+        assert actuator.has_client is False
 
         result = actuator.scale("api-gw", "prod", 5, 7)
         assert result.success is False
-        assert "not available" in result.error
+        assert "injected" in result.error
+
+    def test_actuator_config_refuses_credential_discovery_fields(self):
+        """kubeconfig_path / context no longer exist: the actuator discovers nothing."""
+        for field in ("kubeconfig_path", "context"):
+            with pytest.raises(TypeError):
+                ActuatorConfig(**{field: "anything"})
+
+    def test_mutates_reflects_mode(self):
+        assert K8sActuator().mutates is False
+        assert K8sActuator(ActuatorConfig(mode=ActuatorMode.SCALE_PATCH)).mutates is True
 
 
 # ============================================================
@@ -325,86 +329,25 @@ class TestGateActuatorHistory:
 
 
 # ============================================================
-# Gate Actuator — ArgoCD Sync
+# Gate Actuator — one mode, no ArgoCD access, no token
 # ============================================================
 
-class TestGateActuatorArgoCD:
-    def test_argocd_no_url_fails(self):
-        """ArgoCD mode without URL should fail."""
-        gate = GateActuator(GateConfig(mode=GateMode.ARGOCD_SYNC))
-        result = gate.execute(GateAction.SYNC, "app", "ns")
-        assert result.success is False
-        assert "URL not configured" in result.error
+class TestGateActuatorContainment:
+    def test_dry_run_is_the_only_mode(self):
+        assert set(GateMode) == {GateMode.DRY_RUN}
 
-    def test_argocd_hold_succeeds(self):
-        """HOLD action in ArgoCD mode should succeed (no API call)."""
-        gate = GateActuator(GateConfig(
-            mode=GateMode.ARGOCD_SYNC,
-            argocd_url="https://argocd.test:8080",
-        ))
-        result = gate.execute(GateAction.HOLD, "app", "ns")
-        assert result.success is True
-        assert result.action == "hold"
+    def test_config_has_no_url_token_or_tls_switch(self):
+        for field in ("argocd_url", "argocd_token", "argocd_insecure"):
+            with pytest.raises(TypeError):
+                GateConfig(**{field: "anything"})
 
-    def test_argocd_allow_succeeds(self):
-        """ALLOW action in ArgoCD mode should succeed (no API call)."""
-        gate = GateActuator(GateConfig(
-            mode=GateMode.ARGOCD_SYNC,
-            argocd_url="https://argocd.test:8080",
-        ))
-        result = gate.execute(GateAction.ALLOW, "app", "ns")
-        assert result.success is True
-        assert result.action == "allow"
-
-    @patch("urllib.request.urlopen")
-    def test_argocd_sync_success(self, mock_urlopen):
-        """Successful ArgoCD sync API call."""
-        mock_urlopen.return_value = MagicMock()
-        gate = GateActuator(GateConfig(
-            mode=GateMode.ARGOCD_SYNC,
-            argocd_url="https://argocd.test:8080",
-            argocd_token="test-token",
-        ))
+    def test_sync_is_recorded_never_transmitted(self):
+        gate = GateActuator(GateConfig(mode=GateMode.DRY_RUN))
+        assert gate.mutates is False
         result = gate.execute(GateAction.SYNC, "my-app", "prod")
         assert result.success is True
+        assert result.mode == "dry_run"
         assert result.action == "sync"
-        mock_urlopen.assert_called_once()
-
-    @patch("urllib.request.urlopen")
-    def test_argocd_sync_retry(self, mock_urlopen):
-        """Should retry on ArgoCD API failure."""
-        mock_urlopen.side_effect = [
-            ConnectionError("timeout"),
-            MagicMock(),  # success on retry
-        ]
-        gate = GateActuator(GateConfig(
-            mode=GateMode.ARGOCD_SYNC,
-            argocd_url="https://argocd.test:8080",
-            argocd_token="test-token",
-            retry_delay_seconds=0.01,
-        ))
-        result = gate.execute(GateAction.SYNC, "my-app", "prod")
-        assert result.success is True
-        assert result.retries == 1
-
-
-# ============================================================
-# Gate Actuator — Admission Webhook
-# ============================================================
-
-class TestGateActuatorAdmission:
-    def test_admission_policy_allow(self):
-        gate = GateActuator(GateConfig(mode=GateMode.ADMISSION_WEBHOOK))
-        result = gate.execute(GateAction.ALLOW, "app", "ns")
-        assert result.success is True
-        assert result.mode == "admission_webhook"
-        assert result.action == "allow"
-
-    def test_admission_policy_hold(self):
-        gate = GateActuator(GateConfig(mode=GateMode.ADMISSION_WEBHOOK))
-        result = gate.execute(GateAction.HOLD, "app", "ns")
-        assert result.success is True
-        assert result.action == "hold"
 
 
 # ============================================================
@@ -438,20 +381,25 @@ class TestActionExports:
 
 
 # ============================================================
-# Engine Integration — approve() triggers actuator
+# Engine Integration — approve() records, never executes
 # ============================================================
 
 class TestEngineActuatorIntegration:
-    def test_approve_without_actuator(self):
-        """Without actuator config, approve() should not execute."""
-        engine = RecommendEngine(RecommendConfig(
+    def _engine(self, **overrides):
+        cfg = dict(
             service="api-gw",
             namespace="prod",
             confidence=ConfidenceConfig(
                 action_threshold=0.1,
                 coherence_threshold=0.1,
             ),
-        ))
+        )
+        cfg.update(overrides)
+        return RecommendEngine(RecommendConfig(**cfg))
+
+    def test_approve_without_actuator(self):
+        """Without actuator config, approve() records and executes nothing."""
+        engine = self._engine()
         action = _make_action(delta=2, score=0.8, coherence=0.9)
         cycle = engine.evaluate(action, current_replicas=5)
         assert cycle.recommendation is not None
@@ -460,77 +408,35 @@ class TestEngineActuatorIntegration:
         assert rec is not None
         assert rec.execution_result is None
 
-    def test_approve_with_dry_run_actuator(self):
-        """With dry_run actuator, approve() should execute and record result."""
-        engine = RecommendEngine(RecommendConfig(
-            service="api-gw",
-            namespace="prod",
-            confidence=ConfidenceConfig(
-                action_threshold=0.1,
-                coherence_threshold=0.1,
-            ),
-            actuator=ActuatorConfig(mode=ActuatorMode.DRY_RUN),
-        ))
+    def test_approve_with_dry_run_actuator_executes_nothing(self):
+        """A DRY_RUN actuator is accepted, and approve() still does not call it."""
+        engine = self._engine(actuator=ActuatorConfig(mode=ActuatorMode.DRY_RUN))
         action = _make_action(delta=2, score=0.8, coherence=0.9)
         cycle = engine.evaluate(action, current_replicas=5)
         assert cycle.recommendation is not None
 
         rec = engine.approve(cycle.recommendation.id, by="ops-team")
         assert rec is not None
-        assert rec.execution_result is not None
-        assert rec.execution_result.success is True
-        assert rec.execution_result.mode == "dry_run"
-        assert rec.execution_result.deployment == "api-gw"
-        assert rec.execution_result.target_replicas == 7  # 5 + 2
+        assert rec.execution_result is None
+        assert engine.actuator.history == []
 
-    def test_approve_with_scale_patch_actuator(self):
-        """With scale_patch actuator (mocked), approve triggers K8s API call."""
-        engine = RecommendEngine(RecommendConfig(
-            service="api-gw",
-            namespace="prod",
-            confidence=ConfidenceConfig(
-                action_threshold=0.1,
-                coherence_threshold=0.1,
-            ),
-            actuator=ActuatorConfig(mode=ActuatorMode.SCALE_PATCH),
-        ))
-        # Mock the K8s client
-        mock_api = MagicMock()
-        engine.actuator._apps_api = mock_api
-        engine.actuator._initialized = True
+    def test_scale_patch_actuator_is_refused_at_engine_construction(self):
+        """A mutating actuator cannot be held by the engine at all (D-1)."""
+        with pytest.raises(RuntimeError):
+            self._engine(actuator=ActuatorConfig(mode=ActuatorMode.SCALE_PATCH))
 
-        action = _make_action(delta=2, score=0.8, coherence=0.9)
-        cycle = engine.evaluate(action, current_replicas=5)
-        assert cycle.recommendation is not None
-
-        rec = engine.approve(cycle.recommendation.id, by="ops-team")
-        assert rec is not None
-        assert rec.execution_result is not None
-        assert rec.execution_result.success is True
-        assert rec.execution_result.mode == "scale_patch"
-        mock_api.patch_namespaced_deployment_scale.assert_called_once()
+    def test_hpa_metric_actuator_is_refused_at_engine_construction(self):
+        with pytest.raises(RuntimeError):
+            self._engine(actuator=ActuatorConfig(mode=ActuatorMode.HPA_METRIC))
 
     def test_engine_reset_clears_actuator(self):
-        """Engine reset should also reset actuator history and client state."""
-        engine = RecommendEngine(RecommendConfig(
-            service="api-gw",
-            namespace="prod",
-            confidence=ConfidenceConfig(
-                action_threshold=0.1,
-                coherence_threshold=0.1,
-            ),
-            actuator=ActuatorConfig(mode=ActuatorMode.DRY_RUN),
-        ))
-        # Execute a scaling action
-        action = _make_action(delta=2, score=0.8, coherence=0.9)
-        cycle = engine.evaluate(action, current_replicas=5)
-        engine.approve(cycle.recommendation.id, by="test")
+        """Engine reset should also reset actuator history."""
+        engine = self._engine(actuator=ActuatorConfig(mode=ActuatorMode.DRY_RUN))
+        engine.actuator.scale("api-gw", "prod", 5, 7)  # a direct dry-run proposal
         assert len(engine.actuator.history) == 1
 
-        # Reset should clear actuator history
         engine.reset()
         assert len(engine.actuator.history) == 0
-        assert engine.actuator._initialized is False
 
     def test_engine_reset_without_actuator(self):
         """Engine reset should work fine when no actuator configured."""
@@ -538,29 +444,14 @@ class TestEngineActuatorIntegration:
         engine.reset()  # Should not raise
         assert engine.actuator is None
 
-    def test_approve_cooldown_regardless_of_execution(self):
-        """Cooldown should start even if actuator execution fails."""
-        engine = RecommendEngine(RecommendConfig(
-            service="api-gw",
-            namespace="prod",
-            confidence=ConfidenceConfig(
-                action_threshold=0.1,
-                coherence_threshold=0.1,
-            ),
-            actuator=ActuatorConfig(mode=ActuatorMode.SCALE_PATCH),
-        ))
-        # Force actuator to fail
-        engine.actuator._initialized = True
-        engine.actuator._apps_api = None
-
+    def test_approve_starts_cooldown_without_executing(self):
+        """Cooldown starts on approval, so the same signal is not re-approved in a burst."""
+        engine = self._engine(actuator=ActuatorConfig(mode=ActuatorMode.DRY_RUN))
         action = _make_action(delta=2, score=0.8, coherence=0.9)
         cycle = engine.evaluate(action, current_replicas=5)
         assert cycle.recommendation is not None
 
         rec = engine.approve(cycle.recommendation.id, by="ops-team")
         assert rec is not None
-        assert rec.execution_result is not None
-        assert rec.execution_result.success is False
-
-        # Cooldown should still be active
+        assert rec.execution_result is None
         assert engine.safety.last_action_time is not None

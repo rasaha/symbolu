@@ -1,10 +1,10 @@
 {
   "package": "operations",
-  "total": 55,
+  "total": 58,
   "reconciliation": {},
   "excluded": {
     "except_arms": 2,
-    "boolean_subterms": 13
+    "boolean_subterms": 15
   },
   "guards": [
     {
@@ -449,9 +449,9 @@
     },
     {
       "index": 45,
-      "module": "orchestrator.py",
-      "line": 163,
-      "condition": "self.config.auto_approve_threshold is not None",
+      "module": "action/rollback.py",
+      "line": 143,
+      "condition": "rollback_fn is not None and (not _declared_non_mutating(rollback_fn))",
       "kind": "if",
       "shape": "raise",
       "recorded_in": "",
@@ -460,8 +460,8 @@
     {
       "index": 46,
       "module": "orchestrator.py",
-      "line": 166,
-      "condition": "act_cfg is not None",
+      "line": 174,
+      "condition": "self.config.auto_approve_threshold is not None",
       "kind": "if",
       "shape": "raise",
       "recorded_in": "",
@@ -470,8 +470,8 @@
     {
       "index": 47,
       "module": "orchestrator.py",
-      "line": 168,
-      "condition": "getattr(act_cfg, 'mode', None) != ActuatorMode.DRY_RUN",
+      "line": 177,
+      "condition": "act_cfg is not None",
       "kind": "if",
       "shape": "raise",
       "recorded_in": "",
@@ -480,8 +480,8 @@
     {
       "index": 48,
       "module": "orchestrator.py",
-      "line": 429,
-      "condition": "self._running or (self._thread is not None and self._thread.is_alive())",
+      "line": 179,
+      "condition": "getattr(act_cfg, 'mode', None) != ActuatorMode.DRY_RUN",
       "kind": "if",
       "shape": "raise",
       "recorded_in": "",
@@ -489,6 +489,26 @@
     },
     {
       "index": 49,
+      "module": "orchestrator.py",
+      "line": 435,
+      "condition": "self._running or (self._thread is not None and self._thread.is_alive())",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 50,
+      "module": "recommend/engine.py",
+      "line": 170,
+      "condition": "actuator_config is not None and actuator_config.mode is not ActuatorMode.DRY_RUN",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 51,
       "module": "recommend/webhook.py",
       "line": 47,
       "condition": "self.min_confidence not in VALID_CONFIDENCE_LEVELS",
@@ -498,7 +518,7 @@
       "outcome": ""
     },
     {
-      "index": 50,
+      "index": 52,
       "module": "shadow/runner.py",
       "line": 209,
       "condition": "self._running or (self._thread is not None and self._thread.is_alive())",
@@ -508,7 +528,7 @@
       "outcome": ""
     },
     {
-      "index": 51,
+      "index": 53,
       "module": "observability/metrics_server.py",
       "line": 112,
       "condition": "self._httpd is not None",
@@ -518,7 +538,7 @@
       "outcome": ""
     },
     {
-      "index": 52,
+      "index": 54,
       "module": "cli.py",
       "line": 229,
       "condition": "__name__ == '__main__'",
@@ -528,9 +548,19 @@
       "outcome": ""
     },
     {
-      "index": 53,
+      "index": 55,
       "module": "main.py",
-      "line": 279,
+      "line": 162,
+      "condition": "mode_str != 'dry_run'",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 56,
+      "module": "main.py",
+      "line": 282,
       "condition": "args.config",
       "kind": "if",
       "shape": "raising-helper call",
@@ -538,9 +568,9 @@
       "outcome": ""
     },
     {
-      "index": 54,
+      "index": 57,
       "module": "main.py",
-      "line": 336,
+      "line": 339,
       "condition": "__name__ == '__main__'",
       "kind": "if",
       "shape": "raising-helper call",
@@ -548,9 +578,9 @@
       "outcome": ""
     },
     {
-      "index": 55,
+      "index": 58,
       "module": "main.py",
-      "line": 337,
+      "line": 340,
       "condition": "main()",
       "kind": "helper-admission",
       "shape": "helper-admission call",

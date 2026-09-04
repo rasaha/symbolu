@@ -36,7 +36,7 @@ dependencies = [
     "ugence-risk-authority-execution-assurance>=0.1.0",
     "ugence-decision-authority>=1.0.0",
     "ugence-governance-contracts>=0.4.0",
-    "ugence-cloud-scaling-operations>=0.1.2",
+    "ugence-cloud-scaling-operations>=0.2.0",
 ]
 
 [project.optional-dependencies]

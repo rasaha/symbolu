@@ -1,5 +1,6 @@
 {
   "authority_class": "CONTROLLED_EXECUTION",
+  "auto_approval_disposition": "records an approval only; nothing executes (containment ruling D-3)",
   "auto_approval_present_in": [
     "cloud_scaling_operations/orchestrator.py",
     "cloud_scaling_operations/main.py"
@@ -61,12 +62,12 @@
       "third_party_deps": []
     },
     {
-      "authority_note": "mutation entrypoint \u2014 MUST be gated by ExecutionAuthorization in the controlled facade",
-      "credential_requirements": true,
+      "authority_note": "non-mutating dry-run recorder (containment ruling D-2): one mode, no ArgoCD URL, no bearer token",
+      "credential_requirements": false,
       "imported_advisory_interfaces": [],
       "listener_capability": false,
-      "mutation_capability": true,
-      "network_capability": true,
+      "mutation_capability": false,
+      "network_capability": false,
       "packaging_decision": "PACKAGE_INTO_ugence_cloud_scaling_operations",
       "path": "cloud_scaling_operations/action/gate_actuator.py",
       "public_symbols": [
@@ -80,8 +81,8 @@
       "third_party_deps": []
     },
     {
-      "authority_note": "mutation entrypoint \u2014 MUST be gated by ExecutionAuthorization in the controlled facade",
-      "credential_requirements": true,
+      "authority_note": "reference actuator over an injected client only; discovers no credentials and imports no Kubernetes SDK (containment ruling D-2); refused by RecommendEngine in any mode but DRY_RUN (D-1)",
+      "credential_requirements": false,
       "imported_advisory_interfaces": [],
       "listener_capability": false,
       "mutation_capability": true,
@@ -95,9 +96,7 @@
         "K8sActuator"
       ],
       "subprocess_capability": false,
-      "third_party_deps": [
-        "kubernetes"
-      ]
+      "third_party_deps": []
     },
     {
       "authority_note": "non-mutating support/observe",
@@ -155,7 +154,7 @@
       "third_party_deps": []
     },
     {
-      "authority_note": "non-mutating support/observe",
+      "authority_note": "non-mutating: refuses a rollback function not declared non-mutating (containment ruling D-1)",
       "credential_requirements": false,
       "imported_advisory_interfaces": [],
       "listener_capability": false,
@@ -173,7 +172,7 @@
       "third_party_deps": []
     },
     {
-      "authority_note": "non-mutating support/observe",
+      "authority_note": "non-mutating service bootstrap: refuses any actuator.mode but dry_run (containment ruling D-1)",
       "credential_requirements": false,
       "imported_advisory_interfaces": [
         "ugence_cloud_scaling_controller.config",
@@ -267,7 +266,7 @@
       ]
     },
     {
-      "authority_note": "non-mutating support/observe",
+      "authority_note": "non-mutating: approve() and auto-approval record a decision only (containment ruling D-3)",
       "credential_requirements": false,
       "imported_advisory_interfaces": [
         "ugence_cloud_scaling_controller.config",
@@ -326,7 +325,7 @@
       "third_party_deps": []
     },
     {
-      "authority_note": "non-mutating support/observe",
+      "authority_note": "non-mutating: refuses a non-DRY_RUN actuator at construction; approve() records and executes nothing (containment ruling D-1, D-3)",
       "credential_requirements": false,
       "imported_advisory_interfaces": [
         "ugence_cloud_scaling_controller.controller",
@@ -428,8 +427,7 @@
     }
   ],
   "mutation_entrypoints": [
-    "cloud_scaling_operations/action/gate_actuator.py",
-    "cloud_scaling_operations/action/k8s_actuator.py"
+    "cloud_scaling_operations/action/k8s_actuator.py (SCALE_PATCH through an injected client only; refused by RecommendEngine)"
   ],
   "source_namespace": "cloud_scaling_operations"
 }

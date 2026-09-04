@@ -6,7 +6,7 @@ this package **contains infrastructure-mutation capability**: in `LIVE` mode, wi
 credentials and an explicit external authorization, it can patch Kubernetes deployment
 scale and trigger ArgoCD syncs.
 
-- **Distribution:** `ugence-cloud-scaling-operations` · **Import:** `ugence_cloud_scaling_operations` · **Version:** `0.1.0`
+- **Distribution:** `ugence-cloud-scaling-operations` · **Import:** `ugence_cloud_scaling_operations` · **Version:** `0.2.0`
 - **Authority class:** `CONTROLLED_EXECUTION` · **Execution capability:** `INFRASTRUCTURE_MUTATION`
 - **Advisory-only:** false · **Contains concrete executor:** true · **Requires external authorization:** true
 - **Default execution mode:** `dry_run` · **Live execution enabled by default:** no
@@ -26,8 +26,9 @@ Every infrastructure change requires an immutable `ExecutionAuthorization` minte
 external authority. **A recommendation, an approval Boolean, or a confidence score is
 NOT execution authority.** All mutation paths fail closed (missing/expired/wrong-tenant/
 wrong-target/wrong-action/out-of-bounds/replayed/untrusted-issuer → denied). The
-recommendation engine can never mint its own authority: `auto_approve_threshold` is
-refused when it would drive a non-dry-run actuator.
+recommendation engine can never mint its own authority: since the orchestrator
+containment ruling (0.2.0) it refuses any non-dry-run actuator at construction, and
+`approve()` records the decision and executes nothing.
 
 ## Execution modes
 
@@ -46,6 +47,23 @@ Authority-gated `ControlledScalingExecutor`, injected-client `KubernetesScalingE
 `GateExecutor` (ArgoCD/admission), `RollbackCoordinator`, readiness/outcome/audit, and
 idempotency — plus the legacy operations modules (orchestrator, recommend pipeline,
 observability, shadow runners) as monorepo-migrated code.
+
+## Orchestrator containment (0.2.0)
+
+`docs/architecture/ADR_CLOUD_SCALING_OPERATIONS_ORCHESTRATOR_CONTAINMENT_SCOPING.md`
+rules the recommendation loop non-mutating, and 0.2.0 implements it:
+
+- `RecommendEngine` refuses a non-`DRY_RUN` `ActuatorConfig` at construction, whichever
+  loop builds it; `RollbackMonitor` refuses a rollback function not declared
+  non-mutating (D-1).
+- `K8sActuator` takes an injected client or none and discovers no credentials;
+  `GateActuator` has one mode, no ArgoCD URL and no bearer token (D-2).
+- `ProductionOrchestrator.approve` and `RecommendEngine.approve` record the decision and
+  return the recommendation with no execution result (D-3).
+- The service entrypoint refuses any `actuator.mode` but `dry_run`.
+
+An approved recommendation is input to the governed ladder
+(`cloud-scaling-bounded-execution`), never a mutation this package performs.
 
 ## What it does **not** claim
 Not production-certified; not live-cluster validated; no cost/reliability/safety claim

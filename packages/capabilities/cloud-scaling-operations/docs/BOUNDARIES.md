@@ -13,5 +13,8 @@
   and idempotency storage.
 - **Mutation entrypoints:** `ControlledScalingExecutor.execute` (LIVE) and
   `GateExecutor.sync` (LIVE). Both fail closed without authorization.
+- **The orchestrator loop is contained.** `approve()` is non-mutating; the recommendation
+  engine refuses a mutating actuator at construction; the actuators discover no
+  credentials (`docs/AUTHORITY_MODEL.md`, containment ruling).
 - The Kubernetes SDK, ArgoCD access, metrics, and OTLP are optional extras / injected
   clients — none are core dependencies.
