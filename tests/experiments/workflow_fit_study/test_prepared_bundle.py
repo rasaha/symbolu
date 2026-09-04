@@ -510,40 +510,122 @@ def _design_kwargs(**overrides):
 
 
 @pytest.mark.parametrize(
-    "value",
-    [SECRET, "sk-proj-NOTAREALKEY-0000000000", "no-scheme", "memory:/x", "://x", "1scheme://x",
-     "memory://", "memory://x\n", "memory://x\x00y", "memory://x y", " memory://x"],
+    ("value", "message"),
+    [
+        (SECRET, "must be a well-formed absolute URI"),
+        ("sk-proj-NOTAREALKEY-0000000000", "must be a well-formed absolute URI"),
+        ("no-scheme", "must be a well-formed absolute URI"),
+        ("memory:/x", "must be a well-formed absolute URI"),
+        ("://x", "must be a well-formed absolute URI"),
+        ("1scheme://x", "must be a well-formed absolute URI"),
+        ("memory://", "must name a non-empty authority"),
+        ("memory://x\n", "must not contain whitespace or control characters"),
+        ("memory://x\x00y", "must not contain whitespace or control characters"),
+        ("memory://x y", "must not contain whitespace or control characters"),
+        (" memory://x", "must not contain whitespace or control characters"),
+    ],
 )
-def test_verdict_custody_ref_of_any_non_uri_shape_is_refused(value):
-    with pytest.raises(B.PreparedBundleError, match="verdict_custody_ref must be a well-formed absolute URI"):
+def test_verdict_custody_ref_of_any_non_uri_shape_is_refused(value, message):
+    with pytest.raises(B.PreparedBundleError, match=message):
         B.ExperimentalDesign(**_design_kwargs(verdict_custody_ref=value))
 
 
-# Revision 19, obligation 4: these pin a KNOWN BOUNDARY of the structural ruling; they do
-# not endorse it. The ruling refuses a bare credential but not one embedded inside an
-# otherwise well-formed URI, so each of these is accepted today and committed by
-# index_digest. A scheme allowlist would not change that — every scheme here is legitimate.
-# When a separate owner ruling settles whether a custody reference may carry userinfo or
-# opaque path/query/fragment segments, these tests are the ones that must flip to refusal.
+# Revision 19, obligation-4 ruling: verdict_custody_ref is a non-secret locator and must
+# never transport a credential. These three shapes were accepted before the ruling and are
+# refused now; they are the ones the earlier boundary-pinning tests pinned as open.
+@pytest.mark.parametrize(
+    ("value", "message"),
+    [
+        ("https://user:" + SECRET + "@host.invalid/p", "must not carry userinfo"),
+        ("memory://workflow-fit-test/x#" + SECRET, "must not carry a fragment"),
+    ],
+)
+def test_a_credential_embedded_in_a_well_formed_uri_is_now_refused(tmp_path, value, message):
+    with pytest.raises(B.PreparedBundleError, match=message):
+        B.ExperimentalDesign(**_design_kwargs(verdict_custody_ref=value))
+    # And the same refusal on read: a bundle hand-written with the value, re-indexed so every
+    # digest agrees, must not verify.
+    manifest = slice2._calibration_manifest()
+    out = tmp_path / "bundle"
+    _prepare_calibration(out, manifest=manifest)
+    payload = json.loads((out / "experimental_design.json").read_text())
+    payload["verdict_custody_ref"] = value
+    (out / "experimental_design.json").write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n")
+    _reindex(out)
+    with pytest.raises(B.PreparedBundleError, match=message):
+        B.verify(out, catalog=pf.catalog(), rule_set=pf.rule_set(), advisory=None)
+
+
+def test_a_key_shaped_path_segment_is_still_accepted_by_ruling_6(tmp_path):
+    """Obligation-4 ruling 6, made executable. A credential whose format is letters, digits
+    and hyphens is a VALID path segment under ruling 4's charset, so it is still accepted.
+    Refusing it would mean banning hyphens from locator paths, which the ruling permits.
+    This is the case ruling 6 exists for: syntax restrictions never prove a path carries no
+    secret, and only a trusted, D5-approved source for verdict_custody_ref does."""
+    value = "https://custody.invalid/" + SECRET
+    assert B.ExperimentalDesign(**_design_kwargs(verdict_custody_ref=value)).verdict_custody_ref == value
+
+
+@pytest.mark.parametrize(
+    ("value", "message"),
+    [
+        # userinfo, in every spelling
+        ("https://user@host.invalid/p", "must not carry userinfo"),
+        ("https://user:pw@host.invalid", "must not carry userinfo"),
+        ("memory://@host/p", "must not carry userinfo"),
+        # query and fragment
+        ("https://host.invalid/p?k=v", "must not carry a query component"),
+        ("https://host.invalid/p#frag", "must not carry a fragment component"),
+        ("https://host.invalid/p?", "must not carry a query component"),
+        # percent-encoding
+        ("https://host.invalid/%73%65%63", "must not use percent-encoding"),
+        ("https://host.invalid/a%2Fb", "must not use percent-encoding"),
+        # traversal and empty segments
+        ("https://host.invalid/a/../b", "must not contain empty, '.' or '..' segments"),
+        ("https://host.invalid/a/./b", "must not contain empty, '.' or '..' segments"),
+        ("https://host.invalid/a//b", "must not contain empty, '.' or '..' segments"),
+        ("https://host.invalid/a/", "must not contain empty, '.' or '..' segments"),
+        # path charset
+        ("https://host.invalid/a b", "must not contain whitespace"),
+        ("https://host.invalid/a:b", "path may use only ASCII letters"),
+        ("https://host.invalid/a+b", "path may use only ASCII letters"),
+        ("https://host.invalid/café", "path may use only ASCII letters"),
+        # structure
+        ("https:///p", "must name a non-empty authority"),
+        ("no-scheme/p", "must be a well-formed absolute URI"),
+        ("1scheme://host", "must be a well-formed absolute URI"),
+    ],
+)
+def test_custody_reference_syntax_restrictions(value, message):
+    with pytest.raises(B.PreparedBundleError, match=message):
+        B.ExperimentalDesign(**_design_kwargs(verdict_custody_ref=value))
+
+
+def test_custody_reference_longer_than_the_documented_maximum_is_refused():
+    over = "memory://h/" + ("a" * (B._MAX_CUSTODY_REF_LENGTH - 10))
+    assert len(over) > B._MAX_CUSTODY_REF_LENGTH
+    with pytest.raises(B.PreparedBundleError, match="exceeds the documented maximum length"):
+        B.ExperimentalDesign(**_design_kwargs(verdict_custody_ref=over))
+
+
+def test_custody_reference_at_exactly_the_documented_maximum_is_accepted():
+    at = "memory://h/" + ("a" * (B._MAX_CUSTODY_REF_LENGTH - len("memory://h/")))
+    assert len(at) == B._MAX_CUSTODY_REF_LENGTH
+    assert B.ExperimentalDesign(**_design_kwargs(verdict_custody_ref=at)).verdict_custody_ref == at
+
+
 @pytest.mark.parametrize(
     "value",
     [
-        "https://user:" + SECRET + "@host.invalid/p",
-        "https://host.invalid/" + SECRET,
-        "memory://workflow-fit-test/x#" + SECRET,
+        "memory://workflow-fit-test/calibration/rep0",
+        "memory://h",
+        "https://custody.invalid/verdicts/run-1/rep_0",
+        "s3+custody://bucket/a.b~c-d_e",
+        "memory://host:8080/p",
     ],
 )
-def test_a_credential_embedded_in_a_well_formed_uri_is_currently_accepted(tmp_path, value):
-    design_ok = B.ExperimentalDesign(**_design_kwargs(verdict_custody_ref=value))
-    assert design_ok.verdict_custody_ref == value
-    manifest = slice2._calibration_manifest()
-    out = tmp_path / "bundle"
-    _prepare_calibration(out, manifest=manifest, experimental_design=_calibration_design(manifest, verdict_custody_ref=value))
-    verified = B.verify(out, catalog=pf.catalog(), rule_set=pf.rule_set(), advisory=None)
-    # The boundary in full: the value survives preparation AND verification, and index_digest
-    # commits it. Recorded so the gap cannot be mistaken for closed.
-    assert verified.verdict_custody_ref == value
-    assert json.loads((out / "experimental_design.json").read_text())["verdict_custody_ref"] == value
+def test_permitted_simple_locator_paths_are_accepted(value):
+    assert B.ExperimentalDesign(**_design_kwargs(verdict_custody_ref=value)).verdict_custody_ref == value
 
 
 @pytest.mark.parametrize("value", ["memory://workflow-fit-test/x", "https://example.invalid/a/b", "s3+custody://bucket/key"])

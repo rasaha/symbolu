@@ -1937,15 +1937,52 @@ named in revision 18 are unchanged and still carry that imprecision.
    supply a `verdict_custody_ref` from an untrusted source**, and the field's
    contents are not evidence that no credential was committed.
 
+**Obligation 4 — ruled. `verdict_custody_ref` is a non-secret locator and must never be
+used to transport credentials `[R]`.** For **every** URI scheme, until D5 ratifies a
+narrower scheme and endpoint allowlist:
+
+1. **Userinfo is forbidden.** Any URI whose parsed authority contains a username,
+   password or other content before `@` is refused.
+2. **Query and fragment components are forbidden.**
+3. **Percent-encoding is forbidden.**
+4. **The path**, when present, may use only ASCII letters, digits, `/`, `-`, `_`, `.` and
+   `~`; must stay within a documented maximum length; and must contain no empty interior,
+   `.` or `..` segments. The documented maximum is **255 characters**
+   (`_MAX_CUSTODY_REF_LENGTH`) — a documented bound, not a derived one.
+5. **Applied at construction and repeated on read**, so a bundle read from disk is held to
+   the same rules as one being written.
+6. **These are syntax restrictions and prove nothing about content.** They do **not**
+   establish that an allowed-looking path contains no secret, and no code or document may
+   claim they do. A genuine run must obtain `verdict_custody_ref` from a trusted,
+   D5-approved configuration or registry; a reference supplied by an untrusted source
+   remains prohibited.
+
+**Provisional, and versioned when replaced.** These all-scheme restrictions stand in for an
+allowlist that does not yet exist. A future D5 ratification may replace them with approved
+schemes, authorities and reference forms. That replacement **must be versioned**: it takes a
+new commitment identifier and must never silently reinterpret an existing prepared bundle.
+
+**What ruling 6 costs, made concrete `[V]`.** A credential whose format is ASCII letters,
+digits and hyphens — the common `sk-…` shape — is a **valid path segment** under ruling 4
+and is therefore still accepted as `https://custody.invalid/<key>`. Refusing it would mean
+banning hyphens from locator paths, which ruling 4 permits. This is not a gap in the
+implementation; it is exactly the residue ruling 6 names, and the test suite asserts the
+acceptance explicitly so it can never be mistaken for an oversight. Of the three shapes
+revision 19 previously pinned as open, two (userinfo, fragment) are now refused and this
+third remains accepted **by ruling**.
+
 **On the record of this correction.** Revision 19 as first written asserted that
 the structural constraint "refuses every credential shape". That was false in the
 case above, and the overstatement originated in the assistant-drafted option text
 the owner ratified from, not in the owner's ruling. The ruling itself stands
 unchanged; only the claim made for it is corrected. The four guards are unmodified.
 
-**Status.** Obligation 1 is **closed for these four fields against a bare
-credential value**, and **not closed** against a credential embedded in a
-well-formed `verdict_custody_ref` URI, which obligation 4 above carries forward.
+**Status.** Obligation 1 is **closed for these four fields**, and obligation 4 is
+**ruled and enforced** for userinfo, query, fragment, percent-encoding, path charset,
+traversal segments and length. What remains open is not a defect but ruling 6's stated
+limit: syntax cannot prove a permitted path carries no secret, so **no genuine run may take
+`verdict_custody_ref` from an untrusted source**, and the field's contents are never
+evidence that no credential was committed.
 This authorises no run: D1–D5 remain incomplete, the custody endpoint remains
 unbound, slice 3B remains uncommissioned, and no provider call, credential access
 or genuine calibration is permitted by this revision.

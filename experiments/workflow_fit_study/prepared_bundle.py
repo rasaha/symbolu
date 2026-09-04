@@ -103,15 +103,65 @@ _TOKEN_SPLIT = re.compile(r"[^a-z0-9]+")
 # of them: it inspects key *names*, and here the secret would be a *value* under a
 # legitimate key. Each shape below is an owner ruling, not an inference from usage.
 
-# `verdict_custody_ref`: structural only — a well-formed absolute URI. The scheme is
-# deliberately NOT allowlisted: §2.2 binds the concrete endpoint at D5 ratification and
-# declines to name it, so an allowlist built today would encode a fabricated value. This
-# still refuses every credential shape, which carries no "://".
+# `verdict_custody_ref`: a **non-secret locator**, never a credential transport (obligation-4
+# ruling). The scheme is still deliberately NOT allowlisted: §2.2 binds the concrete endpoint
+# at D5 ratification and declines to name it, so an allowlist built today would encode a
+# fabricated value. The restrictions below are therefore applied to *every* scheme, and are
+# provisional: a future D5 ratification may replace them with an allowlist of approved
+# schemes, authorities and reference forms. Such a change is versioned — it takes a new
+# commitment identifier and never silently reinterprets an existing prepared bundle.
+#
+# These are syntax restrictions. They do **not** prove an allowed-looking path carries no
+# secret, and nothing in this module may claim they do; a genuine run must take
+# verdict_custody_ref from a trusted, D5-approved configuration or registry.
+#
 # ``\Z``, not ``$``: Python's ``$`` also matches before a trailing newline, the laxity
 # recorded as obligation 2. That laxity is inherited in ``_FACTORY_PATH`` and left alone
-# there by ruling; it is not reproduced in a regex written fresh here. Control characters
+# there by ruling; it is not reproduced in regexes written fresh here. Control characters
 # are excluded explicitly: ``\s`` alone would admit NUL and ESC.
-_ABSOLUTE_URI = re.compile(r"^[A-Za-z][A-Za-z0-9+.-]*://[^\s\x00-\x1f\x7f]+\Z")
+_CUSTODY_SCHEME = re.compile(r"[A-Za-z][A-Za-z0-9+.-]*\Z")
+
+# The ruling constrains the *path* charset explicitly and forbids userinfo in the authority;
+# it does not give an authority charset, so the authority is left otherwise unconstrained
+# beyond the no-whitespace, no-control, no-"@" rules. Over-constraining it here would be an
+# invention, not a ruling.
+_CUSTODY_PATH_SEGMENT = re.compile(r"[A-Za-z0-9._~-]+\Z")
+
+# "documented maximum length", per the ruling. 255 bytes is the documented value: it is the
+# conventional single-path-component limit and is far above any locator the prepared bundle
+# has produced. It is a *documented* bound, not a derived one.
+_MAX_CUSTODY_REF_LENGTH = 255
+
+
+def _validate_custody_reference(value: str) -> None:
+    """Obligation-4 ruling: verdict_custody_ref is a non-secret locator. Userinfo, query,
+    fragment and percent-encoding are forbidden under every scheme; the path is restricted to
+    a simple ASCII locator charset with no empty, ``.`` or ``..`` interior segments."""
+    where = "ExperimentalDesign.verdict_custody_ref"
+    if len(value) > _MAX_CUSTODY_REF_LENGTH:
+        raise PreparedBundleError(f"{where} exceeds the documented maximum length of {_MAX_CUSTODY_REF_LENGTH} characters")
+    if any(c.isspace() or ord(c) < 0x20 or ord(c) == 0x7F for c in value):
+        raise PreparedBundleError(f"{where} must not contain whitespace or control characters")
+    if "%" in value:
+        raise PreparedBundleError(f"{where} must not use percent-encoding; a locator carries no escaped content")
+    if "?" in value:
+        raise PreparedBundleError(f"{where} must not carry a query component")
+    if "#" in value:
+        raise PreparedBundleError(f"{where} must not carry a fragment component")
+    scheme, sep, rest = value.partition("://")
+    if not sep or not _CUSTODY_SCHEME.match(scheme):
+        raise PreparedBundleError(f"{where} must be a well-formed absolute URI 'scheme://rest'")
+    authority, slash, path = rest.partition("/")
+    if not authority:
+        raise PreparedBundleError(f"{where} must name a non-empty authority")
+    if "@" in authority:
+        raise PreparedBundleError(f"{where} must not carry userinfo; a locator never transports a credential")
+    if slash:
+        for segment in path.split("/"):
+            if segment in ("", ".", ".."):
+                raise PreparedBundleError(f"{where} path must not contain empty, '.' or '..' segments")
+            if not _CUSTODY_PATH_SEGMENT.match(segment):
+                raise PreparedBundleError(f"{where} path may use only ASCII letters, digits and '-', '_', '.', '~'")
 
 # `execution_order_rule`: exact match. The owner ratified this as the sole intended value.
 _EXECUTION_ORDER_RULE = "ascending_case_digest"
@@ -266,11 +316,7 @@ class ExperimentalDesign:
                 f"ExperimentalDesign.execution_order_rule must be exactly {_EXECUTION_ORDER_RULE!r} "
                 "(revision 19); a value of any other shape is refused rather than committed"
             )
-        if not _ABSOLUTE_URI.match(self.verdict_custody_ref):
-            raise PreparedBundleError(
-                "ExperimentalDesign.verdict_custody_ref must be a well-formed absolute URI "
-                "'scheme://rest' (revision 19); a value of any other shape is refused rather than committed"
-            )
+        _validate_custody_reference(self.verdict_custody_ref)
         calibration_fields = (
             self.sampling_algorithm_id, self.sampling_algorithm_version, self.seed, self.population_size,
             self.sample_size, self.selected_indexes, self.sample_index_digest, self.formula_id, self.formula_version,
