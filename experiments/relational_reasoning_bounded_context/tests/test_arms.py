@@ -51,8 +51,12 @@ def test_rope_record_unsigned_and_scoped():
     rec = load_signed_record(p)
     assert rec["arm"] == "ROPE"
     for role, entry in rec["roles"].items():
-        assert entry["authorized"] is False and entry["token_sha256"] is None
         assert sorted(entry["scope_seeds"]) == sorted(C.ARMS["ROPE"]["seeds"][role])
+        if role in ("development", "final"):      # evidence tiers stay closed until the arm is ratified
+            assert entry["authorized"] is False and entry["token_sha256"] is None, role
+        elif entry["authorized"]:                 # smoke may be owner-signed (calibration); hash only
+            assert entry["token_sha256"] and len(entry["token_sha256"]) == 64
+            assert entry["protocol_lock_digest"] == MAN.config_digest("ROPE")
     assert record_path_for("ABS").name == "BTRR_EXECUTION_AUTHORIZATION_RECORD.json"
 
 def test_config_digest_binds_arm_and_train_recipe():
