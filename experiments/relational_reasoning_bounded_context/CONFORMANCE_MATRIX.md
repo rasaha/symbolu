@@ -31,8 +31,17 @@ semantic was changed. Execution remains fail-closed.
 | Preserved BindingSlots/E1/KDA verdicts co-emitted; forbidden never emitted | PASS |
 | Execution lock (EXECUTION_AUTHORIZATION.md unsigned) | PASS |
 
+## Post-smoke corrections (F11)
+| Finding | Correction | Test evidence | Status |
+|---|---|---|---|
+| **F11** generator RNG seeded from the salted builtin `hash(str)` (`_rng` used `hash(split)`/`hash(role)`); the same (seed, split, index, role) produced different episodes in different interpreters (PYTHONHASHSEED), so the "deterministic generator" was not reproducible across runs and the in-process replay check could not see it | `generator._stable_hash` (sha256-derived) replaces both call sites; `config_digest` does not cover generator source, so existing authorization signatures stay valid; no gate/cap/seed/architecture value changed | `test_F11_*` (2): byte-identical episodes and `fact_hash` across subprocesses with PYTHONHASHSEED 0/1/424242 and vs the in-process reference; no bare `hash(` call site in generator source | **CLOSED** (`b16e4e4c`) |
+
+Note: any run produced before `b16e4e4c` (including the seed-8100 smoke calibration runs) is internally
+consistent within its process but not bit-reproducible from its seed; runs on development/final seeds must use
+code at or after this commit.
+
 ## Test totals
-`tests/test_btrr.py` 28 + `tests/test_corrections.py` 18 = **46 tests, all passing** (stdlib runner; no
+`tests/test_btrr.py` 28 + `tests/test_corrections.py` 20 + `tests/test_auth_mechanism.py` 12 + `tests/test_harness.py` 8 = **68 tests, all passing** (stdlib runner; no
 pytest/torch; fixture seeds 883000–883004 only; no reserved scientific seed consumed).
 
 ## PyTorch runtime status (F10) — CLOSED
