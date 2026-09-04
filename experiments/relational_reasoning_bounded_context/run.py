@@ -17,7 +17,7 @@ from . import metrics as M
 from . import shortcuts as SC
 from . import verdict as V
 from .base_capability import p0_gate
-from .config import MAX_SEQ_LEN, OUTPUT_MARKER, OUTPUT_TOKEN_LIMIT
+from .config import MAX_SEQ_LEN, OUTCOME_VOCAB, OUTPUT_MARKER, OUTPUT_TOKEN_LIMIT
 from .eval import NON_ADMISSIBLE
 from .execution import assert_generation_allowed
 from .serializer import serialize_input
@@ -50,6 +50,31 @@ def answer_accuracy(preds: list) -> float:
     return ok / len(preds)
 
 
+def _copy_stats(preds: list) -> dict:
+    """Character-level copy diagnostics over predictions whose gold answer is an opaque id (diagnostic only;
+    not a gate). Distinguishes 'cannot locate the target' (first char at chance) from 'locates it but cannot
+    copy it through' (first char right, short common prefix) from 'all letters, wrong last char'."""
+    rows = []
+    for ctx, text in preds:
+        g = ctx.authoritative_output.answer
+        if g is None or g in OUTCOME_VOCAB or g in ("LOW", "MEDIUM", "HIGH", "CRITICAL") or g in ("EU", "NA", "APAC", "LATAM"):
+            continue
+        p = _safe(text); a = (p.answer or "") if p is not None else ""
+        lcp = 0
+        for x, y in zip(a, g):
+            if x != y:
+                break
+            lcp += 1
+        rows.append((a[:1] == g[:1], lcp, a[:-1] == g[:-1] and len(a) == len(g), a == g))
+    if not rows:
+        return {"n": 0}
+    n = len(rows)
+    return {"n": n, "first_char_match": sum(r[0] for r in rows) / n,
+            "mean_common_prefix": sum(r[1] for r in rows) / n,
+            "all_but_last_char_match": sum(r[2] for r in rows) / n,
+            "exact": sum(r[3] for r in rows) / n}
+
+
 def p0_failure_profile(preds: list) -> dict:
     """Categorize each P0 prediction (diagnostic; not a gate): invalid / abstained / copied_query_root /
     in_context_wrong (answer is some other visible id or token) / correct / other."""
@@ -65,11 +90,35 @@ def p0_failure_profile(preds: list) -> dict:
             prof["abstained"] += 1
         elif p.answer == ctx.query.root_entity_id:
             prof["copied_query_root"] += 1
-        elif p.answer in set(serialize_input(ctx).replace("\n", " ").split(" ")):
+        elif hasattr(ctx, "entities") and p.answer in set(serialize_input(ctx).replace("\n", " ").split(" ")):
             prof["in_context_wrong"] += 1
         else:
             prof["other"] += 1
+    prof["copy"] = _copy_stats(preds)
     return prof
+
+
+def rescore_predictions_file(path: str | pathlib.Path) -> dict:
+    """Offline re-scoring of a predictions_<role>_<seed>.jsonl (no model, no seed): per-cohort P0 accuracy
+    and copy diagnostics computed from the stored gold/pred texts. Fixture-free and torch-free."""
+    from .schema_ext import ReasoningOutput
+
+    class _Ctx:  # minimal stand-in carrying what the scorers read
+        def __init__(self, row):
+            self.authoritative_output = parse_output(row["gold"])
+            self.query = type("Q", (), {"root_entity_id": row["query_root"]})()
+            self._input = ""
+    by = {}
+    for line in pathlib.Path(path).read_text().splitlines():
+        if not line.strip():
+            continue
+        row = json.loads(line)
+        by.setdefault(row["cohort"], []).append((_Ctx(row), row["pred"]))
+    out = {}
+    for cohort, preds in by.items():
+        acc = p0_accuracy(preds) if cohort.startswith("B") else answer_accuracy(preds)
+        out[cohort] = {"n": len(preds), "accuracy": round(acc, 3), "copy": _copy_stats(preds)}
+    return out
 
 
 def assemble_report(*, seed: int, role: str, checkpoint_digest: str,
