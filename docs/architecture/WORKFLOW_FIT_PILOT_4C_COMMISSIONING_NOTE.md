@@ -2046,3 +2046,52 @@ role requires an artifact that is absent or of the wrong type.
 more. D1–D5 remain incomplete, the custody endpoint remains unbound, real custody adapters and
 genuine execution remain blocked, and no provider call, credential access or genuine
 calibration is permitted by this revision.
+
+### Revision 21 (slice 3B-1 as implemented: F3, F4 and the custody port, 2026-09-04)
+
+Implements slice 3B-1 as commissioned by revision 20. This revision **rules nothing new**; it
+records what the code now enforces and what it still does not.
+
+**F3 — enforced `[V]`.** `runner.run_phase_4c_pilot` is the separately named Phase 4C entry
+point. It calls `manifest.require_phase_4c_eligible()` before any boundary process exists, so
+a v1 manifest is refused by the entry point rather than only by callers that ask. `run_pilot`
+is **unchanged** and remains available for historical mechanism-validation tests; the two are
+not aliases, which a test asserts by source inspection. A v1 manifest is refused, **never**
+upgraded or silently reinterpreted. The slice-2 test that pinned F3 as unenforced is inverted
+rather than deleted: it now requires `runner.py` to appear in the caller list.
+
+**F4 — enforced `[V]`.** `PilotStudyManifest.revalidate_role()` rebuilds the manifest through
+its own constructor, which re-runs the role invariants, and requires the freshly settled
+digest to equal the one carried. This is the substance of the F4 obligation: the v1 digest
+payload excludes `run_role` and `calibration_provenance`, so a v1 object whose role was set by
+circumventing the frozen dataclass keeps a digest that still verifies — a test demonstrates
+exactly that, then shows `revalidate_role` refusing it. Recomputing the digest alone would
+not have caught it. `run_phase_4c_pilot` calls it alongside the F3 gate.
+
+**Custody port `[V]`.** `custody.py` defines `VerdictCustodyRecord` (a settled
+`record_digest` over reference, manifest digest, index digest and an ascending, duplicate-free
+verdict set), the `VerdictCustodyPort` protocol, `write_and_verify`, and the test-only
+`InMemoryVerdictCustody` double. `write_and_verify` performs the two-step revision 17 requires
+— write, then read back and compare — as **two distinct call sites**, so a failure is
+classified by the operation that failed per §2.3: `RETENTION_WRITE_FAILED` for the write,
+`RETENTION_VERIFY_FAILED` for the read-back, never one reported as the other. No refusal code
+was added (ruling 4).
+
+**Deliberately not done, and why.**
+
+- **No endpoint, ACL, writer identity, encryption, key custody, retention or deletion policy
+  is bound** — all remain D5 (ruling 1). The module names none of them.
+- **The double is test-only** (ruling 3): process-local, persisting nothing, enforcing no
+  access-control list, holding no retention policy. It is never genuine custody evidence and
+  authorises no run.
+- **The port does not re-validate `custody_ref` syntax `[G]`.** The obligation-4 grammar
+  (revision 19) lives with the prepared bundle, which commits the reference under
+  `index_digest` before any custody call. The package must not import from `experiments`, and
+  a second copy of the grammar here would be a second authority free to drift from it. The
+  consequence is that a caller bypassing the prepared bundle could hand the port an
+  unvalidated reference — which is ruling 5's trust boundary restated, not a new gap.
+- **No runner role branching and no `CalibrationResult` production** — slice 3B-2.
+
+**Status.** Slices 3B-0 and 3B-1 are complete. D1–D5 remain incomplete, the custody endpoint
+remains unbound, real custody adapters and genuine execution remain blocked, and no provider
+call, credential access or genuine calibration is permitted by this revision.

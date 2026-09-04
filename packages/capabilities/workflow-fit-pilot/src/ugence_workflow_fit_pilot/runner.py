@@ -147,6 +147,30 @@ def _mean(values: Sequence[Decimal]) -> str:
     return str(sum(values, Decimal(0)) / Decimal(len(values)))
 
 
+def run_phase_4c_pilot(
+    manifest: PilotStudyManifest,
+    **kwargs,
+) -> "PilotRunResult":
+    """The Phase 4C run entry point (slice 3B-1, revision 20 ruling on entry points).
+
+    **F3, enforced here.** ``require_phase_4c_eligible`` refuses a v1 manifest before any
+    boundary is started, so a historical artifact can never enter a Phase 4C run by being
+    passed to a runner that does not ask. **F4, enforced here.** ``revalidate_role`` re-runs
+    the manifest's role invariants through its own constructor rather than trusting a
+    recomputed v1 digest, which excludes the role fields and therefore proves nothing
+    about them.
+
+    ``run_pilot`` is deliberately left unchanged and stays available for historical
+    mechanism-validation tests. A v1 manifest is **never** silently reinterpreted: it is
+    refused, not upgraded.
+
+    This gate does not make a run genuine. D1-D5 remain incomplete, no custody adapter is
+    bound, and the calibration branch is slice 3B-2; every argument is still the caller's."""
+    manifest.require_phase_4c_eligible()
+    manifest.revalidate_role()
+    return run_pilot(manifest, **kwargs)
+
+
 def run_pilot(
     manifest: PilotStudyManifest,
     *,
