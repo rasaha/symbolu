@@ -175,3 +175,10 @@ the large expected effect sizes.
     reported regardless. The A0 frozen config and its committed rows are not
     modified; A1 is reported as additional systems `LLTKalman-A1` and
     `Fusion(LLT-A1+BCVF)`.
+  * *Outcome (appended after scoring; rule not edited).* Frozen A1 config:
+    `q_level_ratio=0.01, q_slope_ratio=0.003, cusum_k=2.0, cusum_h=12.0,
+    bias_z=4.0, bias_min_m=0.20, bias_sustain=4, λ=0.9` (486 configs, 198
+    survivors). Evaluation seeds 100..149: TEST-only recall 1.00, TEST-only
+    FA 0.00, ALL-family delay 6.30 (strict tick 6.96), common-mode false
+    detection 0.00. All four conditions met → **`A1_ADOPT`**. Detail:
+    `ROBOTICS_LLT_KALMAN_TRUST_RESULTS.md` §7.

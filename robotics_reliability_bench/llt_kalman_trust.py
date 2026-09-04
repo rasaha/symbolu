@@ -77,10 +77,15 @@ class LLTKalmanConfig:
     noise_clip: float = 9.0           # clip e^2 at clip * s^2 (robust to one jump)
 
 
-# Frozen A1 configuration (set after the TUNE-only sweep in
-# results/llt_kalman_tune_A1.json; None until frozen). The A0 defaults above
-# are NOT modified so the committed A0 rows stay reproducible.
-A1_CONFIG: Optional["LLTKalmanConfig"] = None
+# Frozen A1 configuration — the TUNE-only sweep's choice
+# (results/llt_kalman_tune_A1.json: 486 configs, 198 survivors, min strict-tick
+# delay 8.28 on TUNE, ties to larger cusum_h then bias_z, first in grid order).
+# Frozen BEFORE any evaluation seed was scored. The A0 defaults above are NOT
+# modified so the committed A0 rows stay reproducible.
+A1_CONFIG = LLTKalmanConfig(
+    q_level_ratio=0.01, q_slope_ratio=0.003, cusum_k=2.0, cusum_h=12.0,
+    bias_z=4.0, bias_min_m=0.20, bias_sustain=4,
+    noise_forgetting=0.9, noise_warmup=6, noise_clip=9.0)
 
 
 @dataclass
