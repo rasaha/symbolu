@@ -94,11 +94,17 @@ def write_and_verify(port: VerdictCustodyPort, record: VerdictCustodyRecord) -> 
     ``CalibrationResult`` may treat custody as established.
 
     **The call site determines the category, not the adapter** (§2.3, owner ruling, revision
-    4; correction recorded in revision 23). Each call is wrapped so that whatever an adapter
-    raises — a ``PilotError`` carrying the *other* code, or a bare ``OSError`` carrying none —
-    is re-raised with the code belonging to the operation that was being performed, chained
-    from the original so the cause is not lost. Before this correction the classification was
-    delegated to the adapter, and revision 21 wrongly claimed otherwise.
+    4; correction recorded in revision 23, refined in revision 24). Each call is wrapped so
+    that whatever an adapter raises — a ``PilotError`` carrying the *other* code, or a bare
+    ``OSError`` carrying none — is re-raised with the code belonging to the operation that was
+    being performed, chained from the original so the cause is not lost. Before this
+    correction the classification was delegated to the adapter, and revision 21 wrongly
+    claimed otherwise.
+
+    The message interpolates the exception's **type name only**, never ``str(e)``: an adapter
+    is untrusted code, and an exception whose ``__str__`` itself raises would otherwise escape
+    both wrappers as the *formatting* error, unclassified. The original is chained, so nothing
+    is lost by not rendering it here.
 
     ``BaseException`` is never caught: a ``KeyboardInterrupt`` or ``SystemExit`` is not a
     retention failure.
@@ -109,7 +115,7 @@ def write_and_verify(port: VerdictCustodyPort, record: VerdictCustodyRecord) -> 
     except Exception as e:
         raise PilotError(
             PilotErrorCode.RETENTION_WRITE_FAILED,
-            f"custody write failed: {type(e).__name__}: {e}",
+            f"custody write failed: {type(e).__name__}",
         ) from e
     if written != record.record_digest:
         raise PilotError(PilotErrorCode.RETENTION_WRITE_FAILED, "custody writer returned a digest for other content")
@@ -118,7 +124,7 @@ def write_and_verify(port: VerdictCustodyPort, record: VerdictCustodyRecord) -> 
     except Exception as e:
         raise PilotError(
             PilotErrorCode.RETENTION_VERIFY_FAILED,
-            f"custody read-back failed: {type(e).__name__}: {e}",
+            f"custody read-back failed: {type(e).__name__}",
         ) from e
     # Identity and equality, not digest equality alone: a non-conforming adapter can return
     # any object carrying a matching ``record_digest`` attribute.

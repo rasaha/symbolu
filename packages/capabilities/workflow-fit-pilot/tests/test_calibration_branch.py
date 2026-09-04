@@ -186,11 +186,31 @@ def test_the_calibration_branch_builds_no_comparison_and_no_coverage():
     assert all(isinstance(a, ast.Constant) and a.value is None for a in (request_arg, result_arg, coverage_arg))
 
 
-def test_a_success_summary_is_impossible_without_a_coverage_report():
-    from ugence_workflow_fit_pilot.contracts.coverage import success_summary
+def test_a_success_summary_has_no_coverage_report_to_permit_it_under_calibration():
+    """Revision 24. This previously asserted `(AttributeError, TypeError)` and so codified an
+    untyped crash as the guarantee, which revision 22 then described as a design property.
 
-    with pytest.raises((AttributeError, TypeError)):
-        success_summary(None, slice2._calibration_manifest(), {})
+    The real guarantee is upstream and typed: `render` refuses a calibration result with
+    ROLE_ARTIFACT_INCONSISTENT, so `success_summary` is never reached with None on any
+    commissioned path. `success_summary` itself is a pure function that dereferences its
+    argument (contracts/coverage.py:97) and is not the guard; calling it with None directly
+    is a caller error, asserted here only to pin that it has not silently acquired a guard
+    of its own."""
+    from ugence_workflow_fit_pilot.contracts.coverage import success_summary
+    from ugence_workflow_fit_pilot.report import render
+    from ugence_workflow_fit_pilot.runner import PilotRunResult
+
+    manifest = slice2._calibration_manifest()
+    calibration_result = PilotRunResult(
+        manifest=manifest, validated=None, runs=(), request=None, result=None,
+        states=(), coverage=None, outcomes={}, evaluator_flags=(),
+    )
+    with pytest.raises(PilotError) as e:
+        render(calibration_result)
+    assert e.value.code is PilotErrorCode.ROLE_ARTIFACT_INCONSISTENT
+
+    with pytest.raises(AttributeError):
+        success_summary(None, manifest, {})
 
 
 def test_confirmatory_and_v1_runs_keep_the_comparison_path():

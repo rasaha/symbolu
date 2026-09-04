@@ -2077,6 +2077,13 @@ classified by the operation that failed per §2.3: `RETENTION_WRITE_FAILED` for 
 `RETENTION_VERIFY_FAILED` for the read-back, never one reported as the other. No refusal code
 was added (ruling 4).
 
+> **Superseded by revision 23 — retained for the record and no longer a description of
+> current behaviour.** The clause "never one reported as the other" was **false** when
+> written: `write_and_verify` wrapped neither call site, so an adapter's own choice of
+> exception decided the category. The behaviour it describes became true only with the
+> revision-23 correction, refined in revision 24. The `[V]` label on this paragraph did not
+> hold at the time it was applied.
+
 **Deliberately not done, and why.**
 
 - **No endpoint, ACL, writer identity, encryption, key custody, retention or deletion policy
@@ -2109,6 +2116,12 @@ which makes a success summary **impossible** rather than empty. The run rests at
 `UNDER_TEST`; whether that is a *completed* calibration is decided by
 `require_calibration_endpoint` (slice 3B-0) against a `CalibrationResult`, never by the runner.
 
+> **"Impossible rather than empty" superseded by revision 24 — retained for the record.** The
+> mechanism at the time was an untyped `AttributeError` from `report.render`, not a designed
+> refusal, and the accompanying test codified `(AttributeError, TypeError)` as the guarantee.
+> `render` now refuses a calibration result with `ROLE_ARTIFACT_INCONSISTENT`, and the test
+> asserts that typed refusal instead.
+
 **Historical behaviour is unchanged `[V]`.** `is_calibration_run` is false for a v1 manifest
 and for a v2 CONFIRMATORY manifest, so no historical mechanism-validation run and no
 confirmatory run can take the branch. The branch is asserted over the **AST** of the runner,
@@ -2133,15 +2146,22 @@ was written. `governed_unit` is not a parameter: it is fixed at `score.unit` by 
 `InMemoryVerdictCustody`. It is never genuine custody evidence and authorises no real
 calibration or confirmatory run.
 
+> **Superseded by revision 23 — retained for the record.** "Every result built in the suite"
+> was **false**: two helpers in `tests/contracts/test_run_role_and_calibration.py` build
+> `CalibrationResult` objects with no custody at all. Ruling 3 is unaffected — neither is
+> genuine evidence — but the sentence overstated what the suite does.
+
 **Status.** Slices 3B-0, 3B-1 and 3B-2 are complete. What remains blocked is unchanged and
 unchanged in kind: D1–D5 incomplete, the custody endpoint unbound, real custody adapters and
 genuine execution blocked, no provider call, no credential access, no genuine calibration.
 
 ### Revision 23 (independent-review corrections to slices 3B-1 and 3B-2, 2026-09-04)
 
-An independent adversarial review of the 3B stack — run on a **different model**, not a
-same-session self-review, after five self-reviews of earlier slices had missed defects of
-exactly this kind — returned NOT APPROVED. This revision records the corrections. It **rules
+An independent adversarial review of the 3B stack returned NOT APPROVED. It was commissioned
+to run on a different model than the one that wrote the code, after five same-session
+self-reviews of earlier slices had missed defects of exactly this kind. **That provenance is
+a process claim this repository cannot itself settle**; what it can settle is the findings,
+which are reproduced below and were each verified against the code. This revision records the corrections. It **rules
 nothing new**.
 
 **Withdrawn: revision 21's `[V]` claim about failure classification.** Revision 21 asserted
@@ -2152,8 +2172,10 @@ delegated entirely to whatever an adapter chose to raise: an adapter raising
 and a bare `OSError` from either side surfaced unclassified. §2.3 rules that *"the call site
 determines the category"*, which the code did not do.
 
-**Corrected `[V]`.** `write_and_verify` now wraps each call site and re-raises any `Exception`
-with that site's code, chained from the original so the cause survives. `BaseException` is
+**Corrected `[V]`.** `write_and_verify` now wraps each call site and re-raises `Exception`
+with that site's code, chained from the original so the cause survives. (As first written
+this said "any `Exception`", which revision 24 found overstated: an adapter exception whose
+`__str__` raised escaped both wrappers as the *formatting* error. Corrected there.) `BaseException` is
 never caught — an interrupt is not a retention outcome. Read-back verification now requires
 `isinstance(stored, VerdictCustodyRecord)` **and** `stored == record`, not digest equality
 alone, since any object can carry a matching attribute. Eight tests cover this, asserting by
@@ -2183,7 +2205,7 @@ it.
 **Corrected: a vacuous test.** Dropping the `is_v2` clause from `is_calibration_run` failed
 none of the 204 tests, because a constructor-built v1 always has `run_role=None` and the
 clause never decides. The test now tampers a v1 manifest with a smuggled role, which is the
-only case distinguishing the two implementations. Three bare `pytest.raises` calls now assert
+only case distinguishing the two implementations. Four bare `pytest.raises` calls across three tests now assert
 an error code or message.
 
 **Carried forward, not closed `[G]`.**
@@ -2204,3 +2226,58 @@ an error code or message.
 remain incomplete, the custody endpoint remains unbound, real custody adapters and genuine
 execution remain blocked, and no provider call, credential access or genuine calibration is
 permitted by this revision.
+
+### Revision 24 (second independent-review corrections, 2026-09-04)
+
+A second independent adversarial pass over the corrected stack confirmed the revision-23
+blocking defect closed and returned CONDITIONALLY APPROVED. This revision closes what it
+found. It **rules nothing new**.
+
+**Corrected: the `__str__` escape `[V]`.** Revision 23 said `write_and_verify` re-raises
+"any `Exception`" with its site's code. Both handlers interpolated `str(e)`, so an adapter
+exception whose `__str__` itself raises escaped **both** wrappers as the *formatting* error,
+unclassified — fail-closed, since no result is built, but not what was claimed. The handlers
+now interpolate `type(e).__name__` only; the original is chained, so nothing is lost by not
+rendering it. Two tests cover it, one per site, with an exception class whose `__str__`
+raises. Revision 23's sentence is corrected in place.
+
+**Corrected: superseded claims now annotated where they stand.** Revision 23 withdrew two
+false claims but left both original sentences unmarked at their sites, so a reader of
+revision 21 or 22 alone still met a false `[V]`. Following the revision-19 form, revision 21's
+"never one reported as the other", revision 22's "every result built in the suite uses
+`InMemoryVerdictCustody`", and revision 22's "impossible rather than empty" now carry
+in-place supersession notes. The original text is retained, not deleted.
+
+**Corrected: an untyped crash no longer stands as a guarantee.**
+`test_a_success_summary_is_impossible_without_a_coverage_report` asserted
+`(AttributeError, TypeError)`, codifying a crash as the design property revision 22 described.
+It now asserts the typed refusal that is the real guarantee — `render` raising
+`ROLE_ARTIFACT_INCONSISTENT` — and pins separately that `success_summary` has not silently
+acquired a guard of its own.
+
+**Hardened, though already correct `[V]`.** The review verified that a read-back returning a
+subclass instance or a mutated record with a forced `record_digest` is refused; only the
+`SimpleNamespace` case was tested. Both now have tests.
+
+**Corrected: two small overstatements in revision 23** — "any `Exception`" (above) and "three
+bare `pytest.raises` calls", which was four calls across three tests. The claim that the
+review "was run on a different model" is a process fact this repository cannot settle; it is
+now stated as what was commissioned rather than as a verified property.
+
+**Carried forward, added to revision 23's three `[G]` items.**
+
+4. **`transition` does not refuse `RESULT_INCONCLUSIVE` carrying a
+   `ReadinessComparisonResult` on a CALIBRATION manifest** (`contracts/lifecycle.py`,
+   the guarded events are `RESULT_ASSESSED`/`EVALUATED` only). An `INCONCLUSIVE` record
+   carrying a `result_digest` can therefore be hand-built for a calibration run and would
+   replay if the result is supplied. Revision 13 forbids *comparison* for that role, not
+   merely assessment, so this is narrower than the ruling. Unprobed — closing it needs a
+   synthetic engine result.
+5. **The behavioural calibration test is behind a module-level `importorskip`** in
+   `tests/pilot/test_end_to_end.py`. Where the `agentic` tree is absent it is skipped, and
+   the calibration branch is then covered by the AST assertion alone. Revision 23's
+   behavioural `[V]` holds in this environment, not universally.
+
+**Status.** Unchanged in kind: D1–D5 incomplete, the custody endpoint unbound, real custody
+adapters and genuine execution blocked, no provider call, no credential access, no genuine
+calibration.
