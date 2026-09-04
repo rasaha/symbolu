@@ -41,7 +41,7 @@ from .boundary.client import BoundaryConnection, GatewayStubClient, method_to_js
 from .boundary.frames import CaptureRecord, capture_from_json
 from .boundary.process import BoundaryProcess
 from .contracts.coverage import ChallengerCoverageReport, build_coverage_report
-from .contracts.lifecycle import LifecycleEvent, PilotConfigurationStateRecord, comparison_request_id, propose, transition
+from .contracts.lifecycle import LifecycleEvent, PilotConfigurationStateRecord, comparison_request_id, is_calibration_run, propose, transition
 from .contracts.manifest import PilotStudyManifest, ValidatedManifest, validate_manifest
 from .contracts.observation import (
     PILOT_OBSERVATION_SCHEMA_VERSION,
@@ -138,7 +138,7 @@ class PilotRunResult:
     request: Optional[ReadinessComparisonRequest]
     result: Optional[ReadinessComparisonResult]
     states: Tuple[PilotConfigurationStateRecord, ...]
-    coverage: ChallengerCoverageReport
+    coverage: Optional[ChallengerCoverageReport]  # None under CALIBRATION: revision 13 makes coverage absent for that role
     outcomes: Dict[ReasoningMethodRef, FitOutcome]
     evaluator_flags: Tuple[str, ...] = ()
 
@@ -225,6 +225,16 @@ def run_pilot(
     request = result = None
     outcomes: Dict[ReasoningMethodRef, FitOutcome] = {}
     baseline = manifest.plan.baseline
+    if is_calibration_run(manifest):
+        # Revision 13's role matrix, enforced (slice 3B-2). Under CALIBRATION the comparison
+        # request is *unconstructible*, not merely skipped: there is no challenger to compare
+        # the baseline against, so no ReadinessComparisonRequest is built, no engine call is
+        # made, and no RESULT_ASSESSED transition can follow. Coverage is absent for the same
+        # reason — it reports challenger coverage, and a calibration run assigns no challenger
+        # — which makes a success summary impossible rather than merely empty. The run rests
+        # at UNDER_TEST; whether that is a *completed* calibration is decided by
+        # require_calibration_endpoint against a CalibrationResult, not by this runner.
+        return PilotRunResult(manifest, validated, tuple(runs), None, None, tuple(states), None, {}, evaluator_flags)
     if complete_runs:  # the engine decides; an absent baseline is its request-level refusal, never the runner's silence
         request = ReadinessComparisonRequest(
             schema_version=COMPARISON_REQUEST_SCHEMA_VERSION, request_id=comparison_request_id(manifest.manifest_digest), task_class=manifest.plan.task_class,

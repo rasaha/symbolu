@@ -2095,3 +2095,44 @@ was added (ruling 4).
 **Status.** Slices 3B-0 and 3B-1 are complete. D1–D5 remain incomplete, the custody endpoint
 remains unbound, real custody adapters and genuine execution remain blocked, and no provider
 call, credential access or genuine calibration is permitted by this revision.
+
+### Revision 22 (slice 3B-2 as implemented: the calibration branch, 2026-09-04)
+
+Implements slice 3B-2 as commissioned by revision 20. This revision **rules nothing new**.
+
+**The calibration branch `[V]`.** `run_pilot` now returns immediately after execution when
+`is_calibration_run(manifest)` holds, with no `ReadinessComparisonRequest`, no engine call, no
+`RESULT_ASSESSED` transition and no coverage report — revision 13's role matrix, enforced
+rather than merely stated. `PilotRunResult.coverage` becomes `Optional`, and is `None` for
+that role: coverage reports *challenger* coverage and a calibration run assigns no challenger,
+which makes a success summary **impossible** rather than empty. The run rests at
+`UNDER_TEST`; whether that is a *completed* calibration is decided by
+`require_calibration_endpoint` (slice 3B-0) against a `CalibrationResult`, never by the runner.
+
+**Historical behaviour is unchanged `[V]`.** `is_calibration_run` is false for a v1 manifest
+and for a v2 CONFIRMATORY manifest, so no historical mechanism-validation run and no
+confirmatory run can take the branch. The branch is asserted over the **AST** of the runner,
+not its source text, so a comment naming `RESULT_ASSESSED` can neither pass nor fail the test.
+
+**Test-only `CalibrationResult` production `[V]`.** `custody.build_calibration_result`
+constructs a result only after **both** revision-17 conditions:
+
+- **Condition 1 — the prepared bundle verified** — is the caller's, evidenced by the new
+  `VerifiedPreparedFacts`. The verifier lives in `experiments/`, the package must not import
+  from there, and this function therefore **cannot** re-check it and does not pretend to. The
+  type exists to make the hand-off explicit and to carry the obligation `[G]`.
+- **Condition 2 — a successful custody write and read-back** — is performed here through
+  `write_and_verify`, so no result can rest on a write that failed or could not be verified.
+
+`VerifiedPreparedFacts` re-asserts revision 17's rule that `index_digest` and
+`sample_index_digest` are strictly distinct. A custody record addressed elsewhere, or binding
+another manifest or index digest, is refused **before** any write — tests assert that nothing
+was written. `governed_unit` is not a parameter: it is fixed at `score.unit` by the contract.
+
+**Revision 20 ruling 3 holds.** Every result built in the suite uses
+`InMemoryVerdictCustody`. It is never genuine custody evidence and authorises no real
+calibration or confirmatory run.
+
+**Status.** Slices 3B-0, 3B-1 and 3B-2 are complete. What remains blocked is unchanged and
+unchanged in kind: D1–D5 incomplete, the custody endpoint unbound, real custody adapters and
+genuine execution blocked, no provider call, no credential access, no genuine calibration.
