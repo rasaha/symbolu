@@ -144,6 +144,53 @@ TransformationMethod.DIRECT`; `AuthorityStatus.UNVERIFIED → AttestationStatus.
 `AttributionStatus.NOT_ATTRIBUTED`. This mapping is **not** wired into
 `governed-value` in this phase.
 
+## Neutral idempotency and validity contracts (G7, G8)
+
+Additive, neutral vocabulary for two questions every execution seam asks and
+the frozen provider contracts left to free strings and ad-hoc fields: *is this
+the same logical action again?* and *is this artifact still good?* **Contracts
+and structural invariants only** — neither family is a deduplication store, a
+reservation ledger, a clock, a verifier or an authority. Atomic one-time
+reservation and replay protection belong to the execution ledger that Action
+Clearance's phase G names; these contracts give it one vocabulary.
+
+**Idempotency (G7)** — `IdempotencyKey` is the identity of one logical action:
+the caller's `key`, the coordinates its `IdempotencyScope` names, and an opaque
+`partition` token reserved for the tenant/environment coordinate (G1, G2).
+
+| `IdempotencyScope` | identity |
+|---|---|
+| `GLOBAL` | `key` |
+| `ACTOR` | `actor` + `key` |
+| `TARGET_RESOURCE` | `target_resource` + `key` |
+| `ACTOR_AND_TARGET` | `actor` + `target_resource` + `key` |
+
+A coordinate the scope does not name must be empty, so one identity has exactly
+one `canonical_digest()`. A producer that adopts the contract places that digest
+in the existing free-string `idempotency_key` field, which makes the field
+scope-bound and fixed-width without changing its type or default.
+`IdempotencyResolution` reports how a receiver classified the identity:
+`FIRST`, `DUPLICATE` (then `duplicate_of` names the original and is required) or
+`UNKNOWN`, which is never first and never determinate — a consumer that cannot
+tell whether it has already acted fails closed.
+
+**Validity (G8)** — `Validity` is a half-open `[issued_at, expires_at)` window
+with an optional `stale_after` soft bound strictly inside it. `status_at(as_of)`
+returns exactly one `ValidityStatus` by precedence: `NOT_YET_VALID`, `EXPIRED`,
+`STALE`, `FRESH`. Staleness is **derived at an explicit instant, never stored**
+and never read from a clock; every instant must be timezone-aware and a naive
+one is rejected. Instants canonicalize in UTC exactly as `AssessedSystemBinding`
+does. Mapping to the frozen fields is documentation only:
+`ActionGovernanceResult.expiry == validity.expires_at` and
+`ActionGovernanceRequest.authorization_expired == not validity.is_valid_at(as_of)`.
+
+**Why new families rather than new fields.** The provider dataclasses' fields,
+defaults, constructor signatures and serialized forms are pinned byte-for-byte
+by the serialization-equivalence tests, and any key added to their `asdict`
+output would silently move every fingerprint a consumer computes over an
+existing request. So `CONTRACT_VERSION` stays `1.0.0`; the package version
+advances to `0.4.0`.
+
 ## Compatibility paths
 
 The neutral contracts previously lived in `governance_providers`. Those paths still
@@ -165,9 +212,10 @@ Removal/review target: `governance_providers` 0.2.0. See `MIGRATION.md`.
 
 ## Known limitations / deferred
 
-This phase is a **physical** extraction only. Known platform-contract gaps
-(missing `tenant_id`/`environment_id`, no standard error *envelope*, no
-idempotency/expiry *contract*, fragmented CER/audit shapes) are **documented, not
-implemented** — see
-`docs/migrations/governance_contracts/CONTRACT_GAPS_AND_EVOLUTION_PLAN.md`. A
-versioned contract-evolution phase owns those.
+This phase is a **physical** extraction only. Of the platform-contract gaps
+in `docs/migrations/governance_contracts/CONTRACT_GAPS_AND_EVOLUTION_PLAN.md`,
+**G7 (idempotency) and G8 (validity) landed in 0.4.0** as additive neutral
+families. The rest (missing `tenant_id`/`environment_id`, no standard error
+*envelope*, fragmented CER/audit shapes, no cross-product result envelope) remain
+**documented, not implemented**; the versioned contract-evolution phase owns
+them.

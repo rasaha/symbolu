@@ -1,5 +1,67 @@
 # Changelog — ugence-governance-contracts
 
+## [0.4.0] — neutral idempotency (G7) and validity (G8) contracts (additive)
+
+**Additive, backward-compatible.** No existing public symbol, field, enum value,
+default, constructor signature, serialization or authority meaning changed.
+`CONTRACT_VERSION` (the **provider** contract surface) is **unchanged at
+`1.0.0`** — as for the evidence and assessed-system identity families, these are
+new additive *neutral contract families* that do not touch the provider
+contract. Only the package `__version__` advances, to `0.4.0`. Remains a
+stdlib-only leaf. Closes gaps **G7** and **G8** of
+`docs/migrations/governance_contracts/CONTRACT_GAPS_AND_EVOLUTION_PLAN.md`,
+sequenced first by
+`docs/architecture/ADR_UGENCE_GOVERNANCE_GAP_SEQUENCING_RATIFICATION.md`.
+
+### Added — `contracts/idempotency.py` (G7)
+- **`IdempotencyScope`** — `GLOBAL`, `ACTOR`, `TARGET_RESOURCE`,
+  `ACTOR_AND_TARGET`: what a key is unique within, declared, never inferred.
+- **`IdempotencyKey`** — the identity of one logical action: `key`, the
+  coordinates the scope names, and an opaque `partition` token reserved for the
+  tenant/environment coordinate that G1/G2 will name. A coordinate the scope
+  does not name must be empty, so one identity has exactly one
+  `canonical_digest()`. Keys and coordinates are stored stripped.
+- **`IdempotencyDisposition`** and **`IdempotencyResolution`** — `FIRST`,
+  `DUPLICATE`, `UNKNOWN`; `duplicate_of` is required exactly when the
+  disposition is `DUPLICATE` and forbidden otherwise. `UNKNOWN` is never first
+  and never determinate.
+- **`IdempotencyContractError`** — structural rejections, subclassing
+  `ValueError`, mirroring `EvidenceContractError`.
+
+### Added — `contracts/validity.py` (G8)
+- **`Validity`** — half-open `[issued_at, expires_at)` window with an optional
+  `stale_after` soft bound strictly inside it; `expires_at` absent means no hard
+  expiry. `status_at(as_of)` returns one **`ValidityStatus`** by precedence
+  (`NOT_YET_VALID`, `EXPIRED`, `STALE`, `FRESH`); `is_valid_at`, `is_fresh_at`,
+  `is_stale_at`, `is_expired_at` derive from it. Instants must be
+  timezone-aware and canonicalize in UTC, exactly as `AssessedSystemBinding`.
+- **`ValidityContractError`** — structural rejections, subclassing `ValueError`.
+
+### Decided — staleness is derived, not stored
+The evolution plan sketched `Validity{issued_at, expires_at, stale}`. A stored
+`stale` boolean would itself go stale the moment it was written, so the contract
+carries the bound (`stale_after`) and derives the answer at a caller-supplied
+`as_of`. No clock is read anywhere in either module; a test asserts it.
+
+### Decided — new families, not new fields on the frozen provider contracts
+The plan allowed "additive optional fields" too. They were not used: the
+provider dataclasses' fields, defaults, constructor signatures, `repr` and
+`asdict` output are pinned byte-for-byte by the serialization-equivalence
+baseline, and adding a key to a request's `asdict` output would silently move
+every fingerprint a consumer computes over an existing request. The binding is
+by value instead: a producer places `IdempotencyKey.canonical_digest()` in the
+existing free-string `idempotency_key` field, and `ActionGovernanceResult.expiry`
+/ `ActionGovernanceRequest.authorization_expired` map to `validity.expires_at` /
+`not validity.is_valid_at(as_of)`. The legacy `governance_providers` shim is
+untouched; it re-exports the provider surface only, as it did for the evidence
+and identity families.
+
+### What these contracts are not
+Not a deduplication store, a reservation ledger, replay protection, a retention
+window, a clock, a revocation service or an authority. Atomic one-time
+reservation belongs to the execution ledger that Action Clearance's phase G
+names; these contracts are its vocabulary.
+
 ## [0.3.1] — assessed-system binding instants canonicalize in UTC (fix)
 
 **Patch.** No public symbol, field, enum value, default or authority meaning

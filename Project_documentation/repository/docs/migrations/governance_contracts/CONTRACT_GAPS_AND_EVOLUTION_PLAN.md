@@ -65,6 +65,11 @@ contract is likely required.
 - **Backward-compatible?** Yes (additive). **v2?** No.
 
 ## G7 — No idempotency contract
+- **Status:** landed in `ugence-governance-contracts` 0.4.0 as the additive
+  `contracts/idempotency.py` family (`IdempotencyScope`, `IdempotencyKey`,
+  `IdempotencyDisposition`, `IdempotencyResolution`). `duplicate_of` lives on
+  `IdempotencyResolution`, not on the frozen `ExecutionDispatchResult`, because the
+  serialization baseline pins that dataclass byte-for-byte.
 - **Evidence:** `idempotency_key` exists as a free string on action/execution
   requests, but there is **no contract** defining its semantics, scope, or a
   dedup-result field.
@@ -74,6 +79,9 @@ contract is likely required.
 - **Backward-compatible?** Yes (semantics + additive field). **v2?** No.
 
 ## G8 — No expiry/staleness contract
+- **Status:** landed in `ugence-governance-contracts` 0.4.0 as the additive
+  `contracts/validity.py` family (`Validity`, `ValidityStatus`). `stale` is derived
+  at an explicit `as_of` from a `stale_after` bound, not stored.
 - **Evidence:** `ActionGovernanceResult.expiry` and
   `ActionGovernanceRequest.authorization_expired` exist ad hoc; no neutral
   staleness/expiry contract shared across families.
