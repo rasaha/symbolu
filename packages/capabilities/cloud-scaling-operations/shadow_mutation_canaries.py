@@ -283,6 +283,35 @@ def _canary_auto_approval_guard() -> Dict[str, Any]:
                 audit_or_denial=blocked, fallback_bypass=(not blocked), detail=detail)
 
 
+def _canary_engine_refuses_mutating_actuator() -> Dict[str, Any]:
+    """The recommendation engine must refuse a mutating actuator at construction, with or
+    without auto-approval (containment ruling D-1): a manual approve() must have nothing
+    to execute through."""
+    try:
+        from ugence_cloud_scaling_operations.recommend.engine import RecommendEngine, RecommendConfig
+        from ugence_cloud_scaling_operations.action.k8s_actuator import ActuatorConfig, ActuatorMode
+    except Exception as exc:
+        return _rec("RecommendEngine(SCALE_PATCH actuator, manual approval)",
+                    mutation_path_reached=False, blocked_before_transmission=True,
+                    transport_write_calls=0, result="unreachable_without_optional_deps",
+                    audit_or_denial=True, detail=f"engine not importable: {type(exc).__name__}")
+    blocked = False
+    detail = ""
+    try:
+        RecommendEngine(RecommendConfig(actuator=ActuatorConfig(mode=ActuatorMode.SCALE_PATCH)))
+        detail = "constructed WITHOUT refusal"
+    except RuntimeError as exc:
+        blocked = True
+        detail = f"refused: {type(exc).__name__}"
+    except Exception as exc:  # any other failure is still non-executing
+        blocked = True
+        detail = f"non-executing failure: {type(exc).__name__}"
+    return _rec("RecommendEngine(SCALE_PATCH actuator, manual approval)",
+                mutation_path_reached=True, blocked_before_transmission=blocked,
+                transport_write_calls=0, result="refused" if blocked else "CONSTRUCTED",
+                audit_or_denial=blocked, fallback_bypass=(not blocked), detail=detail)
+
+
 def _canary_default_dry_run(name: str, importer) -> Dict[str, Any]:
     """Legacy actuator/exporter/webhook: default config is non-mutating; no egress."""
     try:
@@ -357,6 +386,7 @@ def run_mutation_canaries() -> Dict[str, Any]:
             _canary_rollback_no_authz(),
             _canary_generic_http_transport(),
             _canary_auto_approval_guard(),
+            _canary_engine_refuses_mutating_actuator(),
         ]
         canaries.extend(_legacy_canaries())
         real_transmissions = tw.real_transmissions

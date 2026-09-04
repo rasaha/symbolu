@@ -5,7 +5,7 @@ hand: CI regenerates this and fails on any difference.
 
 **Reference-HMAC caveat (ruled 2026-08-31).** The authority gates this inventory scores are verified against `ReferenceAuthorityVerifier`, a deterministic HMAC for tests and local development — explicitly NOT a production KMS (`authority.py`). Every kill therefore proves **gate enforcement** — that the check is applied, discriminates its typed outcome, and fails closed — and none proves production cryptographic strength, which belongs to whatever verifier a deployment injects.
 
-**55 outcome-bearing guards.** A guard is a decision point whose body can
+**58 outcome-bearing guards.** A guard is a decision point whose body can
 reach a refusal. What counts as a refusal differs by package and is recorded per guard
 below: Phase 5A raises; Phase 5B also returns `_refuse(...)` at a gate and
 `(_Outcome.X, …)` from the helper that decided it. Applying one package's definition to
@@ -34,7 +34,7 @@ This package records no prior inventory; this is the first one.
 
 ## Classification
 
-Every guard is classified: **51 `SCORED`** — the
+Every guard is classified: **54 `SCORED`** — the
 sweep neutralises it and the suite must fail — and
 **4 `EXCLUDED`**, each with a reason from a closed vocabulary and
 a test that measures the reason. A guard is never excluded because it survived; a
@@ -43,15 +43,15 @@ survivor with no prior declaration fails the sweep.
 | Module:line | Reason | Why | Measured by |
 |---|---|---|---|
 | `cli.py:229` | `outside-authority-bearing-definition` | The console-script dispatch. It decides process bootstrap, not an execution outcome, and is unreachable in any imported run of the suite — the module imports under its own name. | `tests/execution/test_guard_coverage.py::test_the_console_entrypoints_do_not_run_on_import` |
-| `main.py:279` | `outside-authority-bearing-definition` | Config-source selection inside the service bootstrap: it picks where a long-running process reads configuration from, and decides no admission outcome. Exercising it means booting the service; the authority gates the configuration feeds are scored directly. | `tests/execution/test_guard_coverage.py::test_the_console_entrypoints_do_not_run_on_import` |
-| `main.py:336` | `outside-authority-bearing-definition` | The same dispatch for the service entrypoint module. | `tests/execution/test_guard_coverage.py::test_the_console_entrypoints_do_not_run_on_import` |
-| `main.py:337` | `outside-authority-bearing-definition` | The statement the dispatch above guards — the call that boots the long-running service. Deleting it changes nothing an imported test run can observe, for the same module-name reason. | `tests/execution/test_guard_coverage.py::test_the_console_entrypoints_do_not_run_on_import` |
+| `main.py:282` | `outside-authority-bearing-definition` | Config-source selection inside the service bootstrap: it picks where a long-running process reads configuration from, and decides no admission outcome. Exercising it means booting the service; the authority gates the configuration feeds are scored directly. | `tests/execution/test_guard_coverage.py::test_the_console_entrypoints_do_not_run_on_import` |
+| `main.py:339` | `outside-authority-bearing-definition` | The same dispatch for the service entrypoint module. | `tests/execution/test_guard_coverage.py::test_the_console_entrypoints_do_not_run_on_import` |
+| `main.py:340` | `outside-authority-bearing-definition` | The statement the dispatch above guards — the call that boots the long-running service. Deleting it changes nothing an imported test run can observe, for the same module-name reason. | `tests/execution/test_guard_coverage.py::test_the_console_entrypoints_do_not_run_on_import` |
 
 ## Not counted, and why
 
 * **2 `except` arms** that raise. The `if False:` operator
   cannot neutralise a handler, so they are outside this operator rather than overlooked.
-* **13 extra sub-terms** of boolean guards. `if a and b:` is
+* **15 extra sub-terms** of boolean guards. `if a and b:` is
   neutralised and scored as one guard; scoring each side independently is a different
   operator.
 
@@ -103,14 +103,17 @@ survivor with no prior declaration fails the sweep.
 | 42 | `k8s_executor.py:50` | if | raise | SCORED | — | `not namespace or not resource` |
 | 43 | `k8s_executor.py:57` | if | raise | SCORED | — | `not namespace or not resource` |
 | 44 | `k8s_executor.py:62` | if | raise | SCORED | — | `current != expected_current` |
-| 45 | `orchestrator.py:163` | if | raise | SCORED | — | `self.config.auto_approve_threshold is not None` |
-| 46 | `orchestrator.py:166` | if | raise | SCORED | — | `act_cfg is not None` |
-| 47 | `orchestrator.py:168` | if | raise | SCORED | — | `getattr(act_cfg, 'mode', None) != ActuatorMode.DRY_RUN` |
-| 48 | `orchestrator.py:429` | if | raise | SCORED | — | `self._running or (self._thread is not None and self._thread.is_alive())` |
-| 49 | `recommend/webhook.py:47` | if | raise | SCORED | — | `self.min_confidence not in VALID_CONFIDENCE_LEVELS` |
-| 50 | `shadow/runner.py:209` | if | raise | SCORED | — | `self._running or (self._thread is not None and self._thread.is_alive())` |
-| 51 | `observability/metrics_server.py:112` | if | raise | SCORED | — | `self._httpd is not None` |
-| 52 | `cli.py:229` | if | raise | EXCLUDED | — | `__name__ == '__main__'` |
-| 53 | `main.py:279` | if | raising-helper call | EXCLUDED | — | `args.config` |
-| 54 | `main.py:336` | if | raising-helper call | EXCLUDED | — | `__name__ == '__main__'` |
-| 55 | `main.py:337` | helper-admission | helper-admission call | EXCLUDED | — | `main()` |
+| 45 | `action/rollback.py:143` | if | raise | SCORED | — | `rollback_fn is not None and (not _declared_non_mutating(rollback_fn))` |
+| 46 | `orchestrator.py:174` | if | raise | SCORED | — | `self.config.auto_approve_threshold is not None` |
+| 47 | `orchestrator.py:177` | if | raise | SCORED | — | `act_cfg is not None` |
+| 48 | `orchestrator.py:179` | if | raise | SCORED | — | `getattr(act_cfg, 'mode', None) != ActuatorMode.DRY_RUN` |
+| 49 | `orchestrator.py:435` | if | raise | SCORED | — | `self._running or (self._thread is not None and self._thread.is_alive())` |
+| 50 | `recommend/engine.py:170` | if | raise | SCORED | — | `actuator_config is not None and actuator_config.mode is not ActuatorMode.DR…` |
+| 51 | `recommend/webhook.py:47` | if | raise | SCORED | — | `self.min_confidence not in VALID_CONFIDENCE_LEVELS` |
+| 52 | `shadow/runner.py:209` | if | raise | SCORED | — | `self._running or (self._thread is not None and self._thread.is_alive())` |
+| 53 | `observability/metrics_server.py:112` | if | raise | SCORED | — | `self._httpd is not None` |
+| 54 | `cli.py:229` | if | raise | EXCLUDED | — | `__name__ == '__main__'` |
+| 55 | `main.py:162` | if | raise | SCORED | — | `mode_str != 'dry_run'` |
+| 56 | `main.py:282` | if | raising-helper call | EXCLUDED | — | `args.config` |
+| 57 | `main.py:339` | if | raising-helper call | EXCLUDED | — | `__name__ == '__main__'` |
+| 58 | `main.py:340` | helper-admission | helper-admission call | EXCLUDED | — | `main()` |

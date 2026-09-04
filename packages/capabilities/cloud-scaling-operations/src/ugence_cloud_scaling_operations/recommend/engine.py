@@ -13,14 +13,16 @@ Each cycle:
 6. Send webhook notifications (with real recommendation ID)
 7. Expire stale recommendations
 
-On approval, the engine executes the scaling action via the K8s actuator
-(if configured). The actuator runs in DRY_RUN mode by default — set
-actuator_config to enable live scaling.
+On approval the engine records the decision and executes **nothing**
+(ADR_CLOUD_SCALING_OPERATIONS_ORCHESTRATOR_CONTAINMENT_SCOPING, D-1 and D-3): an
+approved recommendation is input to the governed ladder — admission, reservation,
+credential grant, bounded execution — never a mutation this engine performs. The
+engine refuses a non-DRY_RUN ``ActuatorConfig`` at construction, whichever loop
+builds it, so it can never hold a mutating actuator.
 
 NOTE — Cooldown timing:
-Cooldown starts when a recommendation is *approved* and *executed*.
-If execution fails, cooldown is still started to prevent rapid retries.
-See SafetyBounds.record_action().
+Cooldown starts when a recommendation is *approved*, so the same signal cannot be
+re-approved in a burst. See SafetyBounds.record_action().
 """
 
 import logging
@@ -51,7 +53,7 @@ from ugence_cloud_scaling_operations.recommend.approval import (
 )
 from ugence_cloud_scaling_operations.action.k8s_actuator import (
     ActuatorConfig,
-    ExecutionResult,
+    ActuatorMode,
     K8sActuator,
 )
 from ugence_cloud_scaling_operations.action.policy import (
@@ -91,7 +93,9 @@ class RecommendConfig:
     webhooks: List[WebhookConfig] = field(default_factory=list)
     # Approval TTL (seconds)
     approval_ttl_seconds: float = 600.0
-    # Actuator config (None = no execution on approval, dry_run by default)
+    # Actuator config. Only a DRY_RUN actuator is accepted (D-1); approval never
+    # executes through it (D-3). It remains so a rollback watch can be wired to a
+    # non-mutating scale function.
     actuator: Optional[ActuatorConfig] = None
     # Policy engine config (None = no policy checks)
     policy: Optional[PolicyConfig] = None
@@ -119,6 +123,10 @@ class RecommendCycleResult:
     # Whether recommendation was suppressed and why
     suppressed: bool = False
     suppress_reason: str = ""
+
+
+class MutatingActuatorRefused(RuntimeError):
+    """The engine was asked to hold a non-DRY_RUN actuator (containment ruling D-1)."""
 
 
 def _build_signals(action: ActionResult) -> Dict[str, Any]:
@@ -153,6 +161,20 @@ class RecommendEngine:
 
     def __init__(self, config: RecommendConfig | None = None):
         self.config = config or RecommendConfig()
+        # HARD AUTHORITY GUARD (ADR orchestrator containment, D-1): the recommendation
+        # engine can never hold a mutating actuator, whichever loop constructs it. The
+        # orchestrator's auto-approve guard was the only line before this ruling; a
+        # manual approve() with a SCALE_PATCH actuator reached the Kubernetes API with
+        # no ExecutionAuthorization. Refused here, before any component is built.
+        actuator_config = self.config.actuator
+        if actuator_config is not None and actuator_config.mode is not ActuatorMode.DRY_RUN:
+            raise MutatingActuatorRefused(
+                f"RecommendEngine refuses actuator mode {actuator_config.mode.value!r}: "
+                "a recommendation engine may not hold a mutating actuator. Live scaling "
+                "is dispatched only through the governed ladder into "
+                "ControlledScalingExecutor with an external ExecutionAuthorization; set "
+                "the actuator to DRY_RUN or omit it."
+            )
         self.scorer = ConfidenceScorer(self.config.confidence)
         self.safety = SafetyBounds(self.config.safety)
         self.dispatcher = WebhookDispatcher(self.config.webhooks)
@@ -319,20 +341,17 @@ class RecommendEngine:
         reason: str = "",
         metrics_snapshot: Optional[Dict[str, float]] = None,
     ) -> Optional[Recommendation]:
-        """Approve a pending recommendation and execute the scaling action.
+        """Approve a pending recommendation. Nothing is executed.
 
-        Pipeline: Policy check → Actuator execution → Rollback watch → Outcome tracking
+        ADR orchestrator containment, D-3: approval records the human decision and
+        returns the recommendation with ``execution_result`` left ``None``. No policy
+        check, actuator call, rollback watch or outcome record follows, because each of
+        those presumes an execution this engine may not perform. An approved
+        recommendation is input to the governed ladder (admission, reservation,
+        credential grant, bounded execution), never a mutation.
 
-        If an actuator is configured, executes the scaling action via K8s API.
-        Records the action in safety bounds (starts cooldown) regardless of
-        execution success to prevent rapid retries.
-
-        Args:
-            recommendation_id: ID of the recommendation to approve.
-            by: Who approved (operator ID).
-            reason: Optional note from operator.
-            metrics_snapshot: Current metrics for rollback/outcome baselines.
-                              If None, uses the recommendation's action snapshot.
+        The safety cooldown still starts, so the same signal cannot be re-approved in a
+        burst. ``metrics_snapshot`` is accepted for signature compatibility and ignored.
 
         Returns:
             The approved Recommendation, or None if not found/not pending.
@@ -340,84 +359,11 @@ class RecommendEngine:
         rec = self.approvals.approve(recommendation_id, by=by, reason=reason)
         if rec is None:
             return None
-
-        # Use recommendation's action metrics if no snapshot provided
-        if metrics_snapshot is None:
-            metrics_snapshot = rec.action.metrics_snapshot
-
-        # 1. Policy check — block if policy denies
-        if self.policy is not None:
-            policy_result = self.policy.check(
-                deployment=rec.service,
-                namespace=rec.namespace,
-                current_replicas=rec.current_replicas,
-                target_replicas=rec.target_replicas,
-            )
-            if not policy_result.allowed:
-                logger.warning(
-                    "Policy blocked execution for %s: %s",
-                    rec.id, policy_result.reason,
-                )
-                rec.execution_result = ExecutionResult(
-                    success=False,
-                    mode="policy_blocked",
-                    deployment=rec.service,
-                    namespace=rec.namespace,
-                    previous_replicas=rec.current_replicas,
-                    target_replicas=rec.target_replicas,
-                    delta=rec.clamped_delta,
-                    timestamp=time.time(),
-                    error=f"Policy denied: {policy_result.reason}",
-                    recommendation_id=rec.id,
-                )
-                self.safety.record_action()
-                return rec
-
-        # 2. Execute via actuator if configured
-        execution: Optional[ExecutionResult] = None
-        if self.actuator is not None:
-            execution = self.actuator.scale(
-                deployment=rec.service,
-                namespace=rec.namespace,
-                current_replicas=rec.current_replicas,
-                target_replicas=rec.target_replicas,
-                recommendation_id=rec.id,
-            )
-            rec.execution_result = execution
-            if execution.success:
-                logger.info(
-                    "Executed scaling for %s: %s",
-                    rec.id, execution.format_log(),
-                )
-                # 3. Start rollback watch if configured
-                if self.rollback is not None:
-                    self.rollback.start_watch(
-                        recommendation_id=rec.id,
-                        deployment=rec.service,
-                        namespace=rec.namespace,
-                        pre_action_replicas=rec.current_replicas,
-                        post_action_replicas=rec.target_replicas,
-                        pre_action_metrics=metrics_snapshot,
-                    )
-                # 4. Record for outcome tracking if configured
-                if self.outcome is not None:
-                    self.outcome.record_action(
-                        recommendation_id=rec.id,
-                        deployment=rec.service,
-                        namespace=rec.namespace,
-                        delta=rec.clamped_delta,
-                        pre_action_metrics=metrics_snapshot,
-                    )
-                # 5. Record action for policy rate limiting
-                if self.policy is not None:
-                    self.policy.record_action(rec.service, rec.namespace)
-            else:
-                logger.error(
-                    "Scaling execution FAILED for %s: %s",
-                    rec.id, execution.error,
-                )
-
-        # Start cooldown regardless of execution result
+        rec.execution_result = None
+        logger.info(
+            "Approved %s by %s: recorded, nothing executed (authority is external)",
+            rec.id, by or "-",
+        )
         self.safety.record_action()
         return rec
 

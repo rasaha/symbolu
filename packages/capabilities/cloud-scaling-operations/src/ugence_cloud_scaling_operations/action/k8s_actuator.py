@@ -1,49 +1,53 @@
-"""Kubernetes Actuator — executes scaling decisions via K8s API.
+"""Kubernetes Actuator — the reference scaling actuator behind the recommendation loop.
 
-Two scaling mechanisms:
-  1. Deployment scale patch — directly sets replica count
-  2. HPA target override — adjusts HPA's custom metric target
+Containment (ADR_CLOUD_SCALING_OPERATIONS_ORCHESTRATOR_CONTAINMENT_SCOPING, D-2):
 
-Uses the K8s Python client or raw HTTP. Falls back gracefully when
-the cluster is unreachable (logs error, does not crash).
+  * This module loads **no** kubeconfig and **no** in-cluster configuration and
+    imports **no** Kubernetes SDK. A client is *injected* by whoever constructs the
+    actuator, or it is absent — mirroring ``KubernetesScalingExecutor``. Asking the
+    actuator to discover credentials is not a mode it has.
+  * ``RecommendEngine`` refuses this actuator in any mode but ``DRY_RUN`` (D-1), and
+    ``RollbackMonitor`` accepts its ``scale`` only when :attr:`K8sActuator.mutates` is
+    ``False``. The ``SCALE_PATCH`` mode survives for a caller that injects a client
+    deliberately, outside any recommendation loop; live scaling under governance goes
+    through ``BoundedExecutionSeam`` → ``ControlledScalingExecutor``.
 
-Safety: all mutations are gated by the recommend/safety.py bounds
-BEFORE reaching this module. This module trusts its inputs.
+Modes:
+  1. ``DRY_RUN`` — log the proposed change; the default.
+  2. ``SCALE_PATCH`` — PATCH the deployment's replica count through the injected client.
+  3. ``HPA_METRIC`` — log only; the action score is expected to be exposed as a metric
+     for a HorizontalPodAutoscaler to consume.
+
+Safety: replica bounds are enforced upstream by recommend/safety.py. This module
+trusts its inputs.
 """
 
 import logging
 import threading
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import Enum
-from typing import Dict, List, Optional
+from typing import List, Optional
 
 logger = logging.getLogger(__name__)
-
-# Attempt K8s client import — optional dependency.
-# When unavailable, the actuator runs in dry-run mode.
-try:
-    from kubernetes import client as k8s_client, config as k8s_config
-    K8S_AVAILABLE = True
-except ImportError:
-    K8S_AVAILABLE = False
 
 
 class ActuatorMode(Enum):
     """How the actuator applies scaling decisions."""
     DRY_RUN = "dry_run"          # Log only, no mutations
-    SCALE_PATCH = "scale_patch"  # PATCH deployment replicas directly
+    SCALE_PATCH = "scale_patch"  # PATCH deployment replicas through an injected client
     HPA_METRIC = "hpa_metric"    # Expose action_score as custom metric for HPA
 
 
 @dataclass
 class ActuatorConfig:
-    """Configuration for the K8s actuator."""
+    """Configuration for the K8s actuator.
+
+    There is deliberately no ``kubeconfig_path`` and no ``context``: the actuator
+    never discovers credentials. Pass a client to :class:`K8sActuator` instead.
+    """
     # Operating mode
     mode: ActuatorMode = ActuatorMode.DRY_RUN
-    # K8s context (None = in-cluster or default kubeconfig)
-    kubeconfig_path: Optional[str] = None
-    context: Optional[str] = None
     # Retry on transient K8s API failures
     max_retries: int = 2
     retry_delay_seconds: float = 1.0
@@ -78,67 +82,34 @@ class ExecutionResult:
 
 
 class K8sActuator:
-    """Executes scaling decisions against the Kubernetes API.
+    """Executes scaling decisions against an *injected* Kubernetes AppsV1 client.
 
-    Usage:
-        actuator = K8sActuator(ActuatorConfig(mode=ActuatorMode.SCALE_PATCH))
-        result = actuator.scale(
-            deployment="api-gateway",
-            namespace="prod",
-            current_replicas=5,
-            target_replicas=7,
-        )
-        if result.success:
-            print(f"Scaled {result.deployment} to {result.target_replicas}")
+    Usage (dry run — the only shape a recommendation loop may hold):
+        actuator = K8sActuator(ActuatorConfig())
+        result = actuator.scale("api-gateway", "prod", 5, 7)
+
+    Usage (deliberate, outside any recommendation loop):
+        actuator = K8sActuator(ActuatorConfig(mode=ActuatorMode.SCALE_PATCH),
+                               apps_api=apps_v1_client)
     """
 
-    def __init__(self, config: Optional[ActuatorConfig] = None):
+    def __init__(self, config: Optional[ActuatorConfig] = None, *, apps_api: Optional[object] = None):
         self.config = config or ActuatorConfig()
-        self._apps_api: Optional[object] = None
-        self._initialized = False
+        # The one way a client arrives. Nothing here opens a kubeconfig, reads a
+        # service-account token or imports the kubernetes package.
+        self._apps_api: Optional[object] = apps_api
         self._lock = threading.Lock()
         self._history: List[ExecutionResult] = []
         self._max_history = 1000
 
-    def _ensure_client(self) -> bool:
-        """Lazily initialize the K8s client.
+    @property
+    def mutates(self) -> bool:
+        """Whether a ``scale`` call can change infrastructure. Read by RollbackMonitor."""
+        return self.config.mode is not ActuatorMode.DRY_RUN
 
-        Returns True if client is ready, False if unavailable.
-        """
-        if self._initialized:
-            return self._apps_api is not None
-
-        self._initialized = True
-
-        if self.config.mode == ActuatorMode.DRY_RUN:
-            return True  # No client needed for dry run
-
-        if not K8S_AVAILABLE:
-            logger.warning(
-                "kubernetes package not installed — actuator forced to dry_run. "
-                "Install with: pip install kubernetes"
-            )
-            return False
-
-        try:
-            if self.config.kubeconfig_path:
-                k8s_config.load_kube_config(
-                    config_file=self.config.kubeconfig_path,
-                    context=self.config.context,
-                )
-            else:
-                try:
-                    k8s_config.load_incluster_config()
-                except k8s_config.ConfigException:
-                    k8s_config.load_kube_config(context=self.config.context)
-
-            self._apps_api = k8s_client.AppsV1Api()
-            logger.info("K8s client initialized (mode=%s)", self.config.mode.value)
-            return True
-        except Exception as e:
-            logger.error("Failed to initialize K8s client: %s", e)
-            self._apps_api = None
-            return False
+    @property
+    def has_client(self) -> bool:
+        return self._apps_api is not None
 
     def scale(
         self,
@@ -253,8 +224,9 @@ class K8sActuator:
         timestamp: float,
         recommendation_id: str,
     ) -> ExecutionResult:
-        """PATCH the deployment's replica count via K8s API."""
-        if not self._ensure_client() or self._apps_api is None:
+        """PATCH the deployment's replica count through the injected client."""
+        if self._apps_api is None:
+            # Fail closed: no client was injected and none will be discovered.
             return ExecutionResult(
                 success=False,
                 mode="scale_patch",
@@ -264,7 +236,7 @@ class K8sActuator:
                 target_replicas=target_replicas,
                 delta=delta,
                 timestamp=timestamp,
-                error="K8s client not available",
+                error="no injected Kubernetes client (the actuator discovers none)",
                 recommendation_id=recommendation_id,
             )
 
@@ -335,8 +307,6 @@ class K8sActuator:
             return [r for r in self._history if r.success and r.timestamp > cutoff]
 
     def reset(self) -> None:
-        """Clear execution history."""
+        """Clear execution history. The injected client, if any, is kept."""
         with self._lock:
             self._history.clear()
-        self._initialized = False
-        self._apps_api = None

@@ -1,7 +1,7 @@
 {
   "package": "operations",
-  "total": 55,
-  "scored": 51,
+  "total": 58,
+  "scored": 54,
   "excluded": 4,
   "classification": {
     "1": {
@@ -270,47 +270,59 @@
     },
     "45": {
       "status": "SCORED",
-      "module": "orchestrator.py",
-      "line": 163,
-      "condition": "self.config.auto_approve_threshold is not None"
+      "module": "action/rollback.py",
+      "line": 143,
+      "condition": "rollback_fn is not None and (not _declared_non_mutating(rollback_fn))"
     },
     "46": {
       "status": "SCORED",
       "module": "orchestrator.py",
-      "line": 166,
-      "condition": "act_cfg is not None"
+      "line": 174,
+      "condition": "self.config.auto_approve_threshold is not None"
     },
     "47": {
       "status": "SCORED",
       "module": "orchestrator.py",
-      "line": 168,
-      "condition": "getattr(act_cfg, 'mode', None) != ActuatorMode.DRY_RUN"
+      "line": 177,
+      "condition": "act_cfg is not None"
     },
     "48": {
       "status": "SCORED",
       "module": "orchestrator.py",
-      "line": 429,
-      "condition": "self._running or (self._thread is not None and self._thread.is_alive())"
+      "line": 179,
+      "condition": "getattr(act_cfg, 'mode', None) != ActuatorMode.DRY_RUN"
     },
     "49": {
+      "status": "SCORED",
+      "module": "orchestrator.py",
+      "line": 435,
+      "condition": "self._running or (self._thread is not None and self._thread.is_alive())"
+    },
+    "50": {
+      "status": "SCORED",
+      "module": "recommend/engine.py",
+      "line": 170,
+      "condition": "actuator_config is not None and actuator_config.mode is not ActuatorMode.DRY_RUN"
+    },
+    "51": {
       "status": "SCORED",
       "module": "recommend/webhook.py",
       "line": 47,
       "condition": "self.min_confidence not in VALID_CONFIDENCE_LEVELS"
     },
-    "50": {
+    "52": {
       "status": "SCORED",
       "module": "shadow/runner.py",
       "line": 209,
       "condition": "self._running or (self._thread is not None and self._thread.is_alive())"
     },
-    "51": {
+    "53": {
       "status": "SCORED",
       "module": "observability/metrics_server.py",
       "line": 112,
       "condition": "self._httpd is not None"
     },
-    "52": {
+    "54": {
       "status": "EXCLUDED",
       "reason": "outside-authority-bearing-definition",
       "detail": "The console-script dispatch. It decides process bootstrap, not an execution outcome, and is unreachable in any imported run of the suite \u2014 the module imports under its own name.",
@@ -319,31 +331,37 @@
       "line": 229,
       "condition": "__name__ == '__main__'"
     },
-    "53": {
+    "55": {
+      "status": "SCORED",
+      "module": "main.py",
+      "line": 162,
+      "condition": "mode_str != 'dry_run'"
+    },
+    "56": {
       "status": "EXCLUDED",
       "reason": "outside-authority-bearing-definition",
       "detail": "Config-source selection inside the service bootstrap: it picks where a long-running process reads configuration from, and decides no admission outcome. Exercising it means booting the service; the authority gates the configuration feeds are scored directly.",
       "evidence": "tests/execution/test_guard_coverage.py::test_the_console_entrypoints_do_not_run_on_import",
       "module": "main.py",
-      "line": 279,
+      "line": 282,
       "condition": "args.config"
     },
-    "54": {
+    "57": {
       "status": "EXCLUDED",
       "reason": "outside-authority-bearing-definition",
       "detail": "The same dispatch for the service entrypoint module.",
       "evidence": "tests/execution/test_guard_coverage.py::test_the_console_entrypoints_do_not_run_on_import",
       "module": "main.py",
-      "line": 336,
+      "line": 339,
       "condition": "__name__ == '__main__'"
     },
-    "55": {
+    "58": {
       "status": "EXCLUDED",
       "reason": "outside-authority-bearing-definition",
       "detail": "The statement the dispatch above guards \u2014 the call that boots the long-running service. Deleting it changes nothing an imported test run can observe, for the same module-name reason.",
       "evidence": "tests/execution/test_guard_coverage.py::test_the_console_entrypoints_do_not_run_on_import",
       "module": "main.py",
-      "line": 337,
+      "line": 340,
       "condition": "main()"
     }
   }
