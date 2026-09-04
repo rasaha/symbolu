@@ -217,7 +217,7 @@ def test_noncanonical_decimal_representation_of_an_index_fails_construction():
             execution_order_rule="ascending_case_digest", verdict_custody_ref="memory://x",
             sampling_algorithm_id="bbh_hash_rank_select", sampling_algorithm_version="1",
             seed="1", population_size=5, sample_size=2, selected_indexes=("00", "1"),
-            sample_index_digest=index_list_digest((0, 1)), formula_id="f", formula_version="1",
+            sample_index_digest=index_list_digest((0, 1)), formula_id="calfloor.linear_chain", formula_version="1",
         )
 
 
@@ -487,6 +487,101 @@ def test_a_provider_configuration_of_any_other_shape_is_refused_on_read(tmp_path
     (out / "provider_configuration.json").write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n")
     _reindex(out)
     with pytest.raises(B.PreparedBundleError):
+        B.verify(out, catalog=pf.catalog(), rule_set=pf.rule_set(), advisory=None)
+
+
+
+# --------------------------------------------------------------------------- revision-19 field shapes
+
+
+SECRET = "sk-ant-api03-NOTAREALKEY-000000000000000000"
+
+
+def _design_kwargs(**overrides):
+    """A minimal CONFIRMATORY design; overrides isolate the one field under test."""
+    kwargs = dict(
+        manifest_id="m", manifest_digest="a" * 64, run_role="CONFIRMATORY",
+        benchmark_id="b", benchmark_version="1", benchmark_content_digest="a" * 64,
+        execution_order_rule="ascending_case_digest",
+        verdict_custody_ref="memory://workflow-fit-test/shape",
+    )
+    kwargs.update(overrides)
+    return kwargs
+
+
+@pytest.mark.parametrize(
+    "value",
+    [SECRET, "sk-proj-NOTAREALKEY-0000000000", "no-scheme", "memory:/x", "://x", "1scheme://x",
+     "memory://", "memory://x\n", "memory://x\x00y", "memory://x y", " memory://x"],
+)
+def test_verdict_custody_ref_of_any_non_uri_shape_is_refused(value):
+    with pytest.raises(B.PreparedBundleError, match="verdict_custody_ref must be a well-formed absolute URI"):
+        B.ExperimentalDesign(**_design_kwargs(verdict_custody_ref=value))
+
+
+@pytest.mark.parametrize("value", ["memory://workflow-fit-test/x", "https://example.invalid/a/b", "s3+custody://bucket/key"])
+def test_well_formed_custody_uris_are_accepted(value):
+    assert B.ExperimentalDesign(**_design_kwargs(verdict_custody_ref=value)).verdict_custody_ref == value
+
+
+# "" is omitted: it is refused earlier by the pre-existing non-blank guard, which has its
+# own test. Listing it here would assert a refusal this ruling did not cause.
+@pytest.mark.parametrize("value", [SECRET, "descending_case_digest", "ascending_case_digest ", "Ascending_Case_Digest", "ascending_case_digest\n"])
+def test_execution_order_rule_other_than_the_ratified_value_is_refused(value):
+    with pytest.raises(B.PreparedBundleError, match="execution_order_rule must be exactly"):
+        B.ExperimentalDesign(**_design_kwargs(execution_order_rule=value))
+
+
+def _calibration_kwargs(**overrides):
+    indexes = select_indexes(seed=RATIFIED_SEED, population_size=POPULATION, sample_size=SAMPLE)
+    kwargs = _design_kwargs(
+        run_role="CALIBRATION",
+        sampling_algorithm_id="bbh_hash_rank_select", sampling_algorithm_version="1",
+        seed=str(RATIFIED_SEED), population_size=POPULATION, sample_size=SAMPLE,
+        selected_indexes=tuple(str(i) for i in indexes), sample_index_digest=index_list_digest(indexes),
+        formula_id="calfloor.linear_chain", formula_version="1",
+    )
+    kwargs.update(overrides)
+    return kwargs
+
+
+@pytest.mark.parametrize("value", [SECRET, "calfloor.linear_chain.v1", "calfloor_linear_chain", "CALFLOOR.LINEAR_CHAIN", "calfloor.linear_chain\n", "other"])
+def test_formula_id_other_than_the_ratified_value_is_refused(value):
+    with pytest.raises(B.PreparedBundleError, match="formula_id must be exactly"):
+        B.ExperimentalDesign(**_calibration_kwargs(formula_id=value))
+
+
+@pytest.mark.parametrize("value", [SECRET, "v1", "1.0", "01", "0", "-1", "1\n", "one"])
+def test_formula_version_of_any_non_integer_shape_is_refused(value):
+    with pytest.raises(B.PreparedBundleError, match="formula_version must be a bare positive integer"):
+        B.ExperimentalDesign(**_calibration_kwargs(formula_version=value))
+
+
+@pytest.mark.parametrize("value", ["1", "2", "10"])
+def test_bare_positive_integer_formula_versions_are_accepted(value):
+    assert B.ExperimentalDesign(**_calibration_kwargs(formula_version=value)).formula_version == value
+
+
+@pytest.mark.parametrize(
+    ("field", "value", "message"),
+    [
+        ("verdict_custody_ref", SECRET, "verdict_custody_ref must be a well-formed absolute URI"),
+        ("execution_order_rule", SECRET, "execution_order_rule must be exactly"),
+        ("formula_id", SECRET, "formula_id must be exactly"),
+        ("formula_version", SECRET, "formula_version must be a bare positive integer"),
+    ],
+)
+def test_a_hand_written_credential_shaped_field_is_refused_on_read(tmp_path, field, value, message):
+    """Obligation 1: the writer's guard is worthless if the reader does not re-apply it. A
+    hand-written experimental_design.json, re-indexed so every digest agrees, must still be
+    refused \u2014 otherwise index_digest would commit the credential permanently."""
+    out = tmp_path / "bundle"
+    _prepare_calibration(out)
+    payload = json.loads((out / "experimental_design.json").read_text())
+    payload[field] = value
+    (out / "experimental_design.json").write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n")
+    _reindex(out)
+    with pytest.raises(B.PreparedBundleError, match=message):
         B.verify(out, catalog=pf.catalog(), rule_set=pf.rule_set(), advisory=None)
 
 

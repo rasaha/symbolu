@@ -97,6 +97,31 @@ _API_TOKEN = "api"
 
 _TOKEN_SPLIT = re.compile(r"[^a-z0-9]+")
 
+# Revision 19 owner rulings. Obligation 1 (revision 18) recorded four free-form prepared
+# fields that accept credential-shaped values and reach a prepared artifact, where
+# ``index_digest`` would commit them permanently. The credential-key scan cannot catch any
+# of them: it inspects key *names*, and here the secret would be a *value* under a
+# legitimate key. Each shape below is an owner ruling, not an inference from usage.
+
+# `verdict_custody_ref`: structural only — a well-formed absolute URI. The scheme is
+# deliberately NOT allowlisted: §2.2 binds the concrete endpoint at D5 ratification and
+# declines to name it, so an allowlist built today would encode a fabricated value. This
+# still refuses every credential shape, which carries no "://".
+# ``\Z``, not ``$``: Python's ``$`` also matches before a trailing newline, the laxity
+# recorded as obligation 2. That laxity is inherited in ``_FACTORY_PATH`` and left alone
+# there by ruling; it is not reproduced in a regex written fresh here. Control characters
+# are excluded explicitly: ``\s`` alone would admit NUL and ESC.
+_ABSOLUTE_URI = re.compile(r"^[A-Za-z][A-Za-z0-9+.-]*://[^\s\x00-\x1f\x7f]+\Z")
+
+# `execution_order_rule`: exact match. The owner ratified this as the sole intended value.
+_EXECUTION_ORDER_RULE = "ascending_case_digest"
+
+# `formula_id` / `formula_version`: the owner ratified the split of the note's
+# `calfloor.linear_chain.v1` into an id and a version, composing as `<id>.v<version>`.
+# The id is pinned by exact match; the version is a bare positive integer.
+_FORMULA_ID = "calfloor.linear_chain"
+_FORMULA_VERSION = re.compile(r"^[1-9][0-9]*\Z")
+
 # ``package.module:function``. Identical to the shape the 4B loader already enforces
 # (``experiments/workflow_fit_reference_pilot/loaders.py``, ``_FACTORY``), reused here so a
 # prepared bundle cannot commit a provider_factory of any other shape.
@@ -236,6 +261,16 @@ class ExperimentalDesign:
                 raise PreparedBundleError(f"ExperimentalDesign.{name} must be a non-blank string")
         if self.run_role not in (r.value for r in PilotRunRole):
             raise PreparedBundleError(f"ExperimentalDesign.run_role must be one of {[r.value for r in PilotRunRole]}")
+        if self.execution_order_rule != _EXECUTION_ORDER_RULE:
+            raise PreparedBundleError(
+                f"ExperimentalDesign.execution_order_rule must be exactly {_EXECUTION_ORDER_RULE!r} "
+                "(revision 19); a value of any other shape is refused rather than committed"
+            )
+        if not _ABSOLUTE_URI.match(self.verdict_custody_ref):
+            raise PreparedBundleError(
+                "ExperimentalDesign.verdict_custody_ref must be a well-formed absolute URI "
+                "'scheme://rest' (revision 19); a value of any other shape is refused rather than committed"
+            )
         calibration_fields = (
             self.sampling_algorithm_id, self.sampling_algorithm_version, self.seed, self.population_size,
             self.sample_size, self.selected_indexes, self.sample_index_digest, self.formula_id, self.formula_version,
@@ -277,6 +312,16 @@ class ExperimentalDesign:
         for name in ("formula_id", "formula_version"):
             if not isinstance(getattr(self, name), str) or not getattr(self, name).strip():
                 raise PreparedBundleError(f"ExperimentalDesign.{name} must be a non-blank string")
+        if self.formula_id != _FORMULA_ID:
+            raise PreparedBundleError(
+                f"ExperimentalDesign.formula_id must be exactly {_FORMULA_ID!r} (revision 19); "
+                "a value of any other shape is refused rather than committed"
+            )
+        if not _FORMULA_VERSION.match(self.formula_version):
+            raise PreparedBundleError(
+                "ExperimentalDesign.formula_version must be a bare positive integer with no leading "
+                "zeros (revision 19); a value of any other shape is refused rather than committed"
+            )
 
 
 def _experimental_design_payload(ed: ExperimentalDesign) -> Dict[str, Any]:
