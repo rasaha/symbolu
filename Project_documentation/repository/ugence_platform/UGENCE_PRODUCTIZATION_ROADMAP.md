@@ -293,7 +293,7 @@ No item may claim a label above the one listed, and no item may claim
 | **Entry** | GAS-1 committed. A local Postgres is available in CI. |
 | **Work** | The neutral `DurableExecutionAdapter` Protocols in a new integration package; a DBOS-backed implementation; Postgres-backed `CheckpointStore`, `RuntimeEventStore` and `RuntimeStateStore` behind the existing Agent Runtime Protocols `[V]` (`packages/runtime/agent-runtime/src/ugence_agent_runtime/persistence/interfaces.py`). Every matrix row from GAS-1 lands as an executing test. |
 | **Exit** | Every GAS-1 matrix row has a passing CI test against a real local Postgres, including the crash, duplicate-delivery, expiry, revocation, Postgres-unavailable, budget-contention, long-pause, version-change and clock-skew rows. `packages/runtime/agent-runtime` gains **no** new import `[V]` — the adapter depends on the runtime, never the reverse. |
-| **Status (2026-09-05)** | **Implemented; all eleven matrix rows green locally** (`packages/integration/durable-execution`, 43 passed; Agent Runtime byte-unchanged, 364 passed). CI has not yet run on a pull request, so DBOS remains **candidate** pending owner decision OD-3. Evidence: ADR §8A. |
+| **Status (2026-09-05)** | **Implemented; all eleven matrix rows green in CI** against a real PostgreSQL (durable-execution-ci job 101257085510 on `fe6f1591`: matrix 29 passed, no row skipped; Agent Runtime byte-unchanged, 364 passed). Owner ruled **OD-3 `RATIFY`**: DBOS is **ratified as the initial engine**. Not pilot-validated, not production-certified. Evidence: ADR §8A and §9. |
 | **Label on completion** | **Core implemented** for the adapter package; **DBOS moves from *candidate* to *ratified as the initial engine*** at this exit and at no earlier point (GAS-R1). Agent Runtime's own "not distributed-safe, not exactly-once" statements `[V]` (`packages/runtime/agent-runtime/README.md:36`) are revised only for the properties the matrix actually proves, and only in the adapter's README. |
 
 #### GAS-3 · Production `GovernanceHook` adapter from `GovernedExecutionDecision`
@@ -353,7 +353,7 @@ All four are ruled and recorded at source; GAS-1 is complete and GAS-2 is open.
 |---|---|---|
 | OD-1 | `REQUIRE_SINGLE_TRANSACTION` — atomic commit is a **DBOS ratification gate**; if DBOS cannot provide it, GAS-2 stops and reports rather than accepting a residual | `ADR_DBOS_DURABLE_EXECUTION_INTEGRATION.md` §9 |
 | OD-2 | `COEXIST_WITH_BOUNDARY` — governance stores keep their ratified SQLite; DBOS and the three Agent Runtime stores share Postgres behind a documented consistency boundary | same, §9 |
-| OD-3 | **Open** — whether the CI-verified matrix promotes DBOS from *candidate* to *ratified*. Opened by GAS-2's evidence; GAS-3 does not depend on it | same, §8A and §9 |
+| OD-3 | **`RATIFY`** (2026-09-05) — the CI-verified matrix promotes DBOS from *candidate* to *ratified as the initial engine*; `DBOS_ENGINE_STATUS = "RATIFIED"` | same, §8A and §9 |
 | SD-1 | `EXPLICIT_PUBLIC_ALLOWLIST` — the studio boundary widens only by a per-package public-entry-point allowlist; the architecture test is retained | `apps/ugence-governance-studio/docs/GOVERNED_AGENT_STUDIO_V1_SCREEN_AUDIT.md` |
 | SD-2 | `NON_AUTHORITY_STUDIO` — the studio never issues, activates, revokes, grants, authorizes, clears or executes | same |
 

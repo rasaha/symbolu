@@ -1,11 +1,12 @@
 # DBOS durable execution — integration scoping
 
-**Status: SCOPING — DBOS is a CANDIDATE engine, not a ratified one.** This record
-fixes what an implementation must do. It authorizes no code change, adds no
-dependency, and ships no adapter. DBOS becomes the ratified initial engine only when
-every row of the matrix in §8 has passing evidence in CI (roadmap item GAS-2; see
+**Status: RATIFIED — DBOS is the initial durable-execution engine by owner ruling
+OD-3 (§9, 2026-09-05).** The ruling rests on every row of the §8 matrix passing in CI
+(§8A). Ratified means that and only that: not pilot-validated, not
+production-certified, not approved for any live system. This record fixes what the
+implementation must do (roadmap item GAS-2; see
 `Project_documentation/repository/ugence_platform/UGENCE_PRODUCTIZATION_ROADMAP.md`
-§11). Until then, no document, README or release note may describe the engine
+§11). Beyond the ratified claim, no document, README or release note may describe the engine
 integration as implemented, durable, exactly-once, distributed-safe or
 production-ready.
 
@@ -542,13 +543,14 @@ several magnitudes. The residual is stated, not papered over: detection recognis
 known default, and a deployment that hides a monotonic reading behind an unrecognisable
 wrapper defeats the guard.
 
-### Status: DBOS is still a CANDIDATE
+### Status: DBOS is RATIFIED (OD-3)
 
-Every row is green **in a local environment**; the CI workflow
-(`.github/workflows/durable-execution-ci.yml`) has not yet executed on a pull request.
-`DBOS_ENGINE_STATUS` therefore remains `CANDIDATE`, asserted by the package suite.
-Promotion to ratified is a deliberate owner act recorded in this ADR — never a side
-effect of a green run — and is the next decision (§9, OD-3).
+Every row is green in CI against a real PostgreSQL 16 on the runner. CI evidence: durable-execution-ci job 101254854185 (first green run on PR #1605) and job 101257085510 on `fe6f1591` (after the four review fixes): OD-1 5 passed; matrix rows 01–11 all PASSED, 29 passed, "No matrix row was skipped"; production-hook re-run 12 passed; boundaries and ADR conformance 12 passed; Agent Runtime unchanged, 364 passed.
+Four defects found in review between those runs were fixed before the ruling: the
+row-10 comparison could pass vacuously through a default digest; a budget refusal
+aborted the enclosing transaction; `signal()` raced a concurrent advance for the
+sequence key; the attempt token was never reset. `DBOS_ENGINE_STATUS` is `RATIFIED`,
+asserted by the package suite together with the OD-3 record in §9.
 
 ---
 
@@ -639,12 +641,12 @@ human to see the parked instance; no credential broker exists `[G]`.
 
 ## 9 — Owner decisions (ruled 2026-09-05)
 
-OD-1 and OD-2 were ruled by the repository owner before GAS-2 began. OD-3 opened on GAS-2's evidence and is the only one outstanding.
+OD-1 and OD-2 were ruled by the repository owner before GAS-2 began. OD-3 was ruled on GAS-2's CI evidence after the review fixes. None is outstanding.
 
 | # | Ruling |
 |---|---|
 | **OD-1** | **`REQUIRE_SINGLE_TRANSACTION`.** Atomic commit is a **DBOS ratification gate**, not a documented residual. The DBOS step record, the `RuntimeStateStore` update, the `CheckpointStore` append and the `RuntimeEventStore` appends must commit in **one supported Postgres transaction**. If DBOS cannot provide this, **DBOS remains a candidate and GAS-2 stops and reports the evidence** — a permanent split-commit residual is neither accepted nor engineered around. This *strengthens* what §5.4 and §8 row 3 previously contemplated: those passages are read subject to this ruling. |
-| **OD-3** | **Open.** Promotion of DBOS from *candidate* to *ratified as the initial engine*, on the evidence in §8A plus a green run of the CI workflow on a pull request. Until ruled, `DBOS_ENGINE_STATUS` stays `CANDIDATE`. |
+| **OD-3** | **`RATIFY`** (2026-09-05). DBOS is promoted from *candidate* to *ratified as the initial engine* on the evidence in §8A: durable-execution-ci job 101257085510 on `fe6f1591`, every matrix row PASSED, no row skipped, production-hook re-run green, Agent Runtime unchanged. `DBOS_ENGINE_STATUS` is `RATIFIED`. Ratified establishes nothing beyond the matrix: not pilot-validated, not production-certified, no live execution, no credentials. |
 | **OD-2** | **`COEXIST_WITH_BOUNDARY`.** Risk Authority and execution-reservation persistence stay on their separately ratified SQLite Posture B `[V]` (`ADR_RISK_AUTHORITY_DURABLE_PERSISTENCE_SCOPING.md` D-1). DBOS and the three Agent Runtime stores share Postgres. The two backends coexist behind an **explicitly documented consistency boundary**, stated in the adapter README. GAS-2 migrates and redesigns no governance store. §8 row 8's budget ledger therefore lives in the shared Postgres. |
 
 ### What OD-1 changes in this record
@@ -671,7 +673,6 @@ consistency, HSM/KMS custody and key rotation are untouched here. The clock defe
 
 ## 11 — Next step
 
-GAS-2 and GAS-3 are implemented; their evidence is recorded in §8A and §8B. Rule
-**OD-3** — whether the CI-verified matrix promotes DBOS from *candidate* to *ratified* —
-and only then flip `DBOS_ENGINE_STATUS`. GAS-4 (Studio v1) is the next build item and
-does not depend on OD-3; it is gated instead by SD-1 and SD-2, both already ruled.
+GAS-2 and GAS-3 are implemented; their evidence is recorded in §8A and §8B, and OD-3
+is ruled `RATIFY` (§9). GAS-4 (Studio v1) is the next build item; it is gated by SD-1
+and SD-2, both already ruled.
