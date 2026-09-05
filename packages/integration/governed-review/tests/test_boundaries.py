@@ -33,6 +33,8 @@ FORBIDDEN = {
     # the engine, the runtime and the studio: composed around, never imported here
     "ugence_durable_execution", "dbos", "ugence_agent_runtime",
     "ugence_governance_studio_api", "ugence_console_api",
+    # HE-1: the append is the review service's root's; the contract package stays clean
+    "ugence_control_plane_root",
     # capabilities and reserved nouns
     "ugence_decision_authority", "ugence_policy_workflow_compiler",
     "ugence_execution_reservation", "ugence_action_clearance", "risk_authority",
@@ -85,7 +87,8 @@ def test_pyproject_declares_the_ratified_dependency_set():
     }
     joined = " ".join(data["project"]["dependencies"]).lower()
     for forbidden in ("durable-execution", "dbos", "pydantic", "decision-authority",
-                      "sqlalchemy", "psycopg", "boto3", "kubernetes", "redis"):
+                      "sqlalchemy", "psycopg", "boto3", "kubernetes", "redis",
+                      "control-plane-root"):
         assert forbidden not in joined
     assert pkg.__version__ == "0.2.0"
 
