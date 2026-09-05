@@ -554,6 +554,91 @@ asserted by the package suite together with the OD-3 record in §9.
 
 ---
 
+## 8B — GAS-3: the production hook, and the matrix re-run (2026-09-05)
+
+Implemented at `packages/integration/agent-runtime-governance`
+(`ugence-agent-runtime-governance` 0.1.0). **68 passed.** Agent Runtime, RA-4.5
+composition and the RA-6 status runtime are all byte-unchanged and their own suites
+still pass.
+
+### The projection
+
+`GovernedExecutionDecision` → `GovernanceEvaluation`, bound to the exact proposal
+fingerprint and correlation id, with Risk Authority's own `envelope_id` as the binding
+reference. Total and non-broadening `[V]`:
+
+| `FinalDisposition` | → | Runtime directive |
+|---|---|---|
+| `GRANT` | `CLEAR` | CONTINUE |
+| `DENY` | `BLOCK` | STOP |
+| `HOLD_NON_EXECUTABLE` | `HOLD`, or `ESCALATE` where an approval is required | WAIT / PAUSE |
+| `ERROR_NON_EXECUTABLE` | `BLOCK` | STOP |
+| anything else | `BLOCK` | STOP |
+
+A GRANT carrying no `envelope_id` is **refused**, not given a minted identifier: there
+would be nothing to bind the clearance to, and inventing one would make an unbindable
+permission look bindable.
+
+### Three widening paths, closed and tested `[V]`
+
+1. **A str-enum look-alike.** `FinalDisposition` subclasses `str`, so `"GRANT"` compares
+   equal to `FinalDisposition.GRANT` *and hashes identically* — a dict lookup or an `==`
+   check accepts it. `isinstance` is checked first.
+2. **A self-reported `executable`.** CLEAR requires GRANT *and* `executable is True`, so
+   an object claiming `executable=True` beside a DENY is refused.
+3. **An uninspectable decision.** `getattr(obj, name, default)` only swallows
+   `AttributeError`. A decision whose `__getattr__` raised anything else propagated into
+   the runtime's hot path — where a raising hook is indistinguishable from one that was
+   never asked. **The adversarial suite caught this while being written**; every read is
+   now guarded and the hook never raises.
+
+### The recheck is wired, not rebuilt `[V]`
+
+Risk Authority's status runtime already ships `make_pre_effect_recheck`, already in the
+`(evaluation, proposal, now) -> (ok, reasons)` shape the `authority_recheck` seam
+expects. Rebuilding it would duplicate authority-critical logic outside the package that
+owns it. What was missing is the *resolver* — mapping a neutral proposal back to the
+envelope its CLEAR rested on — so the hook records `fingerprint -> (envelope, tier)` on
+clearing and `build_authority_recheck` supplies it.
+
+Tested against genuine Ed25519-signed envelopes through the RA-6 scenario builder: a real
+revocation and a real epoch advance are both caught at the commit point. This closes the
+loop opened by §8 row 6's negative case.
+
+### Matrix re-run with the production hook `[V]`
+
+`packages/integration/durable-execution/tests/test_matrix_production_hook.py`, **12
+passed**. The rows below ran with the real hook in place of `AllowAllGovernanceHook`.
+
+| Row | With the production hook |
+|---:|---|
+| 1 · crash before the provider call | PASSING — hook re-consulted after recovery, identical fingerprint |
+| 2 · crash during the provider call | PASSING — same idempotency key on retry |
+| 3 · crash after the effect, before the commit | PASSING — advance transaction rolled back whole |
+| 4 · duplicate delivery | PASSING — exactly one executes |
+| 5 · clearance expiry | PASSING — **stronger**: expiry originates on the envelope and travels composition → epoch-seconds projection → `validate_clearance` |
+| 6 · revocation, and the negative case | PASSING — both |
+| 7 · checkpoint corruption | PASSING |
+| 8 · budget contention | governance-independent — covered once in `test_matrix.py` |
+| 9 · pause and resume | PASSING — **stronger**: ESCALATE is *derived* from a composed HOLD carrying a required approval, not injected |
+| 10 · definition version change | governance-independent |
+| 11 · clock skew and monotonic refusal | governance-independent |
+
+The three exemptions are asserted by a test that inspects those rows' source for hook
+dependence, so the gap in the count is proven rather than asserted. A baseline test also
+confirms the production hook actually reaches CLEAR — otherwise the durability
+assertions would pass vacuously by never clearing.
+
+### Maturity: Core implemented `[V]`
+
+Not pilot-validated, not production-certified. What stays blocked is unchanged by GAS-3:
+Risk Authority `production_mode` still raises `ProductionContainmentError` `[G]`; **HOLD,
+DEFER, ESCALATE and MANUAL_REVIEW still have no sink** `[G]` — the hook now emits them
+faithfully and the runtime parks on them correctly, and there is still nowhere for a
+human to see the parked instance; no credential broker exists `[G]`.
+
+---
+
 ## 9 — Owner decisions (ruled 2026-09-05)
 
 OD-1 and OD-2 were ruled by the repository owner before GAS-2 began. OD-3 was ruled on GAS-2's CI evidence after the review fixes. None is outstanding.
@@ -588,6 +673,6 @@ consistency, HSM/KMS custody and key rotation are untouched here. The clock defe
 
 ## 11 — Next step
 
-GAS-2 is implemented, its evidence is recorded in §8A, and OD-3 is ruled `RATIFY`
-(§9). GAS-3 (the production `GovernanceHook` adapter from `GovernedExecutionDecision`)
-is the next build item.
+GAS-2 and GAS-3 are implemented; their evidence is recorded in §8A and §8B, and OD-3
+is ruled `RATIFY` (§9). GAS-4 (Studio v1) is the next build item; it is gated by SD-1
+and SD-2, both already ruled.

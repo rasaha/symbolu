@@ -210,9 +210,19 @@ def _main() -> int:
     import _hooks
 
     tag = os.environ.get("UDE_PROCESS_TAG", "child")
+
+    # UDE_HOOK selects which governance hook drives the crash rows. The matrix was first
+    # proven with the recording test hook; "production" re-runs the same rows against the
+    # real GovernedExecutionHook composing through the ratified engine.
+    if os.environ.get("UDE_HOOK") == "production":
+        import _production
+
+        hook: Any = _production.clearing_hook(app_url)
+    else:
+        hook = _hooks.RecordingHook(app_url, process_tag=tag)
+
     ds, dbos, adapter, bundle = wire(
-        app_url=app_url, sys_url=sys_url,
-        provider=provider, hook=_hooks.RecordingHook(app_url, process_tag=tag),
+        app_url=app_url, sys_url=sys_url, provider=provider, hook=hook,
     )
     adapter.start(
         workflow_id=WORKFLOW_ID, definition_digest=DEFINITION_DIGEST,

@@ -1,0 +1,98 @@
+name: agent-runtime-governance-ci
+
+# Scoped CI for ugence-agent-runtime-governance (roadmap GAS-3): the production
+# GovernanceHook adapter.
+#
+# The adversarial suite is the point of this job. It proves that no composed outcome
+# other than an unambiguous GRANT can reach CLEAR — exhaustively over the veto
+# vocabulary, and against decision objects deliberately shaped to defeat a naive
+# projection.
+
+on:
+  pull_request:
+    paths:
+      - "packages/integration/agent-runtime-governance/**"
+      - ".github/workflows/agent-runtime-governance-ci.yml"
+  push:
+    branches:
+      - "claude/**"
+    paths:
+      - "packages/integration/agent-runtime-governance/**"
+      - ".github/workflows/agent-runtime-governance-ci.yml"
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  suite:
+    name: Adversarial + boundary suite
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          # pydantic is not this package's dependency; it is Decision Authority's, which
+          # the risk-authority-runtime suite re-run below imports. Installed here so the
+          # "must be unaffected" step actually runs those suites rather than failing at
+          # collection.
+          pip install pytest pydantic
+
+      - name: Adversarial suite (no restrictive disposition may widen to CLEAR)
+        run: |
+          cd packages/integration/agent-runtime-governance
+          python -m pytest tests/test_adversarial.py -o addopts= -v --no-header
+
+      - name: Last-mile recheck, against real Ed25519 envelopes and real revocation
+        run: |
+          cd packages/integration/agent-runtime-governance
+          python -m pytest tests/test_recheck_wiring.py -o addopts= -v --no-header
+
+      - name: Boundary checks
+        run: |
+          cd packages/integration/agent-runtime-governance
+          python -m pytest tests/test_boundaries.py -o addopts= -v --no-header
+
+      - name: Agent Runtime must be unaffected
+        run: |
+          python -m pytest packages/runtime/agent-runtime/tests -q
+          if ! git diff --quiet HEAD -- packages/runtime/agent-runtime; then
+            echo "packages/runtime/agent-runtime was modified; the dependency must stay one-way."
+            git --no-pager diff --stat HEAD -- packages/runtime/agent-runtime
+            exit 1
+          fi
+
+      - name: Risk Authority composition must be unaffected
+        env:
+          # The RA-6 status-runtime suite exercises the Agent Runtime clearance seam and
+          # imports ugence_agent_runtime; its own conftest adds only risk_authority. Scoped
+          # to this step so the steps above keep proving this package needs no PYTHONPATH.
+          PYTHONPATH: packages/runtime/agent-runtime/src
+        run: |
+          # This package uses RA-4.5 composition and RA-6's recheck; it must change
+          # neither. Re-running their own suites is the cheap way to know.
+          python -m pytest packages/integration/risk-authority-runtime/tests -q
+          python -m pytest packages/integration/risk-authority-status-runtime/tests -q
+          for pkg in risk-authority-runtime risk-authority-status-runtime; do
+            if ! git diff --quiet HEAD -- "packages/integration/$pkg"; then
+              echo "packages/integration/$pkg was modified; it must be used, not changed."
+              exit 1
+            fi
+          done
+
+  build:
+    name: Wheel + sdist build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: |
+          python -m pip install --upgrade pip
+          pip install build
+      - run: python -m build packages/integration/agent-runtime-governance
