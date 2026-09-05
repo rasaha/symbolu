@@ -146,7 +146,19 @@ as passed on account of the worker; no LIVE execution.
    configuration, the four-switch production mode, the SQLite volume, the JWKS egress
    record, TLS on the listener, and tests that a fixture adapter or in-memory store is
    refused in production and that the studio's proof header reaches the service.
-   Label: **Reference-grade, shadow-only**.
+   Label: **Reference-grade, shadow-only**. Shipped as `deployment/governed-runtime-worker`
+   0.1.0 (`REFERENCE_GRADE_SHADOW_ONLY`, `ENFORCEMENT_ENABLED = False`): `compose` wires
+   every seam of §3 in one process; `UGENCE_REVIEW_DEPLOYMENT_MODE` has exactly two
+   values; `preflight` refuses a fixture identity or eligibility adapter, an in-memory
+   store, a non-authoritative bundle, a public bind and a plain listener before any
+   connection; `EXTERNAL_DEPLOYMENT_EVIDENCE.json` records the JWKS host as the only
+   egress; §4a rows 1, 2, 3, 7 and 8 and an end-to-end run over a real PostgreSQL with
+   the in-process issuer are tests. Composing surfaced two defects in the composed
+   packages, fixed alongside: the review service's HTTP queue view assumed an
+   `ApproverRef` method the directory's eligibility projection lacks
+   (`governed-review-service`), and the control-plane audit ledger's SQLite
+   connection was bound to its opening thread and refused every linkage append from
+   an HTTP handler (`control-plane-root` 0.1.1). No image, no container gate (step 4).
 3. **P3E amendment** (CR-2): the variable, the combined app under the gate, the
    runtime-config record and its freeze test.
 4. **Worker container gates**: a gate set for the worker image, entered only when the
@@ -159,6 +171,6 @@ review and the mirror.
 
 ## 7 — Next step
 
-Step 2, the worker composition root, under CR-1, CR-3, CR-4 and CR-5, labelled
-`REFERENCE_GRADE_SHADOW_ONLY`; then step 3, the P3E amendment under CR-2. Step 4 waits
-on the mirror.
+Step 2 is shipped. Next: step 3, the P3E amendment under CR-2 (the variable, the
+combined app under the existing gate, the runtime-config record and its freeze test).
+Step 4 waits on the mirror.
