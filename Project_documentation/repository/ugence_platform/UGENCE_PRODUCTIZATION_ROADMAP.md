@@ -303,6 +303,7 @@ No item may claim a label above the one listed, and no item may claim
 | **Entry** | GAS-2 exit met. |
 | **Work** | A hook adapter that composes Risk Authority, Decision Authority and ActionGate through `RiskAuthorityCompositionEngine.compose` `[V]` (`packages/integration/risk-authority-runtime/.../composition.py:62`) and projects the resulting `GovernedExecutionDecision` `[V]` (`.../contracts.py:339`) onto `GovernanceEvaluation` `[V]` (`.../agent_runtime/governance/interfaces.py`). The adapter binds `proposal_fingerprint` and `correlation_reference` and mints nothing. |
 | **Exit** | Only three hooks existed before this item `[V]` (`Unconfigured`, `AllowAll`, deprecated `Noop`); a fourth exists, is fail-closed on every non-`GRANT` disposition, and passes an adversarial suite proving `HOLD`/`ESCALATE`/`BLOCK` can never widen to `CLEAR`. `AllowAllGovernanceHook` remains non-default. |
+| **Status (2026-09-05)** | **Implemented.** `packages/integration/agent-runtime-governance` 0.1.0, 68 passed; the ADR §8 matrix re-run with the production hook is 12 passed. Evidence: ADR §8B. |
 | **Label on completion** | **Core implemented.** Not pilot-validated: `production_mode` still raises `ProductionContainmentError` in Risk Authority `[V]` (`packages/risk_authority/src/risk_authority/domain/errors.py:19`), and `HOLD`, `DEFER`, `ESCALATE` and `MANUAL_REVIEW` still have no sink `[G]`. |
 
 #### GAS-4 · Studio v1 — six screens on React Flow
