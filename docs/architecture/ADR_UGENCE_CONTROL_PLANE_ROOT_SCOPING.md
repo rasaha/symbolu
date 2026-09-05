@@ -54,7 +54,26 @@ artifact (line 26-30), which is what settles the shape.
 | D-2 | What the artifact is | **A composition root, not a capability.** It wires packages that already exist, mints no authority, owns no domain vocabulary, and adds nothing to the capability count — which is what line 26-30 anticipates, and it is that line, not the noun argument, that settles the shape. **On the name, the prohibition at line 85-86 is not dispositive and this record does not claim it is**: that rule protects a noun an existing README *reserves*, and the three packages cited *disclaim* "AI Control Plane" rather than reserving it — the opposite move `[I]`. The noun is nevertheless unavailable, for a stronger reason: it already names a product with its own tracked documentation tree and its own console plan `[V]`, so a package taking it would collide with that product, not with the three disclaimers. Name: `packages/integration/control-plane-root`, distribution `ugence-control-plane-root` — a root *under* the AI Control Plane, never the thing itself. |
 | D-3 | Where the audit-ledger service lives | **Under this root, per D-4 of the sequencing ADR.** The service composes the durable-audit shape (copied from storygraph, never imported, as D-3 of that ADR already ruled for Policy Authority) and mints `AuditReference`s into it. It **unifies no existing store**: the seven stores stay where they are, and G4's contract remains the only thing that correlates them. |
 | D-4 | What the root may never own | **No policy, no decision, no envelope, no revocation, no credential, no queue, no clock of its own beyond a single injected instant per act, and no second copy of any vocabulary.** It refuses; it does not decide. Every authority it touches is exercised by the package that already owns it. |
-| D-5 | Scope of the first slice | **The audit-ledger service and nothing else.** Not because the rest is unscoped, and not because it is unbuilt: roadmap §3 exists, §4 puts the console and two runtime connectors **in v1**, the console is already shipped and classified `CANONICAL_IMPLEMENTATION`, and a read-only GitHub evidence connector already exists `[V]`. The reason is narrower and survives all of that — **the ledger is the only §3 service that is a composition of packages under `packages/`, which is the only thing a root in `packages/integration/` may be.** The console is a running FastAPI service outside that tree and is already *the* AI Control Plane console; a root that grew one would not be duplicating a plan, it would be duplicating a shipped service. |
+| D-5 | Scope of the first slice | **The audit-ledger service and nothing else.** Not because the rest is unscoped, and not because it is unbuilt: roadmap §3 exists, §4 puts the console and two runtime connectors **in v1**, the console is already shipped and classified `CANONICAL_IMPLEMENTATION`, and a read-only GitHub evidence connector already exists `[V]`. The reason is that the ledger is the only §3 service **with no single owner** — the one that has to be *composed* rather than merely used. The walk below establishes that service by service rather than asserting it. |
+
+## Why the ledger, service by service
+
+Roadmap §3 names six shared services (`UGENCE_PRODUCTIZATION_ROADMAP.md:79-87`). A
+root in `packages/integration/` can only compose packages under `packages/`, so the
+question for each is: does one already own it, and if not, is it composable here?
+
+| §3 service | Who owns it | Composable by this root? |
+|---|---|---|
+| Identity & tenancy | The IdP, deliberately. `authority-directory` answers "what may a principal do"; the IdP answers "who is this", and "a role grant never substitutes for that" `[V]` (`packages/integration/authority-directory/README.md:53-60`) | **No** — the owner is outside the repository entirely |
+| Policy service | `packages/policy-authority`: "There is exactly **one** Policy Authority in Ugence; this is it" `[V]` (`:5`) | **No need** — a single package already is the service |
+| Canonical contract layer | `packages/governance-contracts` — the contracts are the layer `[V]` | **No need** — likewise |
+| **Evidence & audit service** | **Nobody.** Seven stores exist and none is the service; G4 gave them a way to be *pointed at* without unifying them `[V]` | **Yes** — this is the one that must be composed |
+| Console | `ugence_console_api/` + `apps/console/`, already built and classified `CANONICAL_IMPLEMENTATION` `[V]` | **No** — it is a running service outside `packages/`, and already *the* AI Control Plane console |
+| Connector framework | Split: a read-only evidence connector in `products/code-governance`, execution-target connectors being built phase by phase by the cloud-scaling ladder `[V]` | **No** — neither half is a composition of `packages/` members, and the hub question is open (`[R]` below) |
+
+So the ledger is not chosen because it is the most valuable §3 service. It is chosen
+because it is the only one that is both unowned and composable here — the other five
+each fail one of those two tests, for the reasons above.
 
 ## What the root composes
 
@@ -119,7 +138,11 @@ with, at minimum:
   unbuilt; `products/code-governance` owns a read-only evidence connector, and
   `ugence_console_api/` is a shipped, classified console. Both came from searching
   `docs/` and `packages/` and treating the result as repository-wide.
-  **The methodological point outlives the two facts**: this repository has major
+  A third review then caught the *fix itself* carrying an unlabelled "the ledger is
+  the only §3 service…" — a repository-wide claim checked against none of the other
+  five services. It is now the per-service walk above, which shows the reasoning
+  instead of asserting it.
+  **The methodological point outlives the three facts**: this repository has major
   trees outside `packages/` — `products/` (distinct from `packages/products/`),
   `ugence_console_api/`, `apps/`, `Project_documentation/` — so an absence claimed
   from `packages/` alone is not a repository-wide absence, and no `[V]` or `[G]` in
