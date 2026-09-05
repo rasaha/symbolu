@@ -32,6 +32,9 @@ from ugence_durable_execution.engine.dbos_engine import (
 from ugence_durable_execution.postgres.bundle import PostgresStoreBundle
 
 WORKFLOW_ID = "wf-matrix"
+#: A three-task chain, for the bounded-resume row: one durable step may advance at most
+#: one task of it.
+WORKFLOW_ID_CHAIN = "wf-matrix-chain"
 DEFINITION_DIGEST = "digest-v1"
 
 PROVIDER_CALLS_DDL = """
@@ -87,6 +90,21 @@ class KillBeforeProvider(RecordingProvider):
 
 
 def build_definition(workflow_id: str = WORKFLOW_ID) -> WorkflowDefinition:
+    if workflow_id == WORKFLOW_ID_CHAIN:
+        return WorkflowDefinition(
+            workflow_id=workflow_id,
+            tasks=tuple(
+                TaskDefinition(
+                    task_id=f"t{i}",
+                    operation="do",
+                    provider_id="recorder",
+                    consequential=True,
+                    arguments={"n": i},
+                    depends_on=(f"t{i - 1}",) if i > 1 else (),
+                )
+                for i in (1, 2, 3)
+            ),
+        )
     return WorkflowDefinition(
         workflow_id=workflow_id,
         tasks=(
