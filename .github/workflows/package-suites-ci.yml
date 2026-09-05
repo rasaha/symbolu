@@ -92,15 +92,20 @@ jobs:
         # it (capabilities/cloud-scaling-controller/.../controller.py:13). It is
         # installed rather than the suites being excluded — a package whose
         # dependency is missing is a package whose tests did not run.
-        # pynacl is likewise real and fail-closed: the four cloud-scaling packages
-        # reach trusted-evidence-authority, which refuses to import without it
-        # ("Length validation alone is not a substitute ... closure-audit finding
-        # F-03"). cffi is its native-binding requirement; without it the import
-        # dies in a pyo3 panic rather than a readable error. pydantic is needed by
-        # governance-provider-framework's optional adapter.
+        # cryptography and pynacl are likewise real and fail-closed. The four
+        # cloud-scaling packages reach trusted-evidence-authority through their
+        # fixture chain, and it refuses to import without either — deliberately:
+        # "There is no pure-Python fallback: a trusted-evidence verifier must not
+        # silently downgrade to unvetted cryptography", and for PyNaCl, "Length
+        # validation alone is not a substitute ... closure-audit finding F-03".
+        # Installing them is the only correct response; excluding the four suites
+        # would be reporting green for tests that never ran. cffi is PyNaCl's
+        # native binding, without which the import dies in an unreadable pyo3
+        # panic. pydantic is needed by governance-provider-framework's optional
+        # adapter.
         run: |
           python -m pip install --upgrade pip
-          pip install pytest numpy cffi pydantic pynacl
+          pip install pytest numpy cffi cryptography pydantic pynacl
       - name: Suite
         # From the package's own directory: several need their conftest.py to put
         # src/ and their first-party dependencies on sys.path, and cannot be
