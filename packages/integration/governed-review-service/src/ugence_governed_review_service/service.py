@@ -393,6 +393,10 @@ class ReviewService:
         proven = self._resolve_identity(approval_id, presented_approver, presented_proof, as_of)
         if isinstance(proven, DecisionOutcome):
             return proven
+        # ID-2 (AI-D): the digest-bound reference to the verified claims, recorded on
+        # the approval and in its hash-linked decision event; empty without a proof.
+        reference = authentication_reference(proven.claims) \
+            if proven is not None and proven.claims is not None else ""
         record = self._ledger.get_approval(approval_id)
         if record is None:
             return DecisionOutcome(DecisionResult.REFUSED_UNKNOWN_APPROVAL, approval_id,
@@ -414,6 +418,7 @@ class ReviewService:
                 record = self._ledger.decide(
                     approval_id, approver=presented_approver, decision=decision,
                     as_of=as_of, justification=justification,
+                    authentication_reference=reference,
                 )
             except EligibilityRefused as exc:
                 return DecisionOutcome(DecisionResult.REFUSED_INELIGIBLE, approval_id,
@@ -513,11 +518,15 @@ class ReviewService:
     def _deliver(self, result: DecisionResult, record: ApprovalRecord, instance_id: str,
                  task_id: str, decision: ReviewDecision, proven: Optional[ApproverIdentity],
                  tenant: tuple[str, str]) -> DecisionOutcome:
-        proof_label, reference, assurance = IDENTITY_PROOF, "", None
+        proof_label, assurance = IDENTITY_PROOF, None
         if proven is not None and proven.claims is not None:
             proof_label = proven.proof
-            reference = authentication_reference(proven.claims)
             assurance = RecordedAssurance(acr=proven.claims.acr, amr=proven.claims.amr)
+        # What the ledger recorded is what is reported: on a replay under a fresh
+        # proof, the standing record's reference stands, not the resubmission's.
+        reference = record.authentication_reference or (
+            authentication_reference(proven.claims)
+            if proven is not None and proven.claims is not None else "")
         self._adapter.signal(
             instance_id=instance_id, signal_name=SIGNAL_NAME,
             payload={

@@ -17,7 +17,7 @@ PUBLIC_API = PROJECT / "public_api.json"
 def test_the_distribution_is_named_and_versioned_exactly():
     text = PYPROJECT.read_text(encoding="utf-8")
     assert 'name = "ugence-approval-workflow"' in text
-    assert PKG_DIR.name == "ugence_approval_workflow" and pkg.__version__ == "0.1.0"
+    assert PKG_DIR.name == "ugence_approval_workflow" and pkg.__version__ == "0.2.0"
 
 
 def test_the_public_api_manifest_equals_the_live_package_surface():

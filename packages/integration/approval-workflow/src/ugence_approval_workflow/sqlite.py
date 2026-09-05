@@ -254,16 +254,22 @@ class SqliteApprovalWorkflowStore:
     def decide(self, approval_id: str, *, approver: ApproverRef, decision: ReviewDecision,
                as_of: datetime, justification: str = "",
                accepted_finding_ids: tuple[str, ...] = (),
-               signature_reference: str = "") -> ApprovalRecord:
+               signature_reference: str = "",
+               authentication_reference: str = "") -> ApprovalRecord:
         with self._tx() as c:
             record = self._require(c, approval_id)
             evolved = next_on_decide(
                 record, approver=approver, decision=decision,
                 eligibility=self._eligibility_for(record, approver, as_of), as_of=as_of,
                 justification=justification, accepted_finding_ids=accepted_finding_ids,
-                signature_reference=signature_reference)
-            return self._write(c, evolved, as_of, approver.approver_id,
-                               {"decision": decision.value, "role": approver.role})
+                signature_reference=signature_reference,
+                authentication_reference=authentication_reference)
+            detail = {"decision": decision.value, "role": approver.role}
+            if evolved.authentication_reference:
+                # AI-D: the reference is part of the hash-linked event, so an altered
+                # reference breaks the chain as an altered decision does.
+                detail["authentication_reference"] = evolved.authentication_reference
+            return self._write(c, evolved, as_of, approver.approver_id, detail)
 
     def request_exception(self, approval_id: str, *, requested_by: str, justification: str,
                           exception_validity: Validity, as_of: datetime) -> ApprovalRecord:

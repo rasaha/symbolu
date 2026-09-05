@@ -3,7 +3,7 @@
   "distribution": "ugence-approval-workflow",
   "namespace": "ugence_approval_workflow",
   "note": "Machine-readable snapshot of the curated public API (ugence_approval_workflow.__all__). tests/packaging/test_packaging.py asserts this file equals the live package surface. Regenerate with scripts/generate_public_api.py when the curated API changes deliberately.",
-  "package_version": "0.1.0",
+  "package_version": "0.2.0",
   "symbols": {
     "APPROVAL_ID_PREFIX": {
       "kind": "constant",
@@ -59,6 +59,7 @@
         "decided_authority_reference",
         "decided_at",
         "signature_reference",
+        "authentication_reference",
         "is_fixture",
         "exception_requested_by",
         "exception_justification",
@@ -369,7 +370,7 @@
     },
     "__version__": {
       "kind": "constant",
-      "value": "0.1.0"
+      "value": "0.2.0"
     },
     "approval_id_for": {
       "kind": "function",
@@ -424,7 +425,8 @@
         "as_of",
         "justification",
         "accepted_finding_ids",
-        "signature_reference"
+        "signature_reference",
+        "authentication_reference"
       ]
     },
     "next_on_exception_decision": {

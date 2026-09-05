@@ -1,6 +1,6 @@
 # Ugence approver identity — scoping record
 
-**Status: SCOPED AND RULED; AI-A, AI-B and AI-C implemented.** The five owner decisions in
+**Status: SCOPED AND RULED; AI-A to AI-D implemented.** The five owner decisions in
 §5 were ruled on 2026-09-05. Step AI-A of §6 shipped in `governed-review-service` 0.3.0
 `[V]` (`identity.py`, `tests/test_identity.py`) and step AI-B in the studio `[V]`
 (`clients/review.py`, `api/v2/review.py`, `client-v2.ts`,
@@ -169,6 +169,14 @@ Entry conditions are met; each step is entered only by its own implementation pr
 4. **AI-D · Ledger and linkage carry the proof** (ID-2): `authentication_reference` as
    an additive field of the approval record and of `ReviewLinkage`, digest-bound; row 9.
    Label: **Core implemented**.
+   **Shipped `[V]`**: `approval-workflow` 0.2.0 (`ApprovalRecord.authentication_reference`,
+   `decide(authentication_reference=)`, the reference inside the hash-linked decision
+   event), `governed-review` 0.3.0 (`ReviewLinkage.authentication_reference`,
+   `governed_review.linkage.v2`), `governed-review-service` 0.4.0 (passes the proven
+   reference to the ledger; `verify_authentication_reference`). Row 9 is proven: an
+   altered `decided_by` or reference fails the artifact digest or the chain, and a
+   reference recomputed from altered claims mismatches. `signature_reference` stays
+   unused; records decided without a proof are byte-identical to before.
 5. **AI-E · Assurance policy and gate** (ID-5): the ratified policy, and the entry
    gate that fails closed without it (row 13). Entered only when enforcement or LIVE
    is itself being scoped.
@@ -183,6 +191,7 @@ outside this sequence entirely.
 
 ## 7 — Next step
 
-AI-D, the approval record and the linkage carrying `authentication_reference` (row
-9), then AI-E. Enterprise-issuer validation of AI-C waits on an owner-provisioned
-issuer.
+AI-E, the assurance policy and its fail-closed entry gate (row 13), entered only when
+enforcement or LIVE is itself being scoped. Enterprise-issuer validation of AI-C waits
+on an owner-provisioned issuer. No composition root yet wires the review service with
+an identity port (adapter ADR fact 9).

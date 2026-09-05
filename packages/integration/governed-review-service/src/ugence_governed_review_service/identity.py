@@ -41,6 +41,7 @@ mode refuses it. A real adapter is AI-C and lives in its own package.
 from __future__ import annotations
 
 import hashlib
+import hmac
 import json
 from dataclasses import dataclass
 from datetime import datetime
@@ -65,6 +66,7 @@ __all__ = [
     "VerifiedClaims",
     "authentication_reference",
     "subject_reference",
+    "verify_authentication_reference",
 ]
 
 #: The two labels a decision may carry for its approver (ADR §6). The package-level
@@ -221,6 +223,19 @@ def authentication_reference(claims: VerifiedClaims) -> str:
     material = json.dumps(claims.canonical(), sort_keys=True, separators=(",", ":"),
                           ensure_ascii=False).encode("utf-8")
     return _REFERENCE_PREFIX + hashlib.sha256(material).hexdigest()
+
+
+def verify_authentication_reference(claims: VerifiedClaims, recorded: str) -> bool:
+    """ID-2, row 9: does a recorded reference re-derive from these claims?
+
+    A reference copied from a ledger record or a linkage is checked by recomputing it
+    from the verified claims; any altered claim, or an altered reference, mismatches.
+    The comparison is constant-time so the answer leaks nothing about where it differs.
+    """
+
+    if not isinstance(recorded, str) or not recorded:
+        return False
+    return hmac.compare_digest(authentication_reference(claims), recorded)
 
 
 class StaticApproverIdentityAdapter:

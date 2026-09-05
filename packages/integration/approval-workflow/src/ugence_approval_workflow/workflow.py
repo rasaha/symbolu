@@ -77,8 +77,14 @@ def next_on_present(record: ApprovalRecord, *, as_of: datetime,
 def next_on_decide(record: ApprovalRecord, *, approver: ApproverRef, decision: ReviewDecision,
                    eligibility: EligibilityDecision, as_of: datetime, justification: str = "",
                    accepted_finding_ids: tuple[str, ...] = (),
-                   signature_reference: str = "") -> ApprovalRecord:
-    """``PENDING -> GRANTED | REJECTED | CHANGES_REQUIRED``, recorded not granted."""
+                   signature_reference: str = "",
+                   authentication_reference: str = "") -> ApprovalRecord:
+    """``PENDING -> GRANTED | REJECTED | CHANGES_REQUIRED``, recorded not granted.
+
+    ``authentication_reference`` (ID-2, AI-D) is the caller's digest-bound reference
+    to the verified claims that proved ``approver``; this package records it and
+    verifies nothing about it, exactly as it records ``decided_authority_reference``.
+    """
 
     current = _live_state(record, as_of)
     target = state_for_decision(decision)
@@ -92,7 +98,9 @@ def next_on_decide(record: ApprovalRecord, *, approver: ApproverRef, decision: R
         decided_authority_reference=approver.authority_reference, decided_at=as_of,
         justification=optional_text(justification, "justification") or record.justification,
         accepted_finding_ids=tuple(accepted_finding_ids),
-        signature_reference=optional_text(signature_reference, "signature_reference"))
+        signature_reference=optional_text(signature_reference, "signature_reference"),
+        authentication_reference=optional_text(authentication_reference,
+                                               "authentication_reference"))
 
 
 def next_on_exception_request(record: ApprovalRecord, *, requested_by: str, justification: str,

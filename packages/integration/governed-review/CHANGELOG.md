@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.3.0 — 2026-09-05 — AI-D (approver-identity ruling ID-2)
+
+- `ReviewLinkage.authentication_reference`, copied from the approval record by
+  `reconstruct()`; empty when the decision was recorded without a proof; part of the
+  linkage digest like every other field.
+- `LINKAGE_VERSION` is `governed_review.linkage.v2`: a field was added, so the shape is
+  a new version. A v1 entry in a control-plane ledger stays valid and is not rewritten.
+
 ## 0.2.0 — 2026-09-05 — HR-E (contract only)
 
 - `linkage`: `ReviewLinkage`, a frozen, digest-bound join of one parked-approved-resumed

@@ -6,7 +6,7 @@ wheel never has to import the package (and thus its dependencies).
 
 from __future__ import annotations
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 
 #: Frozen contract identity of the consumption-key serialization and event shapes.
 CONTRACT_VERSION = "approval_workflow.v1"

@@ -48,7 +48,8 @@ FP = "c" * 64
 # --------------------------------------------------------------------------- #
 # synthetic inputs, real ledger
 # --------------------------------------------------------------------------- #
-def _consumed_approval(ledger, clock, instance_id="i1", task_id="t1", fingerprint=FP):
+def _consumed_approval(ledger, clock, instance_id="i1", task_id="t1", fingerprint=FP,
+                       authentication_reference=""):
     identity = ProposalIdentity(fingerprint=fingerprint, instance_id=instance_id, task_id=task_id)
     now = clock.datetime()
     rec = ledger.request_approval(
@@ -56,7 +57,8 @@ def _consumed_approval(ledger, clock, instance_id="i1", task_id="t1", fingerprin
         validity=F.window(now, hours=48), as_of=now)
     ledger.present_for_decision(rec.approval_id, as_of=now)
     clock.advance(minutes=5)
-    F.decide(ledger, rec.approval_id, as_of=clock.datetime())
+    F.decide(ledger, rec.approval_id, as_of=clock.datetime(),
+             authentication_reference=authentication_reference)
     clock.advance(minutes=1)
     out = ledger.consume(rec.approval_id, consumer_ref=f"{instance_id}:{task_id}",
                          subject_digest=fingerprint, as_of=clock.datetime())
@@ -119,6 +121,8 @@ def test_the_linkage_joins_the_three_stores_and_digests_deterministically(world)
     assert (link.instance_id, link.task_id, link.consumer_ref) == ("i1", "t1", "i1:t1")
     assert link.proposal_fingerprint == FP and link.approval_state == "CONSUMED"
     assert link.decided_by == F.APPROVER.approver_id and link.decided_role == F.ROLE
+    assert link.authentication_reference == "", "decided without a proof: none recorded"
+    assert "authentication_reference" in link.to_dict()
     assert link.consumption_id == expected_consumption_id(world["identity"], tenant_id=F.TENANT,
                                                           approval_id=world["approval_id"])
     assert (link.parked_disposition_event_seq, link.paused_event_seq, link.signal_event_seq,
@@ -134,6 +138,28 @@ def test_the_linkage_joins_the_three_stores_and_digests_deterministically(world)
     assert again.linkage == link and again.linkage.digest() == link.digest()
     assert len(link.digest()) == 64
     assert json.loads(json.dumps(link.to_dict()))["decided_at"].endswith("+00:00")
+
+
+def test_the_linkage_carries_the_authentication_reference_and_digests_it(tmp_path):
+    """AI-D, row 9: the reference travels from the record into the linkage, and a
+    linkage with a different reference has a different digest."""
+
+    reference = "authn:sha256:" + "ab" * 32
+    clock, ledger = F.Clock(), F.sqlite_ledger(tmp_path)
+    approval_id, _identity = _consumed_approval(ledger, clock, authentication_reference=reference)
+    link = reconstruct(ledger, tenant_id=F.TENANT, instance_id="i1", task_id="t1",
+                       approval_id=approval_id, events=_events(approval_id),
+                       journal=_journal()).linkage
+    assert link.authentication_reference == reference
+    assert link.to_dict()["authentication_reference"] == reference
+    assert link.linkage_version == "governed_review.linkage.v2"
+    other = ReviewLinkage(**{**link.to_dict(), "decided_at": link.decided_at,
+                             "consumed_at": link.consumed_at,
+                             "authentication_reference": "authn:sha256:" + "cd" * 32})
+    assert other.digest() != link.digest()
+    blank = ReviewLinkage(**{**link.to_dict(), "decided_at": link.decided_at,
+                             "consumed_at": link.consumed_at, "authentication_reference": ""})
+    assert blank.digest() != link.digest()
 
 
 def test_the_projections_are_valid_g4_references(world):
