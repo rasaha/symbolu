@@ -121,7 +121,9 @@ to in-force registrations first, always.
 no agent-runtime, no Decision Authority, no Risk Authority, no Policy Authority, no
 approval workflow, no authority directory, no Model Selection, no Benchmark
 Registry, no `sqlite3`, no network client, no cloud SDK, no pydantic. Composition
-roots, products and applications may import it; no capability package may.
+roots, products and applications may import it; no capability package may — enforced repository-wide by
+`scripts/check_package_import_boundaries.py` and
+`tests/boundaries/test_package_import_boundaries.py`.
 
 ## Gaps that survive this release
 
@@ -132,5 +134,5 @@ roots, products and applications may import it; no capability package may.
 - No store, so nothing persists; a composition root holds whatever it registers.
 - The classification vocabulary is unratified, so the label stays uninterpreted
   until an owner fixes a taxonomy.
-- The repository still has no test enforcing "no capability package may import it";
-  that gap is shared with both other wave 2 packages.
+- (Closed) The repository now enforces "no capability package may import it"
+  repository-wide, in `scripts/check_package_import_boundaries.py`.

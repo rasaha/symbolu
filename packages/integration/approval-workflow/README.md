@@ -166,7 +166,9 @@ Nothing else — not Decision Authority, not the Policy Workflow Compiler, not
 cloud-scaling-operations, not execution-reservation, not `ugence_storygraph`, no
 product, no network client, no cloud SDK, no pydantic. A boundary test asserts the
 import set over the AST and the declared dependency list. Composition roots, products
-and applications may import this package; no capability package may.
+and applications may import this package; no capability package may — enforced repository-wide by
+`scripts/check_package_import_boundaries.py` and
+`tests/boundaries/test_package_import_boundaries.py`.
 
 ## Gaps that survive this release
 

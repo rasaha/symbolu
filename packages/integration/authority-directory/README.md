@@ -137,7 +137,9 @@ a composition root may hand either one an adapter built over it.
 Nothing else — not the approval workflow, not Decision Authority, not Risk Authority,
 not Policy Authority, no IdP client, no LDAP or SCIM library, no cryptography, no
 network client, no cloud SDK, no pydantic. Composition roots, products and applications
-may import it; no capability package may.
+may import it; no capability package may — enforced repository-wide by
+`scripts/check_package_import_boundaries.py` and
+`tests/boundaries/test_package_import_boundaries.py`.
 
 ## Gaps that survive this release
 
