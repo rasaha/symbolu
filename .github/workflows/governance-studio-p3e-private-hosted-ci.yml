@@ -19,7 +19,7 @@ on:
       - "deployment/governance-studio/**"
       - "apps/ugence-governance-studio/**"
       - ".github/workflows/governance-studio-p3e-private-hosted-ci.yml"
-  workflow_dispatch:  # manual base-image digest resolution (resolve-base-images job)
+  workflow_dispatch:
 
 env:
   PYTHONPATH: >-
@@ -126,29 +126,18 @@ jobs:
               print(f"NOTE: {v.get('moderate',0)} moderate / {v.get('low',0)} low advisories present (documented, not blocking)")
           PY
 
-  resolve-base-images:
-    # Resolution stage (§3): resolve live base-image digests from the registry manifest
-    # API and upload a machine-readable report. Run manually (workflow_dispatch) to obtain
-    # digests to commit; it does NOT silently update the approved pins.
-    if: github.event_name == 'workflow_dispatch'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with: { python-version: "3.11" }
-      - name: resolve
-        run: |
-          python deployment/governance-studio/ci/resolve_base_images.py \
-            deployment/governance-studio/base-images.json /tmp/base-image-resolution.json
-          cat /tmp/base-image-resolution.json
-      - uses: actions/upload-artifact@v4
-        with: { name: base-image-resolution, path: /tmp/base-image-resolution.json }
-
   container:
-    # Requires a container runtime AND container-registry access to pull the pinned base
-    # images. base-image-digest-verification is BLOCKING: a null/unresolved or drifted
-    # digest, an unpinned Dockerfile, or an inaccessible registry all fail the job — the
-    # container gates never report as passed without a real build.
+    # Requires a container runtime AND an owner-approved OCI mirror that serves the
+    # ratified base-image digests (BASE_IMAGE_MIRROR_DECISION.json,
+    # ruling_2026_09_05_separation). Three separated checks:
+    #   ratified-pin-conformance   BLOCKING, network-independent: record == pins == Dockerfile
+    #   mirror-digest-conformance  BLOCKING when the mirror is configured: the manifest the
+    #                              mirror serves BY the ratified digest is content-addressed
+    #                              to it; a typed RESOURCE_BLOCKER_MIRROR_UNCONFIGURED
+    #                              otherwise, with no docker.io fallback
+    #   upstream tag drift         NOT here: advisory, in governance-studio-p3e-base-image-drift
+    # The container gates never report as passed without a real build, and this job never
+    # uses continue-on-error: a pin, platform or mirror-digest mismatch is red.
     runs-on: ubuntu-latest
     needs: application
     env:
@@ -179,56 +168,62 @@ jobs:
       - name: ratified-pin-conformance
         # BLOCKING, and deliberately ahead of every other container step. Asserts
         # base-images.json == Dockerfile == the owner-ratified supply decision in
-        # docs/audits/ugence_governance_studio_p3e/BASE_IMAGE_MIRROR_DECISION.json.
-        # Combined with base-image-digest-verification below (live registry ==
-        # base-images.json), this makes the ratified digest the transitive
-        # authority for what is actually built: a re-pin or a substituted image
-        # cannot land without editing the ratification record, which requires
-        # owner re-ratification.
+        # docs/audits/ugence_governance_studio_p3e/BASE_IMAGE_MIRROR_DECISION.json,
+        # including platform declarations. Opens no socket: an upstream tag moving or a
+        # registry being unreachable cannot change its answer.
         run: python deployment/governance-studio/ci/verify_ratified_pins.py
 
-      - name: base-image-digest-verification
+      - name: mirror-digest-conformance
+        id: mirror
+        # BLOCKING when the mirror is configured: asks the owner-approved mirror for each
+        # ratified image BY DIGEST and proves the manifest it serves is content-addressed
+        # to that digest. When the record's mirror coordinates are null it emits the one
+        # typed resource blocker and the build steps below do not run. docker.io is never
+        # consulted. The credential VALUE, once the owner names its secret, is passed as
+        # the environment variable the record names, masked, and never printed; no secret
+        # name is referenced here until the owner supplies one.
         run: |
-          python deployment/governance-studio/ci/resolve_base_images.py \
-            deployment/governance-studio/base-images.json /tmp/live-resolution.json
-          python - <<'PY'
-          import json, sys
-          pins = json.load(open("deployment/governance-studio/base-images.json"))
-          live = {(r["repository"], r["tag"]): r for r in json.load(open("/tmp/live-resolution.json"))["results"]}
-          df = open("deployment/governance-studio/Dockerfile").read()
-          fail = []
-          for e in pins["base_images"]:
-              key = (e["repository"], e["tag"]); ref = f'{e["registry"]}/{e["repository"]}:{e["tag"]}'
-              d = e.get("manifest_digest")
-              if not d: fail.append(f"{ref}: pinned digest is null (blocking)"); continue
-              lr = live.get(key, {})
-              if lr.get("status") != "resolved": fail.append(f"{ref}: registry status {lr.get('status')}")
-              elif lr.get("manifest_digest") != d: fail.append(f"{ref}: live {lr.get('manifest_digest')} != pinned {d}")
-              if f"@{d}" not in df: fail.append(f"{ref}: Dockerfile does not pin {d}")
-              if e.get("platform") != pins.get("platform", "linux/amd64"): fail.append(f"{ref}: platform mismatch")
-          if fail: print("\n".join("FAIL "+f for f in fail), file=sys.stderr); sys.exit(1)
-          print("base images: digest-pinned, live-verified, Dockerfile-pinned, platform-verified")
-          PY
+          set +e
+          python deployment/governance-studio/ci/verify_mirror_digest.py \
+            docs/audits/ugence_governance_studio_p3e/BASE_IMAGE_MIRROR_DECISION.json \
+            deployment/governance-studio/base-images.json \
+            "$EVIDENCE_DIR/mirror-digest-conformance.json" --print-build-args | tee /tmp/mirror-out.txt
+          code=${PIPESTATUS[0]}
+          set -e
+          case "$code" in
+            0) echo "mirror_ready=true" >> "$GITHUB_OUTPUT"
+               echo "BUILD_CONTEXTS=$(tail -n 1 /tmp/mirror-out.txt)" >> "$GITHUB_ENV" ;;
+            3) echo "mirror_ready=false" >> "$GITHUB_OUTPUT"
+               echo "outcome=RESOURCE_BLOCKER_MIRROR_UNCONFIGURED" >> "$GITHUB_OUTPUT" ;;
+            *) echo "mirror-digest-conformance: MISMATCH or UNREACHABLE (exit $code); halting, no gate executed" >&2
+               exit "$code" ;;
+          esac
 
       - name: container-build
+        if: steps.mirror.outputs.mirror_ready == 'true'
         run: |
           DFSHA=$(sha256sum deployment/governance-studio/Dockerfile | cut -d' ' -f1)
-          docker buildx build --platform linux/amd64 --load -t "$IMAGE" -f deployment/governance-studio/Dockerfile .
+          # FROM lines stay pinned to docker.io/library/<image>@<ratified digest>; the
+          # --build-context overrides make each resolve through the mirror BY that digest.
+          docker buildx build --platform linux/amd64 --load -t "$IMAGE" $BUILD_CONTEXTS -f deployment/governance-studio/Dockerfile .
           docker image inspect "$IMAGE" --format 'id={{.Id}} arch={{.Architecture}} os={{.Os}} size={{.Size}}'
           echo "IMAGE_ID=$(docker image inspect "$IMAGE" --format '{{.Id}}')" >> "$GITHUB_ENV"
           echo "DOCKERFILE_SHA256=$DFSHA" >> "$GITHUB_ENV"
 
       - name: image-inspection
+        if: steps.mirror.outputs.mirror_ready == 'true'
         run: |
           test "$(docker inspect --format '{{.Config.User}}' "$IMAGE")" = "10001:10001"
           docker inspect --format '{{json .Config.ExposedPorts}}' "$IMAGE" | python -c "import json,sys; p=json.load(sys.stdin); assert list(p)==['8443/tcp'], p; print('exposes only 8443/tcp')"
           for t in npm node tsc gcc cc; do if docker run --rm --entrypoint sh "$IMAGE" -c "command -v $t" 2>/dev/null; then echo "FAIL $t present in runtime"; exit 1; fi; done
           echo "no npm/node/compiler in runtime image"
       - name: runtime-package-inventory
+        if: steps.mirror.outputs.mirror_ready == 'true'
         id: runtime_package_inventory
         run: docker run --rm --entrypoint python "$IMAGE" -m pip freeze | tee "$EVIDENCE_DIR/runtime-image-packages.txt"
 
       - name: image-layer-secret-scan
+        if: steps.mirror.outputs.mirror_ready == 'true'
         id: image_layer_secret_scan
         run: |
           # config/history first, then genuine per-layer CONTENT scan
@@ -236,6 +231,7 @@ jobs:
           python deployment/governance-studio/ci/scan_image_layers.py "$IMAGE" "$EVIDENCE_DIR/secret-scan.json"
 
       - name: container-runtime-verification
+        if: steps.mirror.outputs.mirror_ready == 'true'
         id: container_runtime_verification
         run: |
           mkdir -p /tmp/tls
@@ -245,6 +241,7 @@ jobs:
           deployment/governance-studio/ci/verify_container.sh "$IMAGE" /tmp/tls operator "demo-pass-123"
 
       - name: image-sbom
+        if: steps.mirror.outputs.mirror_ready == 'true'
         id: image_sbom
         # pinned SBOM action (Syft); binds the SBOM to the built image
         uses: anchore/sbom-action@v0.17.9
@@ -254,6 +251,7 @@ jobs:
           output-file: ${{ env.EVIDENCE_DIR }}/sbom.image.cdx.json
 
       - name: container-vulnerability-scan
+        if: steps.mirror.outputs.mirror_ready == 'true'
         id: container_vulnerability_scan
         # pinned Trivy action; blocking on HIGH/CRITICAL, JSON evidence
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
@@ -284,9 +282,10 @@ jobs:
              "container-runtime-verification": "${{ steps.container_runtime_verification.outcome }}"}
 
       - name: clean-checkout-reproducibility
+        if: steps.mirror.outputs.mirror_ready == 'true'
         run: |
           TMP="$(mktemp -d)"; git archive HEAD | tar -x -C "$TMP"
-          docker buildx build --platform linux/amd64 --load -t governance-studio-private-hosted:clean -f "$TMP/deployment/governance-studio/Dockerfile" "$TMP"
+          docker buildx build --platform linux/amd64 --load -t governance-studio-private-hosted:clean $BUILD_CONTEXTS -f "$TMP/deployment/governance-studio/Dockerfile" "$TMP"
           A=$(docker image inspect "$IMAGE" --format '{{.Id}}'); B=$(docker image inspect governance-studio-private-hosted:clean --format '{{.Id}}')
           echo "primary=$A clean=$B"
           # application-artifact reproducibility is asserted in the application job; image
@@ -300,3 +299,23 @@ jobs:
         with:
           name: p3e-container-evidence
           path: ${{ env.EVIDENCE_DIR }}/*
+
+      - name: container-gate-outcome
+        if: always()
+        # The job's one honest verdict. A mirror that is not configured is a RESOURCE
+        # blocker, stated as such and still red: no gate executed, nothing passed. It is
+        # not a digest-conformance failure, which would have stopped the job earlier with
+        # its own reason.
+        run: |
+          if [ "${{ steps.mirror.outputs.mirror_ready }}" = "true" ]; then
+            echo "container gates executed against the mirror-served ratified digests"
+          elif [ "${{ steps.mirror.outcome }}" = "failure" ]; then
+            echo "::error title=MIRROR_DIGEST_CONFORMANCE_HALT::halted at mirror-digest-conformance: MIRROR_DIGEST_MISMATCH or MIRROR_UNREACHABLE. No gate executed, nothing passed, nothing re-pinned; escalate to the owner."
+            exit 1
+          elif [ "${{ steps.mirror.outcome }}" != "success" ]; then
+            echo "::error title=CONFORMANCE_HALT::halted before mirror-digest-conformance (a pin, platform or Dockerfile mismatch, or an earlier step). No gate executed."
+            exit 1
+          else
+            echo "::error title=RESOURCE_BLOCKER_MIRROR_UNCONFIGURED::container gates NOT_EXECUTED. Required from the owner, recorded in BASE_IMAGE_MIRROR_DECISION.json mirror.*: registry_host, repository_prefix, secret_name. No docker.io fallback; the ratified digests are unchanged and conform."
+            exit 1
+          fi

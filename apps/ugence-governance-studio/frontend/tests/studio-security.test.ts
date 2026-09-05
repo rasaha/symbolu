@@ -89,6 +89,23 @@ describe("SD-2 — no screen can reach an authority act", () => {
     }
   });
 
+  it("the approver proof is sent on the decision operation only and never stored or decoded (ID-1)", () => {
+    const uses = appFiles.filter((f) => /APPROVER_PROOF_HEADER|approver[-_ ]?proof|submitReviewDecision/i.test(f.text));
+    expect(uses.map((f) => f.rel).sort()).toEqual([
+      "src/api/client-v2.ts",
+      "src/features/studio/ReviewQueueScreen.tsx",
+      "src/features/studio/hooks.ts",
+    ]);
+    const client = clientText;
+    const headerUses = client.split("APPROVER_PROOF_HEADER").length - 1;
+    expect(headerUses).toBe(3); // the declaration, its doc mention, and the one decision request
+    expect(client.indexOf("APPROVER_PROOF_HEADER]")).toBeGreaterThan(client.indexOf("submitReviewDecision"));
+    for (const file of uses) {
+      expect(file.text).not.toMatch(/localStorage|sessionStorage|indexedDB|document\.cookie/);
+      expect(file.text).not.toMatch(/atob\s*\(|JSON\.parse\s*\(\s*proof|proof\.split|console\.(log|info|debug|warn|error)/);
+    }
+  });
+
   it("the console routes the studio can reach are the four read/shadow ones", () => {
     expect(manifest.console_routes_reachable_from_the_studio).toHaveLength(4);
     for (const route of manifest.console_routes_reachable_from_the_studio) {

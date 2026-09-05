@@ -160,9 +160,24 @@ export const readReviewApproval = (approvalId: string) =>
   gap(`/api/v2/review/approvals/${enc(approvalId)}`);
 
 /**
+ * ID-1 (`PASS_THROUGH_OPAQUE_TOKEN`): the one header an opaque, review-service-bound
+ * approver proof may travel in. Sent on the decision operation and on no other; the
+ * value is never decoded, logged, stored or reused by this client.
+ */
+export const APPROVER_PROOF_HEADER = "X-Ugence-Approver-Proof";
+
+/**
  * Relay a human's decision, verbatim. The studio adds no identity and reads nothing
  * but the review service's typed answer; whether the instance proceeds is decided by
  * the review service and the governed composition behind it, never here.
+ *
+ * `proof`, when the operator supplied one, rides this one request in
+ * `APPROVER_PROOF_HEADER` and is dropped as soon as the request is built.
  */
-export const submitReviewDecision = (body: ReviewDecisionBody) =>
-  gap("/api/v2/review/decisions", postJson(body));
+export const submitReviewDecision = (body: ReviewDecisionBody, proof = "") => {
+  const init = postJson(body);
+  if (proof) {
+    init.headers = { ...(init.headers as Record<string, string>), [APPROVER_PROOF_HEADER]: proof };
+  }
+  return gap("/api/v2/review/decisions", init);
+};

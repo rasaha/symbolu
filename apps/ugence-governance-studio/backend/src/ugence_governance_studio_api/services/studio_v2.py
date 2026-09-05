@@ -504,6 +504,10 @@ class ReviewRelayService:
     def approval(self, approval_id: str) -> Dict[str, Any]:
         return self._guard(lambda: self._review.approval(approval_id))
 
-    def submit_decision(self, body: Dict[str, Any]) -> Dict[str, Any]:
-        """Relay verbatim. The studio adds nothing and reads nothing but the answer."""
-        return self._guard(lambda: self._review.submit_decision(body))
+    def submit_decision(self, body: Dict[str, Any], *, proof: str = "") -> Dict[str, Any]:
+        """Relay verbatim. The studio adds nothing and reads nothing but the answer.
+
+        ``proof`` is the opaque approver proof the request presented (ID-1), passed
+        through to the client unread and kept in no attribute of this service.
+        """
+        return self._guard(lambda: self._review.submit_decision(body, proof=proof))

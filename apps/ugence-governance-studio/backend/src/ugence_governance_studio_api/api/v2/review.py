@@ -11,6 +11,7 @@ from __future__ import annotations
 from fastapi import APIRouter
 from starlette.requests import Request
 
+from ...clients.review import PROOF_HEADER
 from ...contracts.v2 import ReviewDecisionRequest
 from .deps import studio, v2_response
 
@@ -61,5 +62,11 @@ def submit_decision(request: Request, req: ReviewDecisionRequest):
     eligibility and reads nothing but the review service's typed answer, which it
     returns whether the decision was recorded, replayed or refused.
     """
-    result = studio(request).review.submit_decision(req.model_dump())
+    # Owner ruling ID-1 (AI-B): if the request carries the approver-proof header, that
+    # one opaque, review-service-bound value is forwarded in the same header on this
+    # relay only. It is read here rather than declared as a parameter so it appears in
+    # no schema, no generated client type and no envelope, and the frozen v2 contract
+    # is unchanged. It is never decoded, logged, stored or reused.
+    proof = request.headers.get(PROOF_HEADER, "")
+    result = studio(request).review.submit_decision(req.model_dump(), proof=proof)
     return v2_response(request, operation="review.submit_decision", result=result)
