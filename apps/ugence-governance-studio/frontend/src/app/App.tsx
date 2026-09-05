@@ -15,6 +15,20 @@ import { FallbackScreen } from "@/features/fallbacks/FallbackScreen";
 import { ReplayScreen } from "@/features/replay/ReplayScreen";
 import { CompareScreen } from "@/features/compare/CompareScreen";
 import { WhatIfScreen } from "@/features/whatif/WhatIfScreen";
+// Governed Agent Studio (GAS-4/5) — additive, mounted alongside the v1 explorer.
+import {
+  AuthorityScreen,
+  ConstitutionScreen,
+  ObserveScreen,
+  PolicyScreen,
+  PublishScreen,
+  SimulateScreen,
+  StudioLayout,
+} from "@/features/studio";
+import {
+  FROZEN_APPROVAL_RECORD,
+  FROZEN_POLICY_PACK,
+} from "@/features/studio/fixtures/frozenPack";
 
 export function App() {
   return (
@@ -36,6 +50,20 @@ export function App() {
             <Route path="replay" element={<ReplayScreen />} />
             <Route path="compare" element={<CompareScreen />} />
             <Route path="what-if" element={<WhatIfScreen />} />
+          </Route>
+          <Route path="/studio" element={<StudioLayout />}>
+            <Route index element={<Navigate to="constitution" replace />} />
+            <Route path="constitution" element={<ConstitutionScreen />} />
+            <Route
+              path="policy"
+              element={
+                <PolicyScreen pack={FROZEN_POLICY_PACK} approval={FROZEN_APPROVAL_RECORD} />
+              }
+            />
+            <Route path="authority" element={<AuthorityScreen />} />
+            <Route path="simulate" element={<SimulateScreen />} />
+            <Route path="publish" element={<PublishScreen compiledPackage={{}} />} />
+            <Route path="observe" element={<ObserveScreen />} />
           </Route>
           <Route path="*" element={<Navigate to="/scenarios" replace />} />
         </Routes>
