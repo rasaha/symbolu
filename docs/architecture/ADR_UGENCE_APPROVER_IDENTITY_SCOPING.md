@@ -1,6 +1,6 @@
 # Ugence approver identity — scoping record
 
-**Status: SCOPED AND RULED; AI-A and AI-B implemented.** The five owner decisions in
+**Status: SCOPED AND RULED; AI-A, AI-B and AI-C implemented.** The five owner decisions in
 §5 were ruled on 2026-09-05. Step AI-A of §6 shipped in `governed-review-service` 0.3.0
 `[V]` (`identity.py`, `tests/test_identity.py`) and step AI-B in the studio `[V]`
 (`clients/review.py`, `api/v2/review.py`, `client-v2.ts`,
@@ -157,6 +157,15 @@ Entry conditions are met; each step is entered only by its own implementation pr
 3. **AI-C · OIDC adapter** as its own small package, the first crypto and IdP-client
    dependency on this path, validated against a real issuer in CI only if a test issuer
    can run without egress. Label: **Reference-grade**.
+   **Shipped `[V]`** as `packages/integration/approver-identity-jwt` 0.1.0 under
+   IA-1 to IA-5 (`ADR_UGENCE_APPROVER_IDENTITY_ADAPTER_SCOPING.md`): locally
+   validated RFC 9068 access tokens, PyJWT over `cryptography`, RS256/ES256/EdDSA
+   only, a configured JWKS cached by `kid` with one refresh then fail-closed, the
+   explicit IA-4 claim mapping, no wall clock, no token ever logged, stored or
+   returned. Proven only against its in-process issuer: label
+   `REFERENCE_GRADE_SHADOW_ONLY`, `ISSUER_VALIDATION = IN_PROCESS_ISSUER_ONLY`;
+   real enterprise-issuer validation remains unproven, and no composition root
+   wires it yet.
 4. **AI-D · Ledger and linkage carry the proof** (ID-2): `authentication_reference` as
    an additive field of the approval record and of `ReviewLinkage`, digest-bound; row 9.
    Label: **Core implemented**.
@@ -174,7 +183,6 @@ outside this sequence entirely.
 
 ## 7 — Next step
 
-AI-C, the real identity adapter in its own package, the first identity-provider and
-crypto dependency on this path; scoped in
-`ADR_UGENCE_APPROVER_IDENTITY_ADAPTER_SCOPING.md`, awaiting rulings IA-1 to IA-5.
-AI-D and AI-E follow in order.
+AI-D, the approval record and the linkage carrying `authentication_reference` (row
+9), then AI-E. Enterprise-issuer validation of AI-C waits on an owner-provisioned
+issuer.

@@ -1,0 +1,86 @@
+name: approver-identity-jwt-ci
+
+# Scoped CI for ugence-approver-identity-jwt (AI-C, owner rulings IA-1 to IA-5).
+#
+# The suite runs against an in-process issuer on 127.0.0.1 with keys generated at test
+# time: no egress, no external identity provider, no credential. PyJWT and cryptography
+# are installed within the bounds pyproject.toml declares, and the installed versions are
+# printed so a drift outside them is visible in the log.
+
+on:
+  pull_request:
+    paths:
+      - "packages/integration/approver-identity-jwt/**"
+      - "packages/integration/governed-review-service/**"
+      - ".github/workflows/approver-identity-jwt-ci.yml"
+  push:
+    branches:
+      - "claude/setup-symbolu-monorepo-**"
+      - "claude/**"
+    paths:
+      - "packages/integration/approver-identity-jwt/**"
+      - "packages/integration/governed-review-service/**"
+      - ".github/workflows/approver-identity-jwt-ci.yml"
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  adapter-suite:
+    name: Approver identity JWT adapter (in-process issuer, no egress)
+    runs-on: ubuntu-latest
+    env:
+      PYTHONPATH: >-
+        packages/integration/approver-identity-jwt/src:packages/integration/governed-review-service/src:packages/integration/governed-review/src:packages/integration/control-plane-root/src:packages/integration/approval-workflow/src:packages/integration/authority-directory/src:packages/governance-contracts/src:packages/integration/agent-runtime-governance/src:packages/integration/risk-authority-runtime/src:packages/integration/risk-authority-status-runtime/src:packages/runtime/agent-runtime/src:packages/risk_authority/src:packages/capabilities/decision-authority/src:packages/providers/actiongate/src:packages/integration/durable-execution/src:packages/integration/governed-review/tests:packages/integration/governed-review-service/tests
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies within the declared bounds
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest pydantic "dbos>=2.0" "SQLAlchemy>=2.0" \
+            "PyJWT[crypto]>=2.8.0,<3.0.0" "cryptography>=41.0.7,<47.0.0"
+          python -c "import importlib.metadata as m; print('PyJWT', m.version('PyJWT')); print('cryptography', m.version('cryptography'))"
+
+      - name: Boundaries, public API, packaging
+        run: |
+          cd packages/integration/approver-identity-jwt
+          python -m pytest tests/test_boundaries.py -o addopts= -v --no-header
+
+      - name: Failure matrix (adapter ADR §4) over the in-process issuer
+        run: |
+          cd packages/integration/approver-identity-jwt
+          python -m pytest tests/test_failure_matrix.py -o addopts= -v --no-header
+
+      - name: Claim mapping (IA-4)
+        run: |
+          cd packages/integration/approver-identity-jwt
+          python -m pytest tests/test_claim_mapping.py -o addopts= -v --no-header
+
+      - name: Token redaction
+        run: |
+          cd packages/integration/approver-identity-jwt
+          python -m pytest tests/test_redaction.py -o addopts= -v --no-header
+
+      - name: Behind the real review service (real SQLite ledger)
+        run: |
+          cd packages/integration/approver-identity-jwt
+          python -m pytest tests/test_end_to_end.py -o addopts= -v --no-header
+
+  build:
+    name: Wheel + sdist build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: |
+          python -m pip install --upgrade pip build
+          python -m build packages/integration/approver-identity-jwt
+          ls -la packages/integration/approver-identity-jwt/dist/

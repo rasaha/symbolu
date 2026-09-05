@@ -1,0 +1,52 @@
+# Ugence Approver Identity JWT — the first real ApproverIdentityPort adapter for the
+# governed review service (AI-C, owner rulings IA-1 to IA-5,
+# docs/architecture/ADR_UGENCE_APPROVER_IDENTITY_ADAPTER_SCOPING.md).
+#
+#   THIS PACKAGE VALIDATES A PROOF IT DID NOT ISSUE. IT MINTS NO IDENTITY, HOLDS NO
+#   CREDENTIAL BEYOND PUBLIC KEYS, AND NEVER LOGS, STORES OR RETURNS A TOKEN.
+#
+# Dependency direction (one-way, composition only):
+#     ugence-governed-review-service <- the port it implements and the claims shape it fills
+#     PyJWT[crypto]                  <- RFC 7519/7517 parsing and signature verification (IA-2)
+#     cryptography                   <- the ratified cryptographic backend PyJWT verifies with
+#
+# Nothing else. No Decision Authority, no approval ledger, no directory, no durable
+# engine, no studio, no HTTP client library (stdlib urllib fetches the JWKS), no clock.
+#
+# Build:   python -m build packages/integration/approver-identity-jwt
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ugence-approver-identity-jwt"
+dynamic = ["version"]
+description = "Ugence Approver Identity JWT — locally validated RFC 9068 access tokens as proof of who decided, for the governed review service's ApproverIdentityPort. Reference-grade, shadow-only; validated against an in-process issuer only."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "Proprietary" }
+authors = [{ name = "Rakesh Mohan" }]
+keywords = ["governance", "approval", "identity", "jwt", "ugence"]
+classifiers = ["Typing :: Typed"]
+dependencies = [
+    "ugence-governed-review-service>=0.3.0",
+    "PyJWT[crypto]>=2.8.0,<3.0.0",
+    "cryptography>=41.0.7,<47.0.0",
+]
+
+[project.optional-dependencies]
+test = ["pytest>=7.0"]
+
+[tool.setuptools.dynamic]
+version = { attr = "ugence_approver_identity_jwt.version.__version__" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["ugence_approver_identity_jwt*"]
+
+[tool.setuptools.package-data]
+ugence_approver_identity_jwt = ["py.typed"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
