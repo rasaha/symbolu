@@ -19,7 +19,7 @@ from ugence_governance_studio_api.version import API_V2_CONTRACT_VERSION, SYNTHE
 
 _BACKEND = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 _APP = os.path.dirname(_BACKEND)
-_FIXTURES = os.path.join(_APP, "demo_data", "v2")
+_FIXTURES = os.path.join(_APP, "fixtures", "v2")
 _EXPECTED = os.path.join(_APP, "expected_outputs")
 
 

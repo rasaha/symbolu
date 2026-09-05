@@ -111,14 +111,14 @@ describe("2 · Policy", () => {
     const path = await import("node:path");
     const source = JSON.parse(
       readFileSync(
-        path.resolve(__dirname, "..", "..", "demo_data", "v2", "policy_pack.json"),
+        path.resolve(__dirname, "..", "..", "fixtures", "v2", "policy_pack.json"),
         "utf-8",
       ),
     );
     expect(JSON.parse(JSON.stringify(FROZEN_POLICY_PACK))).toEqual(source);
     const approvalSource = JSON.parse(
       readFileSync(
-        path.resolve(__dirname, "..", "..", "demo_data", "v2", "approval_record.json"),
+        path.resolve(__dirname, "..", "..", "fixtures", "v2", "approval_record.json"),
         "utf-8",
       ),
     );

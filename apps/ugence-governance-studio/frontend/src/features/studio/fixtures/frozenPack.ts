@@ -1,4 +1,4 @@
-// The frozen reference policy pack, mirrored from apps/ugence-governance-studio/demo_data/v2/.
+// The frozen reference policy pack, mirrored from apps/ugence-governance-studio/fixtures/v2/.
 //
 // Committed rather than fetched so the Policy screen renders deterministically with no
 // backend, and so the canvas round-trip test and the screen tests exercise the SAME

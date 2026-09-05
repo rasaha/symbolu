@@ -241,7 +241,7 @@ Not decoration; each is a real absence the backend reports rather than papers ov
 | Publish | `available: false` until a console base URL is configured; SHADOW is the only mode reachable. |
 | Observe | Unreachable and empty are distinguished — "the console said nothing" and "the console is unreachable" must not look alike on an audit screen. The console `AuditStore` remains per-instance. |
 
-**Not yet wheel-bundled.** The v2 fixtures under `demo_data/v2/` are read from the app
+**Not yet wheel-bundled.** The v2 fixtures under `fixtures/v2/` are read from the app
 directory by the suite; they are not in the distribution's `data/` tree, because
 `test_bundled_fixtures_match_p3a_source` bundles the four named P3A scenarios only.
 Bundling belongs with the screen work that will actually load them.
