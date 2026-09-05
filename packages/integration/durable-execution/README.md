@@ -88,10 +88,12 @@ Two consequences worth stating plainly:
   and attempt 7 of a task produce the same key and the same proposal fingerprint. The
   adapter's `attempt_token` is deliberately excluded from both; mixing it in would make
   every retry look like a brand-new action.
-* **Recovery never auto-runs.** Agent Runtime restores a recovered instance as PAUSED
-  requiring explicit continuation. So a retry after a crash is two steps — an explicit
-  resume, then an advance that re-crosses the boundary from the beginning. This is
-  asserted by matrix rows 1–3.
+* **Recovery never auto-runs, and resume is bounded.** Agent Runtime restores a
+  recovered instance as PAUSED requiring explicit continuation. So a retry after a
+  crash is two steps — an explicit resume, then an advance that re-crosses the boundary
+  from the beginning. `resume` delegates to the runtime's bounded `continue_workflow`:
+  it re-arms and runs nothing, so one durable step never crosses the governance
+  boundary more than once. Asserted by matrix rows 1–3 and row 9.
 
 ## Two configuration requirements that are not optional
 
@@ -194,9 +196,10 @@ effect of a green suite.
 
 ## Known gaps
 
-Multi-region consistency, HSM/KMS custody and key rotation are untouched. HOLD, DEFER,
-ESCALATE and MANUAL_REVIEW still have no sink, so a parked instance (row 9) has nowhere
-to be seen by a human until one is built. Risk Authority `production_mode` still raises
+Multi-region consistency, HSM/KMS custody and key rotation are untouched. ESCALATE has
+a sink since GAS-7 HR-A (`packages/integration/governed-review` binds and consumes an
+approval before the engine advances), but no queue or decision surface is built yet, so
+a parked instance (row 9) is still not visible to a human. Risk Authority `production_mode` still raises
 `ProductionContainmentError`. Clock discipline is enforced against the known monotonic
 default; a deployment that hides a monotonic reading behind an unrecognisable wrapper
 defeats the guard, and that residual is stated rather than papered over.

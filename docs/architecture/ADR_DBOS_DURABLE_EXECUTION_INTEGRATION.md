@@ -522,10 +522,16 @@ this.
 
 ### Three findings that change how the matrix reads
 
-1. **Recovery never auto-runs.** Agent Runtime restores a recovered instance as PAUSED
-   requiring explicit continuation, so a post-crash retry is deliberately two steps — an
-   explicit resume, then an advance that re-crosses the boundary from the beginning.
-   Rows 1–3 assert this rather than working around it. `[V]`
+1. **Recovery never auto-runs, and resume is bounded.** Agent Runtime restores a
+   recovered instance as PAUSED requiring explicit continuation, so a post-crash retry
+   is deliberately two steps — an explicit resume, then an advance that re-crosses the
+   boundary from the beginning. Rows 1–3 assert this rather than working around it.
+   `[V]` Under owner ruling HR-4 (`ADR_UGENCE_HUMAN_REVIEW_DURABLE_RESUME_SCOPING.md`)
+   the adapter's `resume` delegates to the runtime's bounded `continue_workflow`, not
+   the draining `resume_workflow`: one durable step re-arms and runs nothing, and each
+   later step advances one quantum. Row 9 now resumes for real and asserts the
+   post-resume fingerprint equals the pre-park one; a three-task chain asserts one task
+   per step. `[V]`
 2. **Row 7 blocks rather than raising.** With Postgres down, DBOS's retriable-error loop
    backs off indefinitely, so an in-process advance never returns. Blocking is the
    correct behaviour — an advance that cannot commit its checkpoint must not proceed —
@@ -665,9 +671,10 @@ and is retained only to show what was rejected.
 The Credential Broker (cloud-scaling Phase 5X) does not exist, so no live execution is
 reachable regardless of engine `[V]` (capability pipeline Appendix B §B.6 ¶2). Risk
 Authority `production_mode` raises `ProductionContainmentError` `[V]`
-(`packages/risk_authority/src/risk_authority/domain/errors.py:19`). HOLD, DEFER,
-ESCALATE and MANUAL_REVIEW have no sink, so §8 row 9's parked instance has nowhere to
-be seen by a human until one is built. Registries are in-memory. Multi-region
+(`packages/risk_authority/src/risk_authority/domain/errors.py:19`). ESCALATE now has a
+sink: `packages/integration/governed-review` binds an approval to §8 row 9's parked
+proposal and consumes it before the engine advances (GAS-7 HR-A); the queue and
+decision surfaces (HR-C, HR-D) are not built. Registries are in-memory. Multi-region
 consistency, HSM/KMS custody and key rotation are untouched here. The clock defect in
 §6.4 is open until row 11 passes.
 

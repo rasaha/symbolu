@@ -92,5 +92,5 @@ the adapter, the source never imports it. Nothing under `packages/capabilities`.
   by a later step.
 - `decided_by` is what the caller of the ledger presented. Identity proof is the
   review service's IdP session, which does not exist yet (HR-C).
-- The adapter's `resume` drains the whole workflow inside one durable step; the rows
-  here observe that and do not depend on it. Bounding it is HR-B.
+- The adapter's `resume` is bounded since HR-B: it re-arms and runs nothing, and the
+  rows here rely on the following `advance` to perform the single run.
