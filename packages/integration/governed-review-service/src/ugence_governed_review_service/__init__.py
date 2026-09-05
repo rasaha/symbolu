@@ -34,6 +34,7 @@ from .identity import (
     VerifiedClaims,
     authentication_reference,
     subject_reference,
+    verify_authentication_reference,
 )
 from .linkage import (
     LINKAGE_KIND,
@@ -71,7 +72,7 @@ __all__ = [
     "ApproverIdentityPort", "ApproverIdentity", "VerifiedClaims", "ActorKind", "TenantMode",
     "RecordedAssurance", "StaticApproverIdentityAdapter", "IdentityUnavailable",
     "PROOF_HEADER", "PRESENTED_UNPROVEN", "IDP_AUTHENTICATED", "IDENTITY_PROOF_LABELS",
-    "authentication_reference", "subject_reference",
+    "authentication_reference", "subject_reference", "verify_authentication_reference",
     "RunReader", "DbosRunReader", "StaticRunReader",
     "ROUTES", "build_app", "queue_entry_view", "decision_view",
     "LINKAGE_KIND", "LinkageAppender", "LinkageIndex", "InMemoryLinkageIndex",

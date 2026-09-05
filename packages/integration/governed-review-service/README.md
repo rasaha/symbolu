@@ -62,7 +62,7 @@ After a GRANT is recorded or replayed, and on every run-detail read, the service
 `LinkageAppender` to reconstruct the `ReviewLinkage` (governed-review's HR-E contract)
 from the approval ledger, the durable event log and the checkpoint journal, and to
 append it to the control-plane audit ledger as a `LedgerEntry` of kind
-`governed_review.linkage.v1`. The ledger answers with G4's `AuditReference`, which the
+`governed_review.linkage.v2`. The ledger answers with G4's `AuditReference`, which the
 service returns on the decision outcome and on run detail.
 
 Three things hold, and the tests hold them:

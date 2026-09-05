@@ -6,7 +6,7 @@ Owner ruling HE-1 (``APPEND_FROM_REVIEW_SERVICE_ROOT``): after a GRANT is record
 replayed and the instance's next quantum has consumed the approval, the review
 service reconstructs the :class:`ReviewLinkage` from the three stores and appends it
 to ``ugence_control_plane_root``'s audit ledger as a ``LedgerEntry`` of kind
-``governed_review.linkage.v1``. The ledger returns G4's ``AuditReference``; the
+``governed_review.linkage.v2``. The ledger returns G4's ``AuditReference``; the
 service exposes it, and the linkage, on the run-detail read (HE-5).
 
 Two properties are load-bearing:
@@ -53,8 +53,9 @@ __all__ = [
     "linkage_view",
 ]
 
-#: The ``LedgerEntry.kind`` a linkage is appended under (HE-1).
-LINKAGE_KIND = "governed_review.linkage.v1"
+#: The ``LedgerEntry.kind`` a linkage is appended under (HE-1). Follows the
+#: linkage's own version: v2 since AI-D added ``authentication_reference``.
+LINKAGE_KIND = "governed_review.linkage.v2"
 
 #: The payload key that carries the linkage's own digest, so the entry can be found
 #: again by it. Everything else in the payload is ``ReviewLinkage.to_dict()``.
@@ -117,7 +118,7 @@ class LedgerLinkageIndex:
     ship is a schema-versioned, append-only table whose columns its README documents.
     This index opens that file read-only, refuses any schema version other than the
     one the installed ``ugence_control_plane_root`` declares, and asks one question:
-    which row of kind ``governed_review.linkage.v1`` carries this linkage digest. It
+    which row of kind ``governed_review.linkage.v2`` carries this linkage digest. It
     writes nothing and interprets nothing else.
     """
 

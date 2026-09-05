@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.4.0 — 2026-09-05 — AI-D (approver-identity ruling ID-2)
+
+Contract `governed_review_service.v4`: the same five routes; the approval view and the
+linkage view carry `authentication_reference`.
+
+- A proven decision's `authentication_reference` is passed to the ledger's `decide()`
+  and so recorded on the approval and in its hash-linked event; the outcome reports
+  what the ledger recorded, so a replay under a fresh proof reports the standing
+  reference.
+- Linkages are appended as `governed_review.linkage.v2` (`LINKAGE_KIND`).
+- `verify_authentication_reference(claims, recorded)`: identity-ADR row 9's recompute
+  check, constant-time.
+
 ## 0.2.0 — 2026-09-05 — HE-1, HE-5
 
 Contract `governed_review_service.v2`: the same five routes, two answers widened.
