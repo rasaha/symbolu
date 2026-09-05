@@ -1,0 +1,302 @@
+{
+  "curated_api_module": "ugence_authority_directory",
+  "distribution": "ugence-authority-directory",
+  "namespace": "ugence_authority_directory",
+  "note": "Machine-readable snapshot of the curated public API (ugence_authority_directory.__all__). tests/packaging/test_packaging.py asserts this file equals the live package surface. Regenerate with scripts/generate_public_api.py when the curated API changes deliberately.",
+  "package_version": "0.1.0",
+  "symbols": {
+    "AuthorityDirectoryError": {
+      "kind": "class",
+      "methods": [
+        "add_note",
+        "with_traceback"
+      ]
+    },
+    "AuthorityDirectoryPort": {
+      "kind": "class",
+      "methods": [
+        "committee_report",
+        "get_grant",
+        "grant_events",
+        "grants_for",
+        "holders_of",
+        "put_grant",
+        "revoke_grant"
+      ]
+    },
+    "CONTRACT_VERSION": {
+      "kind": "constant",
+      "value": "authority_directory.v1"
+    },
+    "CommitteeReport": {
+      "fields": [
+        "committee",
+        "role",
+        "scope",
+        "quorum",
+        "members"
+      ],
+      "kind": "dataclass"
+    },
+    "ContractViolation": {
+      "kind": "class",
+      "methods": [
+        "add_note",
+        "with_traceback"
+      ]
+    },
+    "DelegationRefused": {
+      "kind": "class",
+      "methods": [
+        "add_note",
+        "with_traceback"
+      ]
+    },
+    "DirectoryApproverEligibility": {
+      "kind": "class",
+      "methods": [
+        "committee_for",
+        "eligible_approvers",
+        "is_eligible",
+        "scope_for"
+      ]
+    },
+    "DirectoryApproverRef": {
+      "fields": [
+        "approver_id",
+        "approver_kind",
+        "role",
+        "authority_reference"
+      ],
+      "kind": "dataclass"
+    },
+    "ENFORCEMENT_ENABLED": {
+      "kind": "constant",
+      "value": false
+    },
+    "EligibilityAnswer": {
+      "fields": [
+        "eligible",
+        "reasons"
+      ],
+      "kind": "dataclass"
+    },
+    "GRANT_ID_PREFIX": {
+      "kind": "constant",
+      "value": "grant_"
+    },
+    "GrantAlreadyExistsError": {
+      "kind": "class",
+      "methods": [
+        "add_note",
+        "with_traceback"
+      ]
+    },
+    "GrantEvent": {
+      "fields": [
+        "event_id",
+        "grant_id",
+        "sequence",
+        "event_type",
+        "occurred_at",
+        "actor",
+        "detail"
+      ],
+      "kind": "dataclass"
+    },
+    "GrantEventType": {
+      "kind": "enum",
+      "values": [
+        "GRANTED",
+        "REVOKED"
+      ]
+    },
+    "GrantNotFoundError": {
+      "kind": "class",
+      "methods": [
+        "add_note",
+        "with_traceback"
+      ]
+    },
+    "InMemoryAuthorityDirectory": {
+      "kind": "class",
+      "methods": [
+        "close",
+        "committee_report",
+        "get_grant",
+        "grant_events",
+        "grants_for",
+        "holders_of",
+        "put_grant",
+        "revoke_grant"
+      ]
+    },
+    "MATURITY": {
+      "kind": "constant",
+      "value": "REFERENCE_GRADE_SHADOW_ONLY"
+    },
+    "MAX_DELEGATION_HOPS": {
+      "kind": "int"
+    },
+    "PrincipalKind": {
+      "kind": "enum",
+      "values": [
+        "HUMAN",
+        "COMMITTEE",
+        "DELEGATED_POLICY",
+        "SERVICE",
+        "AI"
+      ]
+    },
+    "PrincipalRef": {
+      "fields": [
+        "principal_id",
+        "principal_kind",
+        "display_ref",
+        "quorum"
+      ],
+      "kind": "dataclass"
+    },
+    "ProductionModeRefused": {
+      "kind": "class",
+      "methods": [
+        "add_note",
+        "with_traceback"
+      ]
+    },
+    "RecordIntegrityError": {
+      "kind": "class",
+      "methods": [
+        "add_note",
+        "with_traceback"
+      ]
+    },
+    "RoleGrant": {
+      "fields": [
+        "grant_id",
+        "tenant_id",
+        "principal",
+        "role",
+        "scope",
+        "validity",
+        "authority_reference",
+        "granting_policy_ref",
+        "delegation_ref",
+        "delegated_from",
+        "member_of",
+        "revoked_at",
+        "revocation_reason",
+        "loaded_by"
+      ],
+      "kind": "dataclass"
+    },
+    "SCHEMA_VERSION": {
+      "kind": "constant",
+      "value": "authority_directory.store/1.0.0"
+    },
+    "SCOPE_SEPARATOR": {
+      "kind": "constant",
+      "value": "/"
+    },
+    "SqliteAuthorityDirectory": {
+      "kind": "class",
+      "methods": [
+        "close",
+        "committee_report",
+        "get_grant",
+        "grant_events",
+        "grants_for",
+        "holders_of",
+        "put_grant",
+        "revoke_grant",
+        "verify_chain"
+      ]
+    },
+    "StoreUnavailableError": {
+      "kind": "class",
+      "methods": [
+        "add_note",
+        "with_traceback"
+      ]
+    },
+    "__version__": {
+      "kind": "constant",
+      "value": "0.1.0"
+    },
+    "build_committee_report": {
+      "kind": "function",
+      "parameters": [
+        "grants",
+        "tenant_id",
+        "committee_id",
+        "role",
+        "scope",
+        "as_of"
+      ]
+    },
+    "delegation_refusals": {
+      "kind": "function",
+      "parameters": [
+        "grant",
+        "delegator",
+        "as_of"
+      ]
+    },
+    "grant_id_for": {
+      "kind": "function",
+      "parameters": [
+        "tenant_id",
+        "principal_id",
+        "role",
+        "scope",
+        "validity"
+      ]
+    },
+    "projection_of": {
+      "kind": "function",
+      "parameters": [
+        "grant"
+      ]
+    },
+    "require_scope": {
+      "kind": "function",
+      "parameters": [
+        "value",
+        "name"
+      ]
+    },
+    "scope_covers": {
+      "kind": "function",
+      "parameters": [
+        "outer",
+        "inner"
+      ]
+    },
+    "select_for_principal": {
+      "kind": "function",
+      "parameters": [
+        "grants",
+        "tenant_id",
+        "principal_id",
+        "as_of"
+      ]
+    },
+    "select_holders": {
+      "kind": "function",
+      "parameters": [
+        "grants",
+        "tenant_id",
+        "role",
+        "scope",
+        "as_of"
+      ]
+    },
+    "valid_at": {
+      "kind": "function",
+      "parameters": [
+        "grants",
+        "as_of"
+      ]
+    }
+  }
+}

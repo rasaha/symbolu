@@ -1,0 +1,507 @@
+{
+  "curated_api_module": "ugence_approval_workflow",
+  "distribution": "ugence-approval-workflow",
+  "namespace": "ugence_approval_workflow",
+  "note": "Machine-readable snapshot of the curated public API (ugence_approval_workflow.__all__). tests/packaging/test_packaging.py asserts this file equals the live package surface. Regenerate with scripts/generate_public_api.py when the curated API changes deliberately.",
+  "package_version": "0.1.0",
+  "symbols": {
+    "APPROVAL_ID_PREFIX": {
+      "kind": "constant",
+      "value": "apr_"
+    },
+    "APPROVAL_KEY_PREFIX": {
+      "kind": "constant",
+      "value": "approval_key.v1:"
+    },
+    "ApprovalAlreadyExistsError": {
+      "kind": "class",
+      "methods": [
+        "add_note",
+        "with_traceback"
+      ]
+    },
+    "ApprovalEvent": {
+      "fields": [
+        "event_id",
+        "approval_id",
+        "sequence",
+        "event_type",
+        "occurred_at",
+        "actor",
+        "detail"
+      ],
+      "kind": "dataclass"
+    },
+    "ApprovalNotFoundError": {
+      "kind": "class",
+      "methods": [
+        "add_note",
+        "with_traceback"
+      ]
+    },
+    "ApprovalRecord": {
+      "fields": [
+        "approval_id",
+        "tenant_id",
+        "subject_kind",
+        "subject_digest",
+        "subject_ref",
+        "requested_by",
+        "required_role",
+        "state",
+        "validity",
+        "request_ordinal",
+        "supersedes",
+        "justification",
+        "accepted_finding_ids",
+        "decided_by",
+        "decided_role",
+        "decided_authority_reference",
+        "decided_at",
+        "signature_reference",
+        "is_fixture",
+        "exception_requested_by",
+        "exception_justification",
+        "exception_validity",
+        "consumer_ref",
+        "consumed_at"
+      ],
+      "kind": "dataclass"
+    },
+    "ApprovalState": {
+      "kind": "enum",
+      "values": [
+        "REQUESTED",
+        "PENDING",
+        "GRANTED",
+        "REJECTED",
+        "CHANGES_REQUIRED",
+        "EXPIRED",
+        "WITHDRAWN",
+        "EXCEPTION_REQUESTED",
+        "EXCEPTION_GRANTED",
+        "EXCEPTION_DENIED",
+        "CONSUMED"
+      ]
+    },
+    "ApprovalSubject": {
+      "fields": [
+        "tenant_id",
+        "subject_kind",
+        "subject_digest",
+        "subject_ref"
+      ],
+      "kind": "dataclass"
+    },
+    "ApprovalWorkflowError": {
+      "kind": "class",
+      "methods": [
+        "add_note",
+        "with_traceback"
+      ]
+    },
+    "ApprovalWorkflowPort": {
+      "kind": "class",
+      "methods": [
+        "approval_events",
+        "consume",
+        "decide",
+        "decide_exception",
+        "get_approval",
+        "list_open",
+        "present_for_decision",
+        "request_approval",
+        "request_exception",
+        "state_at",
+        "withdraw"
+      ]
+    },
+    "ApproverEligibilityPort": {
+      "kind": "class",
+      "methods": [
+        "eligible_approvers",
+        "is_eligible"
+      ]
+    },
+    "ApproverKind": {
+      "kind": "enum",
+      "values": [
+        "HUMAN",
+        "COMMITTEE",
+        "DELEGATED_POLICY",
+        "SERVICE",
+        "AI"
+      ]
+    },
+    "ApproverRef": {
+      "fields": [
+        "approver_id",
+        "approver_kind",
+        "role",
+        "authority_reference"
+      ],
+      "kind": "dataclass"
+    },
+    "ArtifactIntegrityError": {
+      "kind": "class",
+      "methods": [
+        "add_note",
+        "with_traceback"
+      ]
+    },
+    "CONSUMABLE_STATES": {
+      "kind": "frozenset",
+      "values": [
+        "ApprovalState.EXCEPTION_GRANTED",
+        "ApprovalState.GRANTED"
+      ]
+    },
+    "CONSUMPTION_ID_PREFIX": {
+      "kind": "constant",
+      "value": "cns_"
+    },
+    "CONTRACT_VERSION": {
+      "kind": "constant",
+      "value": "approval_workflow.v1"
+    },
+    "ConsumeOutcome": {
+      "fields": [
+        "result",
+        "key",
+        "consumption_id",
+        "holder",
+        "reason"
+      ],
+      "kind": "dataclass"
+    },
+    "ConsumptionKey": {
+      "fields": [
+        "tenant_id",
+        "approval_id",
+        "subject_digest",
+        "consumer_ref"
+      ],
+      "kind": "dataclass"
+    },
+    "ConsumptionResult": {
+      "kind": "enum",
+      "values": [
+        "CONSUMED_FIRST",
+        "ALREADY_CONSUMED",
+        "NOT_GRANTED",
+        "EXPIRED_APPROVAL",
+        "SUBJECT_MISMATCH",
+        "UNKNOWN"
+      ]
+    },
+    "ContractViolation": {
+      "kind": "class",
+      "methods": [
+        "add_note",
+        "with_traceback"
+      ]
+    },
+    "ELIGIBLE_APPROVER_KINDS": {
+      "kind": "frozenset",
+      "values": [
+        "ApproverKind.COMMITTEE",
+        "ApproverKind.HUMAN"
+      ]
+    },
+    "ENFORCEMENT_ENABLED": {
+      "kind": "constant",
+      "value": false
+    },
+    "EXPIRABLE_STATES": {
+      "kind": "frozenset",
+      "values": [
+        "ApprovalState.EXCEPTION_GRANTED",
+        "ApprovalState.EXCEPTION_REQUESTED",
+        "ApprovalState.GRANTED",
+        "ApprovalState.PENDING",
+        "ApprovalState.REQUESTED"
+      ]
+    },
+    "EligibilityDecision": {
+      "fields": [
+        "eligible",
+        "reasons"
+      ],
+      "kind": "dataclass"
+    },
+    "EligibilityRefused": {
+      "kind": "class",
+      "methods": [
+        "add_note",
+        "with_traceback"
+      ]
+    },
+    "IllegalTransitionError": {
+      "kind": "class",
+      "methods": [
+        "add_note",
+        "with_traceback"
+      ]
+    },
+    "InMemoryApprovalWorkflowStore": {
+      "kind": "class",
+      "methods": [
+        "approval_events",
+        "close",
+        "consume",
+        "decide",
+        "decide_exception",
+        "get_approval",
+        "list_open",
+        "present_for_decision",
+        "request_approval",
+        "request_exception",
+        "state_at",
+        "withdraw"
+      ]
+    },
+    "LEGAL_TRANSITIONS": {
+      "keys": [
+        "ApprovalState.CHANGES_REQUIRED",
+        "ApprovalState.CONSUMED",
+        "ApprovalState.EXCEPTION_DENIED",
+        "ApprovalState.EXCEPTION_GRANTED",
+        "ApprovalState.EXCEPTION_REQUESTED",
+        "ApprovalState.EXPIRED",
+        "ApprovalState.GRANTED",
+        "ApprovalState.PENDING",
+        "ApprovalState.REJECTED",
+        "ApprovalState.REQUESTED",
+        "ApprovalState.WITHDRAWN"
+      ],
+      "kind": "mapping"
+    },
+    "MATURITY": {
+      "kind": "constant",
+      "value": "REFERENCE_GRADE_SHADOW_ONLY"
+    },
+    "OPEN_STATES": {
+      "kind": "frozenset",
+      "values": [
+        "ApprovalState.EXCEPTION_REQUESTED",
+        "ApprovalState.PENDING",
+        "ApprovalState.REQUESTED"
+      ]
+    },
+    "ProductionModeRefused": {
+      "kind": "class",
+      "methods": [
+        "add_note",
+        "with_traceback"
+      ]
+    },
+    "ReviewDecision": {
+      "kind": "enum",
+      "values": [
+        "GRANT",
+        "REJECT",
+        "REQUEST_CHANGES"
+      ]
+    },
+    "SCHEMA_VERSION": {
+      "kind": "constant",
+      "value": "approval_workflow.store/1.0.0"
+    },
+    "STATE_RANK": {
+      "keys": [
+        "ApprovalState.CHANGES_REQUIRED",
+        "ApprovalState.CONSUMED",
+        "ApprovalState.EXCEPTION_DENIED",
+        "ApprovalState.EXCEPTION_GRANTED",
+        "ApprovalState.EXCEPTION_REQUESTED",
+        "ApprovalState.EXPIRED",
+        "ApprovalState.GRANTED",
+        "ApprovalState.PENDING",
+        "ApprovalState.REJECTED",
+        "ApprovalState.REQUESTED",
+        "ApprovalState.WITHDRAWN"
+      ],
+      "kind": "mapping"
+    },
+    "SqliteApprovalWorkflowStore": {
+      "kind": "class",
+      "methods": [
+        "approval_events",
+        "close",
+        "consume",
+        "decide",
+        "decide_exception",
+        "get_approval",
+        "list_open",
+        "present_for_decision",
+        "request_approval",
+        "request_exception",
+        "state_at",
+        "verify_chain",
+        "withdraw"
+      ]
+    },
+    "StaticApproverEligibility": {
+      "kind": "class",
+      "methods": [
+        "eligible_approvers",
+        "is_eligible",
+        "register"
+      ]
+    },
+    "StoreUnavailableError": {
+      "kind": "class",
+      "methods": [
+        "add_note",
+        "with_traceback"
+      ]
+    },
+    "TERMINAL_STATES": {
+      "kind": "frozenset",
+      "values": [
+        "ApprovalState.CHANGES_REQUIRED",
+        "ApprovalState.CONSUMED",
+        "ApprovalState.EXCEPTION_DENIED",
+        "ApprovalState.EXPIRED",
+        "ApprovalState.REJECTED",
+        "ApprovalState.WITHDRAWN"
+      ]
+    },
+    "__version__": {
+      "kind": "constant",
+      "value": "0.1.0"
+    },
+    "approval_id_for": {
+      "kind": "function",
+      "parameters": [
+        "subject",
+        "requested_by",
+        "request_ordinal"
+      ]
+    },
+    "build_request": {
+      "kind": "function",
+      "parameters": [
+        "subject",
+        "requested_by",
+        "required_role",
+        "validity",
+        "as_of",
+        "request_ordinal",
+        "supersedes",
+        "justification",
+        "is_fixture"
+      ]
+    },
+    "consumption_id_for": {
+      "kind": "function",
+      "parameters": [
+        "key"
+      ]
+    },
+    "is_legal_transition": {
+      "kind": "function",
+      "parameters": [
+        "current",
+        "target"
+      ]
+    },
+    "next_on_consume": {
+      "kind": "function",
+      "parameters": [
+        "record",
+        "consumer_ref",
+        "as_of"
+      ]
+    },
+    "next_on_decide": {
+      "kind": "function",
+      "parameters": [
+        "record",
+        "approver",
+        "decision",
+        "eligibility",
+        "as_of",
+        "justification",
+        "accepted_finding_ids",
+        "signature_reference"
+      ]
+    },
+    "next_on_exception_decision": {
+      "kind": "function",
+      "parameters": [
+        "record",
+        "approver",
+        "granted",
+        "eligibility",
+        "as_of",
+        "justification",
+        "signature_reference"
+      ]
+    },
+    "next_on_exception_request": {
+      "kind": "function",
+      "parameters": [
+        "record",
+        "requested_by",
+        "justification",
+        "exception_validity",
+        "as_of"
+      ]
+    },
+    "next_on_present": {
+      "kind": "function",
+      "parameters": [
+        "record",
+        "as_of",
+        "eligible_approvers"
+      ]
+    },
+    "next_on_withdraw": {
+      "kind": "function",
+      "parameters": [
+        "record",
+        "by",
+        "as_of",
+        "justification"
+      ]
+    },
+    "require_transition": {
+      "kind": "function",
+      "parameters": [
+        "current",
+        "target"
+      ]
+    },
+    "state_for_decision": {
+      "kind": "function",
+      "parameters": [
+        "decision"
+      ]
+    },
+    "structural_refusals": {
+      "kind": "function",
+      "parameters": [
+        "approver",
+        "requested_by",
+        "required_role",
+        "decision"
+      ]
+    },
+    "superseding_refusal": {
+      "kind": "function",
+      "parameters": [
+        "prior",
+        "subject"
+      ]
+    },
+    "validate_for_consumption": {
+      "kind": "function",
+      "parameters": [
+        "record",
+        "key",
+        "as_of"
+      ]
+    }
+  }
+}
