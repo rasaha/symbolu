@@ -74,6 +74,9 @@ export function ReviewQueueScreen() {
   const [approverId, setApproverId] = useState<string>("");
   const [decision, setDecision] = useState<Decision | null>(null);
   const [justification, setJustification] = useState<string>("");
+  // ID-1: the opaque approver proof lives in component state for one submission only.
+  // It is never written to storage, never logged and cleared the moment it is sent.
+  const [proof, setProof] = useState<string>("");
 
   const view = useMemo(() => {
     if (!queue.data || isUnavailable(queue.data)) return null;
@@ -92,6 +95,7 @@ export function ReviewQueueScreen() {
     setApproverId(entry.eligible_approvers[0]?.approver_id ?? "");
     setDecision(null);
     setJustification("");
+    setProof("");
     submit.reset();
   };
 
@@ -237,14 +241,33 @@ export function ReviewQueueScreen() {
                 />
               </div>
 
+              <div>
+                <label htmlFor="approver-proof" className="mb-1 block text-[11px] text-ink-2">
+                  Approver proof (optional; forwarded opaque, once, to the review service)
+                </label>
+                <input
+                  id="approver-proof"
+                  type="password"
+                  autoComplete="off"
+                  value={proof}
+                  onChange={(e) => setProof(e.target.value)}
+                  className="w-full rounded border border-surface-border bg-surface-0 px-2 py-1 font-mono text-[12px] text-ink-0"
+                />
+              </div>
+
               <ActionButton
                 onClick={() => {
                   if (!canSubmit || !approver || !decision) return;
+                  const once = proof;
+                  setProof("");
                   submit.mutate({
-                    approval_id: selected.approval_id,
-                    decision,
-                    presented_approver: approver,
-                    justification,
+                    body: {
+                      approval_id: selected.approval_id,
+                      decision,
+                      presented_approver: approver,
+                      justification,
+                    },
+                    proof: once,
                   });
                 }}
                 disabled={!canSubmit}
@@ -255,6 +278,8 @@ export function ReviewQueueScreen() {
                 Submitting relays the decision to the review service exactly as entered. The
                 review service records it and re-arms the instance; whether it proceeds is
                 settled by the governed composition at its next evaluation, not by this screen.
+                An approver proof, if given, is forwarded unread on this one request and is
+                not kept: this screen never parses, stores or reuses it.
               </p>
             </div>
           )}

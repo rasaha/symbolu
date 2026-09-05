@@ -86,4 +86,7 @@ export const useReviewApproval = (approvalId: string | null) =>
   });
 
 export const useSubmitReviewDecision = () =>
-  useMutation({ mutationFn: (b: ReviewDecisionBody) => v2.submitReviewDecision(b) });
+  useMutation({
+    mutationFn: ({ body, proof }: { body: ReviewDecisionBody; proof?: string }) =>
+      v2.submitReviewDecision(body, proof ?? ""),
+  });

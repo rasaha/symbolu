@@ -1,9 +1,11 @@
 # Ugence approver identity — scoping record
 
-**Status: SCOPED AND RULED; AI-A implemented.** The five owner decisions in §5 were
-ruled on 2026-09-05. Step AI-A of §6 shipped in `governed-review-service` 0.3.0 `[V]`
-(`identity.py`, `tests/test_identity.py`); every later step is still entered only by
-its own implementation prompt. This record adds no dependency, integrates no identity
+**Status: SCOPED AND RULED; AI-A and AI-B implemented.** The five owner decisions in
+§5 were ruled on 2026-09-05. Step AI-A of §6 shipped in `governed-review-service` 0.3.0
+`[V]` (`identity.py`, `tests/test_identity.py`) and step AI-B in the studio `[V]`
+(`clients/review.py`, `api/v2/review.py`, `client-v2.ts`,
+`tests/test_review_proof_relay.py`); every later step is still entered only by its own
+implementation prompt. This record adds no dependency, integrates no identity
 provider and opens no route. It maps where a proven approver
 identity enters the human-review path that GAS-7 built, states what already exists on
 that path, and records the rulings. It reopens none of HR-1 to HR-5 or HE-1 to HE-5.
@@ -143,6 +145,15 @@ Entry conditions are met; each step is entered only by its own implementation pr
 2. **AI-B · Relay** in the studio per ID-1: one opaque, audience-bound header, never
    parsed; the security tests assert it is never logged, persisted or reused (row 14).
    Label: **Core implemented**.
+   **Shipped `[V]`**: the studio backend reads `X-Ugence-Approver-Proof` from the
+   operator's decision request and forwards it, unread, on `POST /review/decisions`
+   only; the review client refuses to attach it to any other route before a
+   connection opens; the route declares no parameter, so the frozen v2 contract, the
+   generated client and the boundary manifest are unchanged. The frontend takes the
+   proof in a password field held in component state, sends it once in the header on
+   the decision operation, and clears it. Row 14 is proven on both sides: no decode,
+   no log line, no store, no reuse, absent from every read. The proof's origin is
+   still the operator's paste: no IdP issues it (AI-C).
 3. **AI-C · OIDC adapter** as its own small package, the first crypto and IdP-client
    dependency on this path, validated against a real issuer in CI only if a test issuer
    can run without egress. Label: **Reference-grade**.
@@ -163,5 +174,5 @@ outside this sequence entirely.
 
 ## 7 — Next step
 
-AI-B, the studio relay of one opaque, audience-bound proof header under ID-1, now that
-the service reads `PROOF_HEADER`. AI-C to AI-E follow in order.
+AI-C, the real identity adapter in its own package, the first identity-provider and
+crypto dependency on this path. AI-D and AI-E follow in order.

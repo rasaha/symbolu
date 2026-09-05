@@ -163,6 +163,59 @@ describe("7 · Review Queue", () => {
     expect(answer).toHaveTextContent(/PRESENTED_UNPROVEN/);
   });
 
+  it("forwards an approver proof opaque, on the decision request only, once (ID-1, row 14)", async () => {
+    const fetchMock = installV2FetchMock({
+      results: {
+        "/api/v2/review/queue": queueOf([entry()]),
+        "/api/v2/review/decisions": {
+          available: true,
+          result: {
+            result: "RECORDED", recorded: true, approval_id: "apr-1", instance_id: "i1", task_id: "t1",
+            signal_delivered: true, resume_delivered: true, resume_skipped_reason: "", reason: "",
+            identity_proof: "PRESENTED_UNPROVEN",
+          },
+        },
+      },
+    });
+    const PROOF = "opaque-proof-7f3e|not/for=the:studio;to,read";
+    renderStudio(<App />, "/studio/review");
+    await userEvent.click(await screen.findByRole("button", { name: /^decide$/i }));
+    await userEvent.click(screen.getByRole("radio", { name: "GRANT" }));
+    await userEvent.type(screen.getByLabelText(/justification \(required\)/i), "reviewed");
+    const proofInput = screen.getByLabelText(/approver proof/i) as HTMLInputElement;
+    expect(proofInput.type).toBe("password");
+    await userEvent.type(proofInput, PROOF);
+    await userEvent.click(screen.getByRole("button", { name: /submit decision/i }));
+    await screen.findByRole("status", { name: /review service answer/i });
+
+    const calls = fetchMock.mock.calls as unknown as [RequestInfo | URL, RequestInit?][];
+    const post = calls.find(([, init]) => init?.method === "POST")!;
+    const headers = post[1]?.headers as Record<string, string>;
+    expect(headers["X-Ugence-Approver-Proof"]).toBe(PROOF);
+    expect(String(post[1]?.body)).not.toContain(PROOF);
+    expect(Object.keys(JSON.parse(String(post[1]?.body))).sort()).toEqual([
+      "approval_id", "decision", "justification", "presented_approver",
+    ]);
+    for (const [url, init] of calls) {
+      if (init?.method === "POST") continue;
+      const h = (init?.headers ?? {}) as Record<string, string>;
+      expect(Object.keys(h).map((k) => k.toLowerCase())).not.toContain("x-ugence-approver-proof");
+      expect(String(url)).not.toContain(PROOF);
+    }
+    // Sent once: the field is cleared and nothing in the page or browser storage holds it.
+    expect(proofInput.value).toBe("");
+    expect(document.body.innerHTML).not.toContain(PROOF);
+    expect(JSON.stringify(localStorage)).not.toContain(PROOF);
+    expect(JSON.stringify(sessionStorage)).not.toContain(PROOF);
+
+    // A second decision without a proof carries none.
+    await userEvent.click(screen.getByRole("button", { name: /submit decision/i }));
+    await waitFor(() => expect(calls.filter(([, i]) => i?.method === "POST").length).toBe(2));
+    const second = calls.filter(([, i]) => i?.method === "POST")[1];
+    const secondHeaders = Object.keys((second[1]?.headers ?? {}) as Record<string, string>);
+    expect(secondHeaders.map((k) => k.toLowerCase())).not.toContain("x-ugence-approver-proof");
+  });
+
   it("shows a refusal as the review service's answer, with its reason", async () => {
     installV2FetchMock({
       results: {
