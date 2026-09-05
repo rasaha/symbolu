@@ -57,8 +57,10 @@ validity, supersedes, registered_by, notes)`.
   unrecognized one is not, because there is no recognized set. There is no
   `severity`, `risk_level`, `tier` or `is_high_risk` anywhere on the record.
 - **`registration_id`** is derived from the binding's own canonical digest, the
-  owner and the window — no UUID, no clock. A different configuration or version is
-  a different system identity, so it can never share an id.
+  owner and the window — no UUID, no clock — and the record **verifies** it at
+  construction, so an id is never chosen by a caller. That is what makes the
+  collision-freedom real: a different configuration, version, owner or window is a
+  different id, so a collection keyed by id can never silently lose a registration.
 
 ## The window
 
@@ -80,8 +82,11 @@ has nothing to supersede.
 
 `supersession_chain()` walks that history newest-first and is deliberately **not**
 filtered by instant, because a superseded registration is normally outside its
-window and the chain exists to reconstruct what was registered when. A cycle
-terminates rather than looping.
+window and the chain exists to reconstruct what was registered when. It walks
+**only admissible links**: a `supersedes` pointing at a record the rule above
+rejects — a different tenant, or the same identity — ends the chain there rather
+than splicing an unrelated registration into a history. A cycle terminates rather
+than looping.
 
 ## The read seam
 

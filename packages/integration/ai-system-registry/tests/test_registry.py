@@ -7,6 +7,7 @@ import pytest
 
 from ugence_ai_system_registry import (
     ContractViolation,
+    registration_id_for,
     SystemRegistryPort,
     registered_at,
     select_by_classification,
@@ -20,6 +21,7 @@ from _fixtures import (
     BEFORE_WINDOW,
     LABEL,
     OTHER_LABEL,
+    OWNER,
     T0,
     T1,
     T2,
@@ -117,13 +119,48 @@ def test_the_chain_reconstructs_history_and_is_not_filtered_by_instant():
 
 
 def test_a_cycle_terminates_rather_than_looping():
-    a = registration(binding(version="1.0.0"), supersedes="reg_b")
-    b_reg = registration(binding(version="1.1.0"), supersedes=a.registration_id)
-    forged = type(a)(registration_id="reg_b", binding=b_reg.binding, owner_ref=b_reg.owner_ref,
-                     classification_label=b_reg.classification_label, validity=b_reg.validity,
-                     supersedes=a.registration_id)
-    chain = supersession_chain((a, forged), a.registration_id)
-    assert [r.registration_id for r in chain] == [a.registration_id, "reg_b"]
+    """Ids are derived from the binding, owner and window — not from ``supersedes`` —
+    so a genuine two-way cycle is still constructible, and must still terminate."""
+
+    b_binding, a_binding = binding(version="1.1.0"), binding(version="1.0.0")
+    b_id = registration_id_for(b_binding, OWNER, window())
+    a = registration(a_binding, supersedes=b_id)
+    b_reg = registration(b_binding, supersedes=a.registration_id)
+    assert b_reg.registration_id == b_id
+
+    chain = supersession_chain((a, b_reg), a.registration_id)
+    assert [r.registration_id for r in chain] == [a.registration_id, b_id]
+
+
+# --------------------------------------------------------------------------- #
+# The chain never splices an inadmissible link (regression: independent review)
+# --------------------------------------------------------------------------- #
+def test_the_chain_stops_at_a_link_the_packages_own_rule_rejects():
+    """A ``supersedes`` across tenants is refused by ``supersession_refusals``; the
+    chain must not walk it into a history that spans two tenants."""
+
+    from ugence_ai_system_registry import supersession_refusals
+
+    predecessor = registration(binding("sysA", tenant="tenant-a"))
+    cross_tenant = registration(binding("sysB", tenant="tenant-z"),
+                                supersedes=predecessor.registration_id)
+    assert supersession_refusals(cross_tenant, predecessor)  # the rule rejects it
+    assert supersession_chain((predecessor, cross_tenant),
+                              cross_tenant.registration_id) == (cross_tenant,)
+
+
+def test_the_chain_stops_at_a_link_that_rebinds_the_same_identity():
+    first = registration(validity=window(BEFORE_WINDOW, days=1))
+    same_identity = registration(supersedes=first.registration_id)
+    # Same binding, so D-3 rejects the supersession and the chain refuses to walk it.
+    assert same_identity.binding_digest == first.binding_digest
+    assert supersession_chain((first, same_identity),
+                              same_identity.registration_id) == (same_identity,)
+
+
+def test_the_chain_stops_at_a_predecessor_that_is_absent_from_the_collection():
+    orphan = registration(binding(version="2.0.0"), supersedes="reg_missing")
+    assert supersession_chain((orphan,), orphan.registration_id) == (orphan,)
 
 
 # --------------------------------------------------------------------------- #

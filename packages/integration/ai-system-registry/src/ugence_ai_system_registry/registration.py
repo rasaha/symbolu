@@ -117,6 +117,16 @@ class SystemRegistration:
         if not isinstance(self.validity, Validity):
             raise ContractViolation(
                 "SystemRegistration.validity must be a governance-contracts Validity")
+        # The id is *derived*, never chosen. Checking it here is what makes the
+        # collision-freedom real: two registrations of different systems, versions,
+        # owners or windows cannot share an id, so a collection keyed by id can
+        # never silently lose one.
+        expected = registration_id_for(self.binding, self.owner_ref, self.validity)
+        if self.registration_id != expected:
+            raise ContractViolation(
+                f"SystemRegistration.registration_id must be the derived id "
+                f"{expected!r}; ids are derived from the binding, owner and window, "
+                "never chosen by the caller")
 
     # ------------------------------------------------------------------ #
     @property

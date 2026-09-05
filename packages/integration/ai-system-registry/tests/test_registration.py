@@ -57,7 +57,7 @@ def test_a_look_alike_binding_is_refused():
 
     with pytest.raises(ContractViolation, match="mints no system identity"):
         SystemRegistration(registration_id="reg_1", binding=NotABinding(), owner_ref=OWNER,
-                           classification_label=LABEL, validity=window())
+                           classification_label=LABEL, validity=window())  # binding checked first
 
 
 def test_the_registration_inherits_the_bindings_ceiling():
@@ -89,17 +89,45 @@ def test_the_registration_id_is_derived_from_the_binding_digest():
         registration_id_for("not-a-binding", OWNER, v)  # type: ignore[arg-type]
 
 
+def test_the_id_is_derived_and_a_chosen_one_is_refused():
+    """Regression (independent review): a hand-picked id let two registrations collide,
+    so a collection keyed by id silently lost one. The id is now checked, not just
+    non-empty, which makes the collision-freedom the README claims actually true."""
+
+    b, v = binding(), window()
+    derived = registration_id_for(b, OWNER, v)
+    SystemRegistration(registration_id=derived, binding=b, owner_ref=OWNER,
+                       classification_label=LABEL, validity=v)
+    with pytest.raises(ContractViolation, match="must be the derived id"):
+        SystemRegistration(registration_id="reg_dup", binding=b, owner_ref=OWNER,
+                           classification_label=LABEL, validity=v)
+    # …and the id must match *these* fields, not merely be some derived id.
+    with pytest.raises(ContractViolation, match="must be the derived id"):
+        SystemRegistration(registration_id=registration_id_for(binding(version="9.9.9"), OWNER, v),
+                           binding=b, owner_ref=OWNER, classification_label=LABEL, validity=v)
+
+
+def test_two_registrations_can_never_share_an_id():
+    """The property the derived id exists to provide, stated as a test."""
+
+    ids = {registration(b).registration_id
+           for b in (binding(), binding(version="1.3.0"), binding(configuration="cfg-b"),
+                     binding("other-system"), binding(tenant="tenant-b"))}
+    assert len(ids) == 5
+
+
 def test_required_fields_are_required():
     b, v = binding(), window()
     for field in ("owner_ref", "classification_label"):
-        kwargs = dict(registration_id="reg_1", binding=b, owner_ref=OWNER,
-                      classification_label=LABEL, validity=v)
+        kwargs = dict(registration_id=registration_id_for(b, OWNER, v), binding=b,
+                      owner_ref=OWNER, classification_label=LABEL, validity=v)
         kwargs[field] = "   "
         with pytest.raises(ContractViolation):
             SystemRegistration(**kwargs)
     with pytest.raises(ContractViolation):
-        SystemRegistration(registration_id="reg_1", binding=b, owner_ref=OWNER,
-                           classification_label=LABEL, validity="not-a-validity")
+        SystemRegistration(registration_id=registration_id_for(b, OWNER, v), binding=b,
+                           owner_ref=OWNER, classification_label=LABEL,
+                           validity="not-a-validity")
 
 
 def test_the_classification_label_is_recorded_and_never_interpreted():

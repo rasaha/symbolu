@@ -19,7 +19,7 @@ from datetime import datetime
 from typing import Iterable, Optional, Protocol, runtime_checkable
 
 from ._canon import optional_text, require_nonempty, require_tzaware
-from .registration import SystemRegistration
+from .registration import SystemRegistration, supersession_refusals
 
 __all__ = [
     "SystemRegistryPort", "registered_at", "select_for_tenant", "select_for_system",
@@ -81,6 +81,14 @@ def supersession_chain(registrations: Iterable[SystemRegistration],
 
     Deliberately **not** filtered by instant: a superseded registration is normally
     outside its window, and the chain exists to reconstruct what was registered when.
+
+    **Only admissible links are walked.** A ``supersedes`` pointing at a registration
+    the package's own rule rejects — a different tenant, or the same system identity —
+    ends the chain there rather than splicing an unrelated record into a history. The
+    returned chain is therefore the admissible prefix, never a longer misleading one.
+    Use :func:`~ugence_ai_system_registry.registration.supersession_refusals` directly
+    to learn *why* a link was refused.
+
     A cycle terminates rather than looping.
     """
 
@@ -91,7 +99,12 @@ def supersession_chain(registrations: Iterable[SystemRegistration],
     while current is not None and current.registration_id not in seen:
         chain.append(current)
         seen.add(current.registration_id)
-        current = by_id.get(current.supersedes) if current.supersedes else None
+        if not current.supersedes:
+            break
+        predecessor = by_id.get(current.supersedes)
+        if predecessor is None or supersession_refusals(current, predecessor):
+            break
+        current = predecessor
     return tuple(chain)
 
 

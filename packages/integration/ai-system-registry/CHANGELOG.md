@@ -14,7 +14,10 @@ Scoped and ratified by `docs/architecture/ADR_UGENCE_AI_SYSTEM_REGISTRY_SCOPING.
   read anywhere, asserted over the AST.
 - `supersession_refusals` / `require_admissible_supersession` (D-3): a superseding
   registration must bind a different system identity, in the same tenant, naming its
-  predecessor. `supersession_chain` reconstructs history and terminates on a cycle.
+  predecessor. `supersession_chain` reconstructs history, walks **only admissible
+  links**, and terminates on a cycle.
+- The derived `registration_id` is **verified at construction**, so a caller can
+  never choose one and two registrations can never collide.
 - `SystemRegistryPort`, a read-only Protocol with **no implementation** (D-4), and
   the pure selectors `registered_at`, `select_for_tenant`, `select_for_system`,
   `select_by_classification`.
