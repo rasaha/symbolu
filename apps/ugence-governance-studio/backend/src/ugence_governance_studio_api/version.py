@@ -77,8 +77,10 @@ MATURITY_FLAGS: Dict[str, bool] = {
     "plan_replay_api_implemented": True,
     "plan_comparison_api_implemented": True,
     "what_if_api_implemented": True,
-    # GAS-4: the six Governed Agent Studio screens' backend. Thin orchestration over
-    # allowlisted public entry points; no screen ships yet.
+    # GAS-4: the six Governed Agent Studio screens and their backend. The backend is
+    # thin orchestration over allowlisted public entry points; the six screens ship
+    # under /studio on the studio's own React Flow canvas. Langflow import is deferred
+    # and customer-gated by owner ruling (roadmap §11.3), so it stays False.
     "studio_v2_contract_implemented": True,
     "constitution_preflight_api_implemented": True,
     "policy_compile_api_implemented": True,
@@ -87,7 +89,7 @@ MATURITY_FLAGS: Dict[str, bool] = {
     "publish_shadow_api_implemented": True,
     "observe_audit_api_implemented": True,
     "langflow_import_implemented": False,
-    "studio_screens_implemented": False,
+    "studio_screens_implemented": True,
     "constitution_issuance_implemented": False,
     "policy_issuance_implemented": False,
     "frontend_implemented": False,
