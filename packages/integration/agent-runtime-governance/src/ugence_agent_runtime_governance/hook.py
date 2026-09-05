@@ -40,7 +40,9 @@ from .interfaces import CompositionInputs, GovernanceInputSource
 
 __all__ = ["GovernedExecutionHook", "REASON_SOURCE_UNAVAILABLE",
            "REASON_COMPOSITION_FAILED", "REASON_NOT_AUTHORITY_BOUND",
-           "REASON_NO_AUTHORIZATION_REFERENCE", "REASON_MALFORMED_INPUTS"]
+           "REASON_NO_AUTHORIZATION_REFERENCE", "REASON_MALFORMED_INPUTS",
+           "REASON_RECORD_CAPACITY", "DEFAULT_MAX_RECORDS",
+           "DEFAULT_UNEXPIRING_RECORD_TTL"]
 
 #: The input source raised, so no authority input exists. Not a denial — a missing
 #: input — but never permission either.
@@ -53,6 +55,51 @@ REASON_NOT_AUTHORITY_BOUND = "GOVERNANCE_PROPOSAL_NOT_AUTHORITY_BOUND"
 REASON_NO_AUTHORIZATION_REFERENCE = "GOVERNANCE_GRANT_WITHOUT_AUTHORIZATION_REFERENCE"
 #: The source returned something that is not ``CompositionInputs``.
 REASON_MALFORMED_INPUTS = "GOVERNANCE_INPUT_SOURCE_MALFORMED"
+#: The clearance record is full of live, unconsumed clearances. A new CLEAR cannot be
+#: recorded for the last-mile recheck, so it is refused: pressure becomes a refusal,
+#: never an eviction of a clearance that is still in flight.
+REASON_RECORD_CAPACITY = "GOVERNANCE_CLEARANCE_RECORD_AT_CAPACITY"
+
+#: Upper bound on live clearance records held for the last-mile recheck.
+DEFAULT_MAX_RECORDS = 4096
+#: A CLEAR with no expiry that is never consumed is dropped after this many seconds;
+#: a later recheck against it fails closed rather than passing through.
+DEFAULT_UNEXPIRING_RECORD_TTL = 3600.0
+
+
+class _ClearanceRecord:
+    """One recorded CLEAR: what the recheck re-verifies, and when it may be dropped."""
+
+    __slots__ = ("envelope", "tier", "valid_until", "recorded_at", "consumed")
+
+    def __init__(
+        self, envelope: Any, tier: Any, valid_until: Optional[float], recorded_at: float
+    ) -> None:
+        self.envelope = envelope
+        self.tier = tier
+        self.valid_until = valid_until
+        self.recorded_at = recorded_at
+        self.consumed = False
+
+    def evictable(self, now: float, unexpiring_ttl: float) -> bool:
+        if self.consumed:
+            return True
+        if self.valid_until is not None:
+            return now > self.valid_until
+        return now - self.recorded_at > unexpiring_ttl
+
+
+def _as_float(value: Any) -> float:
+    """A clock reading as a float, or 0.0 when it cannot be read.
+
+    Used only for the record's own age. An unreadable clock therefore makes an
+    unexpiring record look infinitely old — it is dropped at the next readable sweep
+    and a recheck against it fails closed — rather than making ``evaluate`` raise.
+    """
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return 0.0
 
 
 def _epoch_seconds(value: Any) -> Optional[float]:
@@ -85,6 +132,16 @@ class GovernedExecutionHook:
     Satisfies Agent Runtime's ``GovernanceHook`` protocol structurally. It is safe to
     share across threads: the only mutable state is the envelope record consulted by the
     last-mile recheck, and it is guarded.
+
+    **The clearance record is bounded.** A record is dropped once the recheck has
+    consumed it, once its clearance has expired, or — for a clearance with no expiry —
+    once it has sat unconsumed for ``unexpiring_record_ttl`` seconds. Sweeps run on every
+    evaluation. If the record is still full of live clearances, a new CLEAR is refused
+    with :data:`REASON_RECORD_CAPACITY`: pressure turns into a refusal, and never into
+    the silent eviction of a clearance that may still be on its way to a provider.
+    Dropping a record never widens anything: an expired clearance is already rejected
+    by ``validate_clearance`` before the recheck runs, and the resolver in
+    :mod:`.recheck` fails closed for a CLEAR whose record is gone.
     """
 
     def __init__(
@@ -93,23 +150,32 @@ class GovernedExecutionHook:
         source: GovernanceInputSource,
         engine: Optional[RiskAuthorityCompositionEngine] = None,
         source_version: str = "",
+        max_records: int = DEFAULT_MAX_RECORDS,
+        unexpiring_record_ttl: float = DEFAULT_UNEXPIRING_RECORD_TTL,
     ) -> None:
+        if int(max_records) < 1:
+            raise ValueError("max_records must be at least 1")
+        if float(unexpiring_record_ttl) < 0:
+            raise ValueError("unexpiring_record_ttl must not be negative")
+        self._max_records = int(max_records)
+        self._unexpiring_record_ttl = float(unexpiring_record_ttl)
         self._source = source
         # The ratified composition engine, used as-is. This package contains no
         # composition logic of its own and must never grow any.
         self._engine = engine or RiskAuthorityCompositionEngine()
         self._source_version = source_version
         self._lock = threading.Lock()
-        #: proposal fingerprint -> (envelope, tier), for the last-mile recheck. Recorded
-        #: only for a proposal that actually reached composition, so the recheck can
-        #: re-verify the same envelope the CLEAR rested on.
-        self._envelopes: Dict[str, Tuple[Any, Any]] = {}
+        #: proposal fingerprint -> clearance record, for the last-mile recheck. Recorded
+        #: only for a proposal that actually CLEARed, so the recheck can re-verify the
+        #: same envelope the CLEAR rested on. Bounded; see the class docstring.
+        self._envelopes: Dict[str, _ClearanceRecord] = {}
 
     # -- the GovernanceHook protocol ------------------------------------------
     def evaluate(
         self, proposal: TransitionProposal, evaluation_time: float
     ) -> GovernanceEvaluation:
         """Evaluate one proposed transition. Never raises; never widens."""
+        self._sweep(evaluation_time)
         try:
             inputs = self._source.inputs_for(proposal)
         except Exception as exc:  # noqa: BLE001 - a failed input is never permission
@@ -174,8 +240,26 @@ class GovernedExecutionHook:
                 decision=decision,
             )
 
+        valid_until = _epoch_seconds(
+            getattr(getattr(decision, "effective_constraints", None), "expires_at", None)
+        )
         with self._lock:
-            self._envelopes[proposal.fingerprint] = (inputs.envelope, inputs.tier)
+            already = proposal.fingerprint in self._envelopes
+            if not already and len(self._envelopes) >= self._max_records:
+                at_capacity = True
+            else:
+                at_capacity = False
+                self._envelopes[proposal.fingerprint] = _ClearanceRecord(
+                    inputs.envelope, inputs.tier, valid_until, _as_float(evaluation_time)
+                )
+        if at_capacity:
+            return self._refuse(
+                proposal,
+                REASON_RECORD_CAPACITY,
+                extra_reasons=reason_codes,
+                decision=decision,
+                detail={"live_records": self._max_records},
+            )
 
         return self._evaluation(
             proposal,
@@ -183,11 +267,7 @@ class GovernedExecutionHook:
             reason_codes,
             decision=decision,
             authorization_reference=envelope_id,
-            valid_until=_epoch_seconds(
-                getattr(
-                    getattr(decision, "effective_constraints", None), "expires_at", None
-                )
-            ),
+            valid_until=valid_until,
         )
 
     # -- what the last-mile recheck resolves against --------------------------
@@ -198,9 +278,41 @@ class GovernedExecutionHook:
         is nothing for the recheck to re-verify, and no provider call to guard.
         """
         with self._lock:
-            return self._envelopes.get(getattr(proposal, "fingerprint", ""))
+            record = self._envelopes.get(getattr(proposal, "fingerprint", ""))
+        return None if record is None else (record.envelope, record.tier)
+
+    def consume_envelope(self, proposal: TransitionProposal) -> Optional[Tuple[Any, Any]]:
+        """Like :meth:`envelope_for`, and marks the record consumed.
+
+        The record stays readable until the next sweep, so a recheck repeated within the
+        same quantum (a retry before any new evaluation) still re-verifies the same
+        envelope. From the next evaluation on, the record is gone.
+        """
+        with self._lock:
+            record = self._envelopes.get(getattr(proposal, "fingerprint", ""))
+            if record is None:
+                return None
+            record.consumed = True
+            return (record.envelope, record.tier)
+
+    @property
+    def record_count(self) -> int:
+        """Number of clearance records currently held. Observability only."""
+        with self._lock:
+            return len(self._envelopes)
 
     # -- internals ------------------------------------------------------------
+    def _sweep(self, now: Any) -> None:
+        try:
+            now_f = float(now)
+        except (TypeError, ValueError):
+            return  # an unreadable clock never evicts: fail towards keeping records
+        ttl = self._unexpiring_record_ttl
+        with self._lock:
+            dead = [k for k, r in self._envelopes.items() if r.evictable(now_f, ttl)]
+            for k in dead:
+                del self._envelopes[k]
+
     @staticmethod
     def _authorization_reference(decision: Any) -> str:
         """Risk Authority's own envelope id. Never minted here."""

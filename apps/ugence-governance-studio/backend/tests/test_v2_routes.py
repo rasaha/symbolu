@@ -255,3 +255,61 @@ def test_observe_distinguishes_unreachable_from_empty():
     assert result["available"] is False
     assert "unreachable" in result["reason"] or "console" in result["reason"]
     assert result["result"] is None
+
+
+def test_simulate_threads_the_accepted_mode_into_the_run():
+    """The mode is not a label: it names the runtime, rides in every task's arguments
+    (so every proposal and every provider invocation carries it), and the response
+    reports the mode read back from the objects the runtime ran with."""
+    import ugence_agent_runtime.api as art
+
+    seen: list = []
+
+    class _Provider:
+        provider_id = "fixture"
+        version = "1.0.0"
+
+        def execute(self, invocation):
+            seen.append(dict(invocation.arguments))
+            return art.ToolResult(provider_id="fixture", operation=invocation.operation, ok=True)
+
+    registry = art.ProviderRegistry()
+    registry.register(_Provider())
+    studio = build_studio_context(
+        provider_registry=registry,
+        governance_hook=art.AllowAllGovernanceHook(),
+        hook_is_permissive=True,
+    )
+    client = TestClient(create_v2_app(ApiSettings(environment="test"), studio=studio))
+    result = _result(client.post("/api/v2/simulate/run", json={
+        "workflow": {
+            "workflow_id": "w",
+            "tasks": [{"task_id": "t1", "operation": "do", "provider_id": "fixture",
+                       "arguments": {"x": 1}}],
+        },
+        "execution_mode": "SHADOW",
+    }))
+    assert result["execution_mode"] == "SHADOW"
+    assert result["execution_mode_binding"] == {
+        "runtime_id": "studio-simulation:SHADOW",
+        "task_argument": "execution_mode",
+        "tasks": {"t1": "SHADOW"},
+    }
+    assert seen == [{"x": 1, "execution_mode": "SHADOW"}], (
+        "the provider must receive the mode in the invocation it was handed"
+    )
+
+
+def test_simulate_refuses_a_task_that_declares_a_conflicting_mode(bare_client):
+    """A task already carrying a different execution_mode is a conflict, refused with
+    the same typed 422 as LIVE — never silently overwritten in either direction."""
+    response = bare_client.post("/api/v2/simulate/run", json={
+        "workflow": {
+            "workflow_id": "w",
+            "tasks": [{"task_id": "t1", "operation": "do",
+                       "arguments": {"execution_mode": "LIVE"}}],
+        },
+        "execution_mode": "DRY_RUN",
+    })
+    assert response.status_code == 422
+    assert response.json()["error"]["code"] == "invalid_execution_mode"

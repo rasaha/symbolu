@@ -62,7 +62,7 @@ export function App() {
             />
             <Route path="authority" element={<AuthorityScreen />} />
             <Route path="simulate" element={<SimulateScreen />} />
-            <Route path="publish" element={<PublishScreen compiledPackage={{}} />} />
+            <Route path="publish" element={<PublishScreen />} />
             <Route path="observe" element={<ObserveScreen />} />
           </Route>
           <Route path="*" element={<Navigate to="/scenarios" replace />} />

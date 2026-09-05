@@ -214,21 +214,77 @@ describe("4 · Simulate", () => {
 });
 
 describe("5 · Publish", () => {
-  it("says shadow on the control, and reports an unconfigured console", async () => {
-    installV2FetchMock({
+  const COMPILED = {
+    available: true,
+    success: true,
+    logical_digest: "sha256:release-digest",
+    result: { diagnostics: [] },
+    workflow_ir: {},
+    assurance_manifest: {},
+    audit_schema: {},
+    compiled_package: { package_id: "pkg-1", clauses: [] },
+  };
+
+  it("has nothing to send without a compiled release, and says so", async () => {
+    const fetchMock = installV2FetchMock();
+    renderStudio(<App />, "/studio/publish");
+    const button = await screen.findByRole("button", { name: /send to shadow loop/i });
+    expect(button).toBeDisabled();
+    const note = screen.getByRole("note", { name: /capability unavailable/i });
+    expect(note).toHaveTextContent(/compiled_release/);
+    expect(note).toHaveTextContent(/Policy screen/);
+    await userEvent.click(button);
+    const posted = fetchMock.mock.calls.filter(([u]) => String(u).includes("/api/v2/publish/shadow"));
+    expect(posted).toHaveLength(0);
+  });
+
+  it("sends exactly the release the Policy screen compiled, and reports the console's answer", async () => {
+    const fetchMock = installV2FetchMock({
       results: {
+        "/api/v2/policy/compile": COMPILED,
         "/api/v2/publish/shadow": unavailable(
           "console_api",
           "no ugence_console_api base URL is configured",
         ),
       },
     });
-    renderStudio(<App />, "/studio/publish");
+    renderStudio(<App />, "/studio/policy");
+    await userEvent.click(await screen.findByRole("button", { name: /compile with approval/i }));
+    await screen.findByText(/sha256:release-digest/);
+
+    await userEvent.click(screen.getByRole("link", { name: "Publish" }));
     const button = await screen.findByRole("button", { name: /send to shadow loop/i });
-    expect(button).toBeInTheDocument();
+    expect(screen.getByTestId("compiled-release")).toHaveTextContent(/sha256:release-digest/);
+    expect(button).toBeEnabled();
     await userEvent.click(button);
+
     const note = await screen.findByRole("note", { name: /capability unavailable/i });
     expect(note).toHaveTextContent(/console_api/);
+    const posted = fetchMock.mock.calls.filter(([u]) => String(u).includes("/api/v2/publish/shadow"));
+    expect(posted).toHaveLength(1);
+    const [, init] = posted[0] as unknown as [string, RequestInit];
+    const body = JSON.parse(String(init.body));
+    expect(body).toEqual({ compiled_package: COMPILED.compiled_package });
+  });
+
+  it("drops the release when a recompile does not succeed", async () => {
+    installV2FetchMock({ results: { "/api/v2/policy/compile": COMPILED } });
+    renderStudio(<App />, "/studio/policy");
+    await userEvent.click(await screen.findByRole("button", { name: /compile with approval/i }));
+    await screen.findByText(/sha256:release-digest/);
+
+    // The compiler now refuses: the same screen, a different answer.
+    installV2FetchMock({
+      results: {
+        "/api/v2/policy/compile": { ...COMPILED, success: false, logical_digest: "sha256:refused" },
+      },
+    });
+    await userEvent.click(screen.getByRole("button", { name: /compile with approval/i }));
+    await screen.findByText(/sha256:refused/);
+
+    await userEvent.click(screen.getByRole("link", { name: "Publish" }));
+    expect(await screen.findByRole("button", { name: /send to shadow loop/i })).toBeDisabled();
+    expect(screen.queryByTestId("compiled-release")).toBeNull();
   });
 
   it("offers no live or authorize control", async () => {

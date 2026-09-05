@@ -15,7 +15,8 @@ import {
   useSynthesizePolicyPack,
   useValidatePolicyPack,
 } from "./hooks";
-import { isUnavailable } from "@/api/types-v2";
+import { isRecord, useStudioRelease } from "./release";
+import { isUnavailable, type PolicyCompileResult } from "@/api/types-v2";
 
 export function PolicyScreen({
   pack,
@@ -28,6 +29,7 @@ export function PolicyScreen({
   const validate = useValidatePolicyPack();
   const synthesize = useSynthesizePolicyPack();
   const compile = useCompilePolicyPack();
+  const { setRelease } = useStudioRelease();
   const [showIr, setShowIr] = useState(false);
 
   return (
@@ -63,7 +65,33 @@ export function PolicyScreen({
             Preview Workflow IR
           </ActionButton>
           <ActionButton
-            onClick={() => compile.mutate({ pack, approval })}
+            onClick={() =>
+              compile.mutate(
+                { pack, approval },
+                {
+                  onSuccess: (data) => {
+                    // Only a successful compile carrying a package becomes the
+                    // session's release. Anything else clears it: a Publish screen
+                    // holding a release from before a failed recompile would be
+                    // offering to ship something the compiler just refused.
+                    const compiled = data as PolicyCompileResult;
+                    if (
+                      !isUnavailable(data) &&
+                      compiled.success === true &&
+                      isRecord(compiled.compiled_package)
+                    ) {
+                      setRelease({
+                        compiledPackage: compiled.compiled_package,
+                        logicalDigest: String(compiled.logical_digest ?? ""),
+                      });
+                    } else {
+                      setRelease(null);
+                    }
+                  },
+                  onError: () => setRelease(null),
+                },
+              )
+            }
             disabled={compile.isPending}
           >
             Compile with approval

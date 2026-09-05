@@ -40,11 +40,15 @@ __all__ = [
     "ObserveService",
     "DependencyUnavailable",
     "SIMULATION_MODES",
+    "EXECUTION_MODE_ARGUMENT",
 ]
 
 #: Execution modes the studio may request. ``LIVE`` is deliberately absent and there is
 #: no code path that adds it: the studio never executes.
 SIMULATION_MODES: Tuple[str, ...] = ("DRY_RUN", "SIMULATION", "SHADOW")
+#: The task-argument key the accepted simulation mode is threaded under, so that every
+#: proposal and every provider invocation in a simulated run carries it.
+EXECUTION_MODE_ARGUMENT = "execution_mode"
 
 
 class DependencyUnavailable(RuntimeError):
@@ -301,10 +305,37 @@ class SimulateService:
         max_quanta: int,
         correlation_id: Optional[str],
     ) -> Dict[str, Any]:
-        if execution_mode not in SIMULATION_MODES:
+        if not isinstance(execution_mode, str) or execution_mode not in SIMULATION_MODES:
             raise ValueError(
                 f"execution_mode must be one of {SIMULATION_MODES}; the studio never "
                 f"executes, so LIVE is not accepted (got {execution_mode!r})"
+            )
+        # The accepted mode is threaded into what the runtime actually sees, not merely
+        # echoed: it names the runtime, and it is placed in every task's arguments so it
+        # is part of each proposal the governance boundary evaluates and of each
+        # invocation a provider receives. A task that already carries a different mode
+        # is a conflict, refused rather than silently overwritten.
+        tasks: List[Any] = []
+        for t in workflow.get("tasks", []):
+            arguments = dict(t.get("arguments") or {})
+            declared = arguments.get(EXECUTION_MODE_ARGUMENT)
+            if declared is not None and declared != execution_mode:
+                raise ValueError(
+                    f"task {t.get('task_id')!r} declares {EXECUTION_MODE_ARGUMENT}="
+                    f"{declared!r}, which conflicts with the requested "
+                    f"{execution_mode!r}"
+                )
+            arguments[EXECUTION_MODE_ARGUMENT] = execution_mode
+            tasks.append(
+                art.TaskDefinition(
+                    task_id=str(t["task_id"]),
+                    operation=str(t["operation"]),
+                    provider_id=t.get("provider_id"),
+                    consequential=bool(t.get("consequential", True)),
+                    arguments=arguments,
+                    depends_on=tuple(t.get("depends_on") or ()),
+                    metadata={EXECUTION_MODE_ARGUMENT: execution_mode},
+                )
             )
         if self._providers is None:
             return _unavailable(
@@ -312,24 +343,20 @@ class SimulateService:
                 "no fixture provider registry is configured, so nothing could be run",
             )
 
-        config_kwargs: Dict[str, Any] = {"provider_registry": self._providers}
+        runtime_id = f"studio-simulation:{execution_mode}"
+        config_kwargs: Dict[str, Any] = {
+            "provider_registry": self._providers,
+            "runtime_id": runtime_id,
+        }
         if self._hook is not None:
             config_kwargs["governance_hook"] = self._hook
-        runtime = art.create_runtime(art.AgentRuntimeConfig(**config_kwargs))
+        config = art.AgentRuntimeConfig(**config_kwargs)
+        runtime = art.create_runtime(config)
 
         definition = art.WorkflowDefinition(
             workflow_id=str(workflow.get("workflow_id", "studio-simulation")),
-            tasks=tuple(
-                art.TaskDefinition(
-                    task_id=str(t["task_id"]),
-                    operation=str(t["operation"]),
-                    provider_id=t.get("provider_id"),
-                    consequential=bool(t.get("consequential", True)),
-                    arguments=dict(t.get("arguments") or {}),
-                    depends_on=tuple(t.get("depends_on") or ()),
-                )
-                for t in workflow.get("tasks", [])
-            ),
+            tasks=tuple(tasks),
+            metadata={EXECUTION_MODE_ARGUMENT: execution_mode},
         )
         instance = art.prepare_workflow(runtime, definition, correlation_id)
 
@@ -343,6 +370,16 @@ class SimulateService:
         return {
             "available": True,
             "execution_mode": execution_mode,
+            # Read back from the objects the runtime ran with, so the response reports
+            # the mode that was applied rather than the one that was requested.
+            "execution_mode_binding": {
+                "runtime_id": config.runtime_id,
+                "task_argument": EXECUTION_MODE_ARGUMENT,
+                "tasks": {
+                    t.task_id: t.arguments.get(EXECUTION_MODE_ARGUMENT)
+                    for t in definition.tasks
+                },
+            },
             "instance_id": instance.instance_id,
             "governance_hook_configured": self._hook is not None,
             # Stated explicitly: a run that clears everything because a permissive test
