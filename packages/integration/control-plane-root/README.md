@@ -71,7 +71,23 @@ Authority's registry.
 `UPDATE` and `DELETE` are refused by database triggers, not by convention, and
 `verify_chain()` recomputes a tenant's chain from its rows. The chain is
 **tamper-evident**: it detects modification. It is **not tamper-proof**, and this
-package never says otherwise. A store written at another schema version is refused
+package never says otherwise.
+
+**What tamper-evidence does and does not cover**, stated concretely rather than
+left to the word:
+
+| Attempt | Detected? |
+|---|---|
+| `UPDATE` or `DELETE` through the ledger's own connection | Refused outright by the triggers |
+| A row edited in place after dropping the triggers | **Yes** — its digest no longer matches |
+| A row spliced out of the middle | **Yes** — the survivors' links no longer meet |
+| A **well-formed row forged** through direct SQL, with correct chain arithmetic | **No** |
+
+That last row is the honest limit. The chain is a plain SHA-256 hash chain with no
+signing key, so anyone with write access to the database file can append a row that
+verifies. The guarantee is against careless or accidental in-place edits, **not**
+against an operator with filesystem access. Detecting that would need signed
+entries, which this package does not have and does not claim. A store written at another schema version is refused
 rather than migrated — silently migrating somebody's audit store is the one thing an
 append-only ledger must never do.
 
