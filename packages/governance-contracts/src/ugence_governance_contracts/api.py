@@ -47,6 +47,8 @@ from .contracts import (
     AssessmentWindow,
     AttestationStatus,
     AttributionStatus,
+    AuditContractError,
+    AuditReference,
     BaseProvider,
     BenchmarkReference,
     ConfidenceBasis,
@@ -110,4 +112,6 @@ __all__ = [
     "IdempotencyResolution", "IdempotencyContractError",
     # G8 neutral validity contract (additive)
     "ValidityStatus", "Validity", "ValidityContractError",
+    # G4 neutral audit reference (additive)
+    "AuditReference", "AuditContractError",
 ]

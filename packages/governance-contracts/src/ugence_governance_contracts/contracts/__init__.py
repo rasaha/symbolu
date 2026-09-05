@@ -38,6 +38,10 @@ from .validity import (
     ValidityContractError,
     ValidityStatus,
 )
+from .audit import (
+    AuditContractError,
+    AuditReference,
+)
 from .evidence import (
     AssessmentWindow,
     AttestationStatus,
@@ -81,4 +85,6 @@ __all__ = [
     "IdempotencyResolution", "IdempotencyContractError",
     # G8 neutral validity contract (additive)
     "ValidityStatus", "Validity", "ValidityContractError",
+    # G4 neutral audit reference (additive)
+    "AuditReference", "AuditContractError",
 ]

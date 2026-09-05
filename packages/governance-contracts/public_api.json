@@ -1,10 +1,10 @@
 {
   "distribution": "ugence-governance-contracts",
   "namespace": "ugence_governance_contracts",
-  "package_version": "0.4.0",
+  "package_version": "0.5.0",
   "contract_version": "1.0.0",
   "curated_api_module": "ugence_governance_contracts.api",
-  "note": "Machine-readable snapshot of the curated public API (ugence_governance_contracts.api.__all__). Generated from the installed package; tests/packaging/test_public_api.py asserts this file equals the actual package surface. Regenerate when the curated API changes (a contract/version transition). CONTRACT_VERSION is the PROVIDER-contract surface and stays 1.0.0: the GV-2E-a evidence family and the M-3R.3 neutral assessed-system identity family (AssessedSystemBinding, SystemBindingAuthenticityStatus, SystemIdentityContractError) are additive neutral families that do not change the provider contract. AssessedSystemBinding is the SINGLE canonical assessed-system identity contract for the platform (UVI ADR \u00a720); ugence-agent-value-readiness re-exports these exact objects and defines no copy, subclass or parallel schema, so 'is' identity holds across both public APIs. Every binding field is a platform-neutral primitive (str/datetime): this leaf imports no UVI, readiness, authority or risk package, so no dependency cycle is possible. authenticity_status is a permanently STRUCTURAL_UNVERIFIED property and authenticity_verified a permanently-False property \u2014 no ratified system-binding verifier exists. SystemManifest and the RA-owned SubjectContext are NOT minted here; they are referenced by opaque, co-required ref+digest tokens. G7 (0.4.0) adds the neutral idempotency family (IdempotencyScope, IdempotencyKey, IdempotencyDisposition, IdempotencyResolution, IdempotencyContractError) and G8 adds the neutral validity family (ValidityStatus, Validity, ValidityContractError) from the governance-contracts evolution plan. Both are additive neutral families: NO provider dataclass gained a field, no default, signature, enum value or serialized form moved, so CONTRACT_VERSION stays 1.0.0. An IdempotencyKey is the identity of one logical action (key + the coordinates its scope names + an opaque partition token reserved for G1/G2); a producer that adopts it places IdempotencyKey.canonical_digest() in the existing free-string idempotency_key field. IdempotencyResolution.duplicate_of is required iff the disposition is DUPLICATE; UNKNOWN is never first and never determinate. Validity is a half-open [issued_at, expires_at) window with an optional stale_after soft bound; staleness is derived at an explicit caller-supplied as_of, never stored and never read from a clock. Neither family is a store, ledger, clock, verifier or authority.",
+  "note": "Machine-readable snapshot of the curated public API (ugence_governance_contracts.api.__all__). Generated from the installed package; tests/packaging/test_public_api.py asserts this file equals the actual package surface. Regenerate when the curated API changes (a contract/version transition). CONTRACT_VERSION is the PROVIDER-contract surface and stays 1.0.0: the GV-2E-a evidence family and the M-3R.3 neutral assessed-system identity family (AssessedSystemBinding, SystemBindingAuthenticityStatus, SystemIdentityContractError) are additive neutral families that do not change the provider contract. AssessedSystemBinding is the SINGLE canonical assessed-system identity contract for the platform (UVI ADR \u00a720); ugence-agent-value-readiness re-exports these exact objects and defines no copy, subclass or parallel schema, so 'is' identity holds across both public APIs. Every binding field is a platform-neutral primitive (str/datetime): this leaf imports no UVI, readiness, authority or risk package, so no dependency cycle is possible. authenticity_status is a permanently STRUCTURAL_UNVERIFIED property and authenticity_verified a permanently-False property \u2014 no ratified system-binding verifier exists. SystemManifest and the RA-owned SubjectContext are NOT minted here; they are referenced by opaque, co-required ref+digest tokens. G7 (0.4.0) adds the neutral idempotency family (IdempotencyScope, IdempotencyKey, IdempotencyDisposition, IdempotencyResolution, IdempotencyContractError) and G8 adds the neutral validity family (ValidityStatus, Validity, ValidityContractError) from the governance-contracts evolution plan. Both are additive neutral families: NO provider dataclass gained a field, no default, signature, enum value or serialized form moved, so CONTRACT_VERSION stays 1.0.0. An IdempotencyKey is the identity of one logical action (key + the coordinates its scope names + an opaque partition token reserved for G1/G2); a producer that adopts it places IdempotencyKey.canonical_digest() in the existing free-string idempotency_key field. IdempotencyResolution.duplicate_of is required iff the disposition is DUPLICATE; UNKNOWN is never first and never determinate. Validity is a half-open [issued_at, expires_at) window with an optional stale_after soft bound; staleness is derived at an explicit caller-supplied as_of, never stored and never read from a clock. Neither family is a store, ledger, clock, verifier or authority. G4 (0.5.0) adds the neutral audit reference (AuditReference, AuditContractError): a digest-bound pointer to one entry in one audit store, so entries can be correlated ACROSS the platform's separate audit stores without any store changing, merging or moving. It is additive in the same way: no provider dataclass gained a field and no default, signature, enum value or serialized form moved, so CONTRACT_VERSION stays 1.0.0. It carries no entry body, no event-type vocabulary (Decision Authority's frozen AuditEventType owns those names) and no chain head or previous-entry hash (hash-linking is each store's own property). It is not an audit log, sink, hash chain, verifier or authority. EvidenceReference already covers the evidence half of G4 and no second evidence reference is minted.",
   "symbols": {
     "ActionGovernanceOutcome": {
       "kind": "enum",
@@ -129,6 +129,21 @@
         "NOT_ATTRIBUTED",
         "PARTIALLY_ATTRIBUTED",
         "ATTRIBUTED"
+      ]
+    },
+    "AuditContractError": {
+      "kind": "exception",
+      "failure_class": null
+    },
+    "AuditReference": {
+      "kind": "dataclass",
+      "fields": [
+        "tenant_id",
+        "store_ref",
+        "entry_ref",
+        "entry_digest",
+        "correlation_id",
+        "recorded_at"
       ]
     },
     "BaseProvider": {
