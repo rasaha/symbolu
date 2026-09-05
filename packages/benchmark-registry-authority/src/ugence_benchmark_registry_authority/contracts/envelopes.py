@@ -106,7 +106,9 @@ from ._validation import (
     require_distinct_actors,
     require_enum_member,
     require_exact_type,
+    require_actor_identity,
     require_identifier,
+    require_key_identifier,
     require_pinned_constant,
 )
 from .canonical import (
@@ -317,8 +319,8 @@ class BenchmarkPublisherSubmissionEnvelope:
             self.benchmark_identity_digest, "benchmark_identity_digest"
         )
         require_digest(self.benchmark_content_digest, "benchmark_content_digest")
-        require_identifier(self.publisher_identity, "publisher_identity")
-        require_identifier(self.publisher_key_id, "publisher_key_id")
+        require_actor_identity(self.publisher_identity, "publisher_identity")
+        require_key_identifier(self.publisher_key_id, "publisher_key_id")
         require_enum_member(
             self.signature_profile,
             BenchmarkSignatureProfile,
@@ -406,10 +408,10 @@ class BenchmarkApprovalEnvelope:
             BenchmarkPublisherSubmissionEnvelope,
             "publisher_submission_envelope",
         )
-        require_identifier(
+        require_actor_identity(
             self.approval_authority_identity, "approval_authority_identity"
         )
-        require_identifier(
+        require_key_identifier(
             self.approval_authority_key_id, "approval_authority_key_id"
         )
         require_enum_member(
@@ -548,8 +550,8 @@ class BenchmarkRevocationEnvelope:
     def __post_init__(self) -> None:
         require_exact_type(self.coordinate, BenchmarkCoordinate, "coordinate")
         require_digest(self.admitted_digest, "admitted_digest")
-        require_identifier(self.revoker_identity, "revoker_identity")
-        require_identifier(self.revoker_key_id, "revoker_key_id")
+        require_actor_identity(self.revoker_identity, "revoker_identity")
+        require_key_identifier(self.revoker_key_id, "revoker_key_id")
         require_enum_member(
             self.signature_profile,
             BenchmarkSignatureProfile,

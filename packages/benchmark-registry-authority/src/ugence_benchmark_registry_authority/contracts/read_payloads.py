@@ -54,7 +54,7 @@ from ._validation import (
     require_digest,
     require_enum_member,
     require_exact_type,
-    require_identifier,
+    require_actor_identity,
 )
 from .canonical import (
     BENCHMARK_HISTORICAL_RECORD_PAYLOAD_DIGEST_DOMAIN,
@@ -108,7 +108,7 @@ class BenchmarkResolutionRecordPayload:
             "declared_registration_state",
         )
         require_digest(self.declared_admitted_digest, "declared_admitted_digest")
-        require_identifier(
+        require_actor_identity(
             self.declared_registry_authority_identity,
             "declared_registry_authority_identity",
         )
@@ -178,7 +178,7 @@ class BenchmarkHistoricalRecordPayload:
             "declared_registration_state",
         )
         require_digest(self.declared_admitted_digest, "declared_admitted_digest")
-        require_identifier(
+        require_actor_identity(
             self.declared_registry_authority_identity,
             "declared_registry_authority_identity",
         )

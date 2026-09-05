@@ -48,6 +48,8 @@ __all__ = [
     "require_exact_type",
     "require_canonical_str",
     "require_identifier",
+    "require_key_identifier",
+    "require_actor_identity",
     "require_digest",
     "require_detached_signature",
     "require_public_key_material",
@@ -72,6 +74,18 @@ _ED25519_PUBLIC_KEY_HEX_RE = re.compile(r"^[0-9a-f]{64}$")
 #: signature has to be a string — and a string coordinate must have exactly one
 #: spelling, so the length, the case and the alphabet are all fixed.
 _ED25519_HEX_RE = re.compile(r"^[0-9a-f]{128}$")
+
+#: The ratified key-identifier grammar (ADR §35.2 D-42), applied by D-43 to the
+#: actor-identity fields as well: 1 to 128 characters, lowercase ASCII
+#: alphanumerics, with ``.``, ``_`` and ``-`` admissible only in interior
+#: positions. A **separate** pattern from anything ``require_identifier``
+#: applies, for the reason D-42 records: ``require_identifier`` is shared with
+#: ``applicable_policy_ref`` (whose pinned value carries a ``/``) and with the
+#: free-text ``declared_revocation_reason``, and a wholesale tightening would
+#: refuse an already-pinned policy reference. The floating-token ban of BR-1's
+#: coordinate grammar is deliberately **not** carried over: ``latest`` names one
+#: key and floats nothing, because no seam selects among keys (D-42).
+_KEY_IDENTIFIER_RE = re.compile(r"^[a-z0-9](?:[a-z0-9._-]{0,126}[a-z0-9])?$")
 
 
 def _fail(
@@ -168,6 +182,72 @@ def require_identifier(value: object, name: str) -> str:
     """
 
     return require_canonical_str(value, name, allow_empty=False)
+
+
+def require_key_identifier(value: object, name: str) -> str:
+    """Require a key identifier in D-42's ratified grammar.
+
+    Everything :func:`require_identifier` requires — exact ``str``, unpadded,
+    NFC, non-empty — and then the grammar
+    ``^[a-z0-9](?:[a-z0-9._-]{0,126}[a-z0-9])?$``. Lowercase ASCII only, because
+    NFC is a normalization and not a confusable check: a Cyrillic ``е`` in a key
+    identifier would be a second anchor revision under D-25, and the refusal
+    vocabulary has no member that names a confusable key at this seam, so the
+    condition is made **unrepresentable rather than detected**. A length bound,
+    because an unbounded identifier is unbounded canonical bytes inside a record
+    whose digest is its revision. No leading or trailing separator, so one key
+    has one spelling.
+
+    Every malformation refuses as ``INDETERMINATE``, the reason D-42 pins for a
+    key identifier that is not a ``str``, is a ``str`` subclass, is empty,
+    all-whitespace, padded, non-NFC, outside the alphabet or over the bound.
+    Still an encoding check: naming a key is not possessing one.
+    """
+
+    text = require_canonical_str(value, name, allow_empty=False)
+    if not _KEY_IDENTIFIER_RE.match(text):
+        raise _fail(
+            f"{name} must match the ratified key-identifier grammar "
+            "^[a-z0-9](?:[a-z0-9._-]{0,126}[a-z0-9])?$ — 1 to 128 lowercase "
+            "ASCII alphanumerics with '.', '_' and '-' admissible only in "
+            f"interior positions (got a {len(text)}-character value); one key "
+            "has exactly one spelling, and a confusable spelling is refused "
+            "rather than resolved",
+            BenchmarkRegistryRefusalReason.INDETERMINATE,
+        )
+    return text
+
+
+def require_actor_identity(value: object, name: str) -> str:
+    """Require an actor identity in the same grammar (ADR §35.2 D-43).
+
+    D-43 binds D-42's grammar, unchanged, to the actor-identity fields and only
+    those: the anchor ``identity``, every ``signer_identity``, and the
+    publisher, approval-authority, revoker and declared-registry-authority
+    identities. The ground is stronger than D-42's: ``require_distinct_actors``
+    compares the exact declared strings, so a homoglyph pair *passes* the
+    four-party separation that stops self-approval while naming one actor.
+    Restricting the alphabet makes that pair unrepresentable.
+
+    These are handles the composition root assigns, not names a third party
+    asserts; the package carries no display-name field on any contract. A
+    separate function from :func:`require_key_identifier` even though the
+    pattern is shared, so that the two rulings can diverge later without one
+    silently re-specifying the other.
+    """
+
+    text = require_canonical_str(value, name, allow_empty=False)
+    if not _KEY_IDENTIFIER_RE.match(text):
+        raise _fail(
+            f"{name} must match the ratified actor-identity grammar "
+            "^[a-z0-9](?:[a-z0-9._-]{0,126}[a-z0-9])?$ — 1 to 128 lowercase "
+            "ASCII alphanumerics with '.', '_' and '-' admissible only in "
+            f"interior positions (got a {len(text)}-character value); a "
+            "homoglyph spelling of an identity would pass actor separation "
+            "while naming one actor, so it is refused at construction",
+            BenchmarkRegistryRefusalReason.INDETERMINATE,
+        )
+    return text
 
 
 def require_digest(

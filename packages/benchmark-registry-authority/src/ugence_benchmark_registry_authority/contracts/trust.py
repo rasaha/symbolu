@@ -121,7 +121,8 @@ from ._validation import (
     require_digest,
     require_enum_member,
     require_exact_type,
-    require_identifier,
+    require_actor_identity,
+    require_key_identifier,
     require_public_key_material,
 )
 from .canonical import (
@@ -463,8 +464,8 @@ class BenchmarkTrustAnchorRecord:
 
     def __post_init__(self) -> None:
         require_enum_member(self.role, BenchmarkTrustRole, "role")
-        require_identifier(self.identity, "identity")
-        require_identifier(self.key_id, "key_id")
+        require_actor_identity(self.identity, "identity")
+        require_key_identifier(self.key_id, "key_id")
         require_enum_member(
             self.signature_profile,
             BenchmarkSignatureProfile,
@@ -624,8 +625,8 @@ class BenchmarkTrustAnchorResolution:
 
     def __post_init__(self) -> None:
         require_enum_member(self.role, BenchmarkTrustRole, "role")
-        require_identifier(self.identity, "identity")
-        require_identifier(self.key_id, "key_id")
+        require_actor_identity(self.identity, "identity")
+        require_key_identifier(self.key_id, "key_id")
         if (self.anchor is None) == (self.refusal_reason is None):
             raise BenchmarkRegistryContractError(
                 "a trust-anchor resolution carries exactly one of an anchor "
@@ -879,8 +880,8 @@ def _validate_verified_result(
 
     require_digest(result.verified_digest, "verified_digest")
     _require_pinned_role(result.signer_role, expected_role, "signer_role")
-    require_identifier(result.signer_identity, "signer_identity")
-    require_identifier(result.signer_key_id, "signer_key_id")
+    require_actor_identity(result.signer_identity, "signer_identity")
+    require_key_identifier(result.signer_key_id, "signer_key_id")
     require_enum_member(
         result.signature_profile,
         BenchmarkSignatureProfile,
