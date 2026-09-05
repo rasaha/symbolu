@@ -49,8 +49,9 @@ The approval is used exactly once and the action runs exactly once.
 
 ## What it is not
 
-No queue listing surface, no decision route, no screen, no signal, no resume. Those
-are HR-C and HR-D. It does not change the DBOS adapter's resume shape (HR-B) and it
+No queue listing surface, no decision route, no screen, no signal, no resume. The
+service that lists and records is `ugence-governed-review-service` (HR-C); the screens
+are HR-D. It does not change the DBOS adapter's resume shape (HR-B) and it
 does not link receipts (HR-E). It reads no clock: every instant comes from the
 injected `clock`, which a composition root supplies from the runtime's own time base.
 
@@ -90,7 +91,7 @@ the adapter, the source never imports it. Nothing under `packages/capabilities`.
 - A request that nobody decides within its window expires in the ledger and is not
   re-requested automatically; the instance stays parked until a new ordinal is raised
   by a later step.
-- `decided_by` is what the caller of the ledger presented. Identity proof is the
-  review service's IdP session, which does not exist yet (HR-C).
+- `decided_by` is what the caller of the ledger presented. The review service (HR-C)
+  records it as `PRESENTED_UNPROVEN`; no identity provider integration exists.
 - The adapter's `resume` is bounded since HR-B: it re-arms and runs nothing, and the
   rows here rely on the following `advance` to perform the single run.

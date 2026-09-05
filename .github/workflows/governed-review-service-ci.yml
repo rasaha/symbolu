@@ -1,0 +1,139 @@
+name: governed-review-service-ci
+
+# Scoped CI for ugence-governed-review-service (roadmap GAS-7, step HR-C).
+#
+# The failure-matrix rows the service owns (human-review ADR §4 rows 7, 8, 9) are only
+# evidence against a REAL PostgreSQL (the DBOS adapter) and a real SQLite ledger, so
+# Postgres is installed and driven with pg_ctl exactly as governed-review-ci does. A
+# skipped row is not a passing row: the job fails if any row skipped.
+
+on:
+  pull_request:
+    paths:
+      - "packages/integration/governed-review-service/**"
+      - "packages/integration/governed-review/**"
+      - "packages/integration/approval-workflow/**"
+      - "packages/integration/authority-directory/**"
+      - "packages/integration/durable-execution/**"
+      - "docs/architecture/ADR_UGENCE_HUMAN_REVIEW_DURABLE_RESUME_SCOPING.md"
+      - ".github/workflows/governed-review-service-ci.yml"
+  push:
+    branches:
+      - "claude/**"
+    paths:
+      - "packages/integration/governed-review-service/**"
+      - ".github/workflows/governed-review-service-ci.yml"
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  service-suite:
+    name: Review service rows 7, 8, 9 (real PostgreSQL + SQLite ledger)
+    runs-on: ubuntu-latest
+    env:
+      PGVERSION: "16"
+      PGPORT: "5433"
+      PGDATA: /tmp/ugrs-pgdata
+      PGSOCK: /tmp/ugrs-pgsock
+      UGENCE_DE_TEST_PG: postgresql+psycopg://postgres@127.0.0.1:5433/postgres
+      PYTHONPATH: >-
+        packages/integration/governed-review-service/src:packages/integration/governed-review/src:packages/integration/approval-workflow/src:packages/integration/authority-directory/src:packages/governance-contracts/src:packages/integration/agent-runtime-governance/src:packages/integration/risk-authority-runtime/src:packages/integration/risk-authority-status-runtime/src:packages/runtime/agent-runtime/src:packages/risk_authority/src:packages/capabilities/decision-authority/src:packages/providers/actiongate/src:packages/integration/durable-execution/src:packages/integration/durable-execution/tests:packages/integration/governed-review/tests
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install PostgreSQL server binaries
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-$PGVERSION postgresql-client-$PGVERSION
+
+      - name: Start an independent cluster on 5433
+        run: |
+          PGBIN=/usr/lib/postgresql/$PGVERSION/bin
+          sudo systemctl stop postgresql || true
+          sudo rm -rf "$PGDATA" "$PGSOCK"
+          sudo mkdir -p "$PGDATA" "$PGSOCK"
+          sudo chown -R postgres:postgres "$PGDATA" "$PGSOCK"
+          sudo chmod 700 "$PGDATA"
+          sudo -u postgres "$PGBIN/initdb" -D "$PGDATA" -U postgres --auth=trust
+          sudo -u postgres "$PGBIN/pg_ctl" -D "$PGDATA" \
+            -o "-p $PGPORT -k $PGSOCK -c listen_addresses=127.0.0.1" \
+            -l /tmp/ugrs-pg.log -w start
+          "$PGBIN/pg_isready" -h 127.0.0.1 -p "$PGPORT"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest pydantic "dbos>=2.0" "SQLAlchemy>=2.0" "psycopg[binary]>=3.1" \
+            "fastapi>=0.110" "httpx>=0.27"
+
+      - name: Service core, unit level (real SQLite ledger, adapter double)
+        run: |
+          cd packages/integration/governed-review-service
+          python -m pytest tests/test_service.py -o addopts= -v --no-header
+
+      - name: HTTP surface
+        run: |
+          cd packages/integration/governed-review-service
+          python -m pytest tests/test_http.py -o addopts= -v --no-header
+
+      - name: Boundaries
+        run: |
+          cd packages/integration/governed-review-service
+          python -m pytest tests/test_boundaries.py -o addopts= -v --no-header
+
+      - name: Failure-matrix rows 5, 7, 8, 9 inside the DBOS adapter
+        run: |
+          cd packages/integration/governed-review-service
+          python -m pytest tests/test_matrix_rows.py -o addopts= -v --no-header \
+            --junitxml=/tmp/review-service-matrix.xml
+
+      - name: Fail if any matrix row was skipped
+        run: |
+          python - <<'PY'
+          import sys, xml.etree.ElementTree as ET
+          root = ET.parse("/tmp/review-service-matrix.xml").getroot()
+          skipped = [tc.get("name") for tc in root.iter("testcase") if tc.find("skipped") is not None]
+          if skipped:
+              print("A skipped row is NOT a passing row. Skipped:")
+              for name in skipped:
+                  print(f"  - {name}")
+              sys.exit(1)
+          print("No matrix row was skipped.")
+          PY
+
+      - name: Repository import boundaries
+        run: python scripts/check_package_import_boundaries.py
+
+      - name: The composed packages are unmodified
+        run: |
+          for p in packages/integration/governed-review packages/integration/durable-execution \
+                   packages/integration/approval-workflow packages/integration/authority-directory \
+                   packages/integration/agent-runtime-governance packages/runtime/agent-runtime \
+                   apps/ugence-governance-studio; do
+            if ! git diff --quiet HEAD -- "$p"; then
+              echo "$p was modified by this job; the dependency must stay one-way."; exit 1
+            fi
+          done
+
+      - name: Postgres log (on failure)
+        if: failure()
+        run: sudo cat /tmp/ugrs-pg.log || true
+
+  build:
+    name: Wheel + sdist build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: |
+          python -m pip install --upgrade pip
+          pip install build
+      - run: python -m build packages/integration/governed-review-service
