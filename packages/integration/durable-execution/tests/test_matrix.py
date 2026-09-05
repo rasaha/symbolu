@@ -271,6 +271,20 @@ def test_row_04_duplicate_delivery(wired):
     assert len(evals) == len(executed), (
         "hook invocations must equal executed advances — never fewer"
     )
+    assert bundle.event_store.attempt_token is None, (
+        "the attempt token is scoped to the attempt; nothing may inherit it"
+    )
+    with sa.create_engine(app).begin() as c:
+        tokens = c.execute(
+            sa.text(
+                "SELECT DISTINCT attempt_token FROM ugence_art.runtime_events "
+                "WHERE instance_id='row4'"
+            )
+        ).scalars().all()
+    executed_tokens = [t for t in tokens if t is not None]
+    assert len(executed_tokens) == 1 and executed_tokens[0].startswith("attempt-"), (
+        f"only the attempt that executed records its token; got {tokens}"
+    )
 
 
 # --------------------------------------------------------------------------- #
@@ -554,7 +568,8 @@ def test_row_07_production_mode_refuses_an_in_memory_bundle(pg_databases):
 
     with pytest.raises(PostureError):
         DbosExecutionAdapter(
-            datasource=object(), host=object(), bundle=bundle, production_mode=True
+            datasource=object(), host=object(), bundle=bundle, production_mode=True,
+            definition_digest="digest-row7",
         )
 
 
@@ -649,6 +664,53 @@ def test_row_08_replay_under_the_same_key_settles_once(pg_databases):
     sess.close()
 
 
+@requires_postgres
+def test_row_08_refusal_leaves_the_enclosing_transaction_usable(pg_databases):
+    """A refused reservation is a refusal, not a poisoned transaction: the durable
+    step that asked can still read and write and commit, and the refused key is not
+    remembered as consumed."""
+    app, _sysdb = pg_databases
+    from ugence_durable_execution.postgres.budgets import PostgresBudgetLedger
+    from ugence_durable_execution.postgres.schema import schema_statements
+
+    engine = sa.create_engine(app)
+    with engine.begin() as c:
+        for stmt in schema_statements():
+            c.execute(sa.text(stmt))
+        c.execute(
+            sa.text("INSERT INTO ugence_art.budgets (budget_id, ceiling) VALUES ('b', 1)")
+        )
+
+    sess = sa.orm.sessionmaker(bind=engine)()
+    ledger = PostgresBudgetLedger(lambda: sess)
+    with sess.begin():
+        assert ledger.reserve(budget_id="b", idempotency_key="k1", instance_id="i")
+        with pytest.raises(BudgetExhausted):
+            ledger.reserve(budget_id="b", idempotency_key="k2", instance_id="i")
+        # Still inside the same transaction: it must not be in the aborted state.
+        assert ledger.consumed("b") == 1
+        sess.execute(
+            sa.text("INSERT INTO ugence_art.budgets (budget_id, ceiling) VALUES ('after', 1)")
+        )
+    with sess.begin():
+        keys = sess.execute(
+            sa.text(
+                "SELECT idempotency_key FROM ugence_art.budget_consumption "
+                "WHERE budget_id='b' ORDER BY 1"
+            )
+        ).scalars().all()
+        assert keys == ["k1"], f"a refused key must not be recorded as consumed; got {keys}"
+        assert sess.execute(
+            sa.text("SELECT ceiling FROM ugence_art.budgets WHERE budget_id='after'")
+        ).scalar_one() == 1, "the write after the refusal committed"
+        sess.execute(sa.text("UPDATE ugence_art.budgets SET ceiling = 2 WHERE budget_id='b'"))
+    with sess.begin():
+        assert ledger.reserve(budget_id="b", idempotency_key="k2", instance_id="i"), (
+            "once there is room, the previously refused key consumes"
+        )
+    sess.close()
+
+
 # --------------------------------------------------------------------------- #
 # Row 9 — pause and resume across a human decision spanning hours
 # --------------------------------------------------------------------------- #
@@ -710,6 +772,52 @@ def test_row_09_parked_instance_stays_parked_then_re_evaluates(wired):
     )
 
 
+@requires_postgres
+def test_row_09_signal_serialises_behind_the_instance_lock(wired):
+    """A signal delivered while a step holds the instance's lock waits for that step
+    to finish and then lands with a fresh sequence number, instead of racing the step
+    to the (instance_id, seq) key."""
+    app, sysdb, make = wired
+    ds, adapter, bundle = make()
+    adapter.start(
+        workflow_id=WORKFLOW_ID, definition_digest=DEFINITION_DIGEST,
+        instance_id="row9l", correlation_id="c9l", inputs={},
+    )
+
+    holder = sa.create_engine(app).connect()
+    holder.begin()
+    holder.execute(sa.text("SELECT pg_advisory_xact_lock(hashtext('row9l'))"))
+
+    done = threading.Event()
+    errors: List[BaseException] = []
+
+    def deliver() -> None:
+        try:
+            adapter.signal(instance_id="row9l", signal_name="approved", payload={})
+        except BaseException as exc:  # noqa: BLE001
+            errors.append(exc)
+        finally:
+            done.set()
+
+    t = threading.Thread(target=deliver)
+    t.start()
+    assert not done.wait(1.0), "the signal must wait while the instance lock is held"
+    holder.rollback()
+    holder.close()
+    t.join(timeout=60)
+    assert done.is_set() and not errors, f"signal after release should succeed; {errors}"
+
+    with sa.create_engine(app).begin() as c:
+        seqs = c.execute(
+            sa.text(
+                "SELECT seq FROM ugence_art.runtime_events WHERE instance_id='row9l' "
+                "ORDER BY seq"
+            )
+        ).scalars().all()
+    assert seqs == list(range(1, len(seqs) + 1)), f"event chain has a gap: {seqs}"
+    assert _hooks.provider_calls(app) == []
+
+
 # --------------------------------------------------------------------------- #
 # Row 10 — recovery after a workflow-definition version change
 # --------------------------------------------------------------------------- #
@@ -723,18 +831,46 @@ def test_row_10_definition_version_change_refuses(wired):
         instance_id="row10", correlation_id="c10", inputs={},
     )
 
-    # A redeploy: the same durable state, a different compiled definition.
-    adapter._definition_digest = "digest-v2"  # noqa: SLF001
-    adapter.forget("row10")
+    # A redeploy: the same durable state and stores, a different compiled definition
+    # — stated the only way an adapter can state it, through its constructor.
+    from ugence_durable_execution.engine.dbos_engine import DbosExecutionAdapter
+
+    redeployed = DbosExecutionAdapter(
+        datasource=ds,
+        host=adapter._host,  # noqa: SLF001 - same wiring, only the definition differs
+        bundle=bundle,
+        definition_digest="digest-v2",
+    )
 
     with pytest.raises(DefinitionVersionMismatch) as excinfo:
-        adapter.advance(instance_id="row10", attempt_token="a1")
+        redeployed.advance(instance_id="row10", attempt_token="a1")
 
     message = str(excinfo.value)
     assert DEFINITION_DIGEST in message and "digest-v2" in message, (
         "the refusal must name both digests so an operator can see what changed"
     )
     assert _hooks.provider_calls(app) == [], "nothing may be invoked on a refusal"
+
+
+@requires_postgres
+def test_row_10_check_cannot_be_vacuous(wired):
+    """The row-10 comparison has no escape hatch: an adapter cannot be built without
+    saying what it runs, and a start under a digest this deployment does not run is
+    refused up front rather than becoming an instance nobody can recover."""
+    app, sysdb, make = wired
+    ds, adapter, bundle = make()
+    from ugence_durable_execution.engine.dbos_engine import DbosExecutionAdapter
+
+    with pytest.raises(PostureError):
+        DbosExecutionAdapter(
+            datasource=ds, host=adapter._host, bundle=bundle, definition_digest="",  # noqa: SLF001
+        )
+    with pytest.raises(DefinitionVersionMismatch):
+        adapter.start(
+            workflow_id=WORKFLOW_ID, definition_digest="digest-not-deployed",
+            instance_id="row10v", correlation_id="c10v", inputs={},
+        )
+    assert adapter.status(instance_id="row10v") == {"known": False}
 
 
 def test_row_10_unknown_checkpoint_version_refuses():

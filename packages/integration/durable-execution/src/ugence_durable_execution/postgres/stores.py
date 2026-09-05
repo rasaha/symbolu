@@ -18,6 +18,7 @@ fallback path that opens one.
 from __future__ import annotations
 
 import json
+import threading
 from typing import Any, Callable, List, Optional
 
 import sqlalchemy as sa
@@ -136,7 +137,21 @@ class PostgresRuntimeEventStore:
     def __init__(self, session_provider: SessionProvider, engine_id: str = "") -> None:
         self._session = session_provider
         self._engine_id = engine_id
-        self.attempt_token: Optional[str] = None
+        self._attempt = threading.local()
+
+    @property
+    def attempt_token(self) -> Optional[str]:
+        """The token of the attempt currently being recorded on THIS thread, or None.
+
+        Thread-local because one bundle serves every instance a worker drives; two
+        concurrent advances (ADR §8 row 4) must each record their own token, not
+        whichever was assigned last.
+        """
+        return getattr(self._attempt, "token", None)
+
+    @attempt_token.setter
+    def attempt_token(self, value: Optional[str]) -> None:
+        self._attempt.token = value
 
     def append(self, instance_id: str, event: Any) -> None:
         s = self._session()
