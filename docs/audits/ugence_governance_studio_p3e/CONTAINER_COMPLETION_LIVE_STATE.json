@@ -122,6 +122,17 @@
         "gate_consequence": "every P3E-CTR gate remains NOT_EXECUTED; the run's evidence manifest is INCOMPLETE and no evidence obligation is satisfied"
       }
     },
+    "5b_owner_decision_mirror_pending_provisioning": {
+      "decision": "APPROVED_INTERNAL_MIRROR_PENDING_PROVISIONING",
+      "ruled_by": "rasaha",
+      "ruled_on": "2026-09-05",
+      "recorded_in": "BASE_IMAGE_MIRROR_DECISION.json authoritative_digests.ruling_2026_09_05",
+      "statement": "the ratified Node and Python digests are preserved; no refresh, no re-pin, no weakening or non-blocking of the digest gate, no Dockerfile FROM change, no fabricated mirror coordinates. The container gate stays environment-blocked until an approved private OCI mirror is provisioned outside the repository, and repository configuration is authorized only once the owner supplies the real mirror host, repository prefix and GitHub Actions secret name.",
+      "repin_would_not_help": "re-pinning to the current mutable-tag digests would not resolve the registry-blob egress 403 recorded under resource_gate; the blob pull is blocked regardless of the pin",
+      "non_claim": "no container build, vulnerability scan, SBOM, image signing or downstream container gate has executed; every canonical gate remains NOT_EXECUTED",
+      "unapproved_candidates": "the 2026-08-29 observation is stale and deliberately left unchanged; refreshing it is a separate evidence-refresh decision",
+      "status_preserved": "RATIFIED_PENDING_MIRROR_COORDINATES; mirror host, prefix and secret name remain unconfigured"
+    },
     "6_evidence_manifest_flaw": {
       "condition": "the evidence-manifest step hashed files from a repository directory holding seven committed records, several stating result NOT_EXECUTED, so a run that scanned nothing reported non-null scan hashes",
       "status": "CORRECTED",
