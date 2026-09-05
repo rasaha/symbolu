@@ -188,6 +188,66 @@ the Decision Authority read surface, and the Agent Runtime public API. Under SD-
 the console's `/v1/actions/authorize` and `/v1/actions/clear` are named here as
 **permanently out of the allowlist**.
 
+## What GAS-4 actually landed (backend only, 2026-09-05)
+
+Backend suite **175 passed** (was 142). No screen ships yet.
+
+### The v2 routes, and the screen each serves `[V]`
+
+`apps/ugence-governance-studio/contracts/openapi_v2.json`, generated from
+`create_v2_app` and frozen by `scripts/verify_openapi_v2.py`.
+
+| Screen | Route | Delegates to |
+|---|---|---|
+| Constitution | `POST /api/v2/constitution/validate` | `AgentConstitutionPolicy.from_dict` |
+| Constitution | `POST /api/v2/constitution/preflight` | `ActivationRoot.preflight_issuance` (mutation-free) |
+| Policy | `POST /api/v2/policy/validate` | `GovernedWorkflowCompiler.validate` |
+| Policy | `POST /api/v2/policy/synthesize` | `GovernedWorkflowCompiler.synthesize` |
+| Policy | `POST /api/v2/policy/compile` | `compile_policy_pack` (`require_approval` left at True) |
+| Authority | `GET /api/v2/authority/policies` | `PolicyRegistry.issued_records_for_identity` |
+| Authority | `GET /api/v2/authority/policies/{record_id}` | `get_issued` + `revocations_for` + `supersessions_for` |
+| Authority | `GET /api/v2/authority/decisions/{decision_id}` | Decision Authority read |
+| Simulate | `POST /api/v2/simulate/run` | Agent Runtime `api` (`prepare_workflow` + `advance_workflow`) |
+| Publish | `POST /api/v2/publish/shadow` | console `POST /v1/governed-loop/shadow` over HTTP |
+| Observe | `GET /api/v2/observe/audit` | console `GET /v1/audit` |
+| Observe | `GET /api/v2/observe/audit/{correlation_id}` | console `GET /v1/audit/{id}` |
+
+**Deferred, deliberately.** `POST /api/v2/policy/from-langflow` is GAS-5 and was not
+added; `GET /api/v2/simulate/{run_id}/trace` was folded into the `run` response, since
+the studio holds no run store and a route that implied one would be misleading.
+
+### v1 is untouched `[V]`
+
+`contracts/openapi.json` is byte-identical (`git diff` empty) and `test_freeze.py`
+passes unmodified. That required v2 to be its own application: `canonical_openapi_bytes()`
+regenerates v1 from `create_app`, so v2 routers on that app would have changed the frozen
+bytes. `create_v2_app` and `canonical_v2_openapi_bytes()` are independent, and
+`test_v1_and_v2_are_separate_documents` asserts the two path sets never overlap.
+
+The v2 exports are lazy (PEP 562). Eager imports made every v1 consumer — the v1 OpenAPI
+verifier included — require v2's whole dependency footprint. v1 must not acquire v2's
+dependencies by v2 existing.
+
+### What each screen will have to display `[G]`
+
+Not decoration; each is a real absence the backend reports rather than papers over.
+
+| Screen | The gap it must show |
+|---|---|
+| Constitution | Preflight returns `available: false` — the repository ships no signing key and no trust root, so a preflight would check nothing real. |
+| Policy | Compiles genuinely; the only gap is that `CompilationError` is not exported from the compiler's public `api`, so a boundary violation is reported by type name rather than distinguished structurally. Closing it means exporting the error from the compiler, which is a change to that package. |
+| Authority | With no registry configured, `available: false`. With one, the response names `registry_kind` — `InMemoryPolicyRegistry` shows one process's view, not an enterprise registry. |
+| Simulate | With no hook configured the runtime's own `UnconfiguredGovernanceHook` BLOCKs, and the response carries `governance_hook_permissive` so a run cleared by a test hook can never be presented as a governance result. |
+| Publish | `available: false` until a console base URL is configured; SHADOW is the only mode reachable. |
+| Observe | Unreachable and empty are distinguished — "the console said nothing" and "the console is unreachable" must not look alike on an audit screen. The console `AuditStore` remains per-instance. |
+
+**Not yet wheel-bundled.** The v2 fixtures under `demo_data/v2/` are read from the app
+directory by the suite; they are not in the distribution's `data/` tree, because
+`test_bundled_fixtures_match_p3a_source` bundles the four named P3A scenarios only.
+Bundling belongs with the screen work that will actually load them.
+
+---
+
 ## Gaps carried into GAS-4 `[G]`
 
 No signing key or trust root; `InMemoryPolicyRegistry` is the only reachable registry;
