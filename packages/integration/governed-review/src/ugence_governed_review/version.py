@@ -6,7 +6,7 @@ wheel never has to import the package.
 
 from __future__ import annotations
 
-__version__ = "0.2.0"
+__version__ = "0.3.0"
 
 #: Frozen identity of the binding convention: subject kind, consumer-ref shape and
 #: the reason code a consumed approval contributes to composition.

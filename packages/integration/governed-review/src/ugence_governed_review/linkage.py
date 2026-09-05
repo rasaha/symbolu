@@ -66,8 +66,9 @@ __all__ = [
     "reconstruct",
 ]
 
-#: Frozen identity of this linkage's shape. A field added or renamed is a new version.
-LINKAGE_VERSION = "governed_review.linkage.v1"
+#: Frozen identity of this linkage's shape. A field added or renamed is a new version:
+#: v2 (AI-D, ruling ID-2) added ``authentication_reference``.
+LINKAGE_VERSION = "governed_review.linkage.v2"
 
 #: The ``evidence_kind`` the linkage projects to (G4 ``EvidenceReference``).
 EVIDENCE_KIND = "governed_review.linkage"
@@ -129,6 +130,10 @@ class ReviewLinkage:
     decided_by: str
     decided_role: str
     decided_at: Optional[datetime]
+    #: ID-2 (AI-D): the digest-bound reference to the verified claims behind
+    #: ``decided_by``, copied from the approval record; empty when the decision was
+    #: recorded without a proof. Part of the digest like every other field.
+    authentication_reference: str
     consumption_id: str
     consumed_at: Optional[datetime]
     consumed_event_sequence: int
@@ -382,6 +387,7 @@ def reconstruct(
         approval_id=approval_id, approval_state=record.state.value,
         decided_by=record.decided_by, decided_role=record.decided_role,
         decided_at=record.decided_at,
+        authentication_reference=record.authentication_reference,
         consumption_id=consumption_id, consumed_at=record.consumed_at,
         consumed_event_sequence=int(consumed_event.sequence),
         parked_disposition_event_seq=parked_seq, paused_event_seq=paused_seq,

@@ -137,11 +137,12 @@ def source(ledger, clock: Clock, upstream: Optional[UpstreamSource] = None,
 
 
 def decide(ledger, approval_id: str, *, as_of: datetime, approver: ApproverRef = APPROVER,
-           decision: ReviewDecision = ReviewDecision.GRANT):
+           decision: ReviewDecision = ReviewDecision.GRANT, authentication_reference: str = ""):
     """Record a human decision through the ledger's own transitions."""
 
     return ledger.decide(approval_id, approver=approver, decision=decision, as_of=as_of,
-                         justification="reviewed")
+                         justification="reviewed",
+                         authentication_reference=authentication_reference)
 
 
 def window(issued: datetime, *, hours: int) -> Validity:
