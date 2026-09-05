@@ -1,0 +1,203 @@
+{
+  "curated_api_module": "ugence_vendor_dependency",
+  "distribution": "ugence-vendor-dependency",
+  "namespace": "ugence_vendor_dependency",
+  "note": "Machine-readable snapshot of the curated public API (ugence_vendor_dependency.__all__). tests/packaging/test_packaging.py asserts this file equals the live package surface. Regenerate with scripts/generate_public_api.py when the curated API changes deliberately.",
+  "package_version": "0.1.0",
+  "symbols": {
+    "AssessedSystemBinding": {
+      "fields": [
+        "binding_id",
+        "tenant_id",
+        "subject_id",
+        "context_id",
+        "context_digest",
+        "system_id",
+        "system_version",
+        "configuration_id",
+        "configuration_digest",
+        "canonical_subject_context_ref",
+        "system_manifest_ref",
+        "system_manifest_digest",
+        "deployment_environment_ref",
+        "effective_from",
+        "effective_to"
+      ],
+      "kind": "dataclass"
+    },
+    "CONTRACT_VERSION": {
+      "kind": "constant",
+      "value": "vendor_dependency.v1"
+    },
+    "ContractViolation": {
+      "kind": "class",
+      "methods": [
+        "add_note",
+        "with_traceback"
+      ]
+    },
+    "DECLARATION_ID_PREFIX": {
+      "kind": "constant",
+      "value": "vdd_"
+    },
+    "DeclarationSupersessionError": {
+      "kind": "class",
+      "methods": [
+        "add_note",
+        "with_traceback"
+      ]
+    },
+    "ENFORCEMENT_ENABLED": {
+      "kind": "constant",
+      "value": false
+    },
+    "MATURITY": {
+      "kind": "constant",
+      "value": "CONTRACTS_ONLY"
+    },
+    "SystemBindingAuthenticityStatus": {
+      "kind": "enum",
+      "values": [
+        "STRUCTURAL_UNVERIFIED"
+      ]
+    },
+    "VendorDependencyDeclaration": {
+      "fields": [
+        "declaration_id",
+        "tenant_id",
+        "binding",
+        "vendor_ref",
+        "risk_posture",
+        "policy_ref",
+        "validity",
+        "supersedes",
+        "declared_by",
+        "correlation_id",
+        "notes"
+      ],
+      "kind": "dataclass"
+    },
+    "VendorDependencyError": {
+      "kind": "class",
+      "methods": [
+        "add_note",
+        "with_traceback"
+      ]
+    },
+    "VendorDependencyPort": {
+      "kind": "class",
+      "methods": [
+        "declarations_by_risk_posture",
+        "declarations_for_system",
+        "declarations_for_tenant",
+        "declarations_for_vendor",
+        "get_declaration"
+      ]
+    },
+    "VendorRiskLabel": {
+      "fields": [
+        "label"
+      ],
+      "kind": "dataclass"
+    },
+    "__version__": {
+      "kind": "constant",
+      "value": "0.1.0"
+    },
+    "declaration_id_for": {
+      "kind": "function",
+      "parameters": [
+        "binding",
+        "vendor_ref",
+        "risk_posture",
+        "policy_ref",
+        "validity"
+      ]
+    },
+    "declared_at": {
+      "kind": "function",
+      "parameters": [
+        "declarations",
+        "as_of"
+      ]
+    },
+    "require_admissible_supersession": {
+      "kind": "function",
+      "parameters": [
+        "declaration",
+        "predecessor"
+      ]
+    },
+    "select_by_policy_ref": {
+      "kind": "function",
+      "parameters": [
+        "declarations",
+        "tenant_id",
+        "policy_ref",
+        "as_of"
+      ]
+    },
+    "select_by_risk_posture": {
+      "kind": "function",
+      "parameters": [
+        "declarations",
+        "tenant_id",
+        "risk_posture_label",
+        "as_of"
+      ]
+    },
+    "select_for_system": {
+      "kind": "function",
+      "parameters": [
+        "declarations",
+        "tenant_id",
+        "system_id",
+        "system_version",
+        "as_of"
+      ]
+    },
+    "select_for_tenant": {
+      "kind": "function",
+      "parameters": [
+        "declarations",
+        "tenant_id",
+        "as_of"
+      ]
+    },
+    "select_for_vendor": {
+      "kind": "function",
+      "parameters": [
+        "declarations",
+        "tenant_id",
+        "vendor_ref",
+        "as_of"
+      ]
+    },
+    "supersession_chain": {
+      "kind": "function",
+      "parameters": [
+        "declarations",
+        "declaration_id"
+      ]
+    },
+    "supersession_refusals": {
+      "kind": "function",
+      "parameters": [
+        "declaration",
+        "predecessor"
+      ]
+    },
+    "validity_from_dict": {
+      "kind": "function",
+      "parameters": [
+        "d"
+      ]
+    },
+    "validity_to_dict": {
+      "kind": "function",
+      "parameters": [
+        "validity"
+      ]
+    }
+  }
+}

@@ -1,0 +1,57 @@
+# Ugence Vendor Dependency — the contracts-only record of declared vendor dependencies
+# (gap-sequencing ADR wave 4, row "Third-party AI and vendor risk", line 62).
+#
+# Scoped and ratified by docs/architecture/ADR_UGENCE_VENDOR_RISK_SCOPING.md
+# (VR-1 this name, VR-2 BINDING_ONLY, VR-3 SEPARATE_OPAQUE_RISK_LABEL,
+# VR-4 POLICY_REF_STRING, VR-5 VendorRiskLabel lands in governance-contracts first).
+#
+#   THIS PACKAGE RECORDS WHAT A DECLARER ASSERTED ABOUT A VENDOR DEPENDENCY.
+#   IT NEVER RESOLVES, VERIFIES, SCORES, GRADES, CONTACTS, PERSISTS OR DECIDES.
+#
+# Contracts only: record types, refusal reasons, pure selectors and one read-only
+# Protocol. No store, no connector, no gateway, no scorer, no clock.
+#
+# Not a gateway, not a supplier system, not a registry, not an Authority. Mints no
+# identity and no vocabulary: AssessedSystemBinding and VendorRiskLabel are
+# re-exported from governance-contracts, never redefined.
+#
+# Dependency direction (one-way):
+#     ugence-governance-contracts (leaf)   <- AssessedSystemBinding / VendorRiskLabel / Validity
+#         ▲
+#     ugence-vendor-dependency (this package)
+#
+# Build:   python -m build packages/integration/vendor-dependency
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ugence-vendor-dependency"
+dynamic = ["version"]
+description = "Ugence Vendor Dependency — the contracts-only record of declared vendor dependencies: bounded declarations over the neutral system identity and the neutral vendor-risk label, linked to a policy by reference. Records what a declarer asserted; never resolves, verifies, scores, contacts or decides."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "Proprietary" }
+authors = [{ name = "Rakesh Mohan" }]
+keywords = ["governance", "vendor", "third-party", "dependency", "contracts", "ugence"]
+classifiers = ["Typing :: Typed"]
+dependencies = [
+    "ugence-governance-contracts>=0.7.0",
+]
+
+[project.optional-dependencies]
+test = ["pytest>=7.0"]
+
+[tool.setuptools.dynamic]
+version = { attr = "ugence_vendor_dependency.version.__version__" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["ugence_vendor_dependency*"]
+
+[tool.setuptools.package-data]
+ugence_vendor_dependency = ["py.typed"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
