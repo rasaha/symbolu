@@ -65,6 +65,29 @@ def test_a_lift_may_not_be_retargeted_retenanted_or_reattached():
         assert expected in reasons, (changed, reasons)
 
 
+def test_a_lift_is_checked_against_the_incident_it_is_presented_with():
+    """The third argument is not decoration.
+
+    ``lift_refusals`` is a pure function a composition root may call with an
+    incident it looked up separately. If that incident is not this lift's, the
+    caller has paired two unrelated records, and answering "admissible" would let a
+    lift for one incident be filed against another. Found by a mutation sweep: this
+    guard had no test, while the two rules it backstops did.
+    """
+
+    request = containment()
+    admissible = lift(request)
+    assert lift_refusals(admissible, request, incident()) == ()
+
+    stranger = incident(subject="envelope:env-2")
+    assert stranger.incident_id != admissible.incident_id
+    reasons = lift_refusals(admissible, request, stranger)
+    assert any("not this lift's incident" in r for r in reasons), reasons
+
+    # And it is genuinely independent of the request-side rules: those all pass here.
+    assert lift_refusals(admissible, request, None) == ()
+
+
 def test_a_lift_may_not_precede_the_containment_it_lifts():
     request = containment(at=T2)
     reasons = lift_refusals(lift(request, at=T1), request, None)

@@ -88,8 +88,7 @@ they bypass the methods a dataclass defines.
 So the guarantee is stated as a class rather than a list: **every route through the
 type** — construction, `replace`, the mutators, unpickling, subclassing — refuses an
 unjustified `LIFTED`; and **anything already executing arbitrary code in the process
-can fabricate a record**, which this package does not claim to prevent and no
-comparable package does.
+can fabricate a record**, which this package does not claim to prevent.
 
 ## The RA-6 payload
 

@@ -368,11 +368,17 @@ def test_optional_text_refuses_a_non_string():
 # guard whose twin runs downstream on the same call, so removing one alone changes
 # no behaviour:
 #
-#   records.py:240  cross-incident check in containment_requested()  -> the same
-#                   rule re-runs in _require_containment_evidence via replace()
-#   records.py:264  the lift_refusals re-check in containment_lifted() -> likewise
-#   states.py:83/86 the table check and the forward-only rank check are mutually
-#                   redundant for every state pair the tables define today
+#   IncidentRecord.containment_requested's cross-incident check -> the same rule
+#       re-runs in _require_containment_evidence via replace()
+#   IncidentRecord.containment_lifted's lift_refusals re-check    -> likewise
+#   require_transition's two checks (states.py) are mutually redundant for every
+#       state pair the tables define today
+#
+# Guards are named, not cited by line, because line numbers drift and a stale
+# citation reads as rigor it no longer has. A fourth review found the sweep behind
+# this comment had itself been too narrow — it enumerated only guards whose body is
+# a bare `raise`, missing the `reasons.append` guards in lift_refusals, one of which
+# was uncovered. The sweep now covers both shapes: 36 guards, these four survivors.
 #
 # They are kept as defence in depth, not deleted, because each becomes load-bearing
 # the moment its twin's inputs change. What is asserted instead is that they cannot
