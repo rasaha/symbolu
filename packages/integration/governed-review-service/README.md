@@ -186,10 +186,11 @@ SQLAlchemy. `fastapi` and
 
 ## Known gaps `[G]`
 
-- No real identity adapter (AI-C): with the fixture adapter, or without a port,
-  `decided_by` is what the caller presented and nothing proves who did. The approval
-  record and the linkage carry no `authentication_reference` yet (AI-D); no assurance
-  policy or gate exists (AI-E); the studio relays no proof yet (AI-B).
+- The only real identity adapter, `ugence-approver-identity-jwt` (AI-C), is proven
+  against an in-process issuer only and is wired by no composition root; with the
+  fixture adapter, or without a port, `decided_by` is what the caller presented and
+  nothing proves who did. The approval record and the linkage carry no
+  `authentication_reference` yet (AI-D); no assurance policy or gate exists (AI-E).
 - Requests that expire undecided are not re-requested; the instance stays parked until
   a later step raises a new ordinal.
 - `required_approvals` labels are mapped to one configured role by the binding

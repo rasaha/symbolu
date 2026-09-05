@@ -1,6 +1,8 @@
 # Ugence approver identity adapter (AI-C) — scoping record
 
-**Status: SCOPED AND RULED — nothing here is implemented.** This record scopes step
+**Status: SCOPED, RULED AND IMPLEMENTED** as `packages/integration/approver-identity-jwt`
+0.1.0 `[V]`, labelled `REFERENCE_GRADE_SHADOW_ONLY`; real enterprise-issuer validation
+remains unproven. This record scopes step
 AI-C of `ADR_UGENCE_APPROVER_IDENTITY_SCOPING.md`: the first real implementation of
 `ApproverIdentityPort` (AI-A, `governed-review-service` 0.3.0). The five decisions in
 §5 were ruled by the owner on 2026-09-05, in the AI-C implementation instruction; the
@@ -94,7 +96,10 @@ clock read; no token in any log, ledger, exception message or answer.
 2. **AI-C implementation**: the package, its boundary tests, the in-process issuer,
    validation-failure matrix (§4), and the composition seam that wires
    `ReviewService(identity_port=..., tenant_mode=..., production=...)` (fact 9).
-   Label: **Reference-grade, shadow-only**.
+   Label: **Reference-grade, shadow-only**. **Shipped `[V]`** except the composition
+   seam: no deployment composes the review service, so fact 9 stays open; the
+   adapter's README states how a root wires it. `nbf` is checked by the adapter
+   against the injected clock and cannot be re-checked by the service (§3, `[G]`).
 3. **Issuer validation** against a real enterprise IdP once the owner provisions one
    (fact 10). Until then every `IDP_AUTHENTICATED` label is reference-grade and the
    roadmap's v1 criterion 2 stays unmet.
@@ -104,5 +109,5 @@ follow and are unchanged by this record.
 
 ## 7 — Next step
 
-AI-C implementation under IA-1 to IA-5, labelled `REFERENCE_GRADE_SHADOW_ONLY`; real
-enterprise-issuer validation remains unproven until the owner provisions an issuer.
+AI-D (`ADR_UGENCE_APPROVER_IDENTITY_SCOPING.md` §6). Enterprise-issuer validation of
+this adapter waits on an owner-provisioned issuer and is not claimed.
