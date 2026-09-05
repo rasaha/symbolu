@@ -1,6 +1,6 @@
 // Round-trip property: PolicyPack → graph → PolicyPack loses nothing.
 //
-// Driven by the REAL frozen reference pack (demo_data/v2/policy_pack.json), not a
+// Driven by the REAL frozen reference pack (fixtures/v2/policy_pack.json), not a
 // toy fixture, plus randomised mutations of it. The failure this guards against is
 // not subtle-but-rare: a mapper that rebuilt a pack from only the four collections it
 // understands would delete the other sixteen, and the canvas would still look fine.
@@ -27,7 +27,7 @@ import {
 
 const PACK: PolicyPackLike = JSON.parse(
   readFileSync(
-    path.resolve(__dirname, "..", "..", "demo_data", "v2", "policy_pack.json"),
+    path.resolve(__dirname, "..", "..", "fixtures", "v2", "policy_pack.json"),
     "utf-8",
   ),
 );
