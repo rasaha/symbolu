@@ -33,6 +33,9 @@ they stay CI-gated for a registry-capable runner. See `CONTAINER_RUNTIME_CAPABIL
 - **pip-audit** executed (0 known vulns) and **npm audit** (0 critical/high).
 - Base-image pinning manifest authored (`base-images.json`, digests UNRESOLVED_EGRESS_DENIED)
   + CI `base-image-digest-verification` job that resolves/verifies where egress permits.
+  (Superseded 2026-09-05 by ruling `SEPARATE_PIN_CONFORMANCE_FROM_TAG_DRIFT`: pin
+  conformance is network-independent and blocking, mirror-digest conformance is blocking
+  when configured and a typed resource blocker when not, upstream tag drift is advisory.)
 - Docs/audits corrected to distinguish executed vs NOT_EXECUTED and to record the precise
   egress-policy block. Deployment suite: 93 tests pass.
 
