@@ -33,7 +33,7 @@ _CHECK = r'''
 import dataclasses, importlib.util, json, sys
 
 import ugence_governance_contracts as g
-assert g.__version__ == "0.4.0", g.__version__
+assert g.__version__ == "0.5.0", g.__version__
 assert g.CONTRACT_VERSION == "1.0.0", g.CONTRACT_VERSION
 assert "site-packages" in g.__file__, g.__file__
 assert not any("/symbolu" in p or "governance_providers" in p for p in sys.path), sys.path
@@ -179,6 +179,39 @@ try:
     raise SystemExit("a naive as_of was accepted")
 except ValidityContractError:
     pass
+# G4 neutral audit reference ships and enforces structure
+from ugence_governance_contracts.api import AuditReference, AuditContractError
+_ad = _hl.sha256(b"entry").hexdigest()
+def _aref(**kw):
+    base = dict(tenant_id="t", store_ref="store:events", entry_ref="e:1", entry_digest=_ad)
+    base.update(kw)
+    return AuditReference(**base)
+assert len(_aref().canonical_digest()) == 64
+# It points at an entry; it carries no body, no event vocabulary, no chain head,
+# and no identity of its own.
+assert [f.name for f in _dc.fields(AuditReference)] == [
+    "tenant_id", "store_ref", "entry_ref", "entry_digest", "correlation_id", "recorded_at"]
+# Location vs content: same entry, disagreeing digests, detectable.
+assert _aref().points_to_same_entry(_aref(entry_digest=_hl.sha256(b"other").hexdigest()))
+assert not _aref().agrees_with(_aref(entry_digest=_hl.sha256(b"other").hexdigest()))
+assert _aref().agrees_with(_aref())
+# References into different stores never collide.
+assert not _aref().points_to_same_entry(_aref(store_ref="other:events"))
+# Aware instants normalize to UTC; naive ones are refused.
+_au = _aref(recorded_at=_dtc(2026, 9, 5, 10, 0, tzinfo=_tz.utc))
+_ai = _aref(recorded_at=_dtc(2026, 9, 5, 15, 30, tzinfo=_tz(_td(hours=5, minutes=30))))
+assert _au.canonical_digest() == _ai.canonical_digest()
+for _bad in ({"recorded_at": _dtc(2026, 9, 5, 10, 0)}, {"entry_digest": "nope"},
+             {"tenant_id": "  "}):
+    try:
+        _aref(**_bad)
+        raise SystemExit("audit-reference structural guard did not fire: " + str(_bad))
+    except AuditContractError:
+        pass
+# No second evidence reference was minted alongside it.
+assert [_n for _n in _api.__all__ if _n.endswith("Reference") and "Evidence" in _n] == [
+    "EvidenceReference"]
+
 # The frozen provider contracts gained no field.
 assert [f.name for f in _dc.fields(ExecutionDispatchRequest)] == [
     "action_type", "parameters", "idempotency_key", "correlation_id"]
