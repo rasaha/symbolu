@@ -1,7 +1,9 @@
 # Ugence human review and durable resume — scoping record
 
-**Status: SCOPING — nothing here is implemented.** This record authorizes no code
-change, adds no dependency, opens no route and ships no package. It maps the path a
+**Status: SCOPED AND RULED — nothing here is implemented.** The five owner decisions
+in §5 were ruled on 2026-09-05. This record still authorizes no code change, adds no
+dependency, opens no route and ships no package: each step of §6 is entered only by
+its own implementation prompt. It maps the path a
 parked governed workflow would have to travel to be seen by a human, decided, and
 resumed under fresh governance, states what already exists on that path, and puts five
 decisions to the owner. It reopens none of: DBOS ratified as the initial engine (OD-3),
@@ -106,20 +108,20 @@ row. A row is green only against a real PostgreSQL and a real SQLite ledger.
 | 10 | **Clearance changes before resumed execution** | The resumed evaluation is fresh; a pre-park CLEAR is never reused; a post-approval revocation still blocks | Fresh proposal and hook call per quantum (`engine.py:489-500,590`); clearance record consumed and fail-closed (`recheck.py:149-157`) | Row 9 does not exercise resume; the property is proven only for crash recovery | Park; approve; revoke envelope; resume; blocked, approval consumed, no invocation |
 | 11 | **Unbounded resume inside a durable step** | Resume advances one quantum, so the engine's step boundary matches the runtime's | `continue_workflow` exists and is bounded (`engine.py:219-241`) | The adapter calls `resume_workflow`, which drains (`dbos_engine.py:333`; `engine.py:216`) | Resume a three-task workflow; exactly one task advances per durable step |
 
-## 5 — Owner decisions `[R]`
+## 5 — Owner decisions (ruled 2026-09-05)
 
-| # | Decision | Recommendation |
-|---|---|---|
-| HR-1 | **May the studio transmit a human decision?** `DISPLAY_ONLY` (queue and run detail are read-only; decisions are entered elsewhere) or `DISPLAY_AND_TRANSMIT` (the studio relays a verbatim decision to a separate review service that authenticates and records it). | `DISPLAY_AND_TRANSMIT`, under the §3 boundary: the studio never holds approver identity, never computes eligibility, and the route's operation id and path carry none of the SD-2 verbs. The verb in the body is the human's, not the studio's. |
-| HR-2 | **Where the composition lives.** A new integration package `packages/integration/governed-review` owning the `GovernanceInputSource` that reads the approval ledger, the consumption-then-advance order, and the review service; or a composition root inside the console API. | New integration package. The console API's audit store is an in-memory prototype (`ugence_console_api/audit.py:8-10`) and the studio may not import the console. The package imports approval-workflow, authority-directory and durable-execution, and nothing in `capabilities/`. |
-| HR-3 | **Binding and consumption.** Ratify `subject_kind="agent_runtime_proposal"`, `subject_digest=<proposal fingerprint>`, `consumer_ref=<instance_id>:<task_id>`, consume-then-advance across the two stores, and `ALREADY_CONSUMED` by the same holder treated as satisfied. | Ratify as written in §3. The alternative, a second ledger inside Postgres, would fork the approval record and contradict D-2 of the sequencing record. |
-| HR-4 | **Resume shape.** Keep `resume_workflow` bare and unexposed, switch the adapter to `continue_workflow` for one bounded quantum per durable step, and let consumption be the only trigger; or add an approval payload to the runtime's resume. | Keep the runtime bare. The adapter change is inside the GAS-2 package and re-runs the matrix; a runtime signature change would reopen GAS-R5. |
-| HR-5 | **Which parks are human-reviewable.** ESCALATE only (`required_approvals` non-empty), with HOLD released solely by an upstream authority change; or HOLD too. | ESCALATE only. A HOLD without required approvals states no human obligation, so a human decision on it would be minting one. `MANUAL_REVIEW` is not added as a disposition; it is the label of the ESCALATE queue. |
+| # | Ruling |
+|---|---|
+| **HR-1** | **`DISPLAY_AND_TRANSMIT`.** The studio renders the queue and run detail and relays a verbatim human decision to a separate review service that authenticates the approver and owns the ledger. The studio holds no approver identity, computes no eligibility, consumes nothing, signals nothing and resumes nothing; the relay route's operation id and path carry none of the SD-2 verbs, and the verb in the body is the human's. |
+| **HR-2** | **`NEW_PACKAGE_GOVERNED_REVIEW`.** `packages/integration/governed-review` owns the production `GovernanceInputSource` over the approval ledger and the directory, the consume-then-advance order, and the review service. It imports approval-workflow, authority-directory and durable-execution and nothing under `capabilities/`. The console API is not the home: its audit store is an in-memory prototype (`ugence_console_api/audit.py:8-10`) and the studio may not import it. |
+| **HR-3** | **`RATIFY_FINGERPRINT_BINDING`.** `subject_kind="agent_runtime_proposal"`, `subject_digest=<proposal fingerprint>`, `consumer_ref=<instance_id>:<task_id>`; consume in the SQLite ledger first, then advance in Postgres; `ALREADY_CONSUMED` whose holder is this instance and task is satisfied. No second ledger in Postgres. |
+| **HR-4** | **`BARE_RUNTIME_BOUNDED_ADAPTER`.** `resume_workflow` keeps its signature and is never exposed to a human; the DBOS adapter moves to `continue_workflow`, one bounded quantum per durable step; consumption is the only trigger. The adapter change re-runs the full §8 matrix of the DBOS ADR; GAS-R5 is untouched. |
+| **HR-5** | **`ESCALATE_ONLY`.** Only ESCALATE (`required_approvals` non-empty) enters the review queue. A HOLD is released solely by an upstream authority change. `MANUAL_REVIEW` is the label of the ESCALATE queue, not a new disposition. |
 
 ## 6 — Implementation sequence and maturity ceiling
 
-Entered only after HR-1 to HR-5 are ruled. Each step ships behind its own tests and
-is labelled honestly at exit.
+Entry conditions are met; each step below is still entered only by its own
+implementation prompt, ships behind its own tests and is labelled honestly at exit.
 
 1. **HR-A · Binding and consumption composition** — the production
    `GovernanceInputSource` over the approval ledger and the directory, the
@@ -146,4 +148,6 @@ production certification are not reachable from this work and are not claimed.
 
 ## 7 — Next step
 
-Rule HR-1 to HR-5. Until then this record authorizes nothing.
+HR-A, the binding and consumption composition in `packages/integration/governed-review`,
+under HR-2, HR-3 and HR-5. HR-B to HR-E follow in order. Nothing is implemented by this
+record.

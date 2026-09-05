@@ -4,8 +4,8 @@
 exists or is authorized by this document. It maps the two screens onto what the
 repository already provides, names what each would need, and applies SD-1 and SD-2 to
 every proposed surface. Ruled by
-`docs/architecture/ADR_UGENCE_HUMAN_REVIEW_DURABLE_RESUME_SCOPING.md` (HR-1 to HR-5);
-nothing here is built before those rulings.
+`docs/architecture/ADR_UGENCE_HUMAN_REVIEW_DURABLE_RESUME_SCOPING.md` (HR-1 to HR-5,
+ruled 2026-09-05); nothing here is built before the HR-D implementation prompt.
 
 Evidence labels: `[V]` verified, `[I]` inferred, `[R]` requires ratification, `[G]` gap.
 
@@ -27,7 +27,7 @@ record. It never consumes an approval, never signals, never resumes.
 | **Shows** | Every parked ESCALATE instance for the tenant: instance id, workflow id, task id, proposal fingerprint, operation and provider, disposition and reason codes, `required_approvals` labels, park time, approval state (`REQUESTED`/`PENDING`/`GRANTED` and so on), and the eligible approver set for the required role. |
 | **Source that exists** `[V]` | Approval queue: `ApprovalWorkflowPort.list_open(tenant_id, required_role, as_of)` (`approval-workflow/.../ports.py:61-62`). Eligible set: `ApproverEligibilityPort.eligible_approvers` via the directory adapter (`authority-directory/.../eligibility_adapter.py:116-123`). Instance status: `DbosExecutionAdapter.status(instance_id)` returns known/workflow/digest/write and event counts (`durable-execution/.../dbos_engine.py:337-363`). Parked evaluation: the execution-state journal in the checkpoint carries `governance_disposition`, `evaluation_reference`, `proposal_fingerprint`, `valid_until` (`agent-runtime/.../runtime/execution_state.py:67-84`). |
 | **Missing** `[G]` | No join exists between a parked instance and an approval: the approval subject has no instance field (`approval-workflow/.../subject.py:29-52`), and no request is raised when an instance parks. The queue cannot be listed until HR-3's binding (`subject_digest` = proposal fingerprint) and a request-on-park step exist. `required_resolution` is not persisted (`agent-runtime/.../governance/interfaces.py:90`), so "why it parked" must be read from the `TASK_WAITING` event detail, not the checkpoint. No per-approver filtering exists. |
-| **Never** | Offer any decision control unless HR-1 rules `DISPLAY_AND_TRANSMIT`. Never a resume, release, continue, retry or clear control under any ruling. |
+| **Never** | A resume, release, continue, retry or clear control. Under HR-1 (`DISPLAY_AND_TRANSMIT`) a decision control is permitted and relays the human's decision verbatim to the review service. |
 | **Gap rendering** | With no review service configured: the standard `GapNotice` naming `review_service`, not an empty queue. An empty queue must be distinguishable from an unreachable one, as Observe already does for the console. |
 
 ## Screen 8 · Run Detail
@@ -51,7 +51,7 @@ package from HR-2 and re-implements no governance logic.
 | `GET /api/v2/review/runs/{instance_id}` | `v2_review_read_run` | read | HR-2 |
 | `GET /api/v2/review/runs/{instance_id}/events` | `v2_review_read_run_events` | read | HR-2 |
 | `GET /api/v2/review/approvals/{approval_id}` | `v2_review_read_approval` | read | HR-2 |
-| `POST /api/v2/review/decisions` | `v2_review_submit_decision` | relay only; the path and id carry no prohibited verb; the body's `decision` is the human's word, forwarded verbatim; the studio adds no identity and reads no result other than the service's typed answer | **HR-1 = DISPLAY_AND_TRANSMIT** |
+| `POST /api/v2/review/decisions` | `v2_review_submit_decision` | relay only; the path and id carry no prohibited verb; the body's `decision` is the human's word, forwarded verbatim; the studio adds no identity and reads no result other than the service's typed answer | HR-1 ruled `DISPLAY_AND_TRANSMIT`: permitted, not yet built |
 
 The prohibition test must keep failing on `grant`, `clear`, `execute` and the rest in
 any operation id or path, so no proposed id may be named `…grant…` or `…resume…`; the
@@ -65,8 +65,8 @@ enforced before a socket opens, exactly as `clients/console.py:95-101` does toda
 Authentication of the human is the review service's IdP session; the studio forwards
 no credential and holds none.
 
-**SD-1 allowlist additions** `[R]`: the public entry points of the HR-2 composition
-package only. `ugence_approval_workflow`, `ugence_authority_directory` and
+**SD-1 allowlist additions** `[R]` (the entries themselves await HR-D): the public
+entry points of `ugence_governed_review` (HR-2) only. `ugence_approval_workflow`, `ugence_authority_directory` and
 `ugence_durable_execution` stay off the studio's allowlist; the last is already a
 prohibited import (`test_architecture.py:20-53`).
 
@@ -77,15 +77,17 @@ prohibited import (`test_architecture.py:20-53`).
 - `approved-v2-api-operations.json` grows by four or five operations; the
   `verify-v2-api-boundary.mjs` verb scan and the "no raw fetch in a screen" test apply
   unchanged (`tests/studio-security.test.ts:47-79`).
-- The a11y suite extends to both screens; the decision form, if HR-1 allows it,
-  requires a justification and shows the approver as reported by the review service,
-  never as typed in the browser.
+- The a11y suite extends to both screens; the decision form requires a justification
+  and shows the approver as reported by the review service, never as typed in the
+  browser.
 - The maturity flag `human_review_implemented: False` is added now to `version.py`,
   asserted by `test_operational.py`, and flipped only by the HR-D commit.
 
-## What this audit does not settle
+## What is settled, and what is not
 
-Whether the studio may transmit at all (HR-1); where the composition lives (HR-2);
-the binding and consumption order (HR-3); the resume shape (HR-4); which parks are
-reviewable (HR-5). Until those are ruled, the two screens have no data source and no
-route, and this document changes nothing in the tree.
+HR-1 to HR-5 are ruled (ADR §5): the studio may display and transmit; the composition
+is `packages/integration/governed-review`; approvals bind to the proposal fingerprint
+and are consumed before the engine advances; resume stays bare in the runtime and
+bounded in the adapter; only ESCALATE is reviewable. Until HR-A to HR-C ship, the two
+screens have no data source, and until HR-D they have no route. This document changes
+nothing in the tree.
