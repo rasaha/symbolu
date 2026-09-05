@@ -22,8 +22,12 @@ Scoped and ratified by `docs/architecture/ADR_UGENCE_INCIDENT_RESPONSE_SCOPING.m
   privileged `TENANT_EMERGENCY_STOP` (D-2).
 - Containment evidence is held as the `ContainmentRequest` and `ContainmentLift`
   records themselves, and the lift rules re-run in `__post_init__`. Reaching
-  `LIFTED` therefore requires a real, admissible lift by every route —
-  `dataclasses.replace` included — rather than only by the named method (D-5).
+  `LIFTED` therefore requires a real, admissible lift by every route that constructs
+  or revives a record — `dataclasses.replace` and `pickle` included — rather than
+  only by the named method, and subclassing is refused so the invariant cannot be
+  inherited away. `object.__setattr__` on a live instance remains outside any
+  frozen dataclass's reach, and the README says so rather than claiming otherwise
+  (D-5).
 - `IncidentJournalPort`, a read-only Protocol with no implementation, and pure
   selectors over a caller-held collection. No store ships (D-4).
 - Not an orchestrator and not an `…Authority`; mints no `AuditReference` and no

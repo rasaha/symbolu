@@ -89,14 +89,48 @@ class IncidentRecord:
     #: not their digests: a digest is unverifiable in isolation, so a digest field
     #: would admit ``containment_lift_digest="deadbeef"``. Holding the records lets
     #: :meth:`_require_containment_evidence` re-run the full lift rules at
-    #: construction, which is what gives the asymmetry teeth — every route to
-    #: ``LIFTED``, ``dataclasses.replace`` included, must present a real and
-    #: admissible lift, and constructing one *is* writing the decision down.
+    #: construction, which is what gives the asymmetry teeth: ``LIFTED`` requires a
+    #: real and admissible lift by every route that constructs or revives a record —
+    #: ``dataclasses.replace`` and ``pickle`` included — and constructing one *is*
+    #: writing the decision down. Subclassing is refused outright, because a
+    #: subclass could replace the invariant with nothing.
+    #:
+    #: What this does **not** stop is ``object.__setattr__`` on a live instance.
+    #: Nothing in Python can: frozen dataclasses raise from ``__setattr__``, and
+    #: that is the method being stepped around. So the guarantee is exactly this —
+    #: a record you were *given* has an admissible containment state, and reaching
+    #: an inadmissible one takes deliberately dismantling the object model rather
+    #: than any ordinary use of the type.
     containment_request: Optional["ContainmentRequest"] = None
     containment_lift: Optional["ContainmentLift"] = None
     summary: str = ""
     closed_at: Optional[datetime] = None
     closed_by: str = ""
+
+    def __init_subclass__(cls, **kwargs):
+        """Refuse subclassing. ``__post_init__`` is an invariant, not a hook.
+
+        A subclass overriding it — one line, no type-system fight — would construct a
+        record reporting ``LIFTED`` with no lift behind it. Since every rule this
+        class enforces lives in that method, inheriting the type while replacing the
+        method is inheriting the shape without the rules, which is precisely what
+        must not be possible.
+        """
+
+        raise TypeError(
+            "IncidentRecord may not be subclassed: its invariants live in "
+            "__post_init__, and a subclass could replace them")
+
+    def __setstate__(self, state: dict) -> None:
+        """Re-validate on unpickling. ``pickle`` does not call ``__init__``.
+
+        Without this, a record could be serialised, edited in transit, and revived
+        into an inadmissible containment state.
+        """
+
+        for key, value in state.items():
+            object.__setattr__(self, key, value)
+        self.__post_init__()
 
     def __post_init__(self) -> None:
         for name in ("incident_id", "tenant_id", "subject_ref", "severity_label", "opened_by"):

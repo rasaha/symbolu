@@ -73,9 +73,17 @@ the incident being closed.
 Those rules are an **invariant, not a method**. An `IncidentRecord` holds the
 `ContainmentRequest` and `ContainmentLift` themselves, and re-runs the admissibility
 rules in `__post_init__`, so `dataclasses.replace(record, containment=LIFTED)` is
-refused exactly like the named path. Reaching `LIFTED` requires presenting a real,
-admissible `ContainmentLift` — and constructing one is writing the decision down,
-with its own author and justification.
+refused exactly like the named path. `__setstate__` re-runs them on unpickling, and
+subclassing is refused outright — a subclass could replace the invariant with
+nothing. Reaching `LIFTED` therefore requires a real, admissible `ContainmentLift`,
+and constructing one is writing the decision down, with its own author and
+justification.
+
+The one thing this does not stop is `object.__setattr__` on a live instance, and
+nothing in Python can: frozen dataclasses raise from `__setattr__`, which is the
+method being stepped around. So the guarantee is stated precisely — a record you
+were **given** has an admissible containment state, and reaching an inadmissible one
+takes deliberately dismantling the object model, not any ordinary use of the type.
 
 ## The RA-6 payload
 

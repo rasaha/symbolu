@@ -194,6 +194,41 @@ def test_closing_is_not_a_route_to_lifting():
     assert closed.containment_lifted(lift(request)).containment is ContainmentState.LIFTED
 
 
+def test_the_invariant_cannot_be_inherited_away():
+    """A subclass overriding ``__post_init__`` would inherit the shape without the
+    rules — one line, no type-system fight. Subclassing is refused outright."""
+
+    with pytest.raises(TypeError, match="may not be subclassed"):
+        class _Evil(IncidentRecord):  # pragma: no cover - the class body never runs
+            def __post_init__(self):
+                pass
+
+
+def test_an_inadmissible_state_cannot_be_revived_from_a_pickle():
+    """``pickle`` never calls ``__init__``, so ``__setstate__`` re-runs the invariant.
+
+    Without it a record could be serialised, edited in transit, and revived reporting
+    ``LIFTED`` with no lift behind it.
+    """
+
+    import pickle
+
+    record, request = contained()
+    lifted = record.containment_lifted(lift(request))
+
+    # An honest round trip survives unchanged.
+    assert pickle.loads(pickle.dumps(lifted)) == lifted
+    assert pickle.loads(pickle.dumps(record)) == record
+
+    # A doctored payload — the containment advanced, the lift left absent — does not.
+    doctored = dict(record.__dict__, containment=ContainmentState.LIFTED)
+    with pytest.raises(ContractViolation, match="LIFTED requires"):
+        object.__new__(IncidentRecord).__setstate__(doctored)
+
+    # And that is the exact path pickle takes to rebuild one.
+    assert type(record).__setstate__ is IncidentRecord.__setstate__
+
+
 def test_a_lift_from_a_different_containment_is_refused():
     record, request = contained()
     other_request = containment(incident(subject="envelope:env-2"))
@@ -201,3 +236,42 @@ def test_a_lift_from_a_different_containment_is_refused():
         record.containment_lifted(lift(other_request))
     with pytest.raises(ContainmentLiftRefused, match="only a REQUESTED"):
         incident().containment_lifted(lift(request))
+
+
+# --------------------------------------------------------------------------- #
+# Containment and remediation records
+# --------------------------------------------------------------------------- #
+def test_a_containment_request_records_who_asked_and_why():
+    request = containment()
+    assert request.target_ref and request.reason and request.requested_by
+    assert request.requested_at == T1
+    assert len(request.record_digest()) == 64
+    for blank in ("target_ref", "reason", "requested_by"):
+        with pytest.raises(ContractViolation):
+            dataclasses.replace(request, **{blank: "  "})
+
+
+def test_a_remediation_proposal_may_cite_a_compensation_requirement():
+    plain = proposal()
+    assert not plain.cites_compensation and plain.compensation_ref == ""
+    citing = proposal(compensation="comp-42")
+    assert citing.cites_compensation and citing.compensation_ref == "comp-42"
+
+
+def test_no_second_compensation_type_or_status_is_minted():
+    import ugence_incident_response as pkg
+
+    assert not [n for n in pkg.__all__ if "Compensation" in n]
+    assert not [n for n in pkg.__all__ if n.endswith("ApprovalStatus")]
+
+
+def test_every_instant_must_be_timezone_aware():
+    import datetime as dt
+
+    naive = dt.datetime(2026, 3, 1, 9, 0)
+    with pytest.raises(ContractViolation, match="timezone-aware"):
+        incident(opened=naive)
+    with pytest.raises(ContractViolation, match="timezone-aware"):
+        containment(at=naive)
+    with pytest.raises(ContractViolation, match="timezone-aware"):
+        proposal(at=naive)
