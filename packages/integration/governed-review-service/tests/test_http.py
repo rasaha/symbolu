@@ -105,3 +105,37 @@ def test_request_changes_is_refused_not_mapped(client):
     r = c.post("/review/decisions", json={"approval_id": aid, "decision": ReviewDecision.REQUEST_CHANGES.value,
                                           "presented_approver": _presented()})
     assert r.status_code == 409 and r.json()["result"] == "REFUSED_INVALID_DECISION"
+
+
+def test_the_queue_view_renders_a_directory_projection_that_is_not_an_approver_ref():
+    """A composition root whose eligibility comes from the authority directory lists
+    ``DirectoryApproverRef`` projections: structurally an ``ApproverRef`` without its
+    ``to_dict``. The view reads the structure, never the method."""
+
+    from dataclasses import replace
+
+    from ugence_approval_workflow import ApprovalState
+    from enum import Enum
+
+    from ugence_governed_review_service.http import queue_entry_view
+    from ugence_governed_review_service.service import QueueEntry
+
+    class Kind(str, Enum):
+        HUMAN = "HUMAN"
+
+    class Projection:
+        approver_id = "https%3A%2F%2Fissuer.test|alice"
+        approver_kind = Kind.HUMAN
+        role = S.F.ROLE
+        authority_reference = "directory://roles/risk-approver"
+
+    entry = QueueEntry(
+        approval_id="ap-1", approval_state=ApprovalState.PENDING, instance_id="i1",
+        task_id="t1", fingerprint="f" * 64, required_role=S.F.ROLE, requested_by="r",
+        requested_at=S.F.T0, expires_at=S.F.T0, eligible_approvers=(Projection(),),
+    )
+    view = queue_entry_view(entry)
+    assert view["eligible_approvers"] == [{
+        "approver_id": Projection.approver_id, "approver_kind": "HUMAN",
+        "role": S.F.ROLE, "authority_reference": Projection.authority_reference}]
+    assert queue_entry_view(replace(entry, eligible_approvers=()))["eligible_approvers"] == []
