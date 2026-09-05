@@ -19,7 +19,7 @@ const CONTRACT = path.resolve(FRONTEND, "..", "contracts", "openapi_v2.json");
 const OUT = path.resolve(FRONTEND, "src", "generated", "api-v2.ts");
 const HASH_OUT = path.resolve(FRONTEND, "src", "generated", "openapi-v2.hash.json");
 
-// Every operation the six screens consume. A contract that lost one of these would
+// Every operation the studio screens consume. A contract that lost one of these would
 // break a screen silently at runtime; failing generation is the cheaper discovery.
 export const REQUIRED_V2_OPERATIONS = [
   "v2_constitution_validate",
@@ -34,6 +34,12 @@ export const REQUIRED_V2_OPERATIONS = [
   "v2_publish_shadow",
   "v2_observe_audit_ids",
   "v2_observe_audit_chain",
+  // GAS-7 HR-D: the Review Queue and Run Detail screens (display and relay only).
+  "v2_review_list_queue",
+  "v2_review_read_run",
+  "v2_review_read_run_events",
+  "v2_review_read_approval",
+  "v2_review_submit_decision",
 ];
 
 // SD-2, enforced at generation time as well as in the backend suite. If a route

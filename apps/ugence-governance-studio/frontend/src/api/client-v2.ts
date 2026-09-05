@@ -19,6 +19,7 @@ import {
   type PolicyCompileBody,
   type PolicyPackBody,
   type PublishShadowBody,
+  type ReviewDecisionBody,
   type SimulateRunBody,
   type V2Envelope,
 } from "./types-v2";
@@ -37,6 +38,12 @@ export const V2_OPERATIONS = [
   "v2_publish_shadow",
   "v2_observe_audit_ids",
   "v2_observe_audit_chain",
+  // GAS-7 HR-D — Review Queue and Run Detail: four reads and one verbatim relay.
+  "v2_review_list_queue",
+  "v2_review_read_run",
+  "v2_review_read_run_events",
+  "v2_review_read_approval",
+  "v2_review_submit_decision",
 ] as const;
 
 async function v2Request<T>(pathAndQuery: string, init?: RequestInit): Promise<T> {
@@ -136,3 +143,26 @@ export const listAuditCorrelationIds = () => gap("/api/v2/observe/audit");
 
 export const readAuditChain = (correlationId: string) =>
   gap(`/api/v2/observe/audit/${enc(correlationId)}`);
+
+// -- 7 · Review (GAS-7 HR-D; owner ruling HR-1: display and transmit) -------
+export const listReviewQueue = (requiredRole = "") => {
+  const query = requiredRole ? `?required_role=${enc(requiredRole)}` : "";
+  return gap("/api/v2/review/queue" + query);
+};
+
+export const readReviewRun = (instanceId: string) =>
+  gap(`/api/v2/review/runs/${enc(instanceId)}`);
+
+export const readReviewRunEvents = (instanceId: string) =>
+  gap(`/api/v2/review/runs/${enc(instanceId)}/events`);
+
+export const readReviewApproval = (approvalId: string) =>
+  gap(`/api/v2/review/approvals/${enc(approvalId)}`);
+
+/**
+ * Relay a human's decision, verbatim. The studio adds no identity and reads nothing
+ * but the review service's typed answer; whether the instance proceeds is decided by
+ * the review service and the governed composition behind it, never here.
+ */
+export const submitReviewDecision = (body: ReviewDecisionBody) =>
+  gap("/api/v2/review/decisions", postJson(body));

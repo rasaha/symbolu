@@ -29,7 +29,7 @@ describe("accessibility (§24)", () => {
 });
 
 // --------------------------------------------------------------------------- //
-// Governed Agent Studio — all six screens (GAS-4/5)
+// Governed Agent Studio — the six GAS-4/5 screens and the two GAS-7 review screens
 // --------------------------------------------------------------------------- //
 const STUDIO_SCREENS: { route: string; name: string; ready: () => Promise<unknown> }[] = [
   {
@@ -61,6 +61,17 @@ const STUDIO_SCREENS: { route: string; name: string; ready: () => Promise<unknow
     route: "/studio/observe",
     name: "Observe",
     ready: () => screen.findByLabelText(/correlation id/i),
+  },
+  // GAS-7 HR-D
+  {
+    route: "/studio/review",
+    name: "Review Queue",
+    ready: () => screen.findByRole("note", { name: /capability unavailable/i }),
+  },
+  {
+    route: "/studio/review/i1",
+    name: "Run Detail",
+    ready: () => screen.findByRole("heading", { name: /run detail/i }),
   },
 ];
 
