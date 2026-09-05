@@ -6,7 +6,7 @@ never have to depend on each other.
 
 - **Distribution:** `ugence-governance-contracts`
 - **Namespace:** `ugence_governance_contracts`
-- **Version:** 0.6.0 · **Contract version:** 1.0.0
+- **Version:** 0.7.0 · **Contract version:** 1.0.0
 - **Dependencies:** Python standard library only (no third-party, no other Ugence package)
 - **Typing:** fully type-annotated; ships a PEP 561 `py.typed` marker
 - **Ownership / maturity:** extracted verbatim from the frozen `governance_providers`
@@ -29,6 +29,7 @@ and what it returns*, independent of any concrete implementation:
 | Errors | `FailureClass`, `ProviderError` (+8 subclasses) |
 | Audit correlation (G4) | `AuditReference`, `AuditContractError` |
 | Data classification (DE-5) | `DataClassificationLabel`, `DataClassificationContractError` |
+| Vendor-risk posture (VR-5) | `VendorRiskLabel`, `VendorRiskContractError` |
 
 ## Authority boundary
 
@@ -255,6 +256,28 @@ rule; a label that means nothing to anyone is still a label. It classifies
 nothing, decides nothing and grants no authority. `CONTRACT_VERSION` stays
 `1.0.0`; the package version advances to `0.6.0`.
 
+## Neutral vendor-risk label (VR-5)
+
+**Vendor-risk label (VR-5)** — `VendorRiskLabel` is an immutable, non-empty,
+**uninterpreted** posture label: one `label` field, stored stripped and otherwise
+verbatim, with `canonical_bytes()` and `canonical_digest()`. It lands here rather
+than in the package that first consumes it (`ugence-vendor-dependency`, wave 4)
+so that every engine carrying a vendor-risk posture carries the *same* type. Ruled
+by `docs/architecture/ADR_UGENCE_VENDOR_RISK_SCOPING.md` (VR-3, VR-5).
+
+**A separate dimension, by ruling.** Data classification and vendor-risk posture
+are different axes, so this is a distinct class, not an alias of
+`DataClassificationLabel`; the same text in each is not the same value, neither
+subclasses the other, and a test pins that they are never interchangeable.
+
+**Uninterpreted means uninterpreted.** No grade, enum, taxonomy, ordering,
+severity, score, dominance or implied eligibility. Any non-blank text is a label;
+`order=False`, no rich comparison, so `sorted()` over labels raises; and no
+`score`, `grade`, `dominates` or `is_eligible` exists. Structural validation only:
+a string, non-empty after stripping, free of control characters. It makes no risk
+judgment and grants no authority. `CONTRACT_VERSION` stays `1.0.0`; the package
+version advances to `0.7.0`.
+
 ## Compatibility paths
 
 The neutral contracts previously lived in `governance_providers`. Those paths still
@@ -279,8 +302,9 @@ Removal/review target: `governance_providers` 0.2.0. See `MIGRATION.md`.
 This phase is a **physical** extraction only. Of the platform-contract gaps
 in `docs/migrations/governance_contracts/CONTRACT_GAPS_AND_EVOLUTION_PLAN.md`,
 **G7 (idempotency) and G8 (validity) landed in 0.4.0**, **G4's contract half
-(the neutral audit reference) landed in 0.5.0**, and **DE-5's neutral
-data-classification label landed in 0.6.0**, all as additive neutral families.
+(the neutral audit reference) landed in 0.5.0**, **DE-5's neutral
+data-classification label landed in 0.6.0**, and **VR-5's neutral vendor-risk label
+landed in 0.7.0**, all as additive neutral families.
 G4's *unification* half did not: six durable audit stores plus the kernel port stay
 exactly where they are, and converging them is an unscoped migration. The rest
 (missing `tenant_id`/`environment_id`, no standard error *envelope*, G5 CER

@@ -80,6 +80,8 @@ from .contracts import (
     Validity,
     ValidityContractError,
     ValidityStatus,
+    VendorRiskContractError,
+    VendorRiskLabel,
     VerificationStatus,
 )
 
@@ -118,4 +120,6 @@ __all__ = [
     "AuditReference", "AuditContractError",
     # DE-5 neutral data-classification label (additive)
     "DataClassificationLabel", "DataClassificationContractError",
+    # VR-5 neutral vendor-risk label (additive)
+    "VendorRiskLabel", "VendorRiskContractError",
 ]

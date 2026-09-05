@@ -46,6 +46,10 @@ from .data_classification import (
     DataClassificationContractError,
     DataClassificationLabel,
 )
+from .vendor_risk import (
+    VendorRiskContractError,
+    VendorRiskLabel,
+)
 from .evidence import (
     AssessmentWindow,
     AttestationStatus,
@@ -93,4 +97,6 @@ __all__ = [
     "AuditReference", "AuditContractError",
     # DE-5 neutral data-classification label (additive)
     "DataClassificationLabel", "DataClassificationContractError",
+    # VR-5 neutral vendor-risk label (additive)
+    "VendorRiskLabel", "VendorRiskContractError",
 ]

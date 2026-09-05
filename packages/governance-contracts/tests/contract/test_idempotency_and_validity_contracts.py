@@ -351,7 +351,7 @@ def test_contract_version_unchanged_package_version_advanced():
     # G4 (0.5.0) is additive in the same way G7 and G8 were in 0.4.0: the
     # PROVIDER contract surface is untouched, so CONTRACT_VERSION does not move.
     assert g.CONTRACT_VERSION == "1.0.0"
-    assert g.__version__ == "0.6.0"
+    assert g.__version__ == "0.7.0"
 
 
 def test_neither_family_reads_a_clock():

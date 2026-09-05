@@ -200,7 +200,7 @@ def test_a_reference_carries_no_identity_of_its_own():
 # --------------------------------------------------------------------------- #
 def test_g4_is_additive_and_the_provider_surface_is_untouched():
     assert g.CONTRACT_VERSION == "1.0.0"
-    assert g.__version__ == "0.6.0"
+    assert g.__version__ == "0.7.0"
     for name in ("ActionGovernanceRequest", "ActionGovernanceResult",
                  "ExecutionDispatchRequest", "ExecutionDispatchResult",
                  "AssertionGovernanceRequest", "AssertionGovernanceResult"):

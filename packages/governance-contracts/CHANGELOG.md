@@ -1,5 +1,29 @@
 # Changelog — ugence-governance-contracts
 
+## [0.7.0] — neutral vendor-risk label (VR-5) (additive)
+
+**Additive, backward-compatible.** No existing public symbol, field, enum value,
+default, constructor signature, serialization or authority meaning changed.
+`CONTRACT_VERSION` (the **provider** contract surface) is **unchanged at `1.0.0`**;
+only the package `__version__` advances, to `0.7.0`. Remains a stdlib-only leaf.
+Ruled by `docs/architecture/ADR_UGENCE_VENDOR_RISK_SCOPING.md` (VR-3, VR-5),
+which lands the vocabulary here before the package that first consumes it,
+`ugence-vendor-dependency`, exists.
+
+- `VendorRiskLabel` — an immutable, non-empty, **uninterpreted** posture label
+  (`label`, stored stripped, otherwise verbatim) with `canonical_bytes()` /
+  `canonical_digest()`. Equality is exact text equality and nothing else.
+- `VendorRiskContractError` — every refusal is typed; a blank label, a non-string,
+  or text carrying a control character or line break is rejected at construction.
+  An **unknown** non-empty label is never rejected: there is no recognized set.
+- **A separate dimension from `DataClassificationLabel`** (VR-3): a distinct class,
+  no subclassing either way, never interchangeable — asserted by a test.
+- **No ordering, score or grade**: `order=False`, no rich comparison, so `sorted()`
+  and `max()` over labels raise; no `score`, `grade`, `severity`, `tier`, `rank`,
+  `dominates` or `is_eligible`; no enum, taxonomy or hierarchy ships. A test pins
+  the whole surface.
+- It makes no risk judgment, decides nothing and grants no authority.
+
 ## [0.6.0] — neutral data-classification label (DE-5) (additive)
 
 **Additive, backward-compatible.** No existing public symbol, field, enum value,
