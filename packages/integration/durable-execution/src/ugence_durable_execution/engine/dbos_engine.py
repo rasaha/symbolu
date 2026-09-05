@@ -319,18 +319,29 @@ class DbosExecutionAdapter:
         self._durable.run("signal", _sig)
 
     def resume(self, *, instance_id: str) -> None:
-        """Explicitly re-arm a parked instance so the next ``advance`` re-evaluates.
+        """Re-arm a parked instance. The NEXT ``advance`` re-evaluates; this call runs
+        nothing.
 
-        Delegates to the runtime's ``resume_workflow`` — the runtime's own documented
-        and only way for HOLD/ESCALATE work to proceed. This adapter adds nothing to it
-        and cannot bypass it.
+        Delegates to the runtime's ``continue_workflow`` — the bounded form of its own
+        documented and only way for HOLD/ESCALATE work to proceed: it re-arms WAITING
+        tasks, marks the workflow RUNNING, checkpoints, and stops. ``resume_workflow``
+        would drain the whole workflow to a stable state inside this one durable step,
+        which is exactly what a step boundary must not do: it would let a single engine
+        step cross the governance boundary any number of times and invoke any number of
+        providers. One durable step, one bounded quantum, is the design rule
+        (``advance``); resume keeps to it (owner ruling HR-4, and row 11 of the
+        human-review ADR's failure matrix).
+
+        This adapter adds nothing to the runtime's rule and cannot bypass it: a resumed
+        instance still crosses the governance boundary from the beginning on its next
+        advance, and the clearance obtained before it parked is never reused.
         """
         def _res() -> None:
             digest = self._bundle.state_store.definition_digest(instance_id) or ""
             engine = self._engine_for(instance_id, digest)
             if instance_id not in getattr(engine, "_instances", {}):
                 self._rehydrate(engine, instance_id, digest)
-            engine.resume_workflow(instance_id)
+            engine.continue_workflow(instance_id)
 
         self._durable.run("resume", _res)
 

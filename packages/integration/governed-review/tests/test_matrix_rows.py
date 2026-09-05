@@ -248,10 +248,10 @@ def test_row_08_crash_after_consumption_before_advance_resumes_exactly_once(revi
     assert _hooks.provider_calls(review["app"]) == [], "nothing ran before the crash"
 
     # The re-drive: ALREADY_CONSUMED by this instance and task is satisfied; one run.
-    # (The adapter's resume drains the workflow inside its own step, so the following
-    # advance sees a terminal instance — the bounded-resume change is HR-B, not here.)
+    # (Since HR-B the adapter's resume is bounded: it re-arms and runs nothing, so it
+    # is this advance, crossing governance afresh, that performs the one run.)
     outcome = _resume_and_advance(adapter, "r8", "a2")
-    assert outcome.terminal
+    assert outcome.progressed and not outcome.awaiting_external
     assert _hooks.provider_calls(review["app"]) == ["r8:t1"]
     events = [e.event_type for e in review["ledger"].approval_events(approval_id)]
     assert events.count(ApprovalState.CONSUMED) == 1, "consumed exactly once across the crash"

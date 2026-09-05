@@ -766,11 +766,68 @@ def test_row_09_parked_instance_stays_parked_then_re_evaluates(wired):
         "delivering a signal must not itself permit anything"
     )
 
-    after_signal = _fingerprints(app, "row9")
-    assert after_signal[-1] == parked_evals[0], (
-        "the human decided about the same action that would then run — the pre-pause "
-        "and post-resume proposals fingerprint identically"
+    # The human decision is honoured upstream: the next evaluation composes to CLEAR.
+    # (The recording hook is the matrix's stand-in for that composition.)
+    escalating._disposition = GovernanceDisposition.CLEAR  # noqa: SLF001
+
+    # Resume is bounded: it re-arms and runs nothing. Nothing is invoked until the next
+    # advance crosses the governance boundary again from the beginning.
+    adapter.resume(instance_id="row9")
+    assert _hooks.provider_calls(app) == [], "resume alone must invoke nothing"
+    assert _fingerprints(app, "row9") == parked_evals, "resume alone must not re-evaluate"
+
+    outcome = adapter.advance(instance_id="row9", attempt_token="after-decision")
+    assert outcome.progressed and not outcome.terminal and not outcome.awaiting_external
+    assert _hooks.provider_calls(app) == ["row9:t1"], "exactly one invocation, after resume"
+    # Completion is its own quantum: the task step stops at the task boundary.
+    final = adapter.advance(instance_id="row9", attempt_token="finalise")
+    assert final.terminal and _hooks.provider_calls(app) == ["row9:t1"]
+
+    after_resume = _fingerprints(app, "row9")
+    assert len(after_resume) == len(parked_evals) + 1, "the post-resume evaluation is FRESH"
+    assert after_resume[-1] == parked_evals[0], (
+        "the human decided about the same action that then ran — the pre-pause and "
+        "post-resume proposals fingerprint identically"
     )
+    dispositions = [d for (_f, d, _p) in _hooks.evaluations(app, "row9")]
+    assert dispositions[:-1] == ["ESCALATE"] * len(parked_evals) and dispositions[-1] == "CLEAR"
+
+
+@requires_postgres
+def test_row_09_bounded_resume_advances_one_task_per_durable_step(wired):
+    """Human-review ADR §4 row 11: a resume is one bounded quantum, not a drain.
+
+    A three-task chain parks on ESCALATE at t1. After the decision, ``resume`` runs
+    nothing, and each ``advance`` then runs exactly one task, so an engine step can never
+    cross the governance boundary more than once or invoke more than one provider.
+    """
+    from _dbos_harness import WORKFLOW_ID_CHAIN
+
+    app, sysdb, make = wired
+    hook = _hooks.RecordingHook(app, disposition=GovernanceDisposition.ESCALATE)
+    ds, adapter, bundle = make(hook=hook)
+    adapter.start(
+        workflow_id=WORKFLOW_ID_CHAIN, definition_digest=DEFINITION_DIGEST,
+        instance_id="row9c", correlation_id="c9c", inputs={},
+    )
+    first = adapter.advance(instance_id="row9c", attempt_token="a1")
+    assert first.awaiting_external and _hooks.provider_calls(app) == []
+
+    hook._disposition = GovernanceDisposition.CLEAR  # noqa: SLF001 - the decision lands
+    adapter.resume(instance_id="row9c")
+    assert _hooks.provider_calls(app) == [], "resume runs nothing"
+
+    seen = []
+    for token in ("s1", "s2", "s3"):
+        outcome = adapter.advance(instance_id="row9c", attempt_token=token)
+        assert outcome.progressed and not outcome.terminal, token
+        calls = _hooks.provider_calls(app)
+        assert len(calls) == len(seen) + 1, f"one task per step; after {token}: {calls}"
+        seen = calls
+    assert seen == ["row9c:t1", "row9c:t2", "row9c:t3"]
+    # The fourth step is the finalisation quantum: no provider, workflow COMPLETED.
+    final = adapter.advance(instance_id="row9c", attempt_token="s4")
+    assert final.terminal and _hooks.provider_calls(app) == seen
 
 
 @requires_postgres
