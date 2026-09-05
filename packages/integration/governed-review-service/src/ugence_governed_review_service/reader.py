@@ -28,6 +28,9 @@ class RunReader(Protocol):
     def events(self, instance_id: str) -> Sequence[Mapping[str, Any]]:
         """The full event log, oldest first, each as ``{seq, event_type, body, attempt_token}``."""
 
+    def journal(self, instance_id: str) -> Mapping[str, Mapping[str, Any]]:
+        """The checkpoint's execution-state journal keyed by ``state_digest``; empty if unknown."""
+
 class DbosRunReader:
     """Reads the DBOS adapter's tables through the same datasource the adapter uses.
 
@@ -72,13 +75,25 @@ class DbosRunReader:
 
         return self._ds.run_tx_step(None, _read)
 
+    def journal(self, instance_id: str) -> Mapping[str, Mapping[str, Any]]:
+        def _load() -> Mapping[str, Mapping[str, Any]]:
+            ckpt = self._bundle.state_store.load(instance_id)
+            if ckpt is None:
+                return {}
+            return {k: dict(v) for k, v in (ckpt.execution_state_journal or {}).items()}
+
+        return self._ds.run_tx_step(None, _load)
+
+
 class StaticRunReader:
     """A reader over mappings a composition root or a test supplies. Reads only."""
 
     def __init__(self, checkpoints: Mapping[str, Mapping[str, Any]] = (),
-                 events: Mapping[str, Sequence[Mapping[str, Any]]] = ()) -> None:
+                 events: Mapping[str, Sequence[Mapping[str, Any]]] = (),
+                 journals: Mapping[str, Mapping[str, Mapping[str, Any]]] = ()) -> None:
         self._checkpoints = dict(checkpoints)
         self._events = {k: tuple(v) for k, v in dict(events).items()}
+        self._journals = {k: dict(v) for k, v in dict(journals).items()}
 
     def checkpoint(self, instance_id: str) -> Optional[Mapping[str, Any]]:
         ckpt = self._checkpoints.get(instance_id)
@@ -86,6 +101,9 @@ class StaticRunReader:
 
     def events(self, instance_id: str) -> Sequence[Mapping[str, Any]]:
         return self._events.get(instance_id, ())
+
+    def journal(self, instance_id: str) -> Mapping[str, Mapping[str, Any]]:
+        return dict(self._journals.get(instance_id, {}))
 
 def _checkpoint_view(ckpt: Any) -> Mapping[str, Any]:
     """The neutral projection of a runtime checkpoint: status, tasks and the latest

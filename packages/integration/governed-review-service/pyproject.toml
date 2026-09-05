@@ -12,7 +12,8 @@
 #     ugence-approval-workflow    <- the ledger it records into and lists from
 #     ugence-authority-directory  <- the eligibility adapter the queue reports from
 #     ugence-durable-execution    <- the adapter it signals and resumes; the tables it reads
-#     ugence-governance-contracts <- Validity
+#     ugence-governance-contracts <- Validity, AuditReference
+#     ugence-control-plane-root   <- the audit ledger a completed round trip's linkage is appended to (HE-1)
 #     SQLAlchemy                  <- the read façade's query (the adapter's own driver)
 #
 # Nothing under packages/capabilities; no product; no identity provider; no cloud SDK;
@@ -34,11 +35,12 @@ authors = [{ name = "Rakesh Mohan" }]
 keywords = ["governance", "approval", "review", "durable-execution", "ugence"]
 classifiers = ["Typing :: Typed"]
 dependencies = [
-    "ugence-governed-review>=0.1.0",
+    "ugence-governed-review>=0.2.0",
     "ugence-approval-workflow>=0.1.0",
     "ugence-authority-directory>=0.1.0",
     "ugence-durable-execution>=0.1.0",
     "ugence-governance-contracts>=0.4.0",
+    "ugence-control-plane-root>=0.1.0",
     "SQLAlchemy>=2.0",
 ]
 

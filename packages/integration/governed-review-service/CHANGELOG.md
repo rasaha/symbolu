@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.2.0 — 2026-09-05 — HE-1, HE-5
+
+Contract `governed_review_service.v2`: the same five routes, two answers widened.
+
+- `LinkageAppender`: after a recorded or replayed GRANT, and on every run-detail read,
+  reconstructs the `ReviewLinkage` from the approval ledger, the durable event log and
+  the checkpoint journal and appends it to the control-plane audit ledger
+  (`ugence_control_plane_root`) as a `LedgerEntry` of kind `governed_review.linkage.v1`,
+  payload `ReviewLinkage.to_dict()` plus `linkage_digest`, `recorded_by` the service,
+  `recorded_at` from the injected clock. Returns G4's `AuditReference`.
+- Idempotent per linkage digest: `LedgerLinkageIndex` reads the ledger's own rows,
+  read-only, by the schema version the ledger declares, so a replayed decision or a
+  repeated read never writes twice. `InMemoryLinkageIndex` is the reference port.
+- Non-blocking: a `LinkageError` is the typed outcome `NOT_YET` on the decision and
+  the run-detail read; the decision itself is never withheld or altered.
+- `DecisionOutcome.linkage` and run detail's `linkages` expose the outcome, the
+  linkage and the reference (HE-5). `RunReader.journal` added. No sixth route.
+- Dependency added: `ugence-control-plane-root` (this package only; `governed-review`
+  stays contract-only and its boundary test now forbids the import).
+
 ## 0.1.0 — 2026-09-05 — HR-C
 
 First release. `REFERENCE_GRADE_SHADOW_ONLY`; `ENFORCEMENT_ENABLED = False`;

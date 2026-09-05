@@ -7,7 +7,9 @@ a human's decision, then re-arms the instance it binds to.
 GAS-7 step HR-C under owner rulings HR-1 to HR-5
 (``docs/architecture/ADR_UGENCE_HUMAN_REVIEW_DURABLE_RESUME_SCOPING.md``). It composes
 ``ugence_governed_review`` (the binding), the approval ledger, the authority directory's
-eligibility adapter and the DBOS adapter. Maturity ``REFERENCE_GRADE_SHADOW_ONLY``:
+eligibility adapter and the DBOS adapter; since 0.2.0 it also appends each completed
+round trip's receipt linkage to the control-plane audit ledger (HE-1) and exposes it on
+run detail (HE-5). Maturity ``REFERENCE_GRADE_SHADOW_ONLY``:
 the approver on every decision is a presented reference, not a proven identity.
 """
 
@@ -15,6 +17,16 @@ from __future__ import annotations
 
 from .errors import ClockDisciplineError, ContractViolation, GovernedReviewServiceError
 from .http import ROUTES, build_app, decision_view, queue_entry_view
+from .linkage import (
+    LINKAGE_KIND,
+    InMemoryLinkageIndex,
+    LedgerLinkageIndex,
+    LinkageAppender,
+    LinkageIndex,
+    LinkageOutcome,
+    LinkageState,
+    linkage_view,
+)
 from .reader import DbosRunReader, RunReader, StaticRunReader
 from .service import (
     SIGNAL_NAME,
@@ -38,5 +50,7 @@ __all__ = [
     "instance_of",
     "RunReader", "DbosRunReader", "StaticRunReader",
     "ROUTES", "build_app", "queue_entry_view", "decision_view",
+    "LINKAGE_KIND", "LinkageAppender", "LinkageIndex", "InMemoryLinkageIndex",
+    "LedgerLinkageIndex", "LinkageOutcome", "LinkageState", "linkage_view",
     "GovernedReviewServiceError", "ContractViolation", "ClockDisciplineError",
 ]
