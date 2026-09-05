@@ -1,0 +1,56 @@
+# Ugence Durable Execution — the neutral boundary that lets an external durable
+# engine DRIVE Agent Runtime transitions without owning any governance state.
+#
+# Scoped by docs/architecture/ADR_DBOS_DURABLE_EXECUTION_INTEGRATION.md.
+#
+#   THE ENGINE OWNS SCHEDULING AND RECOVERY. IT OWNS NOTHING ELSE.
+#   DBOS IS A CANDIDATE ENGINE UNTIL EVERY ADR §8 MATRIX ROW PASSES.
+#
+# Dependency direction is one-way and is asserted by tests/test_import_boundary.py:
+#
+#     ugence-agent-runtime  (leaf, UNTOUCHED by this package)
+#         ▲
+#     ugence-durable-execution (this package)  ──> dbos, sqlalchemy, psycopg
+#
+# Agent Runtime gains no import from this package. The adapter depends on the
+# runtime; the runtime never depends on the adapter.
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ugence-durable-execution"
+dynamic = ["version"]
+description = "Ugence Durable Execution — neutral durable-execution adapter and Postgres-backed stores for the Agent Runtime. DBOS candidate engine; not pilot-validated, not production-certified."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "Proprietary" }
+authors = [{ name = "Rakesh Mohan" }]
+keywords = ["governance", "durable-execution", "dbos", "agent-runtime", "ugence"]
+dependencies = [
+    "ugence-agent-runtime>=0.7.0",
+    "dbos>=2.0",
+    "SQLAlchemy>=2.0",
+    "psycopg[binary]>=3.1",
+]
+
+[project.optional-dependencies]
+test = ["pytest>=7.0"]
+
+[tool.setuptools.dynamic]
+version = { attr = "ugence_durable_execution.version.__version__" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["ugence_durable_execution*"]
+
+[tool.setuptools.package-data]
+ugence_durable_execution = ["py.typed"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+markers = [
+    "matrix: an ADR section 8 durability-and-failure matrix row",
+    "postgres: requires a live PostgreSQL server",
+]
