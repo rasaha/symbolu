@@ -137,17 +137,9 @@ jobs:
               sys.exit(1)
           asyncio.run(main())
           PY
-      - name: Migrations — upgrade base -> head
-        run: alembic upgrade head
-      - name: Confirm exactly one Alembic head
-        run: |
-          count=$(alembic heads | grep -c '(head)')
-          echo "alembic heads with (head): $count"
-          test "$count" -eq 1
-      - name: Migrations — downgrade to base then re-upgrade to head
-        run: |
-          alembic downgrade base
-          alembic upgrade head
+      - name: Migration cycle (upgrade / single head / downgrade / re-upgrade)
+        # Same script operators run against pre-production databases (round PR-A).
+        run: bash scripts/validate_migration_cycle.sh
       - name: Guard — PostgreSQL tests are genuinely collected (no silent skip)
         run: |
           out=$(pytest -m postgres --collect-only -q | tail -1)
@@ -168,6 +160,18 @@ jobs:
           if echo "$summary" | grep -qiE 'skipped|xfail'; then
             echo "FAIL: unexpected skipped/xfailed tests (all deps should be present in CI)"; exit 1
           fi
+      - name: Backup/restore validation (pg_dump -> pg_restore -> parity)
+        # Round PR-A: the post-suite database (real migrated schema + test data)
+        # must dump and restore with matching alembic stamp, table set, and row
+        # counts. Restores into the same cluster so the dilchat_* roles exist.
+        run: |
+          psql "postgresql://postgres:dilchat_ci_test_pw@localhost:5432/postgres" \
+            -v ON_ERROR_STOP=1 \
+            -c "DROP DATABASE IF EXISTS dilchat_restore_validate" \
+            -c "CREATE DATABASE dilchat_restore_validate"
+          SOURCE_URL="postgresql://postgres:dilchat_ci_test_pw@localhost:5432/dilchat_test" \
+          RESTORE_URL="postgresql://postgres:dilchat_ci_test_pw@localhost:5432/dilchat_restore_validate" \
+            bash scripts/validate_backup_restore.sh
       - name: Upload JUnit results
         if: always()
         uses: actions/upload-artifact@v4
@@ -324,3 +328,92 @@ jobs:
           path: ${{ runner.temp }}/dilchat-openapi.json
           retention-days: 14
           if-no-files-found: warn
+
+  deployment-artifact:
+    name: Deployment image build + process smoke
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: products/dilchat
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build the deployment image
+        run: docker build -f deploy/Dockerfile -t dilchat-backend:ci .
+
+      - name: Image runs as a non-root user
+        run: |
+          uid="$(docker run --rm dilchat-backend:ci id -u)"
+          echo "runtime uid: $uid"
+          test "$uid" != "0"
+
+      - name: Image excludes the AGPL swiss extra and the test toolchain
+        # DEC-007: pyswisseph is dev/test-only and must never ship in a
+        # deployable image; no production image ships pytest either.
+        run: |
+          docker run --rm dilchat-backend:ci python - <<'PY'
+          import importlib.util as u
+          for mod in ("swisseph", "pytest"):
+              assert u.find_spec(mod) is None, f"{mod} must not be in the image"
+          print("image dependency posture OK")
+          PY
+
+      - name: Both process entry points are importable in the image
+        run: |
+          docker run --rm dilchat-backend:ci python - <<'PY'
+          from ugence_dilchat.app import create_app          # web
+          import ugence_dilchat.relay.__main__ as relay      # worker
+          import ugence_dilchat.scripts_preflight as pre     # preflight
+          import ugence_dilchat.scripts_relay_health as hb   # relay probe
+          assert callable(create_app) and callable(relay.main)
+          assert callable(pre.main) and callable(hb.check)
+          print("entry points OK")
+          PY
+
+      - name: Migrations travel with the image (single head)
+        run: |
+          docker run --rm dilchat-backend:ci alembic heads | tee /tmp/heads.txt
+          test "$(grep -c '(head)' /tmp/heads.txt)" -eq 1
+
+      - name: Relay health probe fails closed with no heartbeat configured
+        run: |
+          set +e
+          out="$(docker run --rm dilchat-backend:ci python -m ugence_dilchat.scripts_relay_health)"
+          code=$?
+          set -e
+          echo "probe: $out (exit $code)"
+          test "$code" -eq 2
+          echo "$out" | grep -q RELAY_HEARTBEAT_NOT_CONFIGURED
+
+      - name: Preflight fails closed against an unreachable database
+        run: |
+          set +e
+          out="$(docker run --rm \
+            -e DILCHAT_ENVIRONMENT=test \
+            -e DILCHAT_DATABASE_URL=postgresql+asyncpg://nobody@127.0.0.1:1/absent \
+            dilchat-backend:ci python -m ugence_dilchat.scripts_preflight)"
+          code=$?
+          set -e
+          echo "$out"
+          test "$code" -eq 1
+          echo "$out" | grep -q UNREACHABLE
+
+      - name: Pilot compose definition is valid
+        # The committed example deliberately leaves the signing key EMPTY (no
+        # credential is committed), so supply a throwaway value purely so the
+        # compose file's required-variable checks can be exercised here.
+        run: |
+          set -a; . deploy/.env.pilot.example; set +a
+          export DILCHAT_ACCESS_TOKEN_PRIVATE_KEY_PEM="ci-placeholder-not-a-key"
+          docker compose -f deploy/docker-compose.pilot.yml config >/dev/null
+          echo "compose definition OK"
+
+      - name: Compose refuses to render without required secrets
+        # The `:?` guards are the point: a pilot must not start half-configured.
+        run: |
+          set +e
+          docker compose -f deploy/docker-compose.pilot.yml config >/dev/null 2>&1
+          code=$?
+          set -e
+          test "$code" -ne 0
+          echo "compose correctly refuses an unconfigured environment"

@@ -172,3 +172,83 @@ FORBIDDEN_VERDICTS: Final[frozenset[str]] = frozenset({
     "ENTERPRISE_READY", "PRODUCTION_READY", "DATABASE_REPLACEMENT_VALIDATED",
     "BINDINGSLOTS_RESOLVED", "KDA_VALIDATION_ELIGIBLE", "AGI_VALIDATED",
 })
+
+# ---- sibling arms (BTRR_ROPE_SIBLING_ARM_PREREGISTRATION_DRAFT.md). ----
+# BTRR-ABS is the frozen parent arm; every module-level constant above describes it and is unchanged.
+# BTRR-RoPE differs in the positional mechanism ONLY (learned absolute table -> parameter-free rotary on
+# Q/K) and carries its own frozen budget, dataset size, reserved seeds and authorization record.
+# `ratified: False` marks values that are DRAFT until the owner ratifies the sibling preregistration.
+ARM_ABS: Final[str] = "ABS"
+ARM_ROPE: Final[str] = "ROPE"
+ROPE_SMOKE_SEEDS: Final[frozenset[int]] = frozenset({8200})
+ROPE_DEVELOPMENT_SEEDS: Final[frozenset[int]] = frozenset({8201, 8202, 8203})
+ROPE_FINAL_SEEDS: Final[frozenset[int]] = frozenset({81700, 81701, 81702, 81703, 81704})
+ARMS: Final = MappingProxyType({
+    ARM_ABS: MappingProxyType({
+        "name": "BTRR-ABS", "positional_mechanism": "learned_absolute", "rope_theta": None,
+        "expected_total_params": 394_752, "expected_reasoning_block_params": 131_392,
+        "max_updates": MAX_UPDATES, "n_train_per_split": None,   # dataset size unfrozen in the ABS protocol
+        "seeds": MappingProxyType({"smoke": SMOKE_SEEDS, "development": DEVELOPMENT_SEEDS,
+                                   "final": FINAL_SEEDS}),
+        "record_file": "BTRR_EXECUTION_AUTHORIZATION_RECORD.json",
+        "preregistration": "BOUNDED_TYPED_RELATIONAL_REASONING_PREREGISTRATION.md", "ratified": True,
+    }),
+    ARM_ROPE: MappingProxyType({
+        "name": "BTRR-RoPE", "positional_mechanism": "rope", "rope_theta": 10000.0,
+        "expected_total_params": 144_896, "expected_reasoning_block_params": 131_392,
+        "max_updates": 15000, "n_train_per_split": 400,          # budget option (a), DRAFT
+        "seeds": MappingProxyType({"smoke": ROPE_SMOKE_SEEDS, "development": ROPE_DEVELOPMENT_SEEDS,
+                                   "final": ROPE_FINAL_SEEDS}),
+        "record_file": "BTRR_ROPE_EXECUTION_AUTHORIZATION_RECORD.json",
+        "preregistration": "BTRR_ROPE_SIBLING_ARM_PREREGISTRATION.json", "ratified": False,
+    }),
+})
+RESERVED_SEED_ARM_ROLES: Final = MappingProxyType({
+    s: (arm, role) for arm, spec in ARMS.items() for role, seeds in spec["seeds"].items() for s in seeds
+})
+_all_reserved = [s for spec in ARMS.values() for seeds in spec["seeds"].values() for s in seeds]
+assert len(_all_reserved) == len(set(_all_reserved)), "reserved seeds overlap across arms/roles"
+assert not (set(_all_reserved) & UNIT_FIXTURE_SEEDS), "reserved seeds collide with unit fixtures"
+
+
+def arm_of_seed(seed: int) -> tuple[str, str] | None:
+    """(arm, role) for a reserved seed; None for fixtures and any non-reserved seed."""
+    return RESERVED_SEED_ARM_ROLES.get(int(seed))
+
+
+def frozen_run_params(arm: str, seed: int, n_train: int | None, max_updates: int | None,
+                      default_n_train: int = 6) -> tuple[int, int]:
+    """Resolve (n_train_per_split, max_updates) for a run and enforce admissibility.
+
+    A reserved seed may only be run under its own arm. On development/final seeds the arm's frozen values
+    are mandatory: any differing override raises (inadmissible). On smoke and non-reserved seeds the
+    frozen values are defaults that calibration may override."""
+    if arm not in ARMS:
+        raise ValueError(f"unknown arm {arm!r}")
+    spec = ARMS[arm]
+    owner = arm_of_seed(seed)
+    if owner is not None and owner[0] != arm:
+        raise ValueError(f"seed {seed} is reserved for arm {owner[0]}, not {arm}")
+    frozen_n, frozen_u = spec["n_train_per_split"], spec["max_updates"]
+    if owner is not None and owner[1] in ("development", "final"):
+        if max_updates is not None and max_updates != frozen_u:
+            raise ValueError(f"{spec['name']} {owner[1]} seed {seed}: max_updates={max_updates} is an "
+                             f"inadmissible override of the frozen budget {frozen_u}")
+        if frozen_n is not None and n_train is not None and n_train != frozen_n:
+            raise ValueError(f"{spec['name']} {owner[1]} seed {seed}: n_train={n_train} is an inadmissible "
+                             f"override of the frozen dataset size {frozen_n}")
+    n = n_train if n_train is not None else (frozen_n if frozen_n is not None else default_n_train)
+    u = max_updates if max_updates is not None else frozen_u
+    return int(n), int(u)
+
+
+def arm_param_count(arm: str) -> tuple[int, int]:
+    """(total, reasoning_block) analytic parameter count for an arm (torch-free)."""
+    total, blocks = backbone_param_count(VOCAB_SIZE, MAX_SEQ_LEN)
+    if ARMS[arm]["positional_mechanism"] == "rope":
+        total -= MAX_SEQ_LEN * D_MODEL            # no learned position table
+    return total, blocks
+
+
+for _arm, _spec in ARMS.items():
+    assert arm_param_count(_arm) == (_spec["expected_total_params"], _spec["expected_reasoning_block_params"]), _arm

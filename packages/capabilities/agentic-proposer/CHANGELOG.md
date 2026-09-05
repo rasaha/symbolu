@@ -1,5 +1,116 @@
 # Changelog — ugence-agentic-proposer
 
+## 0.4.0 — the `OD-C1=B` contract amendment: constitution binding
+
+The Agent Constitution contract-amendment change set, authorized by
+`ACC-AM-IMPL=YES` in
+[`ADR_UGENCE_AGENT_CONSTITUTION_AMENDMENT_ROUND_RATIFICATION.md`](../../../docs/architecture/ADR_UGENCE_AGENT_CONSTITUTION_AMENDMENT_ROUND_RATIFICATION.md),
+implementing `ACC-AM-BASE` and `ACC-AM-1`..`ACC-AM-5` exactly as recorded. **No
+public name added, removed or renamed — the curated surface stays at fifty-one
+(`ACC-AM-5`).** The `0.3.0` precedent for a `P_unsigned`-moving amendment,
+followed whole.
+
+### Added
+
+- **The role-contract surface bears `constitution_ref`** (`ACC-AM-1`) — a
+  **required** C5a reference to an externally issued, signed, versioned and
+  revocable Policy Authority agent constitution, on `strategy_policy_ref`'s
+  exact precedent. A reference only: the constitution's structural bounds never
+  become role data, resolving the reference is an injected boundary outside this
+  package, and the readiness re-derivation obligation stands separately
+  (`ACC-AM-4`: re-derivation changes **nothing yet**, re-arming when clause
+  content beyond the three structural bounds is ratified).
+- **`ProposerAdvisory` binds `constitution_policy_id` and
+  `constitution_policy_version`** (`ACC-AM-2`) — required C5b `Token`s inside
+  `P_unsigned`, mirrored onto the private payload per the G2 equivalence
+  obligation, on `S2B-D6=B1`'s exact grounds: a digest-valid advisory cannot
+  have its governing constitution's identity absent, replaced or never produced,
+  which is what `OD-C1=B`'s "digest-bound to the proposals it governs" cashes
+  out to.
+- **Both advisory builders gain one keyword-only parameter,
+  `constitution_resolution`** — the injected resolved constitution the identity
+  pair is **package-stamped** from, on the `S2B-D7=A` discipline: the pair is
+  never accepted as caller parameters, the resolution's whole read shape is
+  guarded at the boundary (`S2B-PF-G=B`'s precedent), and the resolution's
+  signed `agent_constitution_ref` must equal the role's `constitution_ref`
+  **exactly** before any value is stamped — the consumer the first-slice
+  specification's §2.3 assigned to this round. The check runs in the
+  `S2B-S1-Q12=A` position, so a mis-bound constitution never reaches the
+  injected domain evaluator. Every refusal is discharged by the existing H2
+  surface: **no new exception type**, H2 stays at five classes.
+
+### Explicitly unchanged
+
+- `advisory_version` stays `"1"` (`ACC-AM-3`, the `0.3.0` precedent): the
+  digests of newly built advisories move with the field set, and the version
+  literal does not mark the shift — disclosed by the round and accepted as
+  ruled.
+- The public surface: fifty-one names, zero added (`ACC-AM-5`);
+  `public_api.json` changes only in `package_version` and field lists.
+- Policy Authority, both agent-constitution distributions, and both
+  strategy-permission distributions: not touched by this change set. (The
+  strategy-permission **runtime suite's test fixtures** gained the two new
+  construction arguments — tests only, no `src` change — an owner-granted scope
+  clarification recorded in the change set that ships this release.)
+
+### Breaking
+
+Every role-contract and advisory construction site gains arguments — the shape
+`0.3.0` took and the round disclosed. The `S1_CONTRACT_AND_EQUATION_SPECIFICATION`
+tables, the pinned test registries (cardinalities 11 → 12 and 30 → 32, the
+61-entry patterned sweeps) and the builder signatures moved in this same change
+set, which is the behaviour their wording was chosen to force.
+
+## 0.3.1 — resolver-boundary hardening
+
+A patch release: **one failure class changed, the public surface unchanged at fifty-one
+names.** `[R]` Authorized by `S2B-PF-G=B` in
+[`ADR_UGENCE_S2B_STRATEGY_PERMISSION_FAMILY_RATIFICATION.md`](../../../docs/architecture/ADR_UGENCE_S2B_STRATEGY_PERMISSION_FAMILY_RATIFICATION.md),
+which rules `§10` step 7 of
+[`S2B_STRATEGY_PERMISSION_POLICY_FAMILY_AND_RESOLVER_DESIGN.md`](../../../docs/architecture/S2B_STRATEGY_PERMISSION_POLICY_FAMILY_AND_RESOLVER_DESIGN.md)
+a **separate** change set, never bundled with the two new integration packages — and
+nothing adjacent to it.
+
+### Changed
+
+* **The resolver boundary now covers the resolver's answer, not only the call.**
+  `0.3.0` disclosed that in `_resolve_strategy_policy` the echo comparison sat outside
+  the `try` guarding `resolve(...)`, so a resolver returning a structurally alien object
+  raised `AttributeError: 'Alien' object has no attribute 'strategy_policy_ref'` rather
+  than an H2 class. The guard now spans **every field of the ratified
+  `StrategyPolicyResponse` shape** — the echo, and the `permitted_strategies` and
+  identity pair that `_require_declaration_is_permitted` and the advisory stamping go on
+  to read. Closing the echo access alone would have moved the same failure three lines
+  down; the boundary is drawn where the response crosses into this package. The field
+  names are read from the contract, so the guard cannot drift from the shape.
+* **The refusal is `CrossContractViolationError`, and the original error survives as
+  `__cause__`.** `S2B-S1-Q8=A` is untouched: **no new exception type**, H2 stays at five
+  classes, and this release adds, removes and renames no public name.
+
+`[G]` **The guard establishes field presence, not field shape.** A response **missing**
+any ratified field is refused here; a response carrying every field but a type-alien
+value in one of them is not, and still escapes H2 downstream — a `permitted_strategies`
+of `5` reaches the membership test and raises `TypeError`, and an attribute that answers
+the guard then raises on a later read escapes the same way, since the callers re-read the
+response outside it. `[R]` That is a **different garbage class** from the one `0.3.0`
+disclosed and `S2B-PF-G=B` ruled on; closing it would exceed this authorization and is a
+new owner decision.
+
+`[R]` **Compatibility.** A caller that caught `AttributeError` around a builder call to
+detect a malformed resolver answer no longer sees one **from this path**; it sees an H2
+class. Nothing else in the builders is newly caught. A complete duck-typed response
+still constructs: `S2B-S1-Q9=A` ratifies a Protocol, and the guard reads fields rather
+than testing for one concrete class.
+
+`verify_strategy_permission` is unaffected. It takes an already-typed
+`StrategyPolicyResponse`, issues no resolver call and never raises — it sits outside
+this boundary, and this release does not move it.
+
+`[G]` **What this does not change.** Execution end to end: no strategy-permission policy
+family is registered with Policy Authority by this release, and it registers none. Nor
+does it touch the four present-tense sites the design records at `§8.1`, or anything
+else the pinned design and its ratification record as deferred, ungranted or unruled.
+
 ## 0.3.0 — S2-B Reasoning Strategy Permission
 
 The S2-B first slice. `[R]` Authorized by the `§8` implementation gate, which **opened**

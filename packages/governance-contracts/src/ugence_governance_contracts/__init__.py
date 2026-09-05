@@ -16,13 +16,15 @@ Import the curated surface from :mod:`ugence_governance_contracts.api`.
 
 from __future__ import annotations
 
-__version__ = "0.3.1"
+__version__ = "0.5.0"
 
 #: The provider-contract version this package publishes (unchanged from the
 #: pre-migration ``governance_providers`` framework value). The GV-2E-a evidence
 #: contracts and the M-3R.3 neutral assessed-system identity contracts are new,
 #: additive, backward-compatible neutral families; neither changes the provider
-#: contract surface, so this value is deliberately unchanged.
+#: contract surface, so this value is deliberately unchanged. The G7 idempotency
+#: and G8 validity families (0.4.0) are likewise additive neutral families: no
+#: provider dataclass, protocol, enum or default moved.
 CONTRACT_VERSION = "1.0.0"
 
 from .errors import (  # noqa: E402
@@ -62,6 +64,8 @@ from .contracts import (  # noqa: E402
     AssessmentWindow,
     AttestationStatus,
     AttributionStatus,
+    AuditContractError,
+    AuditReference,
     BaseProvider,
     BenchmarkReference,
     ConfidenceBasis,
@@ -82,6 +86,14 @@ from .contracts import (  # noqa: E402
     SourceBasis,
     SystemBindingAuthenticityStatus,
     SystemIdentityContractError,
+    IdempotencyContractError,
+    IdempotencyDisposition,
+    IdempotencyKey,
+    IdempotencyResolution,
+    IdempotencyScope,
+    Validity,
+    ValidityContractError,
+    ValidityStatus,
     TransformationMethod,
     VerificationStatus,
 )

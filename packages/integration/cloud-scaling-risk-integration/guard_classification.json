@@ -1,0 +1,632 @@
+{
+  "package": "risk-integration",
+  "total": 100,
+  "scored": 92,
+  "excluded": 8,
+  "classification": {
+    "1": {
+      "status": "SCORED",
+      "module": "identifiers.py",
+      "line": 68,
+      "condition": "_CONTROLLER_ACTION_TYPES != CANONICAL_ACTION_TYPES"
+    },
+    "2": {
+      "status": "SCORED",
+      "module": "identifiers.py",
+      "line": 85,
+      "condition": "not isinstance(action_kind, ActionKind)"
+    },
+    "3": {
+      "status": "EXCLUDED",
+      "reason": "unreachable-behind-earlier-guard",
+      "detail": "The value check can only fire for an `ActionKind` member whose value is outside the ratified set, and the import-time drift guard 20 lines above refuses to import at all when any such member exists. The `isinstance` check on the line above has already established that the argument is a genuine member, so between the two there is no input that reaches this one with a value it would reject. The import guard itself is scored, and killed by installing a controller resolution that renames a kind.",
+      "evidence": "tests/test_guard_coverage.py::test_every_ratified_action_kind_is_admitted_so_the_value_check_cannot_fire",
+      "module": "identifiers.py",
+      "line": 88,
+      "condition": "value not in CANONICAL_ACTION_TYPES"
+    },
+    "4": {
+      "status": "SCORED",
+      "module": "outcomes.py",
+      "line": 118,
+      "condition": "getattr(self, flag) is not False"
+    },
+    "5": {
+      "status": "SCORED",
+      "module": "outcomes.py",
+      "line": 123,
+      "condition": "not isinstance(self.status, AdapterOutcomeStatus)"
+    },
+    "6": {
+      "status": "SCORED",
+      "module": "outcomes.py",
+      "line": 125,
+      "condition": "self.schema_version != ADAPTER_OUTCOME_SCHEMA_VERSION"
+    },
+    "7": {
+      "status": "SCORED",
+      "module": "outcomes.py",
+      "line": 130,
+      "condition": "self.status is AdapterOutcomeStatus.RISK_DECISION"
+    },
+    "8": {
+      "status": "SCORED",
+      "module": "outcomes.py",
+      "line": 131,
+      "condition": "not isinstance(self.decision, SubjectRiskDecision)"
+    },
+    "9": {
+      "status": "SCORED",
+      "module": "outcomes.py",
+      "line": 136,
+      "condition": "getattr(self.decision, flag) is not False"
+    },
+    "10": {
+      "status": "SCORED",
+      "module": "outcomes.py",
+      "line": 141,
+      "condition": "self.rejection_reason is not None or self.abstention_reason is not None"
+    },
+    "11": {
+      "status": "SCORED",
+      "module": "outcomes.py",
+      "line": 145,
+      "condition": "self.status is AdapterOutcomeStatus.PROJECTION_ABSTAINED_UPSTREAM"
+    },
+    "12": {
+      "status": "SCORED",
+      "module": "outcomes.py",
+      "line": 146,
+      "condition": "self.decision is not None or self.projection is not None"
+    },
+    "13": {
+      "status": "SCORED",
+      "module": "outcomes.py",
+      "line": 151,
+      "condition": "not isinstance(self.abstention_reason, str) or self.abstention_reason == ''"
+    },
+    "14": {
+      "status": "SCORED",
+      "module": "outcomes.py",
+      "line": 155,
+      "condition": "self.rejection_reason is not None"
+    },
+    "15": {
+      "status": "SCORED",
+      "module": "outcomes.py",
+      "line": 160,
+      "condition": "self.decision is not None"
+    },
+    "16": {
+      "status": "SCORED",
+      "module": "outcomes.py",
+      "line": 164,
+      "condition": "not isinstance(self.rejection_reason, AdapterRejectionReason)"
+    },
+    "17": {
+      "status": "SCORED",
+      "module": "outcomes.py",
+      "line": 168,
+      "condition": "self.abstention_reason is not None"
+    },
+    "18": {
+      "status": "SCORED",
+      "module": "authenticity.py",
+      "line": 216,
+      "condition": "_validate_authenticated_recommendation(self)"
+    },
+    "19": {
+      "status": "SCORED",
+      "module": "authenticity.py",
+      "line": 242,
+      "condition": "_validate_authenticated_abstention(self)"
+    },
+    "20": {
+      "status": "SCORED",
+      "module": "authenticity.py",
+      "line": 267,
+      "condition": "_token_field(record, flag, kind) is not False"
+    },
+    "21": {
+      "status": "SCORED",
+      "module": "authenticity.py",
+      "line": 274,
+      "condition": "isinstance(value, bool) or not isinstance(value, str)"
+    },
+    "22": {
+      "status": "SCORED",
+      "module": "authenticity.py",
+      "line": 276,
+      "condition": "not _DIGEST_RE.match(value)"
+    },
+    "23": {
+      "status": "SCORED",
+      "module": "authenticity.py",
+      "line": 300,
+      "condition": "value is _MISSING"
+    },
+    "24": {
+      "status": "SCORED",
+      "module": "authenticity.py",
+      "line": 319,
+      "condition": "type(token) is not expected"
+    },
+    "25": {
+      "status": "SCORED",
+      "module": "authenticity.py",
+      "line": 357,
+      "condition": "_require_exact_token(token, AuthenticatedRecommendation, 'an authenticated recommendation')"
+    },
+    "26": {
+      "status": "SCORED",
+      "module": "authenticity.py",
+      "line": 358,
+      "condition": "_assert_no_authority_fields(token, 'an authenticated recommendation')"
+    },
+    "27": {
+      "status": "SCORED",
+      "module": "authenticity.py",
+      "line": 361,
+      "condition": "type(recommendation) is not CapacityActionRecommendation"
+    },
+    "28": {
+      "status": "SCORED",
+      "module": "authenticity.py",
+      "line": 376,
+      "condition": "digest != recomputed"
+    },
+    "29": {
+      "status": "SCORED",
+      "module": "authenticity.py",
+      "line": 397,
+      "condition": "_require_exact_token(token, AuthenticatedAbstention, 'an authenticated abstention')"
+    },
+    "30": {
+      "status": "SCORED",
+      "module": "authenticity.py",
+      "line": 398,
+      "condition": "_assert_no_authority_fields(token, 'an authenticated abstention')"
+    },
+    "31": {
+      "status": "SCORED",
+      "module": "authenticity.py",
+      "line": 401,
+      "condition": "type(abstention) is not RecommendationAbstention"
+    },
+    "32": {
+      "status": "SCORED",
+      "module": "authenticity.py",
+      "line": 408,
+      "condition": "carried is not None"
+    },
+    "33": {
+      "status": "SCORED",
+      "module": "authenticity.py",
+      "line": 411,
+      "condition": "digest != recomputed"
+    },
+    "34": {
+      "status": "SCORED",
+      "module": "authenticity.py",
+      "line": 428,
+      "condition": "token_type is AuthenticatedRecommendation"
+    },
+    "35": {
+      "status": "SCORED",
+      "module": "authenticity.py",
+      "line": 429,
+      "condition": "_validate_authenticated_recommendation(token)"
+    },
+    "36": {
+      "status": "SCORED",
+      "module": "authenticity.py",
+      "line": 430,
+      "condition": "token_type is AuthenticatedAbstention"
+    },
+    "37": {
+      "status": "SCORED",
+      "module": "authenticity.py",
+      "line": 431,
+      "condition": "_validate_authenticated_abstention(token)"
+    },
+    "38": {
+      "status": "SCORED",
+      "module": "authenticity.py",
+      "line": 432,
+      "condition": "else of: token_type is AuthenticatedAbstention"
+    },
+    "39": {
+      "status": "SCORED",
+      "module": "authenticity.py",
+      "line": 474,
+      "condition": "carried is not None"
+    },
+    "40": {
+      "status": "SCORED",
+      "module": "authenticity.py",
+      "line": 479,
+      "condition": "expected is not None"
+    },
+    "41": {
+      "status": "SCORED",
+      "module": "authenticity.py",
+      "line": 484,
+      "condition": "not expectations"
+    },
+    "42": {
+      "status": "SCORED",
+      "module": "authenticity.py",
+      "line": 492,
+      "condition": "value != recomputed"
+    },
+    "43": {
+      "status": "SCORED",
+      "module": "authenticity.py",
+      "line": 529,
+      "condition": "isinstance(source, _CONTROLLER_TYPES)"
+    },
+    "44": {
+      "status": "SCORED",
+      "module": "authenticity.py",
+      "line": 543,
+      "condition": "type(value) is not expected"
+    },
+    "45": {
+      "status": "SCORED",
+      "module": "authenticity.py",
+      "line": 581,
+      "condition": "expected_recommendation_digest is not None"
+    },
+    "46": {
+      "status": "SCORED",
+      "module": "authenticity.py",
+      "line": 582,
+      "condition": "_require_digest_syntax('expected_recommendation_digest', expected_recommendation_digest)"
+    },
+    "47": {
+      "status": "SCORED",
+      "module": "authenticity.py",
+      "line": 593,
+      "condition": "source_type is not CapacityActionRecommendation and source_type is not RecommendationAbstention"
+    },
+    "48": {
+      "status": "SCORED",
+      "module": "authenticity.py",
+      "line": 599,
+      "condition": "_reject_subclass(source)"
+    },
+    "49": {
+      "status": "SCORED",
+      "module": "authenticity.py",
+      "line": 602,
+      "condition": "source_type is CapacityActionRecommendation"
+    },
+    "50": {
+      "status": "SCORED",
+      "module": "authenticity.py",
+      "line": 617,
+      "condition": "source_type is RecommendationAbstention"
+    },
+    "51": {
+      "status": "SCORED",
+      "module": "authenticity.py",
+      "line": 621,
+      "condition": "expected_recommendation_digest is not None"
+    },
+    "52": {
+      "status": "SCORED",
+      "module": "authenticity.py",
+      "line": 635,
+      "condition": "not isinstance(source, Mapping)"
+    },
+    "53": {
+      "status": "SCORED",
+      "module": "authenticity.py",
+      "line": 642,
+      "condition": "tag is None"
+    },
+    "54": {
+      "status": "SCORED",
+      "module": "authenticity.py",
+      "line": 650,
+      "condition": "tag == RECOMMENDATION_SCHEMA_VERSION"
+    },
+    "55": {
+      "status": "SCORED",
+      "module": "authenticity.py",
+      "line": 665,
+      "condition": "_require_exact_reconstruction(recommendation, CapacityActionRecommendation)"
+    },
+    "56": {
+      "status": "SCORED",
+      "module": "authenticity.py",
+      "line": 679,
+      "condition": "tag == RECOMMENDATION_ABSTENTION_SCHEMA_VERSION"
+    },
+    "57": {
+      "status": "SCORED",
+      "module": "authenticity.py",
+      "line": 686,
+      "condition": "_require_exact_reconstruction(abstention, RecommendationAbstention)"
+    },
+    "58": {
+      "status": "SCORED",
+      "module": "authenticity.py",
+      "line": 689,
+      "condition": "carried is not None or expected_recommendation_digest is not None"
+    },
+    "59": {
+      "status": "SCORED",
+      "module": "projection.py",
+      "line": 127,
+      "condition": "getattr(self, flag) is not False"
+    },
+    "60": {
+      "status": "SCORED",
+      "module": "projection.py",
+      "line": 131,
+      "condition": "self.schema_version != PROJECTION_SCHEMA_VERSION"
+    },
+    "61": {
+      "status": "SCORED",
+      "module": "projection.py",
+      "line": 135,
+      "condition": "not isinstance(self.request, SubjectRiskEvaluationRequestV2)"
+    },
+    "62": {
+      "status": "SCORED",
+      "module": "projection.py",
+      "line": 139,
+      "condition": "self.request.evaluation_time is not None"
+    },
+    "63": {
+      "status": "SCORED",
+      "module": "projection.py",
+      "line": 149,
+      "condition": "self.context.digest() != self.context_digest"
+    },
+    "64": {
+      "status": "SCORED",
+      "module": "projection.py",
+      "line": 151,
+      "condition": "self.binding.digest() != self.subject_digest"
+    },
+    "65": {
+      "status": "SCORED",
+      "module": "projection.py",
+      "line": 153,
+      "condition": "self.request.digest() != self.request_digest"
+    },
+    "66": {
+      "status": "SCORED",
+      "module": "projection.py",
+      "line": 161,
+      "condition": "validation.context_digest != self.context_digest"
+    },
+    "67": {
+      "status": "SCORED",
+      "module": "projection.py",
+      "line": 163,
+      "condition": "validation.subject_digest != self.subject_digest"
+    },
+    "68": {
+      "status": "SCORED",
+      "module": "projection.py",
+      "line": 165,
+      "condition": "validation.recommendation_digest != self.recommendation_digest"
+    },
+    "69": {
+      "status": "SCORED",
+      "module": "projection.py",
+      "line": 202,
+      "condition": "not isinstance(value, datetime)"
+    },
+    "70": {
+      "status": "SCORED",
+      "module": "projection.py",
+      "line": 204,
+      "condition": "value.tzinfo is None or value.utcoffset() is None"
+    },
+    "71": {
+      "status": "SCORED",
+      "module": "projection.py",
+      "line": 213,
+      "condition": "not isinstance(value, str) or value == ''"
+    },
+    "72": {
+      "status": "EXCLUDED",
+      "reason": "diagnostic-only",
+      "detail": "Named successor: the `value is None` check inside the loop three lines below, which raises the same `ProjectionError` for the same input \u2014 `forecast_evidence_digest` is `candidates[0]`, so it is the first the loop reaches. Measured: with the guard removed the message changes from 'required (ADR \u00a76)' to 'required and must not be None' and nothing else does. ADR Phase 5 \u00a79.1 makes the message prose, so this is a positive showing of diagnostic-only rather than an inference from a shared class.",
+      "evidence": "tests/test_guard_coverage.py::test_the_forecast_digest_guard_shares_its_outcome_with_the_loop_below_it",
+      "module": "projection.py",
+      "line": 252,
+      "condition": "candidates[0][1] is None"
+    },
+    "73": {
+      "status": "SCORED",
+      "module": "projection.py",
+      "line": 257,
+      "condition": "value is None"
+    },
+    "74": {
+      "status": "SCORED",
+      "module": "projection.py",
+      "line": 261,
+      "condition": "not isinstance(value, str) or not value.startswith('sha256:')"
+    },
+    "75": {
+      "status": "SCORED",
+      "module": "projection.py",
+      "line": 289,
+      "condition": "type(authenticated) is not AuthenticatedRecommendation"
+    },
+    "76": {
+      "status": "SCORED",
+      "module": "projection.py",
+      "line": 357,
+      "condition": "correlation_id is not None and (not isinstance(correlation_id, str))"
+    },
+    "77": {
+      "status": "SCORED",
+      "module": "adapter.py",
+      "line": 113,
+      "condition": "seam is None"
+    },
+    "78": {
+      "status": "SCORED",
+      "module": "adapter.py",
+      "line": 118,
+      "condition": "not callable(getattr(seam, 'evaluate', None))"
+    },
+    "79": {
+      "status": "SCORED",
+      "module": "adapter.py",
+      "line": 122,
+      "condition": "clock is None or not callable(clock)"
+    },
+    "80": {
+      "status": "EXCLUDED",
+      "reason": "unreachable-behind-earlier-guard",
+      "detail": "The token was produced by `authenticate_controller_output` on the line above, and every token it returns is built by one of the two `Authenticated*` constructors, each of which runs this same validation in its own `__post_init__`. An invalid token therefore cannot come into existence. `project` takes a *source*, never a token, so no caller-supplied value reaches this call. The package's own comment says as much \u2014 'redundant *now* \u2014 which is the point' \u2014 and the guards inside the function it calls are scored and killed, because a forged token does reach *those*.",
+      "evidence": "tests/test_guard_coverage.py::test_no_invalid_authenticated_token_can_exist_to_reach_the_revalidations",
+      "module": "adapter.py",
+      "line": 152,
+      "condition": "_validate_authenticated_output(authenticated)"
+    },
+    "81": {
+      "status": "SCORED",
+      "module": "adapter.py",
+      "line": 153,
+      "condition": "type(authenticated) is AuthenticatedAbstention"
+    },
+    "82": {
+      "status": "EXCLUDED",
+      "reason": "unreachable-behind-earlier-guard",
+      "detail": "The same construction as the call in `project` above, inside gate 1's `try` so a failure would produce a typed outcome rather than an escaping exception. The token is produced two lines above by `authenticate_controller_output`, so it has already been validated by the constructor that built it.",
+      "evidence": "tests/test_guard_coverage.py::test_no_invalid_authenticated_token_can_exist_to_reach_the_revalidations",
+      "module": "adapter.py",
+      "line": 186,
+      "condition": "_validate_authenticated_output(authenticated)"
+    },
+    "83": {
+      "status": "SCORED",
+      "module": "adapter.py",
+      "line": 187,
+      "condition": "except UnsupportedRecommendationSourceError: self._rejected(AdapterRejectionReason.UNSUPPORTED_INPUT_TYPE, str(exc))"
+    },
+    "84": {
+      "status": "SCORED",
+      "module": "adapter.py",
+      "line": 191,
+      "condition": "except RecommendationInputError: self._rejected(AdapterRejectionReason.MALFORMED_RECOMMENDATION, str(exc))"
+    },
+    "85": {
+      "status": "SCORED",
+      "module": "adapter.py",
+      "line": 195,
+      "condition": "except MissingIndependentDigestError: self._rejected(AdapterRejectionReason.MISSING_INDEPENDENT_RECOMMENDATION_DIGEST, str(exc))"
+    },
+    "86": {
+      "status": "SCORED",
+      "module": "adapter.py",
+      "line": 199,
+      "condition": "except RecommendationAuthenticityError: self._rejected(AdapterRejectionReason.RECOMMENDATION_DIGEST_MISMATCH, str(exc))"
+    },
+    "87": {
+      "status": "SCORED",
+      "module": "adapter.py",
+      "line": 205,
+      "condition": "type(authenticated) is AuthenticatedAbstention"
+    },
+    "88": {
+      "status": "EXCLUDED",
+      "reason": "unreachable-behind-earlier-guard",
+      "detail": "`projection.py` raises no `RecommendationInputError` anywhere \u2014 measured by AST over every `raise` in the module. The class is produced only by authenticity's serialized-reconstruction paths, which gate 1 has already run and which cannot run again inside `project_recommendation`. The arm is kept because gate 3 re-runs the token check independently, and if the two ever disagreed the stricter one must still produce a typed outcome.",
+      "evidence": "tests/test_guard_coverage.py::test_projection_raises_neither_input_nor_authenticity_errors_of_its_own",
+      "module": "adapter.py",
+      "line": 211,
+      "condition": "except RecommendationInputError: self._rejected(AdapterRejectionReason.UNSUPPORTED_INPUT_TYPE, str(exc), tenant_id=_safe_tenant(authenticated), subject_id=_safe_subject(authenticated), recommendation_digest=getattr(authenticated, 'recommendation_digest', None))"
+    },
+    "89": {
+      "status": "EXCLUDED",
+      "reason": "unreachable-behind-earlier-guard",
+      "detail": "The same shape as the arm above. `projection.py` raises no `RecommendationAuthenticityError` of its own; the only route to one is `_validate_authenticated_recommendation`, which cannot fail on a token that both the `Authenticated*` constructor and gate 1 have validated. This is the site guard-coverage ADR \u00a74.1 reports as the audit's single survivor, and the sweep reproduces that survival exactly \u2014 the reason it survives is reachability, not a gap in the suite.",
+      "evidence": "tests/test_guard_coverage.py::test_projection_raises_neither_input_nor_authenticity_errors_of_its_own",
+      "module": "adapter.py",
+      "line": 222,
+      "condition": "except RecommendationAuthenticityError: self._rejected(AdapterRejectionReason.RECOMMENDATION_DIGEST_MISMATCH, str(exc), tenant_id=_safe_tenant(authenticated), subject_id=_safe_subject(authenticated), recommendation_digest=getattr(authenticated, 'recommendation_digest', None))"
+    },
+    "90": {
+      "status": "SCORED",
+      "module": "adapter.py",
+      "line": 230,
+      "condition": "except ProjectionError: self._rejected(AdapterRejectionReason.PROJECTION_FAILED, str(exc), tenant_id=_safe_tenant(authenticated), subject_id=_safe_subject(authenticated), recommendation_digest=getattr(authenticated, 'recommendation_digest', None))"
+    },
+    "91": {
+      "status": "SCORED",
+      "module": "adapter.py",
+      "line": 242,
+      "condition": "except AdapterConfigurationError: self._rejected(AdapterRejectionReason.UNTRUSTED_CLOCK, str(exc), projection=projection)"
+    },
+    "92": {
+      "status": "SCORED",
+      "module": "adapter.py",
+      "line": 247,
+      "condition": "_require_within_validity(now, projection)"
+    },
+    "93": {
+      "status": "SCORED",
+      "module": "adapter.py",
+      "line": 248,
+      "condition": "except RecommendationNotYetValidError: self._rejected(AdapterRejectionReason.RECOMMENDATION_NOT_YET_VALID, str(exc), projection=projection)"
+    },
+    "94": {
+      "status": "SCORED",
+      "module": "adapter.py",
+      "line": 254,
+      "condition": "except RecommendationValidityError: self._rejected(AdapterRejectionReason.RECOMMENDATION_EXPIRED, str(exc), projection=projection)"
+    },
+    "95": {
+      "status": "EXCLUDED",
+      "reason": "unreachable-behind-earlier-guard",
+      "detail": "`projection.py:139` refuses any projection whose request carries an evaluation time, and the projection has no parameter through which to supply one, so the request re-checked here is always one that guard admitted. Kept as defence in depth: it is what stops a future refactor quietly forwarding a caller's clock.",
+      "evidence": "tests/test_guard_coverage.py::test_every_projection_carries_no_evaluation_time",
+      "module": "adapter.py",
+      "line": 266,
+      "condition": "request.evaluation_time is not None"
+    },
+    "96": {
+      "status": "EXCLUDED",
+      "reason": "diagnostic-only",
+      "detail": "Named successor: `outcomes.py:131`, which raises the same `NonExecutableInvariantError` for every value that would fail here \u2014 a seam return that is not a `SubjectRiskDecision` cannot satisfy the outcome's own check either. Measured: removing this guard changes the diagnosis from 'the evaluation seam must return a canonical SubjectRiskDecision' to 'a RISK_DECISION outcome requires a canonical SubjectRiskDecision', and nothing else. Naming the seam is what tells an integrator which collaborator broke its contract.",
+      "evidence": "tests/test_guard_coverage.py::test_the_seam_return_check_shares_its_outcome_with_the_outcome_dataclass",
+      "module": "adapter.py",
+      "line": 271,
+      "condition": "not isinstance(decision, SubjectRiskDecision)"
+    },
+    "97": {
+      "status": "SCORED",
+      "module": "adapter.py",
+      "line": 289,
+      "condition": "not isinstance(now, datetime)"
+    },
+    "98": {
+      "status": "SCORED",
+      "module": "adapter.py",
+      "line": 291,
+      "condition": "now.tzinfo is None or now.utcoffset() is None"
+    },
+    "99": {
+      "status": "SCORED",
+      "module": "adapter.py",
+      "line": 379,
+      "condition": "now > projection.valid_until"
+    },
+    "100": {
+      "status": "SCORED",
+      "module": "adapter.py",
+      "line": 384,
+      "condition": "now < projection.valid_from"
+    }
+  }
+}

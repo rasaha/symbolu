@@ -1,0 +1,259 @@
+{
+  "curated_api_module": "ugence_cloud_scaling_credential_broker",
+  "distribution": "ugence-cloud-scaling-credential-broker",
+  "namespace": "ugence_cloud_scaling_credential_broker",
+  "note": "Machine-readable snapshot of the curated public API (ugence_cloud_scaling_credential_broker.__all__). tests/packaging/test_packaging.py asserts this file equals the live package surface. Regenerate with scripts/generate_public_api.py when the curated API changes deliberately.",
+  "package_version": "0.1.0",
+  "symbols": {
+    "CREDENTIAL_PROFILE": {
+      "kind": "constant",
+      "value": "ugence.cloud-scaling.credential/v1"
+    },
+    "CloudScalingCredentialBrokerError": {
+      "kind": "class",
+      "methods": [
+        "add_note",
+        "with_traceback"
+      ]
+    },
+    "CredentialBrokerConfigurationError": {
+      "kind": "class",
+      "methods": [
+        "add_note",
+        "with_traceback"
+      ]
+    },
+    "CredentialBrokerContractError": {
+      "kind": "class",
+      "methods": [
+        "add_note",
+        "with_traceback"
+      ]
+    },
+    "CredentialBrokerExactTypeError": {
+      "kind": "class",
+      "methods": [
+        "add_note",
+        "with_traceback"
+      ]
+    },
+    "CredentialBrokerPort": {
+      "kind": "class",
+      "methods": [
+        "materialize"
+      ]
+    },
+    "CredentialBrokerSeam": {
+      "kind": "class",
+      "methods": [
+        "materialize",
+        "production",
+        "reference"
+      ]
+    },
+    "CredentialGrant": {
+      "fields": [
+        "grant_id",
+        "tenant_id",
+        "request_digest",
+        "handle_ref",
+        "role",
+        "validity",
+        "broker_authority_id",
+        "credential_profile",
+        "disposition"
+      ],
+      "kind": "dataclass"
+    },
+    "CredentialGrantStore": {
+      "kind": "class",
+      "methods": [
+        "get",
+        "save"
+      ]
+    },
+    "CredentialMaterializationOutcome": {
+      "fields": [
+        "materialized_at",
+        "grant",
+        "refusal",
+        "detail",
+        "request_digest"
+      ],
+      "kind": "dataclass"
+    },
+    "CredentialMaterializationRequest": {
+      "fields": [
+        "tenant_id",
+        "authorization_id",
+        "reservation_id",
+        "target_scope"
+      ],
+      "kind": "dataclass"
+    },
+    "CredentialRefusal": {
+      "kind": "enum",
+      "values": [
+        "AUTHORIZATION_NOT_FOUND",
+        "AUTHORIZATION_NOT_AUTHORIZED",
+        "AUTHORIZATION_EXPIRED",
+        "ENVELOPE_NOT_FOUND",
+        "ENVELOPE_EXPIRED",
+        "RESERVATION_NOT_FOUND",
+        "RESERVATION_NOT_RESERVED",
+        "RESERVATION_MISMATCH",
+        "LEASE_EXPIRED",
+        "TARGET_SCOPE_MISMATCH",
+        "NO_CREDENTIAL_REQUIRED",
+        "WINDOW_INVALID",
+        "BROKER_UNAVAILABLE",
+        "GRANT_INVALID",
+        "GRANT_CONFLICT"
+      ]
+    },
+    "CredentialRequest": {
+      "fields": [
+        "tenant_id",
+        "authorization_ref",
+        "execution_key",
+        "target_scope_digest",
+        "reservation_id",
+        "envelope_id",
+        "role",
+        "issued_at",
+        "not_after",
+        "request_digest",
+        "minting_token"
+      ],
+      "kind": "dataclass"
+    },
+    "CredentialRequestMinter": {
+      "kind": "class",
+      "methods": [
+        "mint"
+      ]
+    },
+    "CredentialRequestRefused": {
+      "kind": "class",
+      "methods": [
+        "add_note",
+        "with_traceback"
+      ]
+    },
+    "DEFAULT_TTL_CAP": {
+      "kind": "timedelta",
+      "seconds": 600.0
+    },
+    "FORBIDDEN_FIELD_NAMES": {
+      "kind": "frozenset",
+      "values": [
+        "access_key",
+        "access_token",
+        "bearer",
+        "client_secret",
+        "credential",
+        "credentials",
+        "key_material",
+        "kubeconfig",
+        "passphrase",
+        "password",
+        "private_key",
+        "refresh_token",
+        "secret",
+        "secret_key",
+        "secrets",
+        "session_token",
+        "token"
+      ]
+    },
+    "GRANT_ID_PREFIX": {
+      "kind": "constant",
+      "value": "cred.v1:"
+    },
+    "GrantDisposition": {
+      "kind": "enum",
+      "values": [
+        "MATERIALIZED",
+        "REPLAYED"
+      ]
+    },
+    "HANDLE_REF_PATTERN": {
+      "kind": "constant",
+      "value": "^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$"
+    },
+    "InMemoryCredentialGrantStore": {
+      "kind": "class",
+      "methods": [
+        "get",
+        "save"
+      ]
+    },
+    "MAX_TTL_CAP": {
+      "kind": "timedelta",
+      "seconds": 900.0
+    },
+    "NO_CREDENTIAL_ACTION_TYPES": {
+      "kind": "frozenset",
+      "values": [
+        "no_change"
+      ]
+    },
+    "REFERENCE_BROKER_AUTHORITY_ID": {
+      "kind": "constant",
+      "value": "ugence.reference-credential-broker"
+    },
+    "REQUEST_DIGEST_PREFIX": {
+      "kind": "constant",
+      "value": "credreq.v1:"
+    },
+    "ReferenceCredentialBroker": {
+      "kind": "class",
+      "methods": [
+        "materialize"
+      ]
+    },
+    "RoleStatement": {
+      "fields": [
+        "tenant_id",
+        "operation",
+        "account_id",
+        "compute_group",
+        "resource_class",
+        "namespace",
+        "region",
+        "max_magnitude",
+        "max_delta"
+      ],
+      "kind": "dataclass"
+    },
+    "__version__": {
+      "kind": "constant",
+      "value": "0.1.0"
+    },
+    "derive_grant_id": {
+      "kind": "function",
+      "parameters": [
+        "request_digest"
+      ]
+    },
+    "derive_least_privilege_role": {
+      "kind": "function",
+      "parameters": [
+        "target_scope"
+      ]
+    },
+    "derive_request_digest": {
+      "kind": "function",
+      "parameters": [
+        "body"
+      ]
+    },
+    "role_widening": {
+      "kind": "function",
+      "parameters": [
+        "granted",
+        "derived"
+      ]
+    }
+  }
+}

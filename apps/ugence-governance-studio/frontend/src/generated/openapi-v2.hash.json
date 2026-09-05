@@ -1,0 +1,42 @@
+{
+  "source_openapi_sha256": "dd63180dc91ba7842dc1dc2b6efb3dbc155ea3bd47200f40de7bac85d373f39a",
+  "api_contract_version": "governance_studio.api.v2",
+  "required_operations": [
+    "v2_constitution_validate",
+    "v2_constitution_preflight",
+    "v2_policy_validate",
+    "v2_policy_synthesize",
+    "v2_policy_compile",
+    "v2_authority_list_policies",
+    "v2_authority_read_policy",
+    "v2_authority_read_decision",
+    "v2_simulate_run",
+    "v2_publish_shadow",
+    "v2_observe_audit_ids",
+    "v2_observe_audit_chain",
+    "v2_review_list_queue",
+    "v2_review_read_run",
+    "v2_review_read_run_events",
+    "v2_review_read_approval",
+    "v2_review_submit_decision"
+  ],
+  "operation_ids": [
+    "v2_authority_list_policies",
+    "v2_authority_read_decision",
+    "v2_authority_read_policy",
+    "v2_constitution_preflight",
+    "v2_constitution_validate",
+    "v2_observe_audit_chain",
+    "v2_observe_audit_ids",
+    "v2_policy_compile",
+    "v2_policy_synthesize",
+    "v2_policy_validate",
+    "v2_publish_shadow",
+    "v2_review_list_queue",
+    "v2_review_read_approval",
+    "v2_review_read_run",
+    "v2_review_read_run_events",
+    "v2_review_submit_decision",
+    "v2_simulate_run"
+  ]
+}

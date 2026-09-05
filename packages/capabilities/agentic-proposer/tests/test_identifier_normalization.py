@@ -792,16 +792,20 @@ def test_the_registry_carries_exactly_the_stated_cardinality(contract, cardinali
         f"{len(FIELD_CLASSIFICATION[contract])}")
 
 
-def test_the_advisory_carries_the_thirty_ratified_fields():
+def test_the_advisory_carries_the_thirty_two_ratified_fields():
     """OD-4(a) took this to twenty-three, because ``candidates`` is added and
     ``candidate_set_id`` is retained alongside it rather than replaced by it. OD-7
     part 5 took it to twenty-seven, mirroring the evaluation-profile and
     selector-policy pairs from ``AdvisoryCandidateSet`` so both are reachable inside
     ``P_unsigned`` (I8.11). `S2B-S1-Q2=A` took it to **thirty**, adding the governing
     strategy policy's identity and version and one scalar declared-strategy assertion —
-    all three identity-participating, which is `S2B-D6=B1`'s proposal-bound guarantee."""
+    all three identity-participating, which is `S2B-D6=B1`'s proposal-bound guarantee.
+    `ACC-AM-2` (the `OD-C1=B` amendment round) took it to **thirty-two**, adding the
+    governing constitution's identity and version on the same grounds."""
     fields = FIELD_CLASSIFICATION["ProposerAdvisory"]
-    assert len(fields) == 30
+    assert len(fields) == 32
+    assert fields["constitution_policy_id"] == C5B
+    assert fields["constitution_policy_version"] == C5B
     assert fields["candidates"] == STRUCTURED
     assert fields["candidate_set_id"] == C5A
     assert fields["selected_candidate_id"] == C5A
@@ -1152,16 +1156,19 @@ def test_every_registered_category_is_covered_by_one_sweep_or_the_other():
     """The denominator, asserted. No registered class may fall between the two sweeps.
 
     For a patterned entry, the candidate reclassifications are the other eight registered
-    classes plus the unregistered sentinel — **nine**, and 58 x 9 = 522. Seven of the
+    classes plus the unregistered sentinel — **nine**, and 61 x 9 = 549. Seven of the
     eight registered ones are weakenings and, with the sentinel, make the sweep above's
-    58 x 8 = 464; the ninth candidate, the sibling patterned class, is a narrowing and
-    makes the sibling test's 58. 464 + 58 = 522, so nothing is unexplained.
+    61 x 8 = 488; the ninth candidate, the sibling patterned class, is a narrowing and
+    makes the sibling test's 61. 488 + 61 = 549, so nothing is unexplained.
 
     The entry count moved from 47 to 55 with OD-7 part 5's eight new C5b fields — four
     on ``AdvisoryCandidateSet`` and their four mirrors on ``ProposerAdvisory`` — and
     from 55 to **58** with S2-B's three new patterned fields:
     ``CognitiveRoleContract.strategy_policy_ref`` (C5a, the policy reference) and
-    ``ProposerAdvisory.strategy_policy_id``/``_version`` (C5b, the stamped pair). The
+    ``ProposerAdvisory.strategy_policy_id``/``_version`` (C5b, the stamped pair) — and
+    from 58 to **61** with the `OD-C1=B` amendment's three (`ACC-AM-1`/`ACC-AM-2`):
+    ``CognitiveRoleContract.constitution_ref`` (C5a, the constitution reference) and
+    ``ProposerAdvisory.constitution_policy_id``/``_version`` (C5b, the stamped pair). The
     advisory's ``declared_strategy`` adds no entry here: it is CLOSED, so it is
     validated by membership and falls outside the patterned sweeps by construction.
     Self-reclassification is the tenth candidate and is not a mutation, so it stands
@@ -1176,7 +1183,7 @@ def test_every_registered_category_is_covered_by_one_sweep_or_the_other():
             f"{sorted(narrowings)}")
     entries = len(C5A_ENTRIES + C5B_ENTRIES)
     applicable = entries * len(WEAKENING_CATEGORIES)
-    assert applicable == 58 * 8 == 464, (
+    assert applicable == 61 * 8 == 488, (
         f"the weakening sweep's applicable count changed to {applicable}; if that is "
         "intended, update the count recorded in the enforcement documentation")
     # The denominator itself, so the two sweeps are shown to exhaust it rather than
@@ -1185,7 +1192,7 @@ def test_every_registered_category_is_covered_by_one_sweep_or_the_other():
     # not a mutation and is not among them.
     candidates_per_entry = (len(CLASSES) - 1) + 1
     narrowing_cases = entries * 1
-    assert applicable + narrowing_cases == entries * candidates_per_entry == 522, (
+    assert applicable + narrowing_cases == entries * candidates_per_entry == 549, (
         f"{applicable} weakening cases + {narrowing_cases} narrowing cases do not "
         f"exhaust the {entries} x {candidates_per_entry} candidate reclassifications")
 

@@ -17,6 +17,13 @@ Limitations:
   - Rollback only reverts replica count — cannot undo side effects
   - Post-rollback, the system enters an extended cooldown to prevent oscillation
   - Attribution is correlational, not causal (same caveat as divergence tracker)
+
+Containment (ADR_CLOUD_SCALING_OPERATIONS_ORCHESTRATOR_CONTAINMENT_SCOPING, D-1):
+a rollback is a second bounded action that needs its own authorization, never an
+unattended revert. The monitor therefore refuses any ``rollback_fn`` that does not
+declare itself non-mutating: only a callable whose owner exposes ``mutates = False``
+(a DRY_RUN ``K8sActuator.scale``) is accepted, so the verdict machinery keeps working
+while the revert itself can only ever be a logged proposal.
 """
 
 import logging
@@ -87,6 +94,22 @@ class RollbackWatch:
         )
 
 
+class MutatingRollbackRefused(RuntimeError):
+    """A rollback function not declared non-mutating was offered (containment ruling D-1)."""
+
+
+def _declared_non_mutating(fn) -> bool:
+    """True only when the callable's owner (or the callable itself) says ``mutates = False``.
+
+    Anything else — a bare function, a mock, a SCALE_PATCH actuator — is treated as
+    mutating and refused. The declaration must be the literal ``False``: a truthy
+    placeholder attribute (as a mock returns for any name) does not count.
+    """
+    owner = getattr(fn, "__self__", None)
+    flag = getattr(owner if owner is not None else fn, "mutates", None)
+    return flag is False
+
+
 class RollbackMonitor:
     """Monitors post-action metrics and triggers rollback on degradation.
 
@@ -109,10 +132,21 @@ class RollbackMonitor:
             config: Rollback configuration.
             rollback_fn: Callable(deployment, namespace, current_replicas,
                          target_replicas, recommendation_id) -> result.
-                         Typically actuator.scale(). If None, rollback is
-                         logged but not executed.
+                         Must declare itself non-mutating (its owner exposes
+                         ``mutates = False``, as a DRY_RUN K8sActuator does);
+                         any other callable is refused at construction. If
+                         None, rollback is logged but not executed.
         """
         self.config = config or RollbackConfig()
+        # HARD AUTHORITY GUARD (ADR orchestrator containment, D-1): an unattended
+        # revert through a mutating function is a mutation without authorization.
+        if rollback_fn is not None and not _declared_non_mutating(rollback_fn):
+            raise MutatingRollbackRefused(
+                "RollbackMonitor refuses a mutating rollback_fn: a rollback is a second "
+                "bounded action that needs its own authorization, never an unattended "
+                "revert. Only a callable whose owner declares `mutates = False` (a "
+                "DRY_RUN K8sActuator.scale) is accepted."
+            )
         self._rollback_fn = rollback_fn
         self._active_watches: List[RollbackWatch] = []
         self._history: List[RollbackWatch] = []

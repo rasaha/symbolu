@@ -8,5 +8,10 @@ __pycache__/
 .venv/
 venv/
 .env
+# Real pilot credentials never enter the repository; only the example does.
+.env.pilot
+deploy/.env.pilot
+# Relay heartbeat files are runtime state, never committed.
+*.heartbeat
 # Swiss Ephemeris data files are NOT committed (licensing + size).
 *.se1

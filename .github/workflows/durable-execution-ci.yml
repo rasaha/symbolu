@@ -1,0 +1,158 @@
+name: durable-execution-ci
+
+# Scoped CI for ugence-durable-execution (roadmap GAS-2).
+#
+# The ADR §8 durability and failure matrix is the DBOS ratification gate, and it is only
+# evidence if it runs against a REAL PostgreSQL server: the crash rows kill real
+# processes and row 7 stops the real database. So Postgres is installed and driven with
+# pg_ctl rather than run as a service container — a service container cannot be stopped
+# from inside the job, which would silently reduce row 7 to a skip.
+#
+# A skipped row is not a passing row. The final step fails the job if any matrix row
+# skipped.
+
+on:
+  pull_request:
+    paths:
+      - "packages/integration/durable-execution/**"
+      - "packages/integration/agent-runtime-governance/**"
+      - "docs/architecture/ADR_DBOS_DURABLE_EXECUTION_INTEGRATION.md"
+      - ".github/workflows/durable-execution-ci.yml"
+  push:
+    branches:
+      - "claude/**"
+    paths:
+      - "packages/integration/durable-execution/**"
+      - "packages/integration/agent-runtime-governance/**"
+      - "docs/architecture/ADR_DBOS_DURABLE_EXECUTION_INTEGRATION.md"
+      - ".github/workflows/durable-execution-ci.yml"
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  matrix-suite:
+    name: ADR section 8 matrix (real PostgreSQL)
+    runs-on: ubuntu-latest
+    env:
+      PGVERSION: "16"
+      PGPORT: "5433"
+      PGDATA: /tmp/ude-pgdata
+      PGSOCK: /tmp/ude-pgsock
+      UGENCE_DE_TEST_PG: postgresql+psycopg://postgres@127.0.0.1:5433/postgres
+      UGENCE_DE_PGPORT: "5433"
+      UGENCE_DE_PGSOCK: /tmp/ude-pgsock
+      UGENCE_DE_PGDATA: /tmp/ude-pgdata
+      UGENCE_DE_PGOSUSER: postgres
+      # Row 7 really stops the server. On the runner there is no TTY for `su`, so the
+      # privileged command is sudo instead — configurable precisely so no shim is needed.
+      UGENCE_DE_PG_PRIVCMD: "sudo -u postgres bash -c"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install PostgreSQL server binaries
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-$PGVERSION postgresql-client-$PGVERSION
+          echo "UGENCE_DE_PGBIN=/usr/lib/postgresql/$PGVERSION/bin" >> "$GITHUB_ENV"
+
+      - name: Initialise and start a cluster we can stop from inside the job
+        run: |
+          PGBIN=/usr/lib/postgresql/$PGVERSION/bin
+          # The runner's default cluster occupies 5432; ours is independent on 5433 so
+          # row 7 can stop it without taking anything else down.
+          sudo systemctl stop postgresql || true
+          sudo rm -rf "$PGDATA" "$PGSOCK"
+          sudo mkdir -p "$PGDATA" "$PGSOCK"
+          sudo chown -R postgres:postgres "$PGDATA" "$PGSOCK"
+          sudo chmod 700 "$PGDATA"
+          sudo -u postgres "$PGBIN/initdb" -D "$PGDATA" -U postgres --auth=trust
+          sudo -u postgres "$PGBIN/pg_ctl" -D "$PGDATA" \
+            -o "-p $PGPORT -k $PGSOCK -c listen_addresses=127.0.0.1" \
+            -l /tmp/ude-pg.log -w start
+          "$PGBIN/pg_isready" -h 127.0.0.1 -p "$PGPORT"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest "dbos>=2.0" "SQLAlchemy>=2.0" "psycopg[binary]>=3.1"
+
+      - name: OD-1 gate — single-transaction commit
+        run: |
+          cd packages/integration/durable-execution
+          PYTHONPATH="src:$GITHUB_WORKSPACE/packages/runtime/agent-runtime/src:tests" \
+            python -m pytest tests/test_od1_single_transaction.py -o addopts= -v --no-header
+
+      - name: ADR section 8 matrix — all eleven rows
+        run: |
+          cd packages/integration/durable-execution
+          PYTHONPATH="src:$GITHUB_WORKSPACE/packages/runtime/agent-runtime/src:tests" \
+            python -m pytest tests/test_matrix.py -o addopts= -v --no-header \
+              --junitxml=/tmp/matrix.xml
+
+      - name: ADR section 8 matrix — re-run with the PRODUCTION governance hook
+        run: |
+          # The matrix above runs with AllowAllGovernanceHook, isolating durability from
+          # governance. This re-run proves the same properties hold when clearance is
+          # genuinely composed and can genuinely be withheld.
+          cd packages/integration/durable-execution
+          PYTHONPATH="src:$GITHUB_WORKSPACE/packages/runtime/agent-runtime/src:tests" \
+            python -m pytest tests/test_matrix_production_hook.py -o addopts= -v --no-header
+
+      - name: Boundary and ADR-conformance checks
+        run: |
+          cd packages/integration/durable-execution
+          PYTHONPATH="src:$GITHUB_WORKSPACE/packages/runtime/agent-runtime/src:tests" \
+            python -m pytest tests/test_boundaries.py tests/test_adr_conformance.py \
+              -o addopts= -v --no-header
+
+      - name: Fail if any matrix row was skipped
+        run: |
+          python - <<'PY'
+          import sys, xml.etree.ElementTree as ET
+          root = ET.parse("/tmp/matrix.xml").getroot()
+          skipped = [
+              tc.get("name")
+              for tc in root.iter("testcase")
+              if tc.find("skipped") is not None
+          ]
+          if skipped:
+              print("A skipped row is NOT a passing row. Skipped:")
+              for name in skipped:
+                  print(f"  - {name}")
+              sys.exit(1)
+          print("No matrix row was skipped.")
+          PY
+
+      - name: Agent Runtime must be unaffected
+        run: |
+          # The dependency is one-way. The runtime's own suite runs unchanged, and its
+          # tree must carry no modification from this package.
+          python -m pytest packages/runtime/agent-runtime/tests -q
+          if ! git diff --quiet HEAD -- packages/runtime/agent-runtime; then
+            echo "packages/runtime/agent-runtime was modified; the dependency must stay one-way."
+            git --no-pager diff --stat HEAD -- packages/runtime/agent-runtime
+            exit 1
+          fi
+
+      - name: Postgres log (on failure)
+        if: failure()
+        run: sudo cat /tmp/ude-pg.log || true
+
+  build:
+    name: Wheel + sdist build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: |
+          python -m pip install --upgrade pip
+          pip install build
+      - run: python -m build packages/integration/durable-execution

@@ -37,8 +37,18 @@ from risk_authority.domain import (
     WorkflowStatus,
 )
 from risk_authority.integrations import InMemoryWorkflowIRSource
+from risk_authority.persistence import SqliteRiskAuthorityStore
 
 FIXED_NOW = datetime(2026, 8, 10, 12, 0, 0, tzinfo=timezone.utc)
+
+
+def durable_store(path=None) -> SqliteRiskAuthorityStore:
+    """A fresh file-backed store: what a production application must stand on (D-5)."""
+
+    import os
+    import tempfile
+
+    return SqliteRiskAuthorityStore(path or os.path.join(tempfile.mkdtemp(), "risk-authority.sqlite"))
 TENANT = "tenant_123"
 ACTOR = "agent_finance_07"
 MODEL = "model_xyz"

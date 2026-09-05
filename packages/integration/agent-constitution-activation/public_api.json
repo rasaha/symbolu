@@ -1,0 +1,75 @@
+{
+  "distribution": "ugence-agent-constitution-activation",
+  "namespace": "ugence_agent_constitution_activation",
+  "package_version": "0.1.0",
+  "note": "Machine-readable snapshot of the curated public API (ugence_agent_constitution_activation.__all__). Generated from the installed package; tests/test_public_api.py asserts this file equals the actual package surface, including dataclass field ORDER. This distribution is the ISSUANCE & ACTIVATION layer the ACC-IA round ratified: orchestration over the shared Ugence Policy Authority and the two constitution distributions, never a new authority. It wires a composition root whose trust (signer, signature verifier, always-required approval verifier) arrives already constructed via ugence_policy_authority.api protocols - the source provably cannot mint, read or persist key material, and no signing key, trust root or approval artifact exists anywhere in this repository. It dry-runs every pre-signing check as a mutation-free PreflightReport, orchestrates issue_policy and restates the outcome as an IssuanceReceipt carrying signer identity fields only (never key material, never signature bytes), derives the conformance resolver's (tenant_id, role_contract_ref) reference map ONLY from an issued record - one entry per reference in the carried artifact's own governed_role_refs, free-form entries unrepresentable, conflicts failing closed, every entry listed on the ActivationReceipt - and assembles the fail-closed constitution resolver, with the ACC-S1-Q3 family-collision guard run on every composition path. It reads no clock, opens no socket, holds no revocation seam, emits no disposition or reserved authority term (OD-C3=B), and takes no role or agent lifecycle authority (OD-C4=A).",
+  "constants": {},
+  "symbols": {
+    "ActivationCompositionError": {
+      "kind": "exception"
+    },
+    "ActivationReceipt": {
+      "kind": "dataclass",
+      "fields": [
+        "record_id",
+        "coordinate",
+        "activated_entries",
+        "activated_at"
+      ]
+    },
+    "ActivationRequestError": {
+      "kind": "exception"
+    },
+    "ActivationRoot": {
+      "kind": "class"
+    },
+    "AgentConstitutionActivationError": {
+      "kind": "exception"
+    },
+    "IssuanceReceipt": {
+      "kind": "dataclass",
+      "fields": [
+        "record_id",
+        "coordinate",
+        "policy_body_digest",
+        "issuing_authority_id",
+        "key_id",
+        "signature_alg",
+        "approving_authority_id",
+        "approval_ref",
+        "approval_digest",
+        "issued_at"
+      ]
+    },
+    "PreflightCheck": {
+      "kind": "dataclass",
+      "fields": [
+        "name",
+        "ok",
+        "detail"
+      ]
+    },
+    "PreflightReport": {
+      "kind": "dataclass",
+      "fields": [
+        "checks",
+        "policy_body_digest"
+      ]
+    },
+    "ReferenceMapConflictError": {
+      "kind": "exception"
+    },
+    "ReferenceMapDerivationError": {
+      "kind": "exception"
+    },
+    "build_activation_root": {
+      "kind": "function"
+    },
+    "populate_reference_map": {
+      "kind": "function"
+    },
+    "preflight_issuance": {
+      "kind": "function"
+    }
+  }
+}

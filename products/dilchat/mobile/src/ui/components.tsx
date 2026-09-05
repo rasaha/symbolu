@@ -58,7 +58,10 @@ export function Body({ children, muted }: { children: React.ReactNode; muted?: b
 export function ErrorText({ children }: { children: React.ReactNode }): React.ReactElement | null {
   if (!children) return null;
   return (
-    <Text accessibilityLiveRegion="polite" style={styles.error}>
+    // Errors are announced assertively (interrupting) so a screen-reader user is
+    // told immediately; `alert` role gives iOS VoiceOver the same behavior. The
+    // red color is never the only signal — the text itself states the problem.
+    <Text accessibilityRole="alert" accessibilityLiveRegion="assertive" style={styles.error}>
       {children}
     </Text>
   );
@@ -135,7 +138,13 @@ export function Card({ children }: { children: React.ReactNode }): React.ReactEl
 
 export function Loading({ label }: { label?: string }): React.ReactElement {
   return (
-    <View accessibilityRole="progressbar" style={styles.loading}>
+    <View
+      accessible
+      accessibilityRole="progressbar"
+      accessibilityLabel={label ?? "Loading"}
+      accessibilityLiveRegion="polite"
+      style={styles.loading}
+    >
       <ActivityIndicator color={colors.primary} />
       {label ? <Body muted>{label}</Body> : null}
     </View>

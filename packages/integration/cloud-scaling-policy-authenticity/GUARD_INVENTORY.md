@@ -10,6 +10,23 @@ below: Phase 5A raises; Phase 5B also returns `_refuse(...)` at a gate and
 another is not a stylistic choice — a raise-only reading of this package would miss
 49 of the guards below.
 
+## Static sites that decide more than one invariant
+
+Guard-coverage ADR §7.2, ruled at ratification: a guard inside a loop over a
+fixed set of flags is **one** static site with a recorded semantic
+multiplicity, not unrolled into one scored site per flag. One mutation
+neutralises all of them together, so a kill shows only that *at least one* is
+tested — the discrimination burden falls on the suite (§6's within-class
+criterion), not on this count. Each multiplicity below is read from the
+iterated constant in the source, not recorded by hand.
+
+| Module:line | Decides | Iterated over |
+|---|---|---|
+| `verification.py:1026` | 6 invariants | `type(value) is not datetime` |
+| `verification.py:1076` | 3 invariants | `instant < occurred_at` |
+
+So this package's 119 static guard sites decide 126 invariants in total.
+
 ## Reconciliation with the recorded inventories
 
 This package records no prior inventory; this is the first one.
@@ -27,9 +44,9 @@ survivor with no prior declaration fails the sweep.
 | `identifiers.py:196` | `equivalent-mutant` | The one of the five that is genuinely equivalent: all three domains are frozen literals in this module, in this distribution, so no resolution can move any of them and the condition is false in every program this package can be part of. | `tests/test_guard_coverage.py::test_the_import_time_separations_hold_for_the_installed_distributions` |
 | `resolution_port.py:193` | `diagnostic-only` | `None` cannot reach this guard without also failing `hasattr(registry, 'get_issued')` thirteen lines below, which raises the same PolicyAuthenticityConfigurationError: a None registry never has the attribute, so no isolating input exists. Kept because 'there is no ambient registry' is the more useful thing to tell a composition root than 'your registry lacks get_issued'. | `tests/test_guard_coverage.py::test_a_resolution_port_built_without_a_registry_is_refused` |
 | `resolution_port.py:195` | `diagnostic-only` | The same shape as the registry guard above: a None verifier always fails `hasattr(signature_verifier, 'verify')` below it with the same error class, so no input isolates this one. | `tests/test_guard_coverage.py::test_a_resolution_port_built_without_a_signature_verifier_is_refused` |
-| `verified.py:675` | `diagnostic-only` | Measured: with the guard removed, both recorded names fall through to the verified-fact lookup and raise the same VerifiedPolicyArtifactIntegrityError ('is not a fact of a verification artifact'). The guard changes the diagnosis from 'not a fact' to 'a recorded fact, not a verified one' — which is the difference between a typo and a category error, and is why it is kept. | `tests/test_guard_coverage.py::test_reading_a_recorded_fact_through_verified_fact_is_refused` |
-| `verified.py:775` | `equivalent-mutant` | A fact cannot be both verified and recorded. Both operands are frozen sets defined in this module, in this distribution, so the intersection is empty in every program this package can be part of. Kept because it is what makes a mis-classified new field fail at import rather than ship as a fact that is digest-covered and unattested. | `tests/test_guard_coverage.py::test_the_fact_partition_is_total_and_disjoint` |
-| `verified.py:780` | `equivalent-mutant` | Every declared field of the artifact must be classified verified or recorded. Both sides are read from this module — the two frozen sets and `dataclasses.fields(VerifiedPolicyAuthenticity)` — so the comparison cannot be made true by anything outside this distribution. | `tests/test_guard_coverage.py::test_the_fact_partition_is_total_and_disjoint` |
+| `verified.py:680` | `diagnostic-only` | Measured: with the guard removed, both recorded names fall through to the verified-fact lookup and raise the same VerifiedPolicyArtifactIntegrityError ('is not a fact of a verification artifact'). The guard changes the diagnosis from 'not a fact' to 'a recorded fact, not a verified one' — which is the difference between a typo and a category error, and is why it is kept. | `tests/test_guard_coverage.py::test_reading_a_recorded_fact_through_verified_fact_is_refused` |
+| `verified.py:780` | `equivalent-mutant` | A fact cannot be both verified and recorded. Both operands are frozen sets defined in this module, in this distribution, so the intersection is empty in every program this package can be part of. Kept because it is what makes a mis-classified new field fail at import rather than ship as a fact that is digest-covered and unattested. | `tests/test_guard_coverage.py::test_the_fact_partition_is_total_and_disjoint` |
+| `verified.py:785` | `equivalent-mutant` | Every declared field of the artifact must be classified verified or recorded. Both sides are read from this module — the two frozen sets and `dataclasses.fields(VerifiedPolicyAuthenticity)` — so the comparison cannot be made true by anything outside this distribution. | `tests/test_guard_coverage.py::test_the_fact_partition_is_total_and_disjoint` |
 | `verification.py:310` | `diagnostic-only` | The same construction as the two resolution_port guards above: a None port always fails `hasattr(port, 'resolve_policy_version')` five lines below, with the same PolicyAuthenticityConfigurationError, so no input isolates it. Kept because 'a port is required' is the more useful diagnosis than 'your port is the wrong shape'. | `tests/test_guard_coverage.py::test_a_verifier_built_without_a_resolution_port_is_refused` |
 | `verification.py:685` | `diagnostic-only` | Each of the three published descriptor fields is backed by a successor carrying the same POLICY_PROJECTION_ABSENT outcome: a None adapter id or policy type fails the exact-str check on the next line, and a None projection fails the Mapping check below that. `None` cannot pass either, so no isolating input exists. Kept because naming *which* fields are absent is what tells a port author what to publish. | `tests/test_guard_coverage.py::test_a_resolution_publishing_no_descriptor_projection_is_refused` |
 
@@ -68,34 +85,34 @@ survivor with no prior declaration fails the sweep.
 | 21 | `resolution_port.py:210` | if | raise | SCORED | — | `not hasattr(signature_verifier, 'verify')` |
 | 22 | `resolution_port.py:354` | if | raise | SCORED | — | `REFERENCE_GRADE_PORTS and isinstance(port, REFERENCE_GRADE_PORTS)` |
 | 23 | `resolution_port.py:359` | if | raise | SCORED | — | `getattr(port, 'is_production_authoritative', False) is not True` |
-| 24 | `verified.py:279` | if | raise | SCORED | — | `smuggled` |
-| 25 | `verified.py:296` | if | raise | SCORED | — | `not_a_field` |
-| 26 | `verified.py:356` | if | raise | SCORED | — | `isinstance(value, bool) or type(value) is not int` |
-| 27 | `verified.py:360` | if | raise | SCORED | — | `value < 0` |
-| 28 | `verified.py:446` | if | raise | SCORED | — | `self.construction_token is not _VERIFICATION_TOKEN` |
-| 29 | `verified.py:453` | if | raise | SCORED | — | `self.verification_profile != VERIFICATION_PROFILE` |
-| 30 | `verified.py:457` | if | raise | SCORED | — | `self.verification_profile_version != VERIFICATION_PROFILE_VERSION` |
-| 31 | `verified.py:461` | if | raise | SCORED | — | `self.policy_trust_anchor_owner != POLICY_TRUST_ANCHOR_OWNER` |
-| 32 | `verified.py:466` | if | raise | SCORED | — | `self.authority_protocol_id != POLICY_AUTHORITY_PROTOCOL_ID` |
-| 33 | `verified.py:471` | if | raise | SCORED | — | `self.authority_canonicalization_version != POLICY_AUTHORITY_CANONICALIZATIO…` |
-| 34 | `verified.py:476` | if | raise | SCORED | — | `self.signature_alg not in SUPPORTED_SIGNATURE_ALGORITHMS` |
-| 35 | `verified.py:488` | if | raising-helper call | SCORED | — | `self.candidate_digest_fact is not None` |
-| 36 | `verified.py:495` | if | raise | SCORED | — | `self.capacity_bounds_fact is not None` |
-| 37 | `verified.py:496` | if | raise | SCORED | — | `type(self.capacity_bounds_fact) is not tuple` |
-| 38 | `verified.py:501` | if | raise | SCORED | — | `not self.capacity_bounds_fact` |
-| 39 | `verified.py:508` | if | raise | SCORED | — | `type(bound) is not VerifiedCapacityBound` |
-| 40 | `verified.py:516` | if | raise | SCORED | — | `len(set(selectors)) != len(selectors)` |
-| 41 | `verified.py:525` | if | raise | SCORED | — | `self.policy_content_digest != self.policy_body_digest` |
-| 42 | `verified.py:534` | if | raise | SCORED | — | `self.artifact_digest != expected` |
-| 43 | `verified.py:675` | if | raise | EXCLUDED | — | `name in RECORDED_FACT_NAMES` |
-| 44 | `verified.py:681` | if | raise | SCORED | — | `name not in VERIFIED_FACT_NAMES` |
-| 45 | `verified.py:695` | if | raise | SCORED | — | `name not in RECORDED_FACT_NAMES` |
-| 46 | `verified.py:737` | if | raise | SCORED | — | `type(value) is not VerifiedPolicyAuthenticity` |
-| 47 | `verified.py:751` | if | raise | SCORED | — | `value.construction_token is not _VERIFICATION_TOKEN` |
-| 48 | `verified.py:756` | if | raise | SCORED | — | `value.artifact_digest not in _MINTED_DIGESTS` |
-| 49 | `verified.py:763` | if | raise | SCORED | — | `value.artifact_digest != value.digest()` |
-| 50 | `verified.py:775` | if | raise | EXCLUDED | — | `VERIFIED_FACT_NAMES & RECORDED_FACT_NAMES` |
-| 51 | `verified.py:780` | if | raise | EXCLUDED | — | `_PARTITIONED != _DECLARED` |
+| 24 | `verified.py:284` | if | raise | SCORED | — | `smuggled` |
+| 25 | `verified.py:301` | if | raise | SCORED | — | `not_a_field` |
+| 26 | `verified.py:361` | if | raise | SCORED | — | `isinstance(value, bool) or type(value) is not int` |
+| 27 | `verified.py:365` | if | raise | SCORED | — | `value < 0` |
+| 28 | `verified.py:451` | if | raise | SCORED | — | `self.construction_token is not _VERIFICATION_TOKEN` |
+| 29 | `verified.py:458` | if | raise | SCORED | — | `self.verification_profile != VERIFICATION_PROFILE` |
+| 30 | `verified.py:462` | if | raise | SCORED | — | `self.verification_profile_version != VERIFICATION_PROFILE_VERSION` |
+| 31 | `verified.py:466` | if | raise | SCORED | — | `self.policy_trust_anchor_owner != POLICY_TRUST_ANCHOR_OWNER` |
+| 32 | `verified.py:471` | if | raise | SCORED | — | `self.authority_protocol_id != POLICY_AUTHORITY_PROTOCOL_ID` |
+| 33 | `verified.py:476` | if | raise | SCORED | — | `self.authority_canonicalization_version != POLICY_AUTHORITY_CANONICALIZATIO…` |
+| 34 | `verified.py:481` | if | raise | SCORED | — | `self.signature_alg not in SUPPORTED_SIGNATURE_ALGORITHMS` |
+| 35 | `verified.py:493` | if | raising-helper call | SCORED | — | `self.candidate_digest_fact is not None` |
+| 36 | `verified.py:500` | if | raise | SCORED | — | `self.capacity_bounds_fact is not None` |
+| 37 | `verified.py:501` | if | raise | SCORED | — | `type(self.capacity_bounds_fact) is not tuple` |
+| 38 | `verified.py:506` | if | raise | SCORED | — | `not self.capacity_bounds_fact` |
+| 39 | `verified.py:513` | if | raise | SCORED | — | `type(bound) is not VerifiedCapacityBound` |
+| 40 | `verified.py:521` | if | raise | SCORED | — | `len(set(selectors)) != len(selectors)` |
+| 41 | `verified.py:530` | if | raise | SCORED | — | `self.policy_content_digest != self.policy_body_digest` |
+| 42 | `verified.py:539` | if | raise | SCORED | — | `self.artifact_digest != expected` |
+| 43 | `verified.py:680` | if | raise | EXCLUDED | — | `name in RECORDED_FACT_NAMES` |
+| 44 | `verified.py:686` | if | raise | SCORED | — | `name not in VERIFIED_FACT_NAMES` |
+| 45 | `verified.py:700` | if | raise | SCORED | — | `name not in RECORDED_FACT_NAMES` |
+| 46 | `verified.py:742` | if | raise | SCORED | — | `type(value) is not VerifiedPolicyAuthenticity` |
+| 47 | `verified.py:756` | if | raise | SCORED | — | `value.construction_token is not _VERIFICATION_TOKEN` |
+| 48 | `verified.py:761` | if | raise | SCORED | — | `value.artifact_digest not in _MINTED_DIGESTS` |
+| 49 | `verified.py:768` | if | raise | SCORED | — | `value.artifact_digest != value.digest()` |
+| 50 | `verified.py:780` | if | raise | EXCLUDED | — | `VERIFIED_FACT_NAMES & RECORDED_FACT_NAMES` |
+| 51 | `verified.py:785` | if | raise | EXCLUDED | — | `_PARTITIONED != _DECLARED` |
 | 52 | `verification.py:152` | if | raise | SCORED | — | `type(self.outcome) is not _Outcome` |
 | 53 | `verification.py:157` | if | raise | SCORED | — | `self.outcome is _Outcome.VERIFIED` |
 | 54 | `verification.py:190` | if | raise | SCORED | — | `(self.verified_policy is None) == (self.refusal is None)` |

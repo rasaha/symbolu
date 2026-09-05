@@ -24,6 +24,8 @@ dependencies = [
     "pydantic-settings>=2.3",
     "python-multipart>=0.0.9",
     "structlog>=24.1",
+    # Phase 3C relay: HTTP client for the Expo push transport.
+    "httpx>=0.27",
 ]
 
 [project.optional-dependencies]

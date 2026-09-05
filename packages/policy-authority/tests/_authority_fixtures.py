@@ -318,7 +318,7 @@ class Authority:
         )
 
 
-def make_authority(*, adapters: Optional[AdapterRegistry] = None, **signer_kwargs) -> Authority:
+def make_authority(*, adapters: Optional[AdapterRegistry] = None, registry=None, **signer_kwargs) -> Authority:
     signer = make_signer(**signer_kwargs)
     revoker = make_signer(
         authority_id=REVOKING_AUTHORITY, key_id="policy-authority-revocation-key-1", seed=7
@@ -333,7 +333,7 @@ def make_authority(*, adapters: Optional[AdapterRegistry] = None, **signer_kwarg
         signer=signer,
         revocation_signer=revoker,
         key_ring=key_ring,
-        registry=InMemoryPolicyRegistry(),
+        registry=registry if registry is not None else InMemoryPolicyRegistry(),
         approval=RecordingApprovalVerifier(),
         adapters=adapters if adapters is not None else default_uvi_adapters(),
     )
@@ -345,6 +345,8 @@ def registry_snapshot(registry) -> tuple:
     from ugence_policy_authority.core.canonical import canonical_bytes
 
     inner = getattr(registry, "inner", registry)
+    if hasattr(inner, "snapshot"):
+        return inner.snapshot()
     return (
         tuple(sorted(canonical_bytes(r.record_id) for r in inner._issued.values())),
         tuple(sorted(canonical_bytes(r.revocation_id) for r in inner._revocations.values())),

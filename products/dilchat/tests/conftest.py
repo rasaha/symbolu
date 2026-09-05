@@ -34,6 +34,13 @@ async def ctx():
         environment=Environment.TEST,
         database_url="sqlite+aiosqlite://",
         astrology_provider="fake",
+        # High-volume 3A tests legitimately send >30 messages/minute; raise the
+        # SEND windows so they are not throttled. The ratified production
+        # defaults are pinned by tests/unit/test_ratified_rate_limits.py, and
+        # enforcement is proven by seeding counters to the configured limit
+        # (tests/integration/test_safety_flows.py), independent of the values.
+        ratelimit_send_per_minute=10_000,
+        ratelimit_send_per_hour=100_000,
     )
     engine = db_module.init_engine(settings)
     async with engine.begin() as conn:

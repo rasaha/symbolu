@@ -184,6 +184,17 @@ class DeploymentChannelIngress:
         return self._trusted
 
 
+def durable_store():
+    """A fresh file-backed Risk Authority store: what production mode stands on (D-5)."""
+
+    import os
+    import tempfile
+
+    from risk_authority.persistence import SqliteRiskAuthorityStore
+
+    return SqliteRiskAuthorityStore(os.path.join(tempfile.mkdtemp(), "risk-authority.sqlite"))
+
+
 def build_runtime(
     *,
     tap_provider=None,
@@ -191,6 +202,7 @@ def build_runtime(
     evidence_admission=None,
     evidence_ingress=None,
     clock=lambda: FIXED_NOW,
+    persistence=None,
 ) -> RiskAuthorityEvidenceRuntime:
     source = InMemoryWorkflowIRSource()
     source.register(build_workflow())
@@ -211,6 +223,7 @@ def build_runtime(
         # caller evidence is dropped.
         evidence_ingress=evidence_ingress or DeploymentChannelIngress(trusted=True),
         decision_authority=ProductionDecisionAuthorityDouble(),
+        persistence=persistence if persistence is not None else durable_store(),
     )
     runtime.application.authority.add_grant(build_grant())
     return runtime

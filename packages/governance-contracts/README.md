@@ -6,7 +6,7 @@ never have to depend on each other.
 
 - **Distribution:** `ugence-governance-contracts`
 - **Namespace:** `ugence_governance_contracts`
-- **Version:** 0.1.0 · **Contract version:** 1.0.0
+- **Version:** 0.5.0 · **Contract version:** 1.0.0
 - **Dependencies:** Python standard library only (no third-party, no other Ugence package)
 - **Typing:** fully type-annotated; ships a PEP 561 `py.typed` marker
 - **Ownership / maturity:** extracted verbatim from the frozen `governance_providers`
@@ -27,6 +27,7 @@ and what it returns*, independent of any concrete implementation:
 | Provider metadata | `ProviderKind`, `ProviderDescriptor`, `ProviderCapabilities`, `ProviderCompatibility`, `ProviderHealth` |
 | Lifecycle | `ProviderLifecycleState` |
 | Errors | `FailureClass`, `ProviderError` (+8 subclasses) |
+| Audit correlation (G4) | `AuditReference`, `AuditContractError` |
 
 ## Authority boundary
 
@@ -144,6 +145,89 @@ TransformationMethod.DIRECT`; `AuthorityStatus.UNVERIFIED → AttestationStatus.
 `AttributionStatus.NOT_ATTRIBUTED`. This mapping is **not** wired into
 `governed-value` in this phase.
 
+## Neutral idempotency and validity contracts (G7, G8)
+
+Additive, neutral vocabulary for two questions every execution seam asks and
+the frozen provider contracts left to free strings and ad-hoc fields: *is this
+the same logical action again?* and *is this artifact still good?* **Contracts
+and structural invariants only** — neither family is a deduplication store, a
+reservation ledger, a clock, a verifier or an authority. Atomic one-time
+reservation and replay protection belong to the execution ledger that Action
+Clearance's phase G names; these contracts give it one vocabulary.
+
+**Idempotency (G7)** — `IdempotencyKey` is the identity of one logical action:
+the caller's `key`, the coordinates its `IdempotencyScope` names, and an opaque
+`partition` token reserved for the tenant/environment coordinate (G1, G2).
+
+| `IdempotencyScope` | identity |
+|---|---|
+| `GLOBAL` | `key` |
+| `ACTOR` | `actor` + `key` |
+| `TARGET_RESOURCE` | `target_resource` + `key` |
+| `ACTOR_AND_TARGET` | `actor` + `target_resource` + `key` |
+
+A coordinate the scope does not name must be empty, so one identity has exactly
+one `canonical_digest()`. A producer that adopts the contract places that digest
+in the existing free-string `idempotency_key` field, which makes the field
+scope-bound and fixed-width without changing its type or default.
+`IdempotencyResolution` reports how a receiver classified the identity:
+`FIRST`, `DUPLICATE` (then `duplicate_of` names the original and is required) or
+`UNKNOWN`, which is never first and never determinate — a consumer that cannot
+tell whether it has already acted fails closed.
+
+**Validity (G8)** — `Validity` is a half-open `[issued_at, expires_at)` window
+with an optional `stale_after` soft bound strictly inside it. `status_at(as_of)`
+returns exactly one `ValidityStatus` by precedence: `NOT_YET_VALID`, `EXPIRED`,
+`STALE`, `FRESH`. Staleness is **derived at an explicit instant, never stored**
+and never read from a clock; every instant must be timezone-aware and a naive
+one is rejected. Instants canonicalize in UTC exactly as `AssessedSystemBinding`
+does. Mapping to the frozen fields is documentation only:
+`ActionGovernanceResult.expiry == validity.expires_at` and
+`ActionGovernanceRequest.authorization_expired == not validity.is_valid_at(as_of)`.
+
+## Neutral audit reference (G4)
+
+**Audit reference (G4)** — `AuditReference` is a digest-bound pointer to **one
+entry in one audit store**: `tenant_id`, `store_ref`, `entry_ref`, `entry_digest`,
+plus an optional `correlation_id` and a `recorded_at` that must be timezone-aware
+when present. It carries **no identity of its own** — it is a value, not an entity:
+`(tenant_id, store_ref, entry_ref)` is the location and `canonical_digest()` is the
+handle. A synthetic reference id would be minted independently by each producer, so
+two records citing one entry would digest differently for no reason a consumer could
+act on. It exists so a governance record can cite the audit
+entry that explains it, and so two records citing one entry can be recognised as
+doing so — `points_to_same_entry()` compares the location, `agrees_with()` also
+compares the digest, which is how a consumer detects that one of them saw
+different content.
+
+**It does not unify the audit stores.** The gap statement named three shapes; the
+platform now has more — the kernel's `AuditRepository` port, a durable hash-linked
+log in storygraph, and separate append-only event tables in policy-authority,
+risk_authority, execution-reservation, approval-workflow and authority-directory.
+This contract gives them one way to be *pointed at*, so entries correlate across
+stores without any store changing, merging or moving. Convergence is a migration
+this contract deliberately does not attempt.
+
+Three things it deliberately does not carry: the entry **body** (a reference that
+embedded the record would be a second copy of the audit — the fragmentation G4
+describes, not a fix for it); an **event-type vocabulary** (Decision Authority's
+`AuditEventType` is frozen at 1.0.0 and owns those names); and a **chain head or
+previous-entry hash** (hash-linking is each store's own property, and requiring it
+here would oblige every store to change). It is not a log, a sink, a hash chain, a
+verifier or an authority.
+
+**The evidence half of G4 was already closed.** D-4 names an `AuditRef`/`EvidenceRef`
+pair, but `EvidenceReference` — digest-bound, tenant- and subject-scoped, with a
+`supersedes_ref` — already is that evidence pointer. No second evidence reference is
+minted, and a test asserts only one exists.
+
+**Why new families rather than new fields.** The provider dataclasses' fields,
+defaults, constructor signatures and serialized forms are pinned byte-for-byte
+by the serialization-equivalence tests, and any key added to their `asdict`
+output would silently move every fingerprint a consumer computes over an
+existing request. So `CONTRACT_VERSION` stays `1.0.0`; the package version
+advances to `0.4.0`, and to `0.5.0` for G4.
+
 ## Compatibility paths
 
 The neutral contracts previously lived in `governance_providers`. Those paths still
@@ -165,9 +249,12 @@ Removal/review target: `governance_providers` 0.2.0. See `MIGRATION.md`.
 
 ## Known limitations / deferred
 
-This phase is a **physical** extraction only. Known platform-contract gaps
-(missing `tenant_id`/`environment_id`, no standard error *envelope*, no
-idempotency/expiry *contract*, fragmented CER/audit shapes) are **documented, not
-implemented** — see
-`docs/migrations/governance_contracts/CONTRACT_GAPS_AND_EVOLUTION_PLAN.md`. A
-versioned contract-evolution phase owns those.
+This phase is a **physical** extraction only. Of the platform-contract gaps
+in `docs/migrations/governance_contracts/CONTRACT_GAPS_AND_EVOLUTION_PLAN.md`,
+**G7 (idempotency) and G8 (validity) landed in 0.4.0**, and **G4's contract half
+(the neutral audit reference) landed in 0.5.0**, all as additive neutral families.
+G4's *unification* half did not: six durable audit stores plus the kernel port stay
+exactly where they are, and converging them is an unscoped migration. The rest
+(missing `tenant_id`/`environment_id`, no standard error *envelope*, G5 CER
+fragmentation, no cross-product result envelope) remain **documented, not
+implemented**; the versioned contract-evolution phase owns them.

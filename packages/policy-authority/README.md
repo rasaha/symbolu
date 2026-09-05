@@ -238,10 +238,45 @@ The registry is **reference-grade and process-local**:
   lock, so concurrent threads in this process cannot interleave into a corrupt
   state.
 
-**This is not distributed or durable atomicity, and is not claimed to be.**
-There is no durability, no replication, no cross-process visibility, and no
-operational story. Production persistence and distributed concurrency are
-deferred (ADR §15.7).
+**The in-memory registry is not durable and does not claim to be.** It stays
+the process-local test reference and is refused in production mode.
+
+### Durable registry (ADR §15.7, closed under decision D-3)
+
+`SqlitePolicyRegistry` is the single-node durable registry, adopting Benchmark
+Registry ruling D-22 Posture B: stdlib `sqlite3`, WAL journal, every append
+inside `BEGIN IMMEDIATE`, exact-coordinate lookup only, issuance, revocation and
+supersession in three append-only tables guarded by triggers that refuse
+`UPDATE` and `DELETE`, and one hash-linked `ledger_events` table so tampering by
+a privileged writer is detectable after the fact (`verify_chain()`). It keeps
+every rule above: idempotent only for a canonically identical record, typed
+conflict for any other reuse of a slot, cross-tenant lookup the same miss, and
+successor plus supersession committed as one transaction or not at all.
+
+Rehydration is family-owned. The core defines the `PolicyArtifactCodec` port and
+never implements it; `UviPolicyArtifactCodec` rebuilds the five UVI families from
+the same canonical structure their body digest is computed over, driven by the
+contracts' own type annotations, so trusted resolution succeeds from a cold
+start with every digest and signature re-checked. A stored record the configured
+codec cannot rehydrate is a `PolicyRegistryStorageError`, never `None`: an
+unreadable record is not an absent one.
+
+What each registry claims is a typed declaration, not prose:
+`declared_consistency(registry)` returns a `PolicyRegistryConsistencyDescriptor`
+whose answers are derived read-only properties of its scope.
+
+| Guarantee | `PROCESS_LOCAL_ONLY` (in-memory) | `SINGLE_NODE_DURABLE` (SQLite) |
+|---|---|---|
+| process-local atomicity, read-after-write | claimed | claimed |
+| durability across restart | disclaimed | claimed |
+| multi-process coordination on one host | disclaimed | claimed |
+| cross-process atomic revocation | disclaimed | claimed |
+| distributed strong consistency | disclaimed | **disclaimed** |
+| eventual-consistency safety | disclaimed | **disclaimed** |
+
+There is no replication, no second node, no high availability and no production
+key-custody story; a `:memory:` path is refused in production mode. No public
+resolution semantics and no signing behaviour changed.
 
 ---
 

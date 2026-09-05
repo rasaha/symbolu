@@ -1,0 +1,300 @@
+{
+  "curated_api_module": "ugence_incident_response",
+  "distribution": "ugence-incident-response",
+  "namespace": "ugence_incident_response",
+  "note": "Machine-readable snapshot of the curated public API (ugence_incident_response.__all__). tests/packaging/test_packaging.py asserts this file equals the live package surface. Regenerate with scripts/generate_public_api.py when the curated API changes deliberately.",
+  "package_version": "0.1.0",
+  "symbols": {
+    "AuditReference": {
+      "fields": [
+        "tenant_id",
+        "store_ref",
+        "entry_ref",
+        "entry_digest",
+        "correlation_id",
+        "recorded_at"
+      ],
+      "kind": "dataclass"
+    },
+    "CONTRACT_VERSION": {
+      "kind": "constant",
+      "value": "incident_response.v1"
+    },
+    "ContainmentLift": {
+      "fields": [
+        "incident_id",
+        "tenant_id",
+        "target_ref",
+        "justification",
+        "lifted_at",
+        "lifted_by",
+        "request_digest"
+      ],
+      "kind": "dataclass"
+    },
+    "ContainmentLiftRefused": {
+      "kind": "class",
+      "methods": [
+        "add_note",
+        "with_traceback"
+      ]
+    },
+    "ContainmentRequest": {
+      "fields": [
+        "incident_id",
+        "tenant_id",
+        "target_ref",
+        "reason",
+        "requested_at",
+        "requested_by"
+      ],
+      "kind": "dataclass"
+    },
+    "ContainmentState": {
+      "kind": "enum",
+      "values": [
+        "NONE",
+        "REQUESTED",
+        "LIFTED"
+      ]
+    },
+    "ContractViolation": {
+      "kind": "class",
+      "methods": [
+        "add_note",
+        "with_traceback"
+      ]
+    },
+    "ENFORCEMENT_ENABLED": {
+      "kind": "constant",
+      "value": false
+    },
+    "INCIDENT_ID_PREFIX": {
+      "kind": "constant",
+      "value": "inc_"
+    },
+    "IllegalTransitionError": {
+      "kind": "class",
+      "methods": [
+        "add_note",
+        "with_traceback"
+      ]
+    },
+    "IncidentJournalPort": {
+      "kind": "class",
+      "methods": [
+        "contained_incidents",
+        "get_incident",
+        "incidents_for_subject",
+        "open_incidents"
+      ]
+    },
+    "IncidentRecord": {
+      "fields": [
+        "incident_id",
+        "tenant_id",
+        "subject_ref",
+        "severity_label",
+        "evidence",
+        "opened_at",
+        "opened_by",
+        "state",
+        "containment",
+        "containment_request",
+        "containment_lift",
+        "summary",
+        "closed_at",
+        "closed_by"
+      ],
+      "kind": "dataclass"
+    },
+    "IncidentResponseError": {
+      "kind": "class",
+      "methods": [
+        "add_note",
+        "with_traceback"
+      ]
+    },
+    "IncidentState": {
+      "kind": "enum",
+      "values": [
+        "OPEN",
+        "CONTAINMENT_REQUESTED",
+        "REMEDIATION_PROPOSED",
+        "CLOSED"
+      ]
+    },
+    "LEGAL_TRANSITIONS": {
+      "keys": [
+        "IncidentState.CLOSED",
+        "IncidentState.CONTAINMENT_REQUESTED",
+        "IncidentState.OPEN",
+        "IncidentState.REMEDIATION_PROPOSED"
+      ],
+      "kind": "mapping"
+    },
+    "MATURITY": {
+      "kind": "constant",
+      "value": "CONTRACTS_ONLY"
+    },
+    "OPEN_STATES": {
+      "kind": "frozenset",
+      "values": [
+        "IncidentState.CONTAINMENT_REQUESTED",
+        "IncidentState.OPEN",
+        "IncidentState.REMEDIATION_PROPOSED"
+      ]
+    },
+    "ReassessmentSignalPayload": {
+      "fields": [
+        "schema_version",
+        "event_id",
+        "tenant_id",
+        "target_type",
+        "target_id",
+        "change_type",
+        "source",
+        "source_version",
+        "observed_at",
+        "reason",
+        "correlation_id",
+        "evidence_refs",
+        "control_refs",
+        "prior_state_ref"
+      ],
+      "kind": "dataclass"
+    },
+    "RemediationProposal": {
+      "fields": [
+        "incident_id",
+        "tenant_id",
+        "proposed_action",
+        "justification",
+        "proposed_at",
+        "proposed_by",
+        "compensation_ref"
+      ],
+      "kind": "dataclass"
+    },
+    "SIGNAL_SCHEMA_VERSION": {
+      "kind": "constant",
+      "value": "1"
+    },
+    "STATE_RANK": {
+      "keys": [
+        "IncidentState.CLOSED",
+        "IncidentState.CONTAINMENT_REQUESTED",
+        "IncidentState.OPEN",
+        "IncidentState.REMEDIATION_PROPOSED"
+      ],
+      "kind": "mapping"
+    },
+    "SignalChangeType": {
+      "kind": "enum",
+      "values": [
+        "RUNTIME_RISK_ESCALATED",
+        "EXECUTION_EFFECT_MISMATCH"
+      ]
+    },
+    "SignalTargetType": {
+      "kind": "enum",
+      "values": [
+        "ENVELOPE",
+        "SUBJECT",
+        "MODEL",
+        "WORKFLOW",
+        "POLICY",
+        "TENANT"
+      ]
+    },
+    "TERMINAL_STATES": {
+      "kind": "frozenset",
+      "values": [
+        "IncidentState.CLOSED"
+      ]
+    },
+    "__version__": {
+      "kind": "constant",
+      "value": "0.1.0"
+    },
+    "canonical_instant": {
+      "kind": "function",
+      "parameters": [
+        "value",
+        "name"
+      ]
+    },
+    "contained_incidents": {
+      "kind": "function",
+      "parameters": [
+        "incidents",
+        "tenant_id"
+      ]
+    },
+    "incident_id_for": {
+      "kind": "function",
+      "parameters": [
+        "tenant_id",
+        "subject_ref",
+        "evidence",
+        "opened_at"
+      ]
+    },
+    "incidents_for_subject": {
+      "kind": "function",
+      "parameters": [
+        "incidents",
+        "tenant_id",
+        "subject_ref"
+      ]
+    },
+    "is_legal_transition": {
+      "kind": "function",
+      "parameters": [
+        "current",
+        "target"
+      ]
+    },
+    "lift_refusals": {
+      "kind": "function",
+      "parameters": [
+        "lift",
+        "request",
+        "incident"
+      ]
+    },
+    "open_incidents": {
+      "kind": "function",
+      "parameters": [
+        "incidents",
+        "tenant_id"
+      ]
+    },
+    "require_admissible_lift": {
+      "kind": "function",
+      "parameters": [
+        "lift",
+        "request",
+        "incident"
+      ]
+    },
+    "require_transition": {
+      "kind": "function",
+      "parameters": [
+        "current",
+        "target"
+      ]
+    },
+    "signal_for_containment": {
+      "kind": "function",
+      "parameters": [
+        "incident",
+        "request",
+        "target_type",
+        "change_type",
+        "source_version",
+        "correlation_id"
+      ]
+    }
+  }
+}

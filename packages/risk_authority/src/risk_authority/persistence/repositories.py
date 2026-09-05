@@ -11,6 +11,7 @@ from __future__ import annotations
 
 from typing import Optional, Protocol, runtime_checkable
 
+from ..domain.actions import ActionAuthorization
 from ..domain.authority import AuthorityGrant
 from ..domain.controls import ControlResult
 from ..domain.decision import RiskDecision
@@ -27,6 +28,7 @@ __all__ = [
     "ControlResultRepository",
     "EvidenceRepository",
     "GovernanceEventStore",
+    "AuthorizationRepository",
 ]
 
 
@@ -70,6 +72,17 @@ class EvidenceRepository(Protocol):
     def get(
         self, tenant_id: str, evidence_id: str
     ) -> Optional[ControlEvidenceRecord]: ...
+
+
+@runtime_checkable
+class AuthorizationRepository(Protocol):
+    """Phase 5C admissions (D-3). ``save`` refuses an existing id whose stored
+    ``action_digest`` differs; the same id with the same digest is idempotent."""
+
+    def save(self, authorization: ActionAuthorization) -> None: ...
+    def get(
+        self, tenant_id: str, authorization_id: str
+    ) -> Optional[ActionAuthorization]: ...
 
 
 @runtime_checkable

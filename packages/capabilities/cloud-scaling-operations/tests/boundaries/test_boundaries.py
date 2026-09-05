@@ -58,13 +58,14 @@ def test_canonical_and_legacy_object_identity():
 def test_auto_approval_cannot_drive_live_actuator():
     # Hard guard: auto_approve_threshold + a non-dry-run actuator is refused.
     from ugence_cloud_scaling_operations.orchestrator import (
-        ProductionOrchestrator, OrchestratorConfig)
+        AutoApprovalRefused, ProductionOrchestrator, OrchestratorConfig)
     from ugence_cloud_scaling_operations.recommend.engine import RecommendConfig
     from ugence_cloud_scaling_operations.action.k8s_actuator import ActuatorConfig, ActuatorMode
     cfg = OrchestratorConfig(
         auto_approve_threshold="high",
         recommend=RecommendConfig(actuator=ActuatorConfig(mode=ActuatorMode.SCALE_PATCH)))
-    with pytest.raises(RuntimeError):
+    # The orchestrator's own guard answers first; the engine's (containment D-1) stands behind it.
+    with pytest.raises(AutoApprovalRefused):
         ProductionOrchestrator(cfg)
 
 

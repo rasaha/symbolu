@@ -70,8 +70,19 @@
     {
       "audit_or_denial": true,
       "blocked_before_transmission": true,
-      "detail": "refused: RuntimeError",
+      "detail": "refused: AutoApprovalRefused",
       "entrypoint": "ProductionOrchestrator(auto-approve + live actuator)",
+      "fallback_bypass": false,
+      "mutation_path_reached": true,
+      "passed": true,
+      "result": "refused",
+      "transport_write_calls": 0
+    },
+    {
+      "audit_or_denial": true,
+      "blocked_before_transmission": true,
+      "detail": "refused: MutatingActuatorRefused",
+      "entrypoint": "RecommendEngine(SCALE_PATCH actuator, manual approval)",
       "fallback_bypass": false,
       "mutation_path_reached": true,
       "passed": true,
@@ -157,11 +168,11 @@
     }
   ],
   "evidence_class": "FAKE_LOCAL_FIXTURE",
-  "passed": 14,
+  "passed": 15,
   "real_cluster_accessed": false,
   "real_environment_observed": false,
   "real_network_transmissions": 0,
   "socket_opens": 1,
-  "total": 14,
+  "total": 15,
   "transmitted_write_methods": []
 }

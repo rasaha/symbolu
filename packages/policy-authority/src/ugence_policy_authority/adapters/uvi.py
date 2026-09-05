@@ -52,12 +52,14 @@ from ugence_uvi_policy_contracts.api import (
 
 from ..core.adapters import PolicyArtifactDescriptor, PolicyCoordinate
 from ..core.canonical import to_canonical_obj
+from ..core.codec import decode_dataclass
 from ..core.errors import PolicyAuthorityRequestError, UnsupportedPolicyArtifactError
 
 __all__ = [
     "UVI_ADAPTER_ID",
     "SUPPORTED_UVI_POLICY_FAMILIES",
     "UviPolicyFamilyAdapter",
+    "UviPolicyArtifactCodec",
     "uvi_coordinate",
 ]
 
@@ -187,3 +189,49 @@ class UviPolicyFamilyAdapter:
         # are untouched and remain bound.
         body["metadata"] = {k: v for k, v in metadata.items() if k != "content_digest"}
         return body
+
+
+class UviPolicyArtifactCodec:
+    """Rehydrates the five UVI policy families from their canonical projection.
+
+    The durable registry stores each artifact as the same canonical structure
+    :func:`to_canonical_obj` produces for digesting, and asks this codec to
+    rebuild the exact runtime type on read. Decoding is driven by the contracts'
+    own type annotations (dataclass fields, enums, tuples, optionals, aware
+    datetimes), so a field the contracts add later is decoded without a change
+    here, and a value the contracts refuse at construction is refused on read
+    exactly as it would be on issuance.
+
+    Refuses anything that is not one of the five families under this adapter's
+    id: a record this codec cannot rehydrate is a storage integrity failure, not
+    an absent record.
+    """
+
+    adapter_id = UVI_ADAPTER_ID
+
+    _TYPES_BY_NAME: dict[str, type] = {
+        cls.__name__: cls for cls in SUPPORTED_UVI_POLICY_FAMILIES.values()
+    }
+
+    def encode(self, policy: object) -> Any:
+        if type(policy) not in _FAMILY_BY_TYPE:
+            raise UnsupportedPolicyArtifactError(
+                f"{type(policy).__name__!r} is not a UVI policy family artifact"
+            )
+        return to_canonical_obj(policy, path="$")
+
+    def decode(self, *, adapter_id: str, policy_type: str, canonical: Any) -> object:
+        if adapter_id != UVI_ADAPTER_ID:
+            raise UnsupportedPolicyArtifactError(
+                f"UviPolicyArtifactCodec does not decode artifacts of adapter {adapter_id!r}"
+            )
+        cls = self._TYPES_BY_NAME.get(policy_type)
+        if cls is None:
+            raise UnsupportedPolicyArtifactError(
+                f"{policy_type!r} is not one of the five supported UVI policy families"
+            )
+        policy = decode_dataclass(cls, canonical, path="$")
+        if type(policy) is not cls:
+            raise UnsupportedPolicyArtifactError("decoded artifact is not the declared type")
+        return policy
+

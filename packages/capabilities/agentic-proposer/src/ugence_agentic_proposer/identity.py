@@ -136,6 +136,14 @@ def _unsigned_advisory_payload_model():
         strategy_policy_id: c.Token
         strategy_policy_version: c.Token
         declared_strategy: c.ReasoningStrategy
+        # `ACC-AM-2`'s pair. G2's equivalence obligation requires this private
+        # payload to carry the same fields, defaults, validators and serializers
+        # ``ProposerAdvisory`` does; omitting them here would put the governing
+        # constitution's identity inside the advisory and OUTSIDE ``P_unsigned``
+        # — which is precisely the weak linked-record guarantee `OD-C1=B`
+        # rejected on `S2B-D6=B1`'s precedent.
+        constitution_policy_id: c.Token
+        constitution_policy_version: c.Token
         recommended_disposition: Optional[c.CandidateDisposition] = None
         requested_review_action: Optional[c.ReviewAction] = None
         requested_review_destination_role_ref: Optional[c.Identifier] = None
@@ -217,8 +225,13 @@ def build_proposer_advisory(
     requested_review_destination_role_ref: "str | None",
     strategy_policy_resolver: "StrategyPolicyResolver",
     declared_strategy: "ReasoningStrategy",
+    constitution_resolution,
 ) -> "ProposerAdvisory":
-    """H1, as amended by OD-7 and by S2-B (`S2B-S1-Q5=A`). Validates its inputs, tests
+    """H1, as amended by OD-7, by S2-B (`S2B-S1-Q5=A`) and by the `OD-C1=B`
+    amendment round (`ACC-AM-2`): ``constitution_resolution`` is the injected
+    resolved constitution the identity pair is package-stamped from, after the
+    signed ``agent_constitution_ref`` is checked equal to the role's
+    ``constitution_ref``. Validates its inputs, tests
     strategy permission, replays the domain evaluation and
     the deterministic selection, derives the nested ``candidates`` sequence, the four
     selection-dependent fields and the four mirrored evaluation/policy fields from
@@ -247,6 +260,7 @@ def build_proposer_advisory(
         requested_review_destination_role_ref=requested_review_destination_role_ref,
         strategy_policy_resolver=strategy_policy_resolver,
         declared_strategy=declared_strategy,
+        constitution_resolution=constitution_resolution,
     )
 
 
@@ -261,6 +275,19 @@ def _resolve_strategy_policy(
     """`S2B-S1-Q9=A` with `S2B-D7=A`. Resolve the role's strategy-policy reference
     through the **injected** resolver and correlation-check the echo before any value
     from the response is used.
+
+    `S2B-PF-G=B` (`0.3.1`) widened this boundary from the resolver call to the whole
+    response: a resolver that answers with an object **missing any ratified field** is
+    refused as ``CrossContractViolationError`` here rather than escaping as
+    ``AttributeError`` from wherever the first missing field happened to be read. The
+    original error is preserved as ``__cause__``. This changes a failure class, not the
+    public surface, and adds no exception type — H2 stays at five classes
+    (`S2B-S1-Q8=A`).
+
+    `[G]` **Presence, not shape.** The guard reads each ratified field once. A response
+    carrying every field but a type-alien value in one still escapes H2 downstream, as
+    does an attribute that answers here and raises on a later read. `[R]` That is a
+    different garbage class from the one `S2B-PF-G=B` ruled on, and is not closed here.
 
     `[R]` **The policy identity and version are package-stamped from this response**,
     never accepted as builder parameters. This is OD-7 part 5's selector-policy
@@ -295,7 +322,33 @@ def _resolve_strategy_policy(
         raise CrossContractViolationError(
             "the injected strategy-policy resolver returned nothing for "
             f"{role.strategy_policy_ref!r}")
-    if response.strategy_policy_ref != request.strategy_policy_ref:
+    # `S2B-PF-G=B` (design §7.3 option B, ADR §2's `S2B-PF-G` row) — the boundary is
+    # widened here to the WHOLE ratified response shape, not to the echo alone. Every
+    # field of ``StrategyPolicyResponse`` is read behind this one guard: the echo
+    # compared just below, and the three the callers of this function go on to use —
+    # ``permitted_strategies`` and the identity pair in
+    # ``_require_declaration_is_permitted``, the identity pair again where the advisory
+    # is stamped. Closing the echo access alone would move the same ``AttributeError``
+    # three lines down rather than close it, so the guard is drawn where the response
+    # crosses into this package, which is where §7.2 puts the boundary.
+    #
+    # `S2B-S1-Q8=A` — **still no new exception type.** An existing H2 class takes an
+    # existing failure; H2 stays at five classes and the public surface is unchanged.
+    # The field names come from the contract itself, so this cannot drift from the
+    # ratified shape. Reading a value is not using one: nothing is compared, stamped or
+    # returned from here, so the echo remains correlation-checked **before any value
+    # from the response is used**, exactly as the docstring above states.
+    try:
+        fields = {name: getattr(response, name)
+                  for name in c.StrategyPolicyResponse.model_fields}
+    except Exception as exc:  # noqa: BLE001 — H2 stays at five classes (`Q8=A`).
+        raise CrossContractViolationError(
+            "the injected strategy-policy resolver answered "
+            f"{role.strategy_policy_ref!r} with an object that does not carry the "
+            "ratified strategy-policy response shape; the role's governing policy "
+            "could not be established, so no advisory is constructed (S2B-D5=A)"
+        ) from exc
+    if fields["strategy_policy_ref"] != request.strategy_policy_ref:
         raise CrossContractViolationError(
             "the resolver's echoed strategy_policy_ref does not correspond to the "
             f"request issued for {role.strategy_policy_ref!r}")
@@ -328,6 +381,55 @@ def _require_declaration_is_permitted(*, policy, declared_strategy) -> None:
             f"version {policy.strategy_policy_version!r} (S2B-D5=A)")
 
 
+def _stamp_constitution_binding(*, constitution_resolution, role):
+    """`ACC-AM-2` with the `S2B-D7=A` discipline: the constitution identity pair
+    is stamped from the **injected** resolution, never accepted as builder
+    parameters — a caller-supplied pair would let a caller label an advisory with
+    a constitution that did not govern it.
+
+    On the `S2B-PF-G=B` precedent the boundary is the whole shape this package
+    reads, guarded here rather than escaping as ``AttributeError`` from wherever
+    the first missing field happened to be read: the resolution's signed
+    ``agent_constitution_ref`` and its ``metadata.policy_id`` /
+    ``metadata.version`` identity. The signed reference must equal the role's
+    ``constitution_ref`` **exactly** before either identity value is used — the
+    consumer the first-slice specification's §2.3 assigned to this round: a
+    caller-supplied resolution is not authoritative merely because it is
+    structured or digest-bound, and equality with the reference the role bears is
+    the correlation this boundary can check.
+
+    `[G]` **Disclosed ceiling, the same one every echo here carries.** Equality
+    catches a resolution for the wrong constitution, a stale wiring or mixed-up
+    concurrent resolutions. It is **not** a defence against a dishonest resolver,
+    and nothing here verifies the constitution's issuer or signature: that is the
+    Policy Authority resolution boundary outside this package, and no
+    ``verified`` boolean is ratified for a resolver to set.
+    """
+    from . import contracts as c  # noqa: F401 — symmetry with the strategy path.
+
+    try:
+        signed_reference = constitution_resolution.agent_constitution_ref
+        metadata = constitution_resolution.metadata
+        policy_id = metadata.policy_id
+        policy_version = metadata.version
+    except Exception as exc:  # noqa: BLE001 — H2 stays at five classes.
+        raise CrossContractViolationError(
+            "the injected constitution resolution does not carry the resolved "
+            f"constitution shape this boundary reads for {role.constitution_ref!r}; "
+            "the role's governing constitution could not be established, so no "
+            "advisory is constructed") from exc
+    if signed_reference != role.constitution_ref:
+        raise CrossContractViolationError(
+            "the resolution's signed agent_constitution_ref does not equal the "
+            f"role's constitution_ref {role.constitution_ref!r}; the injected "
+            "resolution does not answer for this role's governing constitution")
+    if type(policy_id) is not str or type(policy_version) is not str:
+        raise CrossContractViolationError(
+            "the injected constitution resolution's identity pair must be exactly "
+            "strings; a value of any other type cannot be stamped into P_unsigned")
+    return policy_id, policy_version
+
+
 def _construct_advisory(
     *,
     tenant_id: str,
@@ -351,6 +453,7 @@ def _construct_advisory(
     requested_review_destination_role_ref: "str | None",
     strategy_policy_resolver: "StrategyPolicyResolver",
     declared_strategy: "ReasoningStrategy",
+    constitution_resolution,
 ) -> "ProposerAdvisory":
     """The G2 construction shape, shared by ``build_proposer_advisory`` (``advisory_
     version="1"``, no parent) and ``build_advisory_revision`` (an incremented
@@ -401,6 +504,12 @@ def _construct_advisory(
         case_ref=case_ref, as_of=created_at)
     _require_declaration_is_permitted(
         policy=strategy_policy, declared_strategy=declared_strategy)
+    # `ACC-AM-2`, in the same `S2B-S1-Q12=A` position the strategy resolution
+    # occupies and for the same reason: an advisory whose governing constitution
+    # cannot be established never reaches the injected domain evaluator.
+    constitution_policy_id, constitution_policy_version = (
+        _stamp_constitution_binding(
+            constitution_resolution=constitution_resolution, role=role))
 
     if not verify_candidate_eligibility(
             candidate_set=candidate_set, identity=identity, role=role,
@@ -507,6 +616,11 @@ def _construct_advisory(
         strategy_policy_id=strategy_policy.strategy_policy_id,
         strategy_policy_version=strategy_policy.strategy_policy_version,
         declared_strategy=declared_strategy,
+        # `ACC-AM-2` with `S2B-D7=A`'s discipline: stamped from the injected
+        # constitution resolution, never from a caller parameter, after the
+        # signed-reference equality check above.
+        constitution_policy_id=constitution_policy_id,
+        constitution_policy_version=constitution_policy_version,
         recommended_disposition=recommended_disposition,
         requested_review_action=requested_review_action,
         requested_review_destination_role_ref=destination_role_ref,
@@ -541,6 +655,8 @@ def _construct_advisory(
         strategy_policy_id=payload.strategy_policy_id,
         strategy_policy_version=payload.strategy_policy_version,
         declared_strategy=payload.declared_strategy,
+        constitution_policy_id=payload.constitution_policy_id,
+        constitution_policy_version=payload.constitution_policy_version,
         recommended_disposition=payload.recommended_disposition,
         requested_review_action=payload.requested_review_action,
         requested_review_destination_role_ref=(
@@ -575,6 +691,7 @@ def build_advisory_revision(
     requested_review_destination_role_ref: "str | None",
     strategy_policy_resolver: "StrategyPolicyResolver",
     declared_strategy: "ReasoningStrategy",
+    constitution_resolution,
 ) -> "ProposerAdvisory":
     """G3. A revision is a newly asserted identity-bearing advisory: ``claim_
     summaries``, ``observation_refs`` and ``uncertainties`` are required keyword
@@ -618,4 +735,5 @@ def build_advisory_revision(
         requested_review_destination_role_ref=requested_review_destination_role_ref,
         strategy_policy_resolver=strategy_policy_resolver,
         declared_strategy=declared_strategy,
+        constitution_resolution=constitution_resolution,
     )

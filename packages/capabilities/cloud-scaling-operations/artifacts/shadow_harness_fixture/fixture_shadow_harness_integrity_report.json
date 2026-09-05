@@ -47,7 +47,7 @@
     },
     {
       "check": "mutation_canaries_all_blocked",
-      "detail": "14/14",
+      "detail": "15/15",
       "passed": true
     },
     {

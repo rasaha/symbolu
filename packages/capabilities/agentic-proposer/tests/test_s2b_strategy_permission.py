@@ -22,10 +22,12 @@ the guard being narrowed to accommodate them.
 `[R]` **What none of this establishes.** Nothing here proves a model's private
 reasoning became deterministic, that the producer internally followed the token it
 declared, or that the declared procedure was *executed*. The S2-B ADR's §6 is the
-standard and this module does not widen it. `[G]` Execution end to end remains blocked
-regardless: no strategy-permission policy family is registered with Policy Authority,
-which is why every resolver here is a **stub** on the ``DomainEvaluationProvider``
-precedent.
+standard and this module does not widen it. Every resolver here is a **stub**, on the
+``DomainEvaluationProvider`` precedent, because this package owns the protocol and
+implements no resolver — not because none exists. A concrete resolver and a policy
+family now live in separate integration distributions outside this package, and the
+end-to-end proof belongs to them; nothing here depends on either, and these guards run
+with no policy authority present anywhere.
 """
 from __future__ import annotations
 
@@ -58,7 +60,8 @@ def _world(*, provider=None, resolver=None, declared=None, parent=None):
         permitted_candidate_dispositions=[ap.CandidateDisposition.RECOMMEND_WITHHOLD],
         permitted_review_actions=[ap.ReviewAction.ROUTE_APPROVAL_BUNDLE],
         escalation_role_ref="role-2", activation_status=ap.RoleActivationStatus.ACTIVE,
-        strategy_policy_ref=spec.STRATEGY_POLICY_REF)
+        strategy_policy_ref=spec.STRATEGY_POLICY_REF,
+        constitution_ref=spec.CONSTITUTION_REF)
     mandate = ap.WorkMandate(
         schema_version="1.0", tenant_id="tenant-1", created_at=FIXED_INSTANT,
         mandate_id="mandate-1", case_ref="case-1", assigned_role_contract_id="role-1",
@@ -101,6 +104,7 @@ def _world(*, provider=None, resolver=None, declared=None, parent=None):
         expected_profile_version=spec.PROFILE_VERSION,
         requested_review_destination_role_ref="role-approver",
         strategy_policy_resolver=resolver,
+        constitution_resolution=spec.StubConstitutionResolution(),
         declared_strategy=(declared
                            or ap.ReasoningStrategy.SINGLE_CANDIDATE_UNREVISED))
     record = ap.build_proposer_process_record(
@@ -134,6 +138,7 @@ def _builder_kwargs(world, **overrides):
         expected_profile_version=spec.PROFILE_VERSION,
         requested_review_destination_role_ref="role-approver",
         strategy_policy_resolver=world["resolver"],
+        constitution_resolution=spec.StubConstitutionResolution(),
         declared_strategy=ap.ReasoningStrategy.SINGLE_CANDIDATE_UNREVISED)
     kwargs.update(overrides)
     return kwargs
@@ -259,25 +264,32 @@ def test_the_private_payload_mirrors_the_three_fields(world):
 # --------------------------------------------------------------------------- #
 
 def test_neither_advisory_builder_accepts_a_policy_identity_or_version_parameter():
-    """`S2B-D7=A` with `S2B-S1-Q5=A`: each builder gains **exactly two** keyword-only
-    parameters, and neither is a policy identity or version. Read off the signatures,
-    because a caller-supplied value is not authoritative merely because it is structured
-    or digest-bound — the whole point of OD-7 part 5's selector-policy precedent."""
+    """`S2B-D7=A` with `S2B-S1-Q5=A`: each builder gained **exactly two** keyword-only
+    parameters at `0.3.0`, and neither is a policy identity or version. Read off the
+    signatures, because a caller-supplied value is not authoritative merely because it
+    is structured or digest-bound — the whole point of OD-7 part 5's selector-policy
+    precedent. The `OD-C1=B` amendment (`ACC-AM-2`, `0.4.0`) added **exactly one**
+    more on the same discipline — ``constitution_resolution``, the injected resolved
+    constitution the identity pair is stamped from — and, like the strategy pair, the
+    constitution identity pair itself is barred from the signatures."""
     import inspect
 
     for builder, before in ((ap.build_proposer_advisory, 18),
                             (ap.build_advisory_revision, 16)):
         params = inspect.signature(builder).parameters
         assert all(p.kind is inspect.Parameter.KEYWORD_ONLY for p in params.values())
-        assert len(params) == before + 2, (
-            f"{builder.__name__} must gain exactly two parameters (S2B-S1-Q5=A)")
+        assert len(params) == before + 2 + 1, (
+            f"{builder.__name__} must carry S2B-S1-Q5=A's two additions plus "
+            "ACC-AM-2's one, and nothing further")
         assert "strategy_policy_resolver" in params
         assert "declared_strategy" in params
+        assert "constitution_resolution" in params
         for barred in ("strategy_policy_id", "strategy_policy_version",
-                       "permitted_strategies", "policy"):
+                       "permitted_strategies", "policy",
+                       "constitution_policy_id", "constitution_policy_version"):
             assert barred not in params, (
-                f"{builder.__name__} accepts {barred!r}; S2B-D7=A package-stamps it "
-                "from an independently resolved policy instead")
+                f"{builder.__name__} accepts {barred!r}; S2B-D7=A and ACC-AM-2 "
+                "package-stamp it from an independently resolved policy instead")
 
 
 def test_the_stamped_identity_comes_from_the_resolver_not_from_any_caller(world):
@@ -301,7 +313,8 @@ def test_the_stamped_version_is_a_string_never_a_number(world):
             strategy_policy_id=spec.STRATEGY_POLICY_ID,
             strategy_policy_version=1,  # noqa: the point of the probe
             permitted_strategies=(ap.ReasoningStrategy.REVISED_ADVISORY,),
-            strategy_policy_ref=spec.STRATEGY_POLICY_REF)
+            strategy_policy_ref=spec.STRATEGY_POLICY_REF,
+            constitution_ref=spec.CONSTITUTION_REF)
 
 
 def test_the_process_record_derives_both_values_from_the_advisory(world):
@@ -421,6 +434,107 @@ def test_an_uncorrelated_echo_refuses_construction(world):
             **_builder_kwargs(world, strategy_policy_resolver=resolver))
 
 
+# --------------------------------------------------------------------------- #
+# `S2B-PF-G=B` (`0.3.1`) — the widened resolver boundary
+#
+# A resolver that answers with a structurally alien object used to escape the H2
+# surface as ``AttributeError`` from whichever field was read first. The boundary now
+# covers the WHOLE ratified response shape, so the refusal is an existing H2 class
+# wherever the object is deficient. `S2B-S1-Q8=A` still holds: no new exception type,
+# and the public surface is unchanged at fifty-one names.
+# --------------------------------------------------------------------------- #
+
+class _AlienResponse:
+    """Carries none of the ratified response fields."""
+
+
+class _EchoOnlyResponse:
+    """Carries the echo and nothing else.
+
+    This is the probe that makes the boundary's WIDTH testable rather than assumed: it
+    survives the echo comparison and is deficient three lines later, at
+    ``permitted_strategies``. A guard closing only the echo access would pass the test
+    above and still fail here.
+    """
+
+    strategy_policy_ref = spec.STRATEGY_POLICY_REF
+
+
+class _DuckTypedResponse:
+    """A lawful, complete response that is **not** a ``StrategyPolicyResponse``.
+
+    The widened guard reads fields; it does not narrow the protocol to one concrete
+    class. `S2B-S1-Q9=A` ratifies a Protocol, and this asserts the `0.3.1` change did
+    not quietly turn it into a nominal type test.
+    """
+
+    strategy_policy_id = spec.STRATEGY_POLICY_ID
+    strategy_policy_version = spec.STRATEGY_POLICY_VERSION
+    permitted_strategies = tuple(ap.ReasoningStrategy)
+    strategy_policy_ref = spec.STRATEGY_POLICY_REF
+
+
+def test_a_structurally_alien_response_refuses_construction(world):
+    """`S2B-PF-G=B`. Before `0.3.1` this raised ``AttributeError: 'Alien' object has no
+    attribute 'strategy_policy_ref'`` — outside H2 entirely."""
+    resolver = spec.StubStrategyPolicyResolver(returns=_AlienResponse())
+    with pytest.raises(ap.CrossContractViolationError):
+        ap.build_proposer_advisory(
+            **_builder_kwargs(world, strategy_policy_resolver=resolver))
+
+
+def test_a_response_carrying_only_the_echo_refuses_construction(world):
+    """The same defect at a different line, closed by the same guard."""
+    resolver = spec.StubStrategyPolicyResolver(returns=_EchoOnlyResponse())
+    with pytest.raises(ap.CrossContractViolationError):
+        ap.build_proposer_advisory(
+            **_builder_kwargs(world, strategy_policy_resolver=resolver))
+
+
+@pytest.mark.parametrize("missing", sorted(ap.StrategyPolicyResponse.model_fields))
+def test_every_ratified_response_field_is_covered_by_the_boundary(world, missing):
+    """Each field of the ratified shape, withheld on its own. The boundary is the whole
+    response, so no single field's absence can escape H2 — and this fails if a later
+    field is added to the contract but read outside the guard."""
+    lawful = {"strategy_policy_id": spec.STRATEGY_POLICY_ID,
+              "strategy_policy_version": spec.STRATEGY_POLICY_VERSION,
+              "permitted_strategies": tuple(ap.ReasoningStrategy),
+              "strategy_policy_ref": spec.STRATEGY_POLICY_REF}
+    assert set(lawful) == set(ap.StrategyPolicyResponse.model_fields), (
+        "the probe must cover exactly the ratified fields")
+    del lawful[missing]
+    deficient = type("DeficientResponse", (), dict(lawful))()
+    resolver = spec.StubStrategyPolicyResolver(returns=deficient)
+    with pytest.raises(ap.CrossContractViolationError):
+        ap.build_proposer_advisory(
+            **_builder_kwargs(world, strategy_policy_resolver=resolver))
+
+
+def test_the_original_attribute_error_survives_as_the_cause(world):
+    """The refusal does not swallow what went wrong. `[R]` The widened guard reports in
+    an H2 class and preserves the underlying error as ``__cause__``, so an operator
+    still sees which field the resolver failed to carry."""
+    resolver = spec.StubStrategyPolicyResolver(returns=_AlienResponse())
+    with pytest.raises(ap.CrossContractViolationError) as excinfo:
+        ap.build_proposer_advisory(
+            **_builder_kwargs(world, strategy_policy_resolver=resolver))
+    cause = excinfo.value.__cause__
+    assert isinstance(cause, AttributeError), (
+        f"the original error must survive as __cause__, not be swallowed: {cause!r}")
+    assert "strategy_policy_id" in str(cause)
+
+
+def test_the_widened_boundary_does_not_narrow_the_protocol_to_one_class(world):
+    """A complete duck-typed response still constructs. `0.3.1` routes a **deficient**
+    response into H2; it does not make ``StrategyPolicyResponse`` a nominal
+    requirement, which would be a second, unruled behaviour change."""
+    resolver = spec.StubStrategyPolicyResolver(returns=_DuckTypedResponse())
+    advisory = ap.build_proposer_advisory(
+        **_builder_kwargs(world, strategy_policy_resolver=resolver))
+    assert advisory.strategy_policy_id == spec.STRATEGY_POLICY_ID
+    assert advisory.strategy_policy_version == spec.STRATEGY_POLICY_VERSION
+
+
 def test_a_bare_string_declaration_is_a_plain_validation_error(world):
     """`S2B-S1-Q8=A`'s other half: a value failing its own field constraint is
     ``pydantic.ValidationError``. `S2B-R2-Q5=A` makes both ``declared_strategy`` fields
@@ -473,6 +587,10 @@ def test_no_new_exception_type_was_added(world):
     {"permitted": (ap.ReasoningStrategy.REVISED_ADVISORY,)},
     {"raises": RuntimeError("policy store down")},
     {"echo_ref": "policy-authority/something-else"},
+    # `S2B-PF-G=B` (`0.3.1`): the widened boundary's refusals are held to the same
+    # uppercased-substring rule as every other refusal on this path.
+    {"returns": _AlienResponse()},
+    {"returns": _EchoOnlyResponse()},
 ])
 def test_a_refused_construction_emits_no_disposition_and_no_authority_term(
         world, resolver_kwargs):
@@ -722,6 +840,7 @@ def test_a_revision_declares_and_replays_as_revised_advisory():
         expected_profile_version=spec.PROFILE_VERSION,
         requested_review_destination_role_ref="role-approver",
         strategy_policy_resolver=world["resolver"],
+        constitution_resolution=spec.StubConstitutionResolution(),
         declared_strategy=ap.ReasoningStrategy.REVISED_ADVISORY)
     assert revision.parent_advisory_digest == parent.advisory_digest
     assert revision.declared_strategy is ap.ReasoningStrategy.REVISED_ADVISORY

@@ -32,7 +32,7 @@ ADVISORY_PKG = PKG.parent / "cloud-scaling-controller"
 ARTIFACTS = PKG / "artifacts"
 DIST = "ugence-cloud-scaling-operations"
 IMPORT_NAME = "ugence_cloud_scaling_operations"
-EXPECTED_VERSION = "0.1.2"
+EXPECTED_VERSION = "0.2.0"
 BASELINE = "379a6366894fd2eead9460c29f4865fb1c3990de"
 
 FORBIDDEN_CORE = ["kubernetes", "boto3", "botocore", "azure", "google.cloud",
@@ -102,13 +102,21 @@ def main() -> int:
             ("test", "__pycache__", ".pyc", "secret", ".git", "conftest"))]
     c.check("wheel_excludes_tests_caches_secrets", not junk, f"{junk[:4]}")
 
-    # Every mutation entrypoint appears in the authority inventory.
+    # Every mutation entrypoint appears in the authority inventory, and nothing the
+    # containment ruling made non-mutating is still listed as one: the gate actuator has
+    # one dry-run mode and no ArgoCD access, so its presence here would be a stale claim.
     inv_path = ARTIFACTS / "execution_capability_inventory.json"
     inv = json.loads(inv_path.read_text()) if inv_path.exists() else {}
     mut = inv.get("mutation_entrypoints", [])
     c.check("mutation_entrypoints_inventoried",
-            any("k8s_actuator" in m for m in mut) and any("gate_actuator" in m for m in mut),
+            any("k8s_actuator" in m for m in mut) and not any("gate_actuator" in m for m in mut),
             f"{mut}")
+    gate_rows = [m for m in inv.get("modules", []) if m.get("path", "").endswith("action/gate_actuator.py")]
+    c.check("gate_actuator_inventoried_non_mutating",
+            bool(gate_rows) and all(m.get("mutation_capability") is False
+                                    and m.get("network_capability") is False
+                                    and m.get("credential_requirements") is False for m in gate_rows),
+            f"{gate_rows}")
 
     package_inventory = {"wheel": wheel.name, "sha256": ev["wheel"]["sha256"],
                          "entry_count": len(names), "top_level": sorted(tops),
@@ -187,6 +195,20 @@ try:
         out["auto_approval_guarded"] = True
 except Exception as exc:
     out["auto_approval_guarded"] = "error:" + type(exc).__name__
+# containment ruling D-1: the engine itself refuses a mutating actuator, auto-approve or not
+try:
+    from ugence_cloud_scaling_operations.recommend.engine import RecommendEngine, RecommendConfig
+    from ugence_cloud_scaling_operations.action.k8s_actuator import ActuatorConfig, ActuatorMode
+    try:
+        RecommendEngine(RecommendConfig(actuator=ActuatorConfig(mode=ActuatorMode.SCALE_PATCH)))
+        out["engine_refuses_mutating_actuator"] = False
+    except RuntimeError:
+        out["engine_refuses_mutating_actuator"] = True
+    import ugence_cloud_scaling_operations.action.k8s_actuator as _ka
+    out["actuator_discovers_no_credentials"] = not any(
+        n in open(_ka.__file__).read() for n in ("load_kube_config", "load_incluster_config"))
+except Exception as exc:
+    out["engine_refuses_mutating_actuator"] = "error:" + type(exc).__name__
 print(json.dumps(out))
 """ % (FORBIDDEN_CORE,)
         pr = _run([str(py), "-I", "-c", probe], cwd=str(work), env=clean)
@@ -206,6 +228,9 @@ print(json.dumps(out))
                     f"{po.get('forbidden_importable')}")
             c.check("auto_approval_cannot_reach_execution", po.get("auto_approval_guarded") is True,
                     f"{po.get('auto_approval_guarded')}")
+            c.check("engine_refuses_mutating_actuator", po.get("engine_refuses_mutating_actuator") is True,
+                    f"{po.get('engine_refuses_mutating_actuator')}")
+            c.check("actuator_discovers_no_credentials", po.get("actuator_discovers_no_credentials") is True)
 
         v = _run([str(script), "version"], cwd=str(work), env=clean)
         c.check("cli_version", v.returncode == 0 and EXPECTED_VERSION in v.stdout)

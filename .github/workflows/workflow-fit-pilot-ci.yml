@@ -1,0 +1,116 @@
+# Phase 4A gate for the Trusted Workflow-Fit Pilot
+# (docs/architecture/WORKFLOW_FIT_PILOT_4A_COMMISSIONING_SPEC.md §7, §8).
+#
+# Runs the pilot package's suite: every §8 acceptance row, the boundary-process rows
+# (a real separate process with a stub provider), the import-boundary and numeric scans,
+# and the end-to-end row over the research harness. Also runs the Phase 4B reference-pilot
+# qualification suite (experiments/workflow_fit_reference_pilot: mechanism validation only). numpy is installed only so the
+# end-to-end row and the CaptureAttemptStatus vocabulary pin can import the runtime tree
+# and Context Minimization under test-only imports; the package under test imports neither.
+name: Workflow-Fit Pilot CI
+
+on:
+  push:
+    branches: ["main", "master", "dev", "claude/**"]
+    paths:
+      - "packages/capabilities/workflow-fit-pilot/**"
+      - "experiments/workflow_fit_study/pilot_executor.py"
+      - "experiments/workflow_fit_reference_pilot/**"
+      - "experiments/reasoning_method_advisor_demo/**"
+      - "tests/experiments/workflow_fit_reference_pilot/**"
+      - "packages/capabilities/reasoning-method-governance/**"
+      - "packages/capabilities/readiness-comparison/**"
+      - "packages/capabilities/reasoning-method-advisor/**"
+      - "packages/governance-contracts/**"
+      - "packages/uvi-policy-contracts/**"
+      - "packages/jcs/**"
+      - "conftest.py"
+      - ".github/workflows/workflow-fit-pilot-ci.yml"
+  pull_request:
+    branches: ["main", "master", "dev", "claude/**"]
+    paths:
+      - "packages/capabilities/workflow-fit-pilot/**"
+      - "experiments/workflow_fit_study/pilot_executor.py"
+      - "experiments/workflow_fit_reference_pilot/**"
+      - "experiments/reasoning_method_advisor_demo/**"
+      - "tests/experiments/workflow_fit_reference_pilot/**"
+      - "packages/capabilities/reasoning-method-governance/**"
+      - "packages/capabilities/readiness-comparison/**"
+      - "packages/capabilities/reasoning-method-advisor/**"
+      - "packages/governance-contracts/**"
+      - "packages/uvi-policy-contracts/**"
+      - "packages/jcs/**"
+      - "conftest.py"
+      - ".github/workflows/workflow-fit-pilot-ci.yml"
+  workflow_dispatch:
+
+env:
+  FIRST_PARTY: >-
+    packages/jcs
+    packages/governance-contracts
+    packages/uvi-policy-contracts
+    packages/capabilities/context-minimization
+    packages/capabilities/reasoning-method-governance
+    packages/capabilities/readiness-comparison
+    packages/capabilities/reasoning-method-advisor
+    packages/capabilities/workflow-fit-pilot
+
+jobs:
+  workflow-fit-pilot:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Cache pip dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-wfp-${{ hashFiles('packages/**/pyproject.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-wfp-
+            ${{ runner.os }}-pip-
+
+      - name: Install first-party packages
+        run: |
+          python -m pip install --upgrade pip
+          pip install numpy pytest
+          for pkg in $FIRST_PARTY; do pip install -e "$pkg"; done
+
+      - name: Confirm the pilot imports from the installed distribution
+        run: |
+          python - <<'PY'
+          import importlib
+          for name in ("ugence_workflow_fit_pilot.api", "ugence_reasoning_method_advisor.api", "ugence_readiness_comparison"):
+              importlib.import_module(name)
+              print(f"ok  {name}")
+          PY
+
+      - name: Run the pilot suite
+        # `shell: bash` is load-bearing: pipefail keeps tee from masking a pytest failure.
+        shell: bash
+        run: |
+          python -m pytest \
+            packages/capabilities/workflow-fit-pilot/tests \
+            tests/experiments/workflow_fit_reference_pilot \
+            -v \
+            --tb=short \
+            --disable-warnings \
+            2>&1 | tee workflow-fit-pilot-pytest.log
+
+      - name: Wheel self-check
+        run: python packages/capabilities/workflow-fit-pilot/verify_workflow_fit_pilot_distribution.py
+
+      - name: Upload test log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: workflow-fit-pilot-pytest-log
+          path: workflow-fit-pilot-pytest.log
+          if-no-files-found: ignore

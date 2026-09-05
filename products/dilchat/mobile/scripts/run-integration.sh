@@ -43,8 +43,12 @@ echo "run-integration: alembic upgrade head"
 
 echo "run-integration: starting uvicorn on :${PORT}"
 SERVER_LOG="$(mktemp)"
+# `exec` so SERVER_PID is uvicorn itself, not a wrapping subshell — otherwise
+# the cleanup trap kills only the subshell and an orphaned server keeps the
+# port, poisoning the NEXT run (health passes, first DB call 500s on the old
+# server's dead pool).
 ( cd "$BACKEND_DIR" && DILCHAT_ENVIRONMENT="${DILCHAT_ENVIRONMENT:-development}" \
-  "$PYTHON" -m uvicorn ugence_dilchat.app:create_app --factory --host 127.0.0.1 --port "$PORT" \
+  exec "$PYTHON" -m uvicorn ugence_dilchat.app:create_app --factory --host 127.0.0.1 --port "$PORT" \
   >"$SERVER_LOG" 2>&1 ) &
 SERVER_PID=$!
 

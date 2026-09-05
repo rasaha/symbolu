@@ -59,7 +59,8 @@ The gaps between "modules that pass tests" and "one product a customer runs":
    HMAC signing. Needed: durable append-only audit with a real hash-chain and key
    custody.
 4. **Unified control surface.** No admin console today. Needed: one console for
-   policy, review queues, findings, and audit reconstruction.
+   policy, review queues, findings, and audit reconstruction. *(Sequenced as the
+   Governed Agent Studio in §11.)*
 5. **Standard external APIs & canonical contracts.** Internal contracts exist (CER);
    needed: stable public APIs and versioned contracts across modules.
 6. **Connectors.** Needed: two runtime connectors (native + one third-party adapter,
@@ -116,6 +117,10 @@ reference plus one live infrastructure workflow.
 | **Q4** | Enterprise readiness | External security review; observability/deployment tooling; controlled enforcement for selected actions; 1st pilot findings report |
 | **Q5** | Pilot scale + enforcement | 2–3 paid pilots running; first shadow→enforcement conversion; second-domain kernel reuse demonstrated |
 | **Q6** | v1 GA + proof | Enterprise-deployable v1 GA; ≥1 paid enforcement deployment; measured false-positive/false-block + audit-reconstruction results |
+
+*The Governed Agent Studio and the durable-execution engine beneath it are sequenced
+separately in §11; that sequence is engineering-ordered and is not mapped onto these
+quarters here.*
 
 ---
 
@@ -233,6 +238,160 @@ v1 is complete when, for the Kubernetes infrastructure-agent wedge:
   systems-of-record are explicitly deferred (§4).
 - **Cost assumptions** — every figure in §8 is ⟨assumption⟩; the round should be
   re-derived once real quotes land.
+
+---
+
+## 11 · Governed Agent Studio and durable execution
+
+> **Scope note.** This section sequences the Governed Agent Studio and the durable
+> execution engine beneath it. It is an engineering sequencing record, not a budget
+> input: it adds no line to §8 and re-derives no figure in §8c. Each item carries its
+> own status row; GAS-1 through GAS-4 are implemented and merged, GAS-5 is deferred by
+> owner ruling, GAS-6 is gated, GAS-7 is scoped and ruled with no step entered. Nothing
+> in it is piloted or certified. Evidence labels
+> follow the repository convention — `[V]` verified against
+> this repository, `[I]` inferred, `[R]` requires owner ratification, `[G]` gap.
+>
+> **Why this section is here rather than in the research roadmap.** `[V]`
+> `Project_documentation/repository/roadmap/IMPLEMENTATION_ROADMAP.md` is the
+> Symbol-U *scientific* execution plan (Milestones A–G, "documentation only",
+> "Stage A untouched"); it names no Ugence capability. Product delivery sequencing
+> belongs here.
+
+### 11.0 Ratified frame (owner, this programme)
+
+These are settled and are not reopened by any item below.
+
+| # | Ratified decision |
+|---|---|
+| GAS-R1 | **DBOS is the initial standalone durable-execution engine**, and is a **candidate** until every row of the durability and failure matrix in `docs/architecture/ADR_DBOS_DURABLE_EXECUTION_INTEGRATION.md` has passing evidence. |
+| GAS-R2 | **Temporal is the future regulated-enterprise adapter.** The execution adapter must make that swap possible without touching Workflow IR, governance state or receipts. |
+| GAS-R3 | **React Flow is the Ugence-owned studio canvas**, added as a feature inside `apps/ugence-governance-studio`. No third app; no Langflow fork. |
+| GAS-R4 | **Langflow is an import source only.** Its exported JSON is untrusted input: validate, never execute, compile to Workflow IR. The import itself is **deferred and customer-gated** (GAS-5 ruling, §11.3); this frame binds any future adapter. |
+| GAS-R5 | **Workflow IR and governance state are always owned by Ugence.** The engine owns scheduling and recovery only; Agent Runtime owns proposal binding, the governance hook, budgets, checkpoints and receipts. The engine is never the source of truth for governance state. |
+| GAS-R6 | **The governance hook runs inside the durable step.** The engine executes Agent Runtime transitions; Agent Runtime calls the hook before any provider invocation, so a retry can never replay a consequential call without re-clearing it. |
+
+### 11.1 Sequence
+
+Items run in order. Each states its entry criteria, its exit criteria, and the
+**maturity label it may claim on completion** — drawn from the Appendix B stage
+vocabulary in `docs/UGENCE_ENTERPRISE_AI_GOVERNANCE_CAPABILITY_PIPELINE.md` §B.2.
+No item may claim a label above the one listed, and no item may claim
+*Pilot-validated* or *Production-certified* at all within this section.
+
+#### GAS-1 · DBOS integration ADR and failure matrix — **documents only**
+
+| | |
+|---|---|
+| **Entry** | This section ratified; the five owner decisions in §11.3 ruled. |
+| **Work** | `docs/architecture/ADR_DBOS_DURABLE_EXECUTION_INTEGRATION.md`: ownership boundary, the execution-adapter Protocols, the store mapping, hook-inside-step semantics, the Temporal replacement contract, and the complete durability and failure matrix. |
+| **Exit** | The ADR is committed; every matrix row names an expected fail-closed behaviour **and** the evidence artefact that would prove it; no row is left as prose without an evidence column. |
+| **Label on completion** | **Contract-only.** A committed ADR authorizes implementation; it is not implementation. |
+
+#### GAS-2 · Execution adapter and DBOS-backed stores for Agent Runtime
+
+| | |
+|---|---|
+| **Entry** | GAS-1 committed. A local Postgres is available in CI. |
+| **Work** | The neutral `DurableExecutionAdapter` Protocols in a new integration package; a DBOS-backed implementation; Postgres-backed `CheckpointStore`, `RuntimeEventStore` and `RuntimeStateStore` behind the existing Agent Runtime Protocols `[V]` (`packages/runtime/agent-runtime/src/ugence_agent_runtime/persistence/interfaces.py`). Every matrix row from GAS-1 lands as an executing test. |
+| **Exit** | Every GAS-1 matrix row has a passing CI test against a real local Postgres, including the crash, duplicate-delivery, expiry, revocation, Postgres-unavailable, budget-contention, long-pause, version-change and clock-skew rows. `packages/runtime/agent-runtime` gains **no** new import `[V]` — the adapter depends on the runtime, never the reverse. |
+| **Status (2026-09-05)** | **Implemented; all eleven matrix rows green in CI** against a real PostgreSQL (durable-execution-ci job 101257085510 on `fe6f1591`: matrix 29 passed, no row skipped; Agent Runtime byte-unchanged, 364 passed). Owner ruled **OD-3 `RATIFY`**: DBOS is **ratified as the initial engine**. Not pilot-validated, not production-certified. Evidence: ADR §8A and §9. |
+| **Label on completion** | **Core implemented** for the adapter package; **DBOS moves from *candidate* to *ratified as the initial engine*** at this exit and at no earlier point (GAS-R1). Agent Runtime's own "not distributed-safe, not exactly-once" statements `[V]` (`packages/runtime/agent-runtime/README.md:36`) are revised only for the properties the matrix actually proves, and only in the adapter's README. |
+
+#### GAS-3 · Production `GovernanceHook` adapter from `GovernedExecutionDecision`
+
+| | |
+|---|---|
+| **Entry** | GAS-2 exit met. |
+| **Work** | A hook adapter that composes Risk Authority, Decision Authority and ActionGate through `RiskAuthorityCompositionEngine.compose` `[V]` (`packages/integration/risk-authority-runtime/.../composition.py:62`) and projects the resulting `GovernedExecutionDecision` `[V]` (`.../contracts.py:339`) onto `GovernanceEvaluation` `[V]` (`.../agent_runtime/governance/interfaces.py`). The adapter binds `proposal_fingerprint` and `correlation_reference` and mints nothing. |
+| **Exit** | Only three hooks existed before this item `[V]` (`Unconfigured`, `AllowAll`, deprecated `Noop`); a fourth exists, is fail-closed on every non-`GRANT` disposition, and passes an adversarial suite proving `HOLD`/`ESCALATE`/`BLOCK` can never widen to `CLEAR`. `AllowAllGovernanceHook` remains non-default. |
+| **Status (2026-09-05)** | **Implemented.** `packages/integration/agent-runtime-governance` 0.1.0, 68 passed; the ADR §8 matrix re-run with the production hook is 12 passed. Evidence: ADR §8B. |
+| **Label on completion** | **Core implemented.** Not pilot-validated: `production_mode` still raises `ProductionContainmentError` in Risk Authority `[V]` (`packages/risk_authority/src/risk_authority/domain/errors.py:19`), and `HOLD`, `DEFER`, `ESCALATE` and `MANUAL_REVIEW` still have no sink `[G]`. |
+
+#### GAS-4 · Studio v1 — six screens on React Flow
+
+Constitution → Policy → Authority → Simulate → Publish → Observe, built in that order
+inside `apps/ugence-governance-studio`.
+
+| | |
+|---|---|
+| **Entry** | GAS-3 exit met. The screen-to-type audit (`apps/ugence-governance-studio/docs/GOVERNED_AGENT_STUDIO_V1_SCREEN_AUDIT.md`) accepted. |
+| **Work** | An additive `governance_studio.api.v2` contract alongside the frozen `governance_studio.api.v1` `[V]` (`apps/ugence-governance-studio/contracts/openapi.json`); the studio backend as **thin orchestration only** over the existing packages; the six screens against frozen fixtures. |
+| **Exit** | `v1` byte-frozen and still passing its freeze test `[V]` (`backend/tests/test_freeze.py`); every `v2` route delegates to a package entry point with no re-implemented governance logic; no route grants, authorizes or executes; determinism tests pass for all six screens. |
+| **Status (2026-09-05)** | **Backend and all six screens implemented.** Frontend suite 197 passed (was 150), ten verifier gates green, `reactflow` the only new dependency; v1's contract, generated client and 17-operation allowlist byte-identical. The three review gaps (simulate mode threading, publish release binding, bounded clearance record) were closed in PR #1609. Langflow import is deferred (GAS-5, §11.3). Previously: **backend implemented; no screen shipped.** 12 additive v2 routes across the six screens; backend suite 175 passed (was 142). `contracts/openapi.json` is byte-identical and its freeze test passes unmodified. SD-1 allowlist and SD-2 operation-id guard are enforced by tests. Evidence: `apps/ugence-governance-studio/docs/GOVERNED_AGENT_STUDIO_V1_SCREEN_AUDIT.md`. |
+| **Label on completion** | **Core implemented** for the studio feature. The studio's own posture — synthetic data, planning only, no execution or permission granting `[V]` (the frozen OpenAPI description) — is preserved verbatim for `v2`. |
+
+#### GAS-5 · Langflow importer — **deferred, customer-gated (ruled 2026-09-05)**
+
+| | |
+|---|---|
+| **Status (2026-09-05)** | **Removed from the current implementation sequence and from MVP scope** by owner ruling `DEFER_LANGFLOW_CUSTOMER_GATED` (§11.3). Langflow is preserved only as a possible future import adapter. No audit, importer, endpoint, dependency or implementation exists or is scheduled `[V]` (`langflow_import_implemented: False` in the studio's maturity flags; no `/policy/from-langflow` route in `contracts/openapi_v2.json`). React Flow remains the Ugence-owned authoring surface (GAS-R3). |
+| **Entry** | A demonstrated customer or design-partner need **and** a new owner ruling. Not entered on schedule, and not entered by GAS-4's exit alone. |
+| **Work** | A one-way importer: parse exported Langflow JSON, validate against a strict allowlist schema, reject anything unmapped, compile the accepted subset to Workflow IR v2 through `compile_policy_pack` `[V]` (`packages/tooling/policy-workflow-compiler/.../compiler.py:222`). |
+| **Exit** | An adversarial corpus of malformed, oversized, cyclic, deeply nested and code-bearing Langflow exports is refused with typed errors and zero evaluation; the importer executes nothing from the file and imports no Langflow package; unmapped node types refuse rather than degrade. |
+| **Label on completion** | **Core implemented** for the importer. It confers no maturity on the imported graph, which enters as an ordinary unapproved policy pack. |
+
+#### GAS-6 · Temporal adapter — **gated, later**
+
+| | |
+|---|---|
+| **Entry** | GAS-2 exit met **and** an owner ruling authorizing the second engine, taken on evidence of a regulated-enterprise requirement that DBOS does not meet. Not entered on schedule. |
+| **Work** | A second implementation of the same `DurableExecutionAdapter` Protocols. |
+| **Exit** | The complete GAS-1 matrix passes against Temporal **with no change** to Workflow IR, governance state, receipts, or any file under `packages/runtime/agent-runtime` (GAS-R2) — that no-change property is the exit criterion, verified by diff. |
+| **Label on completion** | **Contract-only** until its matrix passes; **Core implemented** thereafter. |
+
+#### GAS-7 · Human review and durable resume — **HR-A to HR-E implemented; HE-1 and HE-5 implemented in service 0.2.0**
+
+| | |
+|---|---|
+| **Entry** | Owner rulings HR-1 to HR-5 in `docs/architecture/ADR_UGENCE_HUMAN_REVIEW_DURABLE_RESUME_SCOPING.md` — **met 2026-09-05**. Each step HR-A to HR-E is entered only by its own implementation prompt. |
+| **Work** | Compose what exists and mint nothing: a production `GovernanceInputSource` that reads the approval ledger and the authority directory, binds an approval to the proposal fingerprint, and consumes it exactly once before the engine advances (HR-A); a bounded resume in the DBOS adapter (HR-B); a review service that lists the queue and records a human decision under IdP identity and the eligibility port (HR-C); Review Queue and Run Detail screens under SD-1 and SD-2 (HR-D); one audit reference joining proposal, approval, consumption and resumed evaluation (HR-E). |
+| **Exit** | The eleven-row failure matrix in that ADR §4 is green against a real PostgreSQL and a real SQLite ledger: duplicate decisions, stale approvals, expiry, revocation, wrong approver, correlation mismatch, crash before and after decision persistence, duplicate resume signals, clearance change before resumed execution, and bounded resume. Matrix row 9 of the DBOS ADR is rewritten to actually resume. |
+| **Status (2026-09-05)** | **HR-A implemented** (`packages/integration/governed-review` 0.1.0, `REFERENCE_GRADE_SHADOW_ONLY`): the production `GovernanceInputSource` binds approvals to the proposal fingerprint, raises the request on park, consumes exactly once before the engine advances, and releases only the Decision Authority HOLD it satisfied; ESCALATE only. Failure-matrix rows 2, 3, 6, 8 and 10 pass inside the real DBOS adapter against a real PostgreSQL with the real SQLite ledger. **HR-B implemented** (durable-execution): the adapter's `resume` is bounded to one quantum per durable step via `continue_workflow`; DBOS §8 row 9 now resumes for real and a three-task chain proves one task per step; the full §8 matrix, the production-hook re-run and the governed-review rows stay green. **HR-C implemented** (`packages/integration/governed-review-service` 0.1.0, `REFERENCE_GRADE_SHADOW_ONLY`, `IDENTITY_PROOF` `PRESENTED_UNPROVEN`): `ReviewService` lists the ESCALATE queue joined to the durable checkpoint, renders a run, records a GRANT or REJECT by a presented approver through the ledger's eligibility port, and then delivers the adapter signal and the bounded resume for that instance only; rows 1 and 5 pass at unit level and rows 5, 7, 8 and 9 pass inside the real DBOS adapter against a real PostgreSQL; the five audited routes exist over FastAPI as an optional extra. No identity provider exists. **HR-D implemented** (studio): Review Queue and Run Detail screens under `/studio/review` with five v2 relay routes over a review-service client whose five-route allowlist is enforced before a socket opens (HR-1); the decision is relayed verbatim, an unreachable service is a gap and never an empty queue, a HOLD is never presented as awaiting a human, and fingerprints and `valid_until` are shown as history; the SD-2 prohibition, console allowlist, v1 byte-freeze and frontend verb scan pass unchanged; `human_review_implemented` is `True` and `authentication_implemented` stays `False`. **HR-E implemented, contract only** (`governed-review` 0.2.0, `LINKAGE_MATURITY` `CONTRACT_ONLY`): `ReviewLinkage` joins proposal fingerprint, approval id, consumption id, park, decision signal, resume and the two sealed evaluations across the approval ledger, the durable event log and the checkpoint journal by id, refuses any join the stores do not support, digests deterministically and projects onto G4's `EvidenceReference`/`AuditReference`; the unified ledger D-4 named now exists as `control-plane-root` 0.1.0 (#1617), and HE-1 rules that the review service's composition root appends each recorded GRANT's linkage to it (ADR §5a; HE-2 to HE-5 ruled alongside). No store changed; clearance receipts untouched. **HE-1 and HE-5 implemented** (`governed-review-service` 0.2.0, contract `governed_review_service.v2`): after a recorded or replayed GRANT and on every run-detail read, the service reconstructs the completed round trip's linkage and appends it to the control-plane audit ledger once, idempotently per linkage digest through a read-only index over the ledger's own rows, returning the `AuditReference`; an incomplete round trip is the typed, non-blocking `NOT_YET`; rows 8 and 9 hold with the ledger in the loop; `governed-review` gains no dependency on the ledger and its boundary test forbids the import. The studio's Run Detail screen renders the linkages as history, with `NOT_YET` and `LEDGER_UNCONFIGURED` shown as the review service's typed answer. The GAS-7 sequence is complete at its stated ceiling. Before HR-A the path was fail-closed in the restrictive direction and has no sink in the permissive one `[V]` (`agent-runtime-governance/.../__init__.py:76-80`): no production `GovernanceInputSource` exists, `resume_workflow` takes only an instance id, the approval ledger is imported by nothing on the path, and no studio, console or client surface lists a queue or records a decision. Evidence: the ADR §2 path map and `apps/ugence-governance-studio/docs/HUMAN_REVIEW_SCREEN_API_AUDIT.md`. |
+| **Label on completion** | **Core implemented, reference-grade, shadow-only** at best: the approval ledger and directory are `REFERENCE_GRADE_SHADOW_ONLY`, the runtime invokes fixture providers, no credential broker or IdP integration exists. Pilot validation and production certification are not reachable from this item. |
+
+### 11.2 Non-goals for this whole sequence
+
+No live execution against real systems. No credentials — the Credential Broker
+(cloud-scaling Phase 5X) remains unbuilt `[V]` (Appendix B §B.6 ¶2) and nothing here
+substitutes for it. No generic LLM, prompt or API canvas nodes. No research-only
+package in the product. No hosted multi-tenancy. No claim of pilot validation or
+production certification, on any item, at any exit above.
+
+### 11.3 Owner decisions — ruled 2026-09-05
+
+All below are ruled and recorded at source. GAS-1 through GAS-4 are complete and
+merged; GAS-5 is deferred; GAS-6 remains gated; GAS-7 is ruled and not entered.
+
+| # | Ruling | Recorded in |
+|---|---|---|
+| OD-1 | `REQUIRE_SINGLE_TRANSACTION` — atomic commit is a **DBOS ratification gate**; if DBOS cannot provide it, GAS-2 stops and reports rather than accepting a residual | `ADR_DBOS_DURABLE_EXECUTION_INTEGRATION.md` §9 |
+| OD-2 | `COEXIST_WITH_BOUNDARY` — governance stores keep their ratified SQLite; DBOS and the three Agent Runtime stores share Postgres behind a documented consistency boundary | same, §9 |
+| OD-3 | **`RATIFY`** (2026-09-05) — the CI-verified matrix promotes DBOS from *candidate* to *ratified as the initial engine*; `DBOS_ENGINE_STATUS = "RATIFIED"` | same, §8A and §9 |
+| SD-1 | `EXPLICIT_PUBLIC_ALLOWLIST` — the studio boundary widens only by a per-package public-entry-point allowlist; the architecture test is retained | `apps/ugence-governance-studio/docs/GOVERNED_AGENT_STUDIO_V1_SCREEN_AUDIT.md` |
+| SD-2 | `NON_AUTHORITY_STUDIO` — the studio never issues, activates, revokes, grants, authorizes, clears or executes | same |
+| HR-1 | **`DISPLAY_AND_TRANSMIT`** (2026-09-05) — the studio renders the review queue and run detail and relays a verbatim human decision to a separate review service; it holds no identity, consumes nothing, signals nothing, resumes nothing | `ADR_UGENCE_HUMAN_REVIEW_DURABLE_RESUME_SCOPING.md` §5; `HUMAN_REVIEW_SCREEN_API_AUDIT.md` |
+| HR-2 | **`NEW_PACKAGE_GOVERNED_REVIEW`** — `packages/integration/governed-review` owns the production `GovernanceInputSource`, the consume-then-advance order and the review service | same, §5 |
+| HR-3 | **`RATIFY_FINGERPRINT_BINDING`** — approvals bind to the proposal fingerprint with `consumer_ref=<instance_id>:<task_id>`; consume in the SQLite ledger, then advance in Postgres; same-holder `ALREADY_CONSUMED` is satisfied | same, §3 and §5 |
+| HR-4 | **`BARE_RUNTIME_BOUNDED_ADAPTER`** — the runtime's resume stays bare and unexposed; the DBOS adapter moves to `continue_workflow`, one quantum per durable step, re-running the DBOS §8 matrix | same, §5 |
+| HR-5 | **`ESCALATE_ONLY`** — only ESCALATE enters the review queue; HOLD is released by upstream authority change only; no new disposition | same, §5 |
+| HE-1 | **`APPEND_FROM_REVIEW_SERVICE_ROOT`** (2026-09-05) — the review service's composition root appends each recorded GRANT's linkage to the control-plane audit ledger as a `LedgerEntry` of kind `governed_review.linkage.v1` and returns the `AuditReference` on the decision outcome; `governed-review` stays contract-only | `ADR_UGENCE_HUMAN_REVIEW_DURABLE_RESUME_SCOPING.md` §5a |
+| HE-2 | **`NO_RECEIPT_FIELD`** — clearance receipts gain no approval or linkage field; the linkage's `EvidenceReference` is the join | same, §5a |
+| HE-3 | **`JOURNAL_IS_THE_RECORD`** — the checkpoint's execution-state journal is the authoritative evaluation record for the linkage; no dedicated evaluation store | same, §5a |
+| HE-4 | **`RATIFY_STORE_REFS_AS_SPELLED`** — `approval-workflow/ledger_events`, `durable-execution/runtime_events`, `durable-execution/runtime_state.execution_state_journal` are the ratified store references | same, §5a |
+| HE-5 | **`EXPOSE_ON_RUN_DETAIL_LATER`** — once HE-1 lands, run detail returns the reconstructed linkage read-only and the studio renders it as history | same, §5a |
+| ID-1 | **`PASS_THROUGH_OPAQUE_TOKEN`** (2026-09-05) — the studio may forward one IdP-issued token audience-bound to the review service; never parsed, logged, persisted or reused | `ADR_UGENCE_APPROVER_IDENTITY_SCOPING.md` §5 |
+| ID-2 | **`SEPARATE_AUTHENTICATION_AND_AUTHORITY_REFERENCES`** — `decided_by` an issuer-qualified subject; `decided_authority_reference` the directory grant; a distinct digest-bound `authentication_reference` to the verified claims, never the token; `signature_reference` unused | same, §5 |
+| ID-3 | **`SERVICE_LOCAL_PORT_UNTIL_SECOND_CONSUMER`** — `ApproverIdentityPort` in `governed-review-service`, compatible with the existing seam, importing no Decision Authority package; promotion needs a second consumer and a separate ruling | same, §5 |
+| ID-4 | **`TENANT_FROM_PROOF_WITH_EXPLICIT_SINGLE_TENANT_FALLBACK`** — a verified tenant claim is authoritative; configured fallback only in explicit `SINGLE_TENANT` mode; multi-tenant mode refuses missing, ambiguous or mismatched claims | same, §5 |
+| ID-5 | **`RECORD_NOW_ENFORCE_BEFORE_LIVE`** — `acr`/`amr` recorded without a threshold while shadow-only; a ratified assurance policy is a mandatory gate before enforcement or LIVE, absent policy fails closed | same, §5 |
+| IA-1 | **`JWT_LOCAL_VALIDATION`** (2026-09-05) — the approver proof is a signed RFC 9068 `at+jwt` validated locally against published keys; no introspection, no client credential in the review service | `ADR_UGENCE_APPROVER_IDENTITY_ADAPTER_SCOPING.md` §5 |
+| IA-2 | **`PYJWT_OVER_CRYPTOGRAPHY`** — `PyJWT[crypto]` over the ratified `cryptography` backend, bounded; RS256, ES256, EdDSA only; HMAC, `none`, malformed, wrong issuer or audience, unknown keys and oversized proofs refused | same, §5 |
+| IA-3 | **`CONFIGURED_JWKS_NO_DISCOVERY`** — explicit issuer, audience and JWKS URL; keys cached by `kid`, one refresh on unknown `kid`, then fail closed; no OIDC discovery; TLS never disabled | same, §5 |
+| IA-4 | **`EXPLICIT_CLAIM_MAPPING`** — tenant-claim and actor-type-claim names have no defaults; `HUMAN` only on an exact configured claim/value match, otherwise `SYSTEM`, never inferred from `sub`, `client_id`, `amr` or `auth_time`; `acr`/`amr` recorded, not enforced; `auth_time` else required `iat`, source recorded; no wall clock | same, §3 and §5 |
+| IA-5 | **`INTEGRATION_PACKAGE_NOW`** — `packages/integration/approver-identity-jwt` (`ugence-approver-identity-jwt`) importing only the review service, `jwt` and stdlib; the port is not promoted | same, §5 |
+| GAS-5 | **`DEFER_LANGFLOW_CUSTOMER_GATED`** (2026-09-05) — Langflow import is removed from the current sequence and MVP scope; preserved only as a possible future import adapter, requiring a demonstrated customer or design-partner need and a new owner ruling. No audit, importer, endpoint, dependency or implementation now. React Flow remains the Ugence-owned authoring surface | this section, GAS-5 and GAS-R4; `GOVERNED_AGENT_STUDIO_V1_SCREEN_AUDIT.md` |
+
 
 ---
 

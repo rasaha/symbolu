@@ -154,15 +154,18 @@ def _build_orchestrator_config(
         cooldown_seconds=safety_cfg.get("cooldown_seconds", 120.0),
     )
 
-    # Actuator
+    # Actuator. Only dry_run is accepted (ADR orchestrator containment, D-1): this
+    # service holds no mutating actuator, and a configured mutating mode is refused
+    # here rather than silently downgraded, so an operator learns at boot.
     act_cfg = raw.get("actuator", {})
     mode_str = act_cfg.get("mode", "dry_run")
-    actuator_mode = {
-        "dry_run": ActuatorMode.DRY_RUN,
-        "scale_patch": ActuatorMode.SCALE_PATCH,
-        "hpa_metric": ActuatorMode.HPA_METRIC,
-    }.get(mode_str, ActuatorMode.DRY_RUN)
-    actuator = ActuatorConfig(mode=actuator_mode)
+    if mode_str != "dry_run":
+        raise ValueError(
+            f"actuator.mode {mode_str!r} is refused: the orchestrator service holds no "
+            "mutating actuator. Live scaling is dispatched only through the governed "
+            "ladder into ControlledScalingExecutor; set actuator.mode to dry_run."
+        )
+    actuator = ActuatorConfig(mode=ActuatorMode.DRY_RUN)
 
     # Feedback
     fb_cfg = raw.get("feedback", {})

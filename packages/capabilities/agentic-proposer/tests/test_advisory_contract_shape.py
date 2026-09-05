@@ -774,7 +774,7 @@ def test_the_candidate_set_reference_is_retained_alongside_the_nesting(graph):
     Twenty-three fields, not twenty-two."""
     assert "candidate_set_id" in graph["ProposerAdvisory"].model_fields
     # OD-7 part 5 moved this from 23 to 27 (I8.11); `S2B-S1-Q2=A` moved it 27 -> 30.
-    assert len(graph["ProposerAdvisory"].model_fields) == 30
+    assert len(graph["ProposerAdvisory"].model_fields) == 32
     assert "AdvisoryCandidateSet" in spec.TOP_LEVEL_CONTRACTS
 
 

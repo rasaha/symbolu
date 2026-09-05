@@ -5,8 +5,10 @@ Tests cover:
 - PolicyEngine: replica bounds, blackout windows, rate limits
 - ReadinessChecker: plasticity threshold, action recency, rollback blocking
 - OutcomeTracker: positive/negative/neutral/oscillation outcomes
-- GateActuator: admission webhook state persistence
-- Engine integration: policy blocks, rollback wiring, outcome tracking, readiness
+- GateActuator: one dry-run mode, no admission webhook or ArgoCD state
+- Engine integration: approve() records and executes nothing, whatever policy,
+  rollback and outcome components are wired
+  (ADR_CLOUD_SCALING_OPERATIONS_ORCHESTRATOR_CONTAINMENT_SCOPING)
 """
 
 import time
@@ -41,6 +43,7 @@ from symbolu.cloud_controller.action.k8s_actuator import (
     ActuatorConfig,
     ActuatorMode,
     ExecutionResult,
+    K8sActuator,
 )
 from symbolu.cloud_controller.action.gate_actuator import (
     GateAction,
@@ -134,9 +137,18 @@ class TestRollbackMonitor:
         assert resolved[0].verdict == RollbackVerdict.DEGRADED
         assert "latency_p99" in resolved[0].verdict_reason
 
-    def test_rollback_executed(self):
-        """Degradation with execute_rollback=True calls rollback_fn."""
-        mock_scale = MagicMock(return_value=MagicMock(success=True))
+    def test_a_mutating_rollback_function_is_refused(self):
+        """An undeclared callable (a mock, a lambda) is treated as mutating and refused."""
+        for fn in (MagicMock(return_value=MagicMock(success=True)), lambda **kwargs: None):
+            with pytest.raises(RuntimeError):
+                RollbackMonitor(
+                    RollbackConfig(execute_rollback=True),
+                    rollback_fn=fn,
+                )
+
+    def test_rollback_executed_through_a_dry_run_actuator_only(self):
+        """Degradation with execute_rollback=True calls a DRY_RUN actuator's scale."""
+        actuator = K8sActuator(ActuatorConfig(mode=ActuatorMode.DRY_RUN))
         monitor = RollbackMonitor(
             RollbackConfig(
                 watch_window_seconds=180,
@@ -144,7 +156,7 @@ class TestRollbackMonitor:
                 degradation_threshold=0.15,
                 execute_rollback=True,
             ),
-            rollback_fn=mock_scale,
+            rollback_fn=actuator.scale,
         )
         watch = monitor.start_watch(
             "rec-1", "api-gw", "prod", 5, 7,
@@ -152,15 +164,14 @@ class TestRollbackMonitor:
         )
         watch.action_timestamp = time.time() - 60
 
-        monitor.check({"latency_p99": 0.5, "error_rate": 0.05})
+        resolved = monitor.check({"latency_p99": 0.5, "error_rate": 0.05})
 
-        mock_scale.assert_called_once_with(
-            deployment="api-gw",
-            namespace="prod",
-            current_replicas=7,
-            target_replicas=5,
-            recommendation_id="rollback-rec-1",
-        )
+        assert resolved[0].verdict == RollbackVerdict.ROLLED_BACK
+        assert len(actuator.history) == 1
+        proposal = actuator.history[0]
+        assert proposal.mode == "dry_run"
+        assert (proposal.previous_replicas, proposal.target_replicas) == (7, 5)
+        assert proposal.recommendation_id == "rollback-rec-1"
 
     def test_grace_period_skips_check(self):
         """Within grace period, no check is performed."""
@@ -539,47 +550,22 @@ class TestOutcomeTracker:
 
 
 # ============================================================
-# Gate Actuator — Admission Webhook Persistence
+# Gate Actuator — one mode, nothing persisted for a webhook to read
 # ============================================================
 
-class TestGateActuatorAdmissionPersistence:
-    def test_admission_policy_persisted(self):
-        gate = GateActuator(GateConfig(mode=GateMode.ADMISSION_WEBHOOK))
-        gate.execute(GateAction.HOLD, "api-gw", "prod", recommendation_id="rec-1")
+class TestGateActuatorContainment:
+    def test_dry_run_is_the_only_mode(self):
+        assert set(GateMode) == {GateMode.DRY_RUN}
+        assert not hasattr(GateActuator(), "get_admission_policy")
 
-        policy = gate.get_admission_policy("api-gw", "prod")
-        assert policy is not None
-        assert policy.action == "hold"
-        assert policy.recommendation_id == "rec-1"
-
-    def test_admission_policy_updated(self):
-        gate = GateActuator(GateConfig(mode=GateMode.ADMISSION_WEBHOOK))
-        gate.execute(GateAction.HOLD, "api-gw", "prod")
-        gate.execute(GateAction.ALLOW, "api-gw", "prod")
-
-        policy = gate.get_admission_policy("api-gw", "prod")
-        assert policy.action == "allow"
-
-    def test_admission_policy_not_found(self):
-        gate = GateActuator(GateConfig(mode=GateMode.ADMISSION_WEBHOOK))
-        assert gate.get_admission_policy("nonexistent", "ns") is None
-
-    def test_admission_policies_property(self):
-        gate = GateActuator(GateConfig(mode=GateMode.ADMISSION_WEBHOOK))
-        gate.execute(GateAction.HOLD, "app1", "ns1")
-        gate.execute(GateAction.ALLOW, "app2", "ns2")
-
-        policies = gate.admission_policies
-        assert len(policies) == 2
-        assert "ns1/app1" in policies
-        assert "ns2/app2" in policies
-
-    def test_reset_clears_policies(self):
-        gate = GateActuator(GateConfig(mode=GateMode.ADMISSION_WEBHOOK))
-        gate.execute(GateAction.HOLD, "app", "ns")
+    def test_a_hold_is_recorded_only(self):
+        gate = GateActuator(GateConfig())
+        result = gate.execute(GateAction.HOLD, "api-gw", "prod", recommendation_id="rec-1")
+        assert result.mode == "dry_run"
+        assert result.action == "hold"
+        assert result.recommendation_id == "rec-1"
         gate.reset()
-        assert gate.get_admission_policy("app", "ns") is None
-        assert len(gate.admission_policies) == 0
+        assert gate.history == []
 
 
 # ============================================================
@@ -596,7 +582,7 @@ class TestEngineAdvancedIntegration:
                 action_threshold=0.1,
                 coherence_threshold=0.1,
             ),
-            actuator=ActuatorConfig(mode=ActuatorMode.DRY_RUN),
+            actuator=kwargs.get("actuator", ActuatorConfig(mode=ActuatorMode.DRY_RUN)),
             policy=kwargs.get("policy", PolicyConfig()),
             rollback=kwargs.get("rollback", RollbackConfig(
                 watch_window_seconds=180,
@@ -610,8 +596,8 @@ class TestEngineAdvancedIntegration:
         )
         return RecommendEngine(config)
 
-    def test_policy_blocks_execution(self):
-        """Policy violation should block actuator execution."""
+    def test_approval_beyond_policy_records_and_executes_nothing(self):
+        """A policy-violating target changes nothing: approval never executes (D-3)."""
         engine = self._make_engine(
             policy=PolicyConfig(
                 default_policy=DeploymentPolicy(max_replicas=6),
@@ -621,15 +607,12 @@ class TestEngineAdvancedIntegration:
         cycle = engine.evaluate(action, current_replicas=5)
         assert cycle.recommendation is not None
 
-        # Target would be 7, exceeds max_replicas=6
+        # Target would be 7, exceeds max_replicas=6 — and nothing runs either way.
         rec = engine.approve(cycle.recommendation.id, by="ops")
         assert rec is not None
-        assert rec.execution_result is not None
-        assert rec.execution_result.success is False
-        assert "policy" in rec.execution_result.mode.lower()
+        assert rec.execution_result is None
 
-    def test_policy_allows_execution(self):
-        """Within policy bounds, execution should proceed."""
+    def test_approval_within_policy_records_and_executes_nothing(self):
         engine = self._make_engine(
             policy=PolicyConfig(
                 default_policy=DeploymentPolicy(max_replicas=20),
@@ -640,25 +623,26 @@ class TestEngineAdvancedIntegration:
 
         rec = engine.approve(cycle.recommendation.id, by="ops")
         assert rec is not None
-        assert rec.execution_result.success is True
+        assert rec.execution_result is None
+        assert engine.actuator.history == []
 
-    def test_rollback_watch_started_on_success(self):
-        """Successful execution should start a rollback watch."""
+    def test_no_rollback_watch_started_on_approval(self):
+        """Nothing executed, so there is nothing to watch for rollback."""
         engine = self._make_engine()
         action = _make_action(delta=2, score=0.8, coherence=0.9)
         cycle = engine.evaluate(action, current_replicas=5)
 
         engine.approve(cycle.recommendation.id, by="ops")
-        assert engine.rollback.active_count == 1
+        assert engine.rollback.active_count == 0
 
-    def test_outcome_tracked_on_success(self):
-        """Successful execution should record for outcome tracking."""
+    def test_no_outcome_recorded_on_approval(self):
+        """Nothing executed, so there is no outcome to evaluate."""
         engine = self._make_engine()
         action = _make_action(delta=2, score=0.8, coherence=0.9)
         cycle = engine.evaluate(action, current_replicas=5)
 
         engine.approve(cycle.recommendation.id, by="ops")
-        assert engine.outcome.pending_count == 1
+        assert engine.outcome.pending_count == 0
 
     def test_check_rollbacks_delegates(self):
         engine = self._make_engine()
@@ -693,17 +677,7 @@ class TestEngineAdvancedIntegration:
         assert engine.outcome.pending_count == 0
         assert engine.pending_count == 0
 
-    def test_no_rollback_watch_on_failed_execution(self):
-        """Failed execution should NOT start rollback watch."""
-        engine = self._make_engine(
-            policy=PolicyConfig(
-                default_policy=DeploymentPolicy(max_replicas=6),
-            ),
-        )
-        action = _make_action(delta=2, score=0.8, coherence=0.9)
-        cycle = engine.evaluate(action, current_replicas=5)
-
-        # Policy blocks (target=7 > max=6)
-        engine.approve(cycle.recommendation.id, by="ops")
-        assert engine.rollback.active_count == 0
-        assert engine.outcome.pending_count == 0
+    def test_a_mutating_actuator_is_refused_with_every_component_wired(self):
+        """The full advanced configuration cannot be built around a SCALE_PATCH actuator."""
+        with pytest.raises(RuntimeError):
+            self._make_engine(actuator=ActuatorConfig(mode=ActuatorMode.SCALE_PATCH))

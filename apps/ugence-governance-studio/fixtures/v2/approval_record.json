@@ -1,0 +1,23 @@
+{
+  "accepted_warning_ids": [],
+  "approval_id": "approval.procurement.reference.fixture",
+  "approved_at": "2026-08-03T00:00:00Z",
+  "decision": "APPROVED",
+  "description": "",
+  "enabled": true,
+  "is_fixture": true,
+  "justification": "Offline reference-equivalence fixture; not a production approval.",
+  "name": "procurement reference approval fixture",
+  "object_id": "approval.procurement.reference.fixture",
+  "object_type": "HUMAN_APPROVAL_RECORD",
+  "policy_pack_digest": "sha256:28eedf60892bc1b3e9f8c15c56d43b0aa353659c8158a793f94168a81de98b14",
+  "policy_pack_id": "pack.procurement.reference",
+  "provenance_refs": [],
+  "related_object_ids": [],
+  "reviewed_gap_ids": [],
+  "reviewer_authority_reference": "offline-fixture://procurement",
+  "reviewer_id": "fixture.reviewer",
+  "reviewer_role": "procurement_governance_reviewer",
+  "signature_reference": "",
+  "version": 1
+}

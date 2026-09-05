@@ -1,39 +1,30 @@
-"""Gate Actuator — controls deployment gates via ArgoCD or K8s Admission Webhooks.
+"""Gate Actuator — a dry-run recorder of deployment-gate decisions.
 
-Two gating mechanisms:
-  1. ArgoCD Sync Gate — POST /api/v1/applications/{name}/sync to trigger
-     or hold back ArgoCD application syncs based on scaling decisions.
-  2. Admission Webhook — validates or mutates pod specs at admission time
-     to enforce scaling policy (e.g., reject scale-up during incident).
+Containment (ADR_CLOUD_SCALING_OPERATIONS_ORCHESTRATOR_CONTAINMENT_SCOPING, D-2):
+this actuator has exactly one mode, ``DRY_RUN``. The ArgoCD sync mode, the admission
+webhook mode, the ArgoCD URL, the bearer token and the insecure-TLS switch are gone:
+a bearer token in a config dataclass was credential material held by a module that
+no authorization gated. ArgoCD access lives with the authority-gated
+``GateExecutor`` (``gate_executor.py``), whose HTTP caller is injected and whose sync
+requires an ``ExecutionAuthorization``.
 
-Like the K8s actuator, this module trusts its inputs — safety bounds are
-enforced upstream by recommend/safety.py.
+What remains records what a gate decision *would* be, for a recommendation loop to
+log, and transmits nothing.
 """
 
 import logging
 import threading
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import Enum
-from typing import Dict, List, Optional
+from typing import List, Optional
 
 logger = logging.getLogger(__name__)
 
-# Optional HTTP dependency for ArgoCD API calls
-try:
-    import urllib.request
-    import urllib.error
-    import json as _json
-    _HTTP_AVAILABLE = True
-except ImportError:
-    _HTTP_AVAILABLE = False
-
 
 class GateMode(Enum):
-    """How the gate actuator controls deployments."""
+    """How the gate actuator controls deployments. One mode: it does not."""
     DRY_RUN = "dry_run"            # Log only
-    ARGOCD_SYNC = "argocd_sync"    # Trigger/hold ArgoCD sync
-    ADMISSION_WEBHOOK = "admission_webhook"  # K8s admission control
 
 
 class GateAction(Enum):
@@ -45,17 +36,8 @@ class GateAction(Enum):
 
 @dataclass
 class GateConfig:
-    """Configuration for the gate actuator."""
+    """Configuration for the gate actuator. No URL, no token, no TLS switch."""
     mode: GateMode = GateMode.DRY_RUN
-    # ArgoCD settings
-    argocd_url: str = ""           # e.g., "https://argocd.internal:8080"
-    argocd_token: str = ""         # Bearer token for ArgoCD API
-    argocd_insecure: bool = False  # Skip TLS verification (dev only)
-    # Timeout for API calls
-    timeout_seconds: float = 10.0
-    # Retry settings
-    max_retries: int = 2
-    retry_delay_seconds: float = 1.0
 
 
 @dataclass
@@ -81,19 +63,11 @@ class GateResult:
 
 
 class GateActuator:
-    """Controls deployment gates for scaling coordination.
+    """Records deployment-gate decisions for scaling coordination. Transmits nothing.
 
     Usage:
-        gate = GateActuator(GateConfig(
-            mode=GateMode.ARGOCD_SYNC,
-            argocd_url="https://argocd.internal:8080",
-            argocd_token="...",
-        ))
-        result = gate.execute(
-            action=GateAction.HOLD,
-            application="api-gateway",
-            namespace="prod",
-        )
+        gate = GateActuator()
+        result = gate.execute(GateAction.HOLD, application="api-gateway", namespace="prod")
     """
 
     def __init__(self, config: Optional[GateConfig] = None):
@@ -101,9 +75,11 @@ class GateActuator:
         self._lock = threading.Lock()
         self._history: List[GateResult] = []
         self._max_history = 1000
-        # Admission webhook policy store — persists decisions for the
-        # webhook server to read. Key: "namespace/application"
-        self._admission_policies: Dict[str, GateResult] = {}
+
+    @property
+    def mutates(self) -> bool:
+        """Always ``False``: there is no mode in which this actuator changes anything."""
+        return False
 
     def execute(
         self,
@@ -112,233 +88,34 @@ class GateActuator:
         namespace: str,
         recommendation_id: str = "",
     ) -> GateResult:
-        """Execute a gate action.
+        """Record a gate decision.
 
         Args:
-            action: What gate action to take (ALLOW, HOLD, SYNC).
+            action: What gate action would be taken (ALLOW, HOLD, SYNC).
             application: ArgoCD application or deployment name.
             namespace: K8s namespace.
             recommendation_id: Linked recommendation ID (for audit).
 
         Returns:
-            GateResult with success/failure details.
+            GateResult describing the decision that was logged, never applied.
         """
         now = time.time()
-
-        if self.config.mode == GateMode.DRY_RUN:
-            result = self._dry_run(action, application, namespace, now, recommendation_id)
-        elif self.config.mode == GateMode.ARGOCD_SYNC:
-            result = self._argocd_sync(action, application, namespace, now, recommendation_id)
-        elif self.config.mode == GateMode.ADMISSION_WEBHOOK:
-            # Admission webhook is passive — it responds to K8s API server calls,
-            # not initiated by us. Log the policy decision for the webhook to read.
-            result = self._admission_policy(action, application, namespace, now, recommendation_id)
-        else:
-            result = GateResult(
-                success=False,
-                mode=self.config.mode.value,
-                action=action.value,
-                application=application,
-                namespace=namespace,
-                timestamp=now,
-                error=f"Unknown mode: {self.config.mode}",
-                recommendation_id=recommendation_id,
-            )
-
-        self._record(result)
-        logger.info(result.format_log())
-        return result
-
-    def _dry_run(
-        self,
-        action: GateAction,
-        application: str,
-        namespace: str,
-        timestamp: float,
-        recommendation_id: str,
-    ) -> GateResult:
-        """Log gate action without executing."""
         logger.info(
             "DRY RUN: would %s gate for %s/%s",
             action.value, namespace, application,
         )
-        return GateResult(
-            success=True,
-            mode="dry_run",
-            action=action.value,
-            application=application,
-            namespace=namespace,
-            timestamp=timestamp,
-            recommendation_id=recommendation_id,
-        )
-
-    def _argocd_sync(
-        self,
-        action: GateAction,
-        application: str,
-        namespace: str,
-        timestamp: float,
-        recommendation_id: str,
-    ) -> GateResult:
-        """Execute gate action via ArgoCD API."""
-        if not self.config.argocd_url:
-            return GateResult(
-                success=False,
-                mode="argocd_sync",
-                action=action.value,
-                application=application,
-                namespace=namespace,
-                timestamp=timestamp,
-                error="ArgoCD URL not configured",
-                recommendation_id=recommendation_id,
-            )
-
-        if action == GateAction.SYNC:
-            return self._argocd_trigger_sync(application, namespace, timestamp, recommendation_id)
-        elif action == GateAction.HOLD:
-            # For HOLD, we don't trigger sync — just log that we're holding
-            logger.info(
-                "ArgoCD HOLD: deferring sync for %s/%s until conditions improve",
-                namespace, application,
-            )
-            return GateResult(
-                success=True,
-                mode="argocd_sync",
-                action="hold",
-                application=application,
-                namespace=namespace,
-                timestamp=timestamp,
-                recommendation_id=recommendation_id,
-            )
-        else:
-            # ALLOW — no active action needed, sync proceeds normally
-            return GateResult(
-                success=True,
-                mode="argocd_sync",
-                action="allow",
-                application=application,
-                namespace=namespace,
-                timestamp=timestamp,
-                recommendation_id=recommendation_id,
-            )
-
-    def _argocd_trigger_sync(
-        self,
-        application: str,
-        namespace: str,
-        timestamp: float,
-        recommendation_id: str,
-    ) -> GateResult:
-        """POST to ArgoCD to trigger an application sync."""
-        url = f"{self.config.argocd_url.rstrip('/')}/api/v1/applications/{application}/sync"
-        headers = {
-            "Content-Type": "application/json",
-            "Authorization": f"Bearer {self.config.argocd_token}",
-        }
-        body = _json.dumps({"prune": False, "dryRun": False}).encode("utf-8")
-
-        last_error = ""
-        for attempt in range(self.config.max_retries + 1):
-            try:
-                req = urllib.request.Request(url, data=body, headers=headers, method="POST")
-                if self.config.argocd_insecure:
-                    import ssl
-                    ctx = ssl.create_default_context()
-                    ctx.check_hostname = False
-                    ctx.verify_mode = ssl.CERT_NONE
-                    urllib.request.urlopen(req, timeout=self.config.timeout_seconds, context=ctx)
-                else:
-                    urllib.request.urlopen(req, timeout=self.config.timeout_seconds)
-
-                return GateResult(
-                    success=True,
-                    mode="argocd_sync",
-                    action="sync",
-                    application=application,
-                    namespace=namespace,
-                    timestamp=timestamp,
-                    retries=attempt,
-                    recommendation_id=recommendation_id,
-                )
-            except Exception as e:
-                last_error = str(e)
-                if attempt < self.config.max_retries:
-                    logger.warning(
-                        "ArgoCD sync retry %d/%d for %s: %s",
-                        attempt + 1, self.config.max_retries, application, e,
-                    )
-                    time.sleep(self.config.retry_delay_seconds)
-
-        return GateResult(
-            success=False,
-            mode="argocd_sync",
-            action="sync",
-            application=application,
-            namespace=namespace,
-            timestamp=timestamp,
-            error=f"Failed after {self.config.max_retries + 1} attempts: {last_error}",
-            retries=self.config.max_retries,
-            recommendation_id=recommendation_id,
-        )
-
-    def _admission_policy(
-        self,
-        action: GateAction,
-        application: str,
-        namespace: str,
-        timestamp: float,
-        recommendation_id: str,
-    ) -> GateResult:
-        """Record admission policy decision and persist for webhook server.
-
-        The admission webhook server calls get_admission_policy() to read
-        the current policy decision for a given application. This method
-        updates the persisted policy state.
-        """
         result = GateResult(
             success=True,
-            mode="admission_webhook",
+            mode=GateMode.DRY_RUN.value,
             action=action.value,
             application=application,
             namespace=namespace,
-            timestamp=timestamp,
+            timestamp=now,
             recommendation_id=recommendation_id,
         )
-
-        # Persist the policy for the webhook server to read
-        key = f"{namespace}/{application}"
-        with self._lock:
-            self._admission_policies[key] = result
-
-        logger.info(
-            "Admission policy set: %s for %s (rec=%s)",
-            action.value, key, recommendation_id,
-        )
+        self._record(result)
+        logger.info(result.format_log())
         return result
-
-    def get_admission_policy(
-        self, application: str, namespace: str,
-    ) -> Optional[GateResult]:
-        """Get the current admission policy for an application.
-
-        Called by the admission webhook server to decide allow/deny.
-
-        Args:
-            application: K8s deployment/application name.
-            namespace: K8s namespace.
-
-        Returns:
-            The most recent GateResult, or None if no policy is set.
-        """
-        key = f"{namespace}/{application}"
-        with self._lock:
-            return self._admission_policies.get(key)
-
-    @property
-    def admission_policies(self) -> Dict[str, GateResult]:
-        """All current admission policies (key: "namespace/application")."""
-        with self._lock:
-            return dict(self._admission_policies)
 
     def _record(self, result: GateResult) -> None:
         """Record gate result for audit trail."""
@@ -353,7 +130,6 @@ class GateActuator:
             return list(self._history)
 
     def reset(self) -> None:
-        """Clear history and admission policies."""
+        """Clear history."""
         with self._lock:
             self._history.clear()
-            self._admission_policies.clear()

@@ -1,0 +1,103 @@
+{
+  "curated_api_module": "ugence_control_plane_root",
+  "distribution": "ugence-control-plane-root",
+  "namespace": "ugence_control_plane_root",
+  "note": "Machine-readable snapshot of the curated public API (ugence_control_plane_root.__all__). tests/packaging/test_packaging.py asserts this file equals the live package surface. Regenerate with scripts/generate_public_api.py when the curated API changes deliberately.",
+  "package_version": "0.1.0",
+  "symbols": {
+    "AuditLedger": {
+      "kind": "class",
+      "methods": [
+        "append",
+        "close",
+        "entry_count",
+        "schema_version",
+        "verify_chain"
+      ]
+    },
+    "AuditReferenceFactory": {
+      "kind": "class",
+      "methods": []
+    },
+    "CONTRACT_VERSION": {
+      "kind": "constant",
+      "value": "control_plane_root.audit_ledger.v1"
+    },
+    "ContractViolation": {
+      "kind": "class",
+      "methods": [
+        "add_note",
+        "with_traceback"
+      ]
+    },
+    "ControlPlaneRootError": {
+      "kind": "class",
+      "methods": [
+        "add_note",
+        "with_traceback"
+      ]
+    },
+    "GENESIS_DIGEST": {
+      "kind": "constant",
+      "value": "0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    "LedgerEntry": {
+      "fields": [
+        "tenant_id",
+        "kind",
+        "recorded_at",
+        "recorded_by",
+        "payload",
+        "correlation_id"
+      ],
+      "kind": "dataclass"
+    },
+    "LedgerIntegrityError": {
+      "kind": "class",
+      "methods": [
+        "add_note",
+        "with_traceback"
+      ]
+    },
+    "MATURITY": {
+      "kind": "constant",
+      "value": "REFERENCE_GRADE"
+    },
+    "SCHEMA_VERSION": {
+      "kind": "constant",
+      "value": "cpr.audit/1.0.0"
+    },
+    "STORE_REF": {
+      "kind": "constant",
+      "value": "ugence_control_plane_root:audit_ledger"
+    },
+    "SchemaVersionMismatch": {
+      "kind": "class",
+      "methods": [
+        "add_note",
+        "with_traceback"
+      ]
+    },
+    "StoredEntry": {
+      "kind": "class",
+      "methods": []
+    },
+    "__version__": {
+      "kind": "constant",
+      "value": "0.1.0"
+    },
+    "canonical_bytes": {
+      "kind": "function",
+      "parameters": [
+        "payload"
+      ]
+    },
+    "domain_digest": {
+      "kind": "function",
+      "parameters": [
+        "domain",
+        "payload"
+      ]
+    }
+  }
+}

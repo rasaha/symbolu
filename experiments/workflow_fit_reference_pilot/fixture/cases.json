@@ -1,0 +1,7 @@
+{
+  "cases": [
+    {"case_id": "case.arith", "query": "What is two plus two? Reply with a final line 'ANSWER: <value>'.", "context": ""},
+    {"case_id": "case.capital", "query": "Name the capital of France. Reply with a final line 'ANSWER: <value>'.", "context": "synthetic fixture context"},
+    {"case_id": "case.boiling", "query": "State the boiling point of water in Celsius at sea level. Reply with a final line 'ANSWER: <value>'.", "context": ""}
+  ]
+}

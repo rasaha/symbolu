@@ -3,6 +3,21 @@
 All notable changes to this distribution. This package follows the Cloud Scaling phase
 numbering; each entry names the phase that produced it.
 
+## Unreleased — guard sweep adopted into the shared Cloud Scaling engine
+
+**No `src/` change, and the version does not move.** The in-package
+`scripts/guard_sweep.py` fork is retired; the gate-removal sweep now runs through
+`scripts/cloud_scaling/guard_sweep.py` under a ratified `producer-attestation` entry with
+all three additive decision classes enabled. The inventory grows from the fork's 92 `if`
+guards to **116 decision points** (94 `if`-layer — two raising-helper-call guards the
+fork's raise-only reading missed — plus 18 helper-admission calls and 4 `except`-arm typed
+rejections). Former fork survivors with a constructible isolating input are now scored and
+killed by `tests/test_guard_coverage.py`; the fifteen without one carry closed-vocabulary
+exclusions in the engine's configuration, each naming the test that measures its claim.
+The published record moves from `GUARD_SWEEP.md`/`guard_sweep.json` (sweep output) to
+`GUARD_INVENTORY.md`/`guard_inventory.json`/`guard_classification.json` (regenerable
+inventory and classification); sweep results are CI artifacts.
+
 ## Unreleased — fixture re-pins for Cloud Scaling Phase 5B-1
 
 **No source change, and the version does not move.** Phase 5B-1 added the required policy

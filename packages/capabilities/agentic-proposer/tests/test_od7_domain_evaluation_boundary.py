@@ -57,7 +57,8 @@ def _world():
         permitted_candidate_dispositions=[ap.CandidateDisposition.RECOMMEND_WITHHOLD],
         permitted_review_actions=[ap.ReviewAction.ROUTE_APPROVAL_BUNDLE],
         escalation_role_ref="role-2", activation_status=ap.RoleActivationStatus.ACTIVE,
-        strategy_policy_ref=spec.STRATEGY_POLICY_REF)
+        strategy_policy_ref=spec.STRATEGY_POLICY_REF,
+        constitution_ref=spec.CONSTITUTION_REF)
     mandate = ap.WorkMandate(
         schema_version="1.0", tenant_id="tenant-1", created_at=FIXED_INSTANT,
         mandate_id="mandate-1", case_ref="case-1", assigned_role_contract_id="role-1",
@@ -131,6 +132,7 @@ def _advisory(world, candidate_set, *, provider=None, destination="role-approver
             destination if candidate_set.selected_candidate_id is not None else None),
         strategy_policy_resolver=(
             strategy_policy_resolver or spec.StubStrategyPolicyResolver()),
+        constitution_resolution=spec.StubConstitutionResolution(),
         declared_strategy=declared_strategy)
 
 
@@ -730,7 +732,7 @@ def test_i8_10_build_proposer_advisory_recomputes_readiness_rather_than_assuming
 
 
 @pytest.mark.parametrize("contract,expected", [
-    ("AdvisoryCandidateSet", 12), ("CandidateAdvisory", 11), ("ProposerAdvisory", 30)])
+    ("AdvisoryCandidateSet", 12), ("CandidateAdvisory", 11), ("ProposerAdvisory", 32)])
 def test_i8_11_the_moved_cardinalities_agree_with_src(contract, expected):
     """The amendment's own arithmetic — 8 -> 12, 10 -> 11, 23 -> 27 — re-verified
     against ``src/`` rather than trusted, exactly as OD-4's cardinality claims were.

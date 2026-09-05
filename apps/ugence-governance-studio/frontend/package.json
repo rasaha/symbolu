@@ -13,9 +13,12 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "generate:api": "node scripts/generate-api.mjs",
+    "generate:api-v2": "node scripts/generate-api-v2.mjs",
     "verify:openapi": "node scripts/verify-openapi.mjs",
+    "verify:openapi-v2": "node scripts/verify-openapi-v2.mjs",
     "verify:boundary": "node scripts/verify-boundary.mjs",
     "verify:api-boundary": "node scripts/verify-api-boundary.mjs",
+    "verify:v2-api-boundary": "node scripts/verify-v2-api-boundary.mjs",
     "verify:terminology": "node scripts/verify-terminology.mjs",
     "verify:contrast": "node scripts/verify-contrast.mjs",
     "verify:version": "node scripts/verify-version.mjs",
@@ -30,6 +33,7 @@
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-router-dom": "^6.28.0",
+    "reactflow": "^11.11.4",
     "zustand": "^4.5.5"
   },
   "devDependencies": {

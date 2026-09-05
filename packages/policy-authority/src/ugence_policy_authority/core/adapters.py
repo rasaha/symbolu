@@ -110,6 +110,12 @@ class PolicyArtifactDescriptor:
     lifecycle_label: str
     lifecycle_is_active: bool
     supersedes_ref: str = ""
+    #: `ACC-LC-1` / `ACC-LC-IA-1`. The exact predecessor this artifact supersedes,
+    #: as a complete :class:`PolicyCoordinate` — the only shape the registry can
+    #: resolve, since exact-match lookup is the only lookup it performs. ``None``
+    #: is the default and the overwhelmingly common case: an artifact supersedes
+    #: nothing. This never relaxes ``supersedes_ref``, which keeps being refused.
+    supersedes_coordinate: Optional[PolicyCoordinate] = None
     effective_from: Optional[datetime] = None
     effective_to: Optional[datetime] = None
 
@@ -136,6 +142,13 @@ class PolicyArtifactDescriptor:
             raise PolicyAuthorityRequestError(
                 "PolicyArtifactDescriptor.supersedes_ref must be a string"
             )
+        if self.supersedes_coordinate is not None and not isinstance(
+            self.supersedes_coordinate, PolicyCoordinate
+        ):
+            raise PolicyAuthorityRequestError(
+                "PolicyArtifactDescriptor.supersedes_coordinate must be a "
+                "PolicyCoordinate — a string cannot bind an exact predecessor"
+            )
         for name in ("effective_from", "effective_to"):
             value = getattr(self, name)
             if value is not None:
@@ -151,6 +164,17 @@ class PolicyArtifactDescriptor:
         """
 
         return bool(self.supersedes_ref.strip())
+
+    @property
+    def declares_structured_supersession(self) -> bool:
+        """Whether an exact predecessor coordinate is present (`ACC-LC-IA-1`).
+
+        Independent of :attr:`declares_supersession`: the unstructured string is
+        refused whether or not a structured coordinate accompanies it, so a
+        artifact carrying both is rejected on the string, exactly as today.
+        """
+
+        return self.supersedes_coordinate is not None
 
     def body_digest(self) -> str:
         """The computed canonical body digest of this artifact."""

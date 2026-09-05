@@ -9,7 +9,19 @@ from __future__ import annotations
 
 from fastapi import APIRouter
 
-from .routes import auth, birth_profiles, chat, consent, couples, health, natal, users
+from .routes import (
+    auth,
+    birth_profiles,
+    blocks,
+    chat,
+    consent,
+    couples,
+    devices,
+    health,
+    natal,
+    reports,
+    users,
+)
 
 api_router = APIRouter()
 api_router.include_router(health.router)
@@ -20,3 +32,6 @@ api_router.include_router(natal.router)
 api_router.include_router(couples.router)
 api_router.include_router(consent.router)
 api_router.include_router(chat.router)
+api_router.include_router(blocks.router)
+api_router.include_router(reports.router)
+api_router.include_router(devices.router)

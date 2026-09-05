@@ -1,0 +1,1015 @@
+{
+  "package": "risk-integration",
+  "total": 100,
+  "reconciliation": {},
+  "excluded": {
+    "except_arms": 8,
+    "boolean_subterms": 12
+  },
+  "guards": [
+    {
+      "index": 1,
+      "module": "identifiers.py",
+      "line": 68,
+      "condition": "_CONTROLLER_ACTION_TYPES != CANONICAL_ACTION_TYPES",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 2,
+      "module": "identifiers.py",
+      "line": 85,
+      "condition": "not isinstance(action_kind, ActionKind)",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 3,
+      "module": "identifiers.py",
+      "line": 88,
+      "condition": "value not in CANONICAL_ACTION_TYPES",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 4,
+      "module": "outcomes.py",
+      "line": 118,
+      "condition": "getattr(self, flag) is not False",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": "",
+      "multiplicity": 7
+    },
+    {
+      "index": 5,
+      "module": "outcomes.py",
+      "line": 123,
+      "condition": "not isinstance(self.status, AdapterOutcomeStatus)",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 6,
+      "module": "outcomes.py",
+      "line": 125,
+      "condition": "self.schema_version != ADAPTER_OUTCOME_SCHEMA_VERSION",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 7,
+      "module": "outcomes.py",
+      "line": 130,
+      "condition": "self.status is AdapterOutcomeStatus.RISK_DECISION",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 8,
+      "module": "outcomes.py",
+      "line": 131,
+      "condition": "not isinstance(self.decision, SubjectRiskDecision)",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 9,
+      "module": "outcomes.py",
+      "line": 136,
+      "condition": "getattr(self.decision, flag) is not False",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": "",
+      "multiplicity": 6
+    },
+    {
+      "index": 10,
+      "module": "outcomes.py",
+      "line": 141,
+      "condition": "self.rejection_reason is not None or self.abstention_reason is not None",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 11,
+      "module": "outcomes.py",
+      "line": 145,
+      "condition": "self.status is AdapterOutcomeStatus.PROJECTION_ABSTAINED_UPSTREAM",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 12,
+      "module": "outcomes.py",
+      "line": 146,
+      "condition": "self.decision is not None or self.projection is not None",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 13,
+      "module": "outcomes.py",
+      "line": 151,
+      "condition": "not isinstance(self.abstention_reason, str) or self.abstention_reason == ''",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 14,
+      "module": "outcomes.py",
+      "line": 155,
+      "condition": "self.rejection_reason is not None",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 15,
+      "module": "outcomes.py",
+      "line": 160,
+      "condition": "self.decision is not None",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 16,
+      "module": "outcomes.py",
+      "line": 164,
+      "condition": "not isinstance(self.rejection_reason, AdapterRejectionReason)",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 17,
+      "module": "outcomes.py",
+      "line": 168,
+      "condition": "self.abstention_reason is not None",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 18,
+      "module": "authenticity.py",
+      "line": 216,
+      "condition": "_validate_authenticated_recommendation(self)",
+      "kind": "helper-admission",
+      "shape": "helper-admission call",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 19,
+      "module": "authenticity.py",
+      "line": 242,
+      "condition": "_validate_authenticated_abstention(self)",
+      "kind": "helper-admission",
+      "shape": "helper-admission call",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 20,
+      "module": "authenticity.py",
+      "line": 267,
+      "condition": "_token_field(record, flag, kind) is not False",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": "",
+      "multiplicity": 8
+    },
+    {
+      "index": 21,
+      "module": "authenticity.py",
+      "line": 274,
+      "condition": "isinstance(value, bool) or not isinstance(value, str)",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 22,
+      "module": "authenticity.py",
+      "line": 276,
+      "condition": "not _DIGEST_RE.match(value)",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 23,
+      "module": "authenticity.py",
+      "line": 300,
+      "condition": "value is _MISSING",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 24,
+      "module": "authenticity.py",
+      "line": 319,
+      "condition": "type(token) is not expected",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 25,
+      "module": "authenticity.py",
+      "line": 357,
+      "condition": "_require_exact_token(token, AuthenticatedRecommendation, 'an authenticated recommendation')",
+      "kind": "helper-admission",
+      "shape": "helper-admission call",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 26,
+      "module": "authenticity.py",
+      "line": 358,
+      "condition": "_assert_no_authority_fields(token, 'an authenticated recommendation')",
+      "kind": "helper-admission",
+      "shape": "helper-admission call",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 27,
+      "module": "authenticity.py",
+      "line": 361,
+      "condition": "type(recommendation) is not CapacityActionRecommendation",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 28,
+      "module": "authenticity.py",
+      "line": 376,
+      "condition": "digest != recomputed",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 29,
+      "module": "authenticity.py",
+      "line": 397,
+      "condition": "_require_exact_token(token, AuthenticatedAbstention, 'an authenticated abstention')",
+      "kind": "helper-admission",
+      "shape": "helper-admission call",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 30,
+      "module": "authenticity.py",
+      "line": 398,
+      "condition": "_assert_no_authority_fields(token, 'an authenticated abstention')",
+      "kind": "helper-admission",
+      "shape": "helper-admission call",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 31,
+      "module": "authenticity.py",
+      "line": 401,
+      "condition": "type(abstention) is not RecommendationAbstention",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 32,
+      "module": "authenticity.py",
+      "line": 408,
+      "condition": "carried is not None",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 33,
+      "module": "authenticity.py",
+      "line": 411,
+      "condition": "digest != recomputed",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 34,
+      "module": "authenticity.py",
+      "line": 428,
+      "condition": "token_type is AuthenticatedRecommendation",
+      "kind": "if",
+      "shape": "raising-helper call",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 35,
+      "module": "authenticity.py",
+      "line": 429,
+      "condition": "_validate_authenticated_recommendation(token)",
+      "kind": "helper-admission",
+      "shape": "helper-admission call",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 36,
+      "module": "authenticity.py",
+      "line": 430,
+      "condition": "token_type is AuthenticatedAbstention",
+      "kind": "if",
+      "shape": "raising-helper call",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 37,
+      "module": "authenticity.py",
+      "line": 431,
+      "condition": "_validate_authenticated_abstention(token)",
+      "kind": "helper-admission",
+      "shape": "helper-admission call",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 38,
+      "module": "authenticity.py",
+      "line": 432,
+      "condition": "else of: token_type is AuthenticatedAbstention",
+      "kind": "else-arm",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 39,
+      "module": "authenticity.py",
+      "line": 474,
+      "condition": "carried is not None",
+      "kind": "if",
+      "shape": "raising-helper call",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 40,
+      "module": "authenticity.py",
+      "line": 479,
+      "condition": "expected is not None",
+      "kind": "if",
+      "shape": "raising-helper call",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 41,
+      "module": "authenticity.py",
+      "line": 484,
+      "condition": "not expectations",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 42,
+      "module": "authenticity.py",
+      "line": 492,
+      "condition": "value != recomputed",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 43,
+      "module": "authenticity.py",
+      "line": 529,
+      "condition": "isinstance(source, _CONTROLLER_TYPES)",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 44,
+      "module": "authenticity.py",
+      "line": 543,
+      "condition": "type(value) is not expected",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 45,
+      "module": "authenticity.py",
+      "line": 581,
+      "condition": "expected_recommendation_digest is not None",
+      "kind": "if",
+      "shape": "raising-helper call",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 46,
+      "module": "authenticity.py",
+      "line": 582,
+      "condition": "_require_digest_syntax('expected_recommendation_digest', expected_recommendation_digest)",
+      "kind": "helper-admission",
+      "shape": "helper-admission call",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 47,
+      "module": "authenticity.py",
+      "line": 593,
+      "condition": "source_type is not CapacityActionRecommendation and source_type is not RecommendationAbstention",
+      "kind": "if",
+      "shape": "raising-helper call",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 48,
+      "module": "authenticity.py",
+      "line": 599,
+      "condition": "_reject_subclass(source)",
+      "kind": "helper-admission",
+      "shape": "helper-admission call",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 49,
+      "module": "authenticity.py",
+      "line": 602,
+      "condition": "source_type is CapacityActionRecommendation",
+      "kind": "if",
+      "shape": "raising-helper call",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 50,
+      "module": "authenticity.py",
+      "line": 617,
+      "condition": "source_type is RecommendationAbstention",
+      "kind": "if",
+      "shape": "raising-helper call",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 51,
+      "module": "authenticity.py",
+      "line": 621,
+      "condition": "expected_recommendation_digest is not None",
+      "kind": "if",
+      "shape": "raising-helper call",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 52,
+      "module": "authenticity.py",
+      "line": 635,
+      "condition": "not isinstance(source, Mapping)",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 53,
+      "module": "authenticity.py",
+      "line": 642,
+      "condition": "tag is None",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 54,
+      "module": "authenticity.py",
+      "line": 650,
+      "condition": "tag == RECOMMENDATION_SCHEMA_VERSION",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 55,
+      "module": "authenticity.py",
+      "line": 665,
+      "condition": "_require_exact_reconstruction(recommendation, CapacityActionRecommendation)",
+      "kind": "helper-admission",
+      "shape": "helper-admission call",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 56,
+      "module": "authenticity.py",
+      "line": 679,
+      "condition": "tag == RECOMMENDATION_ABSTENTION_SCHEMA_VERSION",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 57,
+      "module": "authenticity.py",
+      "line": 686,
+      "condition": "_require_exact_reconstruction(abstention, RecommendationAbstention)",
+      "kind": "helper-admission",
+      "shape": "helper-admission call",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 58,
+      "module": "authenticity.py",
+      "line": 689,
+      "condition": "carried is not None or expected_recommendation_digest is not None",
+      "kind": "if",
+      "shape": "raising-helper call",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 59,
+      "module": "projection.py",
+      "line": 127,
+      "condition": "getattr(self, flag) is not False",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": "",
+      "multiplicity": 9
+    },
+    {
+      "index": 60,
+      "module": "projection.py",
+      "line": 131,
+      "condition": "self.schema_version != PROJECTION_SCHEMA_VERSION",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 61,
+      "module": "projection.py",
+      "line": 135,
+      "condition": "not isinstance(self.request, SubjectRiskEvaluationRequestV2)",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 62,
+      "module": "projection.py",
+      "line": 139,
+      "condition": "self.request.evaluation_time is not None",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 63,
+      "module": "projection.py",
+      "line": 149,
+      "condition": "self.context.digest() != self.context_digest",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 64,
+      "module": "projection.py",
+      "line": 151,
+      "condition": "self.binding.digest() != self.subject_digest",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 65,
+      "module": "projection.py",
+      "line": 153,
+      "condition": "self.request.digest() != self.request_digest",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 66,
+      "module": "projection.py",
+      "line": 161,
+      "condition": "validation.context_digest != self.context_digest",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 67,
+      "module": "projection.py",
+      "line": 163,
+      "condition": "validation.subject_digest != self.subject_digest",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 68,
+      "module": "projection.py",
+      "line": 165,
+      "condition": "validation.recommendation_digest != self.recommendation_digest",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 69,
+      "module": "projection.py",
+      "line": 202,
+      "condition": "not isinstance(value, datetime)",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 70,
+      "module": "projection.py",
+      "line": 204,
+      "condition": "value.tzinfo is None or value.utcoffset() is None",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 71,
+      "module": "projection.py",
+      "line": 213,
+      "condition": "not isinstance(value, str) or value == ''",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 72,
+      "module": "projection.py",
+      "line": 252,
+      "condition": "candidates[0][1] is None",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 73,
+      "module": "projection.py",
+      "line": 257,
+      "condition": "value is None",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 74,
+      "module": "projection.py",
+      "line": 261,
+      "condition": "not isinstance(value, str) or not value.startswith('sha256:')",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 75,
+      "module": "projection.py",
+      "line": 289,
+      "condition": "type(authenticated) is not AuthenticatedRecommendation",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 76,
+      "module": "projection.py",
+      "line": 357,
+      "condition": "correlation_id is not None and (not isinstance(correlation_id, str))",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 77,
+      "module": "adapter.py",
+      "line": 113,
+      "condition": "seam is None",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 78,
+      "module": "adapter.py",
+      "line": 118,
+      "condition": "not callable(getattr(seam, 'evaluate', None))",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 79,
+      "module": "adapter.py",
+      "line": 122,
+      "condition": "clock is None or not callable(clock)",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 80,
+      "module": "adapter.py",
+      "line": 152,
+      "condition": "_validate_authenticated_output(authenticated)",
+      "kind": "helper-admission",
+      "shape": "helper-admission call",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 81,
+      "module": "adapter.py",
+      "line": 153,
+      "condition": "type(authenticated) is AuthenticatedAbstention",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 82,
+      "module": "adapter.py",
+      "line": 186,
+      "condition": "_validate_authenticated_output(authenticated)",
+      "kind": "helper-admission",
+      "shape": "helper-admission call",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 83,
+      "module": "adapter.py",
+      "line": 187,
+      "condition": "except UnsupportedRecommendationSourceError: self._rejected(AdapterRejectionReason.UNSUPPORTED_INPUT_TYPE, str(exc))",
+      "kind": "except-arm",
+      "shape": "typed-refusal return",
+      "recorded_in": "",
+      "outcome": "AdapterRejectionReason.UNSUPPORTED_INPUT_TYPE"
+    },
+    {
+      "index": 84,
+      "module": "adapter.py",
+      "line": 191,
+      "condition": "except RecommendationInputError: self._rejected(AdapterRejectionReason.MALFORMED_RECOMMENDATION, str(exc))",
+      "kind": "except-arm",
+      "shape": "typed-refusal return",
+      "recorded_in": "",
+      "outcome": "AdapterRejectionReason.MALFORMED_RECOMMENDATION"
+    },
+    {
+      "index": 85,
+      "module": "adapter.py",
+      "line": 195,
+      "condition": "except MissingIndependentDigestError: self._rejected(AdapterRejectionReason.MISSING_INDEPENDENT_RECOMMENDATION_DIGEST, str(exc))",
+      "kind": "except-arm",
+      "shape": "typed-refusal return",
+      "recorded_in": "",
+      "outcome": "AdapterRejectionReason.MISSING_INDEPENDENT_RECOMMENDATION_DIGEST"
+    },
+    {
+      "index": 86,
+      "module": "adapter.py",
+      "line": 199,
+      "condition": "except RecommendationAuthenticityError: self._rejected(AdapterRejectionReason.RECOMMENDATION_DIGEST_MISMATCH, str(exc))",
+      "kind": "except-arm",
+      "shape": "typed-refusal return",
+      "recorded_in": "",
+      "outcome": "AdapterRejectionReason.RECOMMENDATION_DIGEST_MISMATCH"
+    },
+    {
+      "index": 87,
+      "module": "adapter.py",
+      "line": 205,
+      "condition": "type(authenticated) is AuthenticatedAbstention",
+      "kind": "if",
+      "shape": "typed-refusal call",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 88,
+      "module": "adapter.py",
+      "line": 211,
+      "condition": "except RecommendationInputError: self._rejected(AdapterRejectionReason.UNSUPPORTED_INPUT_TYPE, str(exc), tenant_id=_safe_tenant(authenticated), subject_id=_safe_subject(authenticated), recommendation_digest=getattr(authenticated, 'recommendation_digest', None))",
+      "kind": "except-arm",
+      "shape": "typed-refusal return",
+      "recorded_in": "",
+      "outcome": "AdapterRejectionReason.UNSUPPORTED_INPUT_TYPE"
+    },
+    {
+      "index": 89,
+      "module": "adapter.py",
+      "line": 222,
+      "condition": "except RecommendationAuthenticityError: self._rejected(AdapterRejectionReason.RECOMMENDATION_DIGEST_MISMATCH, str(exc), tenant_id=_safe_tenant(authenticated), subject_id=_safe_subject(authenticated), recommendation_digest=getattr(authenticated, 'recommendation_digest', None))",
+      "kind": "except-arm",
+      "shape": "typed-refusal return",
+      "recorded_in": "",
+      "outcome": "AdapterRejectionReason.RECOMMENDATION_DIGEST_MISMATCH"
+    },
+    {
+      "index": 90,
+      "module": "adapter.py",
+      "line": 230,
+      "condition": "except ProjectionError: self._rejected(AdapterRejectionReason.PROJECTION_FAILED, str(exc), tenant_id=_safe_tenant(authenticated), subject_id=_safe_subject(authenticated), recommendation_digest=getattr(authenticated, 'recommendation_digest', None))",
+      "kind": "except-arm",
+      "shape": "typed-refusal return",
+      "recorded_in": "",
+      "outcome": "AdapterRejectionReason.PROJECTION_FAILED"
+    },
+    {
+      "index": 91,
+      "module": "adapter.py",
+      "line": 242,
+      "condition": "except AdapterConfigurationError: self._rejected(AdapterRejectionReason.UNTRUSTED_CLOCK, str(exc), projection=projection)",
+      "kind": "except-arm",
+      "shape": "typed-refusal return",
+      "recorded_in": "",
+      "outcome": "AdapterRejectionReason.UNTRUSTED_CLOCK"
+    },
+    {
+      "index": 92,
+      "module": "adapter.py",
+      "line": 247,
+      "condition": "_require_within_validity(now, projection)",
+      "kind": "helper-admission",
+      "shape": "helper-admission call",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 93,
+      "module": "adapter.py",
+      "line": 248,
+      "condition": "except RecommendationNotYetValidError: self._rejected(AdapterRejectionReason.RECOMMENDATION_NOT_YET_VALID, str(exc), projection=projection)",
+      "kind": "except-arm",
+      "shape": "typed-refusal return",
+      "recorded_in": "",
+      "outcome": "AdapterRejectionReason.RECOMMENDATION_NOT_YET_VALID"
+    },
+    {
+      "index": 94,
+      "module": "adapter.py",
+      "line": 254,
+      "condition": "except RecommendationValidityError: self._rejected(AdapterRejectionReason.RECOMMENDATION_EXPIRED, str(exc), projection=projection)",
+      "kind": "except-arm",
+      "shape": "typed-refusal return",
+      "recorded_in": "",
+      "outcome": "AdapterRejectionReason.RECOMMENDATION_EXPIRED"
+    },
+    {
+      "index": 95,
+      "module": "adapter.py",
+      "line": 266,
+      "condition": "request.evaluation_time is not None",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 96,
+      "module": "adapter.py",
+      "line": 271,
+      "condition": "not isinstance(decision, SubjectRiskDecision)",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 97,
+      "module": "adapter.py",
+      "line": 289,
+      "condition": "not isinstance(now, datetime)",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 98,
+      "module": "adapter.py",
+      "line": 291,
+      "condition": "now.tzinfo is None or now.utcoffset() is None",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 99,
+      "module": "adapter.py",
+      "line": 379,
+      "condition": "now > projection.valid_until",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 100,
+      "module": "adapter.py",
+      "line": 384,
+      "condition": "now < projection.valid_from",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    }
+  ]
+}

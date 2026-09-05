@@ -21,8 +21,12 @@ else {
   if (!expo.slug) problems.push("missing slug");
   if (expo.scheme !== "dilchat") problems.push("missing/incorrect scheme");
   const plugins = expo.plugins || [];
-  for (const p of ["expo-router", "expo-secure-store"]) {
+  for (const p of ["expo-router", "expo-secure-store", "expo-notifications"]) {
     if (!plugins.includes(p)) problems.push(`missing plugin: ${p}`);
+  }
+  const easProjectId = expo.extra && expo.extra.eas && expo.extra.eas.projectId;
+  if (easProjectId !== undefined && !process.env.DILCHAT_EAS_PROJECT_ID) {
+    problems.push("extra.eas.projectId must come from DILCHAT_EAS_PROJECT_ID, never be baked in");
   }
   const apiBaseUrl = expo.extra && expo.extra.apiBaseUrl;
   if (apiBaseUrl !== undefined && typeof apiBaseUrl === "string") {

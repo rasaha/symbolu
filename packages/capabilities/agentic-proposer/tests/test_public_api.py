@@ -139,10 +139,12 @@ def test_the_snapshot_carries_exactly_the_fifty_one_authorized_names():
     ``0.2.0``; S2-B authorizes **exactly five** at ``0.3.0`` — the strategy vocabulary,
     the resolver protocol, the resolver request shape, the resolver response shape and
     the replay function. **No removals, no renames**, which this asserts by requiring
-    the residue to be exactly the forty-six that came before.
+    the residue to be exactly the forty-six that came before. `ACC-AM-5` (the
+    `OD-C1=B` amendment, ``0.4.0``) authorizes **zero** names: the surface stays at
+    fifty-one, and the amendment moves field lists only.
     """
     documented = json.loads(_PUBLIC_API_JSON.read_text())
-    assert documented["package_version"] == "0.3.0"
+    assert documented["package_version"] == "0.4.0"
     assert len(documented["symbols"]) == 51
     od7_added = {"DomainEvaluationOutcome", "DomainEvaluationProvider",
                  "DomainEvaluationRequest", "DomainEvaluationResponse",
@@ -156,6 +158,16 @@ def test_the_snapshot_carries_exactly_the_fifty_one_authorized_names():
     assert s2b_added <= set(documented["symbols"])
     assert len(set(documented["symbols"]) - s2b_added) == 46
     assert len(set(documented["symbols"]) - s2b_added - od7_added) == 39
+
+
+def test_the_recorded_version_symbol_agrees_with_the_package_version():
+    """`0.3.1`. The snapshot records the version twice — once as ``package_version``
+    and once as the value of the ``__version__`` symbol — and a patch release that
+    moved one and not the other would leave the file self-contradicting while every
+    count above still passed."""
+    documented = json.loads(_PUBLIC_API_JSON.read_text())
+    assert documented["symbols"]["__version__"]["value"] == ap.__version__
+    assert documented["package_version"] == ap.__version__
 
 
 def test_py_typed_marker_present():

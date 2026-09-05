@@ -96,12 +96,16 @@ scope = Scope(purposes=("P",), tools_allow=("crm.read",), models=(MODEL,), actor
 source = InMemoryWorkflowIRSource(); source.register(wf)
 key = SigningKeyRecord("k", SigningKey.from_seed(bytes(range(32))))
 
+import os, tempfile
+from risk_authority.persistence import SqliteRiskAuthorityStore
+
 def build_runtime(control_assurance, ingress):
     r = RiskAuthorityEvidenceRuntime(
         workflow_source=source, key_record=key, clock=lambda: NOW,
         evidence_admission=ProductionEvidenceAdmission(),
         control_assurance=control_assurance, evidence_ingress=ingress,
-        decision_authority=_ProdDecisionAuthority())
+        decision_authority=_ProdDecisionAuthority(),
+        persistence=SqliteRiskAuthorityStore(os.path.join(tempfile.mkdtemp(), "ra.sqlite")))
     r.application.authority.add_grant(AuthorityGrant(
         principal_id=PRINCIPAL, tenant_id=TENANT, authority_type=AuthorityType.RISK_APPROVAL,
         domains=("FINANCE",), allowed_risk_classes=(RiskClass.HIGH,), max_autonomy=2,

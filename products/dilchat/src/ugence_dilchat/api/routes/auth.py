@@ -78,6 +78,9 @@ async def logout(
     correlation_id: str | None = Depends(get_correlation_id),
 ) -> None:
     await services.identity.logout(principal.session_id, correlation_id)
+    # Logout of THIS device also revokes the push registrations this session
+    # created (device model, D3C ratification); other devices stay registered.
+    await services.devices.revoke_for_session(principal.user_id, principal.session_id)
 
 
 @router.post("/logout-all", status_code=status.HTTP_204_NO_CONTENT)
@@ -87,3 +90,5 @@ async def logout_all(
     correlation_id: str | None = Depends(get_correlation_id),
 ) -> None:
     await services.identity.logout_all(principal.user_id, correlation_id)
+    # Logout-all revokes every push registration the user holds.
+    await services.devices.revoke_all_for_user(principal.user_id)

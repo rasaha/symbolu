@@ -1,0 +1,55 @@
+{
+  "distribution": "ugence-agent-constitution-conformance",
+  "namespace": "ugence_agent_constitution_conformance",
+  "package_version": "0.1.0",
+  "note": "Machine-readable snapshot of the curated public API (ugence_agent_constitution_conformance.__all__). Generated from the installed package; tests/test_public_api.py asserts this file equals the actual package surface, including dataclass field ORDER. This distribution is the CONFORMANCE half of the ratified Agent Constitution first slice (ACC-S1-Q2): a fail-closed resolver that maps an injected (tenant_id, role_contract_ref) key to one exact signed constitution version through the shared Ugence Policy Authority - no fallback, no prefix match, no latest, caller-supplied tz-aware as_of, request-derived expected tenant, approval verifier always required, historical resolution deny-always, artifact returned only on RESOLVED with four post-checks each raising its own error class - plus the ratified first-slice structural conformance predicate, which answers True or False and NOTHING ELSE: no artifact on failure, no disposition, denial, abstention or reserved authority term (OD-C3=B), and no role lifecycle authority of any kind (OD-C4=A). The verifier reads a package-local GovernedRoleFacts presentation assembled by the caller; replay proves conformance of the PRESENTED facts only, never provenance. A PolicyResolutionReason reaches a caller only through ConstitutionUnresolvedError.reason, never message text. Every identity value is the family package's, imported never restated, and every composition path runs the ACC-S1-Q3 registration-time family-collision guard. It issues nothing, signs nothing, stores nothing, reads no clock, opens no socket, loads no plugin, and authorizes no runtime action: consequential execution remains with Risk Authority, ActionGate and Decision Authority.",
+  "constants": {},
+  "symbols": {
+    "AgentConstitutionConformanceError": {
+      "kind": "exception"
+    },
+    "ConstitutionArtifactTypeError": {
+      "kind": "exception"
+    },
+    "ConstitutionFactsError": {
+      "kind": "exception"
+    },
+    "ConstitutionReferenceBindingError": {
+      "kind": "exception"
+    },
+    "ConstitutionRoleBindingError": {
+      "kind": "exception"
+    },
+    "ConstitutionTenantScopeError": {
+      "kind": "exception"
+    },
+    "ConstitutionUnresolvedError": {
+      "kind": "exception"
+    },
+    "ConstitutionVocabularyError": {
+      "kind": "exception"
+    },
+    "GovernedRoleFacts": {
+      "kind": "dataclass",
+      "fields": [
+        "tenant_id",
+        "role_contract_ref",
+        "declared_candidate_dispositions",
+        "declared_review_actions",
+        "declared_tool_scopes"
+      ]
+    },
+    "PolicyAuthorityConstitutionResolver": {
+      "kind": "class"
+    },
+    "UnknownConstitutionReferenceError": {
+      "kind": "exception"
+    },
+    "build_constitution_resolver": {
+      "kind": "function"
+    },
+    "role_facts_conform": {
+      "kind": "function"
+    }
+  }
+}

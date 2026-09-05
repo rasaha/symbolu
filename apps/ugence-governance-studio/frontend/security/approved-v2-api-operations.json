@@ -1,0 +1,66 @@
+{
+  "$schema": "governance_studio.approved_v2_api_operations.v1",
+  "description": "The closed set of v2 operations the studio frontend may consume, including the GAS-7 HR-D review routes (display and verbatim relay only, owner ruling HR-1). Separate from the v1 manifest because the two contracts are frozen independently. Under owner ruling SD-2 no operation naming issue, activate, revoke, grant, authorize, clear or execute may ever appear here; verify-v2-api-boundary.mjs re-derives that from the contract rather than trusting this file.",
+  "contract": "governance_studio.api.v2",
+  "openapi_sha256": "dd63180dc91ba7842dc1dc2b6efb3dbc155ea3bd47200f40de7bac85d373f39a",
+  "approved_operation_ids": [
+    "v2_authority_list_policies",
+    "v2_authority_read_decision",
+    "v2_authority_read_policy",
+    "v2_constitution_preflight",
+    "v2_constitution_validate",
+    "v2_observe_audit_chain",
+    "v2_observe_audit_ids",
+    "v2_policy_compile",
+    "v2_policy_synthesize",
+    "v2_policy_validate",
+    "v2_publish_shadow",
+    "v2_review_list_queue",
+    "v2_review_read_approval",
+    "v2_review_read_run",
+    "v2_review_read_run_events",
+    "v2_review_submit_decision",
+    "v2_simulate_run"
+  ],
+  "approved_paths": [
+    "GET /api/v2/authority/decisions/{decision_id}",
+    "GET /api/v2/authority/policies",
+    "GET /api/v2/authority/policies/{record_id}",
+    "GET /api/v2/observe/audit",
+    "GET /api/v2/observe/audit/{correlation_id}",
+    "GET /api/v2/review/approvals/{approval_id}",
+    "GET /api/v2/review/queue",
+    "GET /api/v2/review/runs/{instance_id}",
+    "GET /api/v2/review/runs/{instance_id}/events",
+    "POST /api/v2/constitution/preflight",
+    "POST /api/v2/constitution/validate",
+    "POST /api/v2/policy/compile",
+    "POST /api/v2/policy/synthesize",
+    "POST /api/v2/policy/validate",
+    "POST /api/v2/publish/shadow",
+    "POST /api/v2/review/decisions",
+    "POST /api/v2/simulate/run"
+  ],
+  "prohibited_verbs": [
+    "issue",
+    "activate",
+    "revoke",
+    "grant",
+    "authorize",
+    "clear",
+    "execute"
+  ],
+  "console_routes_reachable_from_the_studio": [
+    "POST /v1/governed-loop/shadow",
+    "POST /v1/governed-loop/scenario/{scenario_id}",
+    "GET /v1/audit",
+    "GET /v1/audit/{correlation_id}"
+  ],
+  "review_service_routes_reachable_from_the_studio": [
+    "GET /review/queue",
+    "GET /review/runs/{instance_id}",
+    "GET /review/runs/{instance_id}/events",
+    "GET /review/approvals/{approval_id}",
+    "POST /review/decisions"
+  ]
+}

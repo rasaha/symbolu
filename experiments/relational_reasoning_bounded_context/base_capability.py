@@ -10,7 +10,7 @@ import random
 
 from .config import P0_BLOCK_THRESHOLD, P0_SUBTASK_GATE
 from .execution import assert_generation_allowed
-from .generator import P0_SUBTASKS, _Mint, _amount, _rng, _ROLE_ALPHABET
+from .generator import P0_SUBTASKS, _ID_ALPHABET, _Mint, _amount, _rng
 from .schema_ext import (Constraints, Entity, Evidence, Event, ReasoningContext,
                          ReasoningOutput, ReasoningQuery)
 from .serializer import assert_zero_truncation
@@ -20,20 +20,34 @@ def _entities(rng, mint, tenant, n):
     return [Entity("vendor", mint.new(), tenant, (("amount", _amount(rng)),)) for _ in range(n)]
 
 
+# Preregistered B7 = "abstain with the correct status when a trivial VISIBLE flag says 'absent'" (chance 0.5).
+# The flag is carried as an attribute on the queried entity under the requested property name, so the
+# B1/B5 (flag PRESENT -> copy the id) and B7 (flag ABSENT -> abstain) inputs are distinguishable by one
+# visible token. Without it, B7 inputs were byte-shaped identically to B1/B5 with contradictory labels.
+FLAG_KEY = "target_attribute"
+FLAG_PRESENT = "PRESENT"
+FLAG_ABSENT = "ABSENT"
+
+
+def _with_flag(e: Entity, value: str) -> Entity:
+    return Entity(e.entity_type, e.entity_id, e.tenant_id, e.attributes + ((FLAG_KEY, value),))
+
+
 def generate_p0_episode(subtask: str, seed: int, index: int, role: str = "unit",
                         authorization_token: str | None = None) -> ReasoningContext:
     if subtask not in P0_SUBTASKS:
         raise ValueError(f"unknown P0 subtask {subtask}")
     assert_generation_allowed(seed, authorization_token)  # fail-closed BEFORE any P0 cohort materializes
-    rng = _rng(seed, "P0:" + subtask, index)
-    tenant = "T" + "".join(rng.choice(_ROLE_ALPHABET.get(role, "STUVWXYZ")) for _ in range(3))
+    rng = _rng(seed, "P0:" + subtask, index, role)
+    tenant = "T" + "".join(rng.choice(_ID_ALPHABET) for _ in range(3))
     mint = _Mint(rng, role)
     ents = _entities(rng, mint, tenant, rng.randint(6, 12))
     events: list[Event] = []
     evd: list[Evidence] = []
     q = ReasoningQuery("resolve_attribute", "NOT_APPLICABLE", ents[0].entity_id,
                        requested_property="target_attribute")
-    if subtask == "B1":                       # copy an opaque entity id
+    if subtask == "B1":                       # copy an opaque entity id (visible flag PRESENT)
+        ents[0] = _with_flag(ents[0], FLAG_PRESENT)
         gold = ReasoningOutput(ents[0].entity_id, (f"Entity:{ents[0].entity_id}",), (), "SUPPORTED")
     elif subtask == "B2":                     # select one of a bounded set via a trivial cue
         target = ents[rng.randrange(len(ents))]
@@ -55,7 +69,8 @@ def generate_p0_episode(subtask: str, seed: int, index: int, role: str = "unit",
         ev, _ = _event(rng, mint, tenant, ents[0].entity_id)
         events = [ev]
         gold = ReasoningOutput(ev.event_id, (f"Event:{ev.event_id}",), (), "SUPPORTED")
-    elif subtask == "B5":                     # emit exact structured output schema
+    elif subtask == "B5":                     # emit exact structured output schema (visible flag PRESENT)
+        ents[0] = _with_flag(ents[0], FLAG_PRESENT)
         gold = ReasoningOutput(ents[0].entity_id, (f"Entity:{ents[0].entity_id}",), (), "SUPPORTED")
     elif subtask == "B6":                     # return a supplied categorical token
         token = ("LOW", "MEDIUM", "HIGH", "CRITICAL")[rng.randrange(4)]
@@ -64,7 +79,8 @@ def generate_p0_episode(subtask: str, seed: int, index: int, role: str = "unit",
         q = ReasoningQuery("latest_event_value", "NOT_APPLICABLE", ents[0].entity_id,
                            requested_property="latest_state", event_type="risk")
         gold = ReasoningOutput(token, (f"Event:{ev.event_id}",), (), "SUPPORTED")
-    else:                                     # B7 instructed trivial abstention
+    else:                                     # B7 instructed trivial abstention (visible flag ABSENT)
+        ents[0] = _with_flag(ents[0], FLAG_ABSENT)
         gold = ReasoningOutput(None, (), (), "INSUFFICIENT_EVIDENCE")
     return _finish(mint, tenant, q, ents, [], events, [], evd, gold, "P0")
 

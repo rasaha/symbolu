@@ -96,6 +96,148 @@ class OutboxEventType(str, enum.Enum):
     CONVERSATION_REVOKED = "CONVERSATION_REVOKED"
 
 
+class DevicePlatform(str, enum.Enum):
+    """Client platform of a registered push device (Phase 3C)."""
+
+    IOS = "IOS"
+    ANDROID = "ANDROID"
+    UNKNOWN = "UNKNOWN"
+
+
+class DeviceStatus(str, enum.Enum):
+    """Lifecycle of a push-device registration (Phase 3C).
+
+    REVOKED covers user removal, logout(-all), token displacement by a new
+    sign-in on the same device, and permanent provider rejection.
+    """
+
+    ACTIVE = "ACTIVE"
+    REVOKED = "REVOKED"
+
+
+class BlockStatus(str, enum.Enum):
+    """Lifecycle of a directional user block (Phase 3B safety)."""
+
+    ACTIVE = "ACTIVE"
+    REVOKED = "REVOKED"
+
+
+class SafetyBlockReason(str, enum.Enum):
+    """Optional INTERNAL-only safety reason code attached to a block.
+
+    Never required from the user and never disclosed through user APIs.
+    """
+
+    UNSPECIFIED = "UNSPECIFIED"
+    HARASSMENT = "HARASSMENT"
+    ABUSE = "ABUSE"
+    SAFETY = "SAFETY"
+    OTHER = "OTHER"
+
+
+class ReportTargetType(str, enum.Enum):
+    """Whether a report targets a single message or a whole conversation."""
+
+    MESSAGE = "MESSAGE"
+    CONVERSATION = "CONVERSATION"
+
+
+class ReportReason(str, enum.Enum):
+    """Reporter-selected reason code (Phase 3B). Never inferred automatically."""
+
+    HARASSMENT = "HARASSMENT"
+    THREAT = "THREAT"
+    HATE_OR_ABUSE = "HATE_OR_ABUSE"
+    SEXUAL_CONTENT = "SEXUAL_CONTENT"
+    IMPERSONATION = "IMPERSONATION"
+    SPAM = "SPAM"
+    SELF_HARM_CONCERN = "SELF_HARM_CONCERN"
+    OTHER = "OTHER"
+
+
+class ReportStatus(str, enum.Enum):
+    """Reporter-visible report status. Internal case state is NOT exposed here."""
+
+    SUBMITTED = "SUBMITTED"
+    UNDER_REVIEW = "UNDER_REVIEW"
+    RESOLVED = "RESOLVED"
+
+
+class SafetyCaseState(str, enum.Enum):
+    """Internal moderation-case lifecycle (never exposed to normal users)."""
+
+    OPEN = "OPEN"
+    TRIAGED = "TRIAGED"
+    ACTIONED = "ACTIONED"
+    DISMISSED = "DISMISSED"
+    CLOSED = "CLOSED"
+
+
+class SafetyCaseResolution(str, enum.Enum):
+    """Internal recorded action on a safety case (never exposed to normal users)."""
+
+    NO_ACTION = "NO_ACTION"
+    BLOCK_CONFIRMED = "BLOCK_CONFIRMED"
+    ACCOUNT_RESTRICTION_RECOMMENDED = "ACCOUNT_RESTRICTION_RECOMMENDED"
+    CONTENT_PRESERVATION_REQUIRED = "CONTENT_PRESERVATION_REQUIRED"
+    EXTERNAL_REVIEW_REQUIRED = "EXTERNAL_REVIEW_REQUIRED"
+
+
+class SafetyCaseEventType(str, enum.Enum):
+    """Immutable internal case-event types. Metadata is body-free (IDs/codes only)."""
+
+    CASE_OPENED = "CASE_OPENED"
+    REPORT_LINKED = "REPORT_LINKED"
+    EVIDENCE_PRESERVED = "EVIDENCE_PRESERVED"
+    EVIDENCE_ACCESSED = "EVIDENCE_ACCESSED"
+    STATE_CHANGED = "STATE_CHANGED"
+    ACTION_RECORDED = "ACTION_RECORDED"
+    # DEC-PR-4: a reviewer LOOKING at a case is itself an audited access, not
+    # only a change to it. Recorded per case, attributed to an individual
+    # reviewer principal — never a shared identity.
+    CASE_ACCESSED = "CASE_ACCESSED"
+
+
+class SafetyActorType(str, enum.Enum):
+    """Actor that drove an internal safety-case event."""
+
+    USER = "USER"
+    SAFETY = "SAFETY"
+    SYSTEM = "SYSTEM"
+    WORKER = "WORKER"
+
+
+class ReviewerStatus(str, enum.Enum):
+    """Lifecycle of an individual internal reviewer principal (DEC-PR-4)."""
+
+    ACTIVE = "ACTIVE"
+    REVOKED = "REVOKED"
+
+
+class ReviewerRole(str, enum.Enum):
+    """Reviewer capability. The pilot has exactly ONE: read-only review.
+
+    Adjudication, enforcement, appeals, and case assignment are deliberately
+    absent — they are the later, separately-ratified moderation product.
+    """
+
+    READ_ONLY_REVIEWER = "READ_ONLY_REVIEWER"
+
+
+class RetentionState(str, enum.Enum):
+    """Explicit conversation retention state so a later purge worker is safe.
+
+    Phase 3B implements the state transitions and a purge-candidate *seam* only;
+    it performs no destructive production scheduled deletion.
+    """
+
+    ACTIVE = "ACTIVE"
+    REVOKED_PENDING_POLICY = "REVOKED_PENDING_POLICY"
+    PRESERVED_FOR_REPORT = "PRESERVED_FOR_REPORT"
+    ELIGIBLE_FOR_PURGE = "ELIGIBLE_FOR_PURGE"
+    PURGED = "PURGED"
+
+
 class MembershipStatus(str, enum.Enum):
     ACTIVE = "ACTIVE"
     REVOKED = "REVOKED"
@@ -140,6 +282,17 @@ class AuditAction(str, enum.Enum):
     CONVERSATION_CREATED = "CONVERSATION_CREATED"
     CONVERSATION_REVOKED = "CONVERSATION_REVOKED"
     MESSAGE_DELETED = "MESSAGE_DELETED"
+    # Phase 3B safety (all body-free; no reporter description ever stored here).
+    DEVICE_REGISTERED = "DEVICE_REGISTERED"
+    DEVICE_REVOKED = "DEVICE_REVOKED"
+    USER_BLOCK_CREATED = "USER_BLOCK_CREATED"
+    USER_BLOCK_REVOKED = "USER_BLOCK_REVOKED"
+    CHAT_REPORT_CREATED = "CHAT_REPORT_CREATED"
+    SAFETY_CASE_OPENED = "SAFETY_CASE_OPENED"
+    SAFETY_CASE_STATE_CHANGED = "SAFETY_CASE_STATE_CHANGED"
+    SAFETY_EVIDENCE_ACCESSED = "SAFETY_EVIDENCE_ACCESSED"
+    ACCOUNT_DELETION_REQUESTED = "ACCOUNT_DELETION_REQUESTED"
+    ACCOUNT_DELETED = "ACCOUNT_DELETED"
     CONSENT_CREATED = "CONSENT_CREATED"
     CONSENT_GRANTED = "CONSENT_GRANTED"
     CONSENT_REVOKED = "CONSENT_REVOKED"

@@ -1,0 +1,112 @@
+# Internal-pilot deployment definition (DEC-PR-2: pilot is the RELEASE target;
+# the architecture is production-capable). Round PR-C.
+#
+# Shows the shape a pilot deployment must have, and runs it locally end to end:
+#
+#   db       PostgreSQL 16 — owns the dilchat_* roles the migrations create
+#   migrate  one-shot `alembic upgrade head` as the OWNER role, before either
+#            long-running process starts (never run by web or relay)
+#   web      the API as dilchat_app  — HTTP, /v1/health + /v1/readiness probes
+#   relay    the outbox relay as dilchat_worker — NO ports, heartbeat healthcheck
+#
+# Role separation (DEC-3C-4 / I6) is expressed here as two different DSNs: the
+# web process is never given the worker's credentials, so it cannot acquire the
+# worker's outbox privileges even if application code asked for them.
+#
+# Secrets: this file reads them from the environment (see .env.pilot.example);
+# no credential is committed. A real pilot supplies them from the platform's
+# secret store, not a file on disk.
+#
+#   docker compose --env-file .env.pilot -f deploy/docker-compose.pilot.yml up
+
+name: dilchat-pilot
+
+x-image: &image
+  build:
+    context: ..
+    dockerfile: deploy/Dockerfile
+  image: dilchat-backend:pilot
+
+x-common-env: &common-env
+  DILCHAT_ENVIRONMENT: ${DILCHAT_ENVIRONMENT:?set to staging or production}
+  DILCHAT_DEBUG: "false"
+  DILCHAT_ASTROLOGY_PROVIDER: ${DILCHAT_ASTROLOGY_PROVIDER:?approved real provider required}
+  DILCHAT_SWISS_PRODUCTION_LICENSED: ${DILCHAT_SWISS_PRODUCTION_LICENSED:?licensing decision required}
+  DILCHAT_ACCESS_TOKEN_PRIVATE_KEY_PEM: ${DILCHAT_ACCESS_TOKEN_PRIVATE_KEY_PEM:?signing key required}
+  # Destructive purging stays OFF (DEC-PR-3 amendment).
+  DILCHAT_RETENTION_PURGE_ENABLED: "false"
+
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:?}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?}
+      POSTGRES_DB: ${POSTGRES_DB:?}
+    volumes:
+      - dilchat-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+  migrate:
+    <<: *image
+    command: ["alembic", "upgrade", "head"]
+    environment:
+      <<: *common-env
+      # OWNER role: creates roles, tables, policies, and definer functions.
+      DILCHAT_DATABASE_URL: ${DILCHAT_OWNER_DATABASE_URL:?owner DSN required}
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: "no"
+
+  web:
+    <<: *image
+    command:
+      ["uvicorn", "ugence_dilchat.app:create_app", "--factory",
+       "--host", "0.0.0.0", "--port", "8080", "--proxy-headers"]
+    environment:
+      <<: *common-env
+      # APP role — no outbox privileges, RLS-constrained.
+      DILCHAT_DATABASE_URL: ${DILCHAT_APP_DATABASE_URL:?app DSN required}
+    ports:
+      - "${DILCHAT_WEB_PORT:-8080}:8080"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "python", "-c",
+             "import sys,urllib.request; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8080/v1/readiness', timeout=4).status==200 else 1)"]
+      interval: 30s
+      timeout: 5s
+      start_period: 15s
+      retries: 3
+    restart: unless-stopped
+
+  relay:
+    <<: *image
+    command: ["python", "-m", "ugence_dilchat.relay"]
+    environment:
+      <<: *common-env
+      # WORKER role — the only posture that may claim/publish outbox rows.
+      DILCHAT_DATABASE_URL: ${DILCHAT_WORKER_DATABASE_URL:?worker DSN required}
+      DILCHAT_PUSH_TRANSPORT: ${DILCHAT_PUSH_TRANSPORT:-null}
+      DILCHAT_RELAY_HEARTBEAT_PATH: /var/run/dilchat/relay.heartbeat
+    # No ports: the relay serves no HTTP surface. If it is down, messaging stays
+    # correct and push degrades independently (DEC-058 / DEC-3C-4).
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "python", "-m", "ugence_dilchat.scripts_relay_health"]
+      interval: 30s
+      timeout: 5s
+      start_period: 15s
+      retries: 3
+    restart: unless-stopped
+
+volumes:
+  dilchat-pgdata:

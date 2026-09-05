@@ -26,6 +26,22 @@ from .system_identity import (
     SystemBindingAuthenticityStatus,
     SystemIdentityContractError,
 )
+from .idempotency import (
+    IdempotencyContractError,
+    IdempotencyDisposition,
+    IdempotencyKey,
+    IdempotencyResolution,
+    IdempotencyScope,
+)
+from .validity import (
+    Validity,
+    ValidityContractError,
+    ValidityStatus,
+)
+from .audit import (
+    AuditContractError,
+    AuditReference,
+)
 from .evidence import (
     AssessmentWindow,
     AttestationStatus,
@@ -64,4 +80,11 @@ __all__ = [
     "AssessedSystemBinding",
     "SystemBindingAuthenticityStatus",
     "SystemIdentityContractError",
+    # G7 neutral idempotency contract (additive)
+    "IdempotencyScope", "IdempotencyKey", "IdempotencyDisposition",
+    "IdempotencyResolution", "IdempotencyContractError",
+    # G8 neutral validity contract (additive)
+    "ValidityStatus", "Validity", "ValidityContractError",
+    # G4 neutral audit reference (additive)
+    "AuditReference", "AuditContractError",
 ]

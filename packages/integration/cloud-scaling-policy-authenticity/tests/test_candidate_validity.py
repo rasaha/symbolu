@@ -45,6 +45,10 @@ from _policy_fixtures import (
     verifier_for,
 )
 from ugence_cloud_scaling_policy_authenticity import PolicyAuthenticityOutcome as O
+from ugence_cloud_scaling_policy_authenticity.verification import (
+    _CARRIED_INSTANTS,
+    _OCCURRENCE_FACTS,
+)
 
 pytestmark = pytest.mark.skipif(
     phase5a_builders() is None,
@@ -118,18 +122,8 @@ def _as_subclass(value):
     )
 
 
-CARRIED_INSTANTS = (
-    "subject_valid_from_fact",
-    "subject_valid_until_fact",
-    "subject_asserted_at_fact",
-    "decision_evaluated_at_fact",
-    "decision_expires_at_fact",
-    "attestation_issued_at_fact",
-)
-
-
 @pytest.mark.adversarial
-@pytest.mark.parametrize("field", CARRIED_INSTANTS)
+@pytest.mark.parametrize("field", _CARRIED_INSTANTS)
 def test_a_subclass_instant_is_refused_upstream_and_the_honest_one_still_reaches_this_gate(
     field,
 ):
@@ -237,17 +231,41 @@ def test_an_instant_before_the_decision_was_evaluated_is_refused():
 
 
 @pytest.mark.adversarial
-@pytest.mark.parametrize(
-    "name", ["subject_asserted_at_fact", "decision_evaluated_at_fact", "attestation_issued_at_fact"]
-)
+@pytest.mark.parametrize("name", _OCCURRENCE_FACTS)
 def test_every_occurrence_fact_is_enforced_not_just_the_first(name):
-    """Each of the three on its own, so none can be dropped without a test noticing."""
+    """Each of the three on its own, so none can be dropped without a test noticing.
+
+    Parametrized over the production ``_OCCURRENCE_FACTS`` tuple — the constant
+    ``verification.py:1076`` actually iterates, and the source of that site's disclosed
+    multiplicity of 3 (guard-coverage ADR §7.2, extended by §10) — so a fact added to
+    production is exercised here without anyone editing this list. The refusal must name
+    the member, not merely fire: a loop collapsed to its first member fails on the name.
+    """
 
     authority, record, candidate = _pair()
     moved = _with_times(candidate, **{name: T_CANDIDATE + timedelta(seconds=1)})
     result = _verify(moved, T_CANDIDATE, authority, record)
     assert result.outcome is O.CANDIDATE_FACT_NOT_YET_OCCURRED
     assert name in result.refusal.detail
+
+
+@pytest.mark.invariant
+def test_the_occurrence_fact_membership_is_frozen():
+    """The independent half of deriving from production (guard-coverage ADR §10).
+
+    Iterating ``_OCCURRENCE_FACTS`` above covers additions automatically, but would let a
+    member removed from production vanish from the suite without a failure. This pin names
+    the exact expected three, so membership can shrink only by failing here, and the
+    disclosed multiplicity of ``verification.py:1076`` stays re-derivable. Every occurrence
+    fact is also a carried instant, which is what entitles gate 13 to compare it bare.
+    """
+
+    assert _OCCURRENCE_FACTS == (
+        "subject_asserted_at_fact",
+        "decision_evaluated_at_fact",
+        "attestation_issued_at_fact",
+    )
+    assert set(_OCCURRENCE_FACTS) < set(_CARRIED_INSTANTS)
 
 
 # ======================================================================================

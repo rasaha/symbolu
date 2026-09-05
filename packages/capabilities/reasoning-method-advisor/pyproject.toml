@@ -1,0 +1,46 @@
+# Independent distribution for the Ugence Reasoning Method Advisor (slice 2).
+#
+# docs/architecture/REASONING_METHOD_ADVISOR_SLICE2_COMMISSIONING_SPEC.md, owner-ratified
+# as amended 2026-09-02: a RESEARCH-ONLY, deterministic, rule-derived design-time advisor.
+# It reads a developer task profile, the governed reasoning-method catalog and a versioned
+# rule set, and returns a set-valued, labelled, digested advisory. Every claim is
+# RULE_DERIVED; the evidence status is always COMPARISON_EVIDENCE_ABSENT; a primary is
+# named only when exactly one method qualifies.
+#
+# No LLM selection, no benchmark-derived claim, no comparison-result ingestion, no numeric
+# prediction, no scalar cost label, no approval, no configuration mutation, no envelope
+# issuance, no runtime integration. Depends only on the slice 1 governance contracts and
+# their two neutral leaves plus the JCS canonicalizer; a boundary test enforces this.
+#
+# Build:    python -m build packages/capabilities/reasoning-method-advisor
+# Verify:   python packages/capabilities/reasoning-method-advisor/verify_reasoning_method_advisor_distribution.py
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ugence-reasoning-method-advisor"
+# Static: tests/test_public_api.py pins this to ugence_reasoning_method_advisor.__version__.
+version = "0.1.0"
+description = "Ugence Reasoning Method Advisor — research-only, deterministic, rule-derived design-time advisor over the slice 1 reasoning-method contracts."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "Proprietary" }
+authors = [{ name = "Rakesh Mohan" }]
+keywords = ["ugence", "reasoning-method", "advisor", "research-only"]
+dependencies = [
+    "ugence-reasoning-method-governance>=0.1.0",
+    "ugence-governance-contracts>=0.3.1",
+    "ugence-uvi-policy-contracts>=0.1.0",
+    "ugence-jcs>=0.2.0",
+]
+
+[project.optional-dependencies]
+test = ["pytest>=7.0"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["ugence_reasoning_method_advisor*"]
+
+[tool.setuptools.package-data]
+ugence_reasoning_method_advisor = ["py.typed"]

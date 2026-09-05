@@ -1,0 +1,124 @@
+# BTRR smoke-tier calibration log (seed 8100)
+
+**Status:** calibration only. Seed 8100 is the smoke seed; nothing here is admissible evidence. No
+development (8101–8103) or final (81600–81604) seed has been consumed. All numbers below were produced on
+the operator's RunPod pod (RTX 6000 Ada, torch 2.4.1+cu121) and pasted into the session; they are
+operator-reported `[V]` against the pasted output, not re-executed here.
+
+Effective authority remains Amendment 002 (`config_digest`
+`ba73d7bc6df4699dd0ddbd1e6dae79341fccd74b474f231e8857a20a22ffcfe3`, unchanged by every commit below).
+
+## Status after runs 8–10 (supersedes the "capacity floor" reading below where they conflict)
+F16 (letters-only ids) removes the cap on fixed-position copying. Runs 8–10 show every P0 primitive is
+reachable but no checkpoint reaches all of them: B3/B4 range 0–1.0 across trajectories that differ only in
+dataset size. Post-F16 the base-capability blocker is reliability of circuit formation at 64-d / 2 layers,
+not the existence of the capability. Neither arm's frozen budget has been re-evaluated post-F16; the ABS frozen budget (2000
+updates) still never learns the output format, so ABS at the frozen recipe remains BLOCKED regardless.
+
+## Load-bearing question
+Can the frozen recipe (394,752 params, batch 8, **≤ 2000 updates**) establish the P0 base-capability
+gate (≥ 0.98 on each of B1–B7)? **No.** No explored configuration up to 15× the frozen budget does, and
+the two runs above the budget disagree with each other on B1, so the P0 gate is not established and a
+budget amendment is not supported by this evidence.
+
+## Runs (chronological; `n_train` = examples per split/subtask; `n_eval` = 8 per cohort)
+| # | code | n_train | updates | validity | B1 | B2 | B3 | B4 | B5 | B6 | B7 | note |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| 1 | `32658677` | 50 | 15000 | 0.573 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | role-digit pools (F14 artifact), B7 unflagged (F12) |
+| 2 | `4b2d5311` | 400 | 2000 | 0.198 | 0 | 0 | 0 | 0 | 0 | .12 | .25 | frozen budget: format not learned |
+| 3 | `4b2d5311` | 1500 | 2000 | 0.490 | 0 | 0 | 0 | 0 | 0 | .25 | 0 | frozen budget: format not learned |
+| 4 | `4b2d5311` | 400 | 15000 | 0.990 | 0 | 0 | 0 | 0 | 0 | 0 | 1.0 | letters copied, training-pool digit emitted (`DTWXX7`→`DTWXX1`) |
+| 5 | `11e1d1d7` | 400 | 15000 | 0.875 | .88 | .88 | 0 | 0 | .75 | .62 | 1.0 | first fair copy measurement (F14 fixed); loss 0.66, flattening |
+| 6 | `11e1d1d7` | 1500 | 30000 | 1.000 | .12 | 0 | .12 | .12 | .12 | .62 | 1.0 | loss 0.49 still falling; B1 collapsed vs run 5 |
+
+### BTRR-RoPE sibling arm, smoke seed 8200 (matched point; arm implemented at `56c77fa2`, not ratified)
+| # | arm | n_train | updates | validity | B1 | B2 | B3 | B4 | B5 | B6 | B7 | note |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| 7 | RoPE | 400 | 15000 | 1.000 | .12 | 0 | 0 | 0 | .12 | 0 | 1.0 | loss 0.62 at 15k (flat from 12k); B1 predictions letter-exact with a wrong trailing digit only (`UELMA0`→`UELMA2`, `RUQVK5`→`RUQVK9`; answer and path disagree on the digit) |
+
+`[V]` Data-side check on fixtures: trailing digits are uniform (≈0.10 each) in train and final pools; every
+P0 gold id appears verbatim in its input. The digit failure is model-side. `[I]` The failure shape differs
+from BTRR-ABS run 6 (id-shaped babble): the RoPE model copies all five letters of the queried id and treats
+the last character as unpredictable. Single smoke run; H1/H1′ are decided on development seeds only.
+
+### Trailing-digit diagnostic (run 8) and character-level rescoring of runs 6–7
+Offline rescoring (`run.rescore_predictions_file`, commit `44419413`) of the stored predictions overturned the
+"collapsed / babble" reading of ABS run 6: every copy subtask had all letters right and only the trailing
+digit wrong.
+| run | arm | regime | B1 all-but-last / exact | B4 all-but-last / exact | B3 first-char / mean prefix |
+|---|---|---|---|---|---|
+| 6 | ABS | 1500×30000, 5 letters+digit | 1.00 / 0.125 | 1.00 / 0.125 | 0.75 / 2.25 |
+| 7 | RoPE | 400×15000, 5 letters+digit | 0.88 / 0.125 | 0.00 / 0.00 | 1.00 / 1.13 |
+| **8** | ABS | 1500×30000, **6 letters** (same episodes as run 6 except the last id character) | 1.00 / **1.00** | 0.00 / 0.00 | 0.00 / 0.00 |
+
+Run 8 full P0: validity 0.979; B1 1.0, B2 0.75, B3 0, B4 0, B5 0.75, B6 0.88, B7 1.0; loss 0.68 at 30k, still falling.
+- `[V]` F16: the digit slot capped every fixed-position copy subtask in both arms (B1 0.125 → 1.0 on the same
+  episodes). The "capacity floor" reading of runs 5–7 was premature; it was a generator artifact.
+- `[V]` Variable-position copy (B3/B4) is the remaining base-capability blocker and it is unstable across runs:
+  present letter-perfect in run 6 (B4), absent in run 8 under otherwise identical conditions. One run per
+  configuration cannot bound it; development seeds can.
+- `[V]` A CPU three-condition diagnostic on fixture 883003 (700 P0-only examples, 6000 updates) was inconclusive:
+  all conditions memorized (loss 0.04) and produced malformed held-out output. Not evidence for or against F16.
+
+### Post-F16 variance probe (runs 9–10; smoke seed 8100, ABS, 30000 updates, dataset size perturbed)
+Same seed and recipe as run 8; only `n_train_per_split` differs, which changes the training trajectory.
+| run | n_train | validity | B1 | B2 | B3 | B4 | B5 | B6 | B7 | B3 exact / prefix | B4 exact / prefix |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| 8 | 1500 | 0.979 | 1.0 | .75 | 0 | 0 | .75 | .88 | 1.0 | 0 / 0.0 | 0 / 1.4 |
+| 9 | 1400 | 0.927 | 1.0 | .75 | **1.0** | **.88** | 1.0 | .38 | 1.0 | 1.0 / 6.0 | .88 / 6.0 |
+| 10 | 1600 | 1.000 | .50 | .75 | .12 | .62 | .75 | .25 | 1.0 | .12 / 0.8 | .62 / 4.9 |
+
+- `[V]` Every P0 primitive is within reach of the frozen architecture at this budget: each subtask reaches
+  ≥ 0.88 in at least one run (B1, B3, B5, B7 reach 1.0; B4 0.88; B6 0.88; B2 0.75 max).
+- `[V]` No single checkpoint clears the gate (≥ 0.98 on every subtask). Variable-position copy (B3/B4) ranges
+  0–1.0 across three trajectories that differ only in dataset size; B6 (read one categorical value) ranges
+  0.25–0.88. The base-capability failure post-F16 is **reliability of circuit formation**, not capacity.
+- `[I]` `n_eval = 8` per subtask gives ±0.35 confidence intervals; these numbers rank runs, they do not
+  estimate pass rates. Any further calibration should use `n_eval ≥ 64` (evaluation is generation only).
+- Frozen-recipe status unchanged: at 2000 updates the format is never learned, so BTRR-ABS at the frozen
+  recipe remains `RELATIONAL_REASONING_BLOCKED_BY_BASE_CAPABILITY`.
+
+Fixture-only learnability diagnostic (`overfit_diagnostic`, seed 883003, eval-on-train, 15 examples):
+validity / answer / P0 = 1.0 / 1.0 / 1.0 at both 2000 and 4000 updates (CPU). The train→generate
+machinery is sound.
+
+## Findings (see CONFORMANCE_MATRIX.md for the closed items)
+- `[V]` F11 (`b16e4e4c`): generator RNG was seeded from the salted builtin `hash()`; not reproducible across
+  processes. Fixed.
+- `[V]` F12 (`06e8f9e6`): B7 carried no visible "absent" flag; B7 inputs were shaped identically to B1/B5.
+  Fixed. B7 reaches 1.0 in every run since.
+- `[R]` F13 (open): R1–R4 gold is always `EU`, R8/R9/R12 always `VP_APPROVAL_REQUIRED`; the
+  `query_only`/`shuffled_context`/`majority_class` baselines emit `NO_ACTION` and are 0.0 by construction.
+  A per-operation constant emitter passes the R1–R4, R9-composite and R12 answer gates with
+  `shortcut_detected=False` (verified torch-free on fixture 883004). Non-compensation still blocks
+  VALIDATED. Requires owner ratification because it changes 7 splits' answer distributions.
+- `[V]` F14 (`11e1d1d7`): held-out ids carried a visible marker (trailing digit 6/7/8 never seen in
+  training). Run 4's predictions showed letter-exact copies with a training-pool digit. Pools are now
+  partitioned by an invisible hash of the id string with identical token/position distributions. Fixed.
+- `[V]` F15 (`11e1d1d7`): `is_valid_output` raised on schema-cap violations. Fixed.
+- `[V]` Failure shape (runs 5–6): where copying works it is position-anchored (the B1/B2/B5 answer sits at a
+  fixed absolute token offset ≈ 11 in the query line; B6 is the last value before the output marker).
+  B3/B4 answers sit at a variable offset ≈ 190–200 and are never retrieved: predictions are id-shaped
+  babble (`WSSSY9`, `MSSSS0`) with the correct field layout. `[I]` Learned absolute positional embeddings
+  (249,856 of 394,752 params) are the plausible mechanism; not verified.
+- `[V]` Run 5 vs run 6: same seed, more data and 2× the updates, lower training loss, and B1 fell from
+  0.88 to 0.12. One run per configuration is a sample of size one; copy-circuit formation in a 2-layer
+  model is trajectory-dependent. Calibration numbers above must not be read as monotone in budget.
+- `[G]` (closed by the sibling-arm commit: `manifest.config_payload` now binds the training recipe; the ABS digest changed and the smoke record must be re-signed) `config_digest` bound vocab, limits, params, caps, gates and seeds but **not** the training recipe
+  (`max_updates`, lr, batch). A budget amendment would not change the protocol-lock digest.
+
+## Owner decisions
+1. Accept `RELATIONAL_REASONING_BLOCKED_BY_BASE_CAPABILITY` as the frozen-recipe result and proceed to
+   the final tier at the frozen recipe (the preregistration names an unlearnable split at this recipe a
+   reported result), **or** open Amendment 003. The calibration evidence does not support a budget-only
+   amendment; the capacity rule forbids the architectural change (relative/rotary positions, copy head)
+   that the failure shape points to.
+2. Ratify and implement the F13 correction before any R-split number is reported, even under decision 1.
+3. Extend `config_digest` to the training recipe (protocol-lock change; invalidates and requires
+   re-signing the current record).
+4. Optional: additional smoke runs at fixed configuration to bound run-to-run variance before decision 1.
+
+## Not done / not claimed
+No development or final seed consumed. No gate, cap, verdict precedence, or architecture value changed.
+The always-preserved verdicts (`ORIGINAL_BINDINGSLOTS_NEURAL_ROUTING_UNRESOLVED`,
+`E1_TEMPORAL_TRANSFER_PARTIAL`, `KDA_VALIDATION_BLOCKED`) are unaffected.

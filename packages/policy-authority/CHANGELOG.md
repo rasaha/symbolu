@@ -5,6 +5,118 @@ All notable changes to this package are documented here. The surface snapshot in
 `tests/packaging/test_public_api.py`, including dataclass field order and the
 exact value of every string constant.
 
+## 0.3.0 — durable single-node registry (ADR §15.7, decision D-3)
+
+Closes the persistence deferral recorded in ADR §15.7, under decision D-3 of
+`docs/architecture/ADR_UGENCE_GOVERNANCE_GAP_SEQUENCING_RATIFICATION.md`
+(adopting Benchmark Registry ruling D-22 Posture B). Purely additive: ten new
+public names, none removed, no resolution semantics and no signing behaviour
+changed.
+
+### Added
+
+- **`SqlitePolicyRegistry`** — the durable registry behind the unchanged
+  `PolicyRegistry` seam: stdlib `sqlite3`, WAL, `BEGIN IMMEDIATE` around every
+  append, exact-coordinate lookup only, three append-only tables guarded by
+  triggers, a hash-linked `ledger_events` table with `verify_chain()`, idempotent
+  only for a canonically identical record, typed conflict otherwise, cross-tenant
+  lookup the same miss, successor plus supersession in one transaction.
+  `SQLITE_REGISTRY_SCHEMA_VERSION` is refused on mismatch.
+- **`PolicyArtifactCodec`** (core port) and **`UviPolicyArtifactCodec`** (adapter)
+  — family-owned rehydration of the opaque `IssuedPolicyRecord.policy`. The core
+  encodes records with its one canonical encoder and decodes them with a strict
+  annotation-driven dataclass decoder; the UVI codec rebuilds the five families.
+  A record the codec cannot rehydrate is a `PolicyRegistryStorageError`.
+- **`PolicyRegistryConsistencyScope`**, **`PolicyRegistryConsistencyClaim`**,
+  **`PolicyRegistryConsistencyDescriptor`**, **`declared_consistency`** — the
+  typed consistency declaration. `SINGLE_NODE_DURABLE` claims durability,
+  multi-process coordination and cross-process atomic revocation on one host;
+  distributed strong consistency and eventual-consistency safety are explicitly
+  disclaimed in every scope; the answers are derived properties, never fields.
+- **`PolicyRegistryStorageError`**, **`PolicyRegistryProductionModeError`**.
+
+### Changed
+
+- `InMemoryPolicyRegistry` accepts `production_mode` and refuses `True`; it
+  declares `PROCESS_LOCAL_ONLY`. Its constructor is otherwise unchanged.
+
+### Verified
+
+- Parity script against the in-memory reference (identical values and error
+  classes), cold-start trusted resolution for all five UVI families, revocation
+  on one connection visible to another at once, twelve forked processes racing
+  one identity slot (one stored, eleven typed conflicts) and twelve identical
+  writers (all idempotent, one row), append-only triggers, chain tamper
+  detection, and byte-identical store after every failed append.
+
+## 0.2.0 — structured policy-version supersession (the `ACC-LC` round)
+
+The change set authorized as `ACC-LC-IA-2` (see
+`docs/architecture/ADR_UGENCE_AGENT_CONSTITUTION_LIFECYCLE_IMPLEMENTATION_AUTHORITY.md`,
+over the `ACC-LC-BASE`/`ACC-LC-1`..`ACC-LC-5` ratification). Purely additive:
+six new public names, none removed, and no existing behaviour relaxed.
+
+### Added
+
+- **A structured successor reference.**
+  `PolicyArtifactDescriptor.supersedes_coordinate` carries the exact predecessor
+  as a complete `PolicyCoordinate` — the only shape the registry can resolve,
+  since exact-match lookup is the only lookup it performs (`ACC-LC-IA-1`).
+  `None` is the default: an artifact supersedes nothing unless it says so.
+- **Supersession as part of issuance, not a separate act.** There is no
+  `supersede_policy` entry point and deliberately none: `ACC-LC-2` ruled that
+  **one** signed act both admits the successor and stops the predecessor
+  resolving. `issue_policy` gains `supersession_id` and `signature_verifier`,
+  both required exactly when a structured predecessor is declared.
+- **A third append-only store.** `PolicySupersessionRecord` (signed, naming both
+  coordinates), `append_issuance_with_supersession`, `append_supersession` and
+  `supersessions_for`. An issued record is immutable and its `lifecycle_state`
+  is signed artifact content, so nothing edits a predecessor into `SUPERSEDED`;
+  the transition is an append, on revocation's exact precedent (`ACC-LC-IA-2`).
+  The compound append is atomic: if the supersession cannot be written, the
+  issuance is rolled back, because a stored successor whose predecessor still
+  resolves is the one state this act exists to prevent.
+- **Six admissibility refusals at issuance step 4** (`ACC-LC-IA-3`), each raising
+  `PolicySupersessionError` before the digest, the approval verifier, the signer
+  and any append: self-reference, cross-tenant, cross-scope, absent predecessor,
+  already-revoked predecessor, already-superseded predecessor. Step 4 now
+  *reads* the registry; the invariant is unchanged and still proven — **nothing
+  from a rejected artifact is stored**.
+- **Resolution consults the store.** A verified supersession denies with the new
+  `PolicyResolutionReason.SUPERSEDED`, naming the successor; an unverifiable one
+  fails closed as `SUPERSESSION_INTEGRITY_INVALID` rather than being ignored,
+  exactly as its revocation counterpart does. A stored supersession is never
+  trusted merely because it is stored.
+- **Its own signing domain**
+  (`ugence.policy-authority/policy-supersession/v1`), so a supersession
+  signature can never be replayed as an issuance or a revocation.
+- **`SUPERSESSION_PREDECESSOR_INADMISSIBLE`**, the stable typed token consumers
+  branch on instead of string-matching a message.
+
+### Unchanged, deliberately
+
+- **The unstructured refusal stands.** A non-empty `supersedes_ref` string is
+  still rejected at step 4, whether or not a structured coordinate accompanies
+  it. No existing refusal is relaxed and no already-valid artifact is
+  invalidated.
+- **No new key entitlement.** The supersession record is signed by the issuing
+  key in the same act and verified against `ISSUE_POLICY`; a separate "may
+  supersede" capability could never be exercised on its own, since the only path
+  to supersession is issuing a successor.
+- **Supersession is not revocation.** Separate stores, separate concepts,
+  neither implying the other: a superseded version is replaced, not withdrawn,
+  and keeps its record.
+- **No suspension.** Deferred to its own round with its cost recorded
+  (`ACC-LC-3`); a reversible pause needs a state absent from the ratified closed
+  lifecycle set.
+- **No agent or role lifecycle authority** (`OD-C4=A`). This is the lifecycle of
+  a signed, versioned policy artifact and nothing else.
+
+`[G]` No **shipped** adapter yet produces a `supersedes_coordinate`, so no
+shipped policy family can supersede until that family opts in — a separate
+authorization. The capability is proven end to end against a synthetic family in
+`tests/authority/test_supersession.py`, which also keeps it family-neutral.
+
 ## 0.1.0 — initial release (unreleased)
 
 The shared, platform-wide **Ugence Policy Authority**, ratified in

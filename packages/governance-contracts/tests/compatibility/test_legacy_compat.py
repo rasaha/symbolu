@@ -58,11 +58,12 @@ def test_legacy_module_shims_preserve_identity():
 
 
 def test_contract_version_and_versions_preserved():
-    # CONTRACT_VERSION (the provider contract surface) is unchanged by GV-2E-a
-    # and unchanged again by the M-3R.3 neutral assessed-system identity family;
-    # only the package __version__ advances (additive neutral contract families).
+    # CONTRACT_VERSION (the provider contract surface) is unchanged by GV-2E-a,
+    # unchanged again by the M-3R.3 neutral assessed-system identity family, and
+    # unchanged once more by the G4 neutral audit reference; only the package
+    # __version__ advances (additive neutral contract families).
     assert gp_api.CONTRACT_VERSION == canon.CONTRACT_VERSION == "1.0.0"
-    assert canon.__version__ == "0.3.1"
+    assert canon.__version__ == "0.5.0"
 
 
 def test_isinstance_works_across_boundary():

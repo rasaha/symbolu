@@ -1,0 +1,47 @@
+# Independent distribution for the Ugence Readiness Comparison engine.
+#
+# The separately commissioned consuming evaluation engine of the Benchmark Registry ADR,
+# assigned by the owner ruling on Composite ballot §10.1 (2026-09-02) and commissioned as
+# research-only slice 1 by the ratified ballot in
+# docs/architecture/REASONING_METHOD_GOVERNANCE_CONTRACT_AND_COMMISSIONING_BALLOT.md §9.
+#
+# It holds ONE pure function, compare(request) -> result, implementing §5 and §7 of that
+# specification exactly: no I/O, no normalization, no fetch, no averaging, no fallback
+# across dimensions, no read of self-reported quality, no inference of authority from
+# names. Its port contracts live in ugence-reasoning-method-governance, which never imports
+# this package. Every result it produces states authority_resolution_basis =
+# REQUESTER_ASSERTED and every assessment is RESEARCH_ONLY.
+#
+# Build:    python -m build packages/capabilities/readiness-comparison
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ugence-readiness-comparison"
+# Static: the package __init__ imports the engine, whose contract dependencies are
+# not present in an isolated build environment, so a dynamic attr lookup cannot run.
+# tests/packaging/test_boundaries.py pins this to ugence_readiness_comparison.__version__.
+version = "0.2.0"
+description = "Ugence Readiness Comparison — the pure comparison engine over reasoning-method governance contracts (research-only slice 1)."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "Proprietary" }
+authors = [{ name = "Rakesh Mohan" }]
+keywords = ["ugence", "readiness", "comparison", "engine"]
+dependencies = [
+    "ugence-reasoning-method-governance>=0.1.0",
+    "ugence-governance-contracts>=0.3.1",
+    "ugence-uvi-policy-contracts>=0.1.0",
+    "ugence-jcs>=0.2.0",
+]
+
+[project.optional-dependencies]
+test = ["pytest>=7.0"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["ugence_readiness_comparison*"]
+
+[tool.setuptools.package-data]
+ugence_readiness_comparison = ["py.typed"]

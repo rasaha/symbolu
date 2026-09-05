@@ -40,8 +40,18 @@ SwiGLU backbone; output-only CE; greedy decoding). Total params **394,752**; rea
 No filename substitutions were required. `torch` is imported lazily inside `model.py`/`trainer.py` only;
 the package imports torch-free.
 
+Opaque ids are 6 letters from a 24-letter alphabet (F16), hash-partitioned into disjoint train/dev/final/unit pools (F14).
+
+## Sibling arm BTRR-RoPE (draft; not ratified, not signed, not executed)
+`config.ARMS` registers the frozen parent arm `ABS` and the draft sibling `ROPE` (positional mechanism only:
+learned absolute table → parameter-free rotary; 144,896 params; own budget 15000 × 400/split; own seeds
+8200 / 8201–8203 / 81700–81704; own record `BTRR_ROPE_EXECUTION_AUTHORIZATION_RECORD.json`). Every entry
+point takes `arm="ABS"` by default; the ABS build is byte-identical to the pre-arm build (digest test).
+See `docs/research/hybrid_llm/benchmarks/BTRR_ROPE_SIBLING_ARM_PREREGISTRATION_DRAFT.md`.
+
 ## Run implementation tests
 ```
 python3 -m experiments.relational_reasoning_bounded_context.tests.test_btrr
+# also: test_corrections, test_auth_mechanism, test_harness, test_arms (torch-free); test_rope_runtime (torch; skips without it)
 ```
 Torch is not required; no reserved seed is consumed; no model is trained.

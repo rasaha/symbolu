@@ -11,6 +11,10 @@ on:
       - "apps/ugence-governance-studio/docs/**"
       - "packages/capabilities/agent-workforce-composer/**"
       - "packages/tooling/policy-workflow-compiler/**"
+      - "packages/integration/agent-constitution-**"
+      - "packages/policy-authority/**"
+      - "packages/capabilities/decision-authority/**"
+      - "packages/runtime/agent-runtime/**"
       - "platform_freeze/**"
       - ".github/workflows/governance-studio-p3b-api-ci.yml"
   pull_request:
@@ -19,11 +23,17 @@ on:
       - "apps/ugence-governance-studio/contracts/**"
       - "packages/capabilities/agent-workforce-composer/**"
       - "packages/tooling/policy-workflow-compiler/**"
+      - "packages/integration/agent-constitution-**"
+      - "packages/policy-authority/**"
+      - "packages/capabilities/decision-authority/**"
+      - "packages/runtime/agent-runtime/**"
       - ".github/workflows/governance-studio-p3b-api-ci.yml"
 
 env:
+  # Source roots for every package on the SD-1 public-entry-point allowlist. The
+  # first three are v1's; the rest are what the GAS-4 v2 surface reaches.
   PYTHONPATH: >-
-    apps/ugence-governance-studio/backend/src:packages/capabilities/agent-workforce-composer/src:packages/tooling/policy-workflow-compiler/src
+    apps/ugence-governance-studio/backend/src:packages/capabilities/agent-workforce-composer/src:packages/tooling/policy-workflow-compiler/src:packages/integration/agent-constitution-activation/src:packages/integration/agent-constitution-policy/src:packages/integration/agent-constitution-conformance/src:packages/capabilities/agentic-proposer/src:packages/policy-authority/src:packages/capabilities/decision-authority/src:packages/runtime/agent-runtime/src:packages/uvi-policy-contracts/src:packages/governance-contracts/src:packages/jcs/src
   BACKEND: apps/ugence-governance-studio/backend
 
 jobs:
@@ -98,6 +108,30 @@ jobs:
 
       - name: public-api-freeze
         run: python $BACKEND/scripts/public_api_snapshot.py
+
+      # --- GAS-4: the additive v2 contract ---------------------------------
+      # v2 is generated from its own application, so these are separate steps
+      # from the v1 freeze above. If v2 could perturb v1, the step before this
+      # one would already have failed.
+      - name: openapi-v2-freeze
+        run: python $BACKEND/scripts/verify_openapi_v2.py
+
+      - name: sd2-operation-id-prohibition
+        run: python -m pytest $BACKEND/tests/test_v2_operation_ids.py -q
+
+      - name: sd1-allowlist-and-v2-routes
+        run: python -m pytest $BACKEND/tests/test_architecture.py $BACKEND/tests/test_v2_routes.py -q
+
+      - name: v1-contract-must-be-byte-identical
+        run: |
+          # The GAS-4 constraint, asserted against git rather than against the
+          # generator: v2 exists, and v1's committed artifact has not moved.
+          if ! git diff --quiet HEAD -- apps/ugence-governance-studio/contracts/openapi.json; then
+            echo "the frozen v1 OpenAPI contract was modified; v2 must be additive."
+            git --no-pager diff -- apps/ugence-governance-studio/contracts/openapi.json
+            exit 1
+          fi
+          echo "v1 contract unchanged."
 
       - name: terminology
         run: |

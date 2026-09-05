@@ -15,7 +15,7 @@
  * Only synthetic identities and birth data are used.
  */
 import { HttpClient, type TokenProvider } from "@/api/client";
-import { AuthApi, BirthProfileApi, CoupleApi, UserApi } from "@/api/endpoints";
+import { AuthApi, BirthProfileApi, ChatApi, CoupleApi, UserApi } from "@/api/endpoints";
 import { ApiError } from "@/api/errors";
 import type { BirthProfileCreateRequest, TokenResponse } from "@/api/types";
 
@@ -95,6 +95,7 @@ if (!BASE) {
     const B = new Session(base);
     const C = new Session(base);
     let coupleId = "";
+    let conversationId = "";
 
     it("reaches the backend health endpoint", async () => {
       const bare = new HttpClient(
@@ -212,6 +213,63 @@ if (!BASE) {
       expect(err.code).toBe("CONFLICT");
     });
 
+    it("pairing provisioned exactly one shared conversation, invisible to outsiders", async () => {
+      const convA = await ChatApi.current(A.client);
+      const convB = await ChatApi.current(B.client);
+      expect(convA.conversation_id).toBe(convB.conversation_id);
+      expect(convA.couple_id).toBe(coupleId);
+      expect(convA.status).toBe("ACTIVE");
+      conversationId = convA.conversation_id;
+      // Unrelated user C has no conversation and cannot read this one (404, not 403).
+      const noConv = await expectApiError(ChatApi.current(C.client));
+      expect(noConv.status).toBe(404);
+      const foreign = await expectApiError(ChatApi.listMessages(C.client, conversationId));
+      expect(foreign.status).toBe(404);
+    });
+
+    it("sends are idempotent on client_message_id; the partner sees them in order", async () => {
+      const first = await ChatApi.sendMessage(A.client, conversationId, {
+        client_message_id: "live-k1",
+        body: "hello from A",
+      });
+      expect(first.server_sequence).toBeGreaterThan(0);
+      // Replaying the SAME key (the timeout-retry path) returns the ORIGINAL
+      // message — same id, same sequence — never a duplicate.
+      const replay = await ChatApi.sendMessage(A.client, conversationId, {
+        client_message_id: "live-k1",
+        body: "hello from A",
+      });
+      expect(replay.message_id).toBe(first.message_id);
+      expect(replay.server_sequence).toBe(first.server_sequence);
+
+      await ChatApi.sendMessage(B.client, conversationId, { client_message_id: "live-k2", body: "hi back" });
+      await ChatApi.sendMessage(A.client, conversationId, { client_message_id: "live-k3", body: "how are you" });
+
+      // B pages the history forward with the server-minted cursor.
+      const page1 = await ChatApi.listMessages(B.client, conversationId, null, 2);
+      expect(page1.messages).toHaveLength(2);
+      expect(page1.has_more).toBe(true);
+      const page2 = await ChatApi.listMessages(B.client, conversationId, page1.next_cursor);
+      expect(page2.has_more).toBe(false);
+      const all = [...page1.messages, ...page2.messages];
+      expect(all.map((m) => m.body)).toEqual(["hello from A", "hi back", "how are you"]);
+      const sequences = all.map((m) => m.server_sequence);
+      expect([...sequences].sort((x, y) => x - y)).toEqual(sequences); // ascending
+    });
+
+    it("read state advances forward-only", async () => {
+      const conv = await ChatApi.current(B.client);
+      const latest = conv.latest_sequence;
+      expect(latest).toBeGreaterThanOrEqual(3);
+      const rs = await ChatApi.updateReadState(B.client, conversationId, latest);
+      expect(rs.last_read_sequence).toBe(latest);
+      // A backward write is a no-op: the stored value never regresses.
+      const back = await ChatApi.updateReadState(B.client, conversationId, 1);
+      expect(back.last_read_sequence).toBe(latest);
+      const after = await ChatApi.current(B.client);
+      expect(after.last_read_sequence).toBe(latest);
+    });
+
     it("unpairing immediately revokes shared access for both partners", async () => {
       await expect(CoupleApi.unpair(A.client, coupleId)).resolves.toBeUndefined();
       // Access is revoked at once — both sides now see no couple, and a stale
@@ -222,6 +280,18 @@ if (!BASE) {
       expect(b.status).toBe(404);
       const stale = await expectApiError(CoupleApi.unpair(B.client, coupleId));
       expect(stale.status).toBe(404);
+      // The conversation is revoked in the same transaction: no read, no send.
+      // A FORMER member is denied with 403 (membership revoked; pinned by the
+      // backend's tests/security/test_chat_authz.py), while never-members and
+      // "no current conversation" stay 404 (anti-enumeration).
+      const conv = await expectApiError(ChatApi.current(A.client));
+      expect(conv.status).toBe(404);
+      const read = await expectApiError(ChatApi.listMessages(B.client, conversationId));
+      expect(read.status).toBe(403);
+      const send = await expectApiError(
+        ChatApi.sendMessage(A.client, conversationId, { client_message_id: "live-k4", body: "too late" }),
+      );
+      expect(send.status).toBe(403);
     });
 
     it("refresh tokens rotate and reuse is detected (why the client single-flights refresh)", async () => {

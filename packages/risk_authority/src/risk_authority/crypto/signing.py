@@ -45,7 +45,30 @@ def _sha512(data: bytes) -> bytes:
 
 
 def _inv(x: int) -> int:
-    return pow(x, _Q - 2, _Q)
+    """The inverse of ``x`` modulo ``_Q``, by extended Euclid rather than by Fermat.
+
+    ``pow(x, _Q - 2, _Q)`` is RFC 8032's own spelling and is correct, but it is a
+    255-bit modular exponentiation, and the affine addition law below calls this twice
+    for every point addition. It dominated every suite that signs: profiling the Cloud
+    Scaling guard sweeps found ``builtins.pow`` was ~93% of a mutant's entire runtime,
+    204,341 calls behind 102,169 point additions, and the two slowest sweeps in CI spent
+    838 of their 885 runner-minutes here.
+
+    ``pow(x, -1, _Q)`` computes the same value by extended Euclid in C — eight times
+    faster on this modulus, measured, and identical on every invertible input.
+
+    The ``try`` is load-bearing, not defensive styling. Fermat's form silently returns 0
+    for a non-invertible base; the Euclid form raises ``ValueError``. That difference is
+    not academic here: ``_xrecover`` calls this on an attacker-influenced field element,
+    and a guard sweep neutralises refusals to see which gate decided, so an input that
+    reaches this with ``x % _Q == 0`` must keep answering 0. Mapping the exception back
+    makes the two forms equal on *every* integer, which is what the pinning test asserts.
+    """
+
+    try:
+        return pow(x, -1, _Q)
+    except ValueError:  # x is congruent to 0 mod _Q; Fermat's form yields 0 here
+        return 0
 
 
 _D = (-121665 * _inv(121666)) % _Q

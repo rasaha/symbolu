@@ -1,0 +1,54 @@
+name: governance-studio-p3e-base-image-drift
+
+# ADVISORY ONLY (owner ruling SEPARATE_PIN_CONFORMANCE_FROM_TAG_DRIFT, rule 3). Observes
+# what the upstream mutable tags currently resolve to and reports it beside the ratified
+# digests. It is never a required status check, it never fails on drift or on an
+# unreachable registry, it never modifies a tracked file, and it never approves,
+# re-pins or substitutes a digest (rule 4). The report is an artifact for the owner's
+# controlled base-image refresh decision.
+
+on:
+  schedule:
+    - cron: "17 6 * * 1"
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "deployment/governance-studio/base-images.json"
+      - "deployment/governance-studio/Dockerfile"
+      - "docs/audits/ugence_governance_studio_p3e/BASE_IMAGE_MIRROR_DECISION.json"
+      - "deployment/governance-studio/ci/observe_tag_drift.py"
+      - "deployment/governance-studio/ci/resolve_base_images.py"
+      - ".github/workflows/governance-studio-p3e-base-image-drift.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  observe-upstream-tag-drift:
+    name: upstream tag drift (advisory, never required)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.11" }
+
+      - name: ratified-pin-conformance (context only)
+        # The advisory report is read beside a conformance answer; this step is the same
+        # network-independent guard the required workflows run and is blocking there.
+        run: python deployment/governance-studio/ci/verify_ratified_pins.py
+
+      - name: observe
+        run: |
+          python deployment/governance-studio/ci/observe_tag_drift.py \
+            docs/audits/ugence_governance_studio_p3e/BASE_IMAGE_MIRROR_DECISION.json \
+            deployment/governance-studio/base-images.json /tmp/base-image-tag-drift.json
+
+      - name: tracked files unchanged
+        run: |
+          if ! git diff --quiet HEAD; then
+            echo "the advisory observation modified a tracked file; that is never permitted"; exit 1
+          fi
+          echo "no tracked file modified"
+
+      - uses: actions/upload-artifact@v4
+        with: { name: base-image-tag-drift, path: /tmp/base-image-tag-drift.json }

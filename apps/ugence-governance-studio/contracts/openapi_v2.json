@@ -1,0 +1,914 @@
+{
+  "components": {
+    "schemas": {
+      "ConstitutionPreflightRequest": {
+        "additionalProperties": false,
+        "description": "Dry-run every pre-signing check.\n\n``preflight_issuance`` is documented as mutation-free, which is exactly why it is\nthe only activation entry point the studio may reach (SD-2): it reports what\nissuance *would* find without performing it.",
+        "properties": {
+          "approval_reference": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Approval Reference"
+          },
+          "constitution": {
+            "additionalProperties": true,
+            "title": "Constitution",
+            "type": "object"
+          },
+          "expected_reference_tenant_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expected Reference Tenant Id"
+          },
+          "record_id": {
+            "title": "Record Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "constitution",
+          "record_id"
+        ],
+        "title": "ConstitutionPreflightRequest",
+        "type": "object"
+      },
+      "ConstitutionValidateRequest": {
+        "additionalProperties": false,
+        "description": "Structural validation of a constitution document. Mutation-free.",
+        "properties": {
+          "constitution": {
+            "additionalProperties": true,
+            "title": "Constitution",
+            "type": "object"
+          }
+        },
+        "required": [
+          "constitution"
+        ],
+        "title": "ConstitutionValidateRequest",
+        "type": "object"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "title": "Detail",
+            "type": "array"
+          }
+        },
+        "title": "HTTPValidationError",
+        "type": "object"
+      },
+      "PolicyCompileRequest": {
+        "additionalProperties": false,
+        "description": "Compile a reviewed pack.\n\n``approval`` is required and is never defaulted: the compiler's\n``require_approval`` defaults to True and the studio never overrides it.",
+        "properties": {
+          "approval": {
+            "additionalProperties": true,
+            "title": "Approval",
+            "type": "object"
+          },
+          "pack": {
+            "additionalProperties": true,
+            "title": "Pack",
+            "type": "object"
+          }
+        },
+        "required": [
+          "pack",
+          "approval"
+        ],
+        "title": "PolicyCompileRequest",
+        "type": "object"
+      },
+      "PolicyPackRequest": {
+        "additionalProperties": false,
+        "description": "A policy pack as authored on the canvas, carried as a JSON object.",
+        "properties": {
+          "pack": {
+            "additionalProperties": true,
+            "title": "Pack",
+            "type": "object"
+          }
+        },
+        "required": [
+          "pack"
+        ],
+        "title": "PolicyPackRequest",
+        "type": "object"
+      },
+      "PublishShadowRequest": {
+        "additionalProperties": false,
+        "description": "Hand a compiled release package to the console's SHADOW governed loop.\n\nThere is no non-shadow variant of this request, by construction.",
+        "properties": {
+          "compiled_package": {
+            "additionalProperties": true,
+            "title": "Compiled Package",
+            "type": "object"
+          },
+          "scenario_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scenario Id"
+          }
+        },
+        "required": [
+          "compiled_package"
+        ],
+        "title": "PublishShadowRequest",
+        "type": "object"
+      },
+      "ReviewDecisionRequest": {
+        "additionalProperties": false,
+        "description": "A human's decision on a parked proposal, relayed verbatim (HR-1).\n\n``decision`` is the human's word — GRANT or REJECT — and the studio forwards it as\ntyped. ``presented_approver`` is the approver reference the review service listed\nas eligible; the studio holds no identity of its own and proves none, which is why\nthe review service labels every decision ``PRESENTED_UNPROVEN``. ``justification``\nis required: a decision without one is not relayed.",
+        "properties": {
+          "approval_id": {
+            "minLength": 1,
+            "title": "Approval Id",
+            "type": "string"
+          },
+          "decision": {
+            "enum": [
+              "GRANT",
+              "REJECT"
+            ],
+            "title": "Decision",
+            "type": "string"
+          },
+          "justification": {
+            "minLength": 1,
+            "title": "Justification",
+            "type": "string"
+          },
+          "presented_approver": {
+            "additionalProperties": true,
+            "title": "Presented Approver",
+            "type": "object"
+          }
+        },
+        "required": [
+          "approval_id",
+          "decision",
+          "presented_approver",
+          "justification"
+        ],
+        "title": "ReviewDecisionRequest",
+        "type": "object"
+      },
+      "SimulateRunRequest": {
+        "additionalProperties": false,
+        "description": "Run a workflow against fixtures, recording every governance decision.\n\n``execution_mode`` is constrained to the non-mutating modes. LIVE is not a member\nof the accepted set and cannot be requested.",
+        "properties": {
+          "correlation_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Correlation Id"
+          },
+          "execution_mode": {
+            "default": "DRY_RUN",
+            "title": "Execution Mode",
+            "type": "string"
+          },
+          "max_quanta": {
+            "default": 16,
+            "title": "Max Quanta",
+            "type": "integer"
+          },
+          "workflow": {
+            "additionalProperties": true,
+            "title": "Workflow",
+            "type": "object"
+          }
+        },
+        "required": [
+          "workflow"
+        ],
+        "title": "SimulateRunRequest",
+        "type": "object"
+      },
+      "ValidationError": {
+        "properties": {
+          "ctx": {
+            "title": "Context",
+            "type": "object"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "title": "Location",
+            "type": "array"
+          },
+          "msg": {
+            "title": "Message",
+            "type": "string"
+          },
+          "type": {
+            "title": "Error Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError",
+        "type": "object"
+      }
+    }
+  },
+  "info": {
+    "description": "Additive Governed Agent Studio surface over the Ugence governance packages. Thin orchestration only; synthetic and fixture data; planning and observation only. No route issues, activates, revokes, grants, authorizes, clears or executes.\n\n- API contract: governance_studio.api.v2\n- Frozen companion contract: governance_studio.api.v1 (unchanged)\n- Screens: Constitution, Policy, Authority, Simulate, Publish, Observe, Review",
+    "summary": "Additive Governed Agent Studio surface over the Ugence governance packages. Thin orchestration only; synthetic and fixture data; planning and observation only. No route issues, activates, revokes, grants, authorizes, clears or executes.",
+    "title": "Ugence Governed Agent Studio API v2",
+    "version": "governance_studio.api.v2"
+  },
+  "openapi": "3.1.0",
+  "paths": {
+    "/api/v2/authority/decisions/{decision_id}": {
+      "get": {
+        "description": "One recorded Decision Authority decision.",
+        "operationId": "v2_authority_read_decision",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "decision_id",
+            "required": true,
+            "schema": {
+              "title": "Decision Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Read Decision",
+        "tags": [
+          "authority"
+        ]
+      }
+    },
+    "/api/v2/authority/policies": {
+      "get": {
+        "description": "Issued policy records for the identities this deployment was configured with.",
+        "operationId": "v2_authority_list_policies",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Policies",
+        "tags": [
+          "authority"
+        ]
+      }
+    },
+    "/api/v2/authority/policies/{record_id}": {
+      "get": {
+        "description": "One issued record, with its revocations and supersessions.",
+        "operationId": "v2_authority_read_policy",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "record_id",
+            "required": true,
+            "schema": {
+              "title": "Record Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Read Policy",
+        "tags": [
+          "authority"
+        ]
+      }
+    },
+    "/api/v2/constitution/preflight": {
+      "post": {
+        "description": "Dry-run every pre-signing check.\n\nThis is the ONLY activation entry point the studio reaches (SD-2). Issuance and\nactivation are authority acts and are permanently outside the allowlist.",
+        "operationId": "v2_constitution_preflight",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConstitutionPreflightRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Preflight Constitution",
+        "tags": [
+          "constitution"
+        ]
+      }
+    },
+    "/api/v2/constitution/validate": {
+      "post": {
+        "description": "Structural validation of a constitution document. Mutation-free.",
+        "operationId": "v2_constitution_validate",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConstitutionValidateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Validate Constitution",
+        "tags": [
+          "constitution"
+        ]
+      }
+    },
+    "/api/v2/observe/audit": {
+      "get": {
+        "description": "Known correlation ids, as the console reports them.",
+        "operationId": "v2_observe_audit_ids",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Audit Ids",
+        "tags": [
+          "observe"
+        ]
+      }
+    },
+    "/api/v2/observe/audit/{correlation_id}": {
+      "get": {
+        "description": "One reconstructed decision chain, rendered exactly as returned.\n\nThe studio does not re-derive, re-order or re-hash it: the console's audit store is\nthe record, and a studio-side reconstruction would be a second unverified account.",
+        "operationId": "v2_observe_audit_chain",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "correlation_id",
+            "required": true,
+            "schema": {
+              "title": "Correlation Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Audit Chain",
+        "tags": [
+          "observe"
+        ]
+      }
+    },
+    "/api/v2/policy/compile": {
+      "post": {
+        "description": "Compile a reviewed pack into a release.\n\n``approval`` is required by the request model and ``require_approval`` is left at\nthe compiler's default of True. The studio has no path that compiles without one.",
+        "operationId": "v2_policy_compile",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PolicyCompileRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Compile Policy",
+        "tags": [
+          "policy"
+        ]
+      }
+    },
+    "/api/v2/policy/synthesize": {
+      "post": {
+        "description": "Preview the Workflow IR the canvas would produce. No approval; no release.",
+        "operationId": "v2_policy_synthesize",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PolicyPackRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Synthesize Policy",
+        "tags": [
+          "policy"
+        ]
+      }
+    },
+    "/api/v2/policy/validate": {
+      "post": {
+        "description": "Validate a policy pack. No approval required; produces no release.",
+        "operationId": "v2_policy_validate",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PolicyPackRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Validate Policy",
+        "tags": [
+          "policy"
+        ]
+      }
+    },
+    "/api/v2/publish/shadow": {
+      "post": {
+        "description": "Hand a compiled release package to the console's SHADOW governed loop.\n\nThere is no non-shadow variant. The console also exposes action-authorization and\nclearance routes; the studio's console client cannot reach them (SD-2).",
+        "operationId": "v2_publish_shadow",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PublishShadowRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Publish Shadow",
+        "tags": [
+          "publish"
+        ]
+      }
+    },
+    "/api/v2/review/approvals/{approval_id}": {
+      "get": {
+        "description": "One approval record and its hash-linked event chain.",
+        "operationId": "v2_review_read_approval",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "approval_id",
+            "required": true,
+            "schema": {
+              "title": "Approval Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Read Approval",
+        "tags": [
+          "review"
+        ]
+      }
+    },
+    "/api/v2/review/decisions": {
+      "post": {
+        "description": "Relay a human's decision to the review service, verbatim.\n\nThe body is forwarded as received. The studio adds no identity, computes no\neligibility and reads nothing but the review service's typed answer, which it\nreturns whether the decision was recorded, replayed or refused.",
+        "operationId": "v2_review_submit_decision",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReviewDecisionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Submit Decision",
+        "tags": [
+          "review"
+        ]
+      }
+    },
+    "/api/v2/review/queue": {
+      "get": {
+        "description": "Parked ESCALATE instances awaiting a human decision, as the review service lists them.\n\nA HOLD is never presented as awaiting a human (HR-5); the studio counts any it\nfiltered so the guard is visible.",
+        "operationId": "v2_review_list_queue",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "required_role",
+            "required": false,
+            "schema": {
+              "default": "",
+              "title": "Required Role",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Queue",
+        "tags": [
+          "review"
+        ]
+      }
+    },
+    "/api/v2/review/runs/{instance_id}": {
+      "get": {
+        "description": "One instance: checkpoint view, engine status and its open approvals.\n\nFingerprints and ``valid_until`` values are history — what was evaluated and when\nthat evaluation lapsed — never a live permission.",
+        "operationId": "v2_review_read_run",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "instance_id",
+            "required": true,
+            "schema": {
+              "title": "Instance Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Read Run",
+        "tags": [
+          "review"
+        ]
+      }
+    },
+    "/api/v2/review/runs/{instance_id}/events": {
+      "get": {
+        "description": "The full runtime event log for one instance, including signal rows.",
+        "operationId": "v2_review_read_run_events",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "instance_id",
+            "required": true,
+            "schema": {
+              "title": "Instance Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Read Run Events",
+        "tags": [
+          "review"
+        ]
+      }
+    },
+    "/api/v2/simulate/run": {
+      "post": {
+        "description": "Drive a workflow a bounded number of quanta and report every outcome.\n\n``execution_mode`` accepts only the non-mutating modes; ``LIVE`` is refused with a\ntyped 422 rather than being silently downgraded, so a caller that asked for live\nexecution learns that the studio does not do that.",
+        "operationId": "v2_simulate_run",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SimulateRunRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Run Simulation",
+        "tags": [
+          "simulate"
+        ]
+      }
+    }
+  }
+}

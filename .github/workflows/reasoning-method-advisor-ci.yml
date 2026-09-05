@@ -1,0 +1,104 @@
+# Slice 2 gate for the Reasoning Method Advisor
+# (docs/architecture/REASONING_METHOD_ADVISOR_SLICE2_COMMISSIONING_SPEC.md §9).
+#
+# Runs the advisor package's suite: the §7 profile rows P1–P14, refusal rows
+# R-a to R-k, the boundary test, the public-API and version pins, and the
+# cross-process digest-stability test, plus the research-only developer demo suite
+# (tests/experiments/reasoning_method_advisor_demo). numpy is installed only so the optional
+# provenance pin against the experimental selector's SIGNAL_MAP can import the
+# runtime tree; the package under test never imports it.
+name: Reasoning Method Advisor CI
+
+on:
+  push:
+    branches: ["main", "master", "dev", "claude/**"]
+    paths:
+      - "packages/capabilities/reasoning-method-advisor/**"
+      - "experiments/reasoning_method_advisor_demo/**"
+      - "tests/experiments/reasoning_method_advisor_demo/**"
+      - "packages/capabilities/reasoning-method-governance/**"
+      - "packages/governance-contracts/**"
+      - "packages/uvi-policy-contracts/**"
+      - "packages/jcs/**"
+      - "agentic/agentic_framework/reasoning_workflows.py"
+      - "conftest.py"
+      - ".github/workflows/reasoning-method-advisor-ci.yml"
+  pull_request:
+    branches: ["main", "master", "dev", "claude/**"]
+    paths:
+      - "packages/capabilities/reasoning-method-advisor/**"
+      - "experiments/reasoning_method_advisor_demo/**"
+      - "tests/experiments/reasoning_method_advisor_demo/**"
+      - "packages/capabilities/reasoning-method-governance/**"
+      - "packages/governance-contracts/**"
+      - "packages/uvi-policy-contracts/**"
+      - "packages/jcs/**"
+      - "agentic/agentic_framework/reasoning_workflows.py"
+      - "conftest.py"
+      - ".github/workflows/reasoning-method-advisor-ci.yml"
+  workflow_dispatch:
+
+env:
+  FIRST_PARTY: >-
+    packages/jcs
+    packages/governance-contracts
+    packages/uvi-policy-contracts
+    packages/capabilities/reasoning-method-governance
+    packages/capabilities/reasoning-method-advisor
+
+jobs:
+  reasoning-method-advisor:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Cache pip dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-rma-${{ hashFiles('packages/**/pyproject.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-rma-
+            ${{ runner.os }}-pip-
+
+      - name: Install first-party packages
+        run: |
+          python -m pip install --upgrade pip
+          pip install numpy pytest
+          for pkg in $FIRST_PARTY; do pip install -e "$pkg"; done
+
+      - name: Confirm the advisor imports from the installed distribution
+        run: |
+          python - <<'PY'
+          import importlib
+          for name in ("ugence_reasoning_method_advisor.api", "ugence_reasoning_method_governance.api"):
+              importlib.import_module(name)
+              print(f"ok  {name}")
+          PY
+
+      - name: Run the advisor suite
+        # `shell: bash` is load-bearing: pipefail keeps tee from masking a pytest failure.
+        shell: bash
+        run: |
+          python -m pytest \
+            packages/capabilities/reasoning-method-advisor/tests \
+            tests/experiments/reasoning_method_advisor_demo \
+            -v \
+            --tb=short \
+            --disable-warnings \
+            2>&1 | tee reasoning-method-advisor-pytest.log
+
+      - name: Upload test log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reasoning-method-advisor-pytest-log
+          path: reasoning-method-advisor-pytest.log
+          if-no-files-found: ignore

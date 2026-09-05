@@ -1,0 +1,58 @@
+# Ugence Incident Response — incident records, containment requests and remediation
+# proposals (gap-sequencing ADR wave 3, the wave's only new package).
+#
+# Scoped and ratified by docs/architecture/ADR_UGENCE_INCIDENT_RESPONSE_SCOPING.md.
+#
+#   THIS PACKAGE RECORDS AND PROPOSES. IT NEVER REVOKES, EXECUTES, ROLLS BACK,
+#   OR LIFTS ITS OWN CONTAINMENT.
+#
+# Deliberately not an "orchestrator": that word names optional workflow composition
+# that acquires no authority, and this package composes no workflow.
+#
+# Records only — no store. The platform already has six durable append-only event
+# stores plus the kernel's audit port; an incident's durability is its G4
+# AuditReference into one of them.
+#
+# Dependency direction (one-way):
+#     ugence-governance-contracts (leaf)   <- AuditReference / Validity
+#         ▲
+#     ugence-incident-response (this package)
+#
+# The RA-6 reassessment-signal shape is reproduced structurally, never imported:
+# RA-6's AuthorityLifecycleService remains the sole mutator of authority lifecycle.
+#
+# Build:   python -m build packages/integration/incident-response
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ugence-incident-response"
+dynamic = ["version"]
+description = "Ugence Incident Response — incident records, containment requests and remediation proposals over the neutral audit reference. Records and proposes; never revokes, executes, rolls back, or lifts its own containment."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "Proprietary" }
+authors = [{ name = "Rakesh Mohan" }]
+keywords = ["governance", "incident", "containment", "remediation", "contracts", "ugence"]
+classifiers = ["Typing :: Typed"]
+dependencies = [
+    "ugence-governance-contracts>=0.5.0",
+]
+
+[project.optional-dependencies]
+test = ["pytest>=7.0"]
+
+[tool.setuptools.dynamic]
+version = { attr = "ugence_incident_response.version.__version__" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["ugence_incident_response*"]
+
+[tool.setuptools.package-data]
+ugence_incident_response = ["py.typed"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"

@@ -1,0 +1,368 @@
+{
+  "package": "operations",
+  "total": 58,
+  "scored": 54,
+  "excluded": 4,
+  "classification": {
+    "1": {
+      "status": "SCORED",
+      "module": "authority.py",
+      "line": 83,
+      "condition": "authorization is None"
+    },
+    "2": {
+      "status": "SCORED",
+      "module": "authority.py",
+      "line": 87,
+      "condition": "not authorization.authorization_id or not authorization.nonce"
+    },
+    "3": {
+      "status": "SCORED",
+      "module": "authority.py",
+      "line": 89,
+      "condition": "authorization.is_not_yet_valid(now)"
+    },
+    "4": {
+      "status": "SCORED",
+      "module": "authority.py",
+      "line": 91,
+      "condition": "authorization.is_expired(now)"
+    },
+    "5": {
+      "status": "SCORED",
+      "module": "authority.py",
+      "line": 95,
+      "condition": "not verifier.is_trusted_issuer(authorization.issuer)"
+    },
+    "6": {
+      "status": "SCORED",
+      "module": "authority.py",
+      "line": 97,
+      "condition": "not verifier.verify_signature(authorization)"
+    },
+    "7": {
+      "status": "SCORED",
+      "module": "authority.py",
+      "line": 101,
+      "condition": "authorization.tenant_id != tenant_id"
+    },
+    "8": {
+      "status": "SCORED",
+      "module": "authority.py",
+      "line": 105,
+      "condition": "authorization.permitted_action != request.action"
+    },
+    "9": {
+      "status": "SCORED",
+      "module": "authority.py",
+      "line": 110,
+      "condition": "authorization.target_cluster != request.target_cluster or authorization.target_namespace != request.target_namespace or authorization.target_resource != request.target_resource"
+    },
+    "10": {
+      "status": "SCORED",
+      "module": "authority.py",
+      "line": 116,
+      "condition": "authorization.recommendation_id != request.recommendation_id"
+    },
+    "11": {
+      "status": "SCORED",
+      "module": "authority.py",
+      "line": 121,
+      "condition": "tr < authorization.minimum_replicas or tr > authorization.maximum_replicas"
+    },
+    "12": {
+      "status": "SCORED",
+      "module": "authority.py",
+      "line": 125,
+      "condition": "abs(request.delta) > authorization.maximum_delta"
+    },
+    "13": {
+      "status": "SCORED",
+      "module": "authority.py",
+      "line": 131,
+      "condition": "not tp.cluster_allowed(request.target_cluster)"
+    },
+    "14": {
+      "status": "SCORED",
+      "module": "authority.py",
+      "line": 133,
+      "condition": "not tp.namespace_allowed(request.target_namespace)"
+    },
+    "15": {
+      "status": "SCORED",
+      "module": "authority.py",
+      "line": 135,
+      "condition": "not tp.resource_allowed(request.target_resource)"
+    },
+    "16": {
+      "status": "SCORED",
+      "module": "authority.py",
+      "line": 137,
+      "condition": "tr < tp.min_replicas or tr > tp.max_replicas"
+    },
+    "17": {
+      "status": "SCORED",
+      "module": "authority.py",
+      "line": 140,
+      "condition": "abs(request.delta) > tp.max_replica_delta"
+    },
+    "18": {
+      "status": "SCORED",
+      "module": "authority.py",
+      "line": 145,
+      "condition": "request.observed_at is not None"
+    },
+    "19": {
+      "status": "SCORED",
+      "module": "authority.py",
+      "line": 147,
+      "condition": "age < 0 or age > tp.max_observation_age_seconds"
+    },
+    "20": {
+      "status": "SCORED",
+      "module": "executors.py",
+      "line": 66,
+      "condition": "resource == self._fail_on"
+    },
+    "21": {
+      "status": "SCORED",
+      "module": "executors.py",
+      "line": 70,
+      "condition": "resource == self._conflict_on or actual != expected_current"
+    },
+    "22": {
+      "status": "SCORED",
+      "module": "executors.py",
+      "line": 164,
+      "condition": "self.config.is_live()"
+    },
+    "23": {
+      "status": "SCORED",
+      "module": "executors.py",
+      "line": 204,
+      "condition": "mode == ExecutionMode.DRY_RUN"
+    },
+    "24": {
+      "status": "SCORED",
+      "module": "executors.py",
+      "line": 215,
+      "condition": "mode == ExecutionMode.SHADOW"
+    },
+    "25": {
+      "status": "SCORED",
+      "module": "executors.py",
+      "line": 227,
+      "condition": "verify_authorization(authorization, request, self.config, self.verifier, now=now, tenant_id=tenant_id)"
+    },
+    "26": {
+      "status": "SCORED",
+      "module": "executors.py",
+      "line": 229,
+      "condition": "except ExecutionDenied: r"
+    },
+    "27": {
+      "status": "SCORED",
+      "module": "executors.py",
+      "line": 241,
+      "condition": "prior is not None"
+    },
+    "28": {
+      "status": "SCORED",
+      "module": "executors.py",
+      "line": 242,
+      "condition": "prior.request_digest != request.digest() or prior.authorization_id != authorization.authorization_id"
+    },
+    "29": {
+      "status": "SCORED",
+      "module": "executors.py",
+      "line": 246,
+      "condition": "prior.completed"
+    },
+    "30": {
+      "status": "SCORED",
+      "module": "executors.py",
+      "line": 257,
+      "condition": "mode == ExecutionMode.LIVE"
+    },
+    "31": {
+      "status": "SCORED",
+      "module": "executors.py",
+      "line": 259,
+      "condition": "denial"
+    },
+    "32": {
+      "status": "SCORED",
+      "module": "executors.py",
+      "line": 287,
+      "condition": "except ConcurrencyConflict: r"
+    },
+    "33": {
+      "status": "SCORED",
+      "module": "executors.py",
+      "line": 296,
+      "condition": "except Exception: r"
+    },
+    "34": {
+      "status": "SCORED",
+      "module": "gate_executor.py",
+      "line": 81,
+      "condition": "not trigger"
+    },
+    "35": {
+      "status": "SCORED",
+      "module": "gate_executor.py",
+      "line": 86,
+      "condition": "verify_authorization(authorization, request, self.config, self.verifier, now=now, tenant_id=tenant_id)"
+    },
+    "36": {
+      "status": "SCORED",
+      "module": "gate_executor.py",
+      "line": 91,
+      "condition": "self.config.allow_insecure_tls and self.config.is_live()"
+    },
+    "37": {
+      "status": "SCORED",
+      "module": "gate_executor.py",
+      "line": 93,
+      "condition": "not self._url_allowed(base_url)"
+    },
+    "38": {
+      "status": "SCORED",
+      "module": "gate_executor.py",
+      "line": 95,
+      "condition": "self.config.mode == ExecutionMode.DRY_RUN"
+    },
+    "39": {
+      "status": "SCORED",
+      "module": "gate_executor.py",
+      "line": 98,
+      "condition": "self._http is None"
+    },
+    "40": {
+      "status": "SCORED",
+      "module": "gate_executor.py",
+      "line": 111,
+      "condition": "200 <= status < 300"
+    },
+    "41": {
+      "status": "SCORED",
+      "module": "k8s_executor.py",
+      "line": 42,
+      "condition": "self._client is None"
+    },
+    "42": {
+      "status": "SCORED",
+      "module": "k8s_executor.py",
+      "line": 50,
+      "condition": "not namespace or not resource"
+    },
+    "43": {
+      "status": "SCORED",
+      "module": "k8s_executor.py",
+      "line": 57,
+      "condition": "not namespace or not resource"
+    },
+    "44": {
+      "status": "SCORED",
+      "module": "k8s_executor.py",
+      "line": 62,
+      "condition": "current != expected_current"
+    },
+    "45": {
+      "status": "SCORED",
+      "module": "action/rollback.py",
+      "line": 143,
+      "condition": "rollback_fn is not None and (not _declared_non_mutating(rollback_fn))"
+    },
+    "46": {
+      "status": "SCORED",
+      "module": "orchestrator.py",
+      "line": 174,
+      "condition": "self.config.auto_approve_threshold is not None"
+    },
+    "47": {
+      "status": "SCORED",
+      "module": "orchestrator.py",
+      "line": 177,
+      "condition": "act_cfg is not None"
+    },
+    "48": {
+      "status": "SCORED",
+      "module": "orchestrator.py",
+      "line": 179,
+      "condition": "getattr(act_cfg, 'mode', None) != ActuatorMode.DRY_RUN"
+    },
+    "49": {
+      "status": "SCORED",
+      "module": "orchestrator.py",
+      "line": 435,
+      "condition": "self._running or (self._thread is not None and self._thread.is_alive())"
+    },
+    "50": {
+      "status": "SCORED",
+      "module": "recommend/engine.py",
+      "line": 170,
+      "condition": "actuator_config is not None and actuator_config.mode is not ActuatorMode.DRY_RUN"
+    },
+    "51": {
+      "status": "SCORED",
+      "module": "recommend/webhook.py",
+      "line": 47,
+      "condition": "self.min_confidence not in VALID_CONFIDENCE_LEVELS"
+    },
+    "52": {
+      "status": "SCORED",
+      "module": "shadow/runner.py",
+      "line": 209,
+      "condition": "self._running or (self._thread is not None and self._thread.is_alive())"
+    },
+    "53": {
+      "status": "SCORED",
+      "module": "observability/metrics_server.py",
+      "line": 112,
+      "condition": "self._httpd is not None"
+    },
+    "54": {
+      "status": "EXCLUDED",
+      "reason": "outside-authority-bearing-definition",
+      "detail": "The console-script dispatch. It decides process bootstrap, not an execution outcome, and is unreachable in any imported run of the suite \u2014 the module imports under its own name.",
+      "evidence": "tests/execution/test_guard_coverage.py::test_the_console_entrypoints_do_not_run_on_import",
+      "module": "cli.py",
+      "line": 229,
+      "condition": "__name__ == '__main__'"
+    },
+    "55": {
+      "status": "SCORED",
+      "module": "main.py",
+      "line": 162,
+      "condition": "mode_str != 'dry_run'"
+    },
+    "56": {
+      "status": "EXCLUDED",
+      "reason": "outside-authority-bearing-definition",
+      "detail": "Config-source selection inside the service bootstrap: it picks where a long-running process reads configuration from, and decides no admission outcome. Exercising it means booting the service; the authority gates the configuration feeds are scored directly.",
+      "evidence": "tests/execution/test_guard_coverage.py::test_the_console_entrypoints_do_not_run_on_import",
+      "module": "main.py",
+      "line": 282,
+      "condition": "args.config"
+    },
+    "57": {
+      "status": "EXCLUDED",
+      "reason": "outside-authority-bearing-definition",
+      "detail": "The same dispatch for the service entrypoint module.",
+      "evidence": "tests/execution/test_guard_coverage.py::test_the_console_entrypoints_do_not_run_on_import",
+      "module": "main.py",
+      "line": 339,
+      "condition": "__name__ == '__main__'"
+    },
+    "58": {
+      "status": "EXCLUDED",
+      "reason": "outside-authority-bearing-definition",
+      "detail": "The statement the dispatch above guards \u2014 the call that boots the long-running service. Deleting it changes nothing an imported test run can observe, for the same module-name reason.",
+      "evidence": "tests/execution/test_guard_coverage.py::test_the_console_entrypoints_do_not_run_on_import",
+      "module": "main.py",
+      "line": 340,
+      "condition": "main()"
+    }
+  }
+}

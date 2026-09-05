@@ -47,6 +47,8 @@ from .contracts import (
     AssessmentWindow,
     AttestationStatus,
     AttributionStatus,
+    AuditContractError,
+    AuditReference,
     BaseProvider,
     BenchmarkReference,
     ConfidenceBasis,
@@ -60,6 +62,11 @@ from .contracts import (
     ExecutionObservation,
     ExternalExecutionProvider,
     ForecastHorizon,
+    IdempotencyContractError,
+    IdempotencyDisposition,
+    IdempotencyKey,
+    IdempotencyResolution,
+    IdempotencyScope,
     MetricClaim,
     MetricObservation,
     PopulationSlice,
@@ -68,6 +75,9 @@ from .contracts import (
     SystemBindingAuthenticityStatus,
     SystemIdentityContractError,
     TransformationMethod,
+    Validity,
+    ValidityContractError,
+    ValidityStatus,
     VerificationStatus,
 )
 
@@ -97,4 +107,11 @@ __all__ = [
     # M-3R.3 neutral assessed-system identity (additive)
     "AssessedSystemBinding", "SystemBindingAuthenticityStatus",
     "SystemIdentityContractError",
+    # G7 neutral idempotency contract (additive)
+    "IdempotencyScope", "IdempotencyKey", "IdempotencyDisposition",
+    "IdempotencyResolution", "IdempotencyContractError",
+    # G8 neutral validity contract (additive)
+    "ValidityStatus", "Validity", "ValidityContractError",
+    # G4 neutral audit reference (additive)
+    "AuditReference", "AuditContractError",
 ]

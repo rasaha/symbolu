@@ -1,0 +1,63 @@
+# Ugence Cloud Scaling Bounded Execution — Cloud Scaling Phase 5D.
+#
+# A COMPOSITION package: the only path from a 5X CredentialGrant to Cloud Scaling
+# Operations' ControlledScalingExecutor. It imports Risk Authority, the Phase 5A
+# contracts, the 5X broker (grants and the minter, read-only), execution-reservation, the
+# RA-8 execution-assurance contracts, governance-contracts and Cloud Scaling Operations.
+# None of them imports this package.
+#
+# It holds NO credential and builds NO backend: the deployment builds the backend from the
+# grant handle outside this repository and injects it. os, sys, secrets, socket, time,
+# subprocess, urllib, http and every cloud SDK are banned structurally in THIS package;
+# Cloud Scaling Operations' own time import is that dependency's, not ours.
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ugence-cloud-scaling-bounded-execution"
+dynamic = ["version"]
+description = "Ugence Cloud Scaling Bounded Execution — Phase 5D. One bounded change per grant; LIVE only under a proven posture."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "Proprietary" }
+authors = [{ name = "Ugence Labs" }]
+keywords = ["cloud-scaling", "bounded-execution", "dry-run", "risk-authority", "ugence"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Operating System :: OS Independent",
+    "Typing :: Typed",
+]
+dependencies = [
+    "ugence-risk-authority>=0.8.0",
+    "ugence-cloud-scaling-authorization-contracts>=0.2.0",
+    "ugence-cloud-scaling-credential-broker>=0.1.0",
+    "ugence-execution-reservation>=0.1.0",
+    "ugence-risk-authority-execution-assurance>=0.1.0",
+    "ugence-decision-authority>=1.0.0",
+    "ugence-governance-contracts>=0.4.0",
+    "ugence-cloud-scaling-operations>=0.2.0",
+]
+
+[project.optional-dependencies]
+test = ["pytest>=7.0"]
+dev = ["pytest>=7.0", "build>=1.0"]
+
+[tool.setuptools.dynamic]
+version = { attr = "ugence_cloud_scaling_bounded_execution.version.__version__" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["ugence_cloud_scaling_bounded_execution*"]
+
+[tool.setuptools.package-data]
+ugence_cloud_scaling_bounded_execution = ["py.typed"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+markers = [
+    "happy: a positive-control property — something the boundary must ADMIT",
+    "adversarial: an attack that must be REFUSED, or a dangerous capability that must be ABSENT",
+    "invariant: a structural, packaging or frozen-value regression anchor — neither attack nor success",
+]

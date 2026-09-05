@@ -1,0 +1,23 @@
+{
+  "task_class_id": "task-class.reference-pilot.synthetic",
+  "domain_ref": "domain:synthetic-structured-answers",
+  "intended_outcome_ref": "outcome:exact-structured-answer",
+  "consequence_class": "NEGLIGIBLE",
+  "reversibility": "OUTCOME_REVERSIBLE",
+  "evidence_requirement_refs": [],
+  "tool_requirement_refs": [],
+  "structural_characteristics": ["multi_part_question", "ambiguity_detected"],
+  "population_ref": "population:synthetic-fixture",
+  "benchmark_set_ref": "benchmark.reference-pilot.synthetic",
+  "comparison_policy": {
+    "policy_id": "policy.reference-pilot.synthetic",
+    "policy_version": "0",
+    "sufficiency_rule_id": "rule.reference-pilot.exact-answer",
+    "sufficiency_rule_version": "0",
+    "sufficiency_kind": "THRESHOLD_BASED",
+    "threshold": {"threshold_id": "tau.reference-pilot", "unit": "score.unit", "comparator": "GTE", "literal": "1"},
+    "evidence_admission": null,
+    "resource_dimensions": ["LLM_CALLS"],
+    "quality_aggregation": {"aggregation_method_id": "research.mean", "aggregation_method_version": "0", "calculation_ref": "calc:experiments.workflow_fit_study.mean_over_cases.v0"}
+  }
+}

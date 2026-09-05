@@ -78,3 +78,23 @@ include = ["ugence_cloud_scaling_controller*"]
 
 [tool.setuptools.package-data]
 ugence_cloud_scaling_controller = ["py.typed"]
+
+# Guard-coverage ADR §7.1/§9.d prerequisite. The guard sweep runs this suite from a
+# disposable copy *outside* the repository, where the repo-root `pyproject.toml` — which
+# already sets `--import-mode=importlib` — no longer applies. Under pytest's default
+# `prepend` mode a test module is imported under its bare basename, and this package's
+# tree carries three duplicated basenames across its subpackages
+# (`test_boundary.py`, `test_normalization.py`, `test_serialization.py` each appear in
+# two of `planning/`, `forecasting/` and `canonical/`). In the repository they collect
+# because the root config applies; in the copy the second of each pair is an
+# "import file mismatch" and the whole suite is interrupted at collection — so every
+# mutant would be scored against a baseline that never ran.
+#
+# Declared here rather than fixed by renaming: `--import-mode=importlib` is what seven
+# other packages in this monorepo already declare for exactly this reason, and it keeps
+# the copy's collection identical to the repository's instead of making the two differ.
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_functions = ["test_*"]
+addopts = "--import-mode=importlib"

@@ -29,9 +29,10 @@ from dataclasses import dataclass
 from ..audit.service import AuditService
 from ..base import utcnow
 from ..config import Settings
-from ..domain.enums import AuditAction, ConversationStatus, OutboxEventType
+from ..domain.enums import AuditAction, ConversationStatus, OutboxEventType, RetentionState
 from ..errors import DilChatError, ErrorCode, not_found, scope_denied
 from ..infrastructure.chat_orm import ChatConversation, ChatMessage, ChatReadState
+from ..infrastructure.chat_safety_orm import ChatConversationRetention
 from ..repositories.chat import (
     ConversationRepository,
     MessageRepository,
@@ -39,7 +40,9 @@ from ..repositories.chat import (
     ReadStateRepository,
 )
 from ..repositories.couples import MembershipRepository
+from ..repositories.safety import BlockRepository, RetentionRepository
 from ..security.scope import authorize_shared
+from .ratelimit import RateLimiter
 
 # Control characters that are permitted inside a message body.
 _ALLOWED_CONTROL = {"\n", "\r", "\t"}
@@ -70,6 +73,9 @@ class ChatService:
         outbox: OutboxRepository,
         memberships: MembershipRepository,
         audit: AuditService,
+        blocks: BlockRepository | None = None,
+        retention: RetentionRepository | None = None,
+        rate_limiter: RateLimiter | None = None,
     ) -> None:
         self._settings = settings
         self._conversations = conversations
@@ -78,6 +84,11 @@ class ChatService:
         self._outbox = outbox
         self._memberships = memberships
         self._audit = audit
+        # Phase 3B safety collaborators. Optional so 3A-era unit tests that build
+        # the service directly keep working; the API wiring always provides them.
+        self._blocks = blocks
+        self._retention = retention
+        self._rate_limiter = rate_limiter
 
     # -- validation --------------------------------------------------------- #
     def _validate_body(self, body: str) -> str:
@@ -119,6 +130,17 @@ class ChatService:
         if existing is not None:
             return existing
         conv = await self._conversations.create(couple_id)
+        # Phase 3B: every conversation carries an explicit retention row from
+        # birth (migration d4e5f6a7b8c9 backfilled pre-existing conversations).
+        if self._retention is not None:
+            if await self._retention.get_by_conversation(conv.id) is None:
+                await self._retention.add(
+                    ChatConversationRetention(
+                        conversation_id=conv.id,
+                        couple_id=couple_id,
+                        state=RetentionState.ACTIVE.value,
+                    )
+                )
         await self._audit.record(
             action=AuditAction.CONVERSATION_CREATED,
             actor_user_id=actor_user_id,
@@ -157,6 +179,21 @@ class ChatService:
         conv.status = ConversationStatus.REVOKED.value
         conv.revoked_at = utcnow()
         conv.version += 1
+        # Phase 3B: an unpaired conversation enters the revoked-pending retention
+        # state — unless a report already preserved it (PRESERVED_FOR_REPORT is
+        # never downgraded; no purge is executed in this phase).
+        if self._retention is not None:
+            row = await self._retention.get_by_conversation(conv.id)
+            if row is None:
+                await self._retention.add(
+                    ChatConversationRetention(
+                        conversation_id=conv.id,
+                        couple_id=couple_id,
+                        state=RetentionState.REVOKED_PENDING_POLICY.value,
+                    )
+                )
+            elif row.state == RetentionState.ACTIVE.value:
+                row.state = RetentionState.REVOKED_PENDING_POLICY.value
         await self._audit.record(
             action=AuditAction.CONVERSATION_REVOKED,
             actor_user_id=actor_user_id,
@@ -252,6 +289,22 @@ class ChatService:
                     "client_message_id reused with a different body.",
                 )
             return existing  # idempotent replay: no new row, no new outbox event
+
+        # Phase 3B (DILCHAT-D3B-1): while EITHER participant has an ACTIVE block,
+        # new sends are denied in BOTH directions with one identical, generic
+        # error — the surface never discloses who blocked whom. Checked after the
+        # idempotent-replay branch (a retry of an already-committed message must
+        # keep returning that message) and inside the conversation lock.
+        if self._blocks is not None:
+            for member in await self._memberships.for_couple(conv.couple_id):
+                if member.user_id == sender_user_id:
+                    continue
+                if await self._blocks.active_block_between(sender_user_id, member.user_id):
+                    raise scope_denied("Messaging is unavailable for this conversation.")
+        # Phase 3B (DILCHAT-D3B-4): rate-limit only genuinely new sends, after
+        # every authorization check has passed (a 429 never masks a 404/403).
+        if self._rate_limiter is not None:
+            await self._rate_limiter.enforce_send(sender_user_id)
 
         seq = conv.next_sequence
         conv.next_sequence = seq + 1

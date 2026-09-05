@@ -13,6 +13,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { HttpClient, type TokenProvider } from "@/api/client";
 import { AuthApi } from "@/api/endpoints";
 import * as storage from "@/auth/storage";
+import { clearPendingInvitation } from "@/invitation/pendingInvitation";
 
 export type AuthStatus = "loading" | "signed-out" | "signed-in";
 
@@ -37,6 +38,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }): React
     accessRef.current = null;
     await storage.clearAll();
     queryClient.clear(); // drop the prior user's cached server state
+    // Drop any pending invitation context so it cannot leak across an account
+    // switch (sign-out clears it; the next sign-in starts clean).
+    clearPendingInvitation();
   }, [queryClient]);
 
   // Build a stable HttpClient bound to a TokenProvider backed by this context.
@@ -74,11 +78,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }): React
     return new HttpClient(provider);
   }, [clearLocal]);
 
-  // Session restoration on launch.
+  // Session restoration on launch. Never hangs in "loading": any failure to read
+  // the secure store resolves to signed-out (storage.hasSession never throws, but
+  // this catch is a belt-and-braces guarantee against an infinite loading state).
   useEffect(() => {
     let active = true;
     void (async () => {
-      const restored = await storage.hasSession();
+      let restored = false;
+      try {
+        restored = await storage.hasSession();
+      } catch {
+        restored = false;
+      }
       if (active) setStatus(restored ? "signed-in" : "signed-out");
     })();
     return () => {

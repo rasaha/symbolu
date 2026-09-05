@@ -22,8 +22,10 @@ What it does **not** do:
 * it evaluates no readiness, calculates no value, resolves no benchmark, and
   performs no forecasting or attribution.
 
-The reference registry is **in-memory, reference-grade and process-local**, not
-production persistence. Structured successor references (supersession) and
+The reference registry is **in-memory, reference-grade and process-local**; the
+durable registry is the single-node SQLite ``SqlitePolicyRegistry`` (ADR §15.7,
+decision D-3), which claims durability and single-host coordination and
+disclaims anything distributed. Structured successor references (supersession) and
 benchmark-value governance are deferred to separate milestones.
 
 Import the curated surface from :mod:`ugence_policy_authority.api`. See
@@ -32,7 +34,7 @@ Import the curated surface from :mod:`ugence_policy_authority.api`. See
 
 from __future__ import annotations
 
-__version__ = "0.1.0"
+__version__ = "0.3.0"
 
 from .api import *  # noqa: F401,F403,E402
 from .api import __all__ as _api_all  # noqa: E402

@@ -13,7 +13,7 @@ PKG_ROOT = pathlib.Path(OPS.__file__).parents[2]  # .../cloud-scaling-operations
 
 def test_version_matches_manifest():
     manifest = json.loads((PKG_ROOT / "module_manifest.json").read_text())
-    assert __version__ == "0.1.2"
+    assert __version__ == "0.2.0"
     assert manifest["version"] == __version__
 
 

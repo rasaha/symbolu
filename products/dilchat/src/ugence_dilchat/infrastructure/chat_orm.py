@@ -176,8 +176,16 @@ class ChatOutbox(Base):
     created_at: Mapped[dt.datetime] = mapped_column(
         UTCDateTime, nullable=False, default=utcnow, index=True
     )
-    # Set by a future delivery relay (Phase 3C). Unused for correctness in 3A.
+    # Set by the Phase 3C relay. PUBLISHED means "handed to the configured
+    # external transport according to its acknowledgement contract" — it never
+    # means the user received or read anything. Correctness (DEC-058) still
+    # never depends on it.
     published_at: Mapped[dt.datetime | None] = mapped_column(UTCDateTime)
+    # At-least-once delivery bookkeeping (Phase 3C). last_error_code is a
+    # machine code only — never a body, token, or free-text provider response.
+    attempt_count: Mapped[int] = mapped_column(sa.Integer, nullable=False, default=0)
+    next_attempt_at: Mapped[dt.datetime | None] = mapped_column(UTCDateTime)
+    last_error_code: Mapped[str | None] = mapped_column(sa.String(64))
 
     __table_args__ = (
         _enum_check("event_type", enums.OutboxEventType),

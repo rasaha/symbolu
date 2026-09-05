@@ -144,6 +144,12 @@ FIELD_CLASSIFICATION = {
         # C5b vocabulary term, and emphatically not the permitted set itself, which
         # `S2B-D1=A` keeps out of role data entirely.
         "strategy_policy_ref": C5A,
+        # `ACC-AM-1` (the `OD-C1=B` amendment round): a **C5a constitution
+        # reference only**, on ``strategy_policy_ref``'s exact precedent — an
+        # opaque handle minted by the Policy Authority constitution family,
+        # carried and compared whole, required, and never the constitution's
+        # bounds as role data.
+        "constitution_ref": C5A,
     },
     "WorkMandate": {
         "schema_version": CLOSED, "tenant_id": C5A, "created_at": NON_STRING,
@@ -220,6 +226,13 @@ FIELD_CLASSIFICATION = {
         # demands the TOKEN_PATTERN string constraint, which an enum field cannot carry
         # and must not acquire.
         "declared_strategy": CLOSED,
+        # `ACC-AM-2` (the `OD-C1=B` amendment round). The constitution pair is
+        # C5b on exactly the grounds the `S2B-D6=B1` pair above is: each is a
+        # vocabulary term matched by equality — against the resolved
+        # constitution's own identity — rather than an opaque handle carried and
+        # compared whole. The role's ``constitution_ref`` is the opaque handle,
+        # and it is C5a; these two are what the injected resolution answers with.
+        "constitution_policy_id": C5B, "constitution_policy_version": C5B,
         "recommended_disposition": CLOSED, "requested_review_action": CLOSED,
         "requested_review_destination_role_ref": C5A,
         "claim_summaries": C5C, "observation_refs": C5A, "uncertainties": C5C,
@@ -260,7 +273,8 @@ NESTED_PUBLIC_SHAPES = ("CandidateAdvisory", "ProposerProcessStateTransition")
 CONTRACT_CARDINALITY = {
     "AgentIdentityRef": 8,
     # S2-B `S2B-S1-Q2=A`: 10 -> 11, the added field being a C5a policy reference only.
-    "CognitiveRoleContract": 11,
+    # `ACC-AM-1`: 11 -> 12, the added field being a C5a constitution reference only.
+    "CognitiveRoleContract": 12,
     "WorkMandate": 9,
     "BoundedContextEnvelope": 9,
     "ToolObservation": 12,
@@ -273,7 +287,10 @@ CONTRACT_CARDINALITY = {
     # `AdvisoryCandidateSet` stays 12, `CandidateAdvisory` stays 11 and
     # `ProposerProcessRecord` stays 18 — its ``declared_strategy`` is **retyped**, not
     # added to.
-    "ProposerAdvisory": 30,
+    # `ACC-AM-2` (the `OD-C1=B` amendment round) took this 30 -> 32: the governing
+    # constitution's identity and version, both identity-participating and
+    # package-stamped from the injected constitution resolution.
+    "ProposerAdvisory": 32,
     "ProposerProcessRecord": 18,
     "ProposerProcessStateTransition": 2,
 }
@@ -423,11 +440,12 @@ class StubDomainEvaluationProvider:
 # This is a STUB, and it is test support, not a policy. It issues nothing, signs
 # nothing and verifies nothing: it returns whatever permitted set the test asked for.
 # That is the whole point of the boundary `S2B-D1=A` ratifies — the governing policy is
-# issued by Policy Authority, OUTSIDE this package, and `[G]` **no strategy-permission
-# family is registered there today**, which blocks execution end to end. The protocol
-# is injected, so these guards can still exercise resolution, the permission test, the
-# construction order and the replay without any policy authority being present anywhere
-# in the repository. This is the ``StubDomainEvaluationProvider`` precedent exactly.
+# issued by Policy Authority, OUTSIDE this package. A strategy-permission family and a
+# concrete resolver now exist as separate integration distributions, and their own
+# tests carry the end-to-end proof. The protocol is injected, so these guards exercise
+# resolution, the permission test, the construction order and the replay with no policy
+# authority present anywhere — which is why they remain stubs regardless of what exists
+# elsewhere. This is the ``StubDomainEvaluationProvider`` precedent exactly.
 # --------------------------------------------------------------------------- #
 
 #: The policy identity the fixtures resolve to. C5b tokens, compared by equality.
@@ -484,6 +502,41 @@ class StubStrategyPolicyResolver:
             permitted_strategies=self.permitted,
             strategy_policy_ref=self.echo_ref or request.strategy_policy_ref,
         )
+
+
+#: `ACC-AM-2` fixtures. The constitution identity the fixtures resolve to — C5b
+#: tokens, compared by equality — and the C5a reference the role contract bears.
+CONSTITUTION_POLICY_ID = "agent-constitution-baseline"
+#: A **string** (C3 bars every numeric type in this contract family, at any depth).
+CONSTITUTION_POLICY_VERSION = "1.0.0"
+CONSTITUTION_REF = "ugence.agent-constitution/tenant-1/baseline/v1"
+
+
+class _ConstitutionResolutionMetadata:
+    def __init__(self, *, policy_id, version):
+        self.policy_id = policy_id
+        self.version = version
+
+
+class StubConstitutionResolution:
+    """The injected resolved-constitution shape the builders stamp from.
+
+    A STUB on the ``StubStrategyPolicyResolver`` precedent exactly: it resolves
+    nothing and proves nothing — it is the object a composition root would hand
+    the builder after a real Policy Authority constitution resolution, carrying
+    only the fields this package's stamping boundary reads. ``signed_ref`` and
+    the identity overrides exist to break the reference correlation or divert
+    the stamped identity deliberately, which is the only way to exercise those
+    checks: a correct resolution cannot produce that state.
+    """
+
+    def __init__(self, *, signed_ref=None, policy_id=None, policy_version=None):
+        self.agent_constitution_ref = (
+            CONSTITUTION_REF if signed_ref is None else signed_ref)
+        self.metadata = _ConstitutionResolutionMetadata(
+            policy_id=CONSTITUTION_POLICY_ID if policy_id is None else policy_id,
+            version=(CONSTITUTION_POLICY_VERSION if policy_version is None
+                     else policy_version))
 
 
 def strategy_policy_response(**overrides):
@@ -567,8 +620,8 @@ def complete_advisory_fixture(**overrides):
 
     A coupling probe run against a partial fixture proves nothing: the construction
     would fail on a missing required field whatever the coupling did, and the test would
-    pass for the wrong reason. This supplies all thirty fields so that the only thing a
-    rejection can be about is the rule under probe.
+    pass for the wrong reason. This supplies all thirty-two fields so that the only
+    thing a rejection can be about is the rule under probe.
 
     ``declared_strategy`` defaults to the member this fixture's own shape yields — one
     candidate, no parent — so an advisory built from it satisfies
@@ -598,6 +651,8 @@ def complete_advisory_fixture(**overrides):
         "strategy_policy_id": STRATEGY_POLICY_ID,
         "strategy_policy_version": STRATEGY_POLICY_VERSION,
         "declared_strategy": ReasoningStrategy.SINGLE_CANDIDATE_UNREVISED,
+        "constitution_policy_id": CONSTITUTION_POLICY_ID,
+        "constitution_policy_version": CONSTITUTION_POLICY_VERSION,
         "recommended_disposition": None,
         "requested_review_action": None,
         "requested_review_destination_role_ref": None,

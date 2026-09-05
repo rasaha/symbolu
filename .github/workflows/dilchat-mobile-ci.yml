@@ -109,6 +109,66 @@ jobs:
           fi
           echo "secret scan: clean"
 
+  # Toolchain / native-config gates (Phase 2). Proves the Expo config resolves,
+  # Metro can export a bundle, and the generated Android manifest matches the
+  # hardened posture (deep-link scheme, minimal permissions, backup off, no
+  # cleartext). It does NOT compile an APK (no Android SDK) or touch iOS — those
+  # remain manual/device gates (see DILCHAT_MOBILE_PHASE2_KNOWN_LIMITATIONS.md).
+  toolchain:
+    name: Mobile toolchain (expo config / Metro export / native manifest)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: products/dilchat/mobile/package-lock.json
+
+      - name: Install (clean)
+        working-directory: products/dilchat/mobile
+        run: npm ci
+
+      - name: Expo config resolves (mandatory)
+        working-directory: products/dilchat/mobile
+        run: |
+          set -o pipefail
+          npx expo config --json --full > /dev/null
+          echo "expo config: resolved"
+
+      - name: Metro export (mandatory)
+        working-directory: products/dilchat/mobile
+        run: |
+          set -o pipefail
+          npm run toolchain:export
+          test -d dist/_expo/static/js/android
+
+      - name: Bundle safety — no leaked path / prod endpoint / secret (mandatory)
+        working-directory: products/dilchat/mobile
+        run: |
+          set -o pipefail
+          BUNDLE="$(find dist/_expo/static/js/android -name '*.hbc' | head -1)"
+          test -n "$BUNDLE"
+          if grep -aqE '/home/|/Users/|AKIA[0-9A-Z]{16}|ghp_[A-Za-z0-9]{20,}' "$BUNDLE"; then
+            echo "Leaked local path or secret in the exported bundle"; exit 1
+          fi
+          echo "bundle safety: clean"
+
+      - name: Generated Android manifest guard (mandatory)
+        working-directory: products/dilchat/mobile
+        run: |
+          set -o pipefail
+          npm run check:native
+
+      # Informational only: 3 of expo-doctor's checks fetch api.expo.dev and can
+      # fail behind restrictive network egress. It must NOT gate the build; the
+      # deterministic gates above are the enforced contract.
+      - name: Expo doctor (informational, non-blocking)
+        working-directory: products/dilchat/mobile
+        continue-on-error: true
+        run: npx expo-doctor || true
+
   # Live integration: drives the PRODUCTION mobile API client + session layer
   # (real HttpClient/endpoints, Node's real fetch) against the actual FastAPI
   # backend and a PostgreSQL 16 database. It exercises real JWT, rotating refresh
@@ -166,3 +226,101 @@ jobs:
           DILCHAT_INTEGRATION_RUN_ID: ci-${{ github.run_id }}
           PORT: "8091"
         run: npm run test:integration
+
+  # Android COMPILED-BUILD gate (Phase 2 / Track A). Generates the native Android
+  # project via Expo prebuild and runs a real Gradle **debug** compile on GitHub's
+  # Linux runner using the preinstalled, official Google Android SDK. It proves the
+  # app compiles to an installable debug APK and that the generated manifest keeps
+  # the hardened posture (dilchat:// scheme, minimal permissions, backup off, no
+  # cleartext). It does NOT sign a release, run an emulator, or touch iOS — those
+  # remain host/device gates (see DILCHAT_MOBILE_PHASE2_NATIVE_VALIDATION_REPORT.md).
+  # No production signing, credentials, or deployment.
+  android-build:
+    name: Android native gen + Gradle debug build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: products/dilchat/mobile/package-lock.json
+
+      # React Native 0.74 / Expo SDK 51 officially target JDK 17.
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Install (clean)
+        working-directory: products/dilchat/mobile
+        run: npm ci
+
+      - name: Expo prebuild (generate android/)
+        working-directory: products/dilchat/mobile
+        env:
+          EXPO_NO_TELEMETRY: "1"
+          CI: "1"
+        run: |
+          set -o pipefail
+          npx expo prebuild --platform android --no-install
+          test -f android/app/src/main/AndroidManifest.xml
+
+      - name: Generated Android manifest hardening guard
+        working-directory: products/dilchat/mobile
+        run: |
+          set -o pipefail
+          M=android/app/src/main/AndroidManifest.xml
+          grep -q 'android:scheme="dilchat"' "$M"
+          grep -q 'android:allowBackup="false"' "$M"
+          if grep -q 'usesCleartextTraffic="true"' "$M"; then
+            echo "cleartext opt-in present"; exit 1
+          fi
+          for p in READ_EXTERNAL_STORAGE WRITE_EXTERNAL_STORAGE SYSTEM_ALERT_WINDOW VIBRATE; do
+            if ! grep -E "android.permission.${p}\"" "$M" | grep -q 'tools:node="remove"'; then
+              echo "permission ${p} lacks a tools:node=remove declaration"; exit 1
+            fi
+            if grep -E "android.permission.${p}\"" "$M" | grep -qv 'tools:node="remove"'; then
+              echo "permission ${p} is active (should be blocked)"; exit 1
+            fi
+          done
+          # Pinned ACTIVE permission set (DILCHAT-D3C-M1): exactly INTERNET at the
+          # app-manifest level. POST_NOTIFICATIONS is contributed by the
+          # expo-notifications LIBRARY manifest at Gradle merge time, by design.
+          ACTIVE="$(grep -oE '<uses-permission[^>]*/?>' "$M" \
+            | grep -v 'tools:node="remove"' \
+            | grep -oE 'android:name="[^"]+"' \
+            | sed -E 's/android:name="([^"]+)"/\1/' | sort -u)"
+          if [ "$ACTIVE" != "android.permission.INTERNET" ]; then
+            echo "active permission set drifted from pinned INTERNET-only:"; echo "$ACTIVE"; exit 1
+          fi
+          echo "android manifest guard: OK"
+
+      # Expo's generated gradle.properties defaults to -Xmx2048m, which can OOM
+      # during the Hermes AAR JetifyTransform on a loaded runner. Pin a larger,
+      # deterministic build-JVM heap (later gradle.properties keys win on load).
+      - name: Pin deterministic Gradle heap
+        working-directory: products/dilchat/mobile/android
+        run: |
+          set -o pipefail
+          printf '\norg.gradle.jvmargs=-Xmx4g -XX:MaxMetaspaceSize=1g -Dfile.encoding=UTF-8\n' >> gradle.properties
+          echo "gradle heap pinned:"; grep 'org.gradle.jvmargs' gradle.properties
+
+      - name: Gradle debug build (assembleDebug)
+        working-directory: products/dilchat/mobile/android
+        run: |
+          set -o pipefail
+          ./gradlew --no-daemon --stacktrace assembleDebug
+          APK="$(find app/build/outputs/apk/debug -name '*.apk' | head -1)"
+          test -n "$APK"
+          echo "built debug APK: $APK ($(wc -c < "$APK") bytes)"
+
+      - name: Debug APK sanity (valid archive, non-empty)
+        working-directory: products/dilchat/mobile/android
+        run: |
+          set -o pipefail
+          APK="$(find app/build/outputs/apk/debug -name '*.apk' | head -1)"
+          test -s "$APK"
+          unzip -l "$APK" | grep -q 'AndroidManifest.xml'
+          echo "apk sanity: OK (valid zip with manifest)"

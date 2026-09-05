@@ -16,7 +16,12 @@ from .api.router import api_router
 from .astrology.registry import build_provider
 from .config import Settings, get_settings
 from .correlation import CorrelationIdMiddleware
-from .db import dispose_engine, init_engine, is_initialized
+from .db import (
+    RequestTransactionMiddleware,
+    dispose_engine,
+    init_engine,
+    is_initialized,
+)
 from .errors import DilChatError, dilchat_error_handler, unhandled_error_handler
 from .logging import configure_logging
 from .security.tokens import TokenService
@@ -58,6 +63,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.astrology_provider = build_provider(settings)
 
     app.add_middleware(CorrelationIdMiddleware)
+    # Finalizes the request transaction BEFORE the response is transmitted,
+    # closing the commit-visibility race a teardown-time commit would leave.
+    app.add_middleware(RequestTransactionMiddleware)
     # Starlette types handlers against Exception; our handlers narrow the type.
     app.add_exception_handler(DilChatError, dilchat_error_handler)  # type: ignore[arg-type]
     app.add_exception_handler(Exception, unhandled_error_handler)

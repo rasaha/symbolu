@@ -8,7 +8,7 @@
  * committed response shapes. It never hits a network.
  */
 import { HttpClient, type TokenProvider } from "@/api/client";
-import { AuthApi, BirthProfileApi, CoupleApi, UserApi } from "@/api/endpoints";
+import { AuthApi, BirthProfileApi, ChatApi, CoupleApi, DeviceApi, UserApi } from "@/api/endpoints";
 import { getApiBaseUrl } from "@/config/env";
 import type { BirthProfileCreateRequest } from "@/api/types";
 
@@ -142,5 +142,104 @@ describe("contract-level journey against a fetch mock", () => {
     });
     expect(calls[6]).toMatchObject({ method: "GET", path: "/v1/couples/current", auth: "Bearer ACCESS" });
     expect(calls[7]).toMatchObject({ method: "POST", path: "/v1/couples/c1/unpair", auth: "Bearer ACCESS" });
+  });
+
+  it("chat journey: current conversation -> paged history -> idempotent send -> read state", async () => {
+    const base = calls.length;
+
+    // current conversation
+    reply(200, {
+      conversation_id: "conv1",
+      couple_id: "c1",
+      status: "ACTIVE",
+      created_at: "2026-01-01T00:00:00Z",
+      latest_sequence: 2,
+      last_read_sequence: 0,
+      member_user_ids: ["u1", "u2"],
+    });
+    const conv = await ChatApi.current(client);
+    expect(conv.conversation_id).toBe("conv1");
+
+    const msg = (seq: number, cid: string, body: string | null) => ({
+      message_id: `m${seq}`,
+      conversation_id: "conv1",
+      sender_user_id: "u2",
+      client_message_id: cid,
+      server_sequence: seq,
+      body,
+      created_at: "2026-01-01T00:00:01Z",
+      deleted: body === null,
+      deleted_at: body === null ? "2026-01-01T01:00:00Z" : null,
+    });
+
+    // first page (no cursor), then the next page via the opaque server cursor
+    reply(200, { messages: [msg(1, "ca", "hello")], next_cursor: "CURSOR1", has_more: true });
+    const page1 = await ChatApi.listMessages(client, "conv1", null, 50);
+    expect(page1.has_more).toBe(true);
+    reply(200, { messages: [msg(2, "cb", null)], next_cursor: null, has_more: false });
+    const page2 = await ChatApi.listMessages(client, "conv1", page1.next_cursor);
+    expect(page2.messages[0]?.body).toBeNull(); // tombstone shape survives parsing
+
+    // send, then replay the SAME client_message_id (idempotent retry after timeout)
+    reply(201, msg(3, "client-key-1", "sent"));
+    const sent = await ChatApi.sendMessage(client, "conv1", { client_message_id: "client-key-1", body: "sent" });
+    expect(sent.server_sequence).toBe(3);
+    reply(200, msg(3, "client-key-1", "sent")); // replay returns the ORIGINAL row
+    const replayed = await ChatApi.sendMessage(client, "conv1", { client_message_id: "client-key-1", body: "sent" });
+    expect(replayed.message_id).toBe(sent.message_id);
+
+    // forward-only read state
+    reply(200, { conversation_id: "conv1", user_id: "u1", last_read_sequence: 3, updated_at: "2026-01-01T02:00:00Z" });
+    const rs = await ChatApi.updateReadState(client, "conv1", 3);
+    expect(rs.last_read_sequence).toBe(3);
+
+    // ---- Wire-shape assertions ----
+    expect(calls[base + 0]).toMatchObject({ method: "GET", path: "/v1/conversations/current", auth: "Bearer ACCESS" });
+    expect(calls[base + 1]).toMatchObject({
+      method: "GET",
+      path: "/v1/conversations/conv1/messages?limit=50",
+      auth: "Bearer ACCESS",
+    });
+    expect(calls[base + 2]).toMatchObject({
+      method: "GET",
+      path: "/v1/conversations/conv1/messages?cursor=CURSOR1",
+      auth: "Bearer ACCESS",
+    });
+    expect(calls[base + 3]).toMatchObject({ method: "POST", path: "/v1/conversations/conv1/messages", auth: "Bearer ACCESS" });
+    expect(calls[base + 3]?.body).toEqual({ client_message_id: "client-key-1", body: "sent" });
+    expect(calls[base + 4]?.body).toEqual({ client_message_id: "client-key-1", body: "sent" });
+    expect(calls[base + 5]).toMatchObject({ method: "PUT", path: "/v1/conversations/conv1/read-state", auth: "Bearer ACCESS" });
+    expect(calls[base + 5]?.body).toEqual({ last_read_sequence: 3 });
+  });
+
+  it("device journey: register -> list (no token echo) -> revoke", async () => {
+    const base = calls.length;
+    const device = {
+      device_id: "d1",
+      platform: "IOS",
+      status: "ACTIVE",
+      created_at: "2026-01-01T00:00:00Z",
+      revoked_at: null,
+    };
+    reply(201, device);
+    const registered = await DeviceApi.register(client, {
+      push_token: "ExponentPushToken[wire]",
+      platform: "IOS",
+    });
+    expect(registered.device_id).toBe("d1");
+    expect("push_token" in registered).toBe(false); // token is write-only
+
+    reply(200, { devices: [device] });
+    const listed = await DeviceApi.list(client);
+    expect(listed.devices).toHaveLength(1);
+
+    reply(200, { ...device, status: "REVOKED", revoked_at: "2026-01-02T00:00:00Z" });
+    const revoked = await DeviceApi.revoke(client, "d1");
+    expect(revoked.status).toBe("REVOKED");
+
+    expect(calls[base + 0]).toMatchObject({ method: "POST", path: "/v1/devices", auth: "Bearer ACCESS" });
+    expect(calls[base + 0]?.body).toEqual({ push_token: "ExponentPushToken[wire]", platform: "IOS" });
+    expect(calls[base + 1]).toMatchObject({ method: "GET", path: "/v1/devices", auth: "Bearer ACCESS" });
+    expect(calls[base + 2]).toMatchObject({ method: "DELETE", path: "/v1/devices/d1", auth: "Bearer ACCESS" });
   });
 });

@@ -85,6 +85,7 @@ MODULE_PROPERTY_CATEGORY = {
     "test_property_ledger": "invariant",
     "test_gate_isolation": "adversarial",
     "test_capability_domain_separation": "adversarial",
+    "test_guard_coverage": "adversarial",
 }
 
 

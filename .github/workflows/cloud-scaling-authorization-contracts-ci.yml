@@ -22,6 +22,15 @@ on:
       - "packages/risk_authority/**"
       - "packages/trusted-evidence-authority/**"
       - "docs/architecture/ADR_CLOUD_SCALING_AUTHORIZATION_PHASE5.md"
+      # The sweep engine. A change to an operator or a detector changes what this
+      # package's guard sweep measures without touching a byte inside the package, so
+      # a filter that omits it lets the engine drift past this gate unmeasured. An
+      # audit of the guard-coverage work found a real defect of exactly that shape:
+      # a bare-name match in `_raising_helpers` let a non-guard call be inventoried
+      # and scored KILLED, and no package-scoped filter would have re-run this sweep
+      # to catch it.
+      - "scripts/cloud_scaling/guard_sweep.py"
+      - "scripts/cloud_scaling/tests/**"
       - ".github/workflows/cloud-scaling-authorization-contracts-ci.yml"
   push:
     branches:
@@ -29,6 +38,8 @@ on:
       - "claude/setup-symbolu-monorepo-**"
     paths:
       - "packages/integration/cloud-scaling-authorization-contracts/**"
+      - "scripts/cloud_scaling/guard_sweep.py"
+      - "scripts/cloud_scaling/tests/**"
       - ".github/workflows/cloud-scaling-authorization-contracts-ci.yml"
 
 defaults:
@@ -49,16 +60,49 @@ jobs:
           fetch-depth: 0
       - name: Resolve the surface ratchet's baseline
         # The allowlist of public non-field members is ratcheted against history, so the
-        # "before" cannot be edited by the commit that changes the "after". Merge base with the
-        # default branch, named by the event rather than hardcoded — this repository's default
+        # "before" cannot be edited by the commit that changes the "after". The default
+        # branch is named by the event rather than hardcoded — this repository's default
         # branch is not called "main".
+        #
+        # This step used to be a single unconditional `git merge-base HEAD <default>`,
+        # with no default-branch arm and no vacuity guard. Measured on run 33317988694
+        # (the push of merge commit a24d9c6b): merge-base resolved to HEAD itself, so
+        # UGENCE_RATCHET_BASE equalled the head SHA, the ratchet compared the merge
+        # against itself, and the job went green — vacuous on every default-branch push,
+        # failing open where the partition ratchet's resolver fails closed. This is now
+        # the policy-authenticity resolver (its PR #1519 form, resilient to a concurrent
+        # merge advancing the ref mid-step), and `tests/_surface_ratchet.py` refuses a
+        # HEAD-containing baseline a second time, in the tested code, because a guard
+        # that lives only in YAML is covered by nothing.
         run: |
           set -euo pipefail
-          default='${{ github.event.repository.default_branch }}'
-          git fetch --no-tags origin "+refs/heads/${default}:refs/remotes/origin/ratchet-base"
-          base=$(git merge-base HEAD refs/remotes/origin/ratchet-base)
+          head=$(git rev-parse HEAD)
+          base='${{ github.event.pull_request.base.sha }}'
+          source='pull request base sha'
+          if [ -z "${base}" ]; then
+            default='${{ github.event.repository.default_branch }}'
+            git fetch --no-tags origin \
+              "+refs/heads/${default}:refs/remotes/origin/ratchet-base"
+            if git merge-base --is-ancestor "${head}" refs/remotes/origin/ratchet-base; then
+              # A push ON the default branch: HEAD is on that branch's history, however
+              # far the ref has advanced since (ancestor test, not equality — the
+              # equality form is exactly what PR #1515 raced in the policy-authenticity
+              # workflow). The honest "before" is the commit this one landed on top of —
+              # for a merge commit, its first parent, i.e. the previous default tip.
+              base=$(git rev-parse "HEAD^1")
+              source='first parent (push on the default branch)'
+            else
+              base=$(git merge-base HEAD refs/remotes/origin/ratchet-base)
+              source="merge base with ${default}"
+            fi
+          fi
+          git rev-parse --verify "${base}^{commit}" >/dev/null
+          if git merge-base --is-ancestor "${head}" "${base}"; then
+            echo "::error::the surface ratchet baseline (${source}) resolved to ${base}, which already contains HEAD (${head}); comparing the change against itself reports no growth for every widening on it, so the gate would pass vacuously"
+            exit 1
+          fi
           echo "UGENCE_RATCHET_BASE=${base}" >> "$GITHUB_ENV"
-          echo "surface ratchet baseline: ${base} (merge base with ${default})"
+          echo "surface ratchet baseline: ${base} (${source})"
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
@@ -287,9 +331,17 @@ jobs:
           pip install -e packages/integration/cloud-scaling-risk-integration
           pip install -e packages/integration/cloud-scaling-authorization-contracts
       - name: Sweep this shard
-        # Sharded because it cannot be anything else: 109 guards against a 138s suite is four
-        # wall-clock hours in one job. Eight shards puts each at roughly half an hour, which
-        # is the same order as the producer-attestation sweep this generalises.
+        # Sharded because it cannot be anything else. At adoption this was 109 guards
+        # against a 138s suite — four wall-clock hours in one job — and eight shards put
+        # each at roughly half an hour.
+        #
+        # The suite is now ~4.7x faster (measured, this branch): the reference Ed25519's
+        # modular inverse moved from Fermat's exponentiation to extended Euclid, and
+        # `builtins.pow` had been ~93% of every run. The shard count is deliberately
+        # UNCHANGED: at the effective runner concurrency this repository actually gets
+        # (~6.7 concurrent jobs, measured across a full fan-out), wall clock tracks total
+        # runner-minutes rather than how the work is divided, so re-sharding buys nothing
+        # while the pool is saturated. Fewer minutes is the whole win.
         env:
           UGENCE_RATCHET_BASE: ${{ github.event.pull_request.base.sha || github.sha }}
         run: python scripts/cloud_scaling/guard_sweep.py authorization-contracts --shard ${{ matrix.shard }}/8

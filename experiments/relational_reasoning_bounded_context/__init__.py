@@ -8,10 +8,10 @@ Effective authority: Amendment 002 (a84cc8eef848e7081764deb894593f7b270f32ba).
 """
 from __future__ import annotations
 
-from . import (base_capability, config, execution, gates, generator, manifest, metrics, output,
-               replay, schema_ext, serializer, shortcuts, tokenizer, verdict)
+from . import (base_capability, config, dataset, execution, gates, generator, manifest, metrics,
+               output, replay, run, schema_ext, serializer, shortcuts, tokenizer, verdict)
 
 __all__ = [
     "config", "tokenizer", "schema_ext", "serializer", "output", "generator", "base_capability",
-    "metrics", "shortcuts", "gates", "verdict", "execution", "manifest", "replay",
+    "metrics", "shortcuts", "gates", "verdict", "execution", "manifest", "replay", "dataset", "run",
 ]

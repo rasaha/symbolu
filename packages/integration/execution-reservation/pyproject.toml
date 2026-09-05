@@ -1,0 +1,62 @@
+# Ugence Execution Reservation — the durable backend of the Decision Authority
+# execution ledger plus the atomic one-time reservation and clearance-receipt
+# tables that ledger lacks (Action Clearance phases E and G).
+#
+# Scoped and ratified by docs/architecture/ADR_UGENCE_EXECUTION_RESERVATION_SCOPING.md.
+#
+#   THIS PACKAGE RESERVES, RECORDS AND REPORTS CONSUMPTION.
+#   IT NEVER DISPATCHES, OBSERVES AN EXTERNAL SYSTEM, OR MINTS AUTHORITY.
+#
+# One adapter implements four ports:
+#     ClearanceReceiptRepository      <- phase E (receipt persistence + lifecycle events)
+#     ExecutionReservationPort        <- phase G (reserve_once + reservation state machine)
+#     PriorConsumptionSource          <- phase G (PRIOR_CONSUMPTION trusted signal, Level 1)
+#     ugence_decision_authority ExecutionRepository  <- structural conformance, so the
+#                                        Decision Authority ledger stays the only ledger
+#
+# Dependency direction (one-way):
+#     ugence-governance-contracts (leaf)      <- IdempotencyKey / IdempotencyResolution / Validity
+#     ugence-action-clearance (leaf)          <- ClearanceReceiptBody, ClearanceResult, TrustedSignal
+#     ugence-decision-authority (1.0.0, frozen, untouched) <- execution record types + repository port
+#         ▲
+#     ugence-execution-reservation (this package)
+#
+# pydantic is a transitive dependency of Decision Authority only; this package
+# defines no pydantic model of its own. stdlib sqlite3 is the only store.
+#
+# Build:   python -m build packages/integration/execution-reservation
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ugence-execution-reservation"
+dynamic = ["version"]
+description = "Ugence Execution Reservation — durable clearance receipts, atomic one-time execution reservation and the PRIOR_CONSUMPTION signal, as the durable backend of the Decision Authority execution ledger. Reference-grade, shadow-only; never dispatches or mints authority."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "Proprietary" }
+authors = [{ name = "Rakesh Mohan" }]
+keywords = ["governance", "clearance", "reservation", "idempotency", "ledger", "ugence"]
+dependencies = [
+    "ugence-governance-contracts>=0.4.0",
+    "ugence-action-clearance>=0.1.0",
+    "ugence-decision-authority>=1.0.0",
+]
+
+[project.optional-dependencies]
+test = ["pytest>=7.0"]
+
+[tool.setuptools.dynamic]
+version = { attr = "ugence_execution_reservation.version.__version__" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["ugence_execution_reservation*"]
+
+[tool.setuptools.package-data]
+ugence_execution_reservation = ["py.typed"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"

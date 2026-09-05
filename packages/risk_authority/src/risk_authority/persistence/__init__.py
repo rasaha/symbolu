@@ -1,18 +1,32 @@
-"""Persistence: repository contracts, in-memory reference, Postgres skeleton."""
+"""Persistence: repository contracts, in-memory reference, durable SQLite store, Postgres DDL."""
 
 from __future__ import annotations
 
+from .codec import decode_dataclass, decode_envelope, encode_envelope
+from .errors import (
+    PersistenceConflictError,
+    PersistenceProductionModeError,
+    PersistenceStorageError,
+)
 from .in_memory import (
     InMemoryAuthorityRegistry,
     InMemoryControlResultRepository,
     InMemoryDecisionRepository,
     InMemoryEnvelopeRepository,
     InMemoryEvidenceRepository,
+    InMemoryAuthorizationRepository,
     InMemoryGovernanceEventStore,
     InMemoryRiskCaseRepository,
 )
+from .sqlite import (
+    SQLITE_STORE_SCHEMA_VERSION,
+    SqliteIdAllocator,
+    SqliteRevocationState,
+    SqliteRiskAuthorityStore,
+)
 from .repositories import (
     AuthorityRegistry,
+    AuthorizationRepository,
     ControlResultRepository,
     DecisionRepository,
     EnvelopeRepository,
@@ -36,4 +50,16 @@ __all__ = [
     "InMemoryControlResultRepository",
     "InMemoryEvidenceRepository",
     "InMemoryGovernanceEventStore",
+    "InMemoryAuthorizationRepository",
+    "AuthorizationRepository",
+    "SqliteRiskAuthorityStore",
+    "SqliteRevocationState",
+    "SqliteIdAllocator",
+    "SQLITE_STORE_SCHEMA_VERSION",
+    "PersistenceStorageError",
+    "PersistenceConflictError",
+    "PersistenceProductionModeError",
+    "decode_dataclass",
+    "encode_envelope",
+    "decode_envelope",
 ]

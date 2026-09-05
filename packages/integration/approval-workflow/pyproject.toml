@@ -1,0 +1,58 @@
+# Ugence Approval Workflow — the canonical human approval and exception queue:
+# the state machine, expiry, the bounded exception path, and once-only consumption
+# of a granted approval (gap-sequencing ADR wave 2, decision D-2).
+#
+# Scoped and ratified by docs/architecture/ADR_UGENCE_APPROVAL_WORKFLOW_SCOPING.md.
+#
+#   THIS PACKAGE RECORDS AND REPORTS AN APPROVAL.
+#   IT NEVER APPROVES, AUTHENTICATES, MINTS AUTHORITY, OR EXECUTES.
+#
+# Two adapters implement one port:
+#     ApprovalWorkflowPort  <- InMemoryApprovalWorkflowStore (reference; refused in production)
+#                           <- SqliteApprovalWorkflowStore   (single-node durable, stdlib sqlite3)
+#
+# Dependency direction (one-way):
+#     ugence-governance-contracts (leaf)   <- Validity / IdempotencyKey / IdempotencyResolution
+#         ▲
+#     ugence-approval-workflow (this package)
+#
+# Nothing else: not Decision Authority, not the Policy Workflow Compiler, not
+# cloud-scaling-operations, not execution-reservation, not ugence_storygraph, no
+# product, no network client, no cloud SDK, no pydantic. The ledger shape is copied
+# from packages/integration/execution-reservation, never imported.
+#
+# Build:   python -m build packages/integration/approval-workflow
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ugence-approval-workflow"
+dynamic = ["version"]
+description = "Ugence Approval Workflow — the canonical human approval and exception state machine, derived expiry, and once-only consumption of a granted approval. Reference-grade, shadow-only; never approves, authenticates or executes."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "Proprietary" }
+authors = [{ name = "Rakesh Mohan" }]
+keywords = ["governance", "approval", "exception", "workflow", "idempotency", "ugence"]
+classifiers = ["Typing :: Typed"]
+dependencies = [
+    "ugence-governance-contracts>=0.4.0",
+]
+
+[project.optional-dependencies]
+test = ["pytest>=7.0"]
+
+[tool.setuptools.dynamic]
+version = { attr = "ugence_approval_workflow.version.__version__" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["ugence_approval_workflow*"]
+
+[tool.setuptools.package-data]
+ugence_approval_workflow = ["py.typed"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"

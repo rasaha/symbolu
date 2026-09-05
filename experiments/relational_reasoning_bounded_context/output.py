@@ -10,7 +10,7 @@ from __future__ import annotations
 import json
 
 from .config import OUTPUT_FIELDS, STATUS_VALUES
-from .schema_ext import ReasoningOutput
+from .schema_ext import ReasoningOutput, SchemaError
 
 
 class OutputParseError(ValueError):
@@ -51,8 +51,10 @@ def parse_output(text: str) -> ReasoningOutput:
 
 
 def is_valid_output(text: str) -> bool:
+    """True iff `text` parses under the frozen contract AND satisfies the schema caps (a syntactically
+    well-formed output whose reasoning_path/evidence_ids exceed the caps is invalid, not an exception)."""
     try:
         parse_output(text)
         return True
-    except OutputParseError:
+    except (OutputParseError, SchemaError, ValueError, TypeError):
         return False

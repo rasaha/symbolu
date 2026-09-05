@@ -15,6 +15,7 @@ from . import __version__
 from .adapters.uvi import (
     SUPPORTED_UVI_POLICY_FAMILIES,
     UVI_ADAPTER_ID,
+    UviPolicyArtifactCodec,
     UviPolicyFamilyAdapter,
     uvi_coordinate,
 )
@@ -40,6 +41,13 @@ from .core.canonical import (
     sha256_hex,
     to_canonical_obj,
 )
+from .core.codec import PolicyArtifactCodec
+from .core.consistency import (
+    PolicyRegistryConsistencyClaim,
+    PolicyRegistryConsistencyDescriptor,
+    PolicyRegistryConsistencyScope,
+    declared_consistency,
+)
 from .core.ed25519 import SigningKey, VerifyKey
 from .core.errors import (
     PolicyApprovalError,
@@ -49,7 +57,10 @@ from .core.errors import (
     PolicyDigestMismatchError,
     PolicyIssuanceError,
     PolicyRegistryConflictError,
+    PolicyRegistryProductionModeError,
+    PolicyRegistryStorageError,
     PolicyRevocationError,
+    PolicySupersessionError,
     PolicySigningError,
     UnsupportedPolicyArtifactError,
     UnsupportedSupersessionError,
@@ -58,13 +69,25 @@ from .core.issuance import SUPERSESSION_REFERENCE_UNSUPPORTED, issue_policy
 from .core.payload import (
     ISSUANCE_SIGNING_DOMAIN,
     REVOCATION_SIGNING_DOMAIN,
+    SUPERSESSION_SIGNING_DOMAIN,
     issuance_signing_payload,
     revocation_signing_payload,
 )
-from .core.records import IssuedPolicyRecord, PolicyResolution, PolicyRevocationRecord
+from .core.records import (
+    IssuedPolicyRecord,
+    PolicyResolution,
+    PolicyRevocationRecord,
+    PolicySupersessionRecord,
+)
 from .core.registry import InMemoryPolicyRegistry, PolicyRegistry
+from .core.registry_sqlite import SQLITE_REGISTRY_SCHEMA_VERSION, SqlitePolicyRegistry
 from .core.resolution import resolve_policy
 from .core.revocation import revoke_policy, verify_revocation_record
+from .core.supersession import (
+    SUPERSESSION_PREDECESSOR_INADMISSIBLE,
+    require_admissible_supersession,
+    verify_supersession_record,
+)
 from .core.signing import (
     SIGNATURE_ALG,
     DenyAllSignatureVerifier,
@@ -98,6 +121,8 @@ __all__ = [
     "POLICY_BODY_DIGEST_DOMAIN",
     "ISSUANCE_SIGNING_DOMAIN",
     "REVOCATION_SIGNING_DOMAIN",
+    "SUPERSESSION_SIGNING_DOMAIN",
+    "SUPERSESSION_PREDECESSOR_INADMISSIBLE",
     # Errors
     "PolicyAuthorityError",
     "PolicyAuthorityRequestError",
@@ -110,6 +135,7 @@ __all__ = [
     "PolicyIssuanceError",
     "PolicyRegistryConflictError",
     "PolicyRevocationError",
+    "PolicySupersessionError",
     "SUPERSESSION_REFERENCE_UNSUPPORTED",
     # Statuses / reasons
     "ApprovalVerificationStatus",
@@ -153,15 +179,29 @@ __all__ = [
     # Records
     "IssuedPolicyRecord",
     "PolicyRevocationRecord",
+    "PolicySupersessionRecord",
     "PolicyResolution",
     # Registry
     "PolicyRegistry",
     "InMemoryPolicyRegistry",
+    # ADR §15.7 — durable single-node registry (decision D-3)
+    "SqlitePolicyRegistry",
+    "SQLITE_REGISTRY_SCHEMA_VERSION",
+    "PolicyArtifactCodec",
+    "UviPolicyArtifactCodec",
+    "PolicyRegistryConsistencyScope",
+    "PolicyRegistryConsistencyClaim",
+    "PolicyRegistryConsistencyDescriptor",
+    "declared_consistency",
+    "PolicyRegistryStorageError",
+    "PolicyRegistryProductionModeError",
     # Services
     "issue_policy",
     "resolve_policy",
     "revoke_policy",
     "verify_revocation_record",
+    "require_admissible_supersession",
+    "verify_supersession_record",
     # The first policy-family adapter (UVI)
     "UVI_ADAPTER_ID",
     "SUPPORTED_UVI_POLICY_FAMILIES",

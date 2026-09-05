@@ -1,0 +1,12 @@
+{
+  "manifest_id": "manifest.reference-pilot.synthetic",
+  "plan_id": "plan.reference-pilot.synthetic",
+  "baseline_method_id": "linear_chain",
+  "preregistered_by": "owner:reference-pilot-fixture",
+  "sampling_policy_ref": "prereg:exhaustive-catalog",
+  "declared_coverage_ref": "coverage:exhaustive-declared",
+  "benchmark_id": "benchmark.reference-pilot.synthetic",
+  "benchmark_version": "0",
+  "benchmark_issuer_ref": "issuer:reference-pilot-fixture",
+  "benchmark_issuer_identity": "issuer:reference-pilot-fixture"
+}

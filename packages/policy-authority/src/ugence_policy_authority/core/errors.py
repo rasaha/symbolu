@@ -88,5 +88,29 @@ class PolicyRegistryConflictError(PolicyAuthorityError):
     """A registry append would overwrite or contradict an existing record."""
 
 
+class PolicyRegistryStorageError(PolicyAuthorityError):
+    """The durable registry could not be used as a registry.
+
+    Raised when the store is closed or unreachable, its schema version does not
+    match, or a stored record cannot be rehydrated by the configured codec. Every
+    case fails closed: a record that cannot be read is never treated as absent.
+    """
+
+
+class PolicyRegistryProductionModeError(PolicyRegistryStorageError):
+    """A reference-grade registry was asked to run in production mode."""
+
+
+class PolicySupersessionError(PolicyAuthorityError):
+    """A structured supersession reference was present but inadmissible.
+
+    `ACC-LC-IA-3`. Raised when the named predecessor does not exist, does not
+    resolve at the issuance instant, is already revoked or superseded, sits in
+    another tenant or scope, or is the artifact naming itself. Distinct from
+    :class:`UnsupportedSupersessionError`, which refuses the *unstructured*
+    string and is unchanged. Nothing is signed and nothing is stored.
+    """
+
+
 class PolicyRevocationError(PolicyAuthorityError):
     """The revocation request is invalid, unauthorized, cross-tenant, or conflicting."""

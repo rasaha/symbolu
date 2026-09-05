@@ -94,13 +94,20 @@ def test_the_readme_and_changelog_exist():
     assert "grants nothing" in readme.read_text(encoding="utf-8").lower()
 
 
-def test_the_guard_sweep_document_exists():
-    """K-9: the mutation sweep is published, not merely performed."""
+def test_the_guard_inventory_is_published():
+    """K-9: the guard inventory and its classification are published, not merely computed.
 
-    sweep = PROJECT / "GUARD_SWEEP.md"
-    assert sweep.exists()
-    text = sweep.read_text(encoding="utf-8")
-    assert "killed" in text.lower() and "survived" in text.lower()
+    The gate-removal sweep itself runs through the shared engine
+    (``scripts/cloud_scaling/guard_sweep.py producer-attestation``) and its results are CI
+    artifacts; what the package publishes is the checked-in inventory a reviewer diffs —
+    every decision point with its shape, and every site's SCORED/EXCLUDED classification.
+    """
+
+    inventory = PROJECT / "GUARD_INVENTORY.md"
+    classification = PROJECT / "guard_classification.json"
+    assert inventory.exists() and classification.exists()
+    text = classification.read_text(encoding="utf-8")
+    assert '"SCORED"' in text and '"EXCLUDED"' in text
 
 
 def test_no_third_party_runtime_dependency_is_added():

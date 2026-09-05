@@ -111,15 +111,70 @@ failure is **structural** — no artifact is constructed, replay returns `False`
 **no denial and no reserved authority term is emitted**. Mapping such a failure to an
 operational outcome is deliberately unruled and is not done here.
 
+At `0.3.1`, a patch release changed one failure class and no public name: the resolver
+boundary now spans every field of the ratified `StrategyPolicyResponse` shape rather than
+the call alone, so a response **missing** any ratified field is refused as
+`CrossContractViolationError` with the original error preserved as `__cause__`. `[G]` The
+guard establishes field **presence, not field shape** — a response carrying every ratified
+field but a type-alien value in one of them still escapes downstream, which
+[`CHANGELOG.md`](CHANGELOG.md) records as a different, unruled garbage class.
+
+## The constitution binding (`0.4.0`)
+
+At `0.4.0`, the `OD-C1=B` contract amendment binds an **agent constitution** to every
+advisory this package builds, implementing `ACC-AM-BASE` and `ACC-AM-1` – `ACC-AM-5` as
+recorded in
+[`ADR_UGENCE_AGENT_CONSTITUTION_AMENDMENT_ROUND_RATIFICATION.md`](../../../docs/architecture/ADR_UGENCE_AGENT_CONSTITUTION_AMENDMENT_ROUND_RATIFICATION.md).
+Three required fields land and **no public name is added, removed or renamed** — the
+curated surface stays at fifty-one (`ACC-AM-5`), which is why the import block and the
+51-name statement above are unchanged by this release.
+
+* `CognitiveRoleContract` bears **`constitution_ref`** (`ACC-AM-1`) — a required reference
+  to an externally issued, signed, versioned and revocable Policy Authority agent
+  constitution, on `strategy_policy_ref`'s exact precedent. A reference only: the
+  constitution's structural bounds never become role data.
+* `ProposerAdvisory` bears **`constitution_policy_id`** and
+  **`constitution_policy_version`** (`ACC-AM-2`) — inside `P_unsigned`, mirrored onto the
+  private payload per the G2 equivalence obligation, so a digest-valid advisory cannot have
+  its governing constitution's identity absent, replaced or never produced.
+* Both advisory builders gain one keyword-only parameter, **`constitution_resolution`**.
+  The identity pair is **package-stamped** from that injected resolution and is never
+  accepted as a caller argument; the resolution's signed `agent_constitution_ref` must
+  equal the role's `constitution_ref` **exactly** before either value is stamped, and that
+  comparison runs before the injected domain evaluator is reached. Every refusal is
+  discharged by the exception surface already exported — **no new exception type**.
+
+`advisory_version` stays `"1"` (`ACC-AM-3`, the `0.3.0` precedent): the digests of newly
+built advisories move with the field set and the version literal does not mark the shift,
+disclosed by the round and accepted as ruled. Every role-contract and advisory
+construction site gains arguments — the breaking shape `0.3.0` also took.
+
+**Resolving the reference is not done here.** `constitution_resolution` is injected by the
+caller on the `DomainEvaluationProvider` and `StrategyPolicyResolver` precedent: this
+package issues no constitution, resolves no reference, verifies no signature and reads no
+revocation, and whether a given deployment has a constitution issued for it is not
+knowable from here. What happens here is narrower — the injected resolution is checked
+against the role, and the identity pair is stamped into the digest.
+
+`[G]` **The readiness re-derivation obligation (`ACC-AM-4`) changes nothing yet.**
+`equations.py` carries no constitution reference, and the ratified v1 constitution declares
+three structural bounds and no clause content. The obligation re-arms the first time
+clause content beyond those bounds is ratified, which
+[`ADR_UGENCE_AGENT_CONSTITUTION_CLAUSES_V2_ROUND_RATIFICATION.md`](../../../docs/architecture/ADR_UGENCE_AGENT_CONSTITUTION_CLAUSES_V2_ROUND_RATIFICATION.md)
+defers rather than does.
+
 What this package still does **not** do, and does not intend to at this stage: it ships
 **no concrete domain evaluator** (the provider is injected by the caller and computes
 nothing here), **no substantive multi-candidate ranking** (deferred to a future ruling;
 more than one qualifying candidate produces no selection and `ABSTAIN`), **no**
 multi-provider evaluation, **no** semantic auditor, and **no strategy-permission policy**
-(the resolver is injected too, and no such family is registered with Policy Authority,
-which blocks S2-B execution end to end), **no** networking, storage,
-service discovery, plugin loading, transport or HTTP surface — all deferred (Part J of
-the specification).
+(the resolver is injected too; a policy family and a concrete resolver now exist as
+separate integration distributions outside this package, and whether a given deployment
+has an issued policy configured is not knowable from here), **no constitution issuance,
+resolution or revocation check** (the resolved constitution is injected on the same
+precedent; `0.4.0` binds its identity into the digest and checks it against the role, and
+does nothing else with it), **no** networking, storage, service discovery, plugin loading,
+transport or HTTP surface — all deferred (Part J of the specification).
 
 ## Reserved vocabulary
 
@@ -165,12 +220,20 @@ Status: S1 contracts and equations implemented, drift-tested against a pinned
 public-API snapshot; at `0.2.0`, candidate selection under selection-policy v1 and the
 **injected** `DomainEvaluationProvider` boundary shipped with it (OD-7 through OD-10);
 at `0.3.0`, Reasoning Strategy Permission and the **injected** `StrategyPolicyResolver`
-boundary (S2-B).
+boundary (S2-B); at `0.3.1`, the resolver-answer boundary hardening; and at `0.4.0`, the
+`OD-C1=B` constitution binding — `constitution_ref` on the role contract and the
+package-stamped constitution identity pair inside `P_unsigned` — with the curated surface
+unmoved at fifty-one names.
 Not pilot-validated, not production-certified. Nothing in this package has been
 exercised against a real workload. What remains absent: **concrete domain evaluators**
 (the provider is supplied by the caller and this package embeds none), **substantive
 multi-candidate ranking** (deferred to a future ruling; more than one qualifying
 candidate produces no selection and `ABSTAIN`), the **semantic auditor** (Part J,
-deferred), and any **registered strategy-permission policy family** — S2-B is
-implemented and tested against a stubbed resolver, and cannot execute end to end until
-Policy Authority carries such a family.
+deferred), and any **strategy-permission policy issued for a given deployment** — this
+package embeds no resolver and is tested against a stubbed one. The policy family and
+the concrete resolver that S2-B needs to execute end to end now exist, as separate
+integration distributions whose own tests carry that proof; what remains absent here is
+any claim that a particular deployment has such a policy issued and configured. The same
+holds for the agent constitution `0.4.0` binds: this package stamps and checks an injected
+resolution and embeds no issuer, resolver or revocation reader, so whether a particular
+deployment has a constitution issued and configured is likewise not claimed here.

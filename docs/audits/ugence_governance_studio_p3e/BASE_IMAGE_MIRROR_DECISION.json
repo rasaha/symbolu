@@ -49,6 +49,107 @@
       "explicit_non_finding": "The ratified digests are NOT invalid, superseded or compromised. A mutable tag moving to a newer image says nothing about the image these digests name; it is the expected behaviour of a mutable tag and precisely why the pins are by digest.",
       "consequence": "base-image-digest-verification will continue to fail against live tag resolution until the mirror serves the ratified digests. That failure is the ratified MUST_HALT_ON_DIGEST_MISMATCH control operating as designed, not a defect to be silenced."
     },
+    "ruling_2026_09_05": {
+      "decision": "APPROVED_INTERNAL_MIRROR_PENDING_PROVISIONING",
+      "ruled_by": "rasaha",
+      "ruled_on": "2026-09-05",
+      "statement": "Preserve the existing ratified Node and Python base-image digests. Do not refresh or replace them, weaken the digest-verification gate, mark it non-blocking, change either Dockerfile FROM, or fabricate mirror coordinates. The container gate remains environment-blocked until an approved private OCI mirror is provisioned outside the repository. Repository configuration is authorized only after the owner supplies the real mirror host, repository prefix and GitHub Actions secret name.",
+      "preserves": {
+        "status": "RATIFIED_PENDING_MIRROR_COORDINATES",
+        "authoritative_digests": "unchanged: node:22-bookworm-slim sha256:f32b81066cde10a75dbac96646099533316d94bac4150c55da1636e1f0ffdc46 and python:3.11-slim-bookworm sha256:b18992999dbe963a45a8a4da40ac2b1975be1a776d939d098c647482bcad5cba, with their amd64 child digests, in this record, in deployment/governance-studio/base-images.json and in the three Dockerfile FROM lines",
+        "mirror_fields": "registry_host, repository_prefix, coordinates_provided and credentials_provided stay null or false; no secret name is allocated",
+        "ruling_2026_08_29": "HOLD_EXISTING_RATIFIED_DIGESTS stands unchanged"
+      },
+      "prohibited_by_this_ruling": [
+        "refreshing or replacing the ratified digests",
+        "weakening base-image-digest-verification or ratified-pin-conformance, or marking either non-blocking",
+        "changing any Dockerfile FROM",
+        "fabricating, guessing or placeholder-filling mirror host, repository prefix or secret name",
+        "modifying any workflow, manifest digest, dependency, branch-protection setting or credential on the strength of this ruling"
+      ],
+      "why_a_repin_would_not_help": "Re-pinning to the digests the mutable tags currently resolve to would not resolve the known registry-blob egress 403 (production.cloudfront.docker.com and pkg-containers.githubusercontent.com are denied by organization egress policy, per CONTAINER_COMPLETION_LIVE_STATE.json resource_gate). The digest comparison is the first wall; the blob pull is the second, and it is unchanged by any pin.",
+      "explicit_non_claim": "This ruling does not claim that the container build, vulnerability scan, SBOM, image signing or any downstream container gate (C2, C4 to C19) has executed. Every canonical gate remains NOT_EXECUTED and every run's evidence manifest remains INCOMPLETE until the mirror serves the ratified digests and a real build runs.",
+      "unapproved_candidates_untouched": "The unapproved_candidates observation dated 2026-08-29 is known to be stale (the python:3.11-slim-bookworm tag has moved again since) and is deliberately not updated by this ruling; refreshing that observation is a separate evidence-refresh decision under controlled_base_image_refresh.",
+      "authorization_condition": {
+        "status": "BLOCKED_PENDING_OWNER_SUPPLIED_COORDINATES",
+        "required_from_owner": [
+          "mirror host",
+          "repository prefix",
+          "GitHub Actions secret name"
+        ],
+        "then_authorized": "recording the coordinates and secret name in the mirror block of this record, and changing base-image-digest-verification to resolve each image's digest from the mirror and compare it to the authoritative manifest_digest above, with ratified-pin-conformance kept first",
+        "credential_handling": "the credential value itself is never requested, printed, stored or committed; only the secret's name is recorded, and only once the owner supplies it"
+      }
+    },
+    "ruling_2026_09_05_separation": {
+      "decision": "SEPARATE_PIN_CONFORMANCE_FROM_TAG_DRIFT",
+      "ruled_by": "rasaha",
+      "ruled_on": "2026-09-05",
+      "rulings": [
+        {
+          "id": 1,
+          "rule": "The ratified digest in deployment/governance-studio/base-images.json is authoritative until explicitly superseded through a controlled refresh (controlled_base_image_refresh below)."
+        },
+        {
+          "id": 2,
+          "rule": "Dockerfile FROM references and platform declarations must continue matching that ratified digest exactly; mismatches remain blocking."
+        },
+        {
+          "id": 3,
+          "rule": "Movement of an upstream mutable tag such as node:22-bookworm-slim or python:3.11-slim-bookworm does not invalidate an already-ratified immutable digest. Tag drift becomes an advisory observation, never a required-status failure."
+        },
+        {
+          "id": 4,
+          "rule": "No workflow may automatically repin, substitute or approve a new digest."
+        },
+        {
+          "id": 5,
+          "rule": "Container builds must eventually pull the ratified digest from an owner-approved reachable OCI mirror. Missing mirror coordinates remain an explicit resource blocker, not a digest-conformance failure."
+        }
+      ],
+      "what_this_corrects": "base-image-digest-verification conflated two different facts: whether the tree conforms to the ratified immutable digests (a property of tracked files, decidable offline) and whether Docker Hub's mutable tags still point at those digests (a property of an upstream registry that is expected to change). The second was failing the required container job every time a tag moved, which said nothing about the ratified image and could never be fixed without a re-pin the rulings forbid.",
+      "separated_into": {
+        "ratified_pin_conformance": {
+          "blocking": true,
+          "network": "none",
+          "asserts": "this record == base-images.json == every Dockerfile FROM digest, stage list and platform declaration; every FROM digest-pinned",
+          "script": "deployment/governance-studio/ci/verify_ratified_pins.py",
+          "jobs": [
+            "application",
+            "container"
+          ]
+        },
+        "mirror_digest_conformance": {
+          "blocking": true,
+          "network": "the owner-approved mirror only; never docker.io",
+          "asserts": "the manifest the mirror serves BY the ratified digest is content-addressed to that digest (Docker-Content-Digest and a sha256 of the body both equal it) and lists the ratified amd64 child; the build then pulls by that digest from the mirror",
+          "when_unconfigured": "one stable typed outcome RESOURCE_BLOCKER_MIRROR_UNCONFIGURED naming the required registry host, repository prefix and GitHub Actions secret name; no Docker Hub fallback; no gate executed",
+          "script": "deployment/governance-studio/ci/verify_mirror_digest.py",
+          "jobs": [
+            "container"
+          ]
+        },
+        "upstream_tag_drift": {
+          "blocking": false,
+          "required_status": false,
+          "network": "docker.io manifest API, manifests only",
+          "reports": "for each ratified image: the ratified digest, the digest the mutable tag currently resolves to, and whether they differ or the registry was unreachable",
+          "modifies_tracked_files": false,
+          "script": "deployment/governance-studio/ci/observe_tag_drift.py",
+          "workflow": ".github/workflows/governance-studio-p3e-base-image-drift.yml"
+        }
+      },
+      "preserves": {
+        "status": "RATIFIED_PENDING_MIRROR_COORDINATES",
+        "authoritative_digests": "unchanged",
+        "dockerfile_from": "unchanged",
+        "mirror_fields": "registry_host, repository_prefix and secret_name stay null; coordinates_provided and credentials_provided stay false",
+        "ruling_2026_08_29": "HOLD_EXISTING_RATIFIED_DIGESTS stands",
+        "ruling_2026_09_05": "APPROVED_INTERNAL_MIRROR_PENDING_PROVISIONING stands; this ruling implements the separation it left open and authorizes the workflow change that ruling reserved, without filling any mirror field",
+        "unapproved_candidates": "not updated by this ruling"
+      },
+      "explicit_non_claim": "This ruling does not claim that any container gate has executed. Until the mirror serves the ratified digests, the container job stops at the typed resource blocker, every canonical gate remains NOT_EXECUTED and every evidence manifest remains INCOMPLETE."
+    },
     "unapproved_candidates": {
       "status": "UNAPPROVED_OBSERVATION_ONLY",
       "note": "Digests observed when the mutable tags were resolved in CI on 2026-08-29. Recorded for traceability only. They are NOT approved, NOT a replacement, and must not be pinned anywhere without the controlled refresh below.",
@@ -94,32 +195,83 @@
       "effect_if_adopted": "the superseded wording becomes literally true: a re-pin or substitution could not be merged at all without editing this record",
       "effect_if_declined": "the guard stays advisory-by-merge-policy - it reliably turns CI red, but a reviewer can still merge past it, so the narrowed wording above is the accurate description",
       "note": "this is a branch-protection setting outside the repository contents; it cannot be established by any file in this PR"
-    }
+    },
+    "steps": [
+      {
+        "step": "ratified-pin-conformance",
+        "blocking": true,
+        "network": "none",
+        "jobs": [
+          "application",
+          "container"
+        ],
+        "script": "deployment/governance-studio/ci/verify_ratified_pins.py"
+      },
+      {
+        "step": "mirror-digest-conformance",
+        "blocking": true,
+        "network": "owner-approved mirror only",
+        "jobs": [
+          "container"
+        ],
+        "script": "deployment/governance-studio/ci/verify_mirror_digest.py",
+        "typed_outcomes": [
+          "MIRROR_DIGEST_CONFORMS",
+          "MIRROR_DIGEST_MISMATCH",
+          "MIRROR_UNREACHABLE",
+          "RESOURCE_BLOCKER_MIRROR_UNCONFIGURED"
+        ]
+      },
+      {
+        "step": "upstream-tag-drift",
+        "blocking": false,
+        "required_status": false,
+        "workflow": ".github/workflows/governance-studio-p3e-base-image-drift.yml",
+        "script": "deployment/governance-studio/ci/observe_tag_drift.py"
+      }
+    ],
+    "superseded_step_2026_09_05": "base-image-digest-verification (live docker.io tag == base-images.json) is retired by ruling_2026_09_05_separation; its conformance half lives in ratified-pin-conformance and mirror-digest-conformance, its tag-resolution half in upstream-tag-drift"
   },
   "mirror": {
     "registry_host": null,
     "repository_prefix": null,
     "coordinates_provided": false,
     "credentials_provided": false,
+    "provisioning": {
+      "status": "PENDING_OUTSIDE_REPOSITORY",
+      "ruling": "authoritative_digests.ruling_2026_09_05 (APPROVED_INTERNAL_MIRROR_PENDING_PROVISIONING)",
+      "note": "No repository change may fill these fields until the owner supplies the real host, prefix and secret name."
+    },
     "credential_mechanism": {
       "status": "NOT_IMPLEMENTED",
-      "intended": "GitHub Actions repository or organization secrets consumed by the container job; no mirror authentication exists in any workflow today, and no secret name has been allocated",
+      "intended": "a GitHub Actions repository or organization secret whose NAME the owner supplies and this record then names in mirror.secret_name; the container job passes it to mirror-digest-conformance as an environment variable and masks it; no mirror authentication exists in any workflow today and no secret name has been allocated",
       "required_properties_when_implemented": [
         "no credential committed to the repository",
         "no credential printed in job logs",
         "no credential baked into any image layer"
       ],
       "note": "The required properties above are requirements on future work, not descriptions of implemented behavior."
-    }
+    },
+    "secret_name": null
   },
   "stop_condition": {
     "rule": "MUST_HALT_ON_DIGEST_MISMATCH",
-    "status": "PARTIALLY_ENFORCED",
-    "enforced_today": "the static half - base-images.json and the Dockerfile are asserted equal to this record's digests by the blocking ratified-pin-conformance step described under enforcement",
-    "not_enforced_today": "the mirror-side half - no workflow yet resolves digests from a mirror, because no mirror exists; that comparison becomes operative only when the mirror coordinates below are filled in and the container job can run",
-    "check": "for each image, the manifest digest resolved from the mirror must equal the ratified upstream manifest_digest above, byte for byte",
-    "on_mismatch": "halt the container job, execute no gate, mark nothing passed, and escalate to the owner; do not re-pin base-images.json or the Dockerfile to the mirrored digest",
-    "rationale": "a differing digest means the mirrored image is not the ratified image; accepting it would silently substitute the base image this decision exists to prevent"
+    "status": "ENFORCED_WHERE_DECIDABLE",
+    "static_half": {
+      "status": "ENFORCED",
+      "by": "ratified-pin-conformance (blocking, network-independent): this record == base-images.json == Dockerfile FROM digests, stages and platform"
+    },
+    "mirror_half": {
+      "status": "ENFORCED_WHEN_CONFIGURED",
+      "by": "mirror-digest-conformance (blocking): the manifest the mirror serves by the ratified digest must be content-addressed to it, byte for byte",
+      "when_unconfigured": "RESOURCE_BLOCKER_MIRROR_UNCONFIGURED, a typed resource blocker that halts the container job before any pull; it is not a digest-conformance failure and it is never satisfied by a Docker Hub fallback"
+    },
+    "upstream_tag_movement": {
+      "status": "ADVISORY_ONLY",
+      "rule": "a mutable tag moving away from the ratified digest is observed and reported; it never fails a required status and never invalidates a ratified pin (ruling_2026_09_05_separation, rule 3)"
+    },
+    "on_mismatch": "halt the container job, execute no gate, mark nothing passed, and escalate to the owner; do not re-pin base-images.json or the Dockerfile to the mirrored or the currently-tagged digest",
+    "rationale": "a differing digest means the image offered is not the ratified image; accepting it would silently substitute the base image this decision exists to prevent"
   },
   "prohibited": [
     "substituting any base image",
@@ -198,7 +350,7 @@
     "mirror registry host and repository prefix recorded in this file",
     "pull credentials available to CI through the normal secret mechanism, which does not yet exist and must be built",
     "a container runtime (daemon + buildx) available to the job",
-    "CI resolves each image's digest from the mirror and compares it against this record's authoritative_digests, not only against deployment/governance-studio/base-images.json; comparing against base-images.json alone is insufficient, because base-images.json is itself a mutable pin whose authority derives from this record",
+    "CI resolves each image's manifest BY the ratified digest from the owner-approved mirror and proves it is content-addressed to this record's authoritative_digests (mirror-digest-conformance); comparing against base-images.json alone is insufficient, because base-images.json is itself a mutable pin whose authority derives from this record; upstream mutable-tag resolution is advisory and never a precondition",
     "the blocking ratified-pin-conformance step passes, establishing base-images.json == Dockerfile == this record before any pull or build"
   ],
   "on_execution_update": [
@@ -216,7 +368,13 @@
   "validation": {
     "gate_identifiers": "deployment/governance-studio/ci/verify_gate_identifiers.py",
     "ratified_pins": "deployment/governance-studio/ci/verify_ratified_pins.py",
-    "tests": "deployment/governance-studio/tests/test_gate_identifiers.py"
+    "tests": [
+      "deployment/governance-studio/tests/test_gate_identifiers.py",
+      "deployment/governance-studio/tests/test_ratified_pins.py",
+      "deployment/governance-studio/tests/test_base_image_control.py"
+    ],
+    "mirror_digest": "deployment/governance-studio/ci/verify_mirror_digest.py",
+    "tag_drift": "deployment/governance-studio/ci/observe_tag_drift.py"
   },
   "controlled_base_image_refresh": {
     "status": "REQUIRED_FOR_ANY_FUTURE_RE_RATIFICATION",
