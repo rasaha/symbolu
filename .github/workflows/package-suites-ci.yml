@@ -70,6 +70,7 @@ jobs:
           - packages/capabilities/workflow-fit-pilot
           - packages/governance-provider-framework
           - packages/governed-value
+          - packages/integration/agent-assurance-evidence
           - packages/integration/ai-system-registry
           - packages/integration/approval-workflow
           - packages/integration/authority-directory
@@ -78,8 +79,10 @@ jobs:
           - packages/integration/cloud-scaling-credential-broker
           - packages/integration/cloud-scaling-envelope-issuance
           - packages/integration/control-plane-root
+          - packages/integration/data-use-admission
           - packages/integration/execution-reservation
           - packages/integration/incident-response
+          - packages/integration/vendor-dependency
           - packages/uvi-policy-contracts
     steps:
       - uses: actions/checkout@v4
