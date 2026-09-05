@@ -1,0 +1,644 @@
+{
+  "action_constraints": [
+    {
+      "action_type": "CREATE_PURCHASE_ORDER",
+      "authority_requirement_id": "auth.budget_authority",
+      "description": "",
+      "enabled": true,
+      "kind": "ONCE_ONLY",
+      "max_value": null,
+      "members": [],
+      "min_value": null,
+      "name": "authorization not expired",
+      "object_id": "act.cer_not_expired",
+      "object_type": "ACTION_CONSTRAINT",
+      "owning_capability": "ACTION_GATE",
+      "parameter": "cer_expiry",
+      "provenance_refs": [
+        "src.procurement.reference"
+      ],
+      "related_object_ids": [
+        "auth.budget_authority"
+      ],
+      "requires_clearance": false,
+      "version": 1,
+      "violation_reason_code": "EXPIRED"
+    },
+    {
+      "action_type": "CREATE_PURCHASE_ORDER",
+      "authority_requirement_id": "auth.budget_authority",
+      "description": "",
+      "enabled": true,
+      "kind": "NOT_MEMBER_OF",
+      "max_value": null,
+      "members": [],
+      "min_value": null,
+      "name": "supplier not restricted",
+      "object_id": "act.supplier_not_restricted",
+      "object_type": "ACTION_CONSTRAINT",
+      "owning_capability": "ACTION_GATE",
+      "parameter": "supplier_id",
+      "provenance_refs": [
+        "src.procurement.reference"
+      ],
+      "related_object_ids": [
+        "auth.budget_authority"
+      ],
+      "requires_clearance": false,
+      "version": 1,
+      "violation_reason_code": "DENIED"
+    },
+    {
+      "action_type": "CREATE_PURCHASE_ORDER",
+      "authority_requirement_id": "auth.budget_authority",
+      "description": "",
+      "enabled": true,
+      "kind": "NOT_MEMBER_OF",
+      "max_value": null,
+      "members": [],
+      "min_value": null,
+      "name": "budget not restricted",
+      "object_id": "act.budget_not_restricted",
+      "object_type": "ACTION_CONSTRAINT",
+      "owning_capability": "ACTION_GATE",
+      "parameter": "budget_id",
+      "provenance_refs": [
+        "src.procurement.reference"
+      ],
+      "related_object_ids": [
+        "auth.budget_authority"
+      ],
+      "requires_clearance": false,
+      "version": 1,
+      "violation_reason_code": "DENIED"
+    },
+    {
+      "action_type": "CREATE_PURCHASE_ORDER",
+      "authority_requirement_id": "auth.budget_authority",
+      "description": "",
+      "enabled": true,
+      "kind": "HARD_LIMIT",
+      "max_value": 10000000,
+      "members": [],
+      "min_value": null,
+      "name": "amount within hard limit",
+      "object_id": "act.amount_hard_limit",
+      "object_type": "ACTION_CONSTRAINT",
+      "owning_capability": "ACTION_GATE",
+      "parameter": "amount",
+      "provenance_refs": [
+        "src.procurement.reference"
+      ],
+      "related_object_ids": [
+        "auth.budget_authority"
+      ],
+      "requires_clearance": false,
+      "version": 1,
+      "violation_reason_code": "DENIED"
+    },
+    {
+      "action_type": "CREATE_PURCHASE_ORDER",
+      "authority_requirement_id": "auth.budget_authority",
+      "description": "",
+      "enabled": true,
+      "kind": "NUMERIC_RANGE",
+      "max_value": 1000000,
+      "members": [],
+      "min_value": null,
+      "name": "amount within auto-authorize threshold",
+      "object_id": "act.amount_threshold",
+      "object_type": "ACTION_CONSTRAINT",
+      "owning_capability": "ACTION_GATE",
+      "parameter": "amount",
+      "provenance_refs": [
+        "src.procurement.reference"
+      ],
+      "related_object_ids": [
+        "auth.budget_authority"
+      ],
+      "requires_clearance": false,
+      "version": 1,
+      "violation_reason_code": "AUTHORIZED_WITH_CONSTRAINTS"
+    }
+  ],
+  "approval_paths": [
+    {
+      "description": "",
+      "enabled": true,
+      "name": "purchase approval path",
+      "object_id": "path.purchase_approval",
+      "object_type": "APPROVAL_PATH",
+      "owning_capability": "DECISION_AUTHORITY",
+      "provenance_refs": [
+        "src.procurement.reference"
+      ],
+      "related_object_ids": [
+        "step.requester",
+        "step.approver"
+      ],
+      "segregation_pairs": [
+        [
+          "requester",
+          "approver"
+        ]
+      ],
+      "step_ids": [
+        "step.requester",
+        "step.approver"
+      ],
+      "version": 1
+    }
+  ],
+  "approval_records": [],
+  "approval_steps": [
+    {
+      "authority_requirement_id": "auth.human_approver",
+      "description": "",
+      "enabled": true,
+      "name": "requester submits",
+      "object_id": "step.requester",
+      "object_type": "APPROVAL_STEP",
+      "optional": false,
+      "order": 1,
+      "provenance_refs": [
+        "src.procurement.reference"
+      ],
+      "related_object_ids": [],
+      "role_label": "requester",
+      "version": 1
+    },
+    {
+      "authority_requirement_id": "auth.human_approver",
+      "description": "",
+      "enabled": true,
+      "name": "approver approves",
+      "object_id": "step.approver",
+      "object_type": "APPROVAL_STEP",
+      "optional": false,
+      "order": 2,
+      "provenance_refs": [
+        "src.procurement.reference"
+      ],
+      "related_object_ids": [],
+      "role_label": "approver",
+      "version": 1
+    }
+  ],
+  "audit_requirements": [
+    {
+      "applies_to_node_kinds": [
+        "DECISION_RULE",
+        "APPROVAL_GATE"
+      ],
+      "description": "",
+      "enabled": true,
+      "name": "decision audit",
+      "object_id": "audit.decision",
+      "object_type": "AUDIT_REQUIREMENT",
+      "provenance_refs": [
+        "src.procurement.reference"
+      ],
+      "related_object_ids": [],
+      "required_fields": [
+        "decision_reference",
+        "actor_identity",
+        "actor_role",
+        "reason_codes"
+      ],
+      "version": 1
+    },
+    {
+      "applies_to_node_kinds": [
+        "ACTION_CONSTRAINT"
+      ],
+      "description": "",
+      "enabled": true,
+      "name": "action authorization audit",
+      "object_id": "audit.action",
+      "object_type": "AUDIT_REQUIREMENT",
+      "provenance_refs": [
+        "src.procurement.reference"
+      ],
+      "related_object_ids": [],
+      "required_fields": [
+        "action_reference",
+        "constraint_digest",
+        "authorization_outcome"
+      ],
+      "version": 1
+    },
+    {
+      "applies_to_node_kinds": [
+        "TERMINAL_OUTCOME"
+      ],
+      "description": "",
+      "enabled": true,
+      "name": "execution/reconciliation audit",
+      "object_id": "audit.execution",
+      "object_type": "AUDIT_REQUIREMENT",
+      "provenance_refs": [
+        "src.procurement.reference"
+      ],
+      "related_object_ids": [],
+      "required_fields": [
+        "outcome",
+        "reconciliation_status",
+        "compensation_required"
+      ],
+      "version": 1
+    }
+  ],
+  "authority_requirements": [
+    {
+      "allow_non_human": false,
+      "authority_type": "HUMAN_APPROVER",
+      "decision_scope": "purchase_approval",
+      "description": "",
+      "enabled": true,
+      "name": "human purchase approver",
+      "object_id": "auth.human_approver",
+      "object_type": "AUTHORITY_REQUIREMENT",
+      "owning_capability": "DECISION_AUTHORITY",
+      "provenance_refs": [
+        "src.procurement.reference"
+      ],
+      "related_object_ids": [],
+      "required_role": "approver",
+      "version": 1
+    },
+    {
+      "allow_non_human": true,
+      "authority_type": "DELEGATED_POLICY",
+      "decision_scope": "purchase_order_authorization",
+      "description": "",
+      "enabled": true,
+      "name": "budget authorization (control plane)",
+      "object_id": "auth.budget_authority",
+      "object_type": "AUTHORITY_REQUIREMENT",
+      "owning_capability": "DECISION_AUTHORITY",
+      "provenance_refs": [
+        "src.procurement.reference"
+      ],
+      "related_object_ids": [],
+      "required_role": "budget_authority",
+      "version": 1
+    }
+  ],
+  "connector_mappings": [
+    {
+      "authoritative": true,
+      "credential_handle": "",
+      "description": "",
+      "enabled": true,
+      "name": "supplier id -> supplier system",
+      "object_id": "conn.supplier_id",
+      "object_type": "CONNECTOR_MAPPING",
+      "policy_concept": "supplier_id",
+      "precedence": 0,
+      "provenance_refs": [
+        "src.procurement.reference"
+      ],
+      "related_object_ids": [],
+      "target_field": "supplier.supplier_id",
+      "target_system": "SUPPLIER",
+      "version": 1
+    },
+    {
+      "authoritative": true,
+      "credential_handle": "",
+      "description": "",
+      "enabled": true,
+      "name": "budget id -> budget system",
+      "object_id": "conn.budget_id",
+      "object_type": "CONNECTOR_MAPPING",
+      "policy_concept": "budget_id",
+      "precedence": 0,
+      "provenance_refs": [
+        "src.procurement.reference"
+      ],
+      "related_object_ids": [],
+      "target_field": "budget.budget_id",
+      "target_system": "SUPPLIER",
+      "version": 1
+    },
+    {
+      "authoritative": true,
+      "credential_handle": "",
+      "description": "",
+      "enabled": true,
+      "name": "amount -> purchase order amount",
+      "object_id": "conn.amount",
+      "object_type": "CONNECTOR_MAPPING",
+      "policy_concept": "amount",
+      "precedence": 0,
+      "provenance_refs": [
+        "src.procurement.reference"
+      ],
+      "related_object_ids": [],
+      "target_field": "purchase_order.amount",
+      "target_system": "SUPPLIER",
+      "version": 1
+    }
+  ],
+  "decision_rules": [
+    {
+      "authority_requirement_id": "auth.human_approver",
+      "conditions": [
+        {
+          "comparator": "IS_FALSE",
+          "fact_key": "assessment_blocked",
+          "value": null
+        }
+      ],
+      "description": "",
+      "enabled": true,
+      "name": "purchase approval decision",
+      "object_id": "rule.purchase_approval",
+      "object_type": "DECISION_RULE",
+      "on_satisfied_outcome": "ADVANCE",
+      "on_unsatisfied_outcome": "REJECT",
+      "owning_capability": "DECISION_AUTHORITY",
+      "provenance_refs": [
+        "src.procurement.reference"
+      ],
+      "related_object_ids": [
+        "auth.human_approver"
+      ],
+      "version": 1
+    }
+  ],
+  "description": "Structured encoding of the ugence-procurement reference workflow.",
+  "domain": "procurement",
+  "exception_rules": [],
+  "legitimate_counterexamples": [
+    {
+      "description": "",
+      "distinguishing_conditions": [
+        {
+          "comparator": "LTE",
+          "fact_key": "amount",
+          "value": 10000000
+        },
+        {
+          "comparator": "IS_FALSE",
+          "fact_key": "budget_restricted",
+          "value": null
+        }
+      ],
+      "enabled": true,
+      "must_allow_outcome": "ADVANCE",
+      "name": "large purchase within approved elevated budget",
+      "object_id": "ce.elevated_within_approved_budget",
+      "object_type": "LEGITIMATE_COUNTEREXAMPLE",
+      "owning_capability": "COMPILER",
+      "provenance_refs": [
+        "src.procurement.reference"
+      ],
+      "related_object_ids": [],
+      "resembles_object_id": "act.amount_hard_limit",
+      "version": 1
+    }
+  ],
+  "name": "Ugence Procurement reference policy pack",
+  "override_rules": [],
+  "pack_id": "pack.procurement.reference",
+  "prohibited_conditions": [
+    {
+      "behavior": "BLOCK",
+      "conditions": [
+        {
+          "comparator": "LTE",
+          "fact_key": "total_amount",
+          "value": 0
+        }
+      ],
+      "description": "",
+      "enabled": true,
+      "name": "non-positive total blocked",
+      "object_id": "prohibit.non_positive_total",
+      "object_type": "PROHIBITED_CONDITION",
+      "owning_capability": "DECISION_AUTHORITY",
+      "provenance_refs": [
+        "src.procurement.reference"
+      ],
+      "reason_code": "PURCHASE_REQUEST_INVALID",
+      "related_object_ids": [],
+      "version": 1
+    },
+    {
+      "behavior": "BLOCK",
+      "conditions": [
+        {
+          "comparator": "IS_FALSE",
+          "fact_key": "supplier_known",
+          "value": null
+        }
+      ],
+      "description": "",
+      "enabled": true,
+      "name": "unknown supplier blocked",
+      "object_id": "prohibit.unknown_supplier",
+      "object_type": "PROHIBITED_CONDITION",
+      "owning_capability": "DECISION_AUTHORITY",
+      "provenance_refs": [
+        "src.procurement.reference"
+      ],
+      "reason_code": "SUPPLIER_NOT_KNOWN",
+      "related_object_ids": [],
+      "version": 1
+    },
+    {
+      "behavior": "BLOCK",
+      "conditions": [
+        {
+          "comparator": "IS_FALSE",
+          "fact_key": "budget_known",
+          "value": null
+        }
+      ],
+      "description": "",
+      "enabled": true,
+      "name": "unknown budget blocked",
+      "object_id": "prohibit.unknown_budget",
+      "object_type": "PROHIBITED_CONDITION",
+      "owning_capability": "DECISION_AUTHORITY",
+      "provenance_refs": [
+        "src.procurement.reference"
+      ],
+      "reason_code": "BUDGET_NOT_KNOWN",
+      "related_object_ids": [],
+      "version": 1
+    }
+  ],
+  "replay_cases": [],
+  "required_evidence": [
+    {
+      "admissibility_capability": "TAP",
+      "connector_mapping_id": "conn.supplier_id",
+      "description": "",
+      "enabled": true,
+      "evidence_kind": "FIELD_VALUE",
+      "fact_key": "supplier_id",
+      "name": "supplier present",
+      "object_id": "ev.supplier_exists",
+      "object_type": "REQUIRED_EVIDENCE",
+      "on_missing": "BLOCK",
+      "provenance_refs": [
+        "src.procurement.reference"
+      ],
+      "related_object_ids": [],
+      "requires_admissibility_check": false,
+      "version": 1
+    },
+    {
+      "admissibility_capability": "TAP",
+      "connector_mapping_id": "conn.budget_id",
+      "description": "",
+      "enabled": true,
+      "evidence_kind": "FIELD_VALUE",
+      "fact_key": "budget_id",
+      "name": "budget present",
+      "object_id": "ev.budget_exists",
+      "object_type": "REQUIRED_EVIDENCE",
+      "on_missing": "BLOCK",
+      "provenance_refs": [
+        "src.procurement.reference"
+      ],
+      "related_object_ids": [],
+      "requires_admissibility_check": false,
+      "version": 1
+    },
+    {
+      "admissibility_capability": "TAP",
+      "connector_mapping_id": "",
+      "description": "",
+      "enabled": true,
+      "evidence_kind": "SYSTEM_RECORD",
+      "fact_key": "required_fields_complete",
+      "name": "required request fields complete",
+      "object_id": "ev.required_fields_complete",
+      "object_type": "REQUIRED_EVIDENCE",
+      "on_missing": "BLOCK",
+      "provenance_refs": [
+        "src.procurement.reference"
+      ],
+      "related_object_ids": [],
+      "requires_admissibility_check": true,
+      "version": 1
+    }
+  ],
+  "schema_version": "policy_pack.v1",
+  "sequence_risk_patterns": [],
+  "source_documents": [
+    {
+      "authority_level": "reference",
+      "content_digest": "",
+      "description": "Authoritative reference: assessment checks, budget-authority classification, approval/decision vocabulary, action mappings, supplier outcomes, reconciliation and compensation.",
+      "document_version": "0.1.0",
+      "effective_date": "",
+      "enabled": true,
+      "name": "Ugence Procurement reference workflow",
+      "object_id": "src.procurement.reference",
+      "object_type": "SOURCE_DOCUMENT",
+      "provenance_refs": [],
+      "related_object_ids": [],
+      "source_type": "REFERENCE_IMPLEMENTATION",
+      "title": "ugence-procurement 0.1.0 governed purchase-approval workflow",
+      "version": 1
+    }
+  ],
+  "status": "APPROVED",
+  "test_scenarios": [
+    {
+      "actor_identities": {},
+      "category": "POSITIVE",
+      "description": "",
+      "enabled": true,
+      "evidence": {},
+      "expected_outcome": {
+        "audit_events": [],
+        "authorization_outcome": "AUTHORIZED",
+        "reason_codes": [
+          "ACCEPTED"
+        ],
+        "terminal_state": "ADVANCE_AUTHORIZED"
+      },
+      "initial_facts": {
+        "supplier_outcome": "ACCEPTED"
+      },
+      "name": "supplier accepts -> succeeded",
+      "object_id": "scn.supplier_accepted",
+      "object_type": "TEST_SCENARIO",
+      "provenance_refs": [
+        "src.procurement.reference"
+      ],
+      "related_object_ids": [],
+      "requested_action": "CREATE_PURCHASE_ORDER",
+      "source_object_ids": [
+        "rule.purchase_approval"
+      ],
+      "version": 1
+    },
+    {
+      "actor_identities": {},
+      "category": "NEGATIVE",
+      "description": "",
+      "enabled": true,
+      "evidence": {},
+      "expected_outcome": {
+        "audit_events": [],
+        "authorization_outcome": "",
+        "reason_codes": [
+          "REJECTED"
+        ],
+        "terminal_state": "DENIED"
+      },
+      "initial_facts": {
+        "supplier_outcome": "REJECTED"
+      },
+      "name": "supplier rejects -> compensation required",
+      "object_id": "scn.supplier_rejected",
+      "object_type": "TEST_SCENARIO",
+      "provenance_refs": [
+        "src.procurement.reference"
+      ],
+      "related_object_ids": [],
+      "requested_action": "CREATE_PURCHASE_ORDER",
+      "source_object_ids": [
+        "rule.purchase_approval"
+      ],
+      "version": 1
+    },
+    {
+      "actor_identities": {},
+      "category": "TIMEOUT",
+      "description": "",
+      "enabled": true,
+      "evidence": {},
+      "expected_outcome": {
+        "audit_events": [],
+        "authorization_outcome": "",
+        "reason_codes": [
+          "TIMED_OUT"
+        ],
+        "terminal_state": "INDETERMINATE"
+      },
+      "initial_facts": {
+        "supplier_outcome": "TIMED_OUT"
+      },
+      "name": "supplier times out -> unknown/indeterminate",
+      "object_id": "scn.supplier_timeout",
+      "object_type": "TEST_SCENARIO",
+      "provenance_refs": [
+        "src.procurement.reference"
+      ],
+      "related_object_ids": [],
+      "requested_action": "CREATE_PURCHASE_ORDER",
+      "source_object_ids": [
+        "rule.purchase_approval"
+      ],
+      "version": 1
+    }
+  ],
+  "version": 1
+}

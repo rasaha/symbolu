@@ -18,6 +18,12 @@ __version__: str = VERSION
 # Frozen API contract identity (advertised in OpenAPI + every response envelope).
 API_CONTRACT_VERSION: str = "governance_studio.api.v1"
 
+# The ADDITIVE v2 contract (GAS-4). It is a SEPARATE document alongside the frozen
+# v1 one, generated from its own application: adding v2 routes to the v1 app would
+# change ``canonical_openapi_bytes()`` and break the v1 freeze test, which must keep
+# passing unchanged. v1 is not touched, re-versioned or deprecated by v2's existence.
+API_V2_CONTRACT_VERSION: str = "governance_studio.api.v2"
+
 # Supported AWC minor line (P3B packaging protection P1). The backend is pinned to
 # the 0.2.x compatibility surface: it requires >= the minimum tested version and
 # refuses anything at or above the next minor, which may change the awc.v1 /
@@ -71,6 +77,19 @@ MATURITY_FLAGS: Dict[str, bool] = {
     "plan_replay_api_implemented": True,
     "plan_comparison_api_implemented": True,
     "what_if_api_implemented": True,
+    # GAS-4: the six Governed Agent Studio screens' backend. Thin orchestration over
+    # allowlisted public entry points; no screen ships yet.
+    "studio_v2_contract_implemented": True,
+    "constitution_preflight_api_implemented": True,
+    "policy_compile_api_implemented": True,
+    "authority_read_api_implemented": True,
+    "simulate_api_implemented": True,
+    "publish_shadow_api_implemented": True,
+    "observe_audit_api_implemented": True,
+    "langflow_import_implemented": False,
+    "studio_screens_implemented": False,
+    "constitution_issuance_implemented": False,
+    "policy_issuance_implemented": False,
     "frontend_implemented": False,
     "authentication_implemented": False,
     "private_deployment_implemented": False,

@@ -1,18 +1,25 @@
 {
-  "count": 11,
+  "count": 18,
   "names": [
     "API_CONTRACT_VERSION",
+    "API_V2_CONTRACT_VERSION",
     "ApiError",
     "ApiResponse",
     "ApiSettings",
     "AwcOrchestrationService",
+    "CONSOLE_ALLOWED_ROUTES",
+    "ConsoleClient",
+    "ConsoleUnavailable",
     "ScenarioCatalog",
     "ScenarioService",
     "VERSION",
     "__version__",
+    "build_studio_context",
     "create_app",
+    "create_combined_app",
+    "create_v2_app",
     "version_info"
   ],
   "public_api_version": "governance_studio.api.v1",
-  "sha256": "048959f37285a09068ac81d16aec6f12706b4db83876ca9fac1e291bd7f72930"
+  "sha256": "4371c7ecdfc8ec2d0847d005af04ae44b98ec2d3481806ac1b8218f373aa5a0f"
 }
