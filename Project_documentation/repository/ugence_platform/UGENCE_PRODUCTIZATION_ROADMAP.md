@@ -246,8 +246,8 @@ v1 is complete when, for the Kubernetes infrastructure-agent wedge:
 > **Scope note.** This section sequences the Governed Agent Studio and the durable
 > execution engine beneath it. It is an engineering sequencing record, not a budget
 > input: it adds no line to §8 and re-derives no figure in §8c. Each item carries its
-> own status row; GAS-1 through GAS-4 are implemented and merged, GAS-5 is deferred by
-> owner ruling, GAS-6 is gated, GAS-7 is scoped and ruled with no step entered. Nothing
+> own status row; GAS-1 through GAS-4 are implemented and merged, GAS-5 is entered, contract-only,
+> by owner re-ruling, GAS-6 is gated, GAS-7 is scoped and ruled with no step entered. Nothing
 > in it is piloted or certified. Evidence labels
 > follow the repository convention — `[V]` verified against
 > this repository, `[I]` inferred, `[R]` requires owner ratification, `[G]` gap.
@@ -321,12 +321,12 @@ inside `apps/ugence-governance-studio`.
 | **Status (2026-09-05)** | **Backend and all six screens implemented.** Frontend suite 197 passed (was 150), ten verifier gates green, `reactflow` the only new dependency; v1's contract, generated client and 17-operation allowlist byte-identical. The three review gaps (simulate mode threading, publish release binding, bounded clearance record) were closed in PR #1609. Langflow import is deferred (GAS-5, §11.3). Previously: **backend implemented; no screen shipped.** 12 additive v2 routes across the six screens; backend suite 175 passed (was 142). `contracts/openapi.json` is byte-identical and its freeze test passes unmodified. SD-1 allowlist and SD-2 operation-id guard are enforced by tests. Evidence: `apps/ugence-governance-studio/docs/GOVERNED_AGENT_STUDIO_V1_SCREEN_AUDIT.md`. |
 | **Label on completion** | **Core implemented** for the studio feature. The studio's own posture — synthetic data, planning only, no execution or permission granting `[V]` (the frozen OpenAPI description) — is preserved verbatim for `v2`. |
 
-#### GAS-5 · Langflow importer — **deferred, customer-gated (ruled 2026-09-05)**
+#### GAS-5 · Langflow importer — **entered, Langflow first (re-ruled 2026-09-05; contract-only)**
 
 | | |
 |---|---|
-| **Status (2026-09-05)** | **Removed from the current implementation sequence and from MVP scope** by owner ruling `DEFER_LANGFLOW_CUSTOMER_GATED` (§11.3). Langflow is preserved only as a possible future import adapter. No audit, importer, endpoint, dependency or implementation exists or is scheduled `[V]` (`langflow_import_implemented: False` in the studio's maturity flags; no `/policy/from-langflow` route in `contracts/openapi_v2.json`). React Flow remains the Ugence-owned authoring surface (GAS-R3). |
-| **Entry** | A demonstrated customer or design-partner need **and** a new owner ruling. Not entered on schedule, and not entered by GAS-4's exit alone. |
+| **Status (2026-09-05, re-ruled)** | **Entered by owner ruling `ENTER_LANGFLOW_IMPORT_FIRST`** (§11.3), superseding `DEFER_LANGFLOW_CUSTOMER_GATED` on product judgement: importing an existing agentic workflow is the "govern an existing agent" entry path of the studio (`ADR_UGENCE_STUDIO_FRONT_DOOR_SCOPING.md`, FD-2). GAS-R4 stands in full. Scoped by `docs/architecture/ADR_UGENCE_LANGFLOW_IMPORT_SCOPING.md`; **contract-only**: no importer, endpoint, dependency or implementation exists `[V]` (`langflow_import_implemented: False`; no `/policy/from-langflow` route in `contracts/openapi_v2.json`). Other platforms (Copilot Studio, Vertex AI, ServiceNow, LangGraph, CrewAI) stay customer-gated. React Flow remains the Ugence-owned authoring surface (GAS-R3). |
+| **Entry** | Met 2026-09-05 by owner ruling `ENTER_LANGFLOW_IMPORT_FIRST`; implementation is entered only after the owner rules LI-1 to LI-5 in the scoping ADR, and only by its own implementation prompt. |
 | **Work** | A one-way importer: parse exported Langflow JSON, validate against a strict allowlist schema, reject anything unmapped, compile the accepted subset to Workflow IR v2 through `compile_policy_pack` `[V]` (`packages/tooling/policy-workflow-compiler/.../compiler.py:222`). |
 | **Exit** | An adversarial corpus of malformed, oversized, cyclic, deeply nested and code-bearing Langflow exports is refused with typed errors and zero evaluation; the importer executes nothing from the file and imports no Langflow package; unmapped node types refuse rather than degrade. |
 | **Label on completion** | **Core implemented** for the importer. It confers no maturity on the imported graph, which enters as an ordinary unapproved policy pack. |
@@ -395,7 +395,8 @@ merged; GAS-5 is deferred; GAS-6 remains gated; GAS-7 is ruled and not entered.
 | CR-3 | **`PRIVATE_NETWORK_TLS_IDENTITY_MANDATORY`** — the worker listener binds the private segment over TLS; an identity port is mandatory in production; no second gate or credential | same, §5 |
 | CR-4 | **`ONE_DEPLOYMENT_MODE_SWITCH`** — `UGENCE_REVIEW_DEPLOYMENT_MODE=production` sets every production switch together and refuses fixtures and in-memory stores; certifies nothing, enables no LIVE | same, §5 |
 | CR-5 | **`ALLOWLISTED_JWKS_HOST`** — the worker's only egress is the JWKS host over HTTPS, recorded as external deployment evidence; the worker image needs its own P3E-equivalent gate set (`SEPARATE_P3E_EQUIVALENT_EVIDENCE`) | same, §4 and §5 |
-| GAS-5 | **`DEFER_LANGFLOW_CUSTOMER_GATED`** (2026-09-05) — Langflow import is removed from the current sequence and MVP scope; preserved only as a possible future import adapter, requiring a demonstrated customer or design-partner need and a new owner ruling. No audit, importer, endpoint, dependency or implementation now. React Flow remains the Ugence-owned authoring surface | this section, GAS-5 and GAS-R4; `GOVERNED_AGENT_STUDIO_V1_SCREEN_AUDIT.md` |
+| GAS-5 (superseded) | **`DEFER_LANGFLOW_CUSTOMER_GATED`** (2026-09-05, superseded the same day) — Langflow import is removed from the current sequence and MVP scope; preserved only as a possible future import adapter, requiring a demonstrated customer or design-partner need and a new owner ruling. No audit, importer, endpoint, dependency or implementation now. React Flow remains the Ugence-owned authoring surface | this section, GAS-5 and GAS-R4; `GOVERNED_AGENT_STUDIO_V1_SCREEN_AUDIT.md` |
+| GAS-5 | **`ENTER_LANGFLOW_IMPORT_FIRST`** (2026-09-05) — the Langflow import is entered on the owner's product judgement as the studio's "govern an existing agent" path, superseding `DEFER_LANGFLOW_CUSTOMER_GATED`; GAS-R4 preserved in full (untrusted input, validate never execute, one-way, compile to Workflow IR, enters as an unapproved policy pack, confers no maturity); other platforms customer-gated; contract-only until LI-1 to LI-5 are ruled | this section, GAS-5; `ADR_UGENCE_LANGFLOW_IMPORT_SCOPING.md`; `ADR_UGENCE_STUDIO_FRONT_DOOR_SCOPING.md` FD-2 |
 
 
 ---
