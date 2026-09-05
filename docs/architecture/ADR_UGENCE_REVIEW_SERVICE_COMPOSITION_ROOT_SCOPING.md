@@ -174,7 +174,16 @@ as passed on account of the worker; no LIVE execution.
    `create_combined_app` mounted v2 under `/v2`, so the contract's and the frontend's
    `/api/v2/...` paths were served nowhere; it now mounts at the root behind v1.
 4. **Worker container gates**: a gate set for the worker image, entered only when the
-   mirror blocker is cleared, since no image can be built until then.
+   mirror blocker is cleared, since no image can be built until then. Defined
+   statically (owner choice of 2026-09-05, mirror values not yet at hand):
+   `deployment/governed-runtime-worker/Dockerfile` from the ratified python digest
+   only, `base-images.json`, `ci/verify_ratified_pins.py` (offline, first),
+   `ci/verify_container.sh`, `CONTAINER_GATE_SET.json` (GRW-CTR-01 to 10,
+   `DEFINED_NOT_RATIFIED`) and the `container` job of the worker workflow with its own
+   evidence artifact. Every gate is `NOT_EXECUTED` and every manifest `INCOMPLETE`
+   until the mirror record carries owner-supplied coordinates; the runtime script is
+   validated by static parsing only. No ratified digest, FROM line or studio gate
+   record was changed.
 
 **Ceiling.** With steps 2 and 3 the review screens work end to end against fixture
 providers and the in-process issuer. Real approver identity waits on an enterprise
@@ -183,6 +192,7 @@ review and the mirror.
 
 ## 7 — Next step
 
-Steps 2 and 3 are shipped; the ceiling above is reached. Step 4, the worker's own
-gate set, waits on the mirror ruling (mirror host, repository prefix and secret name
-from the owner). Real approver identity waits on an enterprise issuer (AI-E).
+Steps 2 and 3 are shipped and step 4 is defined; the ceiling above is reached. The
+worker gate set executes, and the mirror configuration may be recorded, only when the
+owner supplies the mirror host, repository prefix and secret name. Real approver
+identity waits on an enterprise issuer (AI-E).
