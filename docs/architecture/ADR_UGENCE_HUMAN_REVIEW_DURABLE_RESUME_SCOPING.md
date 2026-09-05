@@ -5,8 +5,8 @@ in §5 were ruled on 2026-09-05. This record still authorizes no code change, ad
 dependency, opens no route and ships no package: each step of §6 is entered only by
 its own implementation prompt. It maps the path a
 parked governed workflow would have to travel to be seen by a human, decided, and
-resumed under fresh governance, states what already exists on that path, and puts five
-decisions to the owner. It reopens none of: DBOS ratified as the initial engine (OD-3),
+resumed under fresh governance, states what already exists on that path, and records
+the five owner decisions. It reopens none of: DBOS ratified as the initial engine (OD-3),
 Langflow deferred (GAS-5), Temporal gated (GAS-6), SD-1, SD-2.
 
 Evidence labels: `[V]` verified against this repository at the merge of PR #1611,
@@ -27,7 +27,7 @@ no sink" `[V]` (`packages/integration/agent-runtime-governance/src/ugence_agent_
 
 | # | Stage | What exists `[V]` | What is missing `[G]` |
 |---|---|---|---|
-| 1 | **Disposition** | `FinalDisposition` has four members: GRANT, DENY, HOLD_NON_EXECUTABLE, ERROR_NON_EXECUTABLE (`risk-authority-runtime/.../contracts.py:78-88`). Decision Authority `DEFER` becomes veto `HOLD` before composition (`decision_authority_adapter.py:64,69`; `composition.py:157-162`). `MANUAL_REVIEW` exists nowhere as code. | No `MANUAL_REVIEW` disposition. Whether one is needed is answered by OD-5, not by adding an enum member. |
+| 1 | **Disposition** | `FinalDisposition` has four members: GRANT, DENY, HOLD_NON_EXECUTABLE, ERROR_NON_EXECUTABLE (`risk-authority-runtime/.../contracts.py:78-88`). Decision Authority `DEFER` becomes veto `HOLD` before composition (`decision_authority_adapter.py:64,69`; `composition.py:157-162`). `MANUAL_REVIEW` exists nowhere as code. | No `MANUAL_REVIEW` disposition. Whether one is needed is answered by HR-5, not by adding an enum member. |
 | 2 | **Projection** | `HOLD_NON_EXECUTABLE` + non-empty `required_approvals` → ESCALATE with `required_resolution="EXTERNAL_APPROVAL"`; otherwise HOLD with `"GOVERNANCE_HOLD_RELEASE"` (`agent-runtime-governance/.../dispositions.py:117-120`; `hook.py:354-360`). `required_approvals` is a `frozenset[str]` of opaque labels combined by union only; its sole consumer is a truthiness test (`dispositions.py:76`). | Labels are never compared to an approver, never satisfied, never emptied. Their vocabulary is unratified; the authority directory deferred its resolver to 0.2.0 (`ADR_UGENCE_AUTHORITY_DIRECTORY_SCOPING.md` D-2). |
 | 3 | **Parked state** | HOLD → task WAITING, workflow WAITING, reason `governance_hold`; ESCALATE → task WAITING, workflow PAUSED, reason `governance_escalate` (`agent-runtime/.../runtime/engine.py:519-535`). `advance_workflow` on a parked instance is a no-op `REQUIRES_RESUME` (`:373-380`). | `required_resolution` is a free `Optional[str]` the runtime never stores, exposes or checks (`governance/interfaces.py:90,111`; absent from `runtime/execution_state.py:72-84` and every checkpoint field). The park reason lives only in the event detail, not the checkpoint (`persistence/checkpoints.py:114-126`). |
 | 4 | **Durability** | The parked checkpoint and its execution-state journal persist in `ugence_art.runtime_state` on the DBOS application database in one transaction with the step record (OD-1). Recovery restores WAITING as WAITING and RUNNING as PAUSED (`persistence/recovery.py:146-169`). Matrix row 9 proves a parked instance never progresses across six re-drives and invokes nothing (`durable-execution/tests/test_matrix.py:719-767`). | Row 9 never calls `resume`; its "post-resume" fingerprint assertion (`:769-773`) compares the single pre-signal evaluation to itself. The park → decision → resume → re-evaluation round trip is proven only for crash recovery (`_dbos_harness.py:241-253`, row 1), not for a human decision. |
