@@ -28,6 +28,13 @@ entry within that store, and ``entry_digest`` binds its content, so a reference
 cannot silently follow an entry that changed. ``correlation_id`` is the optional
 thread a caller already uses to tie a request chain together.
 
+A reference carries **no identity of its own**. It is a value, not an entity:
+``(tenant_id, store_ref, entry_ref)`` is the location and
+:meth:`AuditReference.canonical_digest` is the handle. A synthetic reference id
+would be minted independently by each producer, so two records citing the same
+entry would digest differently for no reason a consumer could act on — which is
+exactly the correlation this contract exists to make possible.
+
 What it deliberately does **not** carry
 ---------------------------------------
 * the entry **body** — a reference that embedded the record would be a second copy
@@ -132,7 +139,7 @@ class AuditReference:
     """An immutable, digest-bound pointer to one entry in one audit store.
 
     Every field participates in :meth:`canonical_digest`, so the complete
-    reference — not merely the entry id — distinguishes one from another. The
+    reference — not merely the entry it names — distinguishes one from another. The
     dataclass is frozen, so no post-construction mutation can alter the content
     or the digest.
 
@@ -140,7 +147,6 @@ class AuditReference:
     the store's job, and interpreting the entry is its owner's.
     """
 
-    audit_id: str
     tenant_id: str
     #: Which audit store holds the entry. Named, never hidden: the platform's
     #: audit stores are separate, and a reference that concealed which one it
@@ -156,7 +162,7 @@ class AuditReference:
     recorded_at: Optional[datetime] = None
 
     def __post_init__(self) -> None:
-        for name in ("audit_id", "tenant_id", "store_ref", "entry_ref"):
+        for name in ("tenant_id", "store_ref", "entry_ref"):
             object.__setattr__(self, name, _require_nonempty(getattr(self, name),
                                                              f"AuditReference.{name}"))
         object.__setattr__(self, "entry_digest",

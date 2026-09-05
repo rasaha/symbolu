@@ -188,9 +188,13 @@ does. Mapping to the frozen fields is documentation only:
 ## Neutral audit reference (G4)
 
 **Audit reference (G4)** — `AuditReference` is a digest-bound pointer to **one
-entry in one audit store**: `audit_id`, `tenant_id`, `store_ref`, `entry_ref`,
-`entry_digest`, plus an optional `correlation_id` and a `recorded_at` that must be
-timezone-aware when present. It exists so a governance record can cite the audit
+entry in one audit store**: `tenant_id`, `store_ref`, `entry_ref`, `entry_digest`,
+plus an optional `correlation_id` and a `recorded_at` that must be timezone-aware
+when present. It carries **no identity of its own** — it is a value, not an entity:
+`(tenant_id, store_ref, entry_ref)` is the location and `canonical_digest()` is the
+handle. A synthetic reference id would be minted independently by each producer, so
+two records citing one entry would digest differently for no reason a consumer could
+act on. It exists so a governance record can cite the audit
 entry that explains it, and so two records citing one entry can be recognised as
 doing so — `points_to_same_entry()` compares the location, `agrees_with()` also
 compares the digest, which is how a consumer detects that one of them saw

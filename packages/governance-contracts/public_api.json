@@ -138,7 +138,6 @@
     "AuditReference": {
       "kind": "dataclass",
       "fields": [
-        "audit_id",
         "tenant_id",
         "store_ref",
         "entry_ref",

@@ -8,7 +8,7 @@ default, constructor signature, serialization or authority meaning changed.
 only the package `__version__` advances, to `0.5.0`. Remains a stdlib-only leaf.
 
 - `AuditReference` — a digest-bound pointer to one entry in one audit store
-  (`audit_id`, `tenant_id`, `store_ref`, `entry_ref`, `entry_digest`, optional
+  (`tenant_id`, `store_ref`, `entry_ref`, `entry_digest`, optional
   `correlation_id` and tz-aware `recorded_at`), with `canonical_bytes()` /
   `canonical_digest()`, `points_to_same_entry()` and `agrees_with()`.
 - `AuditContractError` — every refusal is typed; a naive `recorded_at`, a
@@ -20,6 +20,9 @@ only the package `__version__` advances, to `0.5.0`. Remains a stdlib-only leaf.
   `AuditEventType` owns those names) and no chain head or previous-entry hash.
 - No second evidence reference: `EvidenceReference` already covers D-4's
   `EvidenceRef`, asserted by a test.
+- The reference carries **no identity of its own**: a synthetic reference id would
+  be minted per producer, so two records citing one entry would digest differently.
+  The location plus `canonical_digest()` is the whole identity.
 
 ## [0.4.0] — neutral idempotency (G7) and validity (G8) contracts (additive)
 

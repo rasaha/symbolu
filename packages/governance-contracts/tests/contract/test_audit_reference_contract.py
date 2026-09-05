@@ -29,7 +29,7 @@ _OTHER_DIGEST = "b" * 64
 
 
 def _ref(**overrides) -> AuditReference:
-    fields = dict(audit_id="aud-1", tenant_id="tenant-a",
+    fields = dict(tenant_id="tenant-a",
                   store_ref="ugence_approval_workflow:ledger_events",
                   entry_ref="apr_1:3", entry_digest=_DIGEST)
     fields.update(overrides)
@@ -41,17 +41,17 @@ def _ref(**overrides) -> AuditReference:
 # --------------------------------------------------------------------------- #
 def test_a_reference_names_a_store_an_entry_and_a_digest():
     ref = _ref(correlation_id="corr-9", recorded_at=_T0)
-    assert (ref.audit_id, ref.tenant_id) == ("aud-1", "tenant-a")
+    assert ref.tenant_id == "tenant-a"
     assert ref.store_ref == "ugence_approval_workflow:ledger_events"
     assert ref.entry_ref == "apr_1:3" and ref.entry_digest == _DIGEST
     assert ref.correlation_id == "corr-9" and ref.recorded_at == _T0
     assert [f.name for f in dataclasses.fields(ref)] == [
-        "audit_id", "tenant_id", "store_ref", "entry_ref", "entry_digest",
+        "tenant_id", "store_ref", "entry_ref", "entry_digest",
         "correlation_id", "recorded_at"]
 
 
 def test_every_locating_field_is_required():
-    for field in ("audit_id", "tenant_id", "store_ref", "entry_ref"):
+    for field in ("tenant_id", "store_ref", "entry_ref"):
         with pytest.raises(AuditContractError, match=field):
             _ref(**{field: "   "})
         with pytest.raises(AuditContractError, match=field):
@@ -93,7 +93,6 @@ def test_equal_references_written_with_different_offsets_share_one_digest():
 def test_every_field_participates_in_the_digest():
     base = _ref(correlation_id="corr-9", recorded_at=_T0)
     for changed in (
-        _ref(audit_id="aud-2", correlation_id="corr-9", recorded_at=_T0),
         _ref(tenant_id="tenant-b", correlation_id="corr-9", recorded_at=_T0),
         _ref(store_ref="ugence_authority_directory:directory_events",
              correlation_id="corr-9", recorded_at=_T0),
@@ -130,10 +129,10 @@ def test_two_references_to_one_entry_are_recognised_across_disagreeing_digests()
     and that one of them saw different content."""
 
     a = _ref()
-    b = _ref(audit_id="aud-2", entry_digest=_OTHER_DIGEST)
+    b = _ref(entry_digest=_OTHER_DIGEST)
     assert a.points_to_same_entry(b) and b.points_to_same_entry(a)
     assert not a.agrees_with(b)
-    assert a.agrees_with(_ref(audit_id="aud-3"))
+    assert a.agrees_with(_ref())
 
 
 def test_references_into_different_stores_never_collide():
@@ -158,10 +157,14 @@ def test_no_second_evidence_reference_is_minted():
 
 
 def test_the_reference_carries_no_entry_body_and_no_event_vocabulary():
-    names = {f.name for f in dataclasses.fields(AuditReference)}
-    for forbidden in ("body", "payload", "event_type", "event_types", "message",
-                      "previous_event_hash", "chain_head", "previous_digest",
-                      "actor_id", "actor_type", "new_state", "previous_state"):
+    # Pin the field set exactly rather than denying a list of names: a denylist
+    # passes for any body-carrying field spelled outside it (``content``,
+    # ``details``, …), which is no guard at all for a design invariant.
+    names = [f.name for f in dataclasses.fields(AuditReference)]
+    assert names == ["tenant_id", "store_ref", "entry_ref", "entry_digest",
+                     "correlation_id", "recorded_at"]
+    for forbidden in ("body", "payload", "content", "details", "event_type", "message",
+                      "previous_event_hash", "chain_head", "actor_id", "new_state"):
         assert forbidden not in names, forbidden
     # No enum ships with this family: the kernel's frozen AuditEventType owns the names.
     from ugence_governance_contracts.contracts import audit
@@ -174,6 +177,22 @@ def test_the_family_is_not_a_log_a_sink_or_a_verifier():
     for forbidden in ("append", "write", "read", "all", "verify_chain", "flush",
                       "close", "query", "sink"):
         assert forbidden not in surface, forbidden
+
+
+def test_a_reference_carries_no_identity_of_its_own():
+    """It is a value, not an entity: two producers citing one entry agree.
+
+    A synthetic reference id would be minted independently by each producer, so
+    two records citing the same entry would digest differently for no reason a
+    consumer could act on.
+    """
+
+    names = {f.name for f in dataclasses.fields(AuditReference)}
+    for synthetic in ("audit_id", "reference_id", "id", "uuid"):
+        assert synthetic not in names, synthetic
+    # Two producers, same entry, same content -> byte-identical reference.
+    assert _ref().canonical_digest() == _ref().canonical_digest()
+    assert _ref().canonical_bytes() == _ref().canonical_bytes()
 
 
 # --------------------------------------------------------------------------- #
