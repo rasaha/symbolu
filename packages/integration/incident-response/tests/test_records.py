@@ -364,9 +364,16 @@ def test_optional_text_refuses_a_non_string():
 # --------------------------------------------------------------------------- #
 # Mutation coverage, stated honestly
 # --------------------------------------------------------------------------- #
-# Disabling any guard in src/ fails this suite, with four exceptions. Each is a
-# guard whose twin runs downstream on the same call, so removing one alone changes
-# no behaviour:
+# `scripts/mutation_sweep.py` disables each refusal in src/ in turn and reports the
+# ones no test catches. It ships rather than being described, because the claim has
+# been wrong three times: the sweep behind it saw only `raise` guards and missed
+# `reasons.append`; then it reached only records.py and states.py and missed
+# journal.py's filters; then it reported by line, hiding which of two clauses on one
+# line had survived — which concealed that nothing asserted contained_incidents()
+# actually filters on containment. Run it; the number is whatever it is today.
+#
+# Four sites survive by design. Each is redundant with a twin that runs downstream
+# on the same call, so it cannot be killed alone:
 #
 #   IncidentRecord.containment_requested's cross-incident check -> the same rule
 #       re-runs in _require_containment_evidence via replace()
@@ -374,17 +381,11 @@ def test_optional_text_refuses_a_non_string():
 #   require_transition's two checks (states.py) are mutually redundant for every
 #       state pair the tables define today
 #
-# Guards are named, not cited by line, because line numbers drift and a stale
-# citation reads as rigor it no longer has. A fourth review found the sweep behind
-# this comment had itself been too narrow — it enumerated only guards whose body is
-# a bare `raise`, missing the `reasons.append` guards in lift_refusals, one of which
-# was uncovered. The sweep now covers both shapes: 36 guards, these four survivors.
-#
-# They are kept as defence in depth, not deleted, because each becomes load-bearing
-# the moment its twin's inputs change. What is asserted instead is that they cannot
-# silently diverge:
-# test_the_transition_tables_agree_with_the_forward_only_rule pins states.py's pair,
-# and the two records.py guards are pinned below.
+# They are kept as defence in depth, since each becomes load-bearing the moment its
+# twin's inputs change, and named by function rather than line because a drifted
+# citation reads as rigor it no longer has. What is asserted instead is that they
+# cannot diverge silently: the transition tables are pinned forward-only, and the
+# two records.py guards are pinned against their construction-time twin below.
 def test_the_redundant_containment_guards_have_a_twin_that_agrees():
     """The downstream invariant refuses exactly what the method's own guard refuses."""
 

@@ -17,6 +17,7 @@ from ugence_incident_response import (
     SignalChangeType,
     SignalTargetType,
     contained_incidents,
+    incidents_for_subject,
     lift_refusals,
     open_incidents,
     require_admissible_lift,
@@ -24,11 +25,13 @@ from ugence_incident_response import (
 )
 
 from _fixtures import (
+    SUBJECT,
     T0,
     T1,
     T2,
     T3,
     TENANT,
+    audit_ref,
     contained,
     containment,
     incident,
@@ -282,3 +285,74 @@ def test_the_payload_refuses_a_raw_string_where_an_enum_belongs():
         ReassessmentSignalPayload(**dict(base, target_type="TENANT"))
     with pytest.raises(ContractViolation, match="change_type must be"):
         ReassessmentSignalPayload(**dict(base, change_type="RUNTIME_RISK_ESCALATED"))
+
+
+# --------------------------------------------------------------------------- #
+# The read seam. Every filter clause, not just the happy path.
+# --------------------------------------------------------------------------- #
+def test_incidents_for_subject_is_history_and_is_scoped_to_one_subject():
+    """The whole function was untested — a fifth review found it had no call site.
+
+    It is the history view: open and closed alike, one subject, one tenant. Each
+    clause of that is asserted separately, because a filter that drops a clause
+    still returns plausible-looking results.
+    """
+
+    mine = incident()
+    later = incident(evidence=(audit_ref(entry="e:2", content="entry-2"),), opened=T1)
+    other_subject = incident(subject="envelope:env-2")
+    other_tenant = incident(tenant="tenant-b")
+    world = (later, other_tenant, other_subject, mine)
+
+    found = incidents_for_subject(world, tenant_id=TENANT, subject_ref=SUBJECT)
+    assert found == (mine, later), "one tenant, one subject, ordered by instant"
+    assert other_subject not in found, "the subject clause must filter"
+    assert other_tenant not in found, "the tenant clause must filter"
+
+    # Closed incidents stay: this is history, not a live view.
+    closed = mine.closed(at=T3, by="operator-2")
+    assert incidents_for_subject((closed,), tenant_id=TENANT, subject_ref=SUBJECT) == (closed,)
+
+    # A tenant with nothing recorded gets nothing, not everything.
+    assert incidents_for_subject(world, tenant_id="tenant-z", subject_ref=SUBJECT) == ()
+    for blank in ("", "   "):
+        with pytest.raises(ContractViolation):
+            incidents_for_subject(world, tenant_id=blank, subject_ref=SUBJECT)
+        with pytest.raises(ContractViolation):
+            incidents_for_subject(world, tenant_id=TENANT, subject_ref=blank)
+
+
+def test_contained_incidents_does_not_leak_across_tenants():
+    """A containment is one tenant's business. The filter is asserted, not assumed."""
+
+    mine, _ = contained()
+    theirs, _ = contained(incident(tenant="tenant-b"))
+    world = (mine, theirs)
+
+    assert contained_incidents(world, tenant_id=TENANT) == (mine,)
+    assert contained_incidents(world, tenant_id="tenant-b") == (theirs,)
+    assert contained_incidents(world, tenant_id="tenant-z") == ()
+
+    # And it is a containment view, not a tenant view: an incident nobody asked to
+    # contain does not appear, nor does one whose containment was lifted. Both of
+    # those were unasserted until a mutation sweep forced the clause true and
+    # nothing failed.
+    _, request = contained()
+    lifted = mine.containment_lifted(lift(request))
+    uncontained = incident(subject="envelope:env-3")
+    assert not uncontained.is_contained
+    assert contained_incidents((uncontained,), tenant_id=TENANT) == ()
+    assert contained_incidents((lifted,), tenant_id=TENANT) == ()
+    assert contained_incidents((mine, uncontained, lifted), tenant_id=TENANT) == (mine,)
+
+
+def test_open_incidents_does_not_leak_across_tenants_or_show_closed_ones():
+    mine, theirs = incident(), incident(tenant="tenant-b")
+    closed = incident(subject="envelope:env-2").closed(at=T3, by="operator-2")
+    world = (mine, theirs, closed)
+
+    assert open_incidents(world, tenant_id=TENANT) == (mine,)
+    assert closed not in open_incidents(world, tenant_id=TENANT)
+    for blank in ("", "   "):
+        with pytest.raises(ContractViolation):
+            open_incidents(world, tenant_id=blank)
