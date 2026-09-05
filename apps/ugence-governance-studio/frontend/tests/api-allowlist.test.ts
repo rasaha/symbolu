@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import path from "node:path";
 import {
+  APPROVED_CLIENTS,
   detectConsumption,
   validateManifest,
   detectRawFetch,
@@ -109,6 +110,22 @@ describe("C1 — public API operation allowlist", () => {
 
   it("the full verifier passes on the real tree", () => {
     expect(realRun().violations).toEqual([]);
+  });
+
+  it("the HTTP boundary is exactly the two approved clients", () => {
+    // Adding a client is adding a line here plus a manifest; a screen cannot join the
+    // list by calling fetch.
+    expect([...APPROVED_CLIENTS].sort()).toEqual([
+      "src/api/client-v2.ts",
+      "src/api/client.ts",
+    ]);
+  });
+
+  it("a raw fetch in a screen still fails", () => {
+    const sneaky = [
+      { rel: "src/features/studio/ObserveScreen.tsx", text: "const r = await fetch('/api/v2/observe/audit');" },
+    ];
+    expect(detectRawFetch(sneaky).length).toBe(1);
   });
 });
 
