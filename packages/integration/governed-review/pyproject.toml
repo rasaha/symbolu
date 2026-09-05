@@ -1,0 +1,60 @@
+# Ugence Governed Review — binds a human approval to a parked governed proposal and
+# consumes it exactly once before the durable engine advances (GAS-7, step HR-A).
+#
+# Scoped and ruled by docs/architecture/ADR_UGENCE_HUMAN_REVIEW_DURABLE_RESUME_SCOPING.md
+# (HR-1 to HR-5, 2026-09-05).
+#
+#   THIS PACKAGE BINDS AND CONSUMES AN APPROVAL.
+#   IT NEVER APPROVES, AUTHENTICATES, MINTS AUTHORITY, SIGNALS, RESUMES OR EXECUTES.
+#
+# Dependency direction (one-way, composition only):
+#     ugence-approval-workflow        <- the ledger it binds to and consumes from
+#     ugence-authority-directory      <- the eligibility adapter the ledger answers with
+#     ugence-agent-runtime-governance <- CompositionInputs, the shape a source returns
+#     ugence-risk-authority-runtime   <- GovernanceVetoResult / VetoDisposition contracts
+#     ugence-governance-contracts     <- Validity for the request window
+#
+# Nothing under packages/capabilities; no product; no network client; no cloud SDK;
+# no pydantic; no clock. ugence-durable-execution is a TEST dependency only: the
+# matrix rows run the source inside the real DBOS adapter, the source never imports it.
+#
+# Build:   python -m build packages/integration/governed-review
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ugence-governed-review"
+dynamic = ["version"]
+description = "Ugence Governed Review — the production GovernanceInputSource that binds a human approval to a parked proposal's fingerprint and consumes it exactly once before the engine advances. Reference-grade, shadow-only; never approves, signals, resumes or executes."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "Proprietary" }
+authors = [{ name = "Rakesh Mohan" }]
+keywords = ["governance", "approval", "review", "durable-execution", "ugence"]
+classifiers = ["Typing :: Typed"]
+dependencies = [
+    "ugence-approval-workflow>=0.1.0",
+    "ugence-authority-directory>=0.1.0",
+    "ugence-agent-runtime-governance>=0.1.0",
+    "ugence-risk-authority-runtime>=0.1.0",
+    "ugence-governance-contracts>=0.4.0",
+]
+
+[project.optional-dependencies]
+test = ["pytest>=7.0", "ugence-durable-execution>=0.1.0", "ugence-agent-runtime>=0.7.0"]
+
+[tool.setuptools.dynamic]
+version = { attr = "ugence_governed_review.version.__version__" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["ugence_governed_review*"]
+
+[tool.setuptools.package-data]
+ugence_governed_review = ["py.typed"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+markers = ["matrix: a failure-matrix row from the human-review ADR"]
