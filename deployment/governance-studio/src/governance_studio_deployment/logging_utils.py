@@ -37,7 +37,8 @@ def log_event(event: str, *, level: str = "info", timestamp: str = "", **fields:
         if key in _ALLOWED_FIELDS:
             record[key] = value
     # hard drop of anything that could carry a secret, defensively
-    for banned in ("authorization", "password", "password_hash", "body", "query", "cookie"):
+    for banned in ("authorization", "password", "password_hash", "body", "query", "cookie",
+                   "proof", "x-ugence-approver-proof", "review_service_url"):
         record.pop(banned, None)
     sys.stdout.write(json.dumps(record, sort_keys=True) + "\n")
     sys.stdout.flush()

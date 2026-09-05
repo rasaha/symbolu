@@ -11,6 +11,8 @@ on:
       - "apps/ugence-governance-studio/frontend/**"
       - "apps/ugence-governance-studio/backend/**"
       - "apps/ugence-governance-studio/contracts/openapi.json"
+      - "apps/ugence-governance-studio/contracts/openapi_v2.json"
+      - "packages/runtime/agent-runtime/**"
       - "apps/ugence-governance-studio/demo_data/**"
       - "docs/audits/ugence_governance_studio_p3e/**"
       - ".github/workflows/governance-studio-p3e-private-hosted-ci.yml"
@@ -23,7 +25,7 @@ on:
 
 env:
   PYTHONPATH: >-
-    deployment/governance-studio/src:apps/ugence-governance-studio/backend/src:packages/capabilities/agent-workforce-composer/src:packages/tooling/policy-workflow-compiler/src
+    deployment/governance-studio/src:apps/ugence-governance-studio/backend/src:packages/capabilities/agent-workforce-composer/src:packages/tooling/policy-workflow-compiler/src:packages/runtime/agent-runtime/src
 
 jobs:
   application:
@@ -163,7 +165,7 @@ jobs:
           echo "evidence dir initialised empty: $DIR"
 
       - name: install-e2e-driver-deps
-        run: pip install -e packages/tooling/policy-workflow-compiler -e packages/capabilities/agent-workforce-composer -e apps/ugence-governance-studio/backend -e deployment/governance-studio
+        run: pip install -e packages/tooling/policy-workflow-compiler -e packages/capabilities/agent-workforce-composer -e packages/runtime/agent-runtime -e apps/ugence-governance-studio/backend -e deployment/governance-studio
 
       - name: ratified-pin-conformance
         # BLOCKING, and deliberately ahead of every other container step. Asserts

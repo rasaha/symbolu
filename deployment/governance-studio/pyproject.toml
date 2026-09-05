@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "governance-studio-deployment"
-version = "0.1.0"
+version = "0.2.0"
 description = "Private hosted, HTTPS-only, synthetic-data-only deployment wrapper for the frozen Governance Studio frontend and P3B backend. No permission granting, no agent execution, no business-action authorization."
 requires-python = ">=3.11"
 dependencies = [
@@ -26,6 +26,7 @@ pythonpath = [
   "../../apps/ugence-governance-studio/backend/src",
   "../../packages/capabilities/agent-workforce-composer/src",
   "../../packages/tooling/policy-workflow-compiler/src",
+  "../../packages/runtime/agent-runtime/src",
 ]
 testpaths = ["tests"]
 addopts = "-q"
