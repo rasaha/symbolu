@@ -12,19 +12,22 @@ of that sentence: the artifact scoped here is a composition root and nothing els
 The wave 3 rows assume a control plane. Twelve items were folded into existing
 milestones rather than made packages (line 23), the control plane among them, and
 the audit-ledger service was placed "under the control plane" (D-4, line 39) — so a
-row already half-shipped is waiting on a thing nobody has defined. **What is the
-control plane, given that three shipped packages each disclaim the noun?**
+row already half-shipped is waiting on something this repository has never given a
+package shape. **What, in package terms, is the control plane?**
 
-It is a composition root: a package that wires capabilities which already exist,
-holds no state, and adds no capability to the count. That is the only shape
-compatible with what the repository already says about itself.
+The AI Control Plane is a *product*, with its own tracked documentation tree and its
+own console plan. What wave 3 needs is not that product but the one thing under it
+this repository can actually compose today: a root that wires capabilities which
+already exist, holds no state of its own beyond the ledger it appends to, and adds
+no capability to the count. The sequencing ADR already anticipates exactly that
+artifact (line 26-30), which is what settles the shape.
 
 ## What the repository already fixed
 
 | Finding | Where |
 |---|---|
 | Control plane and integration hub are **folded into an existing milestone**, not new packages — twelve such items `[V]` | `ADR_UGENCE_GOVERNANCE_GAP_SEQUENCING_RATIFICATION.md:23` |
-| Both wave 3 rows are marked `roadmap`, unlike the four rows marked **new package** `[V]` | ibid. `:57`, `:59` |
+| Both wave 3 rows are marked `roadmap`; the wave's one **new package** row is the incident orchestrator, already shipped `[V]` | ibid. `:57`, `:59`, `:58` |
 | The sequencing ADR anticipates exactly one physical artifact here: "the control-plane composition root", among up to three packages that may appear **without adding a capability** `[V]` | ibid. `:26-30` |
 | One prohibition governs new packages: none may take a noun an existing README or NEXT_PHASES reserves `[V]` | ibid. `:85-86` |
 | "AI Control Plane" is disclaimed as **someone else's** territory by three shipped packages `[V]` | `packages/governance-provider-framework/README.md:23`; `packages/capabilities/decision-authority/README.md:16`; `packages/capabilities/model-selection/README.md:102` |
@@ -32,21 +35,24 @@ compatible with what the repository already says about itself.
 | G4's contract half shipped: `AuditReference` points at one entry in one store without unifying, moving or merging any store `[V]` | `packages/governance-contracts/src/ugence_governance_contracts/contracts/audit.py:1-16` (0.5.0) |
 | The durable append-only shape to copy — SQLite, hash-linked, tenant-partitioned, tamper-**evident** not tamper-proof — already exists and is explicitly a reference implementation `[V]` | `packages/capabilities/storygraph/src/ugence_storygraph/durable_audit.py:1-16` |
 | Seven audit stores exist today: the kernel's `AuditRepository` port, storygraph's durable log, and append-only tables in policy-authority, risk_authority, execution-reservation, approval-workflow and authority-directory `[V]` | `.../contracts/audit.py:9-13` |
+| Wave 1's own criterion is stronger than package existence: "every item is a declared seam **with tests already asserting its absence**" `[V]` | `ADR_UGENCE_GOVERNANCE_GAP_SEQUENCING_RATIFICATION.md:75-76` |
 | Wave 1 seams all have packages: credential broker (5X), execution reservation (phases E and G), G7/G8 contracts, `SqlitePolicyRegistry`, envelope issuance, 5C admission `[V]` | `packages/integration/cloud-scaling-credential-broker`, `.../execution-reservation`, `.../cloud-scaling-envelope-issuance`, `.../cloud-scaling-action-admission`, `packages/policy-authority/README.md:244` |
 | Several of those are **reference-grade** and one is explicitly "shadow-only, not enforcement-ready" `[V]` | `packages/integration/execution-reservation/README.md:3`; `packages/policy-authority/README.md:228` |
-| Risk Authority does not declare its own maturity in its README; it **fails closed on any reference-grade or missing dependency**, which makes the maturity of what a root composes an operational input rather than a label `[V]` | `packages/risk_authority/README.md:109` |
-| The cited authority for both wave 3 roadmap rows — "productization roadmap §3" — **is not in this repository** `[G]` | repository-wide search: the phrase occurs only in the sequencing ADR itself (`:36`, `:40`, `:57`) |
+| `RiskEvaluationSeam.production(...)` **fails closed on any reference-grade or missing dependency** `[V]`; that the maturity of what a root composes is therefore an operational input rather than a label is an inference from it `[I]` | `packages/risk_authority/README.md:109` |
+| The productization roadmap **is** in this repository, and its §3 names exactly what the sequencing ADR attributes to it: an "Evidence & audit service — durable, tamper-evident, replayable records", a "Console — operator UI", and a "Connector framework" `[V]` | `Project_documentation/repository/ugence_platform/UGENCE_PRODUCTIZATION_ROADMAP.md:75-87` |
+| Its §4 puts durable tamper-evident audit **and** the console **in v1**, and defers only *additional systems-of-record* connectors — two runtime connectors and one Kubernetes execution-target connector also ship in v1 `[V]` | ibid. `:91-102` |
+| "AI Control Plane" is not an unclaimed noun: it names an existing product with its own tracked documentation tree, including a unified console plan `[V]` | `Project_documentation/control_plane/` (104 tracked files); `.../aicp_v3_research/UGENCE_AI_CONTROL_PLANE_PRODUCTIZATION_PLAN.md:23-24`; `.../ACP/UGENCE_UNIFIED_CONSOLE_PLAN.md` |
 | No package owns connectors; every package that mentions them disclaims them `[G]` | `packages/integration/ai-system-registry/README.md:18,22,132`; `packages/tooling/policy-workflow-compiler/docs/KNOWN_LIMITATIONS.md:22-25`; `packages/products/procurement/docs/PRODUCT_BOUNDARY.md:31,44` |
 
 ## Ratified decisions
 
 | # | Decision | Ruling |
 |---|---|---|
-| D-1 | What "wave 1 seams exist" required | **Packages exist with their declared seams closed** — not enforcement-readiness. Reference-grade maturity does not block wave 3. The gate at line 57 is therefore **met**, and the maturity of what the root composes is disclosed by each composed package's own README, never restated or upgraded here. A root over reference-grade parts is itself reference-grade. |
-| D-2 | What the artifact is | **A composition root, not a capability.** It wires packages that already exist, mints no authority, owns no domain vocabulary, and adds nothing to the capability count (line 26-30). It may **not** take the "AI Control Plane" noun that `governance-provider-framework`, `decision-authority` and `model-selection` each disclaim — the prohibition at line 85-86 is dispositive. Name: `packages/integration/control-plane-root`, distribution `ugence-control-plane-root`. |
+| D-1 | What "wave 1 seams exist" required | **Packages exist with their declared seams closed** — not enforcement-readiness. Reference-grade maturity does not block wave 3, and the maturity of what the root composes is disclosed by each composed package's own README, never restated or upgraded here: a root over reference-grade parts is itself reference-grade. **What is verified here is package existence, not the wave's own criterion** — line 75-76 requires "a declared seam with tests already asserting its absence", and this record cites directories, not test results `[G]`. The gate is therefore ruled met **on this reading of it**, and confirming the per-seam tests is the first task of the implementation slice, not an assumption it may inherit. |
+| D-2 | What the artifact is | **A composition root, not a capability.** It wires packages that already exist, mints no authority, owns no domain vocabulary, and adds nothing to the capability count — which is what line 26-30 anticipates, and it is that line, not the noun argument, that settles the shape. **On the name, the prohibition at line 85-86 is not dispositive and this record does not claim it is**: that rule protects a noun an existing README *reserves*, and the three packages cited *disclaim* "AI Control Plane" rather than reserving it — the opposite move `[I]`. The noun is nevertheless unavailable, for a stronger reason: it already names a product with its own tracked documentation tree and its own console plan `[V]`, so a package taking it would collide with that product, not with the three disclaimers. Name: `packages/integration/control-plane-root`, distribution `ugence-control-plane-root` — a root *under* the AI Control Plane, never the thing itself. |
 | D-3 | Where the audit-ledger service lives | **Under this root, per D-4 of the sequencing ADR.** The service composes the durable-audit shape (copied from storygraph, never imported, as D-3 of that ADR already ruled for Policy Authority) and mints `AuditReference`s into it. It **unifies no existing store**: the seven stores stay where they are, and G4's contract remains the only thing that correlates them. |
 | D-4 | What the root may never own | **No policy, no decision, no envelope, no revocation, no credential, no queue, no clock of its own beyond a single injected instant per act, and no second copy of any vocabulary.** It refuses; it does not decide. Every authority it touches is exercised by the package that already owns it. |
-| D-5 | Scope of the first slice | **The audit-ledger service and nothing else.** The console, the shared services of the missing roadmap §3, and the integration hub are **out of scope** and stay unscoped until that roadmap is in-repo (`[G]` above). A root that grew a console would stop being a root. |
+| D-5 | Scope of the first slice | **The audit-ledger service and nothing else.** Not because the rest is unscoped — roadmap §3 exists and §4 puts the console and two runtime connectors **in v1** `[V]` — but because they are that product's scope, owned by the AI Control Plane plan and its console plan, and reachable from this root only by becoming something other than a root. The ledger is the one §3 service that is a composition of packages this repository already ships; the console is a UI and the connector framework is an execution-target concern the cloud-scaling ladder is already building phase by phase. A root that grew a console would stop being a root. |
 
 ## What the root composes
 
@@ -89,11 +95,24 @@ with, at minimum:
 
 ## Gaps stated up front
 
-* The productization roadmap §3 is not in this repository `[G]`. Everything the
-  control-plane row promised beyond the audit ledger — shared services, the console
-  — is therefore unscopeable, and D-5 defers it rather than guessing.
-* The integration hub stays deferred `[G]`. Every package that mentions connectors
-  disclaims them, so the hub has no home milestone that plans to build it.
+* **D-1's evidence is thinner than wave 1's own criterion** `[G]`. That criterion is
+  "a declared seam with tests already asserting its absence" (`:75-76`); what this
+  record verified is that a package exists for each item. Confirming the per-seam
+  tests is the implementation slice's first task, and if any seam turns out to have
+  no such test, D-1 is the ruling to revisit — not something to work around.
+* **The integration hub is deferred, but not for want of a plan** `[R]`. Roadmap §4
+  ships two runtime connectors and one Kubernetes execution-target connector in v1
+  and defers only *additional systems-of-record* connectors. Meanwhile every package
+  that mentions connectors disclaims them, and the cloud-scaling ladder is building
+  execution-target connectors phase by phase without calling itself a hub. Whether
+  the hub is a real gap or an already-owned milestone under another name needs the
+  owner's ruling; it is not this root's to answer.
+* An earlier draft of this record claimed the productization roadmap was absent from
+  the repository. It is not: it is at
+  `Project_documentation/repository/ugence_platform/UGENCE_PRODUCTIZATION_ROADMAP.md`,
+  and the claim came from a search that covered only `docs/` and `packages/`. The
+  correction is recorded here rather than silently applied, because D-5's original
+  rationale rested on it.
 * This root composes reference-grade packages, so it inherits that maturity `[V]`
   (D-1). Nothing here is production-ready, and no slice of it should be described
   as such.
