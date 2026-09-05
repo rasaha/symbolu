@@ -1,0 +1,63 @@
+# Governed runtime worker — the composition root of the governed review service
+# (ADR_UGENCE_REVIEW_SERVICE_COMPOSITION_ROOT_SCOPING.md, step 2, rulings CR-1, CR-3,
+# CR-4 and CR-5).
+#
+#   ONE PROCESS: the DBOS engine and runtime host, the approval ledger, the authority
+#   directory, the control-plane audit ledger, the run reader, the linkage appender,
+#   the approver identity adapter and the review service HTTP, behind one private TLS
+#   listener. It records and re-arms; it never approves, authenticates of its own
+#   accord, mints authority, clears or executes anything real.
+#
+# Maturity REFERENCE_GRADE_SHADOW_ONLY. UGENCE_REVIEW_DEPLOYMENT_MODE=production is a
+# fail-closed posture (no fixture adapter, no in-memory store, no public bind, no plain
+# HTTP, identity port mandatory) and never a production certification. ENFORCEMENT is
+# disabled in every package composed here, and nothing here enables LIVE execution.
+#
+# Dependency direction: this is a composition root. It imports the integration packages
+# it composes and the runtime they drive, and nothing imports it.
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "governed-runtime-worker"
+dynamic = ["version"]
+description = "Governed runtime worker — composition root for the governed review service over the DBOS engine, the approval ledger, the authority directory, the control-plane audit ledger and the approver identity adapter. Reference-grade, shadow-only; production mode is a posture, not a certification."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "Proprietary" }
+authors = [{ name = "Rakesh Mohan" }]
+classifiers = ["Typing :: Typed"]
+dependencies = [
+  "ugence-governed-review-service[http]>=0.4.0",
+  "ugence-approver-identity-jwt>=0.1.0",
+  "ugence-governed-review>=0.3.0",
+  "ugence-approval-workflow>=0.2.0",
+  "ugence-authority-directory>=0.1.0",
+  "ugence-control-plane-root>=0.1.0",
+  "ugence-durable-execution>=0.1.0",
+  "ugence-agent-runtime>=0.7.0",
+  "ugence-agent-runtime-governance>=0.1.0",
+  "ugence-risk-authority-runtime>=0.1.0",
+  "dbos>=2.0",
+  "SQLAlchemy>=2.0",
+  "psycopg[binary]>=3.1",
+  "uvicorn>=0.27",
+]
+
+[project.optional-dependencies]
+test = ["pytest>=7.0", "httpx>=0.27"]
+
+[tool.setuptools.dynamic]
+version = { attr = "governed_runtime_worker.version.__version__" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["governed_runtime_worker*"]
+
+[tool.setuptools.package-data]
+governed_runtime_worker = ["py.typed"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"

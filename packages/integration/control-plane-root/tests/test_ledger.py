@@ -252,3 +252,36 @@ def test_a_failed_append_rolls_back_and_leaves_no_partial_entry(tmp_path):
     broken._conn.execute("DROP TABLE ledger_entries")
     with pytest.raises(sqlite3.OperationalError):
         broken.append(entry(at=T2), reference_factory=AuditReference)
+
+
+def test_the_ledger_appends_and_verifies_from_threads_other_than_the_opening_one(tmp_path):
+    """A composition root serves the ledger behind an HTTP thread pool: every append
+    from a request thread must land in the one chain, in some order, verifiably."""
+
+    import threading
+
+    ledger = AuditLedger(str(tmp_path / "ledger.sqlite3"))  # noqa: F811 - not the fixture
+    errors: list = []
+
+    def work(n: int) -> None:
+        try:
+            for i in range(5):
+                ledger.append(entry(kind=f"t{n}.{i}"), reference_factory=AuditReference)
+        except Exception as exc:  # noqa: BLE001 - reported below
+            errors.append(exc)
+
+    threads = [threading.Thread(target=work, args=(n,)) for n in range(4)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+    assert errors == []
+    assert ledger.entry_count(tenant_id=TENANT) == 20
+    assert ledger.verify_chain(tenant_id=TENANT)
+    done = []
+    threading.Thread(target=lambda: done.append(ledger.verify_chain(tenant_id=TENANT))).start()
+    for t in threading.enumerate():
+        if t is not threading.current_thread() and not t.daemon:
+            t.join()
+    assert done == [True]
+    ledger.close()

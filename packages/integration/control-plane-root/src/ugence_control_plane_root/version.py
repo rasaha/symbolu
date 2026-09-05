@@ -6,7 +6,7 @@ from typing import Final
 
 __all__ = ["__version__", "CONTRACT_VERSION", "MATURITY", "SCHEMA_VERSION"]
 
-__version__: Final[str] = "0.1.0"
+__version__: Final[str] = "0.1.1"
 
 #: The wire shape of one ledger entry. Bumped when a stored entry's canonical
 #: form changes, never for an additive read helper.

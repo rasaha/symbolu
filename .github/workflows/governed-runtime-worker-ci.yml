@@ -1,0 +1,153 @@
+name: governed-runtime-worker-ci
+
+# Scoped CI for deployment/governed-runtime-worker, the composition root of the governed
+# review service (ADR_UGENCE_REVIEW_SERVICE_COMPOSITION_ROOT_SCOPING.md step 2; rulings
+# CR-1, CR-3, CR-4, CR-5).
+#
+# The posture rows (ADR §4a rows 1, 2, 3, 7, 8) need no server. The end-to-end test is
+# only evidence over a REAL PostgreSQL 16 (the DBOS engine), the real SQLite stores and
+# the approver-identity-jwt package's in-process issuer, so Postgres is installed and
+# driven with pg_ctl exactly as governed-review-service-ci does. A skipped end-to-end
+# test is not a passing one: the job fails if it skipped.
+#
+# No image is built here. The worker's container gate set is step 4 and waits on the
+# mirror ruling; nothing in this workflow reaches docker.io or any registry.
+
+on:
+  pull_request:
+    paths:
+      - "deployment/governed-runtime-worker/**"
+      - "packages/integration/governed-review-service/**"
+      - "packages/integration/approver-identity-jwt/**"
+      - "packages/integration/governed-review/**"
+      - "packages/integration/approval-workflow/**"
+      - "packages/integration/authority-directory/**"
+      - "packages/integration/durable-execution/**"
+      - "packages/integration/control-plane-root/**"
+      - "docs/architecture/ADR_UGENCE_REVIEW_SERVICE_COMPOSITION_ROOT_SCOPING.md"
+      - ".github/workflows/governed-runtime-worker-ci.yml"
+  push:
+    branches:
+      - "claude/**"
+    paths:
+      - "deployment/governed-runtime-worker/**"
+      - ".github/workflows/governed-runtime-worker-ci.yml"
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  worker-suite:
+    name: Worker posture rows 1, 2, 3, 7, 8 + end to end (real PostgreSQL, in-process issuer)
+    runs-on: ubuntu-latest
+    env:
+      PGVERSION: "16"
+      PGPORT: "5433"
+      PGDATA: /tmp/ugrw-pgdata
+      PGSOCK: /tmp/ugrw-pgsock
+      UGENCE_DE_TEST_PG: postgresql+psycopg://postgres@127.0.0.1:5433/postgres
+      PYTHONPATH: >-
+        deployment/governed-runtime-worker/src:packages/integration/governed-review-service/src:packages/integration/approver-identity-jwt/src:packages/integration/approver-identity-jwt/tests:packages/integration/governed-review/src:packages/integration/control-plane-root/src:packages/integration/approval-workflow/src:packages/integration/authority-directory/src:packages/governance-contracts/src:packages/integration/agent-runtime-governance/src:packages/integration/risk-authority-runtime/src:packages/integration/risk-authority-status-runtime/src:packages/runtime/agent-runtime/src:packages/risk_authority/src:packages/capabilities/decision-authority/src:packages/providers/actiongate/src:packages/integration/durable-execution/src:packages/integration/durable-execution/tests
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install PostgreSQL server binaries
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-$PGVERSION postgresql-client-$PGVERSION
+
+      - name: Start an independent cluster on 5433
+        run: |
+          PGBIN=/usr/lib/postgresql/$PGVERSION/bin
+          sudo systemctl stop postgresql || true
+          sudo rm -rf "$PGDATA" "$PGSOCK"
+          sudo mkdir -p "$PGDATA" "$PGSOCK"
+          sudo chown -R postgres:postgres "$PGDATA" "$PGSOCK"
+          sudo chmod 700 "$PGDATA"
+          sudo -u postgres "$PGBIN/initdb" -D "$PGDATA" -U postgres --auth=trust
+          sudo -u postgres "$PGBIN/pg_ctl" -D "$PGDATA" \
+            -o "-p $PGPORT -k $PGSOCK -c listen_addresses=127.0.0.1" \
+            -l /tmp/ugrw-pg.log -w start
+          "$PGBIN/pg_isready" -h 127.0.0.1 -p "$PGPORT"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest pydantic "dbos>=2.0" "SQLAlchemy>=2.0" "psycopg[binary]>=3.1" \
+            "fastapi>=0.110" "httpx>=0.27" "uvicorn>=0.27" \
+            "PyJWT[crypto]>=2.8.0,<3.0.0" "cryptography>=41.0.7,<47.0.0"
+
+      - name: Configuration posture (rows 2, 7, 8)
+        run: |
+          cd deployment/governed-runtime-worker
+          python -m pytest tests/test_config.py -o addopts= -v --no-header
+
+      - name: Preflight refusals (rows 1, 3)
+        run: |
+          cd deployment/governed-runtime-worker
+          python -m pytest tests/test_preflight.py -o addopts= -v --no-header
+
+      - name: Maturity labels and boundaries (row 7)
+        run: |
+          cd deployment/governed-runtime-worker
+          python -m pytest tests/test_maturity_and_boundaries.py -o addopts= -v --no-header
+
+      - name: End to end over a real PostgreSQL with the in-process issuer
+        run: |
+          cd deployment/governed-runtime-worker
+          python -m pytest tests/test_end_to_end.py -o addopts= -v --no-header \
+            --junitxml=/tmp/worker-e2e.xml
+
+      - name: Fail if the end-to-end test was skipped
+        run: |
+          python - <<'PY'
+          import sys, xml.etree.ElementTree as ET
+          root = ET.parse("/tmp/worker-e2e.xml").getroot()
+          skipped = [tc.get("name") for tc in root.iter("testcase") if tc.find("skipped") is not None]
+          if skipped:
+              print("A skipped end-to-end test is NOT a passing one. Skipped:")
+              for name in skipped:
+                  print(f"  - {name}")
+              sys.exit(1)
+          print("The end-to-end test ran.")
+          PY
+
+      - name: The worker holds no credential and prints no DSN
+        run: |
+          # No credential of any kind lives in the deployment tree; the two DSNs are
+          # environment at run time and appear nowhere in it.
+          ! grep -rEn "postgresql(\+psycopg)?://[^ \"']*:[^ \"'@]+@" deployment/governed-runtime-worker/src
+          ! grep -rEin "(api[_-]?key|client[_-]?secret|password)\s*=\s*['\"][^'\"]+" deployment/governed-runtime-worker/src
+
+      - name: Repository import boundaries
+        run: python scripts/check_package_import_boundaries.py
+
+      - name: The P3E studio profile is untouched by this job
+        run: |
+          for p in deployment/governance-studio apps/ugence-governance-studio; do
+            if ! git diff --quiet HEAD -- "$p"; then
+              echo "$p was modified by this job; step 3 (CR-2) is a separate change."; exit 1
+            fi
+          done
+
+      - name: Postgres log (on failure)
+        if: failure()
+        run: sudo cat /tmp/ugrw-pg.log || true
+
+  build:
+    name: Wheel + sdist build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: |
+          python -m pip install --upgrade pip
+          pip install build
+      - run: python -m build deployment/governed-runtime-worker

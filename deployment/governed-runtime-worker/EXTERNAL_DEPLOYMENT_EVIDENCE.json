@@ -1,0 +1,42 @@
+{
+  "schema": "governed-runtime-worker.external-deployment-evidence.v1",
+  "deployment": "governed-runtime-worker",
+  "deployment_version": "0.1.0",
+  "maturity": "REFERENCE_GRADE_SHADOW_ONLY",
+  "ruling": "CR-5 ALLOWLISTED_JWKS_HOST (ADR_UGENCE_REVIEW_SERVICE_COMPOSITION_ROOT_SCOPING.md, section 5)",
+  "evidence_class": "EXTERNAL_DEPLOYMENT_EVIDENCE",
+  "evidence_class_note": "The egress rule is platform configuration outside this process and is recorded here as such. It is not application behaviour: the worker's only outbound connection is the JWKS fetch its identity adapter makes to UGENCE_REVIEW_IDENTITY_JWKS_URL over HTTPS, and nothing in the application enforces the allowlist. A deployment that does not configure the platform rule has no egress control and must say so.",
+  "permitted_egress": [
+    {
+      "purpose": "JWKS retrieval by the approver identity adapter (AI-C, IA-3)",
+      "host": null,
+      "host_note": "the host component of UGENCE_REVIEW_IDENTITY_JWKS_URL, filled in by the owner when the issuer is provisioned; null until then",
+      "scheme": "https",
+      "verification": "default TLS verification; never disabled"
+    }
+  ],
+  "forbidden_egress": [
+    "the issuer's discovery document (no OIDC discovery, IA-3)",
+    "docker.io or any registry (the worker image is built elsewhere; the mirror ruling applies)",
+    "any model, agent, cloud or tool SDK endpoint (none is imported)",
+    "the Governance Studio (the worker never calls the studio; the studio calls the worker)"
+  ],
+  "inbound": {
+    "listener": "one private TLS listener, UGENCE_REVIEW_BIND_HOST:UGENCE_REVIEW_PORT (default 8444)",
+    "reachable_from": "the Governance Studio's network segment only (CR-3)",
+    "authentication": "no gate of its own; an identity port is mandatory in production and every decision requires a proof (CR-3, AI-A)"
+  },
+  "secrets_held": [
+    "UGENCE_REVIEW_APP_DATABASE_URL",
+    "UGENCE_REVIEW_SYSTEM_DATABASE_URL"
+  ],
+  "secrets_note": "the two PostgreSQL DSNs, supplied as environment or a read-only mounted file, never logged, never in an image layer; the identity adapter holds public keys only",
+  "container_gate_evidence": "NONE. The worker image needs its own P3E-equivalent gate set (SEPARATE_P3E_EQUIVALENT_EVIDENCE); none of the studio's gates applies to it, and step 4 waits on the mirror.",
+  "not_claimed": [
+    "production certification",
+    "pilot validation",
+    "enterprise-issuer validation of the identity adapter",
+    "container gate evidence of any kind",
+    "enforcement or LIVE execution"
+  ]
+}

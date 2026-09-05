@@ -1,5 +1,15 @@
 # Changelog — ugence-control-plane-root
 
+## 0.1.1 — the ledger behind a thread pool
+
+- `AuditLedger` opens its one SQLite connection with `check_same_thread=False` and
+  serialises every method on one re-entrant lock. Found by the governed runtime worker
+  (`deployment/governed-runtime-worker`), the first composition root to serve this
+  ledger behind an HTTP server whose handlers run on a thread pool: SQLite's default
+  thread check refused every linkage append made from a request thread. The chain
+  semantics are unchanged: `BEGIN IMMEDIATE` still binds the head read and the
+  extending write, and the lock keeps them in one thread.
+
 ## 0.1.0 — wave 3, initial release
 
 Scoped and ratified by `docs/architecture/ADR_UGENCE_CONTROL_PLANE_ROOT_SCOPING.md`.

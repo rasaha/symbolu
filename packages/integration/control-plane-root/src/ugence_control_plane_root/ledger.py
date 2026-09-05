@@ -23,6 +23,7 @@ modification. It is not tamper-proof and this package never says otherwise.
 from __future__ import annotations
 
 import sqlite3
+import threading
 from typing import Optional, Protocol, runtime_checkable
 
 from ._canon import canonical_bytes, domain_digest, iso, require_nonempty
@@ -81,7 +82,13 @@ class AuditLedger:
 
     def __init__(self, path: str = ":memory:") -> None:
         self.path = path
-        self._conn = sqlite3.connect(path)
+        # One connection, usable from any thread, serialised by one lock: a composition
+        # root serves this ledger behind an HTTP server whose handlers run on a thread
+        # pool, and SQLite's default thread check would refuse every append made there.
+        # The lock keeps the chain-head read and the extending write of one append
+        # together in one thread, so BEGIN IMMEDIATE below stays the whole story.
+        self._lock = threading.RLock()
+        self._conn = sqlite3.connect(path, check_same_thread=False)
         self._conn.execute("PRAGMA journal_mode=WAL")
         self._init_schema()
 
@@ -131,9 +138,10 @@ class AuditLedger:
                 f"{SCHEMA_VERSION!r}; refused rather than migrated")
 
     def schema_version(self) -> str:
-        row = self._conn.execute(
-            "SELECT value FROM meta WHERE key='schema_version'").fetchone()
-        return row[0] if row else ""
+        with self._lock:
+            row = self._conn.execute(
+                "SELECT value FROM meta WHERE key='schema_version'").fetchone()
+            return row[0] if row else ""
 
     # -- the act ----------------------------------------------------------- #
     def append(self, entry: LedgerEntry, *, reference_factory: AuditReferenceFactory):
@@ -142,43 +150,43 @@ class AuditLedger:
         ``reference_factory`` is governance-contracts' ``AuditReference``, injected.
         This package never imports it — see :class:`AuditReferenceFactory`.
         """
+        with self._lock:
+            if not isinstance(entry, LedgerEntry):
+                raise ContractViolation("append.entry must be a LedgerEntry")
+            if not callable(reference_factory):
+                raise ContractViolation("append.reference_factory must be callable")
 
-        if not isinstance(entry, LedgerEntry):
-            raise ContractViolation("append.entry must be a LedgerEntry")
-        if not callable(reference_factory):
-            raise ContractViolation("append.reference_factory must be callable")
+            # BEGIN IMMEDIATE: the read of the chain head and the write that extends it
+            # are one transaction, so two concurrent appends cannot fork a tenant chain.
+            self._conn.execute("BEGIN IMMEDIATE")
+            try:
+                tenant_seq, prev_digest = self._head(entry.tenant_id)
+                content = entry.content_digest()
+                record_digest = domain_digest("control_plane_root.chain", {
+                    "tenant_id": entry.tenant_id, "tenant_seq": tenant_seq,
+                    "prev_digest": prev_digest, "content_digest": content,
+                })
+                self._conn.execute(
+                    "INSERT INTO ledger_entries (tenant_id, tenant_seq, kind, recorded_at,"
+                    " recorded_by, correlation_id, payload_json, content_digest,"
+                    " prev_digest, record_digest) VALUES (?,?,?,?,?,?,?,?,?,?)",
+                    (entry.tenant_id, tenant_seq, entry.kind,
+                     iso(entry.recorded_at, "recorded_at"), entry.recorded_by,
+                     entry.correlation_id,
+                     canonical_bytes(entry.payload).decode("utf-8"),
+                     content, prev_digest, record_digest))
+                seq = int(self._conn.execute("SELECT last_insert_rowid()").fetchone()[0])
+            except Exception:
+                self._conn.rollback()
+                raise
+            self._conn.commit()
 
-        # BEGIN IMMEDIATE: the read of the chain head and the write that extends it
-        # are one transaction, so two concurrent appends cannot fork a tenant chain.
-        self._conn.execute("BEGIN IMMEDIATE")
-        try:
-            tenant_seq, prev_digest = self._head(entry.tenant_id)
-            content = entry.content_digest()
-            record_digest = domain_digest("control_plane_root.chain", {
-                "tenant_id": entry.tenant_id, "tenant_seq": tenant_seq,
-                "prev_digest": prev_digest, "content_digest": content,
-            })
-            self._conn.execute(
-                "INSERT INTO ledger_entries (tenant_id, tenant_seq, kind, recorded_at,"
-                " recorded_by, correlation_id, payload_json, content_digest,"
-                " prev_digest, record_digest) VALUES (?,?,?,?,?,?,?,?,?,?)",
-                (entry.tenant_id, tenant_seq, entry.kind,
-                 iso(entry.recorded_at, "recorded_at"), entry.recorded_by,
-                 entry.correlation_id,
-                 canonical_bytes(entry.payload).decode("utf-8"),
-                 content, prev_digest, record_digest))
-            seq = int(self._conn.execute("SELECT last_insert_rowid()").fetchone()[0])
-        except Exception:
-            self._conn.rollback()
-            raise
-        self._conn.commit()
-
-        stored = StoredEntry(seq, entry, prev_digest, record_digest)
-        return reference_factory(
-            tenant_id=entry.tenant_id, store_ref=STORE_REF,
-            entry_ref=stored.entry_ref, entry_digest=record_digest,
-            correlation_id=entry.correlation_id,
-            recorded_at=entry.recorded_at)
+            stored = StoredEntry(seq, entry, prev_digest, record_digest)
+            return reference_factory(
+                tenant_id=entry.tenant_id, store_ref=STORE_REF,
+                entry_ref=stored.entry_ref, entry_digest=record_digest,
+                correlation_id=entry.correlation_id,
+                recorded_at=entry.recorded_at)
 
     def _head(self, tenant_id: str) -> tuple[int, str]:
         tenant = require_nonempty(tenant_id, "tenant_id")
@@ -191,13 +199,14 @@ class AuditLedger:
 
     # -- reading, for verification only ------------------------------------ #
     def entry_count(self, *, tenant_id: Optional[str] = None) -> int:
-        if tenant_id is None:
-            row = self._conn.execute("SELECT COUNT(*) FROM ledger_entries").fetchone()
-        else:
-            row = self._conn.execute(
-                "SELECT COUNT(*) FROM ledger_entries WHERE tenant_id=?",
-                (require_nonempty(tenant_id, "tenant_id"),)).fetchone()
-        return int(row[0])
+        with self._lock:
+            if tenant_id is None:
+                row = self._conn.execute("SELECT COUNT(*) FROM ledger_entries").fetchone()
+            else:
+                row = self._conn.execute(
+                    "SELECT COUNT(*) FROM ledger_entries WHERE tenant_id=?",
+                    (require_nonempty(tenant_id, "tenant_id"),)).fetchone()
+            return int(row[0])
 
     def verify_chain(self, *, tenant_id: str) -> bool:
         """Recompute one tenant's chain. ``True`` means it agrees with itself.
@@ -206,24 +215,26 @@ class AuditLedger:
         edited a row in place, never that the entries are true or that whoever
         wrote them was entitled to.
         """
+        with self._lock:
 
-        tenant = require_nonempty(tenant_id, "tenant_id")
-        expected_prev, expected_seq = GENESIS_DIGEST, 0
-        for row in self._conn.execute(
-                "SELECT tenant_seq, content_digest, prev_digest, record_digest "
-                "FROM ledger_entries WHERE tenant_id=? ORDER BY tenant_seq", (tenant,)):
-            tenant_seq, content, prev, record = row
-            if int(tenant_seq) != expected_seq or prev != expected_prev:
-                raise LedgerIntegrityError(
-                    f"tenant {tenant!r} chain breaks at position {expected_seq}")
-            recomputed = domain_digest("control_plane_root.chain", {
-                "tenant_id": tenant, "tenant_seq": int(tenant_seq),
-                "prev_digest": prev, "content_digest": content})
-            if recomputed != record:
-                raise LedgerIntegrityError(
-                    f"tenant {tenant!r} entry {tenant_seq} does not match its digest")
-            expected_prev, expected_seq = record, expected_seq + 1
-        return True
+            tenant = require_nonempty(tenant_id, "tenant_id")
+            expected_prev, expected_seq = GENESIS_DIGEST, 0
+            for row in self._conn.execute(
+                    "SELECT tenant_seq, content_digest, prev_digest, record_digest "
+                    "FROM ledger_entries WHERE tenant_id=? ORDER BY tenant_seq", (tenant,)):
+                tenant_seq, content, prev, record = row
+                if int(tenant_seq) != expected_seq or prev != expected_prev:
+                    raise LedgerIntegrityError(
+                        f"tenant {tenant!r} chain breaks at position {expected_seq}")
+                recomputed = domain_digest("control_plane_root.chain", {
+                    "tenant_id": tenant, "tenant_seq": int(tenant_seq),
+                    "prev_digest": prev, "content_digest": content})
+                if recomputed != record:
+                    raise LedgerIntegrityError(
+                        f"tenant {tenant!r} entry {tenant_seq} does not match its digest")
+                expected_prev, expected_seq = record, expected_seq + 1
+            return True
 
     def close(self) -> None:
-        self._conn.close()
+        with self._lock:
+            self._conn.close()

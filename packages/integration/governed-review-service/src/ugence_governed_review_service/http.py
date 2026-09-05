@@ -39,6 +39,20 @@ ROUTES = (
 )
 
 
+def _approver_view(approver: Any) -> dict:
+    """The port's projection, by its four structural attributes. An eligibility port
+    may return its own projection (the authority directory's ``DirectoryApproverRef``)
+    rather than an ``ApproverRef``, so no method beyond the structure is assumed."""
+
+    kind = approver.approver_kind
+    return {
+        "approver_id": approver.approver_id,
+        "approver_kind": getattr(kind, "value", kind),
+        "role": approver.role,
+        "authority_reference": getattr(approver, "authority_reference", ""),
+    }
+
+
 def queue_entry_view(entry: QueueEntry) -> dict:
     return {
         "approval_id": entry.approval_id,
@@ -57,7 +71,7 @@ def queue_entry_view(entry: QueueEntry) -> dict:
         "provider_id": entry.provider_id,
         "operation": entry.operation,
         "governance_disposition": entry.governance_disposition,
-        "eligible_approvers": [a.to_dict() for a in entry.eligible_approvers],
+        "eligible_approvers": [_approver_view(a) for a in entry.eligible_approvers],
         "instance_known": entry.instance_known,
     }
 

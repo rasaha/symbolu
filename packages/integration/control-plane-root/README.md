@@ -2,7 +2,7 @@
 
 **The audit-ledger service — and nothing else.** Distribution
 `ugence-control-plane-root` · namespace `ugence_control_plane_root` · version
-**0.1.0** · maturity **reference-grade**.
+**0.1.1** · maturity **reference-grade**.
 
 > Append one entry, at one caller-supplied instant, into one tenant's chain.
 > Return the `AuditReference` naming it. This package decides nothing, owns no

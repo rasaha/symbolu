@@ -3,7 +3,7 @@
   "distribution": "ugence-control-plane-root",
   "namespace": "ugence_control_plane_root",
   "note": "Machine-readable snapshot of the curated public API (ugence_control_plane_root.__all__). tests/packaging/test_packaging.py asserts this file equals the live package surface. Regenerate with scripts/generate_public_api.py when the curated API changes deliberately.",
-  "package_version": "0.1.0",
+  "package_version": "0.1.1",
   "symbols": {
     "AuditLedger": {
       "kind": "class",
@@ -84,7 +84,7 @@
     },
     "__version__": {
       "kind": "constant",
-      "value": "0.1.0"
+      "value": "0.1.1"
     },
     "canonical_bytes": {
       "kind": "function",
