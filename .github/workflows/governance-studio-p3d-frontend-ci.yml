@@ -8,6 +8,7 @@ on:
     paths:
       - "apps/ugence-governance-studio/frontend/**"
       - "apps/ugence-governance-studio/contracts/openapi.json"
+      - "apps/ugence-governance-studio/contracts/openapi_v2.json"
       - "apps/ugence-governance-studio/backend/**"
       - "apps/ugence-governance-studio/demo_data/**"
       - "apps/ugence-governance-studio/expected_outputs/**"
@@ -18,6 +19,7 @@ on:
     paths:
       - "apps/ugence-governance-studio/frontend/**"
       - "apps/ugence-governance-studio/contracts/openapi.json"
+      - "apps/ugence-governance-studio/contracts/openapi_v2.json"
       - "apps/ugence-governance-studio/backend/**"
       - ".github/workflows/governance-studio-p3d-frontend-ci.yml"
 
@@ -45,6 +47,15 @@ jobs:
         run: npm run verify:openapi
       - name: public-api-operation-allowlist
         run: npm run verify:api-boundary
+
+      # --- Governed Agent Studio (GAS-4/5) -------------------------------
+      # Separate steps from the v1 ones above, because the two contracts are
+      # frozen independently and a shared gate would couple them.
+      - name: v2-openapi-client-drift
+        run: npm run verify:openapi-v2
+
+      - name: v2-api-boundary-and-sd2
+        run: npm run verify:v2-api-boundary
       - name: architecture-boundary
         run: npm run verify:boundary
       - name: terminology
@@ -55,6 +66,24 @@ jobs:
         run: npm run verify:contrast
       - name: contrast-classification
         run: npx vitest run tests/contrast.test.ts
+      - name: v1-surface-must-be-byte-identical
+        working-directory: .
+        run: |
+          # The GAS-4/5 constraint, checked against git: v2 exists, and none of v1's
+          # frozen artifacts moved. A regenerated-but-self-consistent v1 still fails.
+          for f in \
+            apps/ugence-governance-studio/contracts/openapi.json \
+            apps/ugence-governance-studio/frontend/src/generated/api.ts \
+            apps/ugence-governance-studio/frontend/src/generated/openapi.hash.json \
+            apps/ugence-governance-studio/frontend/security/approved-api-operations.json; do
+            if ! git diff --quiet HEAD -- "$f"; then
+              echo "v1 surface modified: $f — v2 must be additive."
+              git --no-pager diff -- "$f"
+              exit 1
+            fi
+          done
+          echo "v1 surface unchanged."
+
       - name: frontend-version-consistency
         run: npm run verify:version
       - name: tracked-source-verification
