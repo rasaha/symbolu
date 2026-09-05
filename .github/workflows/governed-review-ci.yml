@@ -81,6 +81,12 @@ jobs:
           cd packages/integration/governed-review
           python -m pytest tests/test_boundaries.py -o addopts= -v --no-header
 
+      - name: Receipt linkage, unit level and reconstruction against real stores (HR-E)
+        run: |
+          cd packages/integration/governed-review
+          python -m pytest tests/test_linkage.py -o addopts= -v --no-header \
+            --junitxml=/tmp/review-linkage.xml
+
       - name: Failure-matrix rows 2, 3, 6, 8, 10 inside the DBOS adapter
         run: |
           cd packages/integration/governed-review
@@ -91,8 +97,10 @@ jobs:
         run: |
           python - <<'PY'
           import sys, xml.etree.ElementTree as ET
-          root = ET.parse("/tmp/review-matrix.xml").getroot()
-          skipped = [tc.get("name") for tc in root.iter("testcase") if tc.find("skipped") is not None]
+          skipped = []
+          for path in ("/tmp/review-matrix.xml", "/tmp/review-linkage.xml"):
+              root = ET.parse(path).getroot()
+              skipped += [tc.get("name") for tc in root.iter("testcase") if tc.find("skipped") is not None]
           if skipped:
               print("A skipped row is NOT a passing row. Skipped:")
               for name in skipped:

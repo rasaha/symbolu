@@ -87,7 +87,7 @@ def test_pyproject_declares_the_ratified_dependency_set():
     for forbidden in ("durable-execution", "dbos", "pydantic", "decision-authority",
                       "sqlalchemy", "psycopg", "boto3", "kubernetes", "redis"):
         assert forbidden not in joined
-    assert pkg.__version__ == "0.1.0"
+    assert pkg.__version__ == "0.2.0"
 
 
 def test_no_clock_is_read_anywhere():
