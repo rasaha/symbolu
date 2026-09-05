@@ -5,6 +5,25 @@ one row in `ADR_UGENCE_GOVERNANCE_GAP_SEQUENCING_RATIFICATION.md` (`:59`).
 Documentation only: it creates no package, adapter, credential, network call or
 implementation, and amends no package ADR, port, test or manifest.
 
+## CORRECTION — 2026-09-05
+
+**This record originally claimed, as `[V]`, that no Kubernetes execution-target
+adapter existed. That claim was false and is corrected below.** It is not erased:
+the error and its cause are recorded because a ratification record whose
+corrections are invisible is worth less than one that shows them.
+
+`KubernetesScalingExecutor` already ships, is exported from the curated public API,
+and is tested by Ugence. The original claim rested on a single naming-pattern
+search — `grep "class .*ScalingBackend"` — and this class is named `…Executor`, so
+the search could not have found it. **An absence established by one naming pattern
+is not an absence.**
+
+What changed as a result: §2's inventory now lists the shipped adapter; **Gap B is
+removed** — it was never a gap; and the narrower gap the ladder record had stated
+accurately all along takes its place. Only **Gap A** remains outstanding in this
+record. Ratified in `ADR_UGENCE_RUNTIME_CONNECTOR_AND_KUBERNETES_BACKEND_AMENDMENT.md`
+(rulings RC-1 and KBE-1, PR #1624).
+
 ## The two rulings
 
 **IH-1 — `INTEGRATION_HUB_FOLDED_TO_EXISTING_SEAMS`.** No integration-hub package
@@ -45,24 +64,40 @@ important and still be removable without ungoverning anything.
 |---|---|---|
 | Prometheus HTTP poller (`/api/v1/query`) | **Signal / evidence-source** `[V]` | `packages/capabilities/cloud-scaling-controller/src/ugence_cloud_scaling_controller/signals/prometheus.py:1-8` |
 | GitHub webhook verifier + normalizer | **Source-system ingress** `[V]` — and payload-driven: no outbound call exists in it | `products/code-governance/src/ugence_code_governance/github/` (`__init__.py:1-6`, `webhook.py`, `normalizer.py`) |
-| `FakeScalingBackend` | **Execution-target adapter, fake only** `[V]` | `packages/capabilities/cloud-scaling-operations/src/ugence_cloud_scaling_operations/executors.py:50` |
+| `KubernetesScalingExecutor` | **Execution-target adapter — shipped and tested** `[V]`. Implements `ScalingBackend` against an injected `AppsV1Api`-like client; exported from the curated API; the real SDK is an optional extra, touched only if no client is injected and a live one is explicitly requested; loads no credential at import and refuses without a client | `packages/capabilities/cloud-scaling-operations/src/ugence_cloud_scaling_operations/k8s_executor.py:1-8`, `:28-47`; `__init__.py:45`, `:82`; `pyproject.toml:42-44`; tested in `tests/packaging/test_packaging.py`, `tests/execution/test_execution.py`, `tests/execution/test_guard_coverage.py` |
+| `FakeScalingBackend` | Deterministic fake driving SIMULATION and tests `[V]` | `.../executors.py:50` |
 | `ScalingBackend` Protocol | The **seam** an execution-target adapter implements `[V]` | ibid. `:39` |
 | *(nothing)* | **Runtime connector** `[G]` | — |
 
-Repo-wide there are exactly two backend classes, the Protocol and the fake `[V]`.
-In `packages/`, `kubernetes` appears almost only inside the **21** boundary tests
+~~Repo-wide there are exactly two backend classes, the Protocol and the fake.~~
+**Corrected 2026-09-05:** there are three — the Protocol, the fake, and
+`KubernetesScalingExecutor`. In `packages/`, `kubernetes` appears almost only inside the **21** boundary tests
 that forbid importing it `[V]`
 (`grep -rl -i kubernetes --include=test_import_boundary.py --include=test_boundaries.py packages/`).
 
 ## 3 — Outstanding v1 gaps, counted separately
 
-Roadmap §4 puts three things in v1 (`:98`, `:100`). They are **two distinct gaps**,
-not one, and closing either does not close the other:
+Roadmap §4 puts three things in v1 (`:98`, `:100`). **One product gap remains in
+this record, not two** — the second was an error, corrected 2026-09-05:
 
 | Gap | v1 requirement | Status |
 |---|---|---|
-| **Gap A — runtime connectors** | "Two runtime connectors" (`:98`) | **Zero exist** `[G]`. IH-2 rules that neither shipped connector counts. |
-| **Gap B — execution-target adapter** | "One governed execution-target connector (Kubernetes)" (`:100`) | **None exists** `[G]`; only the Protocol and a fake. |
+| **Gap A — runtime connectors** | "Two runtime connectors" (`:98`) | **Zero exist** `[G]`. IH-2 rules that neither shipped connector counts. **The one outstanding product gap in this record.** |
+| ~~Gap B — execution-target adapter~~ | "One governed execution-target connector (Kubernetes)" (`:100`) | **Withdrawn.** The adapter ships and is tested — see §2. This was never a gap. |
+
+**What is genuinely absent, and it is narrower** `[G]`: **no deployment-side
+production factory constructs the adapter from a Credential Broker grant handle.**
+The ladder record stated this accurately all along — *"no production backend
+factory from a grant handle exists in this repository"*
+(`ADR_CLOUD_SCALING_PHASE5D_BOUNDED_EXECUTION_SCOPING.md:61-64`) — and it is a
+narrower thing than the missing adapter this record wrongly asserted.
+
+**KBE-1 places that construction outside the repository.** Ugence owns and tests
+the adapter code; deployment code builds it from a broker-resolved handle and an
+environment-specific client, outside this repository. The adapter stores no
+credential, and LIVE remains gated: absent authority, credentials or configuration
+resolves to refusal or dry-run. See
+`ADR_UGENCE_RUNTIME_CONNECTOR_AND_KUBERNETES_BACKEND_AMENDMENT.md` (PR #1624).
 
 Deferred and **not** gaps: additional systems-of-record connectors (ATS, HRIS,
 claims, finance) and multi-cloud targets beyond Kubernetes (`:95`, `:98`).
@@ -88,8 +123,11 @@ it — not as a scoping decision.
 
 ## 5 — Kubernetes `ScalingBackend`: sequencing moved to the ladder
 
-Per IH-1, Gap B leaves wave 3 and joins the cloud-scaling ladder alongside 5C, 5D
-and 5X. It is **gated by two decisions already ratified there**, and neither is
+**Corrected 2026-09-05.** This section originally sequenced "Gap B" into the ladder
+as work to be done. The adapter already ships (§2), so what moves to the ladder is
+the **remaining factory gap**, not the adapter. IH-1's disposition is unchanged —
+the Kubernetes execution-target adapter is owned by `cloud-scaling-operations` and
+sequenced by the ladder alongside 5C, 5D and 5X, and never by wave 3. It is **gated by two decisions already ratified there**, and neither is
 reopened here:
 
 1. **The credential decision (5X).** "A grant is a handle, not execution"
@@ -101,21 +139,25 @@ reopened here:
    handle, readiness required — and **any absence resolves `LIVE` to `dry_run`**
    (`cloud-scaling-bounded-execution/README.md:39-51`).
 
-**`[R]` One posture question this raises rather than answers.** That same LIVE
-table currently lists the injected backend as *"built by the deployment from the
-grant handle **outside this repository**"* `[V]`
-(`cloud-scaling-bounded-execution/README.md:47`). Sequencing a Kubernetes backend
-*into* the ladder moves it inside. Whether that is intended — a shipped adapter
-rather than a deployment-supplied one — is a ladder decision for its own scoping
-record, and this amendment does not presume it.
+**~~`[R]` One posture question this raises rather than answers.~~ Withdrawn
+2026-09-05 — the question rested on the same error.** I read the LIVE table's
+*"built by the deployment from the grant handle **outside this repository**"*
+(`cloud-scaling-bounded-execution/README.md:47`) as contradicting a shipped
+adapter, and concluded that sequencing one into the ladder would move it inside.
+It would not: that clause governs **construction, not authorship**. The class ships
+inside and is tested by Ugence; the client and the handle resolution stay outside.
+KBE-1 ratifies exactly that split, so there was never a tension to resolve.
 
 ## What this creates
 
 Nothing. No package, no adapter, no credential, no network call, no implementation,
 and no change to any package ADR, port, test or manifest. Closing the row **removes
-nothing and unblocks nothing**: the Kubernetes backend remains unwritten and the two
-runtime connectors remain unbuilt. What changes is only where each is sequenced and
-what each is called.
+nothing and unblocks nothing**: the two runtime connectors remain unbuilt, and the
+deployment-side factory remains absent by ruling rather than by omission. What
+changes is only where each is sequenced and what each is called.
+
+*(Corrected 2026-09-05: this paragraph previously said "the Kubernetes backend
+remains unwritten". It was written; see the CORRECTION note above.)*
 
 Wave 3 is complete: G4's contracts, the incident-response package, and the
 control-plane root, all merged.
