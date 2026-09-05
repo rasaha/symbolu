@@ -22,7 +22,7 @@ import sqlalchemy as sa
 
 import _hooks
 from _dbos_harness import DEFINITION_DIGEST, WORKFLOW_ID, RecordingProvider, wire
-from conftest import requires_postgres
+from conftest import ADMIN_URL as ADMIN_URL_FOR_WAIT, requires_postgres
 
 from ugence_agent_runtime.governance.decisions import (
     AUTHORITY_RECHECK_ERROR,
@@ -419,6 +419,34 @@ def _pg_ctl(action: str) -> None:
     )
     subprocess.run(
         [*PG_PRIVCMD.split(), inner], check=True, capture_output=True, timeout=120
+    )
+    if action == "start":
+        _await_postgres()
+
+
+def _await_postgres(timeout_s: float = 30.0) -> None:
+    """Block until the server accepts connections again, and fail loudly if it does not.
+
+    ``requires_postgres`` is evaluated at import time, so a server this row failed to
+    restart would turn every remaining row into a silent skip — and a skipped row is not
+    a passing row. Better to fail here, naming the cause, than to hand back a green run
+    that tested almost nothing.
+    """
+    deadline = time.time() + timeout_s
+    last: Exception | None = None
+    while time.time() < deadline:
+        try:
+            engine = sa.create_engine(ADMIN_URL_FOR_WAIT)
+            with engine.connect() as c:
+                c.execute(sa.text("SELECT 1"))
+            engine.dispose()
+            return
+        except Exception as exc:  # noqa: BLE001 - retried until the deadline
+            last = exc
+            time.sleep(0.5)
+    raise AssertionError(
+        f"PostgreSQL did not come back within {timeout_s}s after row 7 restarted it; "
+        f"every remaining row would silently skip. Last error: {last}"
     )
 
 
