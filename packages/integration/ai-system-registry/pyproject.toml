@@ -1,0 +1,56 @@
+# Ugence AI System Registry — the contracts-only inventory of registered AI systems
+# (gap-sequencing ADR wave 2, ruled contracts-only by decision D-5).
+#
+# Scoped and ratified by docs/architecture/ADR_UGENCE_AI_SYSTEM_REGISTRY_SCOPING.md.
+#
+#   THIS PACKAGE RECORDS WHAT AN ADMINISTRATOR ASSERTED.
+#   IT NEVER ADMITS, PROMOTES, APPROVES, GATES, RESOLVES OR ATTESTS.
+#
+# Contracts only: record types, refusal reasons, pure selectors and one read-only
+# Protocol. No store, no adapter, no connector, no admission engine — so the
+# operational registry and its systems-of-record connectors cannot leak into v1.
+#
+# Not a portfolio ledger: WorkflowPortfolio in packages/runtime/agent-runtime stays
+# the only one. Mints no system identity: AssessedSystemBinding is re-exported from
+# governance-contracts, never redefined.
+#
+# Dependency direction (one-way):
+#     ugence-governance-contracts (leaf)   <- AssessedSystemBinding / Validity
+#         ▲
+#     ugence-ai-system-registry (this package)
+#
+# Build:   python -m build packages/integration/ai-system-registry
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ugence-ai-system-registry"
+dynamic = ["version"]
+description = "Ugence AI System Registry — the contracts-only inventory of registered AI systems: bounded registration records over the neutral system identity. Records what an administrator asserted; never admits, promotes, gates or attests."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "Proprietary" }
+authors = [{ name = "Rakesh Mohan" }]
+keywords = ["governance", "registry", "inventory", "ai-systems", "contracts", "ugence"]
+classifiers = ["Typing :: Typed"]
+dependencies = [
+    "ugence-governance-contracts>=0.4.0",
+]
+
+[project.optional-dependencies]
+test = ["pytest>=7.0"]
+
+[tool.setuptools.dynamic]
+version = { attr = "ugence_ai_system_registry.version.__version__" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["ugence_ai_system_registry*"]
+
+[tool.setuptools.package-data]
+ugence_ai_system_registry = ["py.typed"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
