@@ -27,12 +27,11 @@ admissible set is fixed at ratification rather than at call time.
 
 None of that verifies anything. Every envelope permanently derives
 ``signature_verified is False`` and ``admission_established is False`` on top of
-§09's five, and **BR-2A implements no signing, no verification and no key
-parsing**, and ships no cryptographic dependency. D-03 makes a verified
-publisher signature mandatory *before admission*; BR-2C injects the verifier,
-whose default is exact deny-all, and supplies the audited one. Until then
-nothing can be admitted, which is the intended state and not a limitation to be
-worked around.
+§09's five, and **the contracts implement no signing, no verification and no
+key parsing**. D-03 makes a verified publisher signature mandatory *before
+admission*; the candidate verifier in ``verifier.py`` verifies against these
+frames, the deny-all default refuses everything, and neither admits anything —
+admission arrives with the durable authority at BR-2D.
 
 The signing frame, specified now so BR-2C need not reinterpret it
 ------------------------------------------------------------------
@@ -310,7 +309,7 @@ class BenchmarkPublisherSubmissionEnvelope:
     signing_frame_version: str
 
     #: A detached signature, exactly 128 lowercase hex characters. Validated as
-    #: an encoding; verified by nothing.
+    #: an encoding here; verified only at the verifier seam.
     detached_signature: str
 
     def __post_init__(self) -> None:

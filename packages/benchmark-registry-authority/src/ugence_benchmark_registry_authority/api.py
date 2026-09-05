@@ -1,4 +1,4 @@
-"""Canonical public API for the Ugence Benchmark Registry Authority (BR-2C-0).
+"""Canonical public API for the Ugence Benchmark Registry Authority (BR-2C candidate, 0.3.0rc1).
 
 The deliberately curated, supported public surface. Import from here (or the
 equivalently-exported top-level :mod:`ugence_benchmark_registry_authority`).
@@ -8,9 +8,11 @@ in the built wheel, in the built sdist, and in an isolated installed runtime.
 
 What this surface contains
 --------------------------
-The structural contract layer at **0.2.3**. It carries BR-2A's ratified
-"Registry and exact-resolution *contracts*" — D-01 through D-17 — and the
-**non-authoritative lifecycle kernel** BR-2B adds on top of them.
+The curated surface at **0.3.0rc1**. It carries BR-2A's ratified "Registry
+and exact-resolution *contracts*" — D-01 through D-17 — the **non-authoritative
+lifecycle kernel** BR-2B adds on top of them, BR-2C's contract surface, and —
+new at this candidate rung — the two implementations of the approval-verifier
+port: the candidate verifier and the exact deny-all default.
 
 * the three inbound assertion **envelopes** — publisher submission, independent
   approval, revocation — carrying *declared* signature material;
@@ -44,19 +46,24 @@ The structural contract layer at **0.2.3**. It carries BR-2A's ratified
   fault-class map and never written out**, so an appended member classifies
   itself in or out rather than waiting for a hand-edited list to catch up.
 
-Why the BR-2C contracts are here at ``0.2.3``
-----------------------------------------------
-D-23 classifies BR-2C as blocked on **both** unratified governance and audited
-cryptographic engineering. D-24, D-25 and D-26 clear the governance half by
-ruling the contract change; D-32 waives the distinct in-repo reviewer for BR-2C
-only. **The engineering half stands**, so this release carries BR-2C's ratified
-*contract surface* and none of its capability.
+The candidate verifier, and why this is ``0.3.0rc1`` and not ``0.3.0``
+-------------------------------------------------------------------------
+* :class:`BenchmarkEd25519Verifier` — the three verification seams on the D-41
+  pair, inside the one dedicated module ``verifier.py``; and
+* :class:`BenchmarkDenyAllVerifier` — the exact deny-all default.
 
-D-33 mints the rung that says exactly that. ``package_version`` is ``0.2.3`` and
-the milestone label is ``BR-2C-0`` — *BR-2C's contracts landed; no BR-2C
-capability did* — which sits between ``BR-2B`` and ``BR-2C`` in
-``tests/_milestones.py``'s ladder. It is a **version rung, not a subphase**:
-D-01's five subphases are unamended and it mints no closure audit.
+D-23 classifies BR-2C as blocked on both unratified governance and audited
+cryptographic engineering. The governance half was cleared at ``BR-2C-0``
+(D-24 to D-26, D-32 to D-43). The owner then ruled that candidate engineering
+and testing may begin before the D-38 reviewer — an independent external
+cryptographic reviewer — is individually named or the review commissioned, and
+ratified ``0.3.0rc1`` as a **candidate version only**. This release is that
+candidate: engineered and tested, not reviewed, not audited, and never
+described as either. ``0.3.0`` — BR-2C's closure — is not taken until that
+review and D-32(4)'s external audit are commissioned, completed and recorded.
+``BR-2C-RC`` sits between ``BR-2C-0`` and ``BR-2C`` in ``tests/_milestones.py``'s
+ladder; it is a **version rung, not a subphase**, and it mints no closure
+audit.
 
 ``0.3.0`` was not available. §35.1 defines it as the *audited verifier*, which
 this release does not ship and D-32 forbids any artifact of this package from
@@ -79,15 +86,16 @@ D-32(4) makes a hard precondition to any production use.
 
 What this surface does **not** contain
 --------------------------------------
-**No registry, no store, no resolver, no admission engine, no signature
-verifier, no key parser, no trust store or anchor, no approval verifier, no
-anchor resolution logic, no clock read, no selection API, no supersession
+**No registry, no store, no resolver, no admission engine, no trust store or
+anchor, no anchor directory, no clock read, no selection API, no supersession
 implementation, no adapter registry, no identity allow-list, no production
-composition root and no cryptographic dependency.**
+composition root, no signer, and no cryptographic import outside
+``verifier.py``.**
 
-The BR-2C contracts above are **shapes, not capability**. A verified-result type
-is not a verifier, a trust-anchor record type is not a trust store, and the ports
-that name the three verification seams and the anchor-resolution seam remain
+The BR-2C contracts above are **shapes, not capability**; the capability is the
+two verifier classes and nothing else. A trust-anchor record type is not a
+trust store, and the ports that name the store, the anchor-resolution seam and
+the clock remain
 inert :class:`typing.Protocol` declarations that nothing in this package
 satisfies — asserted structurally by
 ``tests/contract/test_confusable_and_ports.py``, not promised here. **The
@@ -228,6 +236,10 @@ from .contracts import (
     BENCHMARK_APPROVAL_VERIFIED_RESULT_DIGEST_DOMAIN,
     BENCHMARK_REVOCATION_VERIFIED_RESULT_DIGEST_DOMAIN,
 )
+from .verifier import (
+    BenchmarkDenyAllVerifier,
+    BenchmarkEd25519Verifier,
+)
 from .version import __version__
 
 __all__ = [
@@ -345,4 +357,10 @@ __all__ = [
     # D-35: the refusal subset a verified result may carry. Appended,
     # never inserted.
     "BENCHMARK_VERIFICATION_REFUSAL_REASONS",
+    # BR-2C candidate rung (0.3.0rc1): the two implementations of the
+    # approval-verifier port — the D-41 candidate verifier and the exact
+    # deny-all default. Appended, never inserted. Candidate only: not
+    # reviewed, not audited, not 0.3.0.
+    "BenchmarkDenyAllVerifier",
+    "BenchmarkEd25519Verifier",
 ]

@@ -307,9 +307,9 @@ def require_public_key_material(value: object, name: str) -> str:
     Ed25519 public-key material would have — 32 bytes, one spelling, lowercase
     hex. It does not decode those bytes, does not check that they are a valid
     curve point, does not construct a key object and does not import anything to
-    do so. D-04 forbids this package from parsing key material and this package
-    ships no cryptographic dependency at all; a validator that decoded the point
-    would be the first half of a key parser.
+    do so. D-04 forbids the contracts from parsing key material; the point is
+    decoded and strictly validated only at the verifier seam, in ``verifier.py``,
+    when an anchor is admitted into a verification (D-41).
 
     Carried as a string rather than :class:`bytes` for the same reason every
     other opaque value in this package is: canonicalization refuses ``bytes``
@@ -323,9 +323,9 @@ def require_public_key_material(value: object, name: str) -> str:
     if not _ED25519_PUBLIC_KEY_HEX_RE.match(text):
         raise _fail(
             f"{name} must be Ed25519 public-key material as exactly 64 "
-            "lowercase hex characters (32 bytes); the encoding is checked and "
-            "the bytes are never decoded, because this package parses no key "
-            "material and links no cryptographic library",
+            "lowercase hex characters (32 bytes); the encoding is checked here "
+            "and the bytes are never decoded by the contract — the point is "
+            "validated at the verifier seam, not at construction",
             BenchmarkRegistryRefusalReason.INDETERMINATE,
         )
     return text

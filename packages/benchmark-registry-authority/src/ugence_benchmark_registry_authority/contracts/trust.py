@@ -1,13 +1,14 @@
-"""BR-2C's trust and verification **contracts**. No verifier ships here.
+"""BR-2C's trust and verification **contracts**. No verifier lives in this module.
 
 D-24 and D-25 replace the two ``bool``-returning seams BR-2A froze. This module
 holds the exact types those rulings require, and **nothing that produces one**:
-there is no verifier, no key parser, no trust store, no anchor resolution logic,
-no clock read and no cryptographic dependency in this package. §35.1's
-engineering blocker on BR-2C stands, and D-32 waives only the distinct-reviewer
-requirement, not that.
+the producer is the candidate verifier in ``verifier.py`` (and the deny-all
+default beside it), the only module that imports a cryptographic library. This
+module has no key parser, no trust store, no anchor resolution logic, no clock
+read and no cryptographic import.
 
-**The verifier this contract describes does not exist and has not been audited.**
+**The verifier that produces these at ``0.3.0rc1`` is a candidate: not
+independently reviewed and not externally audited.**
 D-32 narrows "independently audited" for BR-2C to an *external cryptographic
 audit of the verifier*, makes that audit a hard precondition to any production
 use, and forbids any artifact of this package describing the verifier as
@@ -431,8 +432,9 @@ class BenchmarkTrustAnchorRecord:
     signature_profile: BenchmarkSignatureProfile
 
     #: Ed25519 public-key material as exactly 64 lowercase hex characters.
-    #: Validated as an **encoding** and never decoded: this package parses no key
-    #: material and links no cryptographic library.
+    #: Validated here as an **encoding** and never decoded by the contract: the
+    #: point is checked at the verifier seam, when the anchor is admitted into
+    #: a verification (D-41), never at construction (D-04).
     public_key_material: str
 
     #: Inclusive start of the anchor's validity interval.
@@ -697,7 +699,8 @@ class BenchmarkPublisherVerifiedResult:
     derivations remain permanently ``False`` on every instance, including one
     reading ``outcome=VERIFIED``.
 
-    Produced by nothing in this package: no verifier ships here.
+    Produced only by the candidate verifier and the deny-all default in
+    ``verifier.py``, and by a caller writing one down.
     """
 
     #: The canonical digest of the exact publisher submission envelope this
@@ -759,7 +762,7 @@ class BenchmarkApprovalVerifiedResult:
     does **not** establish that the approval is valid, that the artifact may be
     admitted, or that anything was registered — ``approval_authenticity_
     established`` stays permanently ``False`` here as everywhere else in this
-    package, because no verifier exists to establish it.
+    package: a verifier establishes cryptographic verification and nothing else.
     """
 
     #: The canonical digest of the exact approval envelope this result is about.

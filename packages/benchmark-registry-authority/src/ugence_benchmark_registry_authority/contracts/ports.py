@@ -148,7 +148,9 @@ class BenchmarkRegistryStorePort(Protocol):
 
 @runtime_checkable
 class BenchmarkPublisherTrustDirectoryPort(Protocol):
-    """The role-scoped anchor **resolution** seam. **Implemented nowhere.**
+    """The role-scoped anchor **resolution** seam. **Implemented nowhere in this
+    package**: the composition root owns the directory (D-04), and the candidate
+    verifier takes one as an input.
 
     D-25 replaces Boolean entitlement with exact anchor resolution: the seam
     resolves an **immutable role-scoped anchor record** rather than answering
@@ -212,7 +214,9 @@ class BenchmarkPublisherTrustDirectoryPort(Protocol):
 
 @runtime_checkable
 class BenchmarkApprovalVerifierPort(Protocol):
-    """The independent approval-verification seam. **Implemented nowhere.**
+    """The independent approval-verification seam. **Implemented at the
+    candidate rung by exactly two classes** — ``BenchmarkEd25519Verifier`` and
+    ``BenchmarkDenyAllVerifier`` in ``verifier.py`` — and by nothing else.
 
     D-03: a verified publisher signature is **mandatory before admission**. An
     unsigned, malformed, unknown-key, revoked-key or invalidly signed artifact
@@ -225,11 +229,13 @@ class BenchmarkApprovalVerifierPort(Protocol):
     whose default is exact deny-all and supplies the audited one, reusing neither the Policy
     Authority nor the Risk Authority Ed25519 implementation.
 
-    **No verifier ships at this contract slice either, and none has been
-    audited.** D-32 waives the distinct in-repo reviewer for BR-2C only and
-    narrows "independently audited" to an *external cryptographic audit of the
-    verifier*, which remains a hard precondition to any production use. The
-    engineering half of §35.1's blocker is untouched by that waiver.
+    **The verifier that ships at ``0.3.0rc1`` is a candidate.** It has been
+    engineered and tested under the owner's early-engineering ruling; it has
+    **not** been independently reviewed or externally audited. D-32 narrows
+    "independently audited" to an *external cryptographic audit of the
+    verifier*, which remains a hard precondition to any production use, and
+    D-38 requires an independent external cryptographic reviewer to audit the
+    exact release head before any final ``0.3.0``.
 
     Three seams, not two
     ---------------------
@@ -250,7 +256,7 @@ class BenchmarkApprovalVerifierPort(Protocol):
         envelope: BenchmarkPublisherSubmissionEnvelope,
         trusted_instant: datetime,
     ) -> BenchmarkPublisherVerifiedResult:
-        """Verify the envelope's detached signature. Never called here.
+        """Verify the envelope's detached signature.
 
         Returns an exact result binding the envelope digest, the signer role,
         identity and key, the profile, the anchor revision, ``trusted_instant``,
@@ -265,7 +271,7 @@ class BenchmarkApprovalVerifierPort(Protocol):
         envelope: BenchmarkApprovalEnvelope,
         trusted_instant: datetime,
     ) -> BenchmarkApprovalVerifiedResult:
-        """Verify the approval's detached signature. Never called here.
+        """Verify the approval's detached signature.
 
         A distinct result type from the publisher seam's, because D-02 forbids a
         publisher's own signature from standing where an independent approver's
@@ -278,7 +284,7 @@ class BenchmarkApprovalVerifierPort(Protocol):
         envelope: BenchmarkRevocationEnvelope,
         trusted_instant: datetime,
     ) -> BenchmarkRevocationVerifiedResult:
-        """Verify the revocation assertion's signature. Never called here.
+        """Verify the revocation assertion's signature.
 
         Added by D-26, which verifies revokers at BR-2C under role separation.
         **Verifying a revoker's assertion is not appending a revocation**:

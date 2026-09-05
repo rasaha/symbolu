@@ -135,8 +135,9 @@ class BenchmarkSignatureProfile(str, Enum):
     member reserved "for later" would be a byte space a future milestone would
     have to either honour or break, which §05 prohibits.
 
-    **Declaring a profile is not using one.** BR-2A performs no signing, no
-    verification and no key parsing, and ships no cryptographic dependency.
+    **Declaring a profile is not using one.** The contracts perform no signing,
+    no verification and no key parsing; the candidate verifier in
+    ``verifier.py`` verifies under this one profile and signs under none.
     """
 
     #: Ed25519 (RFC 8032) over the SHA-512-based EdDSA construction, applied to
@@ -400,9 +401,9 @@ class BenchmarkVerificationOutcome(str, Enum):
     unknown condition maps there and refuses. A third outcome member would be a
     way for a result to be neither verified nor refused, which fails open.
 
-    **Declaring an outcome is not producing one.** No verifier ships at this
-    contract slice, so every value of this enum in this package is one a caller
-    wrote down.
+    **Declaring an outcome is not producing one.** Only the candidate verifier
+    and the deny-all default in ``verifier.py`` produce a value of this enum;
+    everywhere else in the package it is one a caller wrote down.
     """
 
     #: The signature verified under the bound profile against the bound anchor

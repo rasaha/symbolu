@@ -1,4 +1,4 @@
-"""Ugence Benchmark Registry Authority — BR-2C-0 contract surface, no capability.
+"""Ugence Benchmark Registry Authority — BR-2C candidate head (0.3.0rc1).
 
 Independent distribution ``ugence-benchmark-registry-authority``. The
 **authority/registry layer** of the shared, platform-wide Benchmark Registry,
@@ -18,26 +18,29 @@ Milestone boundary
   verifier, no clock, no append path and no authority-issued result**, and it
   **cannot admit, register, revoke or resolve**. It determines what transition
   *would be* valid; nothing here makes one occur.
-* **BR-2C-0 (this release, 0.2.3; the rung carries 0.2.1, 0.2.2 and 0.2.3)** —
-  BR-2C's ratified **contract surface**, and no BR-2C capability. A **version
-  rung, not a subphase** (D-33, with D-36 ruling that all three versions sit on
-  it): D-01's five subphases are unamended and it mints no closure audit. It
-  exists because the curated surface moved — ``api.__all__`` 93 → 108 across the
-  three versions — while ``0.3.0`` stays reserved for the audited verifier.
-* **BR-2C (0.3.0)** — the cryptographic trust authority: audited verifier,
-  signing-frame verification, anchor resolution, key rotation and revocation.
-  The injected verifier arrives here, defaulting to exact deny-all. **Still
-  blocked** on an audited cryptographic verifier and a composition-root
-  trust-resolver design. Its ratified *contract surface* — the trust-anchor
-  record, the three distinct verified-result types and the reshaped ports
-  (D-24, D-25, D-26), D-34's ``BenchmarkTrustAnchorResolution`` at the
-  trust-directory seam, and D-35's
-  ``BENCHMARK_VERIFICATION_REFUSAL_REASONS``, the twelve of the twenty-four a
-  refused verified result may carry — ship at ``0.2.1``, ``0.2.2`` and
-  ``0.2.3``, because D-23 classifies the
-  governance and engineering blockers as independent and only the governance
-  half is cleared. **No verifier ships, and
-  none has been audited** (D-32).
+* **BR-2C-0 (0.2.1, 0.2.2, 0.2.3)** — BR-2C's ratified **contract surface**,
+  and no BR-2C capability. A **version rung, not a subphase** (D-33, D-36):
+  the trust-anchor record, the three verified-result types, the reshaped ports
+  (D-24, D-25, D-26), the anchor-resolution outcome (D-34) and the verified-
+  result refusal subset (D-35); ``api.__all__`` 93 → 108 across the three.
+* **BR-2C-RC (this release, 0.3.0rc1)** — the **BR-2C candidate head**. The
+  three seams of ``BenchmarkApprovalVerifierPort`` implemented by
+  ``BenchmarkEd25519Verifier`` on the D-41 pair (``cryptography`` verifies,
+  ``PyNaCl`` validates the public-key point at anchor admission), inside the
+  one dedicated module ``verifier.py``; ``BenchmarkDenyAllVerifier``, the
+  **exact deny-all default**; the D-42 key-identifier and D-43 actor-identity
+  grammar applied at construction; ``api.__all__`` 108 → 110. A **candidate
+  version only**, ratified by the owner as such: it conveys no audit,
+  independent-review or production-release claim. It cannot admit, register,
+  revoke or resolve, holds no anchors and reads no clock — the directory and
+  the trusted instant are both inputs. **Not reviewed, not audited, not
+  0.3.0.**
+* **BR-2C (0.3.0)** — BR-2C's closure: the same verifier after the D-38
+  independent external cryptographic reviewer has been individually named and
+  the review commissioned and completed, and D-32(4)'s external cryptographic
+  audit obtained and recorded. Neither has occurred. The composition-root
+  trust-resolver adapter and key entitlements stay with the composition root
+  (D-04) and arrive with it.
 * **BR-2D (0.4.0)** — the durable registry authority: persistence, the trusted
   clock, compare-and-set transitions, immutable event history, the process-local
   in-memory adapter, and the **first authoritative** admission, registration,
@@ -49,10 +52,12 @@ Milestone boundary
 
 Dependencies
 ------------
-Exactly one runtime dependency: ``ugence-benchmark-registry==0.1.*``, plus the
-standard library. Nothing else, in either direction — a dependency-boundary test
-proves this package imports no other Ugence package, and that at BR-2A delivery
-no package in the monorepo imports *this* one. That reverse fact is the **BR-2A
+Exactly three runtime dependencies: ``ugence-benchmark-registry==0.1.*`` and
+the D-41 pair, ``cryptography`` and ``PyNaCl``, both bounded on both sides and
+both imported **only** inside ``verifier.py`` — plus the standard library.
+Nothing else, in either direction — a dependency-boundary test proves this
+package imports no other Ugence package, confines the pair to the one module,
+and that at BR-2A delivery no package in the monorepo imports *this* one. That reverse fact is the **BR-2A
 terminal state, not a permanent invariant**: BR-2C and later explicitly may
 depend on BR-2A after their own ratification.
 
@@ -175,6 +180,8 @@ from .api import (
     BENCHMARK_REVOCATION_VERIFIED_RESULT_DIGEST_DOMAIN,
     BenchmarkTrustAnchorResolution,
     BENCHMARK_VERIFICATION_REFUSAL_REASONS,
+    BenchmarkDenyAllVerifier,
+    BenchmarkEd25519Verifier,
 )
 from .version import __version__
 
@@ -289,5 +296,9 @@ __all__ = [
     "BenchmarkTrustAnchorResolution",
     # D-35: the refusal subset a verified result may carry.
     "BENCHMARK_VERIFICATION_REFUSAL_REASONS",
+    # BR-2C candidate rung (0.3.0rc1): the candidate verifier and the exact
+    # deny-all default. Candidate only — not reviewed, not audited, not 0.3.0.
+    "BenchmarkDenyAllVerifier",
+    "BenchmarkEd25519Verifier",
     "api",
 ]
