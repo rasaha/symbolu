@@ -57,6 +57,106 @@ function ParkedNotice({ status, dispositions }: { status: string; dispositions: 
   return null;
 }
 
+/**
+ * The receipt linkages the review service returns since its 0.2.0 (HE-5). Each is the
+ * service's typed answer about one decided approval: APPENDED or ALREADY_APPENDED
+ * carry the linkage and its control-plane audit reference; NOT_YET means the round
+ * trip is not complete yet; LEDGER_UNCONFIGURED means no ledger is wired. None of
+ * those is an error, and none is rendered as an empty section. Everything shown is
+ * history: what was joined, and where the entry was written.
+ */
+function LinkagesPanel({ linkages }: { linkages: Rec[] }) {
+  if (linkages.length === 0) {
+    return (
+      <p className="text-[12px] text-ink-2">
+        The review service reports no decided approval for this instance, so there is no
+        linkage to show.
+      </p>
+    );
+  }
+  return (
+    <ul className="space-y-3" aria-label="receipt linkages">
+      {linkages.map((l) => {
+        const state = str(l.state);
+        const appended = state === "APPENDED" || state === "ALREADY_APPENDED";
+        const ref = rec(l.audit_reference);
+        const link = rec(l.linkage);
+        return (
+          <li
+            key={`${str(l.approval_id)}:${str(l.task_id)}`}
+            className="rounded border border-surface-border bg-surface-2 p-3 text-[11px]"
+            aria-label={`linkage ${str(l.approval_id)}`}
+          >
+            <div className="mb-1 flex flex-wrap items-center gap-2">
+              <span className="font-mono">{str(l.approval_id)}</span>
+              <span className="text-ink-2">task</span>
+              <span className="font-mono">{str(l.task_id)}</span>
+              <span className="rounded border border-surface-border px-1.5 py-0.5 font-mono">{state}</span>
+            </div>
+            {appended ? (
+              <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1">
+                <dt className="text-ink-2">Linkage digest (history)</dt>
+                <dd>
+                  <Fingerprint value={str(l.linkage_digest) || null} label="linkage digest" />
+                </dd>
+                <dt className="text-ink-2">Audit store</dt>
+                <dd className="font-mono">{str(ref.store_ref) || "—"}</dd>
+                <dt className="text-ink-2">Audit entry</dt>
+                <dd className="font-mono">{str(ref.entry_ref) || "—"}</dd>
+                <dt className="text-ink-2">Entry digest (history)</dt>
+                <dd>
+                  <Fingerprint value={str(ref.entry_digest) || null} label="audit entry digest" />
+                </dd>
+                <dt className="text-ink-2">Recorded at</dt>
+                <dd className="font-mono">{str(ref.recorded_at) || "—"}</dd>
+                <dt className="text-ink-2">Proposal fingerprint (history)</dt>
+                <dd>
+                  <Fingerprint value={str(link.proposal_fingerprint) || null} label="proposal fingerprint" />
+                </dd>
+                <dt className="text-ink-2">Consumption</dt>
+                <dd className="font-mono">{str(link.consumption_id) || "—"}</dd>
+                <dt className="text-ink-2">Decided by</dt>
+                <dd className="font-mono">
+                  {str(link.decided_by) || "—"} · {str(link.decided_role) || "—"} · {str(link.decided_at) || "—"}
+                </dd>
+                <dt className="text-ink-2">Events (park · signal · resume)</dt>
+                <dd className="font-mono">
+                  {str(link.paused_event_seq) || "—"} · {str(link.signal_event_seq) || "none"} ·{" "}
+                  {str(link.resumed_event_seq) || "—"}
+                </dd>
+                <dt className="text-ink-2">Evaluations (parked → resumed)</dt>
+                <dd className="font-mono">
+                  {str(link.parked_disposition) || "—"} → {str(link.resumed_disposition) || "—"}
+                </dd>
+              </dl>
+            ) : (
+              <p role="note" aria-label={`linkage ${state.toLowerCase().replace("_", " ")}`} className="text-ink-1">
+                {state === "NOT_YET" ? (
+                  <>
+                    <span className="font-semibold">Not yet linked.</span> The review service reports
+                    the round trip is not complete: {str(l.reason) || "the next evaluation has not run"}.
+                    Nothing is written until it is.
+                  </>
+                ) : state === "LEDGER_UNCONFIGURED" ? (
+                  <>
+                    <span className="font-semibold">No audit ledger configured.</span> The review
+                    service has no control-plane ledger to write to; the decision stands, the
+                    linkage is not durably recorded.
+                  </>
+                ) : (
+                  <>
+                    <span className="font-semibold">{state}.</span> {str(l.reason)}
+                  </>
+                )}
+              </p>
+            )}
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
 export function RunDetailScreen() {
   const { instanceId = "" } = useParams<{ instanceId: string }>();
   const run = useReviewRun(instanceId);
@@ -174,6 +274,24 @@ export function RunDetailScreen() {
           )
         ) : null}
       </Panel>
+
+      {run.data && !isUnavailable(run.data) && (run.data as { found?: boolean }).found !== false ? (
+        <Panel title="Receipt linkages">
+          <p className="mb-2 text-[11px] text-ink-3">
+            Shown as history. A linkage joins the proposal fingerprint, the approval, its
+            consumption, the park, the decision signal, the resume and the two evaluations; the
+            audit reference says where the review service wrote it. This screen writes nothing.
+          </p>
+          <LinkagesPanel
+            linkages={
+              (() => {
+                const result = rec((run.data as { result?: unknown }).result);
+                return Array.isArray(result.linkages) ? (result.linkages as Rec[]) : [];
+              })()
+            }
+          />
+        </Panel>
+      ) : null}
 
       {approvalId ? (
         <Panel title={`Approval ${approvalId}`}>
