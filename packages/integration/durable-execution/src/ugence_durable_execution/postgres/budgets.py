@@ -61,32 +61,53 @@ class PostgresBudgetLedger:
         the duplicate too late to undo it.
         """
         s = self._session()
-        inserted = s.execute(
-            sa.text(
-                f"INSERT INTO {SCHEMA_NAME}.budget_consumption "
-                "(budget_id, idempotency_key, instance_id, units) "
-                "VALUES (:b, :k, :i, :u) "
-                "ON CONFLICT (budget_id, idempotency_key) DO NOTHING "
-                "RETURNING idempotency_key"
-            ),
-            {"b": budget_id, "k": idempotency_key, "i": instance_id, "u": units},
-        ).first()
-        if inserted is None:
-            return False  # already consumed under this key; settle once, not twice
+        # Everything below runs under a SAVEPOINT so that a refusal leaves the
+        # enclosing transaction usable: PostgreSQL aborts the whole transaction on any
+        # error, so without the savepoint a refused reservation would also poison the
+        # durable step that asked for it. Rolling the savepoint back also discards the
+        # consumption row, so a refused key is not remembered as "already consumed".
+        nested = s.begin_nested()
         try:
-            s.execute(
+            inserted = s.execute(
+                sa.text(
+                    f"INSERT INTO {SCHEMA_NAME}.budget_consumption "
+                    "(budget_id, idempotency_key, instance_id, units) "
+                    "VALUES (:b, :k, :i, :u) "
+                    "ON CONFLICT (budget_id, idempotency_key) DO NOTHING "
+                    "RETURNING idempotency_key"
+                ),
+                {"b": budget_id, "k": idempotency_key, "i": instance_id, "u": units},
+            ).first()
+            if inserted is None:
+                nested.commit()
+                return False  # already consumed under this key; settle once, not twice
+            # Conditional so the ordinary path never trips the CHECK constraint; the
+            # constraint remains the backstop, and a violation is still caught below
+            # inside the savepoint.
+            updated = s.execute(
                 sa.text(
                     f"UPDATE {SCHEMA_NAME}.budgets SET consumed = consumed + :u "
-                    "WHERE budget_id = :b"
+                    "WHERE budget_id = :b AND consumed + :u <= ceiling "
+                    "RETURNING consumed"
                 ),
                 {"u": units, "b": budget_id},
-            )
+            ).first()
+            if updated is None:
+                raise BudgetExhausted(
+                    f"budget {budget_id!r} would exceed its ceiling; refusing to consume "
+                    f"{units} for {idempotency_key!r} (instance {instance_id!r})"
+                )
             s.flush()
         except sa.exc.IntegrityError as exc:
+            nested.rollback()
             raise BudgetExhausted(
                 f"budget {budget_id!r} would exceed its ceiling; refusing to consume "
                 f"{units} for {idempotency_key!r} (instance {instance_id!r})"
             ) from exc
+        except BudgetExhausted:
+            nested.rollback()
+            raise
+        nested.commit()
         return True
 
     def consumed(self, budget_id: str) -> int:

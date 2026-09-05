@@ -44,8 +44,9 @@ neither the application write nor the step record.
 from __future__ import annotations
 
 import json
+from contextlib import contextmanager
 from dataclasses import dataclass
-from typing import Any, Callable, Dict, List, Mapping, Optional, Sequence
+from typing import Any, Callable, Dict, Iterator, List, Mapping, Optional, Sequence
 
 import sqlalchemy as sa
 
@@ -152,8 +153,16 @@ class DbosExecutionAdapter:
         bundle: Any,
         worker_id: str = "worker-1",
         production_mode: bool = True,
-        definition_digest: str = "",
+        definition_digest: str,
     ) -> None:
+        # Required and non-empty: the row-10 refusal compares an instance's stored digest
+        # against THIS value, and an adapter that did not say what it is running could
+        # only ever pass that check vacuously.
+        if not isinstance(definition_digest, str) or not definition_digest:
+            raise PostureError(
+                "definition_digest is required: the adapter must state which compiled "
+                "workflow definition this deployment runs (ADR §8 row 10)"
+            )
         if production_mode and not bundle.is_production_authoritative:
             raise PostureError(
                 "production_mode requires a durable, integrity-checked store bundle; "
@@ -219,6 +228,13 @@ class DbosExecutionAdapter:
                         f"(workflow_id={workflow_id!r}, definition_digest={definition_digest!r})"
                     )
                 return instance_id
+            if definition_digest != self._definition_digest:
+                # An instance started under a definition this deployment is not
+                # running could never be rehydrated by this deployment; refuse now
+                # rather than at the first recovery.
+                raise DefinitionVersionMismatch(
+                    instance_id, definition_digest, self._definition_digest
+                )
             engine = self._engine_for(instance_id, definition_digest)
             definition = self._host.definition_for(workflow_id)
             engine.prepare_workflow(definition, correlation_id)
@@ -248,12 +264,13 @@ class DbosExecutionAdapter:
                 return StepOutcome.parked(instance_id, "CLAIM_HELD_BY_ANOTHER_WORKER")
             digest = state.definition_digest(instance_id) or ""
             engine = self._engine_for(instance_id, digest)
-            events = self._bundle.event_store
-            if hasattr(events, "attempt_token"):
-                events.attempt_token = attempt_token
-            if instance_id not in getattr(engine, "_instances", {}):
-                self._rehydrate(engine, instance_id, digest)
-            outcome = engine.advance_workflow(instance_id)
+            # The token is scoped to THIS attempt on THIS instance: set for the
+            # duration of the advance and cleared on every exit path, so a later
+            # resume, start or interleaved instance can never inherit it.
+            with _attempt_scope(self._bundle.event_store, attempt_token):
+                if instance_id not in getattr(engine, "_instances", {}):
+                    self._rehydrate(engine, instance_id, digest)
+                outcome = engine.advance_workflow(instance_id)
             return StepOutcome.from_advance(outcome)
 
         return self._durable.run("advance", _step)
@@ -269,6 +286,13 @@ class DbosExecutionAdapter:
         """
         def _sig() -> None:
             s = self._ds.sql_session()
+            # The same per-instance transaction-scoped advisory lock ``claim`` takes, so
+            # the sequence number below is computed under exclusion from a concurrent
+            # advance rather than racing it to the (instance_id, seq) primary key. A
+            # signal waits for the in-flight step to end; it is data, so it may queue.
+            s.execute(
+                sa.text("SELECT pg_advisory_xact_lock(hashtext(:i))"), {"i": instance_id}
+            )
             seq = s.execute(
                 sa.text(
                     f"SELECT COALESCE(MAX(seq),0)+1 FROM {SCHEMA_NAME}.runtime_events "
@@ -411,13 +435,14 @@ class DbosExecutionAdapter:
     def _rehydrate(self, engine: Any, instance_id: str, definition_digest: str) -> None:
         """Rebuild an in-process instance from durable state.
 
-        Refuses when the stored ``definition_digest`` differs from the definition now on
-        offer (ADR §8 row 10): an instance started under one compiled workflow is not
-        reinterpreted under another.
+        Refuses when the stored ``definition_digest`` differs from the one THIS adapter
+        was constructed with (ADR §8 row 10): an instance started under one compiled
+        workflow is not reinterpreted under another. The comparison is strict — a
+        missing stored digest is a mismatch too, never a pass.
         """
         stored = self._bundle.state_store.definition_digest(instance_id)
-        deployed = self._definition_digest or definition_digest
-        if stored and deployed and stored != deployed:
+        deployed = self._definition_digest
+        if stored != deployed:
             raise DefinitionVersionMismatch(instance_id, stored, deployed)
         checkpoint = self._bundle.state_store.load(instance_id)
         if checkpoint is None:
@@ -426,6 +451,19 @@ class DbosExecutionAdapter:
             )
         definition = self._host.definition_for(checkpoint.workflow_id)
         engine.recover_runtime(instance_id, definition)
+
+
+@contextmanager
+def _attempt_scope(events: Any, attempt_token: str) -> Iterator[None]:
+    """Set the event store's attempt token for one attempt and clear it afterwards."""
+    if not hasattr(events, "attempt_token"):
+        yield
+        return
+    events.attempt_token = attempt_token
+    try:
+        yield
+    finally:
+        events.attempt_token = None
 
 
 # --------------------------------------------------------------------------- #
