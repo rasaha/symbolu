@@ -247,7 +247,8 @@ v1 is complete when, for the Kubernetes infrastructure-agent wedge:
 > execution engine beneath it. It is an engineering sequencing record, not a budget
 > input: it adds no line to §8 and re-derives no figure in §8c. Each item carries its
 > own status row; GAS-1 through GAS-4 are implemented and merged, GAS-5 is deferred by
-> owner ruling, GAS-6 is gated. Nothing in it is piloted or certified. Evidence labels
+> owner ruling, GAS-6 is gated, GAS-7 is scoped and ruled with no step entered. Nothing
+> in it is piloted or certified. Evidence labels
 > follow the repository convention — `[V]` verified against
 > this repository, `[I]` inferred, `[R]` requires owner ratification, `[G]` gap.
 >
@@ -339,6 +340,16 @@ inside `apps/ugence-governance-studio`.
 | **Exit** | The complete GAS-1 matrix passes against Temporal **with no change** to Workflow IR, governance state, receipts, or any file under `packages/runtime/agent-runtime` (GAS-R2) — that no-change property is the exit criterion, verified by diff. |
 | **Label on completion** | **Contract-only** until its matrix passes; **Core implemented** thereafter. |
 
+#### GAS-7 · Human review and durable resume — **scoped and ruled; HR-A next**
+
+| | |
+|---|---|
+| **Entry** | Owner rulings HR-1 to HR-5 in `docs/architecture/ADR_UGENCE_HUMAN_REVIEW_DURABLE_RESUME_SCOPING.md` — **met 2026-09-05**. Each step HR-A to HR-E is entered only by its own implementation prompt. |
+| **Work** | Compose what exists and mint nothing: a production `GovernanceInputSource` that reads the approval ledger and the authority directory, binds an approval to the proposal fingerprint, and consumes it exactly once before the engine advances (HR-A); a bounded resume in the DBOS adapter (HR-B); a review service that lists the queue and records a human decision under IdP identity and the eligibility port (HR-C); Review Queue and Run Detail screens under SD-1 and SD-2 (HR-D); one audit reference joining proposal, approval, consumption and resumed evaluation (HR-E). |
+| **Exit** | The eleven-row failure matrix in that ADR §4 is green against a real PostgreSQL and a real SQLite ledger: duplicate decisions, stale approvals, expiry, revocation, wrong approver, correlation mismatch, crash before and after decision persistence, duplicate resume signals, clearance change before resumed execution, and bounded resume. Matrix row 9 of the DBOS ADR is rewritten to actually resume. |
+| **Status (2026-09-05)** | **Scoped and ruled; nothing implemented.** The path is fail-closed in the restrictive direction and has no sink in the permissive one `[V]` (`agent-runtime-governance/.../__init__.py:76-80`): no production `GovernanceInputSource` exists, `resume_workflow` takes only an instance id, the approval ledger is imported by nothing on the path, and no studio, console or client surface lists a queue or records a decision. Evidence: the ADR §2 path map and `apps/ugence-governance-studio/docs/HUMAN_REVIEW_SCREEN_API_AUDIT.md`. |
+| **Label on completion** | **Core implemented, reference-grade, shadow-only** at best: the approval ledger and directory are `REFERENCE_GRADE_SHADOW_ONLY`, the runtime invokes fixture providers, no credential broker or IdP integration exists. Pilot validation and production certification are not reachable from this item. |
+
 ### 11.2 Non-goals for this whole sequence
 
 No live execution against real systems. No credentials — the Credential Broker
@@ -349,8 +360,8 @@ production certification, on any item, at any exit above.
 
 ### 11.3 Owner decisions — ruled 2026-09-05
 
-All are ruled and recorded at source. GAS-1 through GAS-4 are complete and merged;
-GAS-5 is deferred; GAS-6 remains gated.
+All below are ruled and recorded at source. GAS-1 through GAS-4 are complete and
+merged; GAS-5 is deferred; GAS-6 remains gated; GAS-7 is ruled and not entered.
 
 | # | Ruling | Recorded in |
 |---|---|---|
@@ -359,6 +370,11 @@ GAS-5 is deferred; GAS-6 remains gated.
 | OD-3 | **`RATIFY`** (2026-09-05) — the CI-verified matrix promotes DBOS from *candidate* to *ratified as the initial engine*; `DBOS_ENGINE_STATUS = "RATIFIED"` | same, §8A and §9 |
 | SD-1 | `EXPLICIT_PUBLIC_ALLOWLIST` — the studio boundary widens only by a per-package public-entry-point allowlist; the architecture test is retained | `apps/ugence-governance-studio/docs/GOVERNED_AGENT_STUDIO_V1_SCREEN_AUDIT.md` |
 | SD-2 | `NON_AUTHORITY_STUDIO` — the studio never issues, activates, revokes, grants, authorizes, clears or executes | same |
+| HR-1 | **`DISPLAY_AND_TRANSMIT`** (2026-09-05) — the studio renders the review queue and run detail and relays a verbatim human decision to a separate review service; it holds no identity, consumes nothing, signals nothing, resumes nothing | `ADR_UGENCE_HUMAN_REVIEW_DURABLE_RESUME_SCOPING.md` §5; `HUMAN_REVIEW_SCREEN_API_AUDIT.md` |
+| HR-2 | **`NEW_PACKAGE_GOVERNED_REVIEW`** — `packages/integration/governed-review` owns the production `GovernanceInputSource`, the consume-then-advance order and the review service | same, §5 |
+| HR-3 | **`RATIFY_FINGERPRINT_BINDING`** — approvals bind to the proposal fingerprint with `consumer_ref=<instance_id>:<task_id>`; consume in the SQLite ledger, then advance in Postgres; same-holder `ALREADY_CONSUMED` is satisfied | same, §3 and §5 |
+| HR-4 | **`BARE_RUNTIME_BOUNDED_ADAPTER`** — the runtime's resume stays bare and unexposed; the DBOS adapter moves to `continue_workflow`, one quantum per durable step, re-running the DBOS §8 matrix | same, §5 |
+| HR-5 | **`ESCALATE_ONLY`** — only ESCALATE enters the review queue; HOLD is released by upstream authority change only; no new disposition | same, §5 |
 | GAS-5 | **`DEFER_LANGFLOW_CUSTOMER_GATED`** (2026-09-05) — Langflow import is removed from the current sequence and MVP scope; preserved only as a possible future import adapter, requiring a demonstrated customer or design-partner need and a new owner ruling. No audit, importer, endpoint, dependency or implementation now. React Flow remains the Ugence-owned authoring surface | this section, GAS-5 and GAS-R4; `GOVERNED_AGENT_STUDIO_V1_SCREEN_AUDIT.md` |
 
 
