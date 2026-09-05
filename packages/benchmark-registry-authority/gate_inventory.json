@@ -1,6 +1,6 @@
 {
   "distribution": "ugence-benchmark-registry-authority",
-  "milestone": "BR-2C-0",
+  "milestone": "BR-2C-RC",
   "note": "Complete inventory of every load-bearing gate, and the measured result of neutralizing each one in turn against the full suite and the author-owned adversarial probes. Production behaviour was not changed to chase a zero-survivor number; any survivor is classified as equivalent, shadowed (naming the shadowing gate), or a real gap. Regenerate by running gate_mutation_sweep.py.",
   "gates_inventoried": 72,
   "killed": 67,

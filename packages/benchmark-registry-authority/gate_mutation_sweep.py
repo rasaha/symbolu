@@ -1153,7 +1153,7 @@ SURVIVOR_CLASSIFICATIONS: dict = {
 
 def main() -> int:
     print("=" * 78)
-    print("BR-2C-0 GATE INVENTORY AND MEASURED GATE-DELETION MUTATION SWEEP")
+    print("BR-2C-RC (0.3.0rc1 candidate) GATE INVENTORY AND MEASURED GATE-DELETION MUTATION SWEEP")
     print("=" * 78)
     by_category: dict = {}
     for gate in GATES:
@@ -1274,7 +1274,7 @@ def main() -> int:
         json.dumps(
             {
                 "distribution": "ugence-benchmark-registry-authority",
-                "milestone": "BR-2C-0",
+                "milestone": "BR-2C-RC",
                 "note": (
                     "Complete inventory of every load-bearing gate, and the "
                     "measured result of neutralizing each one in turn against "
