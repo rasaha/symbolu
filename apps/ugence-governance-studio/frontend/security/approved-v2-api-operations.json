@@ -1,0 +1,49 @@
+{
+  "$schema": "governance_studio.approved_v2_api_operations.v1",
+  "description": "The closed set of v2 operations the studio frontend may consume. Separate from the v1 manifest because the two contracts are frozen independently. Under owner ruling SD-2 no operation naming issue, activate, revoke, grant, authorize, clear or execute may ever appear here; verify-v2-api-boundary.mjs re-derives that from the contract rather than trusting this file.",
+  "contract": "governance_studio.api.v2",
+  "openapi_sha256": "c3ae86bd3335563b97f07095c08d9d3d0cbd6c6c6a7a2bb39526693a99b8f796",
+  "approved_operation_ids": [
+    "v2_authority_list_policies",
+    "v2_authority_read_decision",
+    "v2_authority_read_policy",
+    "v2_constitution_preflight",
+    "v2_constitution_validate",
+    "v2_observe_audit_chain",
+    "v2_observe_audit_ids",
+    "v2_policy_compile",
+    "v2_policy_synthesize",
+    "v2_policy_validate",
+    "v2_publish_shadow",
+    "v2_simulate_run"
+  ],
+  "approved_paths": [
+    "GET /api/v2/authority/decisions/{decision_id}",
+    "GET /api/v2/authority/policies",
+    "GET /api/v2/authority/policies/{record_id}",
+    "GET /api/v2/observe/audit",
+    "GET /api/v2/observe/audit/{correlation_id}",
+    "POST /api/v2/constitution/preflight",
+    "POST /api/v2/constitution/validate",
+    "POST /api/v2/policy/compile",
+    "POST /api/v2/policy/synthesize",
+    "POST /api/v2/policy/validate",
+    "POST /api/v2/publish/shadow",
+    "POST /api/v2/simulate/run"
+  ],
+  "prohibited_verbs": [
+    "issue",
+    "activate",
+    "revoke",
+    "grant",
+    "authorize",
+    "clear",
+    "execute"
+  ],
+  "console_routes_reachable_from_the_studio": [
+    "POST /v1/governed-loop/shadow",
+    "POST /v1/governed-loop/scenario/{scenario_id}",
+    "GET /v1/audit",
+    "GET /v1/audit/{correlation_id}"
+  ]
+}

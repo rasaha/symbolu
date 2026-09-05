@@ -21,6 +21,13 @@ const FRONTEND = path.dirname(HERE);
 const CONTRACT = path.resolve(FRONTEND, "..", "contracts", "openapi.json");
 const MANIFEST = path.join(FRONTEND, "security", "approved-api-operations.json");
 const CLIENT = path.join(FRONTEND, "src", "api", "client.ts");
+
+// The HTTP boundary is allowed in exactly these files, and nowhere else. `client-v2.ts`
+// is a second entry rather than a relaxation: it talks to the additive v2 contract and
+// carries its own operation allowlist (security/approved-v2-api-operations.json,
+// checked by verify-v2-api-boundary.mjs). Adding a client means adding a line here and
+// a manifest to match — it is not something a screen can do by calling fetch.
+export const APPROVED_CLIENTS = ["src/api/client.ts", "src/api/client-v2.ts"];
 const SRC = path.join(FRONTEND, "src");
 const TESTS = path.join(FRONTEND, "tests");
 const NEGATIVE_FIXTURE_MARKER = "api-allowlist-negative-fixtures";
@@ -161,7 +168,7 @@ export function verify({ spec, specSha, manifest, clientText, appFiles, testFile
   report.forbidden_consumed = [...consumed].filter((o) => forbidden.has(o)).sort();
 
   // application code = src minus generated; raw-fetch also excludes the canonical client
-  report.raw_fetch = detectRawFetch(appFiles.filter((f) => f.rel !== "src/api/client.ts"));
+  report.raw_fetch = detectRawFetch(appFiles.filter((f) => !APPROVED_CLIENTS.includes(f.rel)));
   report.forbidden_refs = detectForbiddenReferences([...appFiles, ...testFiles], manifest);
 
   if (errors.length) report.violations.push(...errors.map((e) => `manifest: ${e}`));

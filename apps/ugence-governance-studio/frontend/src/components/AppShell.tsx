@@ -14,9 +14,17 @@ export function AppShell({ children }: { children: ReactNode }) {
             <span className="text-sm font-semibold tracking-tight text-ink-0">Ugence Governance Studio</span>
             <span className="text-xs text-ink-2">Eligibility Explorer</span>
           </Link>
-          <span className="rounded border border-surface-border bg-surface-2 px-2 py-0.5 font-mono text-[11px] text-ink-2">
-            governance_studio.api.v1
-          </span>
+          <nav aria-label="sections" className="flex items-center gap-2">
+            <Link
+              to="/studio"
+              className="rounded border border-surface-border bg-surface-2 px-2 py-0.5 text-[11px] font-medium text-ink-1 hover:bg-surface-3"
+            >
+              Governed Agent Studio
+            </Link>
+            <span className="rounded border border-surface-border bg-surface-2 px-2 py-0.5 font-mono text-[11px] text-ink-2">
+              governance_studio.api.v1
+            </span>
+          </nav>
         </div>
       </header>
       <MaturityBanner />
