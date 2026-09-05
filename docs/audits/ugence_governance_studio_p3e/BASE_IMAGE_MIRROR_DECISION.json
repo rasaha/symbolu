@@ -49,6 +49,38 @@
       "explicit_non_finding": "The ratified digests are NOT invalid, superseded or compromised. A mutable tag moving to a newer image says nothing about the image these digests name; it is the expected behaviour of a mutable tag and precisely why the pins are by digest.",
       "consequence": "base-image-digest-verification will continue to fail against live tag resolution until the mirror serves the ratified digests. That failure is the ratified MUST_HALT_ON_DIGEST_MISMATCH control operating as designed, not a defect to be silenced."
     },
+    "ruling_2026_09_05": {
+      "decision": "APPROVED_INTERNAL_MIRROR_PENDING_PROVISIONING",
+      "ruled_by": "rasaha",
+      "ruled_on": "2026-09-05",
+      "statement": "Preserve the existing ratified Node and Python base-image digests. Do not refresh or replace them, weaken the digest-verification gate, mark it non-blocking, change either Dockerfile FROM, or fabricate mirror coordinates. The container gate remains environment-blocked until an approved private OCI mirror is provisioned outside the repository. Repository configuration is authorized only after the owner supplies the real mirror host, repository prefix and GitHub Actions secret name.",
+      "preserves": {
+        "status": "RATIFIED_PENDING_MIRROR_COORDINATES",
+        "authoritative_digests": "unchanged: node:22-bookworm-slim sha256:f32b81066cde10a75dbac96646099533316d94bac4150c55da1636e1f0ffdc46 and python:3.11-slim-bookworm sha256:b18992999dbe963a45a8a4da40ac2b1975be1a776d939d098c647482bcad5cba, with their amd64 child digests, in this record, in deployment/governance-studio/base-images.json and in the three Dockerfile FROM lines",
+        "mirror_fields": "registry_host, repository_prefix, coordinates_provided and credentials_provided stay null or false; no secret name is allocated",
+        "ruling_2026_08_29": "HOLD_EXISTING_RATIFIED_DIGESTS stands unchanged"
+      },
+      "prohibited_by_this_ruling": [
+        "refreshing or replacing the ratified digests",
+        "weakening base-image-digest-verification or ratified-pin-conformance, or marking either non-blocking",
+        "changing any Dockerfile FROM",
+        "fabricating, guessing or placeholder-filling mirror host, repository prefix or secret name",
+        "modifying any workflow, manifest digest, dependency, branch-protection setting or credential on the strength of this ruling"
+      ],
+      "why_a_repin_would_not_help": "Re-pinning to the digests the mutable tags currently resolve to would not resolve the known registry-blob egress 403 (production.cloudfront.docker.com and pkg-containers.githubusercontent.com are denied by organization egress policy, per CONTAINER_COMPLETION_LIVE_STATE.json resource_gate). The digest comparison is the first wall; the blob pull is the second, and it is unchanged by any pin.",
+      "explicit_non_claim": "This ruling does not claim that the container build, vulnerability scan, SBOM, image signing or any downstream container gate (C2, C4 to C19) has executed. Every canonical gate remains NOT_EXECUTED and every run's evidence manifest remains INCOMPLETE until the mirror serves the ratified digests and a real build runs.",
+      "unapproved_candidates_untouched": "The unapproved_candidates observation dated 2026-08-29 is known to be stale (the python:3.11-slim-bookworm tag has moved again since) and is deliberately not updated by this ruling; refreshing that observation is a separate evidence-refresh decision under controlled_base_image_refresh.",
+      "authorization_condition": {
+        "status": "BLOCKED_PENDING_OWNER_SUPPLIED_COORDINATES",
+        "required_from_owner": [
+          "mirror host",
+          "repository prefix",
+          "GitHub Actions secret name"
+        ],
+        "then_authorized": "recording the coordinates and secret name in the mirror block of this record, and changing base-image-digest-verification to resolve each image's digest from the mirror and compare it to the authoritative manifest_digest above, with ratified-pin-conformance kept first",
+        "credential_handling": "the credential value itself is never requested, printed, stored or committed; only the secret's name is recorded, and only once the owner supplies it"
+      }
+    },
     "unapproved_candidates": {
       "status": "UNAPPROVED_OBSERVATION_ONLY",
       "note": "Digests observed when the mutable tags were resolved in CI on 2026-08-29. Recorded for traceability only. They are NOT approved, NOT a replacement, and must not be pinned anywhere without the controlled refresh below.",
@@ -101,6 +133,11 @@
     "repository_prefix": null,
     "coordinates_provided": false,
     "credentials_provided": false,
+    "provisioning": {
+      "status": "PENDING_OUTSIDE_REPOSITORY",
+      "ruling": "authoritative_digests.ruling_2026_09_05 (APPROVED_INTERNAL_MIRROR_PENDING_PROVISIONING)",
+      "note": "No repository change may fill these fields until the owner supplies the real host, prefix and secret name."
+    },
     "credential_mechanism": {
       "status": "NOT_IMPLEMENTED",
       "intended": "GitHub Actions repository or organization secrets consumed by the container job; no mirror authentication exists in any workflow today, and no secret name has been allocated",
