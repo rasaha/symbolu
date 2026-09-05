@@ -342,10 +342,16 @@ substitutes for it. No generic LLM, prompt or API canvas nodes. No research-only
 package in the product. No hosted multi-tenancy. No claim of pilot validation or
 production certification, on any item, at any exit above.
 
-### 11.3 Owner decisions this section depends on
+### 11.3 Owner decisions — ruled 2026-09-05
 
-Listed in full, with the recommendation, in the delivery brief accompanying GAS-1.
-Until they are ruled, GAS-1 is the only item that may start.
+All four are ruled and recorded at source; GAS-1 is complete and GAS-2 is open.
+
+| # | Ruling | Recorded in |
+|---|---|---|
+| OD-1 | `REQUIRE_SINGLE_TRANSACTION` — atomic commit is a **DBOS ratification gate**; if DBOS cannot provide it, GAS-2 stops and reports rather than accepting a residual | `ADR_DBOS_DURABLE_EXECUTION_INTEGRATION.md` §9 |
+| OD-2 | `COEXIST_WITH_BOUNDARY` — governance stores keep their ratified SQLite; DBOS and the three Agent Runtime stores share Postgres behind a documented consistency boundary | same, §9 |
+| SD-1 | `EXPLICIT_PUBLIC_ALLOWLIST` — the studio boundary widens only by a per-package public-entry-point allowlist; the architecture test is retained | `apps/ugence-governance-studio/docs/GOVERNED_AGENT_STUDIO_V1_SCREEN_AUDIT.md` |
+| SD-2 | `NON_AUTHORITY_STUDIO` — the studio never issues, activates, revokes, grants, authorizes, clears or executes | same |
 
 
 ---
