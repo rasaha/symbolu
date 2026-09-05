@@ -366,11 +366,13 @@ def test_optional_text_refuses_a_non_string():
 # --------------------------------------------------------------------------- #
 # `scripts/mutation_sweep.py` disables each refusal in src/ in turn and reports the
 # ones no test catches. It ships rather than being described, because the claim has
-# been wrong three times: the sweep behind it saw only `raise` guards and missed
+# been wrong four times: the sweep behind it saw only `raise` guards and missed
 # `reasons.append`; then it reached only records.py and states.py and missed
 # journal.py's filters; then it reported by line, hiding which of two clauses on one
 # line had survived — which concealed that nothing asserted contained_incidents()
-# actually filters on containment. Run it; the number is whatever it is today.
+# actually filters on containment; then it skipped `else`-bearing guards and
+# unconditional raises while its docstring claimed all of src/. Run it; the number
+# is whatever it is today.
 #
 # Four sites survive by design. Each is redundant with a twin that runs downstream
 # on the same call, so it cannot be killed alone:

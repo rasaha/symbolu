@@ -55,17 +55,21 @@ def _is_refusal(node: ast.stmt) -> bool:
     return False
 
 
-def _sites() -> list[tuple[pathlib.Path, int, int, int, str]]:
-    """(file, line, col, end_line, kind) for every refusal site."""
+def _sites() -> list[tuple[pathlib.Path, int, int, object, str]]:
+    """(file, line, col, extent, kind) for every refusal site."""
 
     found = []
     for path in sorted(SRC.rglob("*.py")):
         tree = ast.parse(path.read_text(encoding="utf-8"))
+        guarded = set()
         for node in ast.walk(tree):
-            if isinstance(node, ast.If) and not node.orelse and node.body and all(
+            if isinstance(node, ast.If) and node.body and all(
                     _is_refusal(s) for s in node.body):
-                found.append((path, node.lineno, node.col_offset,
-                              node.test.end_lineno, "guard"))
+                # The refusing statements, not the condition: an else-bearing guard
+                # forced false diverts control flow instead of disabling a refusal.
+                guarded.update(id(s) for s in node.body)
+                found.append((path, node.body[0].lineno, node.body[0].col_offset,
+                              node.body[-1].end_lineno, "guard"))
             elif isinstance(node, (ast.GeneratorExp, ast.ListComp, ast.SetComp)):
                 for generator in node.generators:
                     for condition in generator.ifs:
@@ -75,6 +79,12 @@ def _sites() -> list[tuple[pathlib.Path, int, int, int, str]]:
                             found.append((path, part.lineno, part.col_offset,
                                           (part.end_lineno, part.end_col_offset),
                                           "filter"))
+        # Shape 4: a raise no `if` guards. Walked last so the guarded ones,
+        # already recorded above, are not counted twice.
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Raise) and id(node) not in guarded:
+                found.append((path, node.lineno, node.col_offset,
+                              node.end_lineno, "invariant"))
     return found
 
 
@@ -83,8 +93,9 @@ def _disable(path: pathlib.Path, line: int, col: int, end, kind: str) -> str:
 
     original = path.read_text(encoding="utf-8")
     lines = original.splitlines(keepends=True)
-    if kind == "guard":
-        lines[line - 1] = lines[line - 1][:col] + "if False:\n"
+    if kind in ("guard", "invariant"):
+        # Replace the refusing statements with `pass`, preserving indentation.
+        lines[line - 1] = " " * col + "pass\n"
         for index in range(line, end):
             lines[index] = ""
     else:
