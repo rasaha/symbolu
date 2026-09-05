@@ -674,5 +674,7 @@ consistency, HSM/KMS custody and key rotation are untouched here. The clock defe
 ## 11 — Next step
 
 GAS-2 and GAS-3 are implemented; their evidence is recorded in §8A and §8B, and OD-3
-is ruled `RATIFY` (§9). GAS-4 (Studio v1) is the next build item; it is gated by SD-1
-and SD-2, both already ruled.
+is ruled `RATIFY` (§9). GAS-4 (Studio v1) is implemented and merged under SD-1 and
+SD-2. GAS-5 (Langflow import) is deferred and customer-gated by owner ruling
+(roadmap §11.3, `DEFER_LANGFLOW_CUSTOMER_GATED`). GAS-6 (Temporal) stays gated on a
+regulated-enterprise requirement. No build item is scheduled from this record.
