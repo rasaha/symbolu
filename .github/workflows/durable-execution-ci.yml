@@ -15,6 +15,7 @@ on:
   pull_request:
     paths:
       - "packages/integration/durable-execution/**"
+      - "packages/integration/agent-runtime-governance/**"
       - "docs/architecture/ADR_DBOS_DURABLE_EXECUTION_INTEGRATION.md"
       - ".github/workflows/durable-execution-ci.yml"
   push:
@@ -22,6 +23,7 @@ on:
       - "claude/**"
     paths:
       - "packages/integration/durable-execution/**"
+      - "packages/integration/agent-runtime-governance/**"
       - "docs/architecture/ADR_DBOS_DURABLE_EXECUTION_INTEGRATION.md"
       - ".github/workflows/durable-execution-ci.yml"
 
@@ -92,6 +94,15 @@ jobs:
           PYTHONPATH="src:$GITHUB_WORKSPACE/packages/runtime/agent-runtime/src:tests" \
             python -m pytest tests/test_matrix.py -o addopts= -v --no-header \
               --junitxml=/tmp/matrix.xml
+
+      - name: ADR section 8 matrix — re-run with the PRODUCTION governance hook
+        run: |
+          # The matrix above runs with AllowAllGovernanceHook, isolating durability from
+          # governance. This re-run proves the same properties hold when clearance is
+          # genuinely composed and can genuinely be withheld.
+          cd packages/integration/durable-execution
+          PYTHONPATH="src:$GITHUB_WORKSPACE/packages/runtime/agent-runtime/src:tests" \
+            python -m pytest tests/test_matrix_production_hook.py -o addopts= -v --no-header
 
       - name: Boundary and ADR-conformance checks
         run: |

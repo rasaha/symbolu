@@ -52,16 +52,19 @@ HARNESS = os.path.join(os.path.dirname(__file__), "_dbos_harness.py")
 # helpers
 # --------------------------------------------------------------------------- #
 def _child_env() -> dict:
+    """Environment for a harness subprocess.
+
+    PYTHONPATH is built from the PARENT's resolved ``sys.path`` rather than a hand-written
+    list. The conftest adds package source roots (and, for the production-hook re-run, the
+    governance packages); reproducing that list here by hand would silently drift out of
+    date, and the child would fail on an import the parent resolved fine.
+    """
     env = dict(os.environ)
-    env["PYTHONPATH"] = os.pathsep.join(
-        [
-            os.path.join(os.path.dirname(__file__), "..", "src"),
-            os.path.join(
-                os.path.dirname(__file__), "..", "..", "..", "runtime", "agent-runtime", "src"
-            ),
-            os.path.dirname(__file__),
-        ]
-    )
+    entries = [p for p in sys.path if p and os.path.isdir(p)]
+    entries.append(os.path.dirname(__file__))
+    seen: set = set()
+    ordered = [p for p in entries if not (p in seen or seen.add(p))]
+    env["PYTHONPATH"] = os.pathsep.join(ordered)
     return env
 
 
