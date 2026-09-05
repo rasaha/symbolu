@@ -6,7 +6,7 @@ never have to depend on each other.
 
 - **Distribution:** `ugence-governance-contracts`
 - **Namespace:** `ugence_governance_contracts`
-- **Version:** 0.7.0 · **Contract version:** 1.0.0
+- **Version:** 0.8.0 · **Contract version:** 1.0.0
 - **Dependencies:** Python standard library only (no third-party, no other Ugence package)
 - **Typing:** fully type-annotated; ships a PEP 561 `py.typed` marker
 - **Ownership / maturity:** extracted verbatim from the frozen `governance_providers`
@@ -30,6 +30,7 @@ and what it returns*, independent of any concrete implementation:
 | Audit correlation (G4) | `AuditReference`, `AuditContractError` |
 | Data classification (DE-5) | `DataClassificationLabel`, `DataClassificationContractError` |
 | Vendor-risk posture (VR-5) | `VendorRiskLabel`, `VendorRiskContractError` |
+| Assurance finding (AE-5) | `AssuranceFindingLabel`, `AssuranceFindingContractError` |
 
 ## Authority boundary
 
@@ -278,6 +279,30 @@ a string, non-empty after stripping, free of control characters. It makes no ris
 judgment and grants no authority. `CONTRACT_VERSION` stays `1.0.0`; the package
 version advances to `0.7.0`.
 
+## Neutral assurance-finding label (AE-5)
+
+**Assurance-finding label (AE-5)** — `AssuranceFindingLabel` is an immutable,
+non-empty, **uninterpreted** label for what a security or robustness exercise
+found: one `label` field, stored stripped and otherwise verbatim, with
+`canonical_bytes()` and `canonical_digest()`. It lands here rather than in the
+package that first consumes it (`ugence-agent-assurance-evidence`, wave 4) so that
+every engine carrying a finding carries the *same* type. Ruled by
+`docs/architecture/ADR_UGENCE_AGENT_ASSURANCE_EVIDENCE_SCOPING.md` (AE-3, AE-5).
+
+**Not a verification status, by ruling.** `VerificationStatus` remains an
+independent statement about whether a claim was *checked*; the label says what was
+*found*. It is a distinct class, not an enum, never equal to a `VerificationStatus`
+member, and never interchangeable with `DataClassificationLabel` or `VendorRiskLabel`;
+tests pin all of that.
+
+**Uninterpreted means uninterpreted.** No taxonomy, severity, score, ordering or
+implied verification. Any non-blank text is a label; `order=False`, no rich
+comparison, so `sorted()` over labels raises; and no `severity`, `score`, `cvss` or
+`is_verified` exists. Structural validation only: a string, non-empty after
+stripping, free of control characters. It verifies nothing, interprets no risk and
+grants no authority. `CONTRACT_VERSION` stays `1.0.0`; the package version advances
+to `0.8.0`.
+
 ## Compatibility paths
 
 The neutral contracts previously lived in `governance_providers`. Those paths still
@@ -303,8 +328,9 @@ This phase is a **physical** extraction only. Of the platform-contract gaps
 in `docs/migrations/governance_contracts/CONTRACT_GAPS_AND_EVOLUTION_PLAN.md`,
 **G7 (idempotency) and G8 (validity) landed in 0.4.0**, **G4's contract half
 (the neutral audit reference) landed in 0.5.0**, **DE-5's neutral
-data-classification label landed in 0.6.0**, and **VR-5's neutral vendor-risk label
-landed in 0.7.0**, all as additive neutral families.
+data-classification label landed in 0.6.0**, **VR-5's neutral vendor-risk label
+landed in 0.7.0**, and **AE-5's neutral assurance-finding label landed in 0.8.0**,
+all as additive neutral families.
 G4's *unification* half did not: six durable audit stores plus the kernel port stay
 exactly where they are, and converging them is an unscoped migration. The rest
 (missing `tenant_id`/`environment_id`, no standard error *envelope*, G5 CER

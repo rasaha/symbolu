@@ -45,6 +45,8 @@ from .contracts import (
     AssertionGovernanceResult,
     AssessedSystemBinding,
     AssessmentWindow,
+    AssuranceFindingContractError,
+    AssuranceFindingLabel,
     AttestationStatus,
     AttributionStatus,
     AuditContractError,
@@ -122,4 +124,6 @@ __all__ = [
     "DataClassificationLabel", "DataClassificationContractError",
     # VR-5 neutral vendor-risk label (additive)
     "VendorRiskLabel", "VendorRiskContractError",
+    # AE-5 neutral assurance-finding label (additive)
+    "AssuranceFindingLabel", "AssuranceFindingContractError",
 ]

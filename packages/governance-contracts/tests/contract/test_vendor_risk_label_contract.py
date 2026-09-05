@@ -166,7 +166,7 @@ def test_the_vendor_risk_label_is_not_the_data_classification_label():
 # --------------------------------------------------------------------------- #
 def test_vr5_is_additive_and_the_provider_surface_is_untouched():
     assert g.CONTRACT_VERSION == "1.0.0"
-    assert g.__version__ == "0.7.0"
+    assert g.__version__ == "0.8.0"
     for name in ("ActionGovernanceRequest", "ActionGovernanceResult",
                  "ExecutionDispatchRequest", "ExecutionDispatchResult",
                  "AssertionGovernanceRequest", "AssertionGovernanceResult"):

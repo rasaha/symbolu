@@ -16,7 +16,7 @@ Import the curated surface from :mod:`ugence_governance_contracts.api`.
 
 from __future__ import annotations
 
-__version__ = "0.7.0"
+__version__ = "0.8.0"
 
 #: The provider-contract version this package publishes (unchanged from the
 #: pre-migration ``governance_providers`` framework value). The GV-2E-a evidence
@@ -62,6 +62,8 @@ from .contracts import (  # noqa: E402
     AssertionGovernanceResult,
     AssessedSystemBinding,
     AssessmentWindow,
+    AssuranceFindingContractError,
+    AssuranceFindingLabel,
     AttestationStatus,
     AttributionStatus,
     AuditContractError,
@@ -138,5 +140,7 @@ __all__ = [
     "DataClassificationLabel", "DataClassificationContractError",
     # VR-5 neutral vendor-risk label (additive)
     "VendorRiskLabel", "VendorRiskContractError",
+    # AE-5 neutral assurance-finding label (additive)
+    "AssuranceFindingLabel", "AssuranceFindingContractError",
     "api",
 ]

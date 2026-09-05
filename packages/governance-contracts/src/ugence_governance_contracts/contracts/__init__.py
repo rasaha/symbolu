@@ -50,6 +50,10 @@ from .vendor_risk import (
     VendorRiskContractError,
     VendorRiskLabel,
 )
+from .assurance_finding import (
+    AssuranceFindingContractError,
+    AssuranceFindingLabel,
+)
 from .evidence import (
     AssessmentWindow,
     AttestationStatus,
@@ -99,4 +103,6 @@ __all__ = [
     "DataClassificationLabel", "DataClassificationContractError",
     # VR-5 neutral vendor-risk label (additive)
     "VendorRiskLabel", "VendorRiskContractError",
+    # AE-5 neutral assurance-finding label (additive)
+    "AssuranceFindingLabel", "AssuranceFindingContractError",
 ]
