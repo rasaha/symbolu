@@ -446,3 +446,64 @@ class ObserveService:
             return {"available": True, "result": self._console.audit_chain(correlation_id)}
         except ConsoleUnavailable as exc:
             return _unavailable("console_api", str(exc))
+
+
+# --------------------------------------------------------------------------- #
+# 7 · Review (GAS-7, HR-D)
+# --------------------------------------------------------------------------- #
+class ReviewRelayService:
+    """Render the review service's queue and run detail; relay a human decision.
+
+    Owner ruling HR-1 (``DISPLAY_AND_TRANSMIT``). Every method returns what the review
+    service returned. The one thing this service does of its own is the HR-5 guard on
+    the queue: an entry whose recorded disposition is a HOLD is never presented as
+    awaiting a human, because a HOLD is released only by an upstream authority change.
+    The review service already never lists one; this is the second lock, counted so an
+    operator can see it acted.
+    """
+
+    CAPABILITY = "review_service"
+
+    def __init__(self, review: Optional[Any] = None) -> None:
+        self._review = review
+
+    def _gap(self, reason: str) -> Dict[str, Any]:
+        return _unavailable(self.CAPABILITY, reason)
+
+    def _guard(self, fn):
+        from ..clients.review import ReviewNotFound, ReviewServiceUnavailable
+
+        if self._review is None:
+            return self._gap("no governed review service base URL is configured")
+        try:
+            return {"available": True, "result": fn()}
+        except ReviewNotFound as exc:
+            return {"available": True, "found": False, "result": None, "reason": str(exc)}
+        except ReviewServiceUnavailable as exc:
+            return self._gap(str(exc))
+
+    def queue(self, required_role: str = "") -> Dict[str, Any]:
+        answer = self._guard(lambda: self._review.queue(required_role))
+        if not answer.get("available") or not isinstance(answer.get("result"), dict):
+            return answer
+        raw = answer["result"]
+        entries = raw.get("entries") if isinstance(raw.get("entries"), list) else []
+        kept = [e for e in entries
+                if not (isinstance(e, dict) and str(e.get("governance_disposition", "")).upper() == "HOLD")]
+        answer["result"] = dict(raw, entries=kept)
+        answer["excluded_hold"] = len(entries) - len(kept)
+        answer["identity_proof"] = str(raw.get("identity_proof", ""))
+        return answer
+
+    def run(self, instance_id: str) -> Dict[str, Any]:
+        return self._guard(lambda: self._review.run(instance_id))
+
+    def run_events(self, instance_id: str) -> Dict[str, Any]:
+        return self._guard(lambda: self._review.run_events(instance_id))
+
+    def approval(self, approval_id: str) -> Dict[str, Any]:
+        return self._guard(lambda: self._review.approval(approval_id))
+
+    def submit_decision(self, body: Dict[str, Any]) -> Dict[str, Any]:
+        """Relay verbatim. The studio adds nothing and reads nothing but the answer."""
+        return self._guard(lambda: self._review.submit_decision(body))

@@ -10,7 +10,9 @@ asserts the same of every route built from it.
 """
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Literal, Optional
+
+from pydantic import Field
 
 from .envelope import StrictModel
 
@@ -85,3 +87,22 @@ class PublishShadowRequest(StrictModel):
 
     compiled_package: Dict[str, Any]
     scenario_id: Optional[str] = None
+
+
+# --------------------------------------------------------------------------- #
+# Review (GAS-7, HR-D)
+# --------------------------------------------------------------------------- #
+class ReviewDecisionRequest(StrictModel):
+    """A human's decision on a parked proposal, relayed verbatim (HR-1).
+
+    ``decision`` is the human's word — GRANT or REJECT — and the studio forwards it as
+    typed. ``presented_approver`` is the approver reference the review service listed
+    as eligible; the studio holds no identity of its own and proves none, which is why
+    the review service labels every decision ``PRESENTED_UNPROVEN``. ``justification``
+    is required: a decision without one is not relayed.
+    """
+
+    approval_id: str = Field(min_length=1)
+    decision: Literal["GRANT", "REJECT"]
+    presented_approver: Dict[str, Any]
+    justification: str = Field(min_length=1)
