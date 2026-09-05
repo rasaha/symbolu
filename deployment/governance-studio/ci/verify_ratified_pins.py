@@ -1,14 +1,16 @@
 """Assert the base-image pins match the ratified supply decision (P3F).
 
-BLOCKING pre-build gate. ``base-image-digest-verification`` checks the pins
-against the live registry; this checks them against the *owner-ratified record*
-in ``docs/audits/ugence_governance_studio_p3e/BASE_IMAGE_MIRROR_DECISION.json``.
+BLOCKING pre-build gate. This checks the pins against the *owner-ratified record*
+in ``docs/audits/ugence_governance_studio_p3e/BASE_IMAGE_MIRROR_DECISION.json``;
+``mirror-digest-conformance`` (``verify_mirror_digest.py``) then checks that the
+owner-approved mirror serves exactly that digest.
 
 Together the two close the substitution hole: this step establishes
-base-images.json == Dockerfile == ratification record, and the live resolution
-step establishes registry/mirror == base-images.json. A re-pin therefore cannot
-land without editing the ratification record, which requires owner
-re-ratification.
+base-images.json == Dockerfile == ratification record, and the mirror step
+establishes mirror == ratification record. A re-pin therefore cannot land with
+green CI without editing the ratification record, which requires owner
+re-ratification. Upstream mutable-tag movement is observed separately and
+never enters either check.
 
 Checks, all failing closed:
   * every base-images.json entry is a ratified image, at the ratified index and
@@ -16,7 +18,13 @@ Checks, all failing closed:
   * every ratified image is actually pinned in base-images.json;
   * every Dockerfile FROM is digest-pinned, names a ratified image, and pins the
     ratified digest;
-  * the Dockerfile stages per image match the ratified stage list.
+  * the Dockerfile stages per image match the ratified stage list;
+  * the platform declared by the record, by base-images.json (top level and per
+    entry) and by any ``--platform`` on a Dockerfile FROM all agree.
+
+Deterministic and network-independent: it opens no socket, so an upstream
+registry being unreachable, or a mutable tag having moved, cannot change its
+answer (owner ruling SEPARATE_PIN_CONFORMANCE_FROM_TAG_DRIFT, 2026-09-05).
 
 Exits 0 on conformance, 1 on any mismatch. Reads only; changes nothing.
 """
@@ -31,7 +39,8 @@ PINS = "deployment/governance-studio/base-images.json"
 DOCKERFILE = "deployment/governance-studio/Dockerfile"
 
 _FROM = re.compile(
-    r"^FROM\s+(\S+?):(\S+?)@(sha256:[0-9a-f]{64})(?:\s+AS\s+(\S+))?\s*$", re.MULTILINE
+    r"^FROM\s+(?:--platform=(\S+)\s+)?(\S+?):(\S+?)@(sha256:[0-9a-f]{64})(?:\s+AS\s+(\S+))?\s*$",
+    re.MULTILINE,
 )
 
 
@@ -45,15 +54,26 @@ def _short(ref: str) -> str:
 
 
 def main(record: str = RECORD, pins_path: str = PINS, dockerfile: str = DOCKERFILE) -> int:
+    record_doc = json.load(open(record))
     ratified = {
         _short(i["upstream_ref"]): i
-        for i in json.load(open(record))["authoritative_digests"]["images"]
+        for i in record_doc["authoritative_digests"]["images"]
     }
+    platform = record_doc["authoritative_digests"].get("platform")
     fail: list[str] = []
+    if not platform:
+        fail.append("ratification record declares no platform")
 
     pins = json.load(open(pins_path))
+    if pins.get("platform") != platform:
+        fail.append(f'base-images.json platform {pins.get("platform")!r} != ratified {platform!r}')
     seen = set()
     for e in pins["base_images"]:
+        if e.get("platform") != platform:
+            fail.append(
+                f'{_short(e["repository"])}:{e["tag"]} (role {e["role"]}): platform '
+                f'{e.get("platform")!r} != ratified {platform!r}'
+            )
         ref = f'{_short(e["repository"])}:{e["tag"]}'
         r = ratified.get(ref)
         if r is None:
@@ -81,8 +101,13 @@ def main(record: str = RECORD, pins_path: str = PINS, dockerfile: str = DOCKERFI
 
     stages: dict[str, list[str]] = {}
     froms = _FROM.findall(text)
-    for name, tag, digest, stage in froms:
+    for from_platform, name, tag, digest, stage in froms:
         ref = f"{name}:{tag}"
+        if from_platform and from_platform != platform:
+            fail.append(
+                f"Dockerfile stage '{stage}' declares --platform={from_platform} "
+                f"!= ratified {platform}"
+            )
         r = ratified.get(ref)
         if r is None:
             fail.append(
