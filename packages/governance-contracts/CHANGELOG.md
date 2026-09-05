@@ -1,5 +1,79 @@
 # Changelog — ugence-governance-contracts
 
+## [0.8.0] — neutral assurance-finding label (AE-5) (additive)
+
+**Additive, backward-compatible.** No existing public symbol, field, enum value,
+default, constructor signature, serialization or authority meaning changed.
+`CONTRACT_VERSION` (the **provider** contract surface) is **unchanged at `1.0.0`**;
+only the package `__version__` advances, to `0.8.0`. Remains a stdlib-only leaf.
+Ruled by `docs/architecture/ADR_UGENCE_AGENT_ASSURANCE_EVIDENCE_SCOPING.md` (AE-3,
+AE-5), which lands the vocabulary here before the package that first consumes it,
+`ugence-agent-assurance-evidence`, exists.
+
+- `AssuranceFindingLabel` — an immutable, non-empty, **uninterpreted** label for
+  what an exercise found (`label`, stored stripped, otherwise verbatim) with
+  `canonical_bytes()` / `canonical_digest()`. Equality is exact text equality.
+- `AssuranceFindingContractError` — every refusal is typed; a blank label, a
+  non-string (a `VerificationStatus` member included), or text carrying a control
+  character or line break is rejected at construction. An **unknown** non-empty
+  label is never rejected: there is no recognized set.
+- **Not `VerificationStatus`** (AE-3): the enum is untouched and stays an
+  independent statement about whether a claim was checked; the label never equals
+  one of its members. Not `DataClassificationLabel` or `VendorRiskLabel` either —
+  distinct class, no subclassing, never interchangeable, asserted by tests.
+- **No ordering, severity or score**: `order=False`, no rich comparison, so
+  `sorted()` and `max()` over labels raise; no `severity`, `score`, `cvss`, `rank`
+  or `is_verified`; no enum, taxonomy or hierarchy ships.
+- It verifies nothing, interprets no risk and grants no authority.
+
+## [0.7.0] — neutral vendor-risk label (VR-5) (additive)
+
+**Additive, backward-compatible.** No existing public symbol, field, enum value,
+default, constructor signature, serialization or authority meaning changed.
+`CONTRACT_VERSION` (the **provider** contract surface) is **unchanged at `1.0.0`**;
+only the package `__version__` advances, to `0.7.0`. Remains a stdlib-only leaf.
+Ruled by `docs/architecture/ADR_UGENCE_VENDOR_RISK_SCOPING.md` (VR-3, VR-5),
+which lands the vocabulary here before the package that first consumes it,
+`ugence-vendor-dependency`, exists.
+
+- `VendorRiskLabel` — an immutable, non-empty, **uninterpreted** posture label
+  (`label`, stored stripped, otherwise verbatim) with `canonical_bytes()` /
+  `canonical_digest()`. Equality is exact text equality and nothing else.
+- `VendorRiskContractError` — every refusal is typed; a blank label, a non-string,
+  or text carrying a control character or line break is rejected at construction.
+  An **unknown** non-empty label is never rejected: there is no recognized set.
+- **A separate dimension from `DataClassificationLabel`** (VR-3): a distinct class,
+  no subclassing either way, never interchangeable — asserted by a test.
+- **No ordering, score or grade**: `order=False`, no rich comparison, so `sorted()`
+  and `max()` over labels raise; no `score`, `grade`, `severity`, `tier`, `rank`,
+  `dominates` or `is_eligible`; no enum, taxonomy or hierarchy ships. A test pins
+  the whole surface.
+- It makes no risk judgment, decides nothing and grants no authority.
+
+## [0.6.0] — neutral data-classification label (DE-5) (additive)
+
+**Additive, backward-compatible.** No existing public symbol, field, enum value,
+default, constructor signature, serialization or authority meaning changed.
+`CONTRACT_VERSION` (the **provider** contract surface) is **unchanged at `1.0.0`**;
+only the package `__version__` advances, to `0.6.0`. Remains a stdlib-only leaf.
+Ruled by `docs/architecture/ADR_UGENCE_DATA_EGRESS_AUTHORITY_SCOPING.md` (DE-5),
+which lands the vocabulary here — as D-4 did for `AuditReference` — before the
+package that first consumes it, `ugence-data-use-admission`, exists.
+
+- `DataClassificationLabel` — an immutable, non-empty, **uninterpreted** label
+  (`label`, stored stripped, otherwise verbatim) with `canonical_bytes()` /
+  `canonical_digest()`. Equality is exact text equality and nothing else.
+- `DataClassificationContractError` — every refusal is typed; a blank label, a
+  non-string, or text carrying a control character or line break is rejected at
+  construction. An **unknown** label is never rejected, because there is no
+  recognized set.
+- **No ordering operation** (DE-3): the dataclass is `order=False` and defines no
+  rich comparison, so `sorted()` over labels raises; there is no `dominates`,
+  `is_compatible_with`, `rank`, `severity` or `tier`, and no enum, taxonomy,
+  lattice or hierarchy ships with the family. A test pins the whole surface.
+- It classifies nothing, decides nothing and grants no authority: it records what
+  a declarer *called* some data, never what that means.
+
 ## [0.5.0] — neutral audit reference (G4), contract half (additive)
 
 **Additive, backward-compatible.** No existing public symbol, field, enum value,

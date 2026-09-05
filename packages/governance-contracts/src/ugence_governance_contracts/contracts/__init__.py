@@ -42,6 +42,18 @@ from .audit import (
     AuditContractError,
     AuditReference,
 )
+from .data_classification import (
+    DataClassificationContractError,
+    DataClassificationLabel,
+)
+from .vendor_risk import (
+    VendorRiskContractError,
+    VendorRiskLabel,
+)
+from .assurance_finding import (
+    AssuranceFindingContractError,
+    AssuranceFindingLabel,
+)
 from .evidence import (
     AssessmentWindow,
     AttestationStatus,
@@ -87,4 +99,10 @@ __all__ = [
     "ValidityStatus", "Validity", "ValidityContractError",
     # G4 neutral audit reference (additive)
     "AuditReference", "AuditContractError",
+    # DE-5 neutral data-classification label (additive)
+    "DataClassificationLabel", "DataClassificationContractError",
+    # VR-5 neutral vendor-risk label (additive)
+    "VendorRiskLabel", "VendorRiskContractError",
+    # AE-5 neutral assurance-finding label (additive)
+    "AssuranceFindingLabel", "AssuranceFindingContractError",
 ]

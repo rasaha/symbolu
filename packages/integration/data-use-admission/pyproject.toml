@@ -1,0 +1,58 @@
+# Ugence Data-Use Admission — the contracts-only record of declared data use
+# (gap-sequencing ADR wave 4, row "Data privacy and egress authority", line 60).
+#
+# Scoped and ratified by docs/architecture/ADR_UGENCE_DATA_EGRESS_AUTHORITY_SCOPING.md
+# (DE-1 ADMISSION_ONLY, DE-2 STAY_SPLIT, DE-3 UNINTERPRETED, DE-4 this name, DE-5 the
+# label lands in governance-contracts first).
+#
+#   THIS PACKAGE RECORDS WHAT A DECLARER ASSERTED ABOUT DATA.
+#   IT NEVER INSPECTS, CLASSIFIES, REDACTS, MINIMIZES, PERSISTS, ADMITS,
+#   AUTHORIZES, SELECTS, ENFORCES OR GOVERNS EGRESS.
+#
+# Contracts only: record types, refusal reasons, pure selectors and one read-only
+# Protocol. No store, no adapter, no connector, no proxy, no redactor, no clock.
+#
+# Not an Authority: it decides nothing and admits nothing. Mints no identity and no
+# vocabulary: AssessedSystemBinding and DataClassificationLabel are re-exported from
+# governance-contracts, never redefined.
+#
+# Dependency direction (one-way):
+#     ugence-governance-contracts (leaf)   <- AssessedSystemBinding / DataClassificationLabel / Validity
+#         ▲
+#     ugence-data-use-admission (this package)
+#
+# Build:   python -m build packages/integration/data-use-admission
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ugence-data-use-admission"
+dynamic = ["version"]
+description = "Ugence Data-Use Admission — the contracts-only record of declared data use at the admission seam: bounded declarations over the neutral system identity and the neutral data-classification label. Records what a declarer asserted; never inspects, classifies, admits, authorizes or governs egress."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "Proprietary" }
+authors = [{ name = "Rakesh Mohan" }]
+keywords = ["governance", "data-use", "classification", "admission", "contracts", "ugence"]
+classifiers = ["Typing :: Typed"]
+dependencies = [
+    "ugence-governance-contracts>=0.6.0",
+]
+
+[project.optional-dependencies]
+test = ["pytest>=7.0"]
+
+[tool.setuptools.dynamic]
+version = { attr = "ugence_data_use_admission.version.__version__" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["ugence_data_use_admission*"]
+
+[tool.setuptools.package-data]
+ugence_data_use_admission = ["py.typed"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"

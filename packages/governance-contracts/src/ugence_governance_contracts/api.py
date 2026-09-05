@@ -45,6 +45,8 @@ from .contracts import (
     AssertionGovernanceResult,
     AssessedSystemBinding,
     AssessmentWindow,
+    AssuranceFindingContractError,
+    AssuranceFindingLabel,
     AttestationStatus,
     AttributionStatus,
     AuditContractError,
@@ -52,6 +54,8 @@ from .contracts import (
     BaseProvider,
     BenchmarkReference,
     ConfidenceBasis,
+    DataClassificationContractError,
+    DataClassificationLabel,
     EvidenceContractError,
     EvidenceProvenance,
     EvidenceReference,
@@ -78,6 +82,8 @@ from .contracts import (
     Validity,
     ValidityContractError,
     ValidityStatus,
+    VendorRiskContractError,
+    VendorRiskLabel,
     VerificationStatus,
 )
 
@@ -114,4 +120,10 @@ __all__ = [
     "ValidityStatus", "Validity", "ValidityContractError",
     # G4 neutral audit reference (additive)
     "AuditReference", "AuditContractError",
+    # DE-5 neutral data-classification label (additive)
+    "DataClassificationLabel", "DataClassificationContractError",
+    # VR-5 neutral vendor-risk label (additive)
+    "VendorRiskLabel", "VendorRiskContractError",
+    # AE-5 neutral assurance-finding label (additive)
+    "AssuranceFindingLabel", "AssuranceFindingContractError",
 ]
