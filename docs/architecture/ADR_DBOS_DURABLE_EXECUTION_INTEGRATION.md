@@ -492,13 +492,74 @@ to be quietly skipped.** They are named here so that skipping one is visible.
 
 ---
 
+## 8A — Verification record (GAS-2, 2026-09-05)
+
+Implemented at `packages/integration/durable-execution` (`ugence-durable-execution`
+0.1.0). The suite runs against a real PostgreSQL 16 server: the crash rows kill real
+processes, and row 7 stops the real database.
+
+**Result: 43 passed — all eleven rows green, none skipped.** `packages/runtime/agent-runtime`
+is byte-unchanged and its own suite still passes (364 passed, 2 skipped).
+
+### OD-1 is satisfied, and proven rather than inferred
+
+| Case | Observed | What it establishes |
+|---|---|---|
+| SIGKILL with the transaction open | application write **absent**, step record **absent** | one transaction — two separate commits would leave exactly one |
+| Success | both present | they commit together |
+| Exception before commit | write rolled back; only an *error* outcome recorded afterwards | no success record survives a failed step |
+| Replay of a committed step | body does not re-run | the recorded result replays, correctly, for work that already happened |
+
+**The detail that would have made this gate vacuous.** `run_tx_step` writes its step
+record **only inside a DBOS workflow context**; called directly, `in_wf` is False and the
+transaction still commits but no step record is written. An adapter built the obvious way
+would have had the transaction without the durable step and would have *appeared* to pass
+OD-1 while testing nothing. Every mutating operation is therefore a `@DBOS.workflow()`
+wrapping a `@datasource.transaction`; read-only operations stay on a plain transaction,
+since a step record would record an attempt that changed nothing. §5.4 is read subject to
+this.
+
+### Three findings that change how the matrix reads
+
+1. **Recovery never auto-runs.** Agent Runtime restores a recovered instance as PAUSED
+   requiring explicit continuation, so a post-crash retry is deliberately two steps — an
+   explicit resume, then an advance that re-crosses the boundary from the beginning.
+   Rows 1–3 assert this rather than working around it. `[V]`
+2. **Row 7 blocks rather than raising.** With Postgres down, DBOS's retriable-error loop
+   backs off indefinitely, so an in-process advance never returns. Blocking is the
+   correct behaviour — an advance that cannot commit its checkpoint must not proceed —
+   but it has to be observed from outside, so the row attempts the advance in a child
+   process under a hard timeout and asserts what did *not* happen while it blocked. `[V]`
+3. **Attempts deliberately do not share a workflow id**, so DBOS never replays a
+   recorded advance. Every attempt re-enters the runtime and re-crosses the hook; the
+   step record's role here is atomicity and durable evidence, not replay. `[I]`
+
+### The §6.4 clock gap is closed
+
+`assert_durable_clock` refuses the runtime's monotonic default at construction, and row 11
+asserts both the refusal and that skew never widens permission in either direction at
+several magnitudes. The residual is stated, not papered over: detection recognises the
+known default, and a deployment that hides a monotonic reading behind an unrecognisable
+wrapper defeats the guard.
+
+### Status: DBOS is still a CANDIDATE
+
+Every row is green **in a local environment**; the CI workflow
+(`.github/workflows/durable-execution-ci.yml`) has not yet executed on a pull request.
+`DBOS_ENGINE_STATUS` therefore remains `CANDIDATE`, asserted by the package suite.
+Promotion to ratified is a deliberate owner act recorded in this ADR — never a side
+effect of a green run — and is the next decision (§9, OD-3).
+
+---
+
 ## 9 — Owner decisions (ruled 2026-09-05)
 
-Both were ruled by the repository owner before GAS-2 began. They are no longer open.
+OD-1 and OD-2 were ruled by the repository owner before GAS-2 began. OD-3 opened on GAS-2's evidence and is the only one outstanding.
 
 | # | Ruling |
 |---|---|
 | **OD-1** | **`REQUIRE_SINGLE_TRANSACTION`.** Atomic commit is a **DBOS ratification gate**, not a documented residual. The DBOS step record, the `RuntimeStateStore` update, the `CheckpointStore` append and the `RuntimeEventStore` appends must commit in **one supported Postgres transaction**. If DBOS cannot provide this, **DBOS remains a candidate and GAS-2 stops and reports the evidence** — a permanent split-commit residual is neither accepted nor engineered around. This *strengthens* what §5.4 and §8 row 3 previously contemplated: those passages are read subject to this ruling. |
+| **OD-3** | **Open.** Promotion of DBOS from *candidate* to *ratified as the initial engine*, on the evidence in §8A plus a green run of the CI workflow on a pull request. Until ruled, `DBOS_ENGINE_STATUS` stays `CANDIDATE`. |
 | **OD-2** | **`COEXIST_WITH_BOUNDARY`.** Risk Authority and execution-reservation persistence stay on their separately ratified SQLite Posture B `[V]` (`ADR_RISK_AUTHORITY_DURABLE_PERSISTENCE_SCOPING.md` D-1). DBOS and the three Agent Runtime stores share Postgres. The two backends coexist behind an **explicitly documented consistency boundary**, stated in the adapter README. GAS-2 migrates and redesigns no governance store. §8 row 8's budget ledger therefore lives in the shared Postgres. |
 
 ### What OD-1 changes in this record
@@ -525,6 +586,7 @@ consistency, HSM/KMS custody and key rotation are untouched here. The clock defe
 
 ## 11 — Next step
 
-Rule OD-1 and OD-2, then implement GAS-2: the adapter package, the three Postgres
-stores, and every row of §8 as an executing CI test. No other item in the §11 roadmap
-sequence may start first, and DBOS stays a candidate until that suite is green.
+GAS-2 is implemented and its evidence is recorded in §8A. Rule **OD-3** — whether the
+CI-verified matrix promotes DBOS from *candidate* to *ratified* — and only then flip
+`DBOS_ENGINE_STATUS`. GAS-3 (the production `GovernanceHook` adapter from
+`GovernedExecutionDecision`) is the next build item and does not depend on OD-3.
