@@ -70,12 +70,26 @@ A lift must answer a specific request — same tenant, same target, same inciden
 matching digest, and not before the containment it lifts. It is never justified by
 the incident being closed.
 
+Those rules are an **invariant, not a method**. An `IncidentRecord` holds the
+`ContainmentRequest` and `ContainmentLift` themselves, and re-runs the admissibility
+rules in `__post_init__`, so `dataclasses.replace(record, containment=LIFTED)` is
+refused exactly like the named path. Reaching `LIFTED` requires presenting a real,
+admissible `ContainmentLift` — and constructing one is writing the decision down,
+with its own author and justification.
+
 ## The RA-6 payload
 
 `signal_for_containment()` builds a `ReassessmentSignalPayload`: neutral, carrying no
-authority field, naming evidence by digest rather than carrying it. The shape mirrors
-RA-6's `AuthorityReassessmentSignal` **structurally, without importing it** — both are
-`str` enums, so values compare equal and the payload crosses verbatim.
+authority field, naming evidence by digest rather than carrying it. It is
+**field-compatible** with RA-6's `AuthorityReassessmentSignal` without importing it —
+both are `str` enums, so values compare equal — but it is not the same object and
+does not cross verbatim: RA-6 nests `target_type`/`target_id` in a `SignalTarget` and
+`isinstance`-checks its own change-type enum, so a composition root constructs those
+two and passes the rest from `as_signal_fields()`.
+
+That adaptation is the whole integration, and it is pinned rather than asserted:
+`tests/integration/test_ra6_signal_contract.py` imports RA-6, performs it, and checks
+`validation_errors() == ()`. If RA-6 renames a field or a spelling, it fails.
 
 The change types are a deliberate **subset**. `TENANT_EMERGENCY_STOP` is privileged —
 RA-6 admits it only over a stronger emergency-authorized write path — and this
@@ -83,8 +97,10 @@ package has no write path at all, so it may not name it. Categories owned by oth
 observers are excluded too: reporting one would claim an observation this package
 never made.
 
-**Nothing here can deliver the payload.** A test asserts no exported type offers
-`send`, `deliver`, `emit`, `publish`, `reassess` or `write`. A composition root that
+**Nothing here can deliver the payload.** A test walks every callable reachable from
+the curated surface and asserts none takes a transport-shaped argument or is named
+for sending — and the import boundary independently forbids every HTTP, queue and
+database client that delivering one would need. A composition root that
 never delivers is a valid deployment — the incident record stands on its own.
 
 ## No store

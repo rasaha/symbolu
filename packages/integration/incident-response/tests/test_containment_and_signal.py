@@ -23,7 +23,17 @@ from ugence_incident_response import (
     signal_for_containment,
 )
 
-from _fixtures import T0, T1, T2, T3, TENANT, containment, incident, lift
+from _fixtures import (
+    T0,
+    T1,
+    T2,
+    T3,
+    TENANT,
+    contained,
+    containment,
+    incident,
+    lift,
+)
 
 
 # --------------------------------------------------------------------------- #
@@ -83,10 +93,8 @@ def test_a_lift_is_never_justified_by_the_incident_being_closed():
 def test_a_contained_but_closed_incident_stays_visible():
     """The case a lifecycle-driven view would hide, and the one that matters most."""
 
-    contained = dataclasses.replace(
-        incident().advanced_to(IncidentState.CONTAINMENT_REQUESTED),
-        containment=ContainmentState.REQUESTED)
-    closed = contained.closed(at=T3, by="operator-2")
+    record, _request = contained()
+    closed = record.closed(at=T3, by="operator-2")
     world = (closed,)
     assert open_incidents(world, tenant_id=TENANT) == ()          # not open
     assert contained_incidents(world, tenant_id=TENANT) == (closed,)  # still contained
@@ -134,12 +142,28 @@ def test_the_change_types_are_a_deliberate_subset_of_ra6s():
     assert "TENANT_EMERGENCY_STOP" not in {m.value for m in SignalChangeType}
 
 
-def test_the_enum_values_match_ra6s_by_value():
-    """Structural compatibility: both are str enums, so a payload crosses verbatim."""
+def test_the_enum_values_are_exactly_ra6s_by_value():
+    """Structural compatibility, checked against RA-6 itself rather than a literal.
 
-    assert SignalTargetType.ENVELOPE == "ENVELOPE"
-    assert SignalChangeType.RUNTIME_RISK_ESCALATED == "RUNTIME_RISK_ESCALATED"
-    assert SignalTargetType.TENANT in frozenset({"TENANT", "SUBJECT"})
+    A hand-written copy of RA-6's spellings would keep passing after RA-6 changed
+    them, which is the failure this package's whole seam-without-import design
+    depends on catching. So the real enums are imported *by the test* — never by
+    the package — and compared.
+    """
+
+    ra6 = pytest.importorskip("risk_authority.domain.authority_signal",
+                              reason="RA-6 is not installed in this environment")
+
+    assert {m.value for m in SignalTargetType} == {m.value for m in ra6.SignalTargetType}
+
+    ours = {m.value for m in SignalChangeType}
+    theirs = {m.value for m in ra6.SignalChangeType}
+    assert ours < theirs, "our change types must be a strict subset of RA-6's"
+    assert "TENANT_EMERGENCY_STOP" not in ours
+
+    # str-enum equality is what lets the value cross without either import.
+    assert SignalTargetType.ENVELOPE == ra6.SignalTargetType.ENVELOPE.value
+    assert SIGNAL_SCHEMA_VERSION in ra6.SUPPORTED_SIGNAL_SCHEMA_VERSIONS
 
 
 def test_a_non_tenant_target_must_name_something():
@@ -169,11 +193,40 @@ def test_an_unsupported_schema_version_is_refused_at_construction():
 
 
 def test_nothing_in_the_package_can_deliver_the_payload():
+    """Not a name scan of the curated types: every callable they reach.
+
+    A name-only check passes for a method called ``dispatch`` and for a constructor
+    that quietly accepts a ``client=``. So this walks each exported callable's
+    signature too, and refuses transport-shaped parameters — the thing a deliverer
+    would actually need to be given.
+    """
+
+    import inspect
+
     import ugence_incident_response as pkg
 
-    for name in pkg.__all__:
-        value = getattr(pkg, name)
-        surface = {n for n in dir(value) if not n.startswith("_")} if isinstance(value, type) else set()
-        for forbidden in ("send", "deliver", "emit", "publish", "post", "submit",
-                          "reassess", "revoke", "advance_epoch", "write"):
-            assert forbidden not in surface, (name, forbidden)
+    forbidden_names = ("send", "deliver", "emit", "publish", "post", "submit",
+                       "dispatch", "notify", "reassess", "revoke", "advance_epoch",
+                       "write", "execute", "rollback", "apply")
+    forbidden_params = ("client", "session", "transport", "connection", "conn",
+                        "channel", "producer", "publisher", "sink", "endpoint",
+                        "url", "socket", "writer", "bus", "queue")
+
+    def check(owner: str, name: str, value) -> None:
+        assert name not in forbidden_names, f"{owner}.{name}"
+        try:
+            signature = inspect.signature(value)
+        except (TypeError, ValueError):
+            return
+        for parameter in signature.parameters:
+            assert parameter.lower().lstrip("_") not in forbidden_params, (
+                f"{owner}.{name}({parameter})")
+
+    for exported in pkg.__all__:
+        value = getattr(pkg, exported)
+        if callable(value):
+            check("ugence_incident_response", exported, value)
+        if isinstance(value, type):
+            for name, member in inspect.getmembers(value, callable):
+                if not name.startswith("_"):
+                    check(exported, name, member)

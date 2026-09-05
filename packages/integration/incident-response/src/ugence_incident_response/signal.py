@@ -11,12 +11,21 @@ cannot mutate authority state even by mistake. Delivery is a composition root's
 job — and a composition root that never delivers is a valid deployment: the
 incident record stands on its own.
 
-The shape mirrors ``risk_authority.domain.authority_signal.AuthorityReassessmentSignal``
-**structurally, without importing it** — the same seam-without-import relationship
-``authority-directory`` has to the approval workflow's ``ApproverEligibilityPort``.
-Both sides use ``str`` enums, so member values compare and hash equal and a payload
-built here is accepted by the reassessor verbatim. The kinds are deliberately a
-subset: this package can only ever report what it observed.
+The payload is **field-compatible** with
+``risk_authority.domain.authority_signal.AuthorityReassessmentSignal``, not identical
+to it, and it is deliberately not the same object — the same seam-without-import
+relationship ``authority-directory`` has to the approval workflow's
+``ApproverEligibilityPort``. Both sides use ``str`` enums, so member values compare
+and hash equal; but this payload keeps ``target_type``/``target_id`` **flat** where
+RA-6 nests them in a ``SignalTarget``, so a composition root delivering the signal
+must adapt it — see :meth:`ReassessmentSignalPayload.as_signal_fields`.
+Nothing here is accepted verbatim, and claiming otherwise would describe an
+integration nobody wrote. The cross-package contract is pinned by
+``tests/integration/test_ra6_signal_contract.py``, which imports RA-6, performs that
+one construction, and asserts ``validation_errors() == ()``.
+
+The kinds are deliberately a subset: this package can only ever report what it
+observed.
 """
 
 from __future__ import annotations
@@ -86,6 +95,10 @@ class ReassessmentSignalPayload:
     reason: str
     correlation_id: str
     evidence_refs: tuple[str, ...] = ()
+    #: Controls RA-6 should reconsider alongside the evidence. Present because
+    #: ``AuthorityReassessmentSignal`` carries it: omitting a field the receiving
+    #: type has would silently drop whatever a caller meant to say.
+    control_refs: tuple[str, ...] = ()
     prior_state_ref: Optional[str] = None
 
     def __post_init__(self) -> None:
@@ -95,7 +108,13 @@ class ReassessmentSignalPayload:
                 getattr(self, name), f"ReassessmentSignalPayload.{name}"))
         object.__setattr__(self, "target_id",
                            optional_text(self.target_id, "ReassessmentSignalPayload.target_id"))
-        object.__setattr__(self, "evidence_refs", tuple(self.evidence_refs))
+        for name in ("evidence_refs", "control_refs"):
+            values = tuple(getattr(self, name))
+            for value in values:
+                if not isinstance(value, str) or not value.strip():
+                    raise ContractViolation(
+                        f"ReassessmentSignalPayload.{name} entries must be non-blank strings")
+            object.__setattr__(self, name, values)
         if not isinstance(self.target_type, SignalTargetType):
             raise ContractViolation("target_type must be a SignalTargetType member")
         if not isinstance(self.change_type, SignalChangeType):
@@ -120,7 +139,32 @@ class ReassessmentSignalPayload:
             "observed_at": iso(self.observed_at, "observed_at"), "reason": self.reason,
             "correlation_id": self.correlation_id,
             "evidence_refs": list(self.evidence_refs),
+            "control_refs": list(self.control_refs),
             "prior_state_ref": self.prior_state_ref or "",
+        }
+
+    def as_signal_fields(self) -> dict:
+        """The fields RA-6's ``AuthorityReassessmentSignal`` takes **as they are**.
+
+        Two are missing, and their absence is the honest part. RA-6 nests
+        ``target_type``/``target_id`` in its own ``SignalTarget``, and it
+        ``isinstance``-checks its own ``SignalChangeType``; constructing either type
+        here would mean importing RA-6. So a composition root supplies ``target=``
+        and ``change_type=`` itself, from :attr:`target_type`, :attr:`target_id` and
+        :attr:`change_type` — whose *values* are equal to RA-6's, which is why the
+        adaptation is two constructor calls and not a translation table.
+
+        ``tests/integration/test_ra6_signal_contract.py`` performs exactly this and
+        asserts the result's ``validation_errors()`` is empty.
+        """
+
+        return {
+            "schema_version": self.schema_version, "event_id": self.event_id,
+            "tenant_id": self.tenant_id, "source": self.source,
+            "source_version": self.source_version, "observed_at": self.observed_at,
+            "reason": self.reason, "correlation_id": self.correlation_id,
+            "evidence_refs": self.evidence_refs, "control_refs": self.control_refs,
+            "prior_state_ref": self.prior_state_ref,
         }
 
     def canonical_digest(self) -> str:

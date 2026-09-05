@@ -13,9 +13,17 @@ Scoped and ratified by `docs/architecture/ADR_UGENCE_INCIDENT_RESPONSE_SCOPING.m
 - The forward-only incident lifecycle, with containment tracked **apart** from it:
   closing an incident never lifts containment, and `contained_incidents()` keeps
   showing a closed-but-contained incident (D-5).
-- `signal_for_containment` builds RA-6's neutral reassessment payload and never
-  delivers it; the change types are a deliberate subset excluding the privileged
-  `TENANT_EMERGENCY_STOP` (D-2).
+- `signal_for_containment` builds a payload **field-compatible** with RA-6's neutral
+  `AuthorityReassessmentSignal` — not that type — and never delivers it. `target` and
+  `change_type` are the composition root's two constructor calls;
+  `as_signal_fields()` supplies the rest, and
+  `tests/integration/test_ra6_signal_contract.py` imports the real RA-6 and asserts
+  `validation_errors() == ()`. The change types are a deliberate subset excluding the
+  privileged `TENANT_EMERGENCY_STOP` (D-2).
+- Containment evidence is held as the `ContainmentRequest` and `ContainmentLift`
+  records themselves, and the lift rules re-run in `__post_init__`. Reaching
+  `LIFTED` therefore requires a real, admissible lift by every route —
+  `dataclasses.replace` included — rather than only by the named method (D-5).
 - `IncidentJournalPort`, a read-only Protocol with no implementation, and pure
   selectors over a caller-held collection. No store ships (D-4).
 - Not an orchestrator and not an `…Authority`; mints no `AuditReference` and no

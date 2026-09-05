@@ -11,6 +11,7 @@ from ugence_incident_response import (
     ContainmentLift,
     ContainmentRequest,
     IncidentRecord,
+    IncidentState,
     RemediationProposal,
     incident_id_for,
 )
@@ -52,6 +53,21 @@ def containment(inc: IncidentRecord | None = None, *, target: str = TARGET,
     return ContainmentRequest(incident_id=i.incident_id, tenant_id=i.tenant_id,
                               target_ref=target, reason=reason, requested_at=at,
                               requested_by=by)
+
+
+def contained(inc: IncidentRecord | None = None,
+              **kwargs) -> tuple[IncidentRecord, ContainmentRequest]:
+    """An incident in ``CONTAINMENT_REQUESTED`` and the request that put it there.
+
+    Built through :meth:`IncidentRecord.containment_requested` because that is the
+    only way to reach the state: the record carries the request's digest, and a
+    hand-set ``containment=`` is refused at construction.
+    """
+
+    i = inc or incident()
+    request = containment(i, **kwargs)
+    return (i.advanced_to(IncidentState.CONTAINMENT_REQUESTED)
+             .containment_requested(request), request)
 
 
 def lift(request: ContainmentRequest, *, at: datetime = T3, by: str = "operator-2",

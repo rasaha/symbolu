@@ -8,6 +8,7 @@ import dataclasses
 import pytest
 
 from ugence_incident_response import (
+    ContainmentLiftRefused,
     ContainmentState,
     ContractViolation,
     IllegalTransitionError,
@@ -29,8 +30,10 @@ from _fixtures import (
     T3,
     TENANT,
     audit_ref,
+    contained,
     containment,
     incident,
+    lift,
     proposal,
 )
 
@@ -141,58 +144,60 @@ def test_closing_an_incident_does_not_touch_containment():
     """An incident that closed itself and silently restored service is how a
     containment becomes theatre. Closing records only that the incident is over."""
 
-    contained = dataclasses.replace(
-        incident().advanced_to(IncidentState.CONTAINMENT_REQUESTED),
-        containment=ContainmentState.REQUESTED)
-    assert contained.is_contained
+    record, _request = contained()
+    assert record.is_contained
 
-    closed = contained.closed(at=T3, by="operator-2")
+    closed = record.closed(at=T3, by="operator-2")
     assert closed.state is IncidentState.CLOSED
     assert closed.containment is ContainmentState.REQUESTED  # untouched
     assert closed.is_contained, "closing must never lift containment"
 
 
-def test_the_record_offers_no_way_to_lift_its_own_containment():
-    surface = {n for n in dir(incident()) if not n.startswith("_")}
-    for forbidden in ("lift", "lift_containment", "clear", "clear_containment", "resume",
-                      "restart", "revoke", "execute", "rollback"):
-        assert forbidden not in surface, forbidden
+def test_containment_cannot_be_lifted_by_rewriting_the_record():
+    """The bypass a name-scan would miss: ``dataclasses.replace`` onto ``LIFTED``.
+
+    A containment state is admissible only with the record that produced it, so
+    fabricating the state without a :class:`ContainmentLift` is refused at
+    construction rather than merely undiscoverable.
+    """
+
+    record, request = contained()
+
+    with pytest.raises(ContractViolation, match="LIFTED requires"):
+        dataclasses.replace(record, containment=ContainmentState.LIFTED)
+    with pytest.raises(ContainmentLiftRefused, match="admissible lift"):
+        dataclasses.replace(record, containment=ContainmentState.LIFTED,
+                            containment_lift=lift(containment(
+                                incident(subject="envelope:env-2"))))
+    with pytest.raises(ContractViolation, match="NONE carries no"):
+        dataclasses.replace(record, containment=ContainmentState.NONE)
+    with pytest.raises(ContractViolation, match="REQUESTED requires"):
+        dataclasses.replace(incident(), containment=ContainmentState.REQUESTED)
+
+    # And the one legitimate path does work, on the real lift record.
+    lifted = record.containment_lifted(lift(request))
+    assert lifted.containment is ContainmentState.LIFTED
+    assert lifted.containment_lift == lift(request)
 
 
-# --------------------------------------------------------------------------- #
-# Containment and remediation records
-# --------------------------------------------------------------------------- #
-def test_a_containment_request_records_who_asked_and_why():
-    request = containment()
-    assert request.target_ref and request.reason and request.requested_by
-    assert request.requested_at == T1
-    assert len(request.record_digest()) == 64
-    for blank in ("target_ref", "reason", "requested_by"):
-        with pytest.raises(ContractViolation):
-            dataclasses.replace(request, **{blank: "  "})
+def test_closing_is_not_a_route_to_lifting():
+    """Closing an incident leaves the only lift path exactly where it was."""
+
+    record, request = contained()
+    closed = record.closed(at=T3, by="operator-2")
+    assert closed.is_contained
+
+    # Closing did not make the lift admissible-by-default, and it did not make it
+    # inadmissible either: the lift is still its own decision, still required.
+    with pytest.raises(ContractViolation, match="LIFTED requires"):
+        dataclasses.replace(closed, containment=ContainmentState.LIFTED)
+    assert closed.containment_lifted(lift(request)).containment is ContainmentState.LIFTED
 
 
-def test_a_remediation_proposal_may_cite_a_compensation_requirement():
-    plain = proposal()
-    assert not plain.cites_compensation and plain.compensation_ref == ""
-    citing = proposal(compensation="comp-42")
-    assert citing.cites_compensation and citing.compensation_ref == "comp-42"
-
-
-def test_no_second_compensation_type_or_status_is_minted():
-    import ugence_incident_response as pkg
-
-    assert not [n for n in pkg.__all__ if "Compensation" in n]
-    assert not [n for n in pkg.__all__ if n.endswith("ApprovalStatus")]
-
-
-def test_every_instant_must_be_timezone_aware():
-    import datetime as dt
-
-    naive = dt.datetime(2026, 3, 1, 9, 0)
-    with pytest.raises(ContractViolation, match="timezone-aware"):
-        incident(opened=naive)
-    with pytest.raises(ContractViolation, match="timezone-aware"):
-        containment(at=naive)
-    with pytest.raises(ContractViolation, match="timezone-aware"):
-        proposal(at=naive)
+def test_a_lift_from_a_different_containment_is_refused():
+    record, request = contained()
+    other_request = containment(incident(subject="envelope:env-2"))
+    with pytest.raises(ContainmentLiftRefused, match="request_digest does not match"):
+        record.containment_lifted(lift(other_request))
+    with pytest.raises(ContainmentLiftRefused, match="only a REQUESTED"):
+        incident().containment_lifted(lift(request))

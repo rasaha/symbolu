@@ -100,6 +100,8 @@
         "opened_by",
         "state",
         "containment",
+        "containment_request",
+        "containment_lift",
         "summary",
         "closed_at",
         "closed_by"
@@ -157,6 +159,7 @@
         "reason",
         "correlation_id",
         "evidence_refs",
+        "control_refs",
         "prior_state_ref"
       ],
       "kind": "dataclass"

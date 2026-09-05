@@ -13,14 +13,20 @@ acts.
 
 from __future__ import annotations
 
-from datetime import datetime
 from typing import Iterable, Optional, Protocol, runtime_checkable
 
-from ._canon import require_nonempty, require_tzaware
-from .errors import ContainmentLiftRefused
-from .records import ContainmentLift, ContainmentRequest, IncidentRecord
+from ._canon import require_nonempty
+from .records import (
+    IncidentRecord,
+    lift_refusals,
+    require_admissible_lift,
+)
 from .states import OPEN_STATES, IncidentState
 
+#: ``lift_refusals`` and ``require_admissible_lift`` live in :mod:`.records`, next
+#: to the records they judge — :class:`~.records.IncidentRecord.containment_lifted`
+#: is their only in-package caller and importing them back would be a cycle. They
+#: are re-exported here because the read seam is where a composition root looks.
 __all__ = [
     "IncidentJournalPort", "open_incidents", "incidents_for_subject",
     "contained_incidents", "lift_refusals", "require_admissible_lift",
@@ -60,43 +66,6 @@ def contained_incidents(incidents: Iterable[IncidentRecord], *,
     tenant = require_nonempty(tenant_id, "tenant_id")
     return tuple(sorted((i for i in incidents if i.tenant_id == tenant and i.is_contained),
                         key=lambda i: (i.opened_at, i.incident_id)))
-
-
-def lift_refusals(lift: ContainmentLift, request: Optional[ContainmentRequest],
-                  incident: Optional[IncidentRecord]) -> tuple[str, ...]:
-    """Why a containment lift is inadmissible; empty means admissible.
-
-    A lift must answer a specific request, in the same tenant, for the same target,
-    on the same incident. It may **not** be justified by the incident being closed:
-    closing records that the incident is over, never that service may resume.
-    """
-
-    reasons: list[str] = []
-    if request is None:
-        reasons.append("the containment request this lift answers does not exist")
-    else:
-        if lift.request_digest != request.record_digest():
-            reasons.append("request_digest does not match the presented containment request")
-        if lift.tenant_id != request.tenant_id:
-            reasons.append("a lift may not cross tenants")
-        if lift.target_ref != request.target_ref:
-            reasons.append("a lift must name the target its request contained")
-        if lift.incident_id != request.incident_id:
-            reasons.append("a lift must belong to the incident its request belongs to")
-        if lift.lifted_at < request.requested_at:
-            reasons.append("a lift may not precede the containment it lifts")
-    if incident is not None and incident.incident_id != lift.incident_id:
-        reasons.append("the presented incident is not this lift's incident")
-    return tuple(reasons)
-
-
-def require_admissible_lift(lift: ContainmentLift, request: Optional[ContainmentRequest],
-                            incident: Optional[IncidentRecord] = None) -> None:
-    """Raise :class:`ContainmentLiftRefused` when the lift is inadmissible."""
-
-    reasons = lift_refusals(lift, request, incident)
-    if reasons:
-        raise ContainmentLiftRefused("; ".join(reasons))
 
 
 @runtime_checkable
