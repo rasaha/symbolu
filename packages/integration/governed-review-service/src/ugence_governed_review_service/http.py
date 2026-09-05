@@ -8,9 +8,12 @@ read from a session (none exists), no result other than the service's typed answ
 returned, and the body's ``decision`` is the human's word, forwarded verbatim.
 
 The presented approver arrives in the body as a non-secret reference and is recorded
-as exactly that (``identity_proof: PRESENTED_UNPROVEN``). A deployment that fronts
-this app with an identity provider replaces the body field with the session's
-principal in its own composition root; this package does not do it and says so.
+as exactly that (``identity_proof: PRESENTED_UNPROVEN``). Since 0.3.0 (AI-A) the
+decision route also reads one opaque proof from the ``PROOF_HEADER`` header and hands
+it, unparsed, to the service, which relays it to the configured identity port. The
+header value is never echoed, logged, stored or placed in any answer; when no port is
+configured it is ignored. A deployment that fronts this app with an identity provider
+does so behind that port, in its own composition root.
 """
 
 
@@ -18,6 +21,7 @@ from typing import Any, Mapping
 
 from ugence_approval_workflow import ApproverKind, ApproverRef, ReviewDecision
 
+from .identity import PROOF_HEADER
 from .linkage import linkage_view
 from .service import DecisionOutcome, QueueEntry, ReviewService
 from .version import CONTRACT_VERSION, IDENTITY_PROOF, MATURITY, __version__
@@ -72,6 +76,9 @@ def decision_view(outcome: DecisionOutcome) -> dict:
         "reason": outcome.reason,
         "identity_proof": outcome.identity_proof,
         "linkage": linkage_view(outcome.linkage),
+        "authentication_reference": outcome.authentication_reference,
+        "tenant_source": outcome.tenant_source,
+        "assurance": None if outcome.assurance is None else outcome.assurance.to_dict(),
     }
 
 
@@ -143,6 +150,7 @@ def build_app(service: ReviewService) -> Any:
         outcome = service.submit_decision(
             approval_id=str(body.get("approval_id", "")), decision=decision,
             presented_approver=approver, justification=str(body.get("justification", "")),
+            presented_proof=request.headers.get(PROOF_HEADER, ""),
         )
         status = 200 if outcome.recorded else 409
         return JSONResponse(status_code=status, content=decision_view(outcome))

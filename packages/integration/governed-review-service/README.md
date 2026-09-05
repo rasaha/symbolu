@@ -13,10 +13,12 @@ routes the screen/API audit proposed
 
 `REFERENCE_GRADE_SHADOW_ONLY`, `ENFORCEMENT_ENABLED = False`, `IDENTITY_PROOF =
 "PRESENTED_UNPROVEN"`. The approver on every decision is a reference the caller
-presented. No identity provider integration exists, so nothing here proves who decided;
-the ledger's eligibility port, answered by the authority directory, decides only whether
-that reference *may* decide. Every decision feeds a runtime that invokes fixture
-providers. Nothing is pilot-validated or production-certified.
+presented. Since 0.3.0 the service defines the seam a proof enters through (AI-A,
+below), but the only adapter in this repository is a fixture that proves nothing, so
+every decision it records is still `PRESENTED_UNPROVEN`; the ledger's eligibility port,
+answered by the authority directory, decides only whether that reference *may* decide.
+Every decision feeds a runtime that invokes fixture providers. Nothing is
+pilot-validated or production-certified.
 
 ## What it does
 
@@ -79,6 +81,43 @@ Without a ledger configured every linkage outcome is `LEDGER_UNCONFIGURED` and n
 is written. `governed-review` itself gains no dependency on the ledger; its boundary
 test forbids the import.
 
+## The approver identity port (AI-A, rulings ID-2 to ID-5)
+
+`docs/architecture/ADR_UGENCE_APPROVER_IDENTITY_SCOPING.md` rules where proof of who
+decided enters: at this service, at decision time, through a service-local port. A
+composition root may pass `identity_port=` (any `ApproverIdentityPort`:
+`authenticate(proof) -> ApproverIdentity(actor_id, actor_type, authenticated, claims,
+proof)`, the same shape as Decision Authority's seam plus the verified claims, imported
+from nowhere) together with an explicit `tenant_mode=` (`SINGLE_TENANT` or
+`MULTI_TENANT`). Then, before any record is read or changed:
+
+- no proof, an unauthenticated answer, or a proof expired at the write is
+  `REFUSED_UNAUTHENTICATED` (rows 1, 6); the port failing to answer, for any reason, is
+  `REFUSED_IDENTITY_UNAVAILABLE` (row 7); an AI or SYSTEM actor is `REFUSED_NOT_HUMAN`
+  whatever role it holds (row 5);
+- the presented `approver_id` must equal the proven, issuer-qualified subject
+  (`subject_reference`: percent-encoded `issuer|subject`), else
+  `REFUSED_IDENTITY_MISMATCH` (row 2). That subject is what the ledger records as
+  `decided_by`; the directory must know it under the same string (row 3);
+- the tenant comes from the proof (ID-4): one claim is authoritative and must equal
+  the approval's tenant (`REFUSED_NOT_REVIEWABLE` otherwise, row 4); several claims are
+  `REFUSED_TENANT_UNPROVEN` in either mode; no claim falls back to the configured
+  tenant only in `SINGLE_TENANT` mode, and the outcome says `tenant_source =
+  CONFIGURED_SINGLE_TENANT` (row 11); `MULTI_TENANT` refuses it (row 12).
+
+The outcome, and the durable `EXTERNAL_SIGNAL:review_decision` payload, then carry
+`authentication_reference` (ID-2: `authn:sha256:` over the canonical verified claims,
+never the proof; distinct from `decided_authority_reference`, the directory grant),
+`tenant_source`, and `assurance` (ID-5: `acr` and `amr` exactly as the issuer asserted,
+`threshold_enforced: false`; nothing is invented and no level is enforced). The
+approval record and the linkage do not yet carry the reference (AI-D).
+
+`StaticApproverIdentityAdapter` is the only implementation: a fixture map from proof
+strings to identities that labels every answer `PRESENTED_UNPROVEN` and is refused by
+`ReviewService(production=True)`. A real adapter, the first identity-provider and
+crypto dependency on this path, is AI-C in its own package; only it may label a
+decision `IDP_AUTHENTICATED`. Without a port the service behaves as before.
+
 ## HTTP
 
 `build_app(service)` returns a FastAPI application (the `http` extra, imported inside
@@ -97,8 +136,11 @@ No path or operation id carries an SD-2 verb. The decision body is
 approver_kind, role, authority_reference}, justification}`; the answer is the typed
 outcome, 200 when recorded or replayed, 409 with the reason and the standing record when
 refused, 422 when malformed. Since 0.2.0 the answer carries `linkage` and run detail
-carries `linkages` (HE-5); the routes are unchanged. A deployment that fronts this app with an identity provider
-replaces the body's approver with the session principal in its own composition root.
+carries `linkages` (HE-5). Since 0.3.0 (`governed_review_service.v3`) the decision route
+reads one opaque proof from the `X-Ugence-Approver-Proof` header, hands it unparsed to
+the identity port and never echoes, logs or stores it; the answer carries
+`authentication_reference`, `tenant_source` and `assurance`, and run detail carries
+`tenant_mode`. The routes are unchanged.
 
 ## Evidence
 
@@ -122,6 +164,12 @@ reads, the read-only index refusing an in-memory ledger or a foreign schema, and
 ledger entry being exactly the linkage payload plus its digest. Rows 8 and 9 in
 `tests/test_matrix_rows.py` run with the ledger in the loop.
 
+`tests/test_identity.py` — AI-A over the real SQLite ledger and the adapter double:
+identity-ADR rows 1 to 8, 10, 11 and 12; the reference is deterministic and changes
+with any claim; the static adapter never labels an answer authenticated and is refused
+in production; without a port nothing changes; the proof header is read and never
+echoed.
+
 `tests/test_boundaries.py` — the import set, no clock, no capability package, no
 identity provider, credential, network or LIVE token, no prohibited verb in any route,
 no surface that could approve, authenticate, clear or execute, and that every adapter
@@ -138,8 +186,10 @@ SQLAlchemy. `fastapi` and
 
 ## Known gaps `[G]`
 
-- No identity provider: `decided_by` is what the caller presented. The eligibility
-  port bounds who may decide; nothing proves who did.
+- No real identity adapter (AI-C): with the fixture adapter, or without a port,
+  `decided_by` is what the caller presented and nothing proves who did. The approval
+  record and the linkage carry no `authentication_reference` yet (AI-D); no assurance
+  policy or gate exists (AI-E); the studio relays no proof yet (AI-B).
 - Requests that expire undecided are not re-requested; the instance stays parked until
   a later step raises a new ordinal.
 - `required_approvals` labels are mapped to one configured role by the binding

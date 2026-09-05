@@ -1,6 +1,6 @@
 name: governed-review-service-ci
 
-# Scoped CI for ugence-governed-review-service (roadmap GAS-7, steps HR-C and HE-1/HE-5).
+# Scoped CI for ugence-governed-review-service (roadmap GAS-7, steps HR-C, HE-1/HE-5 and AI-A).
 #
 # The failure-matrix rows the service owns (human-review ADR §4 rows 7, 8, 9) are only
 # evidence against a REAL PostgreSQL (the DBOS adapter) and a real SQLite ledger, so
@@ -82,6 +82,11 @@ jobs:
         run: |
           cd packages/integration/governed-review-service
           python -m pytest tests/test_http.py -o addopts= -v --no-header
+
+      - name: Approver identity port and proof shape (AI-A, identity-ADR rows 1-8, 10-12)
+        run: |
+          cd packages/integration/governed-review-service
+          python -m pytest tests/test_identity.py -o addopts= -v --no-header
 
       - name: Boundaries
         run: |
