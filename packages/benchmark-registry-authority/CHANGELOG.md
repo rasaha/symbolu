@@ -2,12 +2,135 @@
 
 All notable changes to this distribution. The format follows Keep a Changelog;
 versioning is Semantic Versioning, and the version ladder is the ratified one:
-BR-2A `0.1.0`, BR-2B `0.2.0`, **BR-2C-0 `0.2.1`, `0.2.2` and `0.2.3`**, BR-2C
-`0.3.0`, BR-2D `0.4.0`, BR-2E `0.5.0` (ADR §35 D-01, amended 2026-08-20, and
-D-33 and D-36). Five of the six rungs are subphases; `BR-2C-0` is a **version
-rung**, carries three versions, and mints no closure audit.
+BR-2A `0.1.0`, BR-2B `0.2.0`, BR-2C-0 `0.2.1`, `0.2.2` and `0.2.3`,
+**BR-2C-RC `0.3.0rc1`**, BR-2C `0.3.0`, BR-2D `0.4.0`, BR-2E `0.5.0` (ADR §35
+D-01, amended 2026-08-20; D-33 and D-36; the owner's BR-2C candidate ruling).
+Five of the seven rungs are subphases; `BR-2C-0` and `BR-2C-RC` are **version
+rungs**, and neither mints a closure audit.
 
-## [Unreleased] — BR-2C-0 closure: shipped-text corrections, D-36, D-37 and D-38
+## [0.3.0rc1] — BR-2C candidate head: the verifier, engineered and tested, not reviewed
+
+**A candidate version, never `0.3.0`.** Ratified by the owner as a candidate
+version only: it conveys no audit, independent-review or production-release
+claim. The D-38 reviewer authority is ratified as **an independent external
+cryptographic reviewer**; the individual reviewer must be named and the review
+commissioned and completed before any final `0.3.0` release, and this candidate
+is not described as audited or independently reviewed anywhere in this
+distribution. Candidate engineering and testing were authorized to begin before
+that naming, and this entry is exactly that and no more.
+
+### Added — the candidate verifier, in one dedicated module
+
+- **`src/ugence_benchmark_registry_authority/verifier.py`** — the only module
+  that performs cryptography. `BenchmarkEd25519Verifier` implements the three
+  seams of `BenchmarkApprovalVerifierPort` (D-24, D-26) over an injected
+  `BenchmarkPublisherTrustDirectoryPort` (D-25, D-34): it reconstructs each
+  envelope's signing input by reading the pinned
+  `BENCHMARK_SIGNING_FRAME_SPECIFICATION` rather than restating it, resolves the
+  anchor by the exact `(role, identity, key_id)` triple the envelope declares,
+  evaluates the anchor on `BENCHMARK_TRUST_ANCHOR_EVALUATION_ORDER` at the
+  caller's explicit trusted instant (D-27, D-28; half-open interval; revocation
+  retroactive), admits the anchor's key only after libsodium's strict point
+  check, applies RFC 8032 §5.1.7's `S < L` before consulting the signature
+  backend, and verifies under the single ratified profile (D-29). Nothing is
+  memoized (D-21).
+- **`BenchmarkDenyAllVerifier`** — the exact deny-all default §35.1's BR-2C row
+  requires: every seam refuses `NO_TRUST_ANCHOR_CONFIGURED`, consults no
+  directory, admits no key, has no field to flip, and still binds the envelope
+  digest, the declared signer and the trusted instant.
+- **D-41's division of labour, exactly**: `cryptography` verifies; `PyNaCl`
+  validates the public-key point at anchor admission. Re-measured on this pair
+  (`cryptography` 41.0.7 and 46.0.7, `PyNaCl` 1.6.2): the signature backend
+  alone accepts a key-less forgery under the identity point, its non-canonical
+  encoding, the order-2 point, one order-4 point and a `y ≥ p` encoding; the
+  point check refuses all twelve corpus entries. The second backend is
+  load-bearing, and `tests/contract/test_verifier.py` asserts that rather than
+  citing it.
+- **D-39 and D-42 at the seam**: parsing is private and no parser API is
+  exported; a malformation of external trust state — a malformed key, a
+  malformed or non-verifying signature, a directory that raises, returns the
+  wrong type or answers a different triple — is **returned** as a `REFUSED`
+  result within D-35's twelve, never raised past the seam. A contract error
+  carrying a reason outside the twelve, or none, refuses `INDETERMINATE`
+  (D-42(d)). The seam's own inputs are contracts: a non-envelope or a naive
+  trusted instant raises before evaluation (D-42(a)), because there is no
+  digest to bind a refusal to.
+- **The D-42 key-identifier grammar and the D-43 actor-identity grammar**,
+  applied at construction through two separate validators,
+  `require_key_identifier` and `require_actor_identity`, at exactly the sites
+  the two rulings name. `applicable_policy_ref` and `declared_revocation_reason`
+  stay on the bare rule. Every malformation refuses `INDETERMINATE`. No pinned
+  vector moved: every fixture identity already conformed.
+- **Two exported symbols**, appended: `api.__all__` 108 → **110**,
+  `public_api.json` 107 → **109**; both manifests classify them as
+  `candidate_verifier_implementation` with `maturity: CANDIDATE_NOT_REVIEWED`.
+  No digest domain, pinned vector, refusal member or contract type moved; the
+  canonical-domain inventory stays at **22**.
+
+### Changed — the release transition, and only what it names
+
+The owner ratified the D-40 release transition for the candidate rung as:
+`cryptography` and `PyNaCl` may be imported **only inside the dedicated verifier
+module** and only for their D-41 roles; the bans on
+`ugence_trusted_evidence_authority`, Policy Authority Ed25519 code, Risk
+Authority Ed25519 code, reuse of any other Ugence Ed25519 implementation, and
+every capability token not expressly named for BR-2C remain in force; no other
+dependency-boundary or milestone prohibition moves. Each gate below moved by
+exactly that much:
+
+- **Dependencies.** `pyproject.toml` declares `cryptography>=41.0.7,<47.0.0`
+  and `PyNaCl>=1.5.0,<2.0.0` after the frozen BR-1 pin — the same bounded
+  style as the trusted-evidence layer, as a *selection*, never an import of
+  that layer's code. `test_dependency_boundary.py` pins the list to exactly
+  those three, pins the pair's imports to `verifier.py` alone, keeps
+  `FORBIDDEN_PACKAGES` intact, and bans any further cryptographic distribution.
+- **Milestone ladder.** `tests/_milestones.py` inserts rung `BR-2C-RC` between
+  `BR-2C-0` and `BR-2C` and maps `0.3.0rc1` to it. The twelve BR-2C capability
+  tokens — eight tree-wide, four on the exported surface — unlock at
+  `BR-2C-RC`; every BR-2D token and every permanent ban is unmoved, and both
+  unlock maps are pinned **in both directions** against BR-2A's frozen sets
+  minus exactly the twelve. `BR-2C-0` still bans everything BR-2A froze.
+- **No-cryptography gates.** "Nothing performs cryptography" became "nothing
+  *outside the verifier module* performs cryptography", plus three new gates:
+  the module imports exactly the D-41 pair; it calls exactly `verify` and
+  `crypto_core_ed25519_is_valid_point` and no signing, key-generation or
+  private-key primitive; and it names no other Ugence Ed25519 code. The
+  contracts subpackage is asserted to import no cryptographic module at all.
+- **Port-implementation gates.** "No concrete class satisfies any port" became
+  "exactly the two candidate verifiers satisfy the verifier port, and nothing
+  satisfies the store, directory or clock port". The `NotImplementedError` ban,
+  the placeholder-name ban and the port-instantiation ban are unchanged.
+- **CI.** The package workflow installs the pair at the declared bounds; the
+  distribution verifier fetches the pair into its local wheelhouse before the
+  `--no-index` install and asserts the isolated environment holds exactly the
+  package, BR-1, the pair and the pair's transitive wheels.
+
+### Measured at this head
+
+Every figure from a fresh run against this tree, never edited:
+
+| Check | Result |
+| --- | --- |
+| Package suite | **2256 passed**, 1 failed — `test_no_package_in_the_monorepo_imports_this_one`, pre-existing on the default branch (`ai-system-registry`'s boundary test names this package by string) |
+| Independent adversarial probes | **93 passed**, source and installed wheel |
+| Distinct properties | **558 adversarial : 41 happy = 13.61 : 1** |
+| Distribution verifier | wheel + sdist built; `--no-index` install verified; **8 negative controls, 8 caught** |
+| `check_package_ci_coverage.py` | all 65 packages named by a workflow |
+| Repository boundary tests | 38 passed; `test_core_observer_boundary.py` fails to collect on a missing `agentic.tools` module, pre-existing |
+| Mutation sweep | **72 gates; 67 KILLED, 5 SURVIVED, 0 errored** — the same five survivors as at `0.2.3`, each classified in `gate_inventory.json` |
+| pyflakes | clean |
+
+### Maturity, stated plainly
+
+**Candidate.** Engineered and tested by the package's author under the owner's
+early-engineering ruling. **Not** independently reviewed, **not** externally
+audited, **not** a production release, and **not** `0.3.0`. D-38(i) and
+D-32(4) are both outstanding. D-37's self-attested capability-ban vocabulary is
+now load-bearing rather than inert, which is exactly the condition D-38 named
+for requiring an independent authority to audit the release head before any
+capability-bearing release.
+
+## [Unreleased before 0.3.0rc1] — BR-2C-0 closure: shipped-text corrections, D-36, D-37 and D-38
 
 **No version bump.** `package_version` stays `0.2.3`. This entry moves no
 **pinned surface count**, no digest domain, no pinned canonical vector, no

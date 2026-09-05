@@ -1,19 +1,29 @@
-# ugence-benchmark-registry-authority — BR-2C-0
+# ugence-benchmark-registry-authority — BR-2C candidate (0.3.0rc1)
 
-**Registry and exact-resolution contracts.** The authority/registry layer of the
+**Registry and exact-resolution contracts, the non-authoritative lifecycle
+kernel, and the BR-2C candidate verifier.** The authority/registry layer of the
 shared, platform-wide Benchmark Registry, sitting **above** the frozen identity
 layer [`ugence-benchmark-registry`](../benchmark-registry) and never inside it.
+
+> **Candidate, not release.** `0.3.0rc1` is a candidate version ratified by the
+> owner as a candidate only. The verifier it ships has been engineered and
+> tested; it has **not** been independently reviewed or externally audited, and
+> nothing here says otherwise. `0.3.0` — BR-2C's closure — waits on the D-38
+> independent external cryptographic reviewer being named and the review
+> commissioned and completed (D-32(4), D-38(i)).
 
 Internal platform infrastructure. Not a customer-facing module, not a product,
 and not a UVI engine. It computes nothing: no observation, no benchmark result,
 no comparison, no readiness, no ROI.
 
-> **Contracts and pure validation only.** Nothing in this package executes a
-> registry operation. There is no admission engine, storage implementation,
-> signature verifier, key parser, trust-anchor store, approval verifier, clock
-> read, resolver, convenience resolver, selection API, supersession
-> implementation, adapter registry, identity allow-list, production composition
-> root, or cryptographic dependency. A capability that does not exist is
+> **Contracts, pure validation, planning, and one verifier.** Nothing in this
+> package executes a registry operation. There is no admission engine, storage
+> implementation, trust-anchor store, clock read, resolver, convenience
+> resolver, selection API, supersession implementation, adapter registry,
+> identity allow-list or production composition root. The candidate verifier
+> establishes cryptographic verification of one envelope against one anchor
+> revision at one caller-supplied instant, and nothing else: it cannot admit,
+> register, revoke or resolve. Every other capability that does not exist is
 > **unrepresentable in the type surface**, not merely unimplemented.
 
 ---
@@ -33,7 +43,9 @@ ugence-benchmark-registry-authority
   0.2.1  (BR-2C-0) deps: unchanged — BR-2C's contracts, no BR-2C capability
   0.2.2  (BR-2C-0) deps: unchanged — D-34's anchor-resolution outcome
   0.2.3  (BR-2C-0) deps: unchanged — D-35's verified-result refusal subset
-  0.3.0  (BR-2C)  deps: + an audited cryptographic verifier
+  0.3.0rc1 (BR-2C-RC) deps: + the D-41 pair (cryptography, PyNaCl), imported
+                    only inside verifier.py — the CANDIDATE verifier
+  0.3.0  (BR-2C)  deps: unchanged — the same verifier, after independent review
   0.4.0  (BR-2D)  deps: + a durable backend named only after ADR DD-10
   0.5.0  (BR-2E)  deps: + whatever operations require, and nothing sooner
 ```
@@ -48,8 +60,9 @@ stored BR-1 canonical artifact or its identity digest.
 | --- | --- | --- | --- |
 | BR-2A | `0.1.0` | Registry and exact-resolution **contracts** | shipped |
 | BR-2B | `0.2.0` | **Non-authoritative lifecycle kernel**: transition validation, predecessor checks, terminality, conflict and idempotency calculation over *caller-asserted* state. **No store, no verifier, no clock, no append path, no authority-issued result** — it cannot admit, register, revoke or resolve | shipped |
-| **BR-2C-0** | `0.2.1`, `0.2.2`, `0.2.3` | **BR-2C's ratified contract surface, and no BR-2C capability.** A version rung, not a subphase (ADR §35.2 **D-33**, with **D-36** ruling that all three versions sit on the one rung): D-01's five subphases are unamended, it mints no closure audit, and it exists because the surface moved — `api.__all__` 93 → 106 at `0.2.1`, 106 → 107 at `0.2.2` under **D-34** and 107 → 108 at `0.2.3` under **D-35** — while `0.3.0` stays reserved for the audited verifier | **this release** |
-| BR-2C | `0.3.0` | Cryptographic trust authority: audited Ed25519 verifier, signing-frame verification, composition-root trust-resolver adapter, key entitlements and revocation. The injected verifier arrives here, defaulting to **exact deny-all** | **contract surface only, shipped in `0.2.1`–`0.2.3`** (ADR §35.2 D-24, D-25, D-26, D-34, D-35; rung minted by D-33); the subphase itself is still blocked on a secure cryptographic verifier and trust-resolver design, **externally audited** |
+| BR-2C-0 | `0.2.1`, `0.2.2`, `0.2.3` | **BR-2C's ratified contract surface, and no BR-2C capability.** A version rung, not a subphase (ADR §35.2 **D-33**, **D-36**): `api.__all__` 93 → 108 across the three versions | shipped |
+| **BR-2C-RC** | `0.3.0rc1` | **The BR-2C candidate head.** `BenchmarkEd25519Verifier` — the three verification seams on the D-41 pair inside one dedicated module — and `BenchmarkDenyAllVerifier`, the exact deny-all default; the D-42/D-43 identifier grammar at construction; `api.__all__` 108 → 110. A version rung, not a subphase; the twelve BR-2C capability tokens unlock here and nothing else moves | **this release — candidate only; not reviewed, not audited** |
+| BR-2C | `0.3.0` | BR-2C's closure: the same verifier after the D-38 independent external cryptographic review and D-32(4)'s external audit are commissioned, completed and recorded. The composition-root trust-resolver adapter and key entitlements stay with the composition root (D-04) | blocked on the D-38 reviewer being named and the review completed |
 | BR-2D | `0.4.0` | Durable registry authority: persistence, the trusted clock, compare-and-set transitions, immutable event history, the process-local in-memory adapter, registry-event signing, and the **first authoritative** admission, registration, revocation and exact resolution. Closes with the identity-locked composition root | blocked on ADR DD-10 |
 | BR-2E | `0.5.0` | Production composition and operations: tenant authorization, service APIs, deployment controls, migrations, backup/recovery, observability, audit export | blocked on BR-2D |
 
@@ -191,16 +204,53 @@ is independently recomputable with plain `hashlib` over the byte string alone,
 importing nothing from the package.
 
 The last four rows are BR-2C's ratified **contract surface**, landed in `0.2.1`
-under ADR §35.2 D-24, D-25 and D-26. They are shapes: the immutable role-scoped
-trust-anchor record the resolution seam returns, and the three distinct exact
-verified-result types that replaced the `bool` returns on the approval-verifier
-and publisher-trust-directory ports. **No verifier ships, no anchor is held or
-resolved, no key material is parsed, no clock is read and no cryptographic
-dependency is linked.** The verifier those contracts describe **does not exist
-and has not been audited**; D-32 makes an external cryptographic audit a hard
-precondition to any production use of it, and forbids any artifact here
-describing it as audited, independently reviewed or production-ready until that
-audit is obtained and recorded.
+under ADR §35.2 D-24, D-25 and D-26: the immutable role-scoped trust-anchor
+record the resolution seam returns, and the three distinct exact verified-result
+types. At `0.3.0rc1` the verifier those contracts describe **exists, as a
+candidate** (see *The candidate verifier* below). It is produced by
+`BenchmarkEd25519Verifier` and by the deny-all default, and by nothing else.
+**No anchor is held or resolved by this package and no clock is read**: the
+anchor directory and the trusted instant are both inputs. D-32 makes an
+external cryptographic audit a hard precondition to any production use, and
+forbids any artifact here describing the verifier as audited, independently
+reviewed or production-ready until that audit is obtained and recorded. None
+does.
+
+## The candidate verifier
+
+One module, [`verifier.py`](src/ugence_benchmark_registry_authority/verifier.py),
+performs cryptography, and it is the only module permitted to import the D-41
+pair. It ships two implementations of `BenchmarkApprovalVerifierPort`:
+
+| Class | What it does |
+| --- | --- |
+| `BenchmarkDenyAllVerifier` | The **exact deny-all default**. Every seam refuses `NO_TRUST_ANCHOR_CONFIGURED`, consults no directory, admits no key, and has no field to flip. Still binds the envelope digest, the declared signer and the trusted instant, so a deny-all answer is as evidence-bound as any other |
+| `BenchmarkEd25519Verifier` | The candidate. Takes an injected `BenchmarkPublisherTrustDirectoryPort`; for each seam it reconstructs the signing input from the pinned `BENCHMARK_SIGNING_FRAME_SPECIFICATION`, resolves the exact `(role, identity, key_id)` triple, evaluates the anchor in D-28's order at the explicit trusted instant, admits the key only after libsodium's strict point check, applies RFC 8032's `S < L`, and verifies with the signature backend |
+
+What a refusal looks like, and where it comes from:
+
+| Condition | Result |
+| --- | --- |
+| Directory has no anchor at the triple / cannot be consulted | `TRUST_ANCHOR_NOT_FOUND` / `TRUST_DIRECTORY_UNAVAILABLE`, no revision bound |
+| Directory raises, returns the wrong type, or answers a different triple | `INDETERMINATE` — never a fallback (D-28) |
+| Anchor revoked / disabled / not yet valid / expired, in that order | the matching `TRUST_ANCHOR_*`, **with** the anchor revision bound |
+| Key material is the identity, a small-order point, or a non-canonical encoding | `INDETERMINATE`, with the revision bound — refused at admission, before the signature backend sees it |
+| Signature malformed, `S ≥ L`, or does not verify | `SIGNATURE_INVALID` |
+| A contract error with a reason outside D-35's twelve, or none | `INDETERMINATE` (D-42(d)) |
+| A non-envelope, or a naive trusted instant | **raises** `BenchmarkRegistryContractError` before evaluation — a caller's contract violation, not external trust state (D-42(a)) |
+
+Why two backends: measured on this pair, the signature backend alone accepts a
+key-less forgery under five of the twelve strict-corpus keys — the identity
+point, its non-canonical encoding, the order-2 point, one order-4 point and a
+`y ≥ p` encoding. The point check refuses all twelve. That measurement is a
+standing test, not a citation.
+
+What it is not: not reviewed, not audited, not wired to a composition root
+(none exists before BR-2D), and not a signer — the module imports no signing
+primitive, and a gate asserts it. The only private keys anywhere are fixed-seed
+**test** keys in `tests/contract/test_verifier.py`; the probe harness carries
+three pinned public keys and three pinned signatures as literals and imports no
+cryptographic library at all.
 
 The three **nested-admissible-only** classes — `BenchmarkCoordinate`,
 `BenchmarkScope`, `BenchmarkApplicabilityCoordinate` — may appear inside a BR-2
@@ -260,11 +310,9 @@ python packages/benchmark-registry-authority/gate_mutation_sweep.py
 
 ### Measured results at this revision
 
-**Re-measured, not edited.** ADR §35.2 D-31(a) deferred this table's
-re-statement to "a fresh sweep and verifier run in a README pass at BR-2C". Every
-number below was produced by executing the named check against this tree at
-`0.2.3`, in the closure pass that corrected the prose around it — never by
-adjusting the figures that stood here.
+**Re-measured, not edited.** Every number below was produced by executing the
+named check against this tree at `0.3.0rc1` — never by adjusting the figures
+that stood here.
 
 **Nothing checks these figures.** No test, probe, verifier, sweep or generator
 compares a number in this table against a run. What attests them is the run
@@ -277,23 +325,19 @@ checks and noticed.
 `readme = "README.md"`, so setuptools embeds the **whole** of it — this paragraph
 and the table below included — in the built distribution's `METADATA`, and
 [`verify_benchmark_registry_authority_distribution.py`](verify_benchmark_registry_authority_distribution.py)
-substring-scans that blob for the banned cryptographic dependency names it lists
-in its own source. **Prose written here can turn a distribution check red**, and
-the margin is two letters: this README uses only the *adjective* for that
-discipline, never the library name it is derived from, and the scan matches the
-library name. That is why the banned strings are named nowhere in this document —
-writing one here would fail the very check it describes. The only place any check
-parses a document directly is BR-1's own `README.md`, where it looks for pinned
-digests.
+substring-scans that blob for dependency names beyond the ratified three it
+lists in its own source. **Prose written here can turn a distribution check
+red.** The only place any check parses a document directly is BR-1's own
+`README.md`, where it looks for pinned digests.
 
 | Check | Result |
 | --- | --- |
-| Package suite | **2113 tests passed** |
-| Independent adversarial probes | **83 passed** (also inside the installed wheel) |
-| Distinct properties | **508 adversarial : 38 happy = 13.37 : 1** (required ≥ 2:1) |
+| Package suite | **2256 tests passed**, 1 pre-existing failure (`test_no_package_in_the_monorepo_imports_this_one`: another package's boundary test names this package by string; red on the default branch too) |
+| Independent adversarial probes | **93 passed** (also inside the installed wheel) |
+| Distinct properties | **558 adversarial : 41 happy = 13.61 : 1** (required ≥ 2:1) |
 | Gate inventory | **72 gates** |
-| Mutation sweep | **67 KILLED, 5 SURVIVED, 0 errored** — every survivor classified |
-| Distribution | wheel + sdist built; offline `--no-index` install verified |
+| Mutation sweep | **67 KILLED, 5 SURVIVED, 0 errored** — every survivor classified; the same five as at `0.2.3` |
+| Distribution | wheel + sdist built; `--no-index` install from a local wheelhouse holding BR-1 and the D-41 pair verified |
 | Negative controls | **8 run, 8 caught** |
 | pyflakes | clean |
 
@@ -340,5 +384,10 @@ does not.
 
 Ratified in
 [`docs/architecture/ADR_UGENCE_TRUSTED_EVIDENCE_AND_BENCHMARK_REGISTRY.md`](../../docs/architecture/ADR_UGENCE_TRUSTED_EVIDENCE_AND_BENCHMARK_REGISTRY.md),
-decisions **D-01 through D-17**, including their recorded modifications. The
-ADR's BR-2 ratification ledger records the final disposition of each.
+decisions **D-01 through D-43**, including their recorded modifications, and
+the owner's BR-2C candidate rulings: the D-38 reviewer authority is an
+independent external cryptographic reviewer, to be individually named with the
+review commissioned and completed before any final `0.3.0`; candidate
+engineering and testing may precede that naming; the D-40 release transition
+for the candidate rung confines the D-41 pair to the dedicated verifier module
+and moves no other prohibition; and `0.3.0rc1` is a candidate version only.
