@@ -95,7 +95,7 @@ def test_pyproject_declares_the_ratified_dependency_set():
                       "boto3", "kubernetes", "redis", "jwt", "authlib", "ldap"):
         assert forbidden not in joined, forbidden
     assert set(data["project"]["optional-dependencies"]["http"]) == {"fastapi>=0.110", "starlette>=0.36"}
-    assert pkg.__version__ == "0.2.0"
+    assert pkg.__version__ == "0.3.0"
 
 
 def test_no_clock_is_read_anywhere():

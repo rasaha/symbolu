@@ -1,9 +1,10 @@
 # Ugence approver identity — scoping record
 
-**Status: SCOPED AND RULED — nothing here is implemented.** The five owner decisions
-in §5 were ruled on 2026-09-05. This record still authorizes no code change, adds no
-dependency, integrates no identity provider and opens no route: each step of §6 is
-entered only by its own implementation prompt. It maps where a proven approver
+**Status: SCOPED AND RULED; AI-A implemented.** The five owner decisions in §5 were
+ruled on 2026-09-05. Step AI-A of §6 shipped in `governed-review-service` 0.3.0 `[V]`
+(`identity.py`, `tests/test_identity.py`); every later step is still entered only by
+its own implementation prompt. This record adds no dependency, integrates no identity
+provider and opens no route. It maps where a proven approver
 identity enters the human-review path that GAS-7 built, states what already exists on
 that path, and records the rulings. It reopens none of HR-1 to HR-5 or HE-1 to HE-5.
 
@@ -130,6 +131,15 @@ Entry conditions are met; each step is entered only by its own implementation pr
    `acr`/`amr` recorded without a threshold (ID-5); rows 1 to 8, 10, 11 and 12 at unit
    level. Every decision carries `identity_proof` = `PRESENTED_UNPROVEN` or
    `IDP_AUTHENTICATED`. Label: **Core implemented, shadow-only**.
+   **Shipped in 0.3.0 `[V]`**: `ApproverIdentityPort`, `VerifiedClaims`,
+   `ApproverIdentity`, `subject_reference`, `authentication_reference`, `TenantMode`,
+   `RecordedAssurance`, `StaticApproverIdentityAdapter` (refused in production mode);
+   the decision route reads one opaque proof header (`PROOF_HEADER`); the reference,
+   tenant source and assurance are carried on the decision outcome and the durable
+   `EXTERNAL_SIGNAL:review_decision` payload. Rows 1 to 8, 10, 11 and 12 are proven at
+   unit level. Not yet: the approval record and the linkage carry no
+   `authentication_reference` (AI-D, row 9). With only the fixture adapter, every
+   decision is still `PRESENTED_UNPROVEN`.
 2. **AI-B · Relay** in the studio per ID-1: one opaque, audience-bound header, never
    parsed; the security tests assert it is never logged, persisted or reused (row 14).
    Label: **Core implemented**.
@@ -153,5 +163,5 @@ outside this sequence entirely.
 
 ## 7 — Next step
 
-AI-A, the port and proof shape in `governed-review-service`, under ID-2 to ID-5.
-AI-B to AI-E follow in order. Nothing is implemented by this record.
+AI-B, the studio relay of one opaque, audience-bound proof header under ID-1, now that
+the service reads `PROOF_HEADER`. AI-C to AI-E follow in order.

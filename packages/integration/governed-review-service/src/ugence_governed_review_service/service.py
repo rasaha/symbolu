@@ -16,8 +16,15 @@ REJECT delivers the signal and leaves the instance parked.
 
 The approver on every decision is a PRESENTED reference (``IDENTITY_PROOF``). The
 ledger's eligibility port, answered by the authority directory, decides whether that
-reference may decide; no one here authenticates it. That is the honest ceiling of
-this release and the reason it is labelled shadow-only.
+reference may decide. Since 0.3.0 (AI-A) a composition root may also supply an
+``ApproverIdentityPort``: then every submission must carry a proof, the port answers
+who it proves, and the service binds the presented approver to that proven,
+issuer-qualified subject before the ledger is touched (ID-2), derives the tenant from
+the proof under an explicit tenant mode (ID-4), and records the asserted assurance
+without enforcing any level (ID-5). The service still mints no identity: it relays a
+proof to the port and fails closed when the port cannot answer. With only the static
+fixture adapter available, every decision stays ``PRESENTED_UNPROVEN``; that is the
+honest ceiling of this release and the reason it is labelled shadow-only.
 
 Row 1 of the failure matrix — a duplicate decision — is handled here rather than in
 the ledger: an identical resubmission (same approval, same approver, same outcome) is
@@ -46,12 +53,22 @@ from ugence_approval_workflow import (
 from ugence_governed_review import SUBJECT_KIND
 
 from .errors import ClockDisciplineError, ContractViolation
+from .identity import (
+    ActorKind,
+    ApproverIdentity,
+    ApproverIdentityPort,
+    RecordedAssurance,
+    TenantMode,
+    authentication_reference,
+)
 from .linkage import LinkageAppender, LinkageOutcome, LinkageState, linkage_view
 from .reader import RunReader
 from .version import IDENTITY_PROOF
 
 __all__ = [
     "SIGNAL_NAME",
+    "TENANT_SOURCE_CONFIGURED",
+    "TENANT_SOURCE_PROOF",
     "DecisionResult",
     "DecisionOutcome",
     "QueueEntry",
@@ -65,6 +82,10 @@ SIGNAL_NAME = "review_decision"
 #: The workflow states a bounded resume may be delivered to. Anything else is already
 #: armed or finished, and a second resume is recorded as skipped, never forced.
 _RESUMABLE = frozenset({"WAITING", "PAUSED"})
+
+#: ID-4: where the tenant a decision was recorded under came from.
+TENANT_SOURCE_PROOF = "PROOF"
+TENANT_SOURCE_CONFIGURED = "CONFIGURED_SINGLE_TENANT"
 
 #: The decisions this service records. ``REQUEST_CHANGES`` is a ledger state with no
 #: runtime meaning on this path and is refused here rather than mapped to anything.
@@ -80,6 +101,12 @@ class DecisionResult(str, Enum):
     REFUSED_ALREADY_DECIDED = "REFUSED_ALREADY_DECIDED"
     REFUSED_INELIGIBLE = "REFUSED_INELIGIBLE"
     REFUSED_INVALID_DECISION = "REFUSED_INVALID_DECISION"
+    # AI-A: identity refusals. Each is answered before any record changes.
+    REFUSED_UNAUTHENTICATED = "REFUSED_UNAUTHENTICATED"
+    REFUSED_IDENTITY_MISMATCH = "REFUSED_IDENTITY_MISMATCH"
+    REFUSED_NOT_HUMAN = "REFUSED_NOT_HUMAN"
+    REFUSED_IDENTITY_UNAVAILABLE = "REFUSED_IDENTITY_UNAVAILABLE"
+    REFUSED_TENANT_UNPROVEN = "REFUSED_TENANT_UNPROVEN"
 
     @property
     def recorded(self) -> bool:
@@ -103,6 +130,12 @@ class DecisionOutcome:
     #: HE-1: what linking did after a GRANT, or why it could not yet. Never withholds
     #: the decision above it.
     linkage: Optional[LinkageOutcome] = None
+    #: ID-2: the digest-bound reference to the verified claims; empty without a proof.
+    authentication_reference: str = ""
+    #: ID-4: ``PROOF`` or ``CONFIGURED_SINGLE_TENANT``; empty when nothing was recorded.
+    tenant_source: str = ""
+    #: ID-5: the assurance the issuer asserted, recorded and never enforced here.
+    assurance: Optional[RecordedAssurance] = None
 
     @property
     def recorded(self) -> bool:
@@ -164,6 +197,9 @@ class ReviewService:
         eligibility: Optional[ApproverEligibilityPort] = None,
         fault_injector: Optional[Callable[[str], None]] = None,
         linkage_appender: Optional[LinkageAppender] = None,
+        identity_port: Optional[ApproverIdentityPort] = None,
+        tenant_mode: Optional[TenantMode] = None,
+        production: bool = False,
     ) -> None:
         if not isinstance(ledger, ApprovalWorkflowPort):
             raise ContractViolation("ledger must satisfy ApprovalWorkflowPort")
@@ -178,6 +214,17 @@ class ReviewService:
             raise ContractViolation("clock must be callable and return a tz-aware datetime")
         if eligibility is not None and not isinstance(eligibility, ApproverEligibilityPort):
             raise ContractViolation("eligibility must satisfy ApproverEligibilityPort")
+        if identity_port is not None:
+            if not isinstance(identity_port, ApproverIdentityPort):
+                raise ContractViolation("identity_port must satisfy ApproverIdentityPort")
+            if production and getattr(identity_port, "NON_PRODUCTION", False):
+                raise ContractViolation("a non-production identity adapter is refused in "
+                                        "production mode")
+            if tenant_mode is None:
+                raise ContractViolation("tenant_mode must be explicit when an identity port "
+                                        "is configured (ID-4)")
+        if tenant_mode is not None and not isinstance(tenant_mode, TenantMode):
+            raise ContractViolation("tenant_mode must be a TenantMode")
         self._ledger = ledger
         self._adapter = adapter
         self._reader = reader
@@ -189,6 +236,19 @@ class ReviewService:
         self._fault = fault_injector or (lambda _point: None)
         # HE-1: absent, every linkage outcome is LEDGER_UNCONFIGURED and nothing is written.
         self._linker = linkage_appender
+        # AI-A: absent, the approver stays a presented reference and no proof is required.
+        # With no port there is no proof to take a tenant from, so the configured tenant
+        # is the only source and the service is labelled SINGLE_TENANT.
+        self._identity = identity_port
+        self._tenant_mode = tenant_mode or TenantMode.SINGLE_TENANT
+
+    @property
+    def tenant_mode(self) -> TenantMode:
+        return self._tenant_mode
+
+    @property
+    def identity_port_configured(self) -> bool:
+        return self._identity is not None
 
     # -- reads ---------------------------------------------------------------------
     def list_queue(self, *, required_role: str = "") -> tuple[QueueEntry, ...]:
@@ -250,6 +310,7 @@ class ReviewService:
             "open_approvals": approvals,
             "linkages": [linkage_view(o) for o in self._link_instance(instance_id, as_of)],
             "identity_proof": IDENTITY_PROOF,
+            "tenant_mode": self._tenant_mode.value,
         }
 
     def _link_instance(self, instance_id: str, as_of: datetime) -> list:
@@ -301,11 +362,15 @@ class ReviewService:
         decision: ReviewDecision,
         presented_approver: ApproverRef,
         justification: str = "",
+        presented_proof: str = "",
     ) -> DecisionOutcome:
         """Record a human's decision verbatim, then re-arm the instance it binds to.
 
         Order, and what each step can leave behind:
 
+        0. with an identity port configured, the proof is resolved and bound to the
+           presented approver (rows 1, 2, 5, 6, 7), then the tenant is derived from it
+           (rows 4, 11, 12); every refusal here changes nothing and reads no record;
         1. refusals that change nothing (unknown, not a proposal, not open, decided);
         2. the ledger's own ``decide`` — one SQLite transaction; refused by the
            eligibility port before any record changes (row 5);
@@ -322,15 +387,22 @@ class ReviewService:
                                    reason="only GRANT and REJECT are recorded on this path")
         if not isinstance(presented_approver, ApproverRef):
             raise ContractViolation("presented_approver must be an ApproverRef")
+        if not isinstance(presented_proof, str):
+            raise ContractViolation("presented_proof must be a string")
         as_of = self._now()
+        proven = self._resolve_identity(approval_id, presented_approver, presented_proof, as_of)
+        if isinstance(proven, DecisionOutcome):
+            return proven
         record = self._ledger.get_approval(approval_id)
         if record is None:
             return DecisionOutcome(DecisionResult.REFUSED_UNKNOWN_APPROVAL, approval_id,
                                    reason="no such approval")
-        if record.subject_kind != SUBJECT_KIND or record.tenant_id != self._tenant:
+        if record.subject_kind != SUBJECT_KIND:
             return DecisionOutcome(DecisionResult.REFUSED_NOT_REVIEWABLE, approval_id, record,
-                                   reason="the approval is not bound to a governed proposal "
-                                          "of this tenant")
+                                   reason="the approval is not bound to a governed proposal")
+        tenant = self._tenant_for(approval_id, record, proven)
+        if isinstance(tenant, DecisionOutcome):
+            return tenant
         instance_id, task_id = instance_of(record)
         state = self._ledger.state_at(approval_id, as_of=as_of)
 
@@ -365,18 +437,97 @@ class ReviewService:
                                    instance_id, task_id, reason=f"approval is {state.value}")
 
         self._fault("after_persist")
-        return self._deliver(result, record, instance_id, task_id, decision)
+        return self._deliver(result, record, instance_id, task_id, decision, proven, tenant)
 
     # -- internals ------------------------------------------------------------------
+    def _resolve_identity(self, approval_id: str, presented: ApproverRef, proof: str,
+                          as_of: datetime) -> Optional[ApproverIdentity] | DecisionOutcome:
+        """Step 0. ``None`` when no port is configured; the proven identity when the
+        proof binds to the presented approver; otherwise the refusal.
+
+        Order: a port configured but no proof (row 1); the port unable to answer (row
+        7, fail closed on any exception); unauthenticated (row 1); not a human (row 5);
+        expired at the write, whatever an earlier read proved (row 6); presented
+        approver other than the proven subject (row 2).
+        """
+
+        if self._identity is None:
+            return None
+        if not proof:
+            return DecisionOutcome(DecisionResult.REFUSED_UNAUTHENTICATED, approval_id,
+                                   reason="an identity port is configured and no proof "
+                                          "was presented")
+        try:
+            identity = self._identity.authenticate(proof)
+        except Exception as exc:  # noqa: BLE001 - row 7: any failure to answer fails closed
+            return DecisionOutcome(DecisionResult.REFUSED_IDENTITY_UNAVAILABLE, approval_id,
+                                   reason=f"the identity port could not answer: "
+                                          f"{type(exc).__name__}")
+        if not isinstance(identity, ApproverIdentity):
+            return DecisionOutcome(DecisionResult.REFUSED_IDENTITY_UNAVAILABLE, approval_id,
+                                   reason="the identity port answered with the wrong shape")
+        if not identity.authenticated or identity.claims is None:
+            return DecisionOutcome(DecisionResult.REFUSED_UNAUTHENTICATED, approval_id,
+                                   reason="the proof does not authenticate anyone")
+        if identity.actor_type is not ActorKind.HUMAN:
+            return DecisionOutcome(DecisionResult.REFUSED_NOT_HUMAN, approval_id,
+                                   reason=f"a {identity.actor_type.value} actor never decides; "
+                                          "a role grant does not make a human")
+        if identity.claims.expires_at <= as_of:
+            return DecisionOutcome(DecisionResult.REFUSED_UNAUTHENTICATED, approval_id,
+                                   reason="the proof had expired when the decision was written")
+        if presented.approver_id != identity.actor_id:
+            return DecisionOutcome(DecisionResult.REFUSED_IDENTITY_MISMATCH, approval_id,
+                                   reason="the presented approver is not the proven, "
+                                          "issuer-qualified subject")
+        return identity
+
+    def _tenant_for(self, approval_id: str, record: ApprovalRecord,
+                    proven: Optional[ApproverIdentity]) -> tuple[str, str] | DecisionOutcome:
+        """ID-4: the tenant this decision is recorded under and where it came from.
+
+        The approval's tenant must equal the tenant of record: the configured one
+        without a proof or, with a proof, the verified claim. ``SINGLE_TENANT`` lets a
+        missing claim fall back to the configured tenant and says so; ``MULTI_TENANT``
+        refuses a missing claim; both refuse an ambiguous one.
+        """
+
+        claims = () if proven is None or proven.claims is None else proven.claims.tenant_claims
+        if len(claims) > 1:
+            return DecisionOutcome(DecisionResult.REFUSED_TENANT_UNPROVEN, approval_id, record,
+                                   reason="the proof carries more than one tenant claim")
+        if len(claims) == 1:
+            tenant, source = claims[0], TENANT_SOURCE_PROOF
+        elif proven is not None and self._tenant_mode is TenantMode.MULTI_TENANT:
+            return DecisionOutcome(DecisionResult.REFUSED_TENANT_UNPROVEN, approval_id, record,
+                                   reason="the proof carries no tenant claim and this service "
+                                          "is MULTI_TENANT; configuration never fills the gap")
+        else:
+            tenant, source = self._tenant, TENANT_SOURCE_CONFIGURED
+        if record.tenant_id != tenant:
+            return DecisionOutcome(DecisionResult.REFUSED_NOT_REVIEWABLE, approval_id, record,
+                                   reason=f"the approval is not reviewable in tenant "
+                                          f"{tenant!r} (source {source})")
+        return tenant, source
+
     def _deliver(self, result: DecisionResult, record: ApprovalRecord, instance_id: str,
-                 task_id: str, decision: ReviewDecision) -> DecisionOutcome:
+                 task_id: str, decision: ReviewDecision, proven: Optional[ApproverIdentity],
+                 tenant: tuple[str, str]) -> DecisionOutcome:
+        proof_label, reference, assurance = IDENTITY_PROOF, "", None
+        if proven is not None and proven.claims is not None:
+            proof_label = proven.proof
+            reference = authentication_reference(proven.claims)
+            assurance = RecordedAssurance(acr=proven.claims.acr, amr=proven.claims.amr)
         self._adapter.signal(
             instance_id=instance_id, signal_name=SIGNAL_NAME,
             payload={
                 "approval_id": record.approval_id, "decision": decision.value,
                 "decided_by": record.decided_by, "decided_role": record.decided_role,
                 "subject_digest": record.subject_digest, "task_id": task_id,
-                "identity_proof": IDENTITY_PROOF,
+                "identity_proof": proof_label,
+                "authentication_reference": reference,
+                "tenant_id": tenant[0], "tenant_source": tenant[1],
+                "assurance": None if assurance is None else assurance.to_dict(),
             },
         )
         self._fault("after_signal")
@@ -400,7 +551,9 @@ class ReviewService:
             linkage = self._link(instance_id, task_id, record.approval_id, self._now())
         return DecisionOutcome(result, record.approval_id, record, instance_id, task_id,
                                signal_delivered=True, resume_delivered=resumed,
-                               resume_skipped_reason=skipped, linkage=linkage)
+                               resume_skipped_reason=skipped, identity_proof=proof_label,
+                               linkage=linkage, authentication_reference=reference,
+                               tenant_source=tenant[1], assurance=assurance)
 
     def _eligible(self, record: ApprovalRecord, as_of: datetime) -> tuple[ApproverRef, ...]:
         if self._eligibility is None:
