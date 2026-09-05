@@ -1,7 +1,7 @@
 {
   "schema": "governed-runtime-worker.external-deployment-evidence.v1",
   "deployment": "governed-runtime-worker",
-  "deployment_version": "0.1.0",
+  "deployment_version": "0.1.1",
   "maturity": "REFERENCE_GRADE_SHADOW_ONLY",
   "ruling": "CR-5 ALLOWLISTED_JWKS_HOST (ADR_UGENCE_REVIEW_SERVICE_COMPOSITION_ROOT_SCOPING.md, section 5)",
   "evidence_class": "EXTERNAL_DEPLOYMENT_EVIDENCE",
@@ -31,12 +31,26 @@
     "UGENCE_REVIEW_SYSTEM_DATABASE_URL"
   ],
   "secrets_note": "the two PostgreSQL DSNs, supplied as environment or a read-only mounted file, never logged, never in an image layer; the identity adapter holds public keys only",
-  "container_gate_evidence": "NONE. The worker image needs its own P3E-equivalent gate set (SEPARATE_P3E_EQUIVALENT_EVIDENCE); none of the studio's gates applies to it, and step 4 waits on the mirror.",
+  "container_gate_evidence": "NONE. The worker's P3E-equivalent gate set is DEFINED in CONTAINER_GATE_SET.json and wired in .github/workflows/governed-runtime-worker-ci.yml (SEPARATE_P3E_EQUIVALENT_EVIDENCE); every gate is NOT_EXECUTED and every evidence manifest INCOMPLETE until the owner-approved mirror serves the ratified digest and a real build runs. No gate is marked passed by definition.",
   "not_claimed": [
     "production certification",
     "pilot validation",
     "enterprise-issuer validation of the identity adapter",
     "container gate evidence of any kind",
     "enforcement or LIVE execution"
-  ]
+  ],
+  "image": {
+    "dockerfile": "deployment/governed-runtime-worker/Dockerfile",
+    "base_image": "the ratified python:3.11-slim-bookworm digest only (base-images.json == BASE_IMAGE_MIRROR_DECISION.json == FROM lines, asserted offline by ci/verify_ratified_pins.py)",
+    "runtime_user": "10001:10001",
+    "read_only_root_filesystem": true,
+    "writable_paths": [
+      "/tmp",
+      "/var/lib/ugence-review"
+    ],
+    "exposed_ports": [
+      "8444/tcp"
+    ],
+    "secrets_in_layers": "none; the two DSNs are environment at run time only and the image-layer secret scan is a gate"
+  }
 }

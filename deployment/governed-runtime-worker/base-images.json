@@ -1,0 +1,27 @@
+{
+  "schema": "base-images.v2",
+  "note": "Base image the governed-runtime-worker Dockerfile builds FROM, pinned by the immutable multi-arch INDEX digest the owner ratified for the P3E studio image (docs/audits/ugence_governance_studio_p3e/BASE_IMAGE_MIRROR_DECISION.json, authoritative_digests). The worker introduces no new base image and no new digest: it builds from the ratified python:3.11-slim-bookworm digest only, in the same two stage roles. CI asserts this file == the ratification record == the Dockerfile FROM lines, offline, before anything else; a change here is a change to the ratified decision.",
+  "platform": "linux/amd64",
+  "resolution_status": "RATIFIED_ELSEWHERE",
+  "resolved_via": "docs/audits/ugence_governance_studio_p3e/BASE_IMAGE_MIRROR_DECISION.json (not re-resolved by this deployment)",
+  "base_images": [
+    {
+      "role": "backend-build",
+      "registry": "docker.io",
+      "repository": "library/python",
+      "tag": "3.11-slim-bookworm",
+      "manifest_digest": "sha256:b18992999dbe963a45a8a4da40ac2b1975be1a776d939d098c647482bcad5cba",
+      "amd64_manifest_digest": "sha256:28255a3ace7eb4c48bc1b57b90af29e1bc82b4fd6c60614a8e3dce61b87ff941",
+      "platform": "linux/amd64"
+    },
+    {
+      "role": "runtime",
+      "registry": "docker.io",
+      "repository": "library/python",
+      "tag": "3.11-slim-bookworm",
+      "manifest_digest": "sha256:b18992999dbe963a45a8a4da40ac2b1975be1a776d939d098c647482bcad5cba",
+      "amd64_manifest_digest": "sha256:28255a3ace7eb4c48bc1b57b90af29e1bc82b4fd6c60614a8e3dce61b87ff941",
+      "platform": "linux/amd64"
+    }
+  ]
+}

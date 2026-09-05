@@ -10,13 +10,17 @@ name: governed-runtime-worker-ci
 # driven with pg_ctl exactly as governed-review-service-ci does. A skipped end-to-end
 # test is not a passing one: the job fails if it skipped.
 #
-# No image is built here. The worker's container gate set is step 4 and waits on the
-# mirror ruling; nothing in this workflow reaches docker.io or any registry.
+# The container job is the worker's own P3E-equivalent gate set (CONTAINER_GATE_SET.json,
+# SEPARATE_P3E_EQUIVALENT_EVIDENCE). Every step is blocking, it never consults
+# docker.io, and halts with the typed RESOURCE_BLOCKER_MIRROR_UNCONFIGURED until the
+# owner-approved mirror serves the ratified digest; until then no gate executes and every
+# evidence manifest is INCOMPLETE.
 
 on:
   pull_request:
     paths:
       - "deployment/governed-runtime-worker/**"
+      - "docs/audits/ugence_governance_studio_p3e/BASE_IMAGE_MIRROR_DECISION.json"
       - "packages/integration/governed-review-service/**"
       - "packages/integration/approver-identity-jwt/**"
       - "packages/integration/governed-review/**"
@@ -138,6 +142,187 @@ jobs:
       - name: Postgres log (on failure)
         if: failure()
         run: sudo cat /tmp/ugrw-pg.log || true
+
+  container:
+    # The worker's own gate set (CONTAINER_GATE_SET.json). Three separated checks, as the
+    # studio's job separates them:
+    #   ratified-pin-conformance   BLOCKING, offline: worker pins == ratified record == FROM
+    #   mirror-digest-conformance  BLOCKING when the mirror is configured; the one typed
+    #                              RESOURCE_BLOCKER_MIRROR_UNCONFIGURED otherwise, no docker.io
+    #   the build and every runtime gate run only when the mirror conforms
+    # Every step is blocking; a pin, platform or mirror-digest mismatch is red.
+    name: Worker container gate set (own evidence; halts until the mirror is configured)
+    runs-on: ubuntu-latest
+    needs: worker-suite
+    env:
+      IMAGE: governed-runtime-worker:ci
+      PGVERSION: "16"
+      PGPORT: "5433"
+      PGDATA: /tmp/grw-pgdata
+      PGSOCK: /tmp/grw-pgsock
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.11" }
+
+      - name: evidence-dir-init
+        # Run-scoped, outside the checkout, must be empty at creation (as the studio's).
+        run: |
+          DIR="$RUNNER_TEMP/grw-evidence-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+          if [ -e "$DIR" ]; then echo "FAIL evidence dir already exists: $DIR"; exit 1; fi
+          mkdir -p "$DIR"
+          [ -z "$(ls -A "$DIR")" ] || { echo "FAIL evidence dir not empty"; exit 1; }
+          echo "EVIDENCE_DIR=$DIR" >> "$GITHUB_ENV"
+          echo "evidence dir initialised empty: $DIR"
+
+      - name: ratified-pin-conformance
+        # BLOCKING, first, offline: the worker builds only from the ratified python digest.
+        run: python deployment/governed-runtime-worker/ci/verify_ratified_pins.py
+
+      - name: mirror-digest-conformance
+        id: mirror
+        # Shared verifier, worker pins. The credential VALUE, once the owner names its
+        # secret, is passed as the environment variable the record names, masked, never
+        # printed; no secret name is referenced here until the owner supplies one.
+        run: |
+          set +e
+          python deployment/governance-studio/ci/verify_mirror_digest.py \
+            docs/audits/ugence_governance_studio_p3e/BASE_IMAGE_MIRROR_DECISION.json \
+            deployment/governed-runtime-worker/base-images.json \
+            "$EVIDENCE_DIR/mirror-digest-conformance.json" --print-build-args | tee /tmp/mirror-out.txt
+          code=${PIPESTATUS[0]}
+          set -e
+          case "$code" in
+            0) echo "mirror_ready=true" >> "$GITHUB_OUTPUT"
+               echo "BUILD_CONTEXTS=$(tail -n 1 /tmp/mirror-out.txt)" >> "$GITHUB_ENV" ;;
+            3) echo "mirror_ready=false" >> "$GITHUB_OUTPUT"
+               echo "outcome=RESOURCE_BLOCKER_MIRROR_UNCONFIGURED" >> "$GITHUB_OUTPUT" ;;
+            *) echo "mirror-digest-conformance: MISMATCH or UNREACHABLE (exit $code); halting, no gate executed" >&2
+               exit "$code" ;;
+          esac
+
+      - name: container-build
+        if: steps.mirror.outputs.mirror_ready == 'true'
+        run: |
+          DFSHA=$(sha256sum deployment/governed-runtime-worker/Dockerfile | cut -d' ' -f1)
+          docker buildx build --platform linux/amd64 --load -t "$IMAGE" $BUILD_CONTEXTS -f deployment/governed-runtime-worker/Dockerfile .
+          docker image inspect "$IMAGE" --format 'id={{.Id}} arch={{.Architecture}} os={{.Os}} size={{.Size}}'
+          echo "IMAGE_ID=$(docker image inspect "$IMAGE" --format '{{.Id}}')" >> "$GITHUB_ENV"
+          echo "DOCKERFILE_SHA256=$DFSHA" >> "$GITHUB_ENV"
+
+      - name: image-inspection
+        if: steps.mirror.outputs.mirror_ready == 'true'
+        run: |
+          test "$(docker inspect --format '{{.Config.User}}' "$IMAGE")" = "10001:10001"
+          docker inspect --format '{{json .Config.ExposedPorts}}' "$IMAGE" | python -c "import json,sys; p=json.load(sys.stdin); assert list(p)==['8444/tcp'], p; print('exposes only 8444/tcp')"
+          for t in npm node tsc gcc cc; do if docker run --rm --entrypoint sh "$IMAGE" -c "command -v $t" 2>/dev/null; then echo "FAIL $t present in runtime"; exit 1; fi; done
+          echo "no npm/node/compiler in runtime image"
+
+      - name: runtime-package-inventory
+        if: steps.mirror.outputs.mirror_ready == 'true'
+        id: runtime_package_inventory
+        run: docker run --rm --entrypoint python "$IMAGE" -m pip freeze | tee "$EVIDENCE_DIR/runtime-image-packages.txt"
+
+      - name: image-layer-secret-scan
+        if: steps.mirror.outputs.mirror_ready == 'true'
+        id: image_layer_secret_scan
+        run: |
+          ! docker history --no-trunc "$IMAGE" | grep -Ei 'DATABASE_URL=postgresql[^ ]*:[^ @]+@|PASSWORD=|server\.key|BEGIN [A-Z ]*PRIVATE KEY|_TOKEN=|AWS_SECRET'
+          python deployment/governance-studio/ci/scan_image_layers.py "$IMAGE" "$EVIDENCE_DIR/secret-scan.json"
+
+      - name: runner-postgres-for-runtime-verification
+        if: steps.mirror.outputs.mirror_ready == 'true'
+        # The positive runtime gate needs a real PostgreSQL the container can reach: the
+        # runner's own cluster, listening on the bridge gateway the verifier creates.
+        run: |
+          sudo apt-get update && sudo apt-get install -y postgresql-$PGVERSION postgresql-client-$PGVERSION
+          PGBIN=/usr/lib/postgresql/$PGVERSION/bin
+          sudo systemctl stop postgresql || true
+          sudo rm -rf "$PGDATA" "$PGSOCK"; sudo mkdir -p "$PGDATA" "$PGSOCK"
+          sudo chown -R postgres:postgres "$PGDATA" "$PGSOCK"; sudo chmod 700 "$PGDATA"
+          sudo -u postgres "$PGBIN/initdb" -D "$PGDATA" -U postgres --auth=trust
+          echo "host all all 10.90.0.0/24 trust" | sudo tee -a "$PGDATA/pg_hba.conf"
+          docker network create --subnet 10.90.0.0/24 --gateway 10.90.0.1 grw-bridge
+          sudo -u postgres "$PGBIN/pg_ctl" -D "$PGDATA" -o "-p $PGPORT -k $PGSOCK -c listen_addresses=127.0.0.1,10.90.0.1" -l /tmp/grw-pg.log -w start
+          "$PGBIN/pg_isready" -h 127.0.0.1 -p "$PGPORT"
+          "$PGBIN/psql" -h 127.0.0.1 -p "$PGPORT" -U postgres -c 'CREATE DATABASE grw_app' -c 'CREATE DATABASE grw_sys'
+          docker network rm grw-bridge
+
+      - name: container-runtime-verification
+        if: steps.mirror.outputs.mirror_ready == 'true'
+        id: container_runtime_verification
+        run: |
+          mkdir -p /tmp/tls
+          openssl req -x509 -newkey rsa:2048 -nodes -keyout /tmp/tls/server.key -out /tmp/tls/server.crt -days 2 -subj "/CN=governed-runtime-worker" -addext "subjectAltName=IP:10.90.0.10" 2>/dev/null
+          chmod 644 /tmp/tls/server.key
+          chmod +x deployment/governed-runtime-worker/ci/verify_container.sh
+          deployment/governed-runtime-worker/ci/verify_container.sh "$IMAGE" /tmp/tls \
+            "postgresql+psycopg://postgres@10.90.0.1:$PGPORT/grw_app" \
+            "postgresql+psycopg://postgres@10.90.0.1:$PGPORT/grw_sys"
+
+      - name: image-sbom
+        if: steps.mirror.outputs.mirror_ready == 'true'
+        id: image_sbom
+        uses: anchore/sbom-action@v0.17.9
+        with:
+          image: governed-runtime-worker:ci
+          format: cyclonedx-json
+          output-file: ${{ env.EVIDENCE_DIR }}/sbom.image.cdx.json
+
+      - name: container-vulnerability-scan
+        if: steps.mirror.outputs.mirror_ready == 'true'
+        id: container_vulnerability_scan
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: governed-runtime-worker:ci
+          severity: HIGH,CRITICAL
+          exit-code: "1"
+          format: json
+          output: ${{ env.EVIDENCE_DIR }}/container-scan.json
+
+      - name: evidence-manifest
+        if: always()
+        # The shared builder over this run's directory: hashes only what this run's
+        # producer steps created; INCOMPLETE otherwise; marks no gate passed.
+        run: |
+          python deployment/governance-studio/ci/build_evidence_manifest.py \
+            --evidence-dir "$EVIDENCE_DIR" \
+            --out "$EVIDENCE_DIR/evidence-manifest.json" \
+            --producers "$PRODUCERS"
+        env:
+          PRODUCERS: >-
+            {"runtime-package-inventory": "${{ steps.runtime_package_inventory.outcome }}",
+             "image-layer-secret-scan": "${{ steps.image_layer_secret_scan.outcome }}",
+             "image-sbom": "${{ steps.image_sbom.outcome }}",
+             "container-vulnerability-scan": "${{ steps.container_vulnerability_scan.outcome }}",
+             "container-runtime-verification": "${{ steps.container_runtime_verification.outcome }}"}
+
+      - name: upload-evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: grw-container-evidence
+          path: ${{ env.EVIDENCE_DIR }}/*
+
+      - name: gate-outcome
+        if: always()
+        run: |
+          if [ "${{ steps.mirror.outputs.mirror_ready }}" = "true" ]; then
+            echo "worker container gates executed against the mirror-served ratified digest"
+          elif [ "${{ steps.mirror.outcome }}" = "failure" ]; then
+            echo "::error title=MIRROR_DIGEST_CONFORMANCE_HALT::halted at mirror-digest-conformance: MIRROR_DIGEST_MISMATCH or MIRROR_UNREACHABLE. No gate executed, nothing passed, nothing re-pinned; escalate to the owner."
+            exit 1
+          elif [ "${{ steps.mirror.outcome }}" != "success" ]; then
+            echo "::error title=CONFORMANCE_HALT::halted before mirror-digest-conformance (a pin, platform or Dockerfile mismatch, or an earlier step). No gate executed."
+            exit 1
+          else
+            echo "::error title=RESOURCE_BLOCKER_MIRROR_UNCONFIGURED::worker container gates NOT_EXECUTED. Required from the owner, recorded in BASE_IMAGE_MIRROR_DECISION.json mirror.*: registry_host, repository_prefix, secret_name. No docker.io fallback; the ratified digest is unchanged and conforms."
+            exit 1
+          fi
+
+      - name: Postgres log (on failure)
+        if: failure()
+        run: sudo cat /tmp/grw-pg.log 2>/dev/null || true
 
   build:
     name: Wheel + sdist build

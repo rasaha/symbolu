@@ -151,6 +151,13 @@ def preflight(config: WorkerConfig, *, identity_port: Any = None, eligibility: A
         raise PostureRefused("a non-authoritative store bundle is refused in production (CR-4)")
 
 
+def _healthz() -> dict:
+    """Container liveness only: no store is read, nothing is authenticated, nothing
+    about configuration is revealed. The review routes are the service's own."""
+
+    return {"status": "ok", "deployment": DEPLOYMENT_NAME, "maturity": MATURITY}
+
+
 def build_identity_port(config: WorkerConfig, clock: WorkerClock) -> Optional[JwtApproverIdentityAdapter]:
     """The AI-C adapter from configuration, or None when no issuer is configured
     (test mode only; production has already refused that in ``preflight``)."""
@@ -255,7 +262,9 @@ def compose(config: WorkerConfig, *, clock: WorkerClock, workload: Workload,
         clock=clock.datetime, eligibility=listing, linkage_appender=appender,
         identity_port=port, tenant_mode=TenantMode.SINGLE_TENANT, production=production,
     )
-    return Worker(config=config, service=service, app=build_app(service), adapter=adapter,
+    app = build_app(service)
+    app.add_api_route("/healthz", _healthz, methods=["GET"], include_in_schema=False)
+    return Worker(config=config, service=service, app=app, adapter=adapter,
                   reader=reader, ledger=ledger, directory=directory, audit=audit,
                   datasource=datasource, bundle=bundle, identity_port=port, workload=workload,
                   _closers=closers)

@@ -14,8 +14,8 @@ invokes is the fixture in `workload.py`. The only identity adapter it can compos
 been validated against an in-process issuer only. `UGENCE_REVIEW_DEPLOYMENT_MODE=production`
 is a **fail-closed posture** and nothing more: it refuses fixtures, in-memory stores,
 public binds and plain HTTP, and it certifies nothing, validates nothing and enables no
-LIVE execution. No container image and no container gate exist yet (step 4 waits on
-the mirror).
+LIVE execution. The container gate set exists and has never executed (the mirror is
+unconfigured); no image has been built.
 
 ## What it composes
 
@@ -94,8 +94,25 @@ through `compose(config, clock=, workload=)` from its own entrypoint.
   (`IDP_AUTHENTICATED`, `authentication_reference`), re-arm, consume, run once, link,
   and no DSN or token in any answer or output (row 8).
 
+## Container image and gate set (step 4)
+
+`Dockerfile` builds only from the ratified `python:3.11-slim-bookworm` digest, in the
+same `backend` and `runtime` stage roles the studio image uses; `base-images.json`
+pins it and `ci/verify_ratified_pins.py` asserts pins == the owner's ratification
+record == the FROM lines, offline, first. Non-root `10001:10001`, read-only root with
+`/tmp` and the `/var/lib/ugence-review` volume writable, `8444/tcp` only, the two DSNs
+as environment at run time and nothing in any layer. `CONTAINER_GATE_SET.json` defines
+the worker's own P3E-equivalent gates (GRW-CTR-01 to 10) and
+`.github/workflows/governed-runtime-worker-ci.yml` runs them in its `container` job;
+`ci/verify_container.sh` is the runtime gate (fail-closed startup negatives on an
+internal network, then a hardened positive run with a private TLS listener over a real
+PostgreSQL). **Every gate is `NOT_EXECUTED`**: the job halts with
+`RESOURCE_BLOCKER_MIRROR_UNCONFIGURED` until the owner-approved mirror is recorded, the
+runtime script has been validated by static parsing only, and the evidence manifest is
+`INCOMPLETE` on every run. The gate set is defined, not ratified.
+
 ## Not claimed
 
 Production certification, pilot validation, enterprise-issuer validation, container
-gate evidence, enforcement, LIVE execution, multi-tenancy. The P3E studio profile is
+gate execution or evidence, a built image, enforcement, LIVE execution, multi-tenancy. The P3E studio profile is
 unchanged by this package (step 3, CR-2).

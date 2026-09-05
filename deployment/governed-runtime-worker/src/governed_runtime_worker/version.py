@@ -5,7 +5,7 @@ Read statically by the build backend so building a wheel imports nothing.
 
 from __future__ import annotations
 
-__version__ = "0.1.0"
+__version__ = "0.1.1"
 
 DEPLOYMENT_NAME = "governed-runtime-worker"
 
