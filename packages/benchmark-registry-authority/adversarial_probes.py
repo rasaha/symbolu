@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Independent adversarial probes for the Benchmark Registry Authority (BR-2C-0).
+"""Independent adversarial probes for the Benchmark Registry Authority (BR-2C candidate, 0.3.0rc1).
 
 Deliberately **independent** of the package's own test suite: this file imports
 no test module, no ``_builders`` helper, no ``conftest`` and no private
@@ -66,6 +66,7 @@ from ugence_benchmark_registry_authority.api import (
     BenchmarkTransitionPlan,
     BenchmarkTransitionRefusal,
     BenchmarkApprovalVerifiedResult,
+    BenchmarkApprovalVerifierPort,
     BenchmarkPublisherVerifiedResult,
     BenchmarkRevocationVerifiedResult,
     BENCHMARK_TRUST_ANCHOR_EVALUATION_ORDER,
@@ -75,6 +76,8 @@ from ugence_benchmark_registry_authority.api import (
     BenchmarkTrustAnchorStatus,
     BenchmarkTrustRole,
     BenchmarkVerificationOutcome,
+    BenchmarkDenyAllVerifier,
+    BenchmarkEd25519Verifier,
     BenchmarkPlanningOutcome,
     is_byte_identical_resubmission,
     plan_submission_outcome,
@@ -1236,7 +1239,7 @@ def _q55():
     assert len(contract["compared_elements"]) == 9
 
 
-@probe("Q-56 no concrete exported class satisfies any inert port")
+@probe("Q-56 exactly the two candidate verifiers satisfy the verifier port; nothing satisfies the other three")
 def _q56():
     import inspect
 
@@ -1254,20 +1257,30 @@ def _q56():
         BenchmarkApprovalVerifierPort,
         BenchmarkClockPort,
     )
-    concrete = [
-        getattr(pkg, name)
+    concrete = {
+        name: getattr(pkg, name)
         for name in pkg.__all__
         if inspect.isclass(getattr(pkg, name))
         and not getattr(getattr(pkg, name), "_is_protocol", False)
-    ]
+    }
+    assert concrete
     for port in ports:
-        refuses(lambda p=port: p(), TypeError)
         required = {
-            n for n in dir(port)
-            if not n.startswith("_") and callable(getattr(port, n, None))
+            name
+            for name in dir(port)
+            if not name.startswith("_") and callable(getattr(port, name, None))
         }
-        for cls in concrete:
-            assert not required <= {n for n in dir(cls) if not n.startswith("_")}
+        satisfying = {
+            name for name, cls in concrete.items()
+            if required <= {n for n in dir(cls) if not n.startswith("_")}
+        }
+        if port is BenchmarkApprovalVerifierPort:
+            assert satisfying == {"BenchmarkDenyAllVerifier", "BenchmarkEd25519Verifier"}, satisfying
+        else:
+            assert satisfying == set(), (port.__name__, satisfying)
+        with_port = [name for name in pkg.__all__ if name.endswith("Port")]
+        for name in with_port:
+            refuses(lambda n=name: getattr(pkg, n)(), TypeError)
 
 
 @probe("Q-57 nothing in the package reads a clock")
@@ -1613,8 +1626,10 @@ def _q69():
     )
 
 
-@probe("Q-70 key material is an encoding that is checked and never decoded")
+@probe("Q-70 key material is an encoding at the record; the point is checked only at the verifier seam")
 def _q70():
+    import ugence_benchmark_registry_authority.contracts as contracts
+
     record = anchor()
     assert len(record.public_key_material) == 64
     for bad in ("A" * 64, "d4" * 31, "", "0x" + "d4" * 32, "zz" * 32, " " + "d4" * 32):
@@ -1622,9 +1637,16 @@ def _q70():
             lambda b=bad: anchor(public_key_material=b),
             BenchmarkRegistryContractError,
         )
-    # No cryptographic library was imported to check any of that.
-    for module in ("cryptography", "nacl", "ed25519", "Crypto", "OpenSSL"):
-        assert module not in sys.modules, module
+    # The record admits the identity point as an ENCODING (D-04: the contract
+    # decodes nothing); the verifier seam is where the point is refused (D-41).
+    assert anchor(public_key_material=IDENTITY_POINT).public_key_material == IDENTITY_POINT
+    # No contracts module holds a cryptographic library in its namespace.
+    for name in dir(contracts):
+        module = getattr(contracts, name)
+        namespace = getattr(module, "__dict__", {}) if hasattr(module, "__file__") else {}
+        for bound in namespace.values():
+            modname = getattr(bound, "__module__", "") or ""
+            assert not modname.split(".")[0] in ("cryptography", "nacl"), (name, bound)
 
 
 @probe("Q-71 the seven trust refusals are appended, role-neutral and classified")
@@ -1922,6 +1944,267 @@ def _q82():
             ),
             BenchmarkRegistryContractError,
         )
+
+
+# --------------------------------------------------------------------------- #
+# BR-2C candidate rung (0.3.0rc1): the verifier, probed through the public API
+#
+# No private key and no cryptographic library appears in this harness. The
+# three genuine signatures below were produced ONCE, outside this file, by
+# Ed25519 keys with the fixed seeds 0x01*32, 0x02*32 and 0x03*32 over the
+# pinned fixtures' signing frames, and are pinned here as literals alongside
+# the matching public keys. Ed25519 signing is deterministic, so they are also
+# regression vectors: a moved frame element, a moved pinned fixture or a moved
+# encoding makes them stop verifying, and this harness sees it with nothing but
+# the curated API.
+# --------------------------------------------------------------------------- #
+PINNED_PUBLISHER_PUBLIC_KEY = (
+    "8a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c"
+)
+PINNED_PUBLISHER_SIGNATURE = (
+    "9afdc00d694a43fb671cfb41e13830de849a64d11011441f1f8f4a73df15137e"
+    "aa030812fa833169a5c45d9f8bf795016dc383087ea4021d645ce876f55ece09"
+)
+PINNED_APPROVER_PUBLIC_KEY = (
+    "8139770ea87d175f56a35466c34c7ecccb8d8a91b4ee37a25df60f5b8fc9b394"
+)
+PINNED_APPROVER_SIGNATURE = (
+    "8db2a055499cb9185c6d4ee884510e9c0a8c74207e169d7f4bbfa7f5530790e6"
+    "5b5e3bd47fc68e9f02540a424f1ea45e00f31527758615662719bcb52f76cd0f"
+)
+PINNED_REVOKER_PUBLIC_KEY = (
+    "ed4928c628d1c2c6eae90338905995612959273a5c63f93636c14614ac8737d1"
+)
+PINNED_REVOKER_SIGNATURE = (
+    "4c945b370b317c5d13e9a7c89173273485b7c5d9ed513af9d4dce3c09acc52a4"
+    "c57ed9aa140757e1ef0c1dbf18bc6d26f0a82453d21d49864719365ac4acec0d"
+)
+#: The identity point, and a key-less forgery (R = identity, S = 0) that a
+#: signature backend without strict point validation accepts under it.
+IDENTITY_POINT = "01" + "00" * 31
+KEYLESS_FORGERY = IDENTITY_POINT + "00" * 32
+#: The Ed25519 group order, for the malleability probe.
+ED25519_L = 2**252 + 27742317777372353535851937790883648493
+
+
+class _Directory:
+    """Exact-triple directory over the pinned anchors; test-side only."""
+
+    def __init__(self, *anchors):
+        self.anchors = {(a.role, a.identity, a.key_id): a for a in anchors}
+        self.asked = []
+
+    def resolve_anchor(self, role, identity, key_id):
+        self.asked.append((role, identity, key_id))
+        found = self.anchors.get((role, identity, key_id))
+        return BenchmarkTrustAnchorResolution(
+            role=role, identity=identity, key_id=key_id, anchor=found,
+            refusal_reason=(
+                None if found is not None
+                else BenchmarkRegistryRefusalReason.TRUST_ANCHOR_NOT_FOUND
+            ),
+        )
+
+
+def _pinned_anchors():
+    return (
+        anchor(public_key_material=PINNED_PUBLISHER_PUBLIC_KEY),
+        anchor(role=BenchmarkTrustRole.APPROVER, identity="approval-authority-beta",
+               key_id="approval-key-1", public_key_material=PINNED_APPROVER_PUBLIC_KEY),
+        anchor(role=BenchmarkTrustRole.REVOKER, identity="revoker-delta",
+               key_id="revocation-key-1", public_key_material=PINNED_REVOKER_PUBLIC_KEY),
+    )
+
+
+def _candidate():
+    return BenchmarkEd25519Verifier(_Directory(*_pinned_anchors()))
+
+
+@probe("Q-83 happy: the pinned signatures verify on all three seams and bind nine facts")
+def _q83():
+    v = _candidate()
+    pub = publisher(detached_signature=PINNED_PUBLISHER_SIGNATURE)
+    app = approval(detached_signature=PINNED_APPROVER_SIGNATURE)
+    rev = revocation_envelope(detached_signature=PINNED_REVOKER_SIGNATURE)
+    for result, envelope, role in (
+        (v.verify_publisher_submission(pub, TRUSTED_INSTANT), pub, BenchmarkTrustRole.PUBLISHER),
+        (v.verify_approval(app, TRUSTED_INSTANT), app, BenchmarkTrustRole.APPROVER),
+        (v.verify_revocation(rev, TRUSTED_INSTANT), rev, BenchmarkTrustRole.REVOKER),
+    ):
+        assert result.outcome is BenchmarkVerificationOutcome.VERIFIED, role
+        assert result.refusal_reason is None
+        assert result.verified_digest == canonical_digest(envelope)
+        assert result.signer_role is role
+        assert result.evaluated_at == TRUSTED_INSTANT
+        assert result.anchor_record_digest is not None
+        assert result.authority_verified is False
+
+
+@probe("Q-84 the exact deny-all default refuses a genuine signature on every seam")
+def _q84():
+    deny = BenchmarkDenyAllVerifier()
+    assert isinstance(deny, BenchmarkApprovalVerifierPort)
+    for result in (
+        deny.verify_publisher_submission(publisher(detached_signature=PINNED_PUBLISHER_SIGNATURE), TRUSTED_INSTANT),
+        deny.verify_approval(approval(detached_signature=PINNED_APPROVER_SIGNATURE), TRUSTED_INSTANT),
+        deny.verify_revocation(revocation_envelope(detached_signature=PINNED_REVOKER_SIGNATURE), TRUSTED_INSTANT),
+    ):
+        assert result.outcome is BenchmarkVerificationOutcome.REFUSED
+        assert result.refusal_reason is BenchmarkRegistryRefusalReason.NO_TRUST_ANCHOR_CONFIGURED
+        assert result.anchor_record_digest is None
+    refuses(lambda: setattr(deny, "allow", True), AttributeError)
+
+
+@probe("Q-85 a well-formed signature that does not verify refuses SIGNATURE_INVALID")
+def _q85():
+    result = _candidate().verify_publisher_submission(publisher(), TRUSTED_INSTANT)
+    assert result.outcome is BenchmarkVerificationOutcome.REFUSED
+    assert result.refusal_reason is BenchmarkRegistryRefusalReason.SIGNATURE_INVALID
+    # Any covered field moved: the pinned signature no longer verifies.
+    moved = publisher(detached_signature=PINNED_PUBLISHER_SIGNATURE,
+                      benchmark_content_digest=OTHER_DIGEST)
+    assert _candidate().verify_publisher_submission(
+        moved, TRUSTED_INSTANT
+    ).refusal_reason is BenchmarkRegistryRefusalReason.SIGNATURE_INVALID
+
+
+@probe("Q-86 RFC 8032 strict decoding: S + L is refused, not accepted as the same signature")
+def _q86():
+    raw = bytes.fromhex(PINNED_PUBLISHER_SIGNATURE)
+    scalar = int.from_bytes(raw[32:], "little")
+    assert scalar < ED25519_L
+    malleated = (raw[:32] + (scalar + ED25519_L).to_bytes(32, "little")).hex()
+    result = _candidate().verify_publisher_submission(
+        publisher(detached_signature=malleated), TRUSTED_INSTANT
+    )
+    assert result.refusal_reason is BenchmarkRegistryRefusalReason.SIGNATURE_INVALID
+
+
+@probe("Q-87 the identity point is refused at anchor admission, so a key-less forgery fails")
+def _q87():
+    identity_anchor = anchor(public_key_material=IDENTITY_POINT)  # the record admits the encoding
+    v = BenchmarkEd25519Verifier(_Directory(identity_anchor))
+    result = v.verify_publisher_submission(
+        publisher(detached_signature=KEYLESS_FORGERY), TRUSTED_INSTANT
+    )
+    assert result.outcome is BenchmarkVerificationOutcome.REFUSED
+    assert result.refusal_reason is BenchmarkRegistryRefusalReason.INDETERMINATE
+    assert result.anchor_record_digest == identity_anchor.anchor_record_digest
+    for small in ("ec" + "ff" * 30 + "7f", "00" * 32, "00" * 31 + "80",
+                  "c7176a703d4dd84fba3c0b760d10670f2a2053fa2c39ccc64ec7fd7792ac037a"):
+        out = BenchmarkEd25519Verifier(_Directory(anchor(public_key_material=small)))
+        assert out.verify_publisher_submission(
+            publisher(detached_signature=KEYLESS_FORGERY), TRUSTED_INSTANT
+        ).refusal_reason is BenchmarkRegistryRefusalReason.INDETERMINATE
+
+
+@probe("Q-88 unknown key -> TRUST_ANCHOR_NOT_FOUND; revoked key -> TRUST_ANCHOR_REVOKED, retroactively")
+def _q88():
+    empty = BenchmarkEd25519Verifier(_Directory())
+    result = empty.verify_publisher_submission(
+        publisher(detached_signature=PINNED_PUBLISHER_SIGNATURE), TRUSTED_INSTANT
+    )
+    assert result.refusal_reason is BenchmarkRegistryRefusalReason.TRUST_ANCHOR_NOT_FOUND
+    assert result.anchor_record_digest is None
+    revoked = anchor(public_key_material=PINNED_PUBLISHER_PUBLIC_KEY,
+                     status=BenchmarkTrustAnchorStatus.REVOKED,
+                     revoked_at=ANCHOR_REVOKED_AT, revocation_reason="compromised")
+    v = BenchmarkEd25519Verifier(_Directory(revoked))
+    before = v.verify_publisher_submission(
+        publisher(detached_signature=PINNED_PUBLISHER_SIGNATURE), TRUSTED_INSTANT
+    )
+    assert TRUSTED_INSTANT < ANCHOR_REVOKED_AT
+    assert before.refusal_reason is BenchmarkRegistryRefusalReason.TRUST_ANCHOR_REVOKED
+    assert before.anchor_record_digest == revoked.anchor_record_digest
+    after_expiry = v.verify_publisher_submission(
+        publisher(detached_signature=PINNED_PUBLISHER_SIGNATURE), T2 + timedelta(days=1)
+    )
+    assert after_expiry.refusal_reason is BenchmarkRegistryRefusalReason.TRUST_ANCHOR_REVOKED
+
+
+@probe("Q-89 the half-open validity interval and the explicit trusted instant")
+def _q89():
+    v = _candidate()
+    env = publisher(detached_signature=PINNED_PUBLISHER_SIGNATURE)
+    assert v.verify_publisher_submission(env, ANCHOR_FROM).outcome is BenchmarkVerificationOutcome.VERIFIED
+    assert v.verify_publisher_submission(
+        env, ANCHOR_FROM - timedelta(microseconds=1)
+    ).refusal_reason is BenchmarkRegistryRefusalReason.TRUST_ANCHOR_NOT_YET_VALID
+    assert v.verify_publisher_submission(
+        env, T2
+    ).refusal_reason is BenchmarkRegistryRefusalReason.TRUST_ANCHOR_EXPIRED
+    refuses(lambda: v.verify_publisher_submission(env, datetime(2026, 4, 1)),
+            BenchmarkRegistryContractError)
+
+
+@probe("Q-90 role separation: each seam asks only its own namespace, and a key never crosses")
+def _q90():
+    directory = _Directory(*_pinned_anchors())
+    v = BenchmarkEd25519Verifier(directory)
+    v.verify_publisher_submission(publisher(detached_signature=PINNED_PUBLISHER_SIGNATURE), TRUSTED_INSTANT)
+    v.verify_approval(approval(detached_signature=PINNED_APPROVER_SIGNATURE), TRUSTED_INSTANT)
+    v.verify_revocation(revocation_envelope(detached_signature=PINNED_REVOKER_SIGNATURE), TRUSTED_INSTANT)
+    assert [asked[0] for asked in directory.asked] == [
+        BenchmarkTrustRole.PUBLISHER, BenchmarkTrustRole.APPROVER, BenchmarkTrustRole.REVOKER,
+    ]
+    # The publisher's key installed only as a publisher does not verify an
+    # approval declaring the same key id.
+    only_publisher = BenchmarkEd25519Verifier(_Directory(_pinned_anchors()[0]))
+    crossed = approval(detached_signature=PINNED_APPROVER_SIGNATURE,
+                       approval_authority_key_id="publisher-key-1")
+    assert only_publisher.verify_approval(
+        crossed, TRUSTED_INSTANT
+    ).refusal_reason is BenchmarkRegistryRefusalReason.TRUST_ANCHOR_NOT_FOUND
+    # The seam accepts exactly its own envelope type.
+    refuses(lambda: v.verify_approval(
+        publisher(detached_signature=PINNED_PUBLISHER_SIGNATURE), TRUSTED_INSTANT
+    ), BenchmarkRegistryContractError)
+
+
+@probe("Q-91 a failing directory refuses closed and never falls back")
+def _q91():
+    class Unavailable:
+        def resolve_anchor(self, role, identity, key_id):
+            return BenchmarkTrustAnchorResolution(
+                role=role, identity=identity, key_id=key_id, anchor=None,
+                refusal_reason=BenchmarkRegistryRefusalReason.TRUST_DIRECTORY_UNAVAILABLE)
+
+    class Raises:
+        def resolve_anchor(self, role, identity, key_id):
+            raise RuntimeError("offline")
+
+    class WrongAnswer:
+        def resolve_anchor(self, role, identity, key_id):
+            other = anchor(key_id="publisher-key-2", public_key_material=PINNED_PUBLISHER_PUBLIC_KEY)
+            return BenchmarkTrustAnchorResolution(
+                role=other.role, identity=other.identity, key_id=other.key_id,
+                anchor=other, refusal_reason=None)
+
+    env = publisher(detached_signature=PINNED_PUBLISHER_SIGNATURE)
+    for directory, expected in (
+        (Unavailable(), BenchmarkRegistryRefusalReason.TRUST_DIRECTORY_UNAVAILABLE),
+        (Raises(), BenchmarkRegistryRefusalReason.INDETERMINATE),
+        (WrongAnswer(), BenchmarkRegistryRefusalReason.INDETERMINATE),
+    ):
+        result = BenchmarkEd25519Verifier(directory).verify_publisher_submission(env, TRUSTED_INSTANT)
+        assert result.outcome is BenchmarkVerificationOutcome.REFUSED
+        assert result.refusal_reason is expected
+        assert result.anchor_record_digest is None
+    refuses(lambda: BenchmarkEd25519Verifier(object()), BenchmarkRegistryContractError)
+
+
+@probe("Q-92 nothing is memoized: the directory is consulted on every call")
+def _q92():
+    directory = _Directory(*_pinned_anchors())
+    v = BenchmarkEd25519Verifier(directory)
+    env = publisher(detached_signature=PINNED_PUBLISHER_SIGNATURE)
+    first = v.verify_publisher_submission(env, TRUSTED_INSTANT)
+    second = v.verify_publisher_submission(env, TRUSTED_INSTANT)
+    assert first == second and first is not second and len(directory.asked) == 2
+    directory.anchors.clear()
+    assert v.verify_publisher_submission(
+        env, TRUSTED_INSTANT
+    ).refusal_reason is BenchmarkRegistryRefusalReason.TRUST_ANCHOR_NOT_FOUND
 
 
 def main() -> int:
