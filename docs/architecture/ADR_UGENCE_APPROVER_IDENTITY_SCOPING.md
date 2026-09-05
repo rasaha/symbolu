@@ -175,4 +175,6 @@ outside this sequence entirely.
 ## 7 — Next step
 
 AI-C, the real identity adapter in its own package, the first identity-provider and
-crypto dependency on this path. AI-D and AI-E follow in order.
+crypto dependency on this path; scoped in
+`ADR_UGENCE_APPROVER_IDENTITY_ADAPTER_SCOPING.md`, awaiting rulings IA-1 to IA-5.
+AI-D and AI-E follow in order.
