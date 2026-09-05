@@ -12,6 +12,13 @@ anything outside it *before* opening a connection. Owner ruling HR-1
 human's decision verbatim to it. It holds no approver identity, computes no
 eligibility, consumes nothing, signals nothing and resumes nothing; the review service
 exposes no route for any of those, and this client could not reach one if it did.
+
+Owner ruling ID-1 (``PASS_THROUGH_OPAQUE_TOKEN``, AI-B): the one thing the studio may
+carry besides the body is a single opaque proof the operator's request presented,
+audience-bound to the review service, forwarded in ``PROOF_HEADER`` on the decision
+relay and on no other route. This client treats it as bytes: it never decodes,
+inspects, logs, stores or reuses it, and :meth:`_request` refuses to attach it to any
+template but ``POST /review/decisions``.
 """
 from __future__ import annotations
 
@@ -26,6 +33,8 @@ __all__ = [
     "ReviewServiceUnavailable",
     "ReviewNotFound",
     "REVIEW_ALLOWED_ROUTES",
+    "PROOF_HEADER",
+    "PROOF_ROUTE",
 ]
 
 #: The complete set of review-service routes the studio may reach. Four reads and one
@@ -40,6 +49,13 @@ REVIEW_ALLOWED_ROUTES: Tuple[Tuple[str, str], ...] = (
 )
 
 _ALLOWED_TEMPLATES = {(m, p) for m, p in REVIEW_ALLOWED_ROUTES}
+
+#: ID-1: the one header the opaque approver proof travels in, and the one route it may
+#: travel on. The name is the review service's (``ugence_governed_review_service.
+#: PROOF_HEADER``), spelled here rather than imported because the studio never imports
+#: that package.
+PROOF_HEADER = "X-Ugence-Approver-Proof"
+PROOF_ROUTE: Tuple[str, str] = ("POST", "/review/decisions")
 
 #: Statuses whose JSON body is the review service's typed answer, not a transport
 #: fault: a refused decision is 409 with the outcome and the standing record.
@@ -86,14 +102,16 @@ class ReviewServiceClient:
         return self._request("GET", "/review/approvals/{approval_id}",
                              path_params={"approval_id": approval_id})
 
-    def submit_decision(self, body: Dict[str, Any]) -> Any:
+    def submit_decision(self, body: Dict[str, Any], *, proof: str = "") -> Any:
         """``POST /review/decisions`` — relay a human's decision, verbatim.
 
         The body is forwarded exactly as the studio received it. Nothing is added: no
-        identity, no session, no computed eligibility. The answer is the service's
+        identity, no session, no computed eligibility. ``proof`` is the opaque value
+        the operator's request presented in ``PROOF_HEADER``, if any; it is forwarded
+        in the same header, unread, and only here (ID-1). The answer is the service's
         typed outcome, whether it recorded, replayed or refused.
         """
-        return self._request("POST", "/review/decisions", body=body)
+        return self._request(*PROOF_ROUTE, body=body, proof=proof)
 
     # -- internals ------------------------------------------------------------
     def _request(
@@ -104,7 +122,15 @@ class ReviewServiceClient:
         path_params: Optional[Dict[str, str]] = None,
         query: Optional[Dict[str, str]] = None,
         body: Optional[Dict[str, Any]] = None,
+        proof: str = "",
     ) -> Any:
+        if proof and (method, template) != PROOF_ROUTE:
+            # The proof rides the decision relay and nothing else. A read carrying it
+            # is refused here, before a connection is opened, whatever the caller did.
+            raise ReviewServiceUnavailable(
+                f"an approver proof may only accompany {PROOF_ROUTE[0]} {PROOF_ROUTE[1]}, "
+                f"never {method} {template}"
+            )
         if (method, template) not in _ALLOWED_TEMPLATES:
             # Refused before a connection is opened. The restriction is a property of
             # the client, not of the caller's good behaviour.
@@ -122,11 +148,14 @@ class ReviewServiceClient:
         if query:
             path = path + "?" + urllib.parse.urlencode(query)
 
+        headers = {"Content-Type": "application/json", "Accept": "application/json"}
+        if proof:
+            headers[PROOF_HEADER] = proof
         request = urllib.request.Request(
             url=self._base + path,
             method=method,
             data=json.dumps(body).encode("utf-8") if body is not None else None,
-            headers={"Content-Type": "application/json", "Accept": "application/json"},
+            headers=headers,
         )
         try:
             with urllib.request.urlopen(request, timeout=self._timeout) as response:

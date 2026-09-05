@@ -72,7 +72,11 @@ enforced before a socket opens, exactly as `clients/console.py:95-101` does toda
 Authentication of the human is the review service's IdP session. Under owner ruling
 ID-1 (`ADR_UGENCE_APPROVER_IDENTITY_SCOPING.md`) the studio may forward one IdP-issued
 token that is audience-bound to the review service, and it never parses, logs, persists
-or reuses it; it holds no identity of its own.
+or reuses it; it holds no identity of its own. Built as AI-B `[V]`: the value travels in
+`X-Ugence-Approver-Proof` on `POST /api/v2/review/decisions` and is forwarded on
+`POST /review/decisions` only (`clients/review.py`, `PROOF_ROUTE`); it is declared in
+no schema; `tests/test_review_proof_relay.py` and the frontend security suite prove
+matrix row 14.
 
 **SD-1 allowlist additions** `[R]` (the entries themselves await HR-D): the public
 entry points of `ugence_governed_review` (HR-2) only. `ugence_approval_workflow`, `ugence_authority_directory` and
