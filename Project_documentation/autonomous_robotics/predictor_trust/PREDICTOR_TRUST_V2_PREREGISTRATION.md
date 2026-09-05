@@ -129,3 +129,195 @@ the large expected effect sizes.
 ## 7. Deviations (append-only, post-hoc)
 
 *(none at preregistration commit)*
+
+* **D1 — additional systems under test (post-hoc extension).** Three
+  detectors not listed in §2 were added to `run_incremental_value.py`:
+  `LLTKalman`, `LLTKalman(strict-tick)`, and `Fusion(LLT+BCVF)`
+  (`robotics_reliability_bench/llt_kalman_trust.py`). Their thresholds were
+  tuned on TUNE families / seeds 0..19 only (`results/llt_kalman_tune.json`)
+  and frozen before TEST scoring; a TEST-family false positive seen during
+  test authoring was not used to adjust them. The three frozen systems, their
+  thresholds, metrics, and decision rules are unchanged, and their committed
+  numbers remain byte-stable. Results and an exploratory (non-frozen) verdict:
+  `ROBOTICS_LLT_KALMAN_TRUST_RESULTS.md`.
+
+* **A1 — LLT-Kalman amendment: time-varying noise estimate (preregistered
+  before scoring).** Written and committed before any A1 configuration was
+  scored on evaluation seeds.
+  * *Hypothesis.* The `calibration_drift` false alarms of the frozen
+    LLT-Kalman variant (TEST-only FA 0.10, all from that family) are caused
+    by the whole-episode per-axis noise estimate under-scaling late variance
+    growth. An exponentially forgetting robust noise estimate removes them
+    without giving back the detection-delay gain.
+  * *Single changed component.* `_robust_obs_noise` (one R per axis per
+    episode) is replaced, when `noise_forgetting` is set, by a causal
+    estimate: a short causal MAD warm-up over the first `noise_warmup` fresh
+    first differences, then `s_t^2 = λ s_{t-1}^2 + (1-λ) clip(e_t^2, 0,
+    noise_clip · s_{t-1}^2)` with `e_t` the drift-compensated first difference
+    scaled by `1/sqrt(2)`. The Kalman filter consumes `R_t = max(s_t,
+    scale_floor)^2` per tick; `Q` stays a ratio of the current `R_t`.
+    Nothing else in the detector changes.
+  * *Carried over frozen, not swept.* `bias_sustain=4`, `bias_min_m=0.20`,
+    `scale_floor=0.05`, `p0_ratio=10`, `noise_warmup=6`, `noise_clip=9.0`,
+    `stale_frac`, `abstain_suspect_frac`, and the global rule.
+  * *Sweep (TUNE families, seeds 0..19 only).* Grid: `q_level_ratio ∈ {0.003,
+    0.01, 0.03}`, `q_slope_ratio ∈ {0.0003, 0.001, 0.003}`, `cusum_k ∈ {2.0,
+    2.5}`, `cusum_h ∈ {6, 8, 12}`, `bias_z ∈ {3, 4, 6}`, `noise_forgetting λ
+    ∈ {0.80, 0.90, 0.95}`. Selection rule identical to the A0 sweep: zero
+    TUNE false alarms, TUNE recall and attribution 1.0, then minimum
+    strict-tick mean delay, ties to larger `cusum_h` then `bias_z`. Recorded
+    in `results/llt_kalman_tune_A1.json`.
+  * *Decision rule (evaluation seeds 100..149).* `A1_ADOPT` only if, for the
+    frozen A1 config: TEST-only recall = 1.00 AND TEST-only false_alarm_rate
+    ≤ 0.02 (the baseline's) AND ALL-family detection_delay_ticks ≤ 8.0 under
+    the default tick policy AND common_mode_false_detection_rate = 0.00.
+    Otherwise `A1_REJECT`, with the strict-tick delay and per-family rows
+    reported regardless. The A0 frozen config and its committed rows are not
+    modified; A1 is reported as additional systems `LLTKalman-A1` and
+    `Fusion(LLT-A1+BCVF)`.
+  * *Outcome (appended after scoring; rule not edited).* Frozen A1 config:
+    `q_level_ratio=0.01, q_slope_ratio=0.003, cusum_k=2.0, cusum_h=12.0,
+    bias_z=4.0, bias_min_m=0.20, bias_sustain=4, λ=0.9` (486 configs, 198
+    survivors). Evaluation seeds 100..149: TEST-only recall 1.00, TEST-only
+    FA 0.00, ALL-family delay 6.30 (strict tick 6.96), common-mode false
+    detection 0.00. All four conditions met → **`A1_ADOPT`**. Detail:
+    `ROBOTICS_LLT_KALMAN_TRUST_RESULTS.md` §7.
+
+* **A2 — realistic-noise pilot (preregistered before scoring). The
+  real-sensor gate is NOT discharged by this amendment.** Written and
+  committed before any A2 bundle was scored.
+  * *Data availability (verified at preregistration).* `NuScenesAdapter` is
+    scaffolding that raises `NotImplementedError`; no nuScenes/KITTI data is
+    on disk; `nuscenes.org` is unreachable from this environment. A2
+    therefore uses the repository's `RealisticNoiseAdapter`
+    (`symbolu_robotics/bcvf_autonomous/datasets/synthetic_realistic.py`:
+    AR(1) correlated noise α=0.8 σ=0.02, 2 % outlier frames at 5×) and is
+    labelled **synthetic-realistic**. Whatever the outcome, the verdict
+    carries the header label `REAL_SENSOR_GATE_NOT_DISCHARGED`.
+  * *No tuning.* Every system runs its frozen configuration:
+    `DeterministicBaseline` (§3), `LLTKalman-A1` (`A1_CONFIG`), `BCVF`
+    (`margin_threshold=1.5, window=12`), `Fusion(LLT-A1+BCVF)`. Seeds
+    200..229 (30 per family), never used anywhere before. Metrics:
+    `metrics.py` unchanged.
+  * *Sub-corpus R1 — corpus families on realistic noise.* M=3, T=100 ticks,
+    dt=0.1, 5 m/s straight path. Nominal streams are built by applying the
+    adapter's own `_apply_correlated_noise` and `_apply_outlier_frames` to
+    the straight path, plus bench-side dropouts: per predictor, with
+    probability 0.2, one 5-tick hold with `valid_mask=False` at a seeded
+    position in ticks 5..T−10. The 14 `fault_corpus` families are then
+    injected with the corpus's own magnitudes, targets, and onsets
+    (`gaussian_noise` = realistic nominal with no injection;
+    `precise_biased` target = adapter noise at σ×0.1). Labels
+    (`truth_label`, `onset_tick`, `harm_class`, `bcvf_visible`) are the
+    corpus's. Longer benign exposure (100 vs 50 ticks) is intentional.
+  * *Sub-corpus R2 — adapter-native scenes.* M=4 (M1..M4), T=400, the
+    per-step state stream is each predictor's first-horizon-step forecast
+    `traj[t, 0, :]`. Families: `gps_multipath`, `map_misalignment`,
+    `constant_bias_sanity` (harmful, target M4 = index 3; onsets 50, 50, 0),
+    `camera_degradation` (zero-mean jitter σ=0.6 m in a 50-tick window:
+    scored as a **variance fault**, reported separately, excluded from the
+    recall aggregate; the rate at which M4 is at least DEGRADED is reported
+    as the relevant response), and `benign_native` (adapter noise pipeline
+    with no injection; benign). Note: in this adapter `gps_multipath` and
+    `map_misalignment` share identical injection code; both rows are
+    reported and the duplication is stated.
+  * *Covariance arm.* Not applicable: the adapter reports no per-predictor
+    covariance, so `R_t` comes from `forgetting_obs_noise` only. Logged as
+    `[G]`.
+  * *Decision rule.* On the R1 ALL-family aggregate, C1: A1 recall ≥
+    baseline recall; C2: A1 false_alarm_rate ≤ baseline false_alarm_rate;
+    C3: A1 common_mode_false_detection_rate = 0.00; C4: A1 delay < baseline
+    delay; C5 (H2 reproduces): BCVF false_alarm_rate ≥ 2× baseline
+    false_alarm_rate OR BCVF recall < baseline recall. On R2, C6: A1 detects
+    each of the three harmful native families with attribution to M4 at
+    rate ≥ 0.90; C7: A1 `benign_native` detected_rate ≤ 0.05.
+    `A2_REPRODUCES` if C1–C7 all hold; `A2_PARTIAL` if C1–C5 hold but C6 or
+    C7 fails, or C6–C7 hold but any of C1–C5 fails; `A2_FAILS` otherwise.
+    No threshold is changed after scoring; a failure is reported as a
+    failure.
+  * *Outcome (appended after scoring; rule not edited).* R1 aggregate,
+    baseline vs A1: recall 1.00 vs 1.00; false-alarm 0.156 vs 0.222;
+    common-mode false-det 0.00 vs 0.233; delay 18.0 vs 6.6; attribution
+    0.67 vs 0.50. BCVF recall 0.20, FA 0.667. R2: A1 attribution on the
+    three harmful native families 0.43 / 0.17 / 0.37; A1 `benign_native`
+    detected 0.83. Conditions: C1 ✅ C2 ❌ C3 ❌ C4 ✅ C5 ✅ C6 ❌ C7 ❌ →
+    **`A2_FAILS`** under `REAL_SENSOR_GATE_NOT_DISCHARGED`. Post-hoc
+    diagnostic (no tuning): the failure is AR(1)-correlated noise alone
+    (A1 benign suspect rate 0.20 with AR(1) only, 0.00 with outliers only;
+    baseline 0.00 in both). `A1_ADOPT` is therefore scoped to white noise.
+    Detail: `ROBOTICS_LLT_KALMAN_TRUST_RESULTS.md` §8.
+
+* **A3 — LLT-Kalman amendment: coloured-noise state (preregistered before
+  scoring).** Written and committed before any A3 configuration was scored
+  on evaluation seeds. The real-sensor gate remains **not discharged**.
+  * *Hypothesis.* A1's false alarms under AR(1) noise (A2 §8.4) come from
+    an uncoloured observation model: the level posterior variance is
+    under-estimated when the residual noise is autocorrelated. Modelling
+    the coloured component as a state calibrates the level test and
+    removes the A2 false alarms without giving back recall.
+  * *Single changed component.* When `coloured_noise=True`, the per-axis
+    LLT state becomes `[level, slope, c]` with `F=[[1,1,0],[0,1,0],[0,0,φ]]`,
+    `H=[1,0,1]`, `Q=diag(q_level, q_slope, q_c)`, `R=scale_floor²`. The
+    coloured-noise parameters are estimated **causally per axis from the
+    filter's own innovations** with forgetting factor `rho_forgetting`:
+    `φ̂` = clipped lag-1 autocorrelation of the innovations in `[0, phi_max]`,
+    `σ̂_n²` = forgetting innovation variance with the A1 clip (`noise_clip`),
+    `q_c = σ̂_n² (1−φ̂²)`. Warm-up: `φ̂=0`, `σ̂_n²` from the A1 causal MAD
+    over the first `noise_warmup` differences. All other channels (CUSUM,
+    level bias test, states, global rule) unchanged. `coloured_noise=False`
+    reproduces A1 exactly (pinned by test).
+  * *Carried over frozen, not swept.* `bias_sustain=4`, `bias_z=4.0`,
+    `bias_min_m=0.20` (applied on the lever-scaled axes exactly as A1;
+    the per-axis-floor idea in the A2 note is **dropped** because at
+    0.20 m / 2.5 it is numerically identical and would only be a hidden
+    re-tune), `scale_floor=0.05`, `p0_ratio=10`, `noise_forgetting=0.9`,
+    `noise_warmup=6`, `noise_clip=9.0`, `cusum_k=2.0`, `stale_frac`,
+    `abstain_suspect_frac`, global rule.
+  * *TUNE set (seeds 0..19 only).* The five A1 TUNE families **plus** two
+    realistic-noise families built by `a2_realistic_pilot.r1_bundle` on
+    seeds 0..19 (never the A2 seeds 200..229): `ar1_benign`
+    (= R1 `gaussian_noise`, benign) and `ar1_constant_bias`
+    (= R1 `constant_bias`, harmful). Selection rule as A0/A1: zero false
+    alarms on every TUNE benign family, recall and attribution 1.0 on every
+    TUNE harm family, then minimum strict-tick mean delay, ties to larger
+    `cusum_h` then larger `phi_max`. Grid: `q_level_ratio ∈ {0.003, 0.01,
+    0.03}`, `q_slope_ratio ∈ {0.001, 0.003}`, `phi_max ∈ {0.8, 0.9, 0.95}`,
+    `rho_forgetting ∈ {0.90, 0.95, 0.98}`, `cusum_h ∈ {8, 12}` (108
+    configs). Recorded in `results/llt_kalman_tune_A3.json`; frozen as
+    `A3_CONFIG`. If no config survives the hard rule, A3 is reported as
+    `A3_NO_SURVIVOR` and nothing is scored on evaluation seeds.
+  * *Decision rule.* The A2 pilot (`a2_realistic_pilot.py`, both
+    sub-corpora, same metrics) is re-run with `LLTKalman-A3` in place of
+    A1 on **fresh seeds 300..329** (never the A2 seeds). C1–C7 exactly as
+    A2, applied to A3. Plus C8 (no regression on the original corpus): on
+    evaluation seeds 100..149 of `fault_corpus`, A3 TEST-only recall = 1.00,
+    TEST-only false_alarm_rate ≤ 0.02, ALL-family delay ≤ 8.0.
+    `A3_ADOPT` if C1–C8 all hold; `A3_PARTIAL` if C1–C7 hold but C8 fails,
+    or C8 holds with C1–C5 holding but C6/C7 failing; `A3_FAILS` otherwise.
+    No threshold is changed after scoring. A1/A0 frozen configs and every
+    committed results row stay untouched; A2's results file is not
+    regenerated.
+  * *Implementation deviation (decided on TUNE data, before any evaluation
+    seed was scored).* The preregistered text estimated `φ̂` from the
+    filter's innovations. A filter that models the coloured state whitens
+    its own innovations, so `φ` is not identifiable from them; the
+    implementation estimates `φ̂` and `σ̂_n²` from mean-corrected forgetting
+    moments of the residual's **first differences** (`φ = 1 + 2ρ_d`,
+    `σ_n² = Var(d)/(2(1−φ))`, white noise ⇒ the A1 estimator). A
+    three-moment AR(1)+white solve was also tried and rejected on TUNE
+    data: the lag-2 autocovariance is not causally estimable at these
+    window lengths (`φ̂ = 0.46` on pure AR(1) 0.8). `R = scale_floor²` as
+    preregistered.
+  * *Outcome (appended after the sweep; rule not edited).* **108 configs,
+    0 survivors → `A3_NO_SURVIVOR`.** Nothing was scored on evaluation
+    seeds 300..329 or 100..149, and `A3_CONFIG` stays `None`. Every config
+    fails the hard rule on `ar1_benign` (false-alarm 0.15–0.30 across the
+    grid corners) and most also on `noisy_unbiased` (0.05) and
+    `ar1_constant_bias` attribution (0.55–0.85). Diagnosis in
+    `ROBOTICS_LLT_KALMAN_TRUST_RESULTS.md` §9: the coloured state is
+    verified to calibrate the level variance on pure AR(1) noise, but on the
+    realistic pipeline (median consensus of three AR(1) streams plus outlier
+    frames) the causal two-moment estimate collapses toward `φ̂≈0` at the
+    noise floor on the heading axis, and with `bias_sustain=4` frozen the
+    0.20 m floor is crossed by lever-scaled heading wander. The real-sensor
+    gate remains not discharged.
