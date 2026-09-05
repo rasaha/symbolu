@@ -1,0 +1,47 @@
+# Ugence Control Plane Root — the audit-ledger service (gap-sequencing ADR wave 3).
+#
+# Scoped and ratified by docs/architecture/ADR_UGENCE_CONTROL_PLANE_ROOT_SCOPING.md.
+#
+#   THIS PACKAGE APPENDS AND RETURNS A REFERENCE. IT DECIDES NOTHING, OWNS NO
+#   POLICY, ISSUES NO ENVELOPE, AND UNIFIES NO EXISTING AUDIT STORE.
+#
+# A composition root, not a capability (D-2) — it adds nothing to the capability
+# count. Deliberately NOT the AI Control Plane: that noun names a product with its
+# own documentation tree and a shipped console. This is a root under it.
+#
+# Dependencies: the standard library only. governance-contracts' AuditReference is
+# INJECTED by the caller, never imported — tests/test_boundaries.py asserts it.
+#
+# Build:   python -m build packages/integration/control-plane-root
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ugence-control-plane-root"
+dynamic = ["version"]
+description = "Ugence control-plane root — the audit-ledger service. Appends one entry at a caller-supplied instant and returns the AuditReference naming it. Decides nothing; unifies no existing store."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "Proprietary" }
+authors = [{ name = "Rakesh Mohan" }]
+keywords = ["governance", "audit", "ledger", "composition-root", "ugence"]
+classifiers = ["Typing :: Typed"]
+dependencies = []
+
+[project.optional-dependencies]
+test = ["pytest>=7.0"]
+
+[tool.setuptools.dynamic]
+version = { attr = "ugence_control_plane_root.version.__version__" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["ugence_control_plane_root*"]
+
+[tool.setuptools.package-data]
+ugence_control_plane_root = ["py.typed"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
