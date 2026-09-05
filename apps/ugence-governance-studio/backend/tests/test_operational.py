@@ -56,6 +56,10 @@ def test_maturity_flags(client):
     assert m["workflow_ir_v1_supported"] is True
     assert m["workflow_ir_v2_supported"] is True
     assert m["frontend_implemented"] is False
+    # GAS-4 shipped the six studio screens; GAS-5 (Langflow import) is deferred by
+    # owner ruling and must not drift to True without a new ruling.
+    assert m["studio_screens_implemented"] is True
+    assert m["langflow_import_implemented"] is False
     assert m["authentication_implemented"] is False
     assert m["agent_execution_implemented"] is False
     assert m["permission_granting_implemented"] is False
