@@ -59,7 +59,8 @@ The gaps between "modules that pass tests" and "one product a customer runs":
    HMAC signing. Needed: durable append-only audit with a real hash-chain and key
    custody.
 4. **Unified control surface.** No admin console today. Needed: one console for
-   policy, review queues, findings, and audit reconstruction.
+   policy, review queues, findings, and audit reconstruction. *(Sequenced as the
+   Governed Agent Studio in §11.)*
 5. **Standard external APIs & canonical contracts.** Internal contracts exist (CER);
    needed: stable public APIs and versioned contracts across modules.
 6. **Connectors.** Needed: two runtime connectors (native + one third-party adapter,
@@ -116,6 +117,10 @@ reference plus one live infrastructure workflow.
 | **Q4** | Enterprise readiness | External security review; observability/deployment tooling; controlled enforcement for selected actions; 1st pilot findings report |
 | **Q5** | Pilot scale + enforcement | 2–3 paid pilots running; first shadow→enforcement conversion; second-domain kernel reuse demonstrated |
 | **Q6** | v1 GA + proof | Enterprise-deployable v1 GA; ≥1 paid enforcement deployment; measured false-positive/false-block + audit-reconstruction results |
+
+*The Governed Agent Studio and the durable-execution engine beneath it are sequenced
+separately in §11; that sequence is engineering-ordered and is not mapped onto these
+quarters here.*
 
 ---
 
@@ -233,6 +238,115 @@ v1 is complete when, for the Kubernetes infrastructure-agent wedge:
   systems-of-record are explicitly deferred (§4).
 - **Cost assumptions** — every figure in §8 is ⟨assumption⟩; the round should be
   re-derived once real quotes land.
+
+---
+
+## 11 · Governed Agent Studio and durable execution
+
+> **Scope note.** This section sequences the Governed Agent Studio and the durable
+> execution engine beneath it. It is an engineering sequencing record, not a budget
+> input: it adds no line to §8 and re-derives no figure in §8c. Every item below is
+> **planned**; nothing in it is implemented, piloted or certified at the time of
+> writing. Evidence labels follow the repository convention — `[V]` verified against
+> this repository, `[I]` inferred, `[R]` requires owner ratification, `[G]` gap.
+>
+> **Why this section is here rather than in the research roadmap.** `[V]`
+> `Project_documentation/repository/roadmap/IMPLEMENTATION_ROADMAP.md` is the
+> Symbol-U *scientific* execution plan (Milestones A–G, "documentation only",
+> "Stage A untouched"); it names no Ugence capability. Product delivery sequencing
+> belongs here.
+
+### 11.0 Ratified frame (owner, this programme)
+
+These are settled and are not reopened by any item below.
+
+| # | Ratified decision |
+|---|---|
+| GAS-R1 | **DBOS is the initial standalone durable-execution engine**, and is a **candidate** until every row of the durability and failure matrix in `docs/architecture/ADR_DBOS_DURABLE_EXECUTION_INTEGRATION.md` has passing evidence. |
+| GAS-R2 | **Temporal is the future regulated-enterprise adapter.** The execution adapter must make that swap possible without touching Workflow IR, governance state or receipts. |
+| GAS-R3 | **React Flow is the Ugence-owned studio canvas**, added as a feature inside `apps/ugence-governance-studio`. No third app; no Langflow fork. |
+| GAS-R4 | **Langflow is an import source only.** Its exported JSON is untrusted input: validate, never execute, compile to Workflow IR. |
+| GAS-R5 | **Workflow IR and governance state are always owned by Ugence.** The engine owns scheduling and recovery only; Agent Runtime owns proposal binding, the governance hook, budgets, checkpoints and receipts. The engine is never the source of truth for governance state. |
+| GAS-R6 | **The governance hook runs inside the durable step.** The engine executes Agent Runtime transitions; Agent Runtime calls the hook before any provider invocation, so a retry can never replay a consequential call without re-clearing it. |
+
+### 11.1 Sequence
+
+Items run in order. Each states its entry criteria, its exit criteria, and the
+**maturity label it may claim on completion** — drawn from the Appendix B stage
+vocabulary in `docs/UGENCE_ENTERPRISE_AI_GOVERNANCE_CAPABILITY_PIPELINE.md` §B.2.
+No item may claim a label above the one listed, and no item may claim
+*Pilot-validated* or *Production-certified* at all within this section.
+
+#### GAS-1 · DBOS integration ADR and failure matrix — **documents only**
+
+| | |
+|---|---|
+| **Entry** | This section ratified; the five owner decisions in §11.3 ruled. |
+| **Work** | `docs/architecture/ADR_DBOS_DURABLE_EXECUTION_INTEGRATION.md`: ownership boundary, the execution-adapter Protocols, the store mapping, hook-inside-step semantics, the Temporal replacement contract, and the complete durability and failure matrix. |
+| **Exit** | The ADR is committed; every matrix row names an expected fail-closed behaviour **and** the evidence artefact that would prove it; no row is left as prose without an evidence column. |
+| **Label on completion** | **Contract-only.** A committed ADR authorizes implementation; it is not implementation. |
+
+#### GAS-2 · Execution adapter and DBOS-backed stores for Agent Runtime
+
+| | |
+|---|---|
+| **Entry** | GAS-1 committed. A local Postgres is available in CI. |
+| **Work** | The neutral `DurableExecutionAdapter` Protocols in a new integration package; a DBOS-backed implementation; Postgres-backed `CheckpointStore`, `RuntimeEventStore` and `RuntimeStateStore` behind the existing Agent Runtime Protocols `[V]` (`packages/runtime/agent-runtime/src/ugence_agent_runtime/persistence/interfaces.py`). Every matrix row from GAS-1 lands as an executing test. |
+| **Exit** | Every GAS-1 matrix row has a passing CI test against a real local Postgres, including the crash, duplicate-delivery, expiry, revocation, Postgres-unavailable, budget-contention, long-pause, version-change and clock-skew rows. `packages/runtime/agent-runtime` gains **no** new import `[V]` — the adapter depends on the runtime, never the reverse. |
+| **Label on completion** | **Core implemented** for the adapter package; **DBOS moves from *candidate* to *ratified as the initial engine*** at this exit and at no earlier point (GAS-R1). Agent Runtime's own "not distributed-safe, not exactly-once" statements `[V]` (`packages/runtime/agent-runtime/README.md:36`) are revised only for the properties the matrix actually proves, and only in the adapter's README. |
+
+#### GAS-3 · Production `GovernanceHook` adapter from `GovernedExecutionDecision`
+
+| | |
+|---|---|
+| **Entry** | GAS-2 exit met. |
+| **Work** | A hook adapter that composes Risk Authority, Decision Authority and ActionGate through `RiskAuthorityCompositionEngine.compose` `[V]` (`packages/integration/risk-authority-runtime/.../composition.py:62`) and projects the resulting `GovernedExecutionDecision` `[V]` (`.../contracts.py:339`) onto `GovernanceEvaluation` `[V]` (`.../agent_runtime/governance/interfaces.py`). The adapter binds `proposal_fingerprint` and `correlation_reference` and mints nothing. |
+| **Exit** | Only three hooks existed before this item `[V]` (`Unconfigured`, `AllowAll`, deprecated `Noop`); a fourth exists, is fail-closed on every non-`GRANT` disposition, and passes an adversarial suite proving `HOLD`/`ESCALATE`/`BLOCK` can never widen to `CLEAR`. `AllowAllGovernanceHook` remains non-default. |
+| **Label on completion** | **Core implemented.** Not pilot-validated: `production_mode` still raises `ProductionContainmentError` in Risk Authority `[V]` (`packages/risk_authority/src/risk_authority/domain/errors.py:19`), and `HOLD`, `DEFER`, `ESCALATE` and `MANUAL_REVIEW` still have no sink `[G]`. |
+
+#### GAS-4 · Studio v1 — six screens on React Flow
+
+Constitution → Policy → Authority → Simulate → Publish → Observe, built in that order
+inside `apps/ugence-governance-studio`.
+
+| | |
+|---|---|
+| **Entry** | GAS-3 exit met. The screen-to-type audit (`apps/ugence-governance-studio/docs/GOVERNED_AGENT_STUDIO_V1_SCREEN_AUDIT.md`) accepted. |
+| **Work** | An additive `governance_studio.api.v2` contract alongside the frozen `governance_studio.api.v1` `[V]` (`apps/ugence-governance-studio/contracts/openapi.json`); the studio backend as **thin orchestration only** over the existing packages; the six screens against frozen fixtures. |
+| **Exit** | `v1` byte-frozen and still passing its freeze test `[V]` (`backend/tests/test_freeze.py`); every `v2` route delegates to a package entry point with no re-implemented governance logic; no route grants, authorizes or executes; determinism tests pass for all six screens. |
+| **Label on completion** | **Core implemented** for the studio feature. The studio's own posture — synthetic data, planning only, no execution or permission granting `[V]` (the frozen OpenAPI description) — is preserved verbatim for `v2`. |
+
+#### GAS-5 · Langflow importer
+
+| | |
+|---|---|
+| **Entry** | GAS-4 exit met. |
+| **Work** | A one-way importer: parse exported Langflow JSON, validate against a strict allowlist schema, reject anything unmapped, compile the accepted subset to Workflow IR v2 through `compile_policy_pack` `[V]` (`packages/tooling/policy-workflow-compiler/.../compiler.py:222`). |
+| **Exit** | An adversarial corpus of malformed, oversized, cyclic, deeply nested and code-bearing Langflow exports is refused with typed errors and zero evaluation; the importer executes nothing from the file and imports no Langflow package; unmapped node types refuse rather than degrade. |
+| **Label on completion** | **Core implemented** for the importer. It confers no maturity on the imported graph, which enters as an ordinary unapproved policy pack. |
+
+#### GAS-6 · Temporal adapter — **gated, later**
+
+| | |
+|---|---|
+| **Entry** | GAS-2 exit met **and** an owner ruling authorizing the second engine, taken on evidence of a regulated-enterprise requirement that DBOS does not meet. Not entered on schedule. |
+| **Work** | A second implementation of the same `DurableExecutionAdapter` Protocols. |
+| **Exit** | The complete GAS-1 matrix passes against Temporal **with no change** to Workflow IR, governance state, receipts, or any file under `packages/runtime/agent-runtime` (GAS-R2) — that no-change property is the exit criterion, verified by diff. |
+| **Label on completion** | **Contract-only** until its matrix passes; **Core implemented** thereafter. |
+
+### 11.2 Non-goals for this whole sequence
+
+No live execution against real systems. No credentials — the Credential Broker
+(cloud-scaling Phase 5X) remains unbuilt `[V]` (Appendix B §B.6 ¶2) and nothing here
+substitutes for it. No generic LLM, prompt or API canvas nodes. No research-only
+package in the product. No hosted multi-tenancy. No claim of pilot validation or
+production certification, on any item, at any exit above.
+
+### 11.3 Owner decisions this section depends on
+
+Listed in full, with the recommendation, in the delivery brief accompanying GAS-1.
+Until they are ruled, GAS-1 is the only item that may start.
+
 
 ---
 
