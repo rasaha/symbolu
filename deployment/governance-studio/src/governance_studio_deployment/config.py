@@ -9,6 +9,7 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass, field
 from typing import List, Optional
+from urllib.parse import urlsplit
 
 from . import DEPLOYMENT_NAME
 from .passwords import is_valid_hash_format
@@ -58,6 +59,10 @@ class DeploymentConfig:
     request_header_name: str = REQUEST_HEADER_NAME
     request_header_value: str = REQUEST_HEADER_VALUE
     enable_access_log: bool = False
+    #: CR-2: the governed review service (the governed runtime worker's private TLS
+    #: listener). Unset means the review screens report a typed gap; nothing else in the
+    #: deployment reads it. It is the profile's one permitted outbound destination.
+    review_service_url: str = ""
     _errors: List[str] = field(default_factory=list, compare=False)
 
     @property
@@ -67,6 +72,10 @@ class DeploymentConfig:
     @property
     def deployment_name(self) -> str:
         return DEPLOYMENT_NAME
+
+    @property
+    def review_service_configured(self) -> bool:
+        return bool(self.review_service_url)
 
     @classmethod
     def from_env(cls, **overrides) -> "DeploymentConfig":
@@ -87,6 +96,8 @@ class DeploymentConfig:
             port=int(overrides.get("port") or _env("UGENCE_STUDIO_PORT") or APP_PORT),
             runtime_dir=overrides.get("runtime_dir") or _env("UGENCE_STUDIO_RUNTIME_DIR") or "/var/run/ugence-studio",
             enable_access_log=bool(overrides.get("enable_access_log", _env("UGENCE_STUDIO_ACCESS_LOG") == "1")),
+            review_service_url=(overrides.get("review_service_url")
+                                or _env("UGENCE_STUDIO_REVIEW_SERVICE_URL") or "").strip().rstrip("/"),
         )
         return cfg
 
@@ -129,4 +140,33 @@ class DeploymentConfig:
         if not self.manifest_path or not os.path.isfile(self.manifest_path):
             errors.append("synthetic scenarios manifest is missing")
 
+        # review service relay (CR-2): optional; when set it is one https origin
+        if self.review_service_url:
+            errors.extend(_review_url_errors(self.review_service_url, self.is_production))
+
         return errors
+
+
+def _review_url_errors(url: str, production: bool) -> List[str]:
+    """Why ``UGENCE_STUDIO_REVIEW_SERVICE_URL`` must not be used, or nothing.
+
+    The relay speaks to the governed runtime worker's private TLS listener and nothing
+    else: an https origin (http only on loopback, only in test mode), no credential in
+    the URL, no query, no fragment. The value is never logged.
+    """
+    errors: List[str] = []
+    try:
+        parts = urlsplit(url)
+    except ValueError:
+        return ["UGENCE_STUDIO_REVIEW_SERVICE_URL is not a valid URL"]
+    if parts.scheme not in ("https", "http") or not parts.hostname:
+        return ["UGENCE_STUDIO_REVIEW_SERVICE_URL must be an http(s) URL with a host"]
+    loopback = parts.hostname in ("localhost", "127.0.0.1", "::1")
+    if parts.scheme == "http" and (production or not loopback):
+        errors.append("UGENCE_STUDIO_REVIEW_SERVICE_URL must use https (plain http is "
+                      "allowed only on loopback in test mode)")
+    if parts.username or parts.password:
+        errors.append("UGENCE_STUDIO_REVIEW_SERVICE_URL must not carry a credential")
+    if parts.query or parts.fragment:
+        errors.append("UGENCE_STUDIO_REVIEW_SERVICE_URL must not carry a query or fragment")
+    return errors

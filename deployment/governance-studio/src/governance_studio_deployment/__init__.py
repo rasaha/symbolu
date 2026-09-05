@@ -11,7 +11,7 @@ Deployment bundle identity is distinct from the component versions it packages.
 from __future__ import annotations
 
 DEPLOYMENT_NAME = "governance-studio-private-hosted"
-DEPLOYMENT_VERSION = "0.1.0"
+DEPLOYMENT_VERSION = "0.2.0"
 
 # Frozen component identities this deployment packages (never relabelled).
 FRONTEND_VERSION = "0.2.0"

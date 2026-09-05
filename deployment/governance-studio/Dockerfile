@@ -31,9 +31,12 @@ ENV PATH="/opt/venv/bin:$PATH"
 COPY apps/ugence-governance-studio/backend /build/backend
 COPY packages/capabilities/agent-workforce-composer /build/awc
 COPY packages/tooling/policy-workflow-compiler /build/compiler
+# CR-2: the combined application imports the v2 surface, whose services import the
+# agent runtime (dependency-free) at module import. Nothing else is added to the layer.
+COPY packages/runtime/agent-runtime /build/agent-runtime
 COPY deployment/governance-studio /build/deployment
 RUN pip install --no-cache-dir "pydantic>=2" "fastapi>=0.110" "uvicorn>=0.27" "starlette>=0.36" \
- && pip install --no-cache-dir /build/compiler /build/awc /build/backend /build/deployment
+ && pip install --no-cache-dir /build/compiler /build/awc /build/agent-runtime /build/backend /build/deployment
 
 # ---- Stage 3: minimal runtime image -----------------------------------------
 FROM python:3.11-slim-bookworm@sha256:b18992999dbe963a45a8a4da40ac2b1975be1a776d939d098c647482bcad5cba AS runtime

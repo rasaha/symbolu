@@ -1,17 +1,47 @@
 {
   "schema_version": "1",
   "deployment": "governance-studio-private-hosted",
-  "deployment_version": "0.1.0",
+  "deployment_version": "0.2.0",
   "single_process": true,
-  "exposed_ports": ["8443/tcp"],
+  "exposed_ports": [
+    "8443/tcp"
+  ],
   "runtime_user": "10001:10001",
   "read_only_root_filesystem": true,
-  "writable_paths": ["/tmp", "/var/run/ugence-studio"],
-  "tls": {"minimum_version": "TLSv1.2", "plaintext_listener": false},
+  "writable_paths": [
+    "/tmp",
+    "/var/run/ugence-studio"
+  ],
+  "tls": {
+    "minimum_version": "TLSv1.2",
+    "plaintext_listener": false
+  },
   "authentication": "http_basic_over_https",
-  "unauthenticated_paths": ["/healthz", "/readyz"],
+  "unauthenticated_paths": [
+    "/healthz",
+    "/readyz"
+  ],
   "data_classification": "SYNTHETIC_DEMONSTRATION_ONLY",
-  "external_network_egress": "none",
+  "external_network_egress": {
+    "default": "none",
+    "permitted": [
+      {
+        "purpose": "governed review relay (ADR_UGENCE_REVIEW_SERVICE_COMPOSITION_ROOT_SCOPING.md, CR-2)",
+        "destination": "UGENCE_STUDIO_REVIEW_SERVICE_URL: the governed runtime worker's private TLS listener",
+        "scheme": "https",
+        "condition": "only while the variable is set; unset, the review screens report a typed gap and the profile makes no outbound connection",
+        "routes": [
+          "GET /review/queue",
+          "GET /review/runs/{instance_id}",
+          "GET /review/runs/{instance_id}/events",
+          "GET /review/approvals/{approval_id}",
+          "POST /review/decisions"
+        ],
+        "forwarded_header": "X-Ugence-Approver-Proof on POST /review/decisions only, verbatim, never parsed, logged or persisted (ID-1)"
+      }
+    ],
+    "container_gate_note": "the container gate runs with the variable unset, so its egress evidence records no outbound connection; the relay's egress is exercised in the deployment suite against a loopback stand-in"
+  },
   "capabilities_dropped": "ALL",
   "no_new_privileges": true,
   "frozen": {
@@ -20,11 +50,23 @@
     "api_contract": "governance_studio.api.v1",
     "awc_version": "0.2.1",
     "compiler_version": "0.2.0",
-    "openapi_sha256": "dc309eab216e1a4c2f63f286887a4ef218a96ac34f8fa8614bff176db7c36656"
+    "openapi_sha256": "dc309eab216e1a4c2f63f286887a4ef218a96ac34f8fa8614bff176db7c36656",
+    "served_api": "create_combined_app: governance_studio.api.v1 with governance_studio.api.v2 mounted behind it (CR-2)",
+    "api_v2_contract": "governance_studio.api.v2",
+    "openapi_v2_sha256": "dd63180dc91ba7842dc1dc2b6efb3dbc155ea3bd47200f40de7bac85d373f39a"
   },
   "prohibited": [
-    "permission_granting", "credential_provisioning", "business_action_authorization",
-    "agent_execution", "external_model_calls", "external_tool_calls", "production_data",
-    "multitenancy", "persistent_database"
-  ]
+    "permission_granting",
+    "credential_provisioning",
+    "business_action_authorization",
+    "agent_execution",
+    "external_model_calls",
+    "external_tool_calls",
+    "production_data",
+    "multitenancy",
+    "persistent_database"
+  ],
+  "configuration_added": {
+    "UGENCE_STUDIO_REVIEW_SERVICE_URL": "optional; read by DeploymentConfig and handed to build_studio_context(review_service_base_url=...) and nowhere else"
+  }
 }

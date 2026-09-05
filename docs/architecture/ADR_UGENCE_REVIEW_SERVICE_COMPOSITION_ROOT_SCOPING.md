@@ -160,7 +160,19 @@ as passed on account of the worker; no LIVE execution.
    connection was bound to its opening thread and refused every linkage append from
    an HTTP handler (`control-plane-root` 0.1.1). No image, no container gate (step 4).
 3. **P3E amendment** (CR-2): the variable, the combined app under the gate, the
-   runtime-config record and its freeze test.
+   runtime-config record and its freeze test. Shipped as `governance-studio-deployment`
+   0.2.0: `UGENCE_STUDIO_REVIEW_SERVICE_URL` (optional; https only outside loopback test
+   mode; no credential, query or fragment) is read by `DeploymentConfig` and handed to
+   `build_studio_context(review_service_base_url=...)` only; `_build_backend` serves
+   `create_combined_app` under the unchanged gate; `approved-runtime-config.json`
+   records the one permitted egress, the served v2 contract and its hash, and the
+   freeze test pins all of it; the deployment suite proves §4a row 4 (unset URL, typed
+   gap on every review route) and ID-1 pass-through against a loopback stand-in. The
+   image gains one dependency-free package (`ugence-agent-runtime`, imported by the v2
+   services) and no other change; FROM digests and the digest gate are untouched.
+   Composing surfaced one defect in the studio backend, fixed alongside:
+   `create_combined_app` mounted v2 under `/v2`, so the contract's and the frontend's
+   `/api/v2/...` paths were served nowhere; it now mounts at the root behind v1.
 4. **Worker container gates**: a gate set for the worker image, entered only when the
    mirror blocker is cleared, since no image can be built until then.
 
@@ -171,6 +183,6 @@ review and the mirror.
 
 ## 7 — Next step
 
-Step 2 is shipped. Next: step 3, the P3E amendment under CR-2 (the variable, the
-combined app under the existing gate, the runtime-config record and its freeze test).
-Step 4 waits on the mirror.
+Steps 2 and 3 are shipped; the ceiling above is reached. Step 4, the worker's own
+gate set, waits on the mirror ruling (mirror host, repository prefix and secret name
+from the owner). Real approver identity waits on an enterprise issuer (AI-E).

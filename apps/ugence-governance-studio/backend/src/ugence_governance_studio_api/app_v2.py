@@ -149,5 +149,9 @@ def create_combined_app(
     settings = settings or ApiSettings.from_env()
     root = create_app(settings)
     v2 = create_v2_app(settings, studio=studio)
-    root.mount("/v2", v2)
+    # Mounted at the root, after every v1 route, so the v2 paths keep the spelling the
+    # contract and the frontend client use (``/api/v2/...``): a mount under a prefix
+    # would serve them at ``/<prefix>/api/v2/...``, which nothing calls. v1 routes are
+    # matched first; only what v1 does not serve reaches v2.
+    root.mount("/", v2)
     return root

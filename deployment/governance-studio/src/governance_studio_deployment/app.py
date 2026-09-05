@@ -4,11 +4,18 @@ One ASGI application serves, behind one HTTPS listener and one auth gate:
     /                frontend SPA (index.html)
     /assets/*        frontend build assets
     /api/v1/*        frozen Governance Studio API (create_app)
+    /api/v2/*        additive Governed Agent Studio API (create_v2_app), mounted behind v1
+                     by create_combined_app (CR-2); the review screens relay to the
+                     governed review service named by UGENCE_STUDIO_REVIEW_SERVICE_URL
+                     and report a typed gap when it is unset
     /health /ready /version   frozen operational endpoints (authenticated)
     /healthz         minimal deployment liveness (unauthenticated)
     /readyz          deployment readiness (unauthenticated)
 
 The frozen backend is imported unmodified; the SPA fallback never captures /api/*.
+The approver-proof header (ID-1) is not read here: it travels through this process to
+the v2 decision route and from there to the review service, verbatim, and is never
+logged or stored.
 """
 from __future__ import annotations
 
@@ -35,8 +42,14 @@ _BACKEND_PATHS = ("/health", "/ready", "/version", "/docs", "/redoc", "/openapi.
 
 
 def _build_backend(config: DeploymentConfig):
-    """Instantiate the FROZEN backend, pinned to the synthetic scenario root."""
-    from ugence_governance_studio_api.app import create_app
+    """Instantiate the FROZEN v1 backend with v2 mounted behind it (CR-2), pinned to
+    the synthetic scenario root.
+
+    The v2 studio context receives exactly one thing from this deployment: the review
+    service base URL, or nothing. Every other v2 dependency stays absent, so those
+    screens report their gaps rather than a fixture.
+    """
+    from ugence_governance_studio_api.app_v2 import build_studio_context, create_combined_app
     from ugence_governance_studio_api.settings import ApiSettings
 
     settings = ApiSettings(
@@ -46,7 +59,8 @@ def _build_backend(config: DeploymentConfig):
         enable_authentication=False,      # deployment access gate performs authentication
         scenario_root=os.path.abspath(config.scenarios_root),
     )
-    return create_app(settings)
+    studio = build_studio_context(review_service_base_url=config.review_service_url or None)
+    return create_combined_app(settings, studio=studio)
 
 
 class _Dispatcher:

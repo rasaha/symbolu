@@ -25,6 +25,9 @@ services:
       UGENCE_STUDIO_ALLOWED_HOSTS: ${UGENCE_STUDIO_ALLOWED_HOSTS:?comma-separated hostnames}
       UGENCE_STUDIO_TLS_CERT_FILE: /run/secrets/tls/server.crt
       UGENCE_STUDIO_TLS_KEY_FILE: /run/secrets/tls/server.key
+      # CR-2: the governed runtime worker's private TLS listener; unset = review screens
+      # report a typed gap. The only outbound destination this profile permits.
+      UGENCE_STUDIO_REVIEW_SERVICE_URL: ${UGENCE_STUDIO_REVIEW_SERVICE_URL:-}
     volumes:
       # certificate material is mounted READ-ONLY; the private key is never baked in
       - type: bind

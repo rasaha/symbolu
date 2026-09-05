@@ -85,7 +85,35 @@ def test_approved_runtime_config_declares_boundaries():
     cfg = json.load(open(os.path.join(HERE, "approved-runtime-config.json"), encoding="utf-8"))
     assert cfg["exposed_ports"] == ["8443/tcp"]
     assert cfg["read_only_root_filesystem"] is True
-    assert cfg["external_network_egress"] == "none"
     assert cfg["data_classification"] == "SYNTHETIC_DEMONSTRATION_ONLY"
     assert "agent_execution" in cfg["prohibited"]
     assert cfg["frozen"]["openapi_sha256"] == "dc309eab216e1a4c2f63f286887a4ef218a96ac34f8fa8614bff176db7c36656"
+    # CR-2: v2 is served behind v1; its contract is frozen by hash exactly as v1's is.
+    assert cfg["frozen"]["api_v2_contract"] == "governance_studio.api.v2"
+    assert cfg["frozen"]["openapi_v2_sha256"] == _sha256(
+        os.path.join(HERE, "..", "..", "apps", "ugence-governance-studio", "contracts", "openapi_v2.json"))
+    assert cfg["frozen"]["served_api"].startswith("create_combined_app")
+
+
+def test_approved_runtime_config_permits_exactly_one_egress_the_review_relay():
+    """CR-2 amended the egress claim from none to one named destination. The record
+    stays exact: default none, one permitted destination, https, the five review
+    routes, the one forwarded header, and gate evidence recorded as unset."""
+    import json
+    cfg = json.load(open(os.path.join(HERE, "approved-runtime-config.json"), encoding="utf-8"))
+    egress = cfg["external_network_egress"]
+    assert egress["default"] == "none"
+    (permitted,) = egress["permitted"]
+    assert "UGENCE_STUDIO_REVIEW_SERVICE_URL" in permitted["destination"]
+    assert permitted["scheme"] == "https"
+    assert len(permitted["routes"]) == 5 and permitted["routes"][-1] == "POST /review/decisions"
+    assert permitted["forwarded_header"].startswith("X-Ugence-Approver-Proof")
+    assert "unset" in egress["container_gate_note"]
+    assert list(cfg["configuration_added"]) == ["UGENCE_STUDIO_REVIEW_SERVICE_URL"]
+    assert cfg["deployment_version"] == "0.2.0"
+
+
+def _sha256(path: str) -> str:
+    import hashlib
+    with open(path, "rb") as fh:
+        return hashlib.sha256(fh.read()).hexdigest()
