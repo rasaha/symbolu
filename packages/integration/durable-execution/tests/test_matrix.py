@@ -2,8 +2,9 @@
 
 Eleven rows. Each is marked ``matrix`` and named for its row so a skipped or failing
 row is visible by name rather than buried in a count. **A skipped row is not a passing
-row**: ``engine_status()`` stays ``CANDIDATE`` until every one of these is green, and
-``test_engine_status_matches_the_evidence`` asserts that claim against this file.
+row**: ``engine_status()`` reports ``RATIFIED`` only because every one of these is green
+in CI, and ``test_engine_status_is_ratified_by_a_recorded_owner_ruling`` asserts that
+claim against the ADR's OD-3 record.
 
 Rows 3, 6 (negative case), 7 (corruption case), 10 and 11 are the ones the ADR names as
 most likely to be quietly skipped. They are here, and they are not optional.
