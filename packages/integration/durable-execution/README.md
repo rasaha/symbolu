@@ -16,14 +16,16 @@ Sequenced as GAS-2 in the Ugence productization roadmap §11.
 
 ## Maturity — read this before citing the package
 
-**DBOS is a CANDIDATE engine.** It is not ratified. `engine_status()` reports the
-current state and the test suite asserts the claim, so it cannot drift away from the
-evidence:
+**DBOS is RATIFIED as the initial durable-execution engine** by owner ruling OD-3
+(ADR §9, 2026-09-05), on the evidence of every ADR §8 matrix row passing in CI against
+a real PostgreSQL (durable-execution-ci job 101257085510 on `fe6f1591`). `engine_status()`
+reports the state and the test suite asserts it together with the ADR record, so the
+claim cannot drift away from the evidence:
 
 ```python
 >>> from ugence_durable_execution import engine_status
 >>> engine_status()
-{'engine': 'dbos', 'status': 'CANDIDATE', 'ratified': False, ...}
+{'engine': 'dbos', 'status': 'RATIFIED', 'ratified': True, ...}
 ```
 
 This package is **not** pilot-validated and **not** production-certified. Nothing in it
@@ -33,8 +35,8 @@ Runtime's own statements about not being distributed-safe or exactly-once are re
 only for the properties the matrix actually proves, and only here — the runtime's own
 README is untouched.
 
-DBOS becomes the ratified initial engine when, and only when, every row of the ADR §8
-matrix has passing evidence in CI. See **Matrix status** below for what passes today.
+Ratified means exactly this: the ADR §8 matrix passes in CI. It does not mean piloted,
+certified, or approved for any live system. See **Matrix status** below.
 
 ## What this package is not
 
@@ -186,9 +188,9 @@ evidence for it.
 | 10 | Recovery after a workflow-definition version change | PASSING |
 | 11 | Clock skew, incl. the monotonic-clock refusal | PASSING |
 
-Passing the matrix is the evidence the ADR asks for. Promoting DBOS from *candidate* to
-*ratified* remains a deliberate owner act recorded in the ADR, not a side effect of a
-green suite.
+Passing the matrix is the evidence the ADR asks for. Promotion from *candidate* to
+*ratified* was a deliberate owner act (OD-3, ADR §9) on that evidence, not a side
+effect of a green suite.
 
 ## Known gaps
 

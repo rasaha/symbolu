@@ -11,11 +11,12 @@ re-crosses the same governance boundary.
 
 Scoped by ``docs/architecture/ADR_DBOS_DURABLE_EXECUTION_INTEGRATION.md``.
 
-**Maturity.** DBOS is a **candidate** engine, not a ratified one. It becomes ratified
-only when every row of the ADR §8 durability and failure matrix has passing evidence in
-CI. Until then nothing here may be described as durable, exactly-once, distributed-safe
-or production-ready. :func:`engine_status` reports the current state and the test suite
-asserts it against the matrix results, so the claim cannot drift from the evidence.
+**Maturity.** DBOS is **ratified as the initial engine** (owner ruling OD-3, ADR §9)
+because every row of the ADR §8 durability and failure matrix has passing evidence in
+CI. Ratified establishes the matrix properties and nothing more: nothing here is
+pilot-validated, production-certified or production-ready. :func:`engine_status`
+reports the state and the test suite asserts it against the ADR record, so the claim
+cannot drift from the evidence.
 """
 from __future__ import annotations
 
@@ -61,9 +62,10 @@ __all__ = [
 def engine_status() -> dict:
     """The engine's ratification state, in the form a caller can assert on.
 
-    ``CANDIDATE`` until every ADR §8 matrix row has passing evidence. Nothing in this
-    package flips it as a side effect; it is changed only by a commit that also carries
-    the evidence.
+    ``RATIFIED`` by owner ruling OD-3 on CI evidence that every ADR §8 matrix row
+    passes. Nothing in this package flips it as a side effect; it is changed only by a
+    commit that also carries the evidence. Ratified is a narrower claim than
+    pilot-validated or production-certified, which stay False.
     """
     return {
         "engine": "dbos",

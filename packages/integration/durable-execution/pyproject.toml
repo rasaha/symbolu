@@ -4,7 +4,7 @@
 # Scoped by docs/architecture/ADR_DBOS_DURABLE_EXECUTION_INTEGRATION.md.
 #
 #   THE ENGINE OWNS SCHEDULING AND RECOVERY. IT OWNS NOTHING ELSE.
-#   DBOS IS A CANDIDATE ENGINE UNTIL EVERY ADR §8 MATRIX ROW PASSES.
+#   DBOS IS RATIFIED (OD-3) BECAUSE EVERY ADR §8 MATRIX ROW PASSES IN CI. NOTHING MORE.
 #
 # Dependency direction is one-way and is asserted by tests/test_import_boundary.py:
 #
@@ -21,7 +21,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "ugence-durable-execution"
 dynamic = ["version"]
-description = "Ugence Durable Execution — neutral durable-execution adapter and Postgres-backed stores for the Agent Runtime. DBOS candidate engine; not pilot-validated, not production-certified."
+description = "Ugence Durable Execution — neutral durable-execution adapter and Postgres-backed stores for the Agent Runtime. DBOS ratified as the initial engine (OD-3); not pilot-validated, not production-certified."
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "Proprietary" }

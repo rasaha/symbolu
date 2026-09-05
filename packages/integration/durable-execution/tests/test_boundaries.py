@@ -96,11 +96,12 @@ def test_no_live_execution_mode_is_reachable():
     assert offenders == [], f"live-execution or credential tokens found: {offenders}"
 
 
-def test_engine_status_is_candidate_until_the_matrix_is_green():
+def test_engine_status_is_ratified_by_a_recorded_owner_ruling():
     """The maturity claim is data the suite asserts on, so it cannot drift.
 
-    Flipping ``DBOS_ENGINE_STATUS`` to ``RATIFIED`` is a deliberate commit that must
-    carry the evidence with it; nothing flips it as a side effect.
+    ``RATIFIED`` is only honest while the ADR records OD-3 as ruled with the CI
+    evidence it was ruled on; the test reads that record so the flag and the ruling
+    cannot separate. Ratified never implies pilot-validated or production-certified.
     """
     from ugence_durable_execution import engine_status
 
@@ -108,18 +109,23 @@ def test_engine_status_is_candidate_until_the_matrix_is_green():
     assert status["engine"] == "dbos"
     assert status["pilot_validated"] is False
     assert status["production_certified"] is False
-    assert status["status"] in {"CANDIDATE", "RATIFIED"}
-    assert status["ratified"] is (status["status"] == "RATIFIED")
+    assert status["status"] == "RATIFIED"
+    assert status["ratified"] is True
+
+    adr = (
+        pathlib.Path(__file__).resolve().parents[4]
+        / "docs" / "architecture" / "ADR_DBOS_DURABLE_EXECUTION_INTEGRATION.md"
+    ).read_text()
+    od3 = adr[adr.index("| **OD-3** |"):]
+    od3 = od3[: od3.index("\n")]
+    assert "`RATIFY`" in od3, "OD-3 must be recorded as ruled RATIFY in ADR §9"
+    assert "101257085510" in od3, "OD-3 must cite the CI job it was ruled on"
 
 
 def test_readme_does_not_overclaim():
-    """The README must not describe the engine as production-ready while the status
-    says CANDIDATE."""
-    from ugence_durable_execution import engine_status
-
+    """The README must not describe the engine as production-ready or pilot-validated.
+    Ratified is a narrower claim than either, so the guard applies in every status."""
     readme = (pathlib.Path(__file__).resolve().parents[1] / "README.md").read_text()
-    if engine_status()["status"] != "CANDIDATE":
-        return
 
     # Strip markdown emphasis before scanning: the disclaimers are written "**not**
     # pilot-validated", and a guard that cannot see through bold would flag the very
@@ -135,7 +141,7 @@ def test_readme_does_not_overclaim():
         while (idx := lowered.find(claim, idx)) != -1:
             window = lowered[max(0, idx - 40):idx]
             assert "not" in window or "never" in window, (
-                f"README claims {claim!r} while the engine status is CANDIDATE; "
+                f"README claims {claim!r}, which ratification does not establish; "
                 f"context: ...{lowered[max(0, idx - 60):idx + len(claim)]}"
             )
             idx += len(claim)
