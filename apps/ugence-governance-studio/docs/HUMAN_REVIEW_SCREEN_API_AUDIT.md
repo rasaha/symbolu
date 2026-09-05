@@ -97,7 +97,8 @@ prohibited import (`test_architecture.py:20-53`).
 HR-1 to HR-5 are ruled (ADR §5): the studio may display and transmit; the composition
 is `packages/integration/governed-review`; approvals bind to the proposal fingerprint
 and are consumed before the engine advances; resume stays bare in the runtime and
-bounded in the adapter; only ESCALATE is reviewable. HR-A to HR-D have shipped: the
-screens have their data source (`governed-review-service`) and their routes. What is
+bounded in the adapter; only ESCALATE is reviewable. HR-A to HR-E have shipped: the
+screens have their data source (`governed-review-service`) and their routes, and Run
+Detail renders the receipt linkages the service returns since its 0.2.0 (HE-5). What is
 still not settled is HR-E, the receipt linkage, and an identity provider, which no
 step of this sequence builds.
