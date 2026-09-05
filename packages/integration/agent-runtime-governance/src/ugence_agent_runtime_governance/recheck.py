@@ -23,7 +23,18 @@ from __future__ import annotations
 
 from typing import Any, Callable, Optional, Tuple
 
-__all__ = ["hook_envelope_resolver", "build_authority_recheck"]
+__all__ = ["hook_envelope_resolver", "build_authority_recheck", "ClearanceRecordMissing"]
+
+
+class ClearanceRecordMissing(RuntimeError):
+    """A CLEAR reached the last mile but the hook no longer holds its record.
+
+    Raised, not returned as ``None``: ``make_pre_effect_recheck`` reads ``None`` as
+    "not authority-bound" and passes through, which for a clearance whose record was
+    consumed or aged out would let the provider call proceed with no re-verification.
+    ``validate_clearance`` turns a raising recheck into a refusal
+    (``GOVERNANCE_AUTHORITY_RECHECK_ERROR``), so raising here fails closed.
+    """
 
 
 def hook_envelope_resolver(hook: Any) -> Callable[[object, object], Optional[Any]]:
@@ -33,12 +44,29 @@ def hook_envelope_resolver(hook: Any) -> Callable[[object, object], Optional[Any
     reads that as "not authority-bound" and passes through — correct here, because a
     proposal with no recorded envelope never obtained a CLEAR from this hook and so has
     no provider call for the recheck to guard. The refusal already happened upstream.
+
+    The one case that must NOT pass through is a CLEAR evaluation whose record the hook
+    has since dropped (consumed, expired, or aged out of the bounded record). That is
+    distinguishable from "never cleared" by the evaluation itself — it carries the CLEAR
+    disposition and an authorization reference — and it raises
+    :class:`ClearanceRecordMissing` so the runtime refuses rather than proceeds.
+
+    Resolving consumes the record: it is dropped at the hook's next sweep.
     """
+    from ugence_agent_runtime.governance.interfaces import GovernanceDisposition
     from ugence_risk_authority_status_runtime.enforcement import PreEffectContext
 
     def _resolve(evaluation: object, proposal: object) -> Optional[PreEffectContext]:
-        record = hook.envelope_for(proposal)
+        record = hook.consume_envelope(proposal)
         if record is None:
+            if (
+                getattr(evaluation, "disposition", None) is GovernanceDisposition.CLEAR
+                and getattr(evaluation, "authorization_reference", None)
+            ):
+                raise ClearanceRecordMissing(
+                    "the hook holds no clearance record for a CLEAR evaluation; "
+                    "refusing rather than re-verifying nothing"
+                )
             return None
         envelope, tier = record
         if envelope is None:

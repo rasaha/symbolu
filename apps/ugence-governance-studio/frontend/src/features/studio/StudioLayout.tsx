@@ -2,7 +2,10 @@
 //
 // Kept separate from the v1 scenario routes so the eligibility explorer's own
 // navigation, screens and tests are untouched by the studio existing.
+import { useMemo, useState } from "react";
 import { NavLink, Outlet } from "react-router-dom";
+
+import type { CompiledRelease, StudioReleaseContext } from "./release";
 
 const SCREENS = [
   { to: "constitution", label: "Constitution" },
@@ -14,6 +17,8 @@ const SCREENS = [
 ] as const;
 
 export function StudioLayout() {
+  const [release, setRelease] = useState<CompiledRelease | null>(null);
+  const context = useMemo<StudioReleaseContext>(() => ({ release, setRelease }), [release]);
   return (
     <div className="space-y-4">
       <nav aria-label="Governed Agent Studio screens" className="flex flex-wrap gap-1">
@@ -38,7 +43,7 @@ export function StudioLayout() {
         alongside the frozen v1 explorer · planning, preflight and observation only ·
         no screen here issues, activates, revokes, grants, authorizes, clears or executes
       </div>
-      <Outlet />
+      <Outlet context={context} />
     </div>
   );
 }

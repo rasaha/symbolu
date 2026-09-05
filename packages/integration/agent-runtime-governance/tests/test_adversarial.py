@@ -414,3 +414,108 @@ def test_the_hook_records_an_envelope_only_for_a_cleared_proposal():
     denied = F.proposal(task_id="no")
     denied_hook.evaluate(denied, 1000.0)
     assert denied_hook.envelope_for(denied) is None
+
+
+# --------------------------------------------------------------------------- #
+# the clearance record is bounded, and dropping a record never widens
+# --------------------------------------------------------------------------- #
+def test_the_clearance_record_refuses_at_capacity_rather_than_evicting():
+    """With the record full of live clearances a new CLEAR is refused; nothing in
+    flight is dropped to make room."""
+    from ugence_agent_runtime_governance import REASON_RECORD_CAPACITY
+
+    hook = GovernedExecutionHook(source=F.StaticSource(F.inputs()), max_records=2)
+    first, second, third = (F.proposal(task_id=t) for t in ("a", "b", "c"))
+    assert hook.evaluate(first, 1000.0).disposition is GovernanceDisposition.CLEAR
+    assert hook.evaluate(second, 1000.0).disposition is GovernanceDisposition.CLEAR
+    assert hook.record_count == 2
+
+    refused = hook.evaluate(third, 1000.0)
+    assert refused.disposition is GovernanceDisposition.BLOCK
+    assert REASON_RECORD_CAPACITY in refused.reason_codes
+    assert refused.authorization_reference is None
+    assert hook.record_count == 2, "refusal must not evict a live record"
+    assert hook.envelope_for(first) is not None and hook.envelope_for(second) is not None
+
+    # Re-evaluating an already-recorded proposal is not a new record.
+    assert hook.evaluate(first, 1000.0).disposition is GovernanceDisposition.CLEAR
+    assert hook.record_count == 2
+
+
+def test_a_consumed_record_is_dropped_at_the_next_sweep_and_frees_capacity():
+    hook = GovernedExecutionHook(source=F.StaticSource(F.inputs()), max_records=1)
+    first, second = F.proposal(task_id="a"), F.proposal(task_id="b")
+    assert hook.evaluate(first, 1000.0).disposition is GovernanceDisposition.CLEAR
+    assert hook.evaluate(second, 1000.0).disposition is GovernanceDisposition.BLOCK
+
+    assert hook.consume_envelope(first) is not None
+    # Still readable until the next evaluation: a retry within the same quantum
+    # re-verifies the same envelope rather than nothing.
+    assert hook.envelope_for(first) is not None
+
+    assert hook.evaluate(second, 1001.0).disposition is GovernanceDisposition.CLEAR
+    assert hook.envelope_for(first) is None
+    assert hook.record_count == 1
+
+
+def test_an_expired_clearance_record_is_swept():
+    hook = GovernedExecutionHook(source=F.StaticSource(F.inputs()))
+    proposal = F.proposal(task_id="a")
+    now = datetime.now(timezone.utc).timestamp()
+    evaluation = hook.evaluate(proposal, now)
+    assert evaluation.disposition is GovernanceDisposition.CLEAR
+    assert evaluation.valid_until is not None
+    assert hook.envelope_for(proposal) is not None
+
+    hook.evaluate(F.proposal(task_id="b"), evaluation.valid_until + 1.0)
+    assert hook.envelope_for(proposal) is None, "an expired record is not kept"
+
+
+def test_the_bound_holds_under_many_clearances():
+    """N distinct proposals through a hook with a small cap never leave more than the
+    cap in the record, whatever mix of consumption and expiry happens between them."""
+    cap = 8
+    hook = GovernedExecutionHook(source=F.StaticSource(F.inputs()), max_records=cap)
+    for i in range(200):
+        p = F.proposal(task_id=f"t{i}")
+        hook.evaluate(p, 1000.0 + i)
+        assert hook.record_count <= cap
+        if i % 3 == 0:
+            hook.consume_envelope(p)
+    assert hook.record_count <= cap
+
+
+def test_the_resolver_fails_closed_for_a_clear_whose_record_is_gone():
+    """A None from the resolver is a pass-through for the recheck. A CLEAR whose record
+    was dropped must therefore never resolve to None: it raises, and the runtime turns a
+    raising recheck into a refusal."""
+    from ugence_agent_runtime.governance.decisions import AUTHORITY_RECHECK_ERROR
+
+    from ugence_agent_runtime_governance import hook_envelope_resolver
+    from ugence_agent_runtime_governance.recheck import ClearanceRecordMissing
+
+    hook = GovernedExecutionHook(source=F.StaticSource(F.inputs(envelope=object())))
+    resolver = hook_envelope_resolver(hook)
+    proposal = F.proposal(task_id="a")
+    evaluation = hook.evaluate(proposal, 1000.0)
+    assert evaluation.disposition is GovernanceDisposition.CLEAR
+
+    assert resolver(evaluation, proposal) is not None  # consumes
+    assert resolver(evaluation, proposal) is not None  # a retry before any sweep
+    hook.evaluate(F.proposal(task_id="b"), 1001.0)  # sweeps the consumed record
+
+    with pytest.raises(ClearanceRecordMissing):
+        resolver(evaluation, proposal)
+
+    def recheck(ev, pr, now):
+        resolver(ev, pr)
+        return True, ()
+
+    permitted, reasons = validate_clearance(
+        evaluation, proposal, 1001.0, authority_recheck=recheck
+    )
+    assert not permitted
+    assert AUTHORITY_RECHECK_ERROR in reasons
+
+    # Never cleared, and no CLEAR evaluation in hand: still a pass-through.
+    assert resolver(None, F.proposal(task_id="never")) is None
