@@ -1,0 +1,110 @@
+name: package-suites-ci
+
+# Runs the test suites of the packages that no other workflow ran.
+#
+# The repository's convention is one workflow per package, and it works — until a
+# package ships without one. Twenty-two of sixty-one had a suite nothing executed
+# when this was added, including every package of the wave 2 and wave 3 governance
+# programme and four of the five wave 1 seams. Each was added with its suite green
+# locally and nothing running it afterwards.
+#
+# So this workflow is the catch-all, and scripts/check_package_ci_coverage.py is the
+# thing that keeps it honest: it fails when a package with a tests/ directory is
+# named by no workflow at all, so the next package cannot drift the same way.
+# tests/boundaries/test_package_ci_coverage.py asserts the same in the local suite.
+#
+# Each package runs from its own directory, because several rely on their own
+# conftest.py to put src/ and their first-party dependencies on sys.path and cannot
+# be collected from the repository root.
+
+on:
+  pull_request:
+    paths:
+      - "packages/**"
+      - "scripts/check_package_ci_coverage.py"
+      - "tests/boundaries/test_package_ci_coverage.py"
+      - ".github/workflows/package-suites-ci.yml"
+  push:
+    branches:
+      - "claude/setup-symbolu-monorepo-**"
+      - "claude/**"
+    paths:
+      - "packages/**"
+      - "scripts/check_package_ci_coverage.py"
+      - "tests/boundaries/test_package_ci_coverage.py"
+      - ".github/workflows/package-suites-ci.yml"
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  coverage-gate:
+    name: Every package suite is named by some workflow
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: No package may ship a suite nothing runs
+        run: python scripts/check_package_ci_coverage.py
+
+  package-suite:
+    name: ${{ matrix.package }}
+    runs-on: ubuntu-latest
+    strategy:
+      # One package's failure must not hide another's: this is the first run these
+      # suites have ever had in CI, so surface all of them.
+      fail-fast: false
+      matrix:
+        package:
+          - packages/capabilities/action-clearance
+          - packages/capabilities/agent-value-readiness
+          - packages/capabilities/llm-steering-controller
+          - packages/capabilities/model-selection
+          - packages/capabilities/readiness-comparison
+          - packages/capabilities/reasoning-method-advisor
+          - packages/capabilities/reasoning-method-governance
+          - packages/capabilities/storygraph
+          - packages/capabilities/workflow-fit-pilot
+          - packages/governance-provider-framework
+          - packages/governed-value
+          - packages/integration/ai-system-registry
+          - packages/integration/approval-workflow
+          - packages/integration/authority-directory
+          - packages/integration/cloud-scaling-action-admission
+          - packages/integration/cloud-scaling-bounded-execution
+          - packages/integration/cloud-scaling-credential-broker
+          - packages/integration/cloud-scaling-envelope-issuance
+          - packages/integration/control-plane-root
+          - packages/integration/execution-reservation
+          - packages/integration/incident-response
+          - packages/uvi-policy-contracts
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install test dependencies
+        # numpy is a real transitive requirement of the four cloud-scaling packages:
+        # each composes ugence-cloud-scaling-controller, whose controller.py imports
+        # it (capabilities/cloud-scaling-controller/.../controller.py:13). It is
+        # installed rather than the suites being excluded — a package whose
+        # dependency is missing is a package whose tests did not run.
+        # pynacl is likewise real and fail-closed: the four cloud-scaling packages
+        # reach trusted-evidence-authority, which refuses to import without it
+        # ("Length validation alone is not a substitute ... closure-audit finding
+        # F-03"). cffi is its native-binding requirement; without it the import
+        # dies in a pyo3 panic rather than a readable error. pydantic is needed by
+        # governance-provider-framework's optional adapter.
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest numpy cffi pydantic pynacl
+      - name: Suite
+        # From the package's own directory: several need their conftest.py to put
+        # src/ and their first-party dependencies on sys.path, and cannot be
+        # collected from the repository root.
+        run: |
+          cd "${{ matrix.package }}"
+          python -m pytest -q
