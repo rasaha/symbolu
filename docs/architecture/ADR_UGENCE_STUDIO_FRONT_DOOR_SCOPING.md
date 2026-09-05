@@ -1,7 +1,7 @@
 # ADR — Governed Agent Studio as the front door: scoping audit
 
 **Status:** scoping audit, 2026-09-05. Documentation only; no code, branch or PR.
-Owner decisions FD-1 to FD-5 in §6 are open. Labels: `[V]` verified, `[I]` inferred,
+Owner decisions FD-1, FD-3, FD-4 and FD-5 in §6 are open; FD-2 was ruled on 2026-09-05. Labels: `[V]` verified, `[I]` inferred,
 `[R]` requires ratification, `[G]` gap.
 
 ## 1 — The question
@@ -57,8 +57,10 @@ must not be built as screens. The import path is already ruled.
 
 ## 5 — Govern an existing agent, under GAS-5
 
-GAS-5 removed the Langflow importer from the sequence and scope; entry needs a
-demonstrated customer need and a new ruling `[V]` (roadmap §11.3). Copilot Studio,
+GAS-5 removed the Langflow importer from the sequence and scope; entry needed a
+demonstrated customer need and a new ruling `[V]` (roadmap §11.3). The owner gave
+that ruling on 2026-09-05 (`ENTER_LANGFLOW_IMPORT_FIRST`); the scoping is in
+`ADR_UGENCE_LANGFLOW_IMPORT_SCOPING.md`. Copilot Studio,
 Vertex AI, ServiceNow, LangGraph and CrewAI appear only in positioning documents `[V]`
 (`docs/COMPETITIVE_LANDSCAPE.md`, `INVESTOR_PITCH.md`); no adapter exists `[G]`. The
 integration-hub amendment already defines the two shapes such an adapter must take
@@ -75,7 +77,7 @@ here is implemented.
 | # | Decision | Options | Recommendation |
 |---|---|---|---|
 | FD-1 | Which seams the deployed studio hands `build_studio_context`, and in what order | `ALL_SEVEN_AT_ONCE` \| `ONE_SEAM_PER_STEP` (activation root; then policy registry and decision store; then hook and provider registry; then console) | `ONE_SEAM_PER_STEP`: each is a P3E amendment with its own freeze test, as CR-2 was |
-| FD-2 | The "govern an existing agent" path | `NOT_BEFORE_NAMED_CUSTOMER` \| `CONTRACT_ONLY_NOW` | `NOT_BEFORE_NAMED_CUSTOMER`, restating GAS-5; the contract in §5 is recorded, not built |
+| FD-2 | The "govern an existing agent" path | **Ruled 2026-09-05: `ENTER_LANGFLOW_FIRST`.** The owner superseded GAS-5 on product judgement (`ENTER_LANGFLOW_IMPORT_FIRST`, roadmap §11.3); Langflow is the first and only import format; other platforms stay customer-gated; scoped in `ADR_UGENCE_LANGFLOW_IMPORT_SCOPING.md` | closed |
 | FD-3 | Lifecycle authority | `COMPOSITION_RECORD_IN_REGISTRY` \| `NEW_PACKAGE` | `COMPOSITION_RECORD_IN_REGISTRY`: a contracts-only lifecycle-state record over `SystemRegistration`, consistent with D-4 and D-5; OD-C4=A stays until a later ruling assigns the transition authority |
 | FD-4 | Use-case intake | `TYPED_INTAKE_ONLY` \| `PROSE_ASSIST` | `TYPED_INTAKE_ONLY` |
 | FD-5 | Which unbuilt screens enter the studio next | any subset of 1, 4, 5, 10 | 1 and 5 as registration forms over existing records; 4 waits on the research-only labels; 10 observe-only over the ledger |
