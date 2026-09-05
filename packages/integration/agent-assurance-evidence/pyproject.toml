@@ -1,0 +1,59 @@
+# Ugence Agent Assurance Evidence — the contracts-only record of what an assurance
+# exercise found (gap-sequencing ADR wave 4, row "Agent security and adversarial
+# assurance", line 63: evidence provider, never a decision authority).
+#
+# Scoped and ratified by docs/architecture/ADR_UGENCE_AGENT_ASSURANCE_EVIDENCE_SCOPING.md
+# (AE-1 this name, AE-2 NEW_RECORD_TYPE over one binding and one existing
+# EvidenceReference, AE-3 UNINTERPRETED_LABEL, AE-4 BOTH consumer routes preserving one
+# evidence identity, AE-5 AssuranceFindingLabel lands in governance-contracts first).
+#
+#   THIS PACKAGE RECORDS WHAT A DECLARER ASSERTED AN EXERCISE FOUND.
+#   IT NEVER RUNS, PROBES, SCORES, ADMITS, EVALUATES, PERSISTS OR DECIDES.
+#
+# Contracts only: record types, refusal reasons, pure selectors and one read-only
+# Protocol. No probe runner, no corpus, no scorer, no admission engine, no clock.
+#
+# Mints no identity and no vocabulary: AssessedSystemBinding, EvidenceReference and
+# AssuranceFindingLabel are re-exported from governance-contracts, never redefined.
+# The EvidenceReference is the finding's sole evidence identity (AE-2).
+#
+# Dependency direction (one-way):
+#     ugence-governance-contracts (leaf)   <- AssessedSystemBinding / EvidenceReference / AssuranceFindingLabel / Validity
+#         ▲
+#     ugence-agent-assurance-evidence (this package)
+#
+# Build:   python -m build packages/integration/agent-assurance-evidence
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ugence-agent-assurance-evidence"
+dynamic = ["version"]
+description = "Ugence Agent Assurance Evidence — the contracts-only record of what a security or robustness exercise found about one exact AI system: a declaration binding one canonical system identity to one existing evidence reference under an uninterpreted finding label. Records what a declarer asserted; never runs, scores, admits or decides."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "Proprietary" }
+authors = [{ name = "Rakesh Mohan" }]
+keywords = ["governance", "assurance", "evidence", "agent-security", "contracts", "ugence"]
+classifiers = ["Typing :: Typed"]
+dependencies = [
+    "ugence-governance-contracts>=0.8.0",
+]
+
+[project.optional-dependencies]
+test = ["pytest>=7.0"]
+
+[tool.setuptools.dynamic]
+version = { attr = "ugence_agent_assurance_evidence.version.__version__" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["ugence_agent_assurance_evidence*"]
+
+[tool.setuptools.package-data]
+ugence_agent_assurance_evidence = ["py.typed"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
