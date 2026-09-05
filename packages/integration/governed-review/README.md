@@ -70,10 +70,40 @@ process that consumes and is SIGKILLed before advancing is followed by exactly o
 run; a revocation after approval still blocks at the last mile with the approval
 consumed. CI runs them on a runner-hosted PostgreSQL 16 and fails if any row skips.
 
+`tests/test_linkage.py` — every refusal of the receipt linkage at unit level; one real
+round trip reconstructed from the real stores against a real PostgreSQL.
+
 `tests/test_boundaries.py` — the import set, no clock, no capability package, no
 network, no credential, no LIVE mode, no surface that could approve, signal, resume or
 execute, and that the only field a consumed approval changes is the Decision
 Authority veto and its label set.
+
+## The receipt linkage (HR-E, contract only)
+
+`ReviewLinkage` is one audit reference joining, for one instance and task, the
+proposal fingerprint, the approval id, the consumption id, the park, the delivered
+decision signal, the resume, and the evaluations sealed before the park and after the
+resume. `reconstruct(ledger, tenant_id=…, instance_id=…, task_id=…, approval_id=…,
+events=…, journal=…)` derives it from the three stores that already exist, by id join:
+
+| Store | What is joined | By |
+|---|---|---|
+| approval ledger (`ugence_approval_workflow`) | the record, its `CONSUMED` event, the consumption id | `subject_ref` = `<instance_id>:<task_id>`, `subject_digest` = fingerprint, `consumption_id` recomputed and compared |
+| durable event log (`ugence_art.runtime_events`) | `GOVERNANCE_DISPOSITION_RECEIVED`, `WORKFLOW_PAUSED`, `EXTERNAL_SIGNAL:review_decision`, `WORKFLOW_RESUMED` | sequence order and the signal's `approval_id` |
+| checkpoint journal (`ugence_art.runtime_state.execution_state_journal`) | the parked and the resumed `CanonicalExecutionState` | the `execution_state_digest` each disposition event names |
+
+Every join that fails is a typed `LinkageError` naming why: a consumption held by
+another instance, a resume recorded before the decision, a park on a HOLD, a resumed
+evaluation that was not CLEAR, a resumed snapshot whose fingerprint differs from the
+approved one. The linkage's `digest()` is deterministic across reconstructions;
+`to_evidence_reference()` and `audit_references()` project it onto governance-contracts'
+G4 `EvidenceReference` and `AuditReference`, which the sequencing record's D-4 ratified
+as the only cross-store correlation.
+
+`LINKAGE_MATURITY = "CONTRACT_ONLY"`. The module opens no connection: the caller reads
+the event log and the journal from the durable engine (the review service's
+`DbosRunReader` does exactly this). It appends nothing anywhere; whether a linkage is
+written into the control-plane audit ledger is owner decision HE-1.
 
 ## Dependencies
 

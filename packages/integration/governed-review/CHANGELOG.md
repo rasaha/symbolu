@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.2.0 — 2026-09-05 — HR-E (contract only)
+
+- `linkage`: `ReviewLinkage`, a frozen, digest-bound join of one parked-approved-resumed
+  round trip across the approval ledger, the durable engine's event log and the
+  checkpoint's execution-state journal; `reconstruct`, which performs that join by the
+  ids HR-3 ratified and refuses, with a typed `LinkageError`, any join the stores do not
+  support; projections onto the G4 contracts (`EvidenceReference` for the linkage,
+  one `AuditReference` per joined entry). `LINKAGE_MATURITY = "CONTRACT_ONLY"`.
+- Reads three stores, writes none. No store gains a column; clearance receipts are
+  untouched; nothing is appended to the control-plane audit ledger (owner decision
+  HE-1 in the human-review ADR).
+- Tests: every refusal at unit level over the real SQLite ledger; one instance parked,
+  decided, signalled, resumed and run, reconstructed from the real stores against a
+  real PostgreSQL, with a deterministic digest across two reconstructions.
+
 ## 0.1.0 — 2026-09-05 — HR-A
 
 First release. `REFERENCE_GRADE_SHADOW_ONLY`; `ENFORCEMENT_ENABLED = False`.

@@ -37,7 +37,7 @@ no sink" `[V]` (`packages/integration/agent-runtime-governance/src/ugence_agent_
 | 8 | **Signal / resume** | `DbosExecutionAdapter.signal` appends `EXTERNAL_SIGNAL:<name>` under the per-instance lock and grants nothing (`engine/dbos_engine.py:278-319`); `resume` delegates to `resume_workflow` (`:321-335`). `resume_workflow` re-arms WAITING tasks and drives; `continue_workflow` re-arms and stops (`engine.py:200-241`). | Both take only an `instance_id`: no approval id, no approver, no evidence. A duplicate signal is recorded twice by design (`postgres/schema.py:48-57`); a signal for an unknown instance is accepted (no FK, no lookup). ~~`resume()` drains to a stable state inside one durable step~~ — closed by HR-B: the adapter now delegates to `continue_workflow`, one bounded quantum per durable step. |
 | 9 | **Re-evaluation** | The next quantum rebuilds the proposal and calls the hook again; no cached evaluation exists; the pre-park clearance is never reused (`engine.py:489-500, 511, 590`; `validate_clearance` at `decisions.py:132-154`). | The re-evaluation asks `GovernanceInputSource.inputs_for`, and **no production implementation of that protocol exists** — the three that exist are test fixtures (`agent-runtime-governance/tests/_fakes.py:125,136`; `durable-execution/tests/_production.py:86`), none reading an approval store. Nothing turns a GRANTED approval into a changed Decision Authority result or an emptied `required_approvals`. |
 | 10 | **Last mile** | RA-6 recheck re-verifies signature, window, tenant, session, epoch and targeted revocation; revocation or epoch advance while suspended blocks the resume (`risk-authority-status-runtime/.../enforcement.py:157-207`; `tests/test_ra6_last_mile_resume.py:148-192`). A CLEAR whose hook record is gone fails closed (`recheck.py:149-157`). | The recheck knows nothing of approvals: `PreEffectContext` has five fields and none is an approval (`enforcement.py:140-154`). Correct: an approval must enter at stage 9, before composition, never at the last mile. |
-| 11 | **Receipts** | Clearance receipts are owned by `execution-reservation` and carry no approver or approval field (`receipts.py:78-96`); the approval ledger's own hash-linked `ledger_events` chain is the approval's evidence (`sqlite.py:73-82,166-183`); the runtime emits `WORKFLOW_RESUMED`, `TASK_WAITING`, `WORKFLOW_PAUSED` events (`models/events.py:25-28`). | No single artifact links proposal fingerprint, approval id, consumption id, resume event and resumed evaluation. The chain is reconstructible only by joining three stores on ids, as the wave-2 walkthrough does by hand (`test_wave_2_walkthrough.py:243-250`). |
+| 11 | **Receipts** | Clearance receipts are owned by `execution-reservation` and carry no approver or approval field (`receipts.py:78-96`); the approval ledger's own hash-linked `ledger_events` chain is the approval's evidence (`sqlite.py:73-82,166-183`); the runtime emits `WORKFLOW_RESUMED`, `TASK_WAITING`, `WORKFLOW_PAUSED` events (`models/events.py:25-28`). | ~~No single artifact links proposal fingerprint, approval id, consumption id, resume event and resumed evaluation~~ — since HR-E, `ugence_governed_review.linkage.ReviewLinkage` is that artifact, reconstructed by id join and projected onto G4's `EvidenceReference`/`AuditReference`; it is contract-only and stored nowhere until HE-1 is ruled. |
 
 **Net finding.** Every stage is individually correct and fail-closed. The missing
 pieces are three: a **composition** that binds an approval to a proposal fingerprint
@@ -118,6 +118,35 @@ row. A row is green only against a real PostgreSQL and a real SQLite ledger.
 | **HR-4** | **`BARE_RUNTIME_BOUNDED_ADAPTER`.** `resume_workflow` keeps its signature and is never exposed to a human; the DBOS adapter moves to `continue_workflow`, one bounded quantum per durable step; consumption is the only trigger. The adapter change re-runs the full §8 matrix of the DBOS ADR; GAS-R5 is untouched. |
 | **HR-5** | **`ESCALATE_ONLY`.** Only ESCALATE (`required_approvals` non-empty) enters the review queue. A HOLD is released solely by an upstream authority change. `MANUAL_REVIEW` is the label of the ESCALATE queue, not a new disposition. |
 
+## 5a — HR-E audit and owner decisions (2026-09-05) `[R]`
+
+**Where the linkage can live.** The sequencing record's D-4 ruled the unified audit
+ledger an *extension*: G4's neutral `AuditReference`/`EvidenceReference` in
+governance-contracts, plus a ledger service under the control plane. Both halves now
+exist `[V]`: governance-contracts 0.5.0 ships both references
+(`contracts/audit.py:138`, `contracts/evidence.py:291`), and `ugence-control-plane-root`
+0.1.0 (#1617, merged 2026-09-05) is the ledger service, taking `LedgerEntry` appends
+with an injected `AuditReference` factory and unifying nothing. So the linkage is a
+*projection onto* G4, not a fourth reference type, and its durable home, if any, is an
+append into that ledger by a composition root. The three stores it joins are the
+approval ledger, the durable engine's event log and the checkpoint's execution-state
+journal; the test-only `governance_evaluations` table is not a store, and the journal
+is the runtime-owned evaluation record, joined through the `execution_state_digest`
+every `GOVERNANCE_DISPOSITION_RECEIVED` event carries `[V]`.
+
+**What HR-E ships.** `ReviewLinkage` and `reconstruct` in `governed-review` 0.2.0,
+`LINKAGE_MATURITY = "CONTRACT_ONLY"`: a frozen shape, a deterministic digest, a
+fail-closed join, and the two G4 projections. No store gains a column; clearance
+receipts are untouched; nothing is appended anywhere.
+
+| # | Decision | Recommendation |
+|---|---|---|
+| **HE-1** | Should a composition root append each linkage into the control-plane audit ledger as a `LedgerEntry` (kind `governed_review.linkage.v1`, payload `ReviewLinkage.to_dict()`)? | **Yes, by the review service's composition root, not by `governed-review`**, which stays contract-only and gains no dependency on the ledger. |
+| **HE-2** | Should clearance receipts (`execution-reservation`) gain an approval or linkage field? | **No.** The linkage's `EvidenceReference` is the join; a receipt field would be a second copy of the approval outside the ledger that owns it. |
+| **HE-3** | Is the checkpoint's execution-state journal the authoritative evaluation record for the linkage, or should a dedicated evaluation store exist? | **The journal.** It is runtime-owned, sealed per quantum and named by the events; a second store would be a second unverified account. |
+| **HE-4** | Are the `store_ref` spellings (`approval-workflow/ledger_events`, `durable-execution/runtime_events`, `durable-execution/runtime_state.execution_state_journal`) the ratified vocabulary for these three stores? | **Ratify as spelled.** G4 leaves the spelling to the store's owner; these name the table each entry sits in. |
+| **HE-5** | Should the review service's run-detail route return the reconstructed linkage (service 0.2.0)? | **Yes, in a later step**, read-only, once HE-1 to HE-4 are ruled; the studio would render it as history like everything else. |
+
 ## 6 — Implementation sequence and maturity ceiling
 
 Entry conditions are met; each step below is still entered only by its own
@@ -160,7 +189,12 @@ implementation prompt, ships behind its own tests and is labelled honestly at ex
    implemented** for the screens.
 5. **HR-E · Receipt linkage** — one audit reference joining proposal fingerprint,
    approval id, consumption id and resumed evaluation, into an existing store per the
-   sequencing record's D-4. Label: **Contract-only** until the unified ledger exists.
+   sequencing record's D-4. **Implemented, contract only** (`governed-review` 0.2.0
+   `linkage`): `ReviewLinkage` and `reconstruct` join the three stores by id, refuse any
+   join they do not support, digest deterministically, and project onto G4's
+   `EvidenceReference` and `AuditReference`; proven at unit level and by one real round
+   trip reconstructed from the real stores against a real PostgreSQL. Its durable home
+   awaits HE-1 (§5a). Label: **Contract-only**.
 
 **Ceiling.** Nothing in this sequence can exceed **reference-grade, shadow-only**:
 the approval ledger and directory are `REFERENCE_GRADE_SHADOW_ONLY`, the runtime
@@ -170,6 +204,8 @@ production certification are not reachable from this work and are not claimed.
 
 ## 7 — Next step
 
-HR-A to HR-D are implemented. HR-E, one audit reference joining proposal fingerprint,
-approval id, consumption id and resumed evaluation, is the last step and is
-contract-only until the unified ledger exists. Nothing is implemented by this record.
+HR-A to HR-E are implemented, HR-E as a contract. The sequence is complete at its
+stated ceiling. What remains is owner-side: the five HE rulings in §5a, of which HE-1
+decides whether a linkage is ever written durably, and the identity provider and
+private OCI mirror that no step of this sequence builds. Nothing is implemented by
+this record.
