@@ -1,0 +1,173 @@
+{
+  "curated_api_module": "ugence_ai_system_registry",
+  "distribution": "ugence-ai-system-registry",
+  "namespace": "ugence_ai_system_registry",
+  "note": "Machine-readable snapshot of the curated public API (ugence_ai_system_registry.__all__). tests/packaging/test_packaging.py asserts this file equals the live package surface. Regenerate with scripts/generate_public_api.py when the curated API changes deliberately.",
+  "package_version": "0.1.0",
+  "symbols": {
+    "AiSystemRegistryError": {
+      "kind": "class",
+      "methods": [
+        "add_note",
+        "with_traceback"
+      ]
+    },
+    "AssessedSystemBinding": {
+      "fields": [
+        "binding_id",
+        "tenant_id",
+        "subject_id",
+        "context_id",
+        "context_digest",
+        "system_id",
+        "system_version",
+        "configuration_id",
+        "configuration_digest",
+        "canonical_subject_context_ref",
+        "system_manifest_ref",
+        "system_manifest_digest",
+        "deployment_environment_ref",
+        "effective_from",
+        "effective_to"
+      ],
+      "kind": "dataclass"
+    },
+    "CONTRACT_VERSION": {
+      "kind": "constant",
+      "value": "ai_system_registry.v1"
+    },
+    "ContractViolation": {
+      "kind": "class",
+      "methods": [
+        "add_note",
+        "with_traceback"
+      ]
+    },
+    "ENFORCEMENT_ENABLED": {
+      "kind": "constant",
+      "value": false
+    },
+    "MATURITY": {
+      "kind": "constant",
+      "value": "CONTRACTS_ONLY"
+    },
+    "REGISTRATION_ID_PREFIX": {
+      "kind": "constant",
+      "value": "reg_"
+    },
+    "RegistrationSupersessionError": {
+      "kind": "class",
+      "methods": [
+        "add_note",
+        "with_traceback"
+      ]
+    },
+    "SystemBindingAuthenticityStatus": {
+      "kind": "enum",
+      "values": [
+        "STRUCTURAL_UNVERIFIED"
+      ]
+    },
+    "SystemRegistration": {
+      "fields": [
+        "registration_id",
+        "binding",
+        "owner_ref",
+        "classification_label",
+        "validity",
+        "supersedes",
+        "registered_by",
+        "notes"
+      ],
+      "kind": "dataclass"
+    },
+    "SystemRegistryPort": {
+      "kind": "class",
+      "methods": [
+        "get_registration",
+        "registrations_by_classification",
+        "registrations_for_system",
+        "registrations_for_tenant"
+      ]
+    },
+    "__version__": {
+      "kind": "constant",
+      "value": "0.1.0"
+    },
+    "registered_at": {
+      "kind": "function",
+      "parameters": [
+        "registrations",
+        "as_of"
+      ]
+    },
+    "registration_id_for": {
+      "kind": "function",
+      "parameters": [
+        "binding",
+        "owner_ref",
+        "validity"
+      ]
+    },
+    "require_admissible_supersession": {
+      "kind": "function",
+      "parameters": [
+        "registration",
+        "predecessor"
+      ]
+    },
+    "select_by_classification": {
+      "kind": "function",
+      "parameters": [
+        "registrations",
+        "tenant_id",
+        "classification_label",
+        "as_of"
+      ]
+    },
+    "select_for_system": {
+      "kind": "function",
+      "parameters": [
+        "registrations",
+        "tenant_id",
+        "system_id",
+        "system_version",
+        "as_of"
+      ]
+    },
+    "select_for_tenant": {
+      "kind": "function",
+      "parameters": [
+        "registrations",
+        "tenant_id",
+        "as_of"
+      ]
+    },
+    "supersession_chain": {
+      "kind": "function",
+      "parameters": [
+        "registrations",
+        "registration_id"
+      ]
+    },
+    "supersession_refusals": {
+      "kind": "function",
+      "parameters": [
+        "registration",
+        "predecessor"
+      ]
+    },
+    "validity_from_dict": {
+      "kind": "function",
+      "parameters": [
+        "d"
+      ]
+    },
+    "validity_to_dict": {
+      "kind": "function",
+      "parameters": [
+        "validity"
+      ]
+    }
+  }
+}
