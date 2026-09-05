@@ -25,10 +25,14 @@ from conftest import requires_postgres
 from ugence_agent_runtime_governance import GovernedExecutionHook
 from ugence_approval_workflow import ApprovalState, ReviewDecision
 
+from ugence_control_plane_root import STORE_REF, AuditLedger
 from ugence_governed_review_service import (
     SIGNAL_NAME,
     DbosRunReader,
     DecisionResult,
+    LedgerLinkageIndex,
+    LinkageAppender,
+    LinkageState,
     ReviewService,
 )
 
@@ -101,10 +105,15 @@ def review(pg_databases, tmp_path):
     hook = RecordingHook(app, src)
     ds, dbos, adapter, bundle = wire(app_url=app, sys_url=sysdb, provider=RecordingProvider(app),
                                      hook=hook, clock=clock.epoch)
-    svc = ReviewService(ledger=ledger, adapter=adapter,
-                        reader=DbosRunReader(datasource=ds, bundle=bundle),
-                        tenant_id=F.TENANT, clock=clock.datetime)
-    state.update(adapter=adapter, source=src, service=svc, ds=ds, bundle=bundle)
+    reader = DbosRunReader(datasource=ds, bundle=bundle)
+    audit_path = os.path.join(str(tmp_path), "audit.sqlite3")
+    audit = AuditLedger(audit_path)
+    appender = LinkageAppender(ledger=audit, index=LedgerLinkageIndex(audit_path, store_ref=STORE_REF),
+                               reader=reader, approvals=ledger, tenant_id=F.TENANT,
+                               recorded_by="governed-review-service")
+    svc = ReviewService(ledger=ledger, adapter=adapter, reader=reader,
+                        tenant_id=F.TENANT, clock=clock.datetime, linkage_appender=appender)
+    state.update(adapter=adapter, source=src, service=svc, ds=ds, bundle=bundle, audit=audit)
     try:
         yield state
     finally:
@@ -152,6 +161,15 @@ def test_a_recorded_grant_re_arms_and_the_next_quantum_consumes_and_runs_once(re
     events = review["service"].read_run_events("ok")
     assert [e["event_type"] for e in events if e["event_type"].startswith("EXTERNAL")] == \
         [f"EXTERNAL_SIGNAL:{SIGNAL_NAME}"]
+    # HE-1 / HE-5: at decision time the linkage was NOT_YET; after the consuming quantum the
+    # run-detail read appends it once and exposes the reference.
+    assert out.linkage is not None and out.linkage.state is LinkageState.NOT_YET
+    assert review["audit"].entry_count() == 0
+    (link,) = review["service"].read_run("ok")["linkages"]
+    assert link["state"] == "APPENDED" and link["audit_reference"]["store_ref"] == STORE_REF
+    assert link["linkage"]["proposal_fingerprint"] == review["ledger"].get_approval(aid).subject_digest
+    assert review["service"].read_run("ok")["linkages"][0]["state"] == "ALREADY_APPENDED"
+    assert review["audit"].entry_count() == 1 and review["audit"].verify_chain(tenant_id=F.TENANT)
 
 
 @requires_postgres
@@ -247,6 +265,14 @@ def test_row_08_a_crash_after_decision_persistence_is_replayed_and_resumes_exact
     assert _hooks.provider_calls(review["app"]) == ["r8:t1"], "exactly one run"
     events = [e.event_type for e in review["ledger"].approval_events(aid)]
     assert events.count(ApprovalState.GRANTED) == 1 and events.count(ApprovalState.CONSUMED) == 1
+    # With the ledger in the loop: the retry that followed the crash appended nothing (NOT_YET),
+    # a replay after the consuming quantum appends the linkage exactly once.
+    assert out.linkage.state is LinkageState.NOT_YET and review["audit"].entry_count() == 0
+    later = review["service"].submit_decision(approval_id=aid, decision=ReviewDecision.GRANT,
+                                              presented_approver=F.APPROVER, justification="retry-2")
+    assert later.result is DecisionResult.REPLAYED and later.linkage.state is LinkageState.APPENDED
+    assert later.linkage.linkage.consumption_id and later.linkage.linkage.signal_event_seq is not None
+    assert review["audit"].entry_count() == 1 and review["audit"].verify_chain(tenant_id=F.TENANT)
 
 
 # --------------------------------------------------------------------------- #
@@ -275,6 +301,17 @@ def test_row_09_two_submissions_for_one_decision_record_two_signals_and_resume_o
                                               presented_approver=F.APPROVER)
     assert third.result is DecisionResult.REPLAYED and not third.resume_delivered
     assert _hooks.provider_calls(review["app"]) == ["r9:t1"]
+    # With the ledger in the loop: two signals, one resume, one linkage. The first two
+    # submissions were NOT_YET; the third appends; a fourth finds the same entry.
+    assert first.linkage.state is LinkageState.NOT_YET and second.linkage.state is LinkageState.NOT_YET
+    assert third.linkage.state is LinkageState.APPENDED
+    assert third.linkage.linkage.signal_event_seq is not None, "the first decision signal is the one linked"
+    fourth = review["service"].submit_decision(approval_id=aid, decision=ReviewDecision.GRANT,
+                                               presented_approver=F.APPROVER)
+    assert fourth.linkage.state is LinkageState.ALREADY_APPENDED
+    assert fourth.linkage.audit_reference == third.linkage.audit_reference
+    assert review["audit"].entry_count() == 1, "duplicates are recorded as signals, never as linkages"
+    assert _signal_rows(review["app"], "r9") == 4, "every replay re-delivers the signal; none re-links"
 
 
 @requires_postgres

@@ -46,6 +46,7 @@ from ugence_approval_workflow import (
 from ugence_governed_review import SUBJECT_KIND
 
 from .errors import ClockDisciplineError, ContractViolation
+from .linkage import LinkageAppender, LinkageOutcome, LinkageState, linkage_view
 from .reader import RunReader
 from .version import IDENTITY_PROOF
 
@@ -99,6 +100,9 @@ class DecisionOutcome:
     resume_skipped_reason: str = ""
     reason: str = ""
     identity_proof: str = IDENTITY_PROOF
+    #: HE-1: what linking did after a GRANT, or why it could not yet. Never withholds
+    #: the decision above it.
+    linkage: Optional[LinkageOutcome] = None
 
     @property
     def recorded(self) -> bool:
@@ -159,6 +163,7 @@ class ReviewService:
         clock: Callable[[], datetime],
         eligibility: Optional[ApproverEligibilityPort] = None,
         fault_injector: Optional[Callable[[str], None]] = None,
+        linkage_appender: Optional[LinkageAppender] = None,
     ) -> None:
         if not isinstance(ledger, ApprovalWorkflowPort):
             raise ContractViolation("ledger must satisfy ApprovalWorkflowPort")
@@ -182,6 +187,8 @@ class ReviewService:
         # A seam for the crash rows only: called with a named point, it may kill the
         # process. It can never change what is recorded, only where the record stops.
         self._fault = fault_injector or (lambda _point: None)
+        # HE-1: absent, every linkage outcome is LEDGER_UNCONFIGURED and nothing is written.
+        self._linker = linkage_appender
 
     # -- reads ---------------------------------------------------------------------
     def list_queue(self, *, required_role: str = "") -> tuple[QueueEntry, ...]:
@@ -241,8 +248,36 @@ class ReviewService:
             "instance": dict(ckpt),
             "engine": dict(self._adapter.status(instance_id=instance_id)),
             "open_approvals": approvals,
+            "linkages": [linkage_view(o) for o in self._link_instance(instance_id, as_of)],
             "identity_proof": IDENTITY_PROOF,
         }
+
+    def _link_instance(self, instance_id: str, as_of: datetime) -> list:
+        """HE-5: every decided approval this instance's log names, linked if it can be.
+
+        The approvals are found from the ``EXTERNAL_SIGNAL:review_decision`` rows the
+        service itself delivered, so a decision recorded elsewhere is not guessed at.
+        """
+
+        seen: list = []
+        for e in self._reader.events(instance_id):
+            body = e.get("body") if isinstance(e.get("body"), Mapping) else {}
+            if str(e.get("event_type") or "") != f"EXTERNAL_SIGNAL:{SIGNAL_NAME}":
+                continue
+            payload = body.get("payload") if isinstance(body.get("payload"), Mapping) else {}
+            approval_id = str(payload.get("approval_id") or "")
+            task_id = str(payload.get("task_id") or "")
+            if approval_id and task_id and (approval_id, task_id) not in seen:
+                seen.append((approval_id, task_id))
+        return [self._link(instance_id, task_id, approval_id, as_of) for approval_id, task_id in seen]
+
+    def _link(self, instance_id: str, task_id: str, approval_id: str,
+              as_of: datetime) -> LinkageOutcome:
+        if self._linker is None:
+            return LinkageOutcome(LinkageState.LEDGER_UNCONFIGURED, approval_id, instance_id,
+                                  task_id, reason="no control-plane audit ledger is configured")
+        return self._linker.link(instance_id=instance_id, task_id=task_id,
+                                 approval_id=approval_id, recorded_at=as_of)
 
     def read_run_events(self, instance_id: str) -> Optional[Sequence[Mapping[str, Any]]]:
         if self._reader.checkpoint(instance_id) is None:
@@ -358,9 +393,14 @@ class ReviewService:
             else:
                 self._adapter.resume(instance_id=instance_id)
                 resumed = True
+        linkage = None
+        if decision is ReviewDecision.GRANT:
+            # HE-1: link when the round trip is complete; a NOT_YET is the honest answer
+            # until the instance's next quantum has consumed the approval.
+            linkage = self._link(instance_id, task_id, record.approval_id, self._now())
         return DecisionOutcome(result, record.approval_id, record, instance_id, task_id,
                                signal_delivered=True, resume_delivered=resumed,
-                               resume_skipped_reason=skipped)
+                               resume_skipped_reason=skipped, linkage=linkage)
 
     def _eligible(self, record: ApprovalRecord, as_of: datetime) -> tuple[ApproverRef, ...]:
         if self._eligibility is None:

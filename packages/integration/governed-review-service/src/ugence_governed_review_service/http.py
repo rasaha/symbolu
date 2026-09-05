@@ -18,6 +18,7 @@ from typing import Any, Mapping
 
 from ugence_approval_workflow import ApproverKind, ApproverRef, ReviewDecision
 
+from .linkage import linkage_view
 from .service import DecisionOutcome, QueueEntry, ReviewService
 from .version import CONTRACT_VERSION, IDENTITY_PROOF, MATURITY, __version__
 
@@ -70,6 +71,7 @@ def decision_view(outcome: DecisionOutcome) -> dict:
         "resume_skipped_reason": outcome.resume_skipped_reason,
         "reason": outcome.reason,
         "identity_proof": outcome.identity_proof,
+        "linkage": linkage_view(outcome.linkage),
     }
 
 

@@ -21,6 +21,7 @@ GR_TESTS = REPO / "packages" / "integration" / "governed-review" / "tests"
 for path in (
     PKG / "src",
     REPO / "packages" / "integration" / "governed-review" / "src",
+    REPO / "packages" / "integration" / "control-plane-root" / "src",
     REPO / "packages" / "integration" / "approval-workflow" / "src",
     REPO / "packages" / "integration" / "authority-directory" / "src",
     REPO / "packages" / "governance-contracts" / "src",

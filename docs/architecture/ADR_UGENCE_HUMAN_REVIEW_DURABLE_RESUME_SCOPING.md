@@ -194,7 +194,7 @@ implementation prompt, ships behind its own tests and is labelled honestly at ex
    join they do not support, digest deterministically, and project onto G4's
    `EvidenceReference` and `AuditReference`; proven at unit level and by one real round
    trip reconstructed from the real stores against a real PostgreSQL. Its durable home
-   is ruled by HE-1 (§5a) and built by the next step. Label: **Contract-only**.
+   is ruled by HE-1 (§5a) and built by `governed-review-service` 0.2.0. Label: **Contract-only** for the contract; the append is **Core implemented, shadow-only**.
 
 **Ceiling.** Nothing in this sequence can exceed **reference-grade, shadow-only**:
 the approval ledger and directory are `REFERENCE_GRADE_SHADOW_ONLY`, the runtime
@@ -205,9 +205,12 @@ production certification are not reachable from this work and are not claimed.
 ## 7 — Next step
 
 HR-A to HR-E are implemented, HR-E as a contract. The sequence is complete at its
-stated ceiling. HE-1 to HE-5 are ruled (§5a). The next implementation step is the one HE-1 and HE-5
-authorize: `governed-review-service` 0.2.0 appends each recorded GRANT's linkage to
-the control-plane audit ledger from its composition root, returns the
-`AuditReference` on the decision outcome, and returns the reconstructed linkage on
-run detail. The identity provider and the private OCI mirror remain owner-side and
-outside this sequence. Nothing is implemented by this record.
+stated ceiling. HE-1 to HE-5 are ruled (§5a) and HE-1 and HE-5 are implemented:
+`governed-review-service` 0.2.0 reconstructs each completed round trip's linkage
+and appends it to the control-plane audit ledger once, idempotently per linkage
+digest, returning the `AuditReference` on the decision outcome and the linkage on
+run detail; a round trip not yet complete is the typed, non-blocking `NOT_YET`.
+Rows 8 and 9 hold with the ledger in the loop. The studio does not yet render the
+linkage; that is a small HR-D follow-up. The identity provider and the private OCI
+mirror remain owner-side and outside this sequence. Nothing is implemented by this
+record.

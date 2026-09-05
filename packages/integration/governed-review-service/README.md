@@ -54,6 +54,31 @@ presented approver, same outcome — is answered `REPLAYED` with the standing re
 re-delivers the signal and, if the instance is still parked, the resume. Any other
 second decision is `REFUSED_ALREADY_DECIDED`; the first stands.
 
+## The receipt linkage (HE-1, HE-5)
+
+After a GRANT is recorded or replayed, and on every run-detail read, the service asks
+`LinkageAppender` to reconstruct the `ReviewLinkage` (governed-review's HR-E contract)
+from the approval ledger, the durable event log and the checkpoint journal, and to
+append it to the control-plane audit ledger as a `LedgerEntry` of kind
+`governed_review.linkage.v1`. The ledger answers with G4's `AuditReference`, which the
+service returns on the decision outcome and on run detail.
+
+Three things hold, and the tests hold them:
+
+- **Non-blocking.** Until the instance's next quantum has consumed the approval, the
+  reconstruction refuses and the outcome is `NOT_YET` with the reason. The decision is
+  never withheld or altered by it.
+- **Once.** The append is idempotent per linkage digest. `LedgerLinkageIndex` reads the
+  ledger's own rows, read-only, refusing any schema version other than the one the
+  installed `ugence_control_plane_root` declares, so a replayed decision or a repeated
+  read finds the existing entry (`ALREADY_APPENDED`) and writes nothing.
+- **Named.** `recorded_by` is the service; `recorded_at` is the injected clock's instant;
+  the entry's `correlation_id` is the instance's.
+
+Without a ledger configured every linkage outcome is `LEDGER_UNCONFIGURED` and nothing
+is written. `governed-review` itself gains no dependency on the ledger; its boundary
+test forbids the import.
+
 ## HTTP
 
 `build_app(service)` returns a FastAPI application (the `http` extra, imported inside
@@ -71,7 +96,8 @@ No path or operation id carries an SD-2 verb. The decision body is
 `{approval_id, decision: "GRANT"|"REJECT", presented_approver: {approver_id,
 approver_kind, role, authority_reference}, justification}`; the answer is the typed
 outcome, 200 when recorded or replayed, 409 with the reason and the standing record when
-refused, 422 when malformed. A deployment that fronts this app with an identity provider
+refused, 422 when malformed. Since 0.2.0 the answer carries `linkage` and run detail
+carries `linkages` (HE-5); the routes are unchanged. A deployment that fronts this app with an identity provider
 replaces the body's approver with the session principal in its own composition root.
 
 ## Evidence
@@ -90,6 +116,12 @@ CI runs them on a runner-hosted PostgreSQL 16 and fails if any row skips.
 `tests/test_http.py` — the OpenAPI surface is exactly the five routes; relay, refusal
 and malformed bodies.
 
+`tests/test_linkage_append.py` — the appender over a real control-plane ledger: NOT_YET
+before consumption, one append after it, ALREADY_APPENDED on replay and on repeated
+reads, the read-only index refusing an in-memory ledger or a foreign schema, and the
+ledger entry being exactly the linkage payload plus its digest. Rows 8 and 9 in
+`tests/test_matrix_rows.py` run with the ledger in the loop.
+
 `tests/test_boundaries.py` — the import set, no clock, no capability package, no
 identity provider, credential, network or LIVE token, no prohibited verb in any route,
 no surface that could approve, authenticate, clear or execute, and that every adapter
@@ -98,7 +130,8 @@ call names the instance the approval binds to and nothing else.
 ## Dependencies
 
 `ugence-governed-review`, `ugence-approval-workflow`, `ugence-authority-directory`,
-`ugence-durable-execution`, `ugence-governance-contracts`, SQLAlchemy. `fastapi` and
+`ugence-durable-execution`, `ugence-governance-contracts`, `ugence-control-plane-root`,
+SQLAlchemy. `fastapi` and
 `starlette` are the `http` extra. `ugence-agent-runtime` and
 `ugence-agent-runtime-governance` are test dependencies only. Nothing under
 `packages/capabilities`.

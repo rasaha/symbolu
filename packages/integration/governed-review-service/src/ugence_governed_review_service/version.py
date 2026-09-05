@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 
-#: The wire contract this release presents: the five routes of the screen/API audit.
-CONTRACT_VERSION = "governed_review_service.v1"
+#: The wire contract this release presents: the five routes of the screen/API audit,
+#: v2 since 0.2.0 widened the decision and run-detail answers with the linkage (HE-1,
+#: HE-5). No sixth route.
+CONTRACT_VERSION = "governed_review_service.v2"
 
 #: Honest label. The service records decisions whose approver is a PRESENTED reference:
 #: no identity provider integration exists, so nothing here proves who decided. Every

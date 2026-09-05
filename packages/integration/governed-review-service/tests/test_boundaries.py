@@ -24,7 +24,7 @@ STDLIB = set(sys.stdlib_module_names)
 ALLOWED = {
     "ugence_governed_review_service", "ugence_governed_review", "ugence_approval_workflow",
     "ugence_authority_directory", "ugence_durable_execution", "ugence_governance_contracts",
-    "sqlalchemy",
+    "ugence_control_plane_root", "sqlalchemy",
 }
 #: Presentation-only, imported inside build_app, never at module scope.
 PRESENTATION = {"fastapi", "starlette"}
@@ -89,13 +89,13 @@ def test_pyproject_declares_the_ratified_dependency_set():
     deps = {re.split(r"[><=]", d)[0] for d in data["project"]["dependencies"]}
     assert deps == {"ugence-governed-review", "ugence-approval-workflow",
                     "ugence-authority-directory", "ugence-durable-execution",
-                    "ugence-governance-contracts", "SQLAlchemy"}
+                    "ugence-governance-contracts", "ugence-control-plane-root", "SQLAlchemy"}
     joined = " ".join(data["project"]["dependencies"]).lower()
     for forbidden in ("agent-runtime", "dbos", "pydantic", "decision-authority", "psycopg",
                       "boto3", "kubernetes", "redis", "jwt", "authlib", "ldap"):
         assert forbidden not in joined, forbidden
     assert set(data["project"]["optional-dependencies"]["http"]) == {"fastapi>=0.110", "starlette>=0.36"}
-    assert pkg.__version__ == "0.1.0"
+    assert pkg.__version__ == "0.2.0"
 
 
 def test_no_clock_is_read_anywhere():
@@ -164,3 +164,22 @@ def test_the_service_resumes_only_the_instance_named_by_the_approval():
 def test_no_new_disposition_mode_or_bare_runtime_call_is_minted(token):
     joined = "\n".join(s.read_text() for s in SOURCES)
     assert token not in joined
+
+
+def test_the_service_never_appends_more_than_the_linkage_and_never_reads_the_ledger_for_meaning():
+    """HE-1: one kind, one payload shape; the index reads rows by digest and nothing else."""
+
+    tree = ast.parse((PKG_DIR / "linkage.py").read_text())
+    appends = [n for n in ast.walk(tree) if isinstance(n, ast.Call)
+               and isinstance(n.func, ast.Attribute) and n.func.attr == "append"]
+    assert len(appends) == 1, "exactly one ledger append in the service"
+    joined = (PKG_DIR / "linkage.py").read_text()
+    assert joined.count("LedgerEntry(") == 1 and 'kind=LINKAGE_KIND' in joined
+    assert "mode=ro" in joined, "the index opens the ledger read-only"
+    for token in ("UPDATE ", "DELETE ", "INSERT "):
+        assert token not in joined.upper().replace("UPDATE OR DELETE", ""), token
+    # The whole package still makes exactly one signal and one resume call.
+    svc = ast.parse((PKG_DIR / "service.py").read_text())
+    calls = [n.func.attr for n in ast.walk(svc) if isinstance(n, ast.Call)
+             and isinstance(n.func, ast.Attribute) and ast.unparse(n.func.value) == "self._adapter"]
+    assert sorted(calls) == ["resume", "signal", "status"]
