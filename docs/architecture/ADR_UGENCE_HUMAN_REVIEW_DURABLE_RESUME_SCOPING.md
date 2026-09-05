@@ -33,7 +33,7 @@ no sink" `[V]` (`packages/integration/agent-runtime-governance/src/ugence_agent_
 | 4 | **Durability** | The parked checkpoint and its execution-state journal persist in `ugence_art.runtime_state` on the DBOS application database in one transaction with the step record (OD-1). Recovery restores WAITING as WAITING and RUNNING as PAUSED (`persistence/recovery.py:146-169`). Matrix row 9 proves a parked instance never progresses across six re-drives and invokes nothing (`durable-execution/tests/test_matrix.py:719-767`). | Row 9 never calls `resume`; its "post-resume" fingerprint assertion (`:769-773`) compares the single pre-signal evaluation to itself. The park → decision → resume → re-evaluation round trip is proven only for crash recovery (`_dbos_harness.py:241-253`, row 1), not for a human decision. |
 | 5 | **Approval ledger** | `ugence_approval_workflow` 0.1.0: eleven states, forward-only, `EXPIRED` derived at read time, exactly-once `GRANTED → CONSUMED` under a canonical consumption key, duplicate decision refused with `IllegalTransitionError`, `list_open` queue read, decision record with `decided_by/decided_role/decided_authority_reference/decided_at/justification` (`states.py:38-97`; `consumption.py:39-95`; `workflow.py:85-95`; `ports.py:61-62`; `records.py:52-83`). SQLite Posture B store, 12-way concurrency proven (`tests/test_concurrency.py`). Maturity `REFERENCE_GRADE_SHADOW_ONLY` (`version.py:9-17`). | Imported by nothing on this path; boundary tests in three packages assert it is *not* imported. `ApprovalSubject` has no action, run or instance field — binding to a proposal is by `subject_digest` only (`subject.py:29-52`). No per-approver queue, no assignment, no pagination. Signs nothing. |
 | 6 | **Eligibility** | `ugence_authority_directory` 0.1.0 answers `ApproverEligibilityPort` without importing it: time-bounded role grants, one-hop delegation, committees reported without vote counting, wrong approver refused with a typed reason (`eligibility_adapter.py:125-154`; walkthrough `test_wave_2_walkthrough.py:258-282`). | Never authenticates; `decided_by` is whatever the caller presents. Identity proof stays with the IdP behind Decision Authority. No IdP, SCIM or LDAP adapter. |
-| 7 | **Human decision** | The record shape exists (stage 5). Decision Authority's `complete_review` seam is proven at the composition root (`test_decision_authority_seam.py:110-123`). | ~~No service, route, screen or client anywhere lists the queue, presents a parked proposal, or records a decision~~ — the service exists since HR-C (`governed-review-service`); no screen or client does yet (HR-D). Studio v2 has twelve routes and none of them (`api/v2/*.py`); the console client reaches four routes (`clients/console.py:34-39`); the console API has no approval, review or resume concept (`ugence_console_api/app.py`). |
+| 7 | **Human decision** | The record shape exists (stage 5). Decision Authority's `complete_review` seam is proven at the composition root (`test_decision_authority_seam.py:110-123`). | ~~No service, route, screen or client anywhere lists the queue, presents a parked proposal, or records a decision~~ — the service exists since HR-C (`governed-review-service`) and the studio screens and client since HR-D. Studio v2 has twelve routes and none of them (`api/v2/*.py`); the console client reaches four routes (`clients/console.py:34-39`); the console API has no approval, review or resume concept (`ugence_console_api/app.py`). |
 | 8 | **Signal / resume** | `DbosExecutionAdapter.signal` appends `EXTERNAL_SIGNAL:<name>` under the per-instance lock and grants nothing (`engine/dbos_engine.py:278-319`); `resume` delegates to `resume_workflow` (`:321-335`). `resume_workflow` re-arms WAITING tasks and drives; `continue_workflow` re-arms and stops (`engine.py:200-241`). | Both take only an `instance_id`: no approval id, no approver, no evidence. A duplicate signal is recorded twice by design (`postgres/schema.py:48-57`); a signal for an unknown instance is accepted (no FK, no lookup). ~~`resume()` drains to a stable state inside one durable step~~ — closed by HR-B: the adapter now delegates to `continue_workflow`, one bounded quantum per durable step. |
 | 9 | **Re-evaluation** | The next quantum rebuilds the proposal and calls the hook again; no cached evaluation exists; the pre-park clearance is never reused (`engine.py:489-500, 511, 590`; `validate_clearance` at `decisions.py:132-154`). | The re-evaluation asks `GovernanceInputSource.inputs_for`, and **no production implementation of that protocol exists** — the three that exist are test fixtures (`agent-runtime-governance/tests/_fakes.py:125,136`; `durable-execution/tests/_production.py:86`), none reading an approval store. Nothing turns a GRANTED approval into a changed Decision Authority result or an emptied `required_approvals`. |
 | 10 | **Last mile** | RA-6 recheck re-verifies signature, window, tenant, session, epoch and targeted revocation; revocation or epoch advance while suspended blocks the resume (`risk-authority-status-runtime/.../enforcement.py:157-207`; `tests/test_ra6_last_mile_resume.py:148-192`). A CLEAR whose hook record is gone fails closed (`recheck.py:149-157`). | The recheck knows nothing of approvals: `PreEffectContext` has five fields and none is an approval (`enforcement.py:140-154`). Correct: an approval must enter at stage 9, before composition, never at the last mile. |
@@ -147,7 +147,17 @@ implementation prompt, ships behind its own tests and is labelled honestly at ex
    `PRESENTED_UNPROVEN`. Label: **Core implemented, shadow-only**, because every
    decision it records feeds a runtime that invokes fixture providers.
 4. **HR-D · Studio screens** — Review Queue and Run Detail under SD-1 and SD-2, per
-   the screen and API audit. Label: **Core implemented** for the screens.
+   the screen and API audit. **Implemented**: five v2 relay routes
+   (`v2_review_list_queue`, `v2_review_read_run`, `v2_review_read_run_events`,
+   `v2_review_read_approval`, `v2_review_submit_decision`) over a standard-library
+   review-service client whose five-route allowlist is enforced before a socket
+   opens; the decision body is relayed verbatim and the studio adds no identity; an
+   unreachable review service renders as a gap, never an empty queue; a HOLD is
+   filtered and counted on both sides of the wire (HR-5); fingerprints and
+   `valid_until` are rendered as history. The SD-2 prohibition, console allowlist,
+   v1 byte-freeze and frontend verb scan pass unchanged; `human_review_implemented`
+   is `True`, `authentication_implemented` stays `False`. Label: **Core
+   implemented** for the screens.
 5. **HR-E · Receipt linkage** — one audit reference joining proposal fingerprint,
    approval id, consumption id and resumed evaluation, into an existing store per the
    sequencing record's D-4. Label: **Contract-only** until the unified ledger exists.
@@ -160,6 +170,6 @@ production certification are not reachable from this work and are not claimed.
 
 ## 7 — Next step
 
-HR-A, HR-B and HR-C are implemented. HR-D, the Review Queue and Run Detail screens
-under SD-1 and SD-2 relaying to the review service, is next; HR-E follows. Nothing is
-implemented by this record.
+HR-A to HR-D are implemented. HR-E, one audit reference joining proposal fingerprint,
+approval id, consumption id and resumed evaluation, is the last step and is
+contract-only until the unified ledger exists. Nothing is implemented by this record.

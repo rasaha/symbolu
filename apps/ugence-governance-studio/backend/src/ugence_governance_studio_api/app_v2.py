@@ -25,6 +25,7 @@ from .app import (
     create_app,
 )
 from .clients.console import ConsoleClient
+from .clients.review import ReviewServiceClient
 from .errors import install_error_handlers
 from .security.middleware import (
     BodySizeLimitMiddleware,
@@ -37,6 +38,7 @@ from .services.studio_v2 import (
     ObserveService,
     PolicyService,
     PublishService,
+    ReviewRelayService,
     SimulateService,
 )
 from .settings import ApiSettings
@@ -63,6 +65,7 @@ def build_studio_context(
     provider_registry: Any = None,
     hook_is_permissive: bool = False,
     console_base_url: Optional[str] = None,
+    review_service_base_url: Optional[str] = None,
 ) -> V2Context:
     """Wire the six services from whatever this deployment actually has.
 
@@ -72,6 +75,7 @@ def build_studio_context(
     that shows a green tick over an ephemeral key.
     """
     console = ConsoleClient(console_base_url) if console_base_url else None
+    review = ReviewServiceClient(review_service_base_url) if review_service_base_url else None
     return V2Context(
         constitution=ConstitutionService(activation_root=activation_root),
         policy=PolicyService(),
@@ -87,6 +91,7 @@ def build_studio_context(
         ),
         publish=PublishService(console=console),
         observe=ObserveService(console=console),
+        review=ReviewRelayService(review=review),
     )
 
 
@@ -125,7 +130,7 @@ def create_v2_app(
         f"{_V2_SUMMARY}\n\n"
         f"- API contract: {API_V2_CONTRACT_VERSION}\n"
         f"- Frozen companion contract: governance_studio.api.v1 (unchanged)\n"
-        f"- Screens: Constitution, Policy, Authority, Simulate, Publish, Observe"
+        f"- Screens: Constitution, Policy, Authority, Simulate, Publish, Observe, Review"
     )
     app.openapi_version = "3.1.0"
     return app

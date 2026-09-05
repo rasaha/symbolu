@@ -17,6 +17,12 @@ from ...version import API_V2_CONTRACT_VERSION
 __all__ = ["v2_response", "studio", "V2Context"]
 
 
+def _absent_review() -> Any:
+    from ...services.studio_v2 import ReviewRelayService
+
+    return ReviewRelayService(review=None)
+
+
 class V2Context:
     """The six services, plus whatever optional dependencies were configured.
 
@@ -34,6 +40,7 @@ class V2Context:
         simulate: Any,
         publish: Any,
         observe: Any,
+        review: Any = None,
     ) -> None:
         self.constitution = constitution
         self.policy = policy
@@ -41,6 +48,9 @@ class V2Context:
         self.simulate = simulate
         self.publish = publish
         self.observe = observe
+        # GAS-7 HR-D: the review relay. Optional so a context built before it existed
+        # keeps working; absent, the review routes report the gap.
+        self.review = review if review is not None else _absent_review()
 
 
 def studio(request: Request) -> V2Context:

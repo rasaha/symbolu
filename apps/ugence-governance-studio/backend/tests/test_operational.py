@@ -60,6 +60,9 @@ def test_maturity_flags(client):
     # owner ruling and must not drift to True without a new ruling.
     assert m["studio_screens_implemented"] is True
     assert m["langflow_import_implemented"] is False
+    # GAS-7 HR-D: the Review Queue and Run Detail screens relay to the governed review
+    # service. The approver stays a presented reference; no identity provider exists.
+    assert m["human_review_implemented"] is True
     assert m["authentication_implemented"] is False
     assert m["agent_execution_implemented"] is False
     assert m["permission_granting_implemented"] is False

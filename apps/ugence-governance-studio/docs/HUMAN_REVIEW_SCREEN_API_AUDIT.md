@@ -1,11 +1,18 @@
 # Human review — screen and API audit (Review Queue, Run Detail)
 
-**Status: audit only.** No route, screen, client method or allowlist entry below
-exists or is authorized by this document. It maps the two screens onto what the
-repository already provides, names what each would need, and applies SD-1 and SD-2 to
-every proposed surface. Ruled by
-`docs/architecture/ADR_UGENCE_HUMAN_REVIEW_DURABLE_RESUME_SCOPING.md` (HR-1 to HR-5,
-ruled 2026-09-05); nothing here is built before the HR-D implementation prompt.
+**Status: implemented by HR-D (2026-09-05).** The two screens, the five v2 relay
+routes and the review-service client below now exist, as proposed here and under
+HR-1 `DISPLAY_AND_TRANSMIT`: `api/v2/review.py`, `clients/review.py`
+(`REVIEW_ALLOWED_ROUTES`, five entries, refused before a socket opens),
+`services/studio_v2.py::ReviewRelayService`, `frontend/src/features/studio/ReviewQueueScreen.tsx`
+and `RunDetailScreen.tsx`. Evidence: `backend/tests/test_review_relay.py` (the decision
+body reaches a real local HTTP stand-in for the review service byte-for-byte; an
+unreachable service is a gap; a HOLD is filtered and counted; the client refuses any
+route outside the five), `frontend/tests/review-screens.test.tsx`, the a11y suite for
+both screens, and the unchanged SD-2 prohibition, console-allowlist, v1 byte-freeze and
+frontend verb-scan tests. The text below is the audit as written; where it says a thing
+is missing, read it as the state before HR-D. Ruled by
+`docs/architecture/ADR_UGENCE_HUMAN_REVIEW_DURABLE_RESUME_SCOPING.md` (HR-1 to HR-5).
 
 Evidence labels: `[V]` verified, `[I]` inferred, `[R]` requires ratification, `[G]` gap.
 
@@ -80,14 +87,17 @@ prohibited import (`test_architecture.py:20-53`).
 - The a11y suite extends to both screens; the decision form requires a justification
   and shows the approver as reported by the review service, never as typed in the
   browser.
-- The maturity flag `human_review_implemented: False` is added now to `version.py`,
-  asserted by `test_operational.py`, and flipped only by the HR-D commit.
+- The maturity flag `human_review_implemented` is `True` as of the HR-D commit and
+  asserted by `test_operational.py`; `authentication_implemented` stays `False`, and
+  every decision the screens relay is labelled `PRESENTED_UNPROVEN` by the review
+  service.
 
 ## What is settled, and what is not
 
 HR-1 to HR-5 are ruled (ADR §5): the studio may display and transmit; the composition
 is `packages/integration/governed-review`; approvals bind to the proposal fingerprint
 and are consumed before the engine advances; resume stays bare in the runtime and
-bounded in the adapter; only ESCALATE is reviewable. Until HR-A to HR-C ship, the two
-screens have no data source, and until HR-D they have no route. This document changes
-nothing in the tree.
+bounded in the adapter; only ESCALATE is reviewable. HR-A to HR-D have shipped: the
+screens have their data source (`governed-review-service`) and their routes. What is
+still not settled is HR-E, the receipt linkage, and an identity provider, which no
+step of this sequence builds.

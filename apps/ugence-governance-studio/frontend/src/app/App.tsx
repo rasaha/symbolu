@@ -22,6 +22,8 @@ import {
   ObserveScreen,
   PolicyScreen,
   PublishScreen,
+  ReviewQueueScreen,
+  RunDetailScreen,
   SimulateScreen,
   StudioLayout,
 } from "@/features/studio";
@@ -64,6 +66,9 @@ export function App() {
             <Route path="simulate" element={<SimulateScreen />} />
             <Route path="publish" element={<PublishScreen />} />
             <Route path="observe" element={<ObserveScreen />} />
+            {/* GAS-7 HR-D: Review Queue and Run Detail, display and relay only. */}
+            <Route path="review" element={<ReviewQueueScreen />} />
+            <Route path="review/:instanceId" element={<RunDetailScreen />} />
           </Route>
           <Route path="*" element={<Navigate to="/scenarios" replace />} />
         </Routes>

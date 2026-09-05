@@ -1,4 +1,4 @@
-// Test helpers for the six studio screens.
+// Test helpers for the studio screens (the six of GAS-4 and the two review screens of GAS-7).
 //
 // A separate fetch mock from the v1 one, serving the v2 envelope shape. Kept apart so
 // the v1 helpers stay exactly as they were and the studio's fixtures cannot perturb
@@ -63,6 +63,10 @@ const DEFAULT_RESULTS: Record<string, unknown> = {
   "/api/v2/observe/audit": unavailable(
     "console_api",
     "no ugence_console_api base URL is configured",
+  ),
+  "/api/v2/review/queue": unavailable(
+    "review_service",
+    "no governed review service base URL is configured",
   ),
 };
 

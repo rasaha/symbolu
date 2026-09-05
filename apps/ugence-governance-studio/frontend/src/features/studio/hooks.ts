@@ -12,6 +12,7 @@ import type {
   PolicyCompileBody,
   PolicyPackBody,
   PublishShadowBody,
+  ReviewDecisionBody,
   SimulateRunBody,
 } from "@/api/types-v2";
 
@@ -51,3 +52,38 @@ export const useAuditChain = (correlationId: string | null) =>
     enabled: correlationId !== null && correlationId !== "",
     retry: RETRY,
   });
+
+// -- 7 · Review (GAS-7 HR-D) ------------------------------------------------
+export const useReviewQueue = (requiredRole = "") =>
+  useQuery({
+    queryKey: ["v2", "review", "queue", requiredRole],
+    queryFn: () => v2.listReviewQueue(requiredRole),
+    retry: RETRY,
+  });
+
+export const useReviewRun = (instanceId: string | null) =>
+  useQuery({
+    queryKey: ["v2", "review", "run", instanceId],
+    queryFn: () => v2.readReviewRun(instanceId as string),
+    enabled: instanceId !== null && instanceId !== "",
+    retry: RETRY,
+  });
+
+export const useReviewRunEvents = (instanceId: string | null) =>
+  useQuery({
+    queryKey: ["v2", "review", "run", instanceId, "events"],
+    queryFn: () => v2.readReviewRunEvents(instanceId as string),
+    enabled: instanceId !== null && instanceId !== "",
+    retry: RETRY,
+  });
+
+export const useReviewApproval = (approvalId: string | null) =>
+  useQuery({
+    queryKey: ["v2", "review", "approval", approvalId],
+    queryFn: () => v2.readReviewApproval(approvalId as string),
+    enabled: approvalId !== null && approvalId !== "",
+    retry: RETRY,
+  });
+
+export const useSubmitReviewDecision = () =>
+  useMutation({ mutationFn: (b: ReviewDecisionBody) => v2.submitReviewDecision(b) });

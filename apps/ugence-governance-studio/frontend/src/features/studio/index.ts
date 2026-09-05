@@ -5,3 +5,5 @@ export { AuthorityScreen } from "./AuthorityScreen";
 export { SimulateScreen } from "./SimulateScreen";
 export { PublishScreen } from "./PublishScreen";
 export { ObserveScreen } from "./ObserveScreen";
+export { ReviewQueueScreen } from "./ReviewQueueScreen";
+export { RunDetailScreen } from "./RunDetailScreen";

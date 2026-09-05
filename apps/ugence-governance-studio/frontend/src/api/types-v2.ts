@@ -48,6 +48,7 @@ export type PolicyPackBody = Body<"v2_policy_validate">;
 export type PolicyCompileBody = Body<"v2_policy_compile">;
 export type SimulateRunBody = Body<"v2_simulate_run">;
 export type PublishShadowBody = Body<"v2_publish_shadow">;
+export type ReviewDecisionBody = Body<"v2_review_submit_decision">;
 
 // -- the gap contract -------------------------------------------------------
 /**
@@ -133,4 +134,53 @@ export interface SimulationRun extends Available {
   /** True when a permissive test hook cleared the run. Never a governance result. */
   governance_hook_permissive: boolean;
   quanta: Record<string, unknown>[];
+}
+
+// -- review (GAS-7 HR-D) ----------------------------------------------------
+/** One parked ESCALATE instance, as the review service lists it. */
+export interface ReviewQueueEntry {
+  approval_id: string;
+  approval_state: string;
+  instance_id: string;
+  task_id: string;
+  fingerprint: string;
+  required_role: string;
+  requested_by: string;
+  requested_at: string;
+  expires_at: string;
+  justification: string;
+  workflow_id: string;
+  workflow_status: string;
+  task_status: string;
+  provider_id: string;
+  operation: string;
+  governance_disposition: string;
+  eligible_approvers: {
+    approver_id: string;
+    approver_kind: string;
+    role: string;
+    authority_reference: string;
+  }[];
+  instance_known: boolean;
+}
+
+export interface ReviewQueue extends Available {
+  result: { entries: ReviewQueueEntry[]; maturity?: string; identity_proof?: string };
+  /** HOLD entries the studio refused to present as awaiting a human (HR-5). */
+  excluded_hold: number;
+  identity_proof: string;
+}
+
+/** The review service's typed answer to a relayed decision. */
+export interface ReviewDecisionOutcome {
+  result: string;
+  recorded: boolean;
+  approval_id: string;
+  instance_id: string;
+  task_id: string;
+  signal_delivered: boolean;
+  resume_delivered: boolean;
+  resume_skipped_reason: string;
+  reason: string;
+  identity_proof: string;
 }

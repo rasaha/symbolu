@@ -14,6 +14,7 @@ const SCREENS = [
   { to: "simulate", label: "Simulate" },
   { to: "publish", label: "Publish" },
   { to: "observe", label: "Observe" },
+  { to: "review", label: "Review" },
 ] as const;
 
 export function StudioLayout() {
@@ -41,7 +42,7 @@ export function StudioLayout() {
       <div className="rounded border border-surface-border bg-surface-2 px-3 py-2 text-[11px] text-ink-2">
         <span className="font-mono">governance_studio.api.v2</span> · additive contract
         alongside the frozen v1 explorer · planning, preflight and observation only ·
-        no screen here issues, activates, revokes, grants, authorizes, clears or executes
+        no screen here issues, activates, revokes, grants, authorizes, clears or executes; the review screens display and relay, and signal or resume nothing
       </div>
       <Outlet context={context} />
     </div>

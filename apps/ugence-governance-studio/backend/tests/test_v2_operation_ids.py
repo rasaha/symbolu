@@ -150,3 +150,25 @@ def test_console_client_cannot_reach_an_authority_route():
         with pytest.raises(ConsoleUnavailable) as excinfo:
             client._request(method, path)  # noqa: SLF001
         assert "not in the studio's permitted console route set" in str(excinfo.value)
+
+
+def test_review_client_cannot_reach_a_resume_signal_or_authority_route():
+    """HR-1 at the outbound edge: the review client is display and transmit only."""
+    from ugence_governance_studio_api.clients.review import (
+        REVIEW_ALLOWED_ROUTES,
+        ReviewServiceClient,
+        ReviewServiceUnavailable,
+    )
+
+    assert len(REVIEW_ALLOWED_ROUTES) == 5
+    for _method, path in REVIEW_ALLOWED_ROUTES:
+        assert not any(v in path.lower() for v in PROHIBITED_VERBS + ("resume", "signal")), path
+
+    client = ReviewServiceClient("http://review.invalid")
+    for method, path in (
+        ("POST", "/review/resume"),
+        ("POST", "/review/signals"),
+        ("POST", "/review/approvals/{approval_id}/grant"),
+    ):
+        with pytest.raises(ReviewServiceUnavailable):
+            client._request(method, path)  # noqa: SLF001

@@ -90,6 +90,11 @@ MATURITY_FLAGS: Dict[str, bool] = {
     "observe_audit_api_implemented": True,
     "langflow_import_implemented": False,
     "studio_screens_implemented": True,
+    # GAS-7 HR-D: the Review Queue and Run Detail screens over the governed review
+    # service relay (HR-1 DISPLAY_AND_TRANSMIT). The studio renders and relays; the
+    # approver stays a presented, unproven reference because no identity provider
+    # exists (authentication_implemented stays False).
+    "human_review_implemented": True,
     "constitution_issuance_implemented": False,
     "policy_issuance_implemented": False,
     "frontend_implemented": False,
