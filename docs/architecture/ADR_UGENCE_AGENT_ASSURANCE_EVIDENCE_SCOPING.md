@@ -1,12 +1,12 @@
-# Ugence agent security and assurance evidence — scoping record
+# Ugence agent security and assurance evidence — scoping record and ratification
 
-**Status: SCOPED, NOT RULED — nothing here is implemented.** This record authorizes
-no code change, creates no package, adds no dependency and amends no package ADR,
-port, test or manifest. Sequenced by `ADR_UGENCE_GOVERNANCE_GAP_SEQUENCING_RATIFICATION.md`
-(wave 4, line 63: "evidence provider to TAP and Risk Authority; never a decision
-authority"). It maps how evidence already reaches the two consumers, what the
-neutral evidence contracts already carry, and the five owner decisions to rule
-before any code.
+**Status:** ratified 2026-09-05 by the repository owner. Scoping only at the time
+of ruling: this record amends no package ADR, port, test or manifest. Sequenced by
+`ADR_UGENCE_GOVERNANCE_GAP_SEQUENCING_RATIFICATION.md` (wave 4, line 63: "evidence
+provider to TAP and Risk Authority; never a decision authority"). The rulings below
+authorize the neutral `AssuranceFindingLabel` in governance-contracts and the
+contracts-only package `packages/integration/agent-assurance-evidence`, and nothing
+beyond them.
 
 Evidence labels: `[V]` verified against this repository at commit `ba9a2941`,
 `[I]` inferred, `[R]` requires ratification, `[G]` gap.
@@ -16,7 +16,8 @@ Evidence labels: `[V]` verified against this repository at commit `ba9a2941`,
 Which package records *what a security or robustness exercise found about this
 exact AI system*, in a form TAP and Risk Authority can consume as evidence, without
 itself deciding anything? **Nothing does, and no package reserves the noun.** The
-one word the row uses, "adversarial", is already taken in a different sense.
+one word the row uses, "adversarial", is already taken in a different sense. Under
+AE-1 the answer is a record of assurance evidence; it runs nothing and admits nothing.
 
 ## 2 — What the repository already fixed
 
@@ -33,35 +34,49 @@ one word the row uses, "adversarial", is already taken in a different sense.
 | TAP consumes evidence only as references: `AssertionGovernanceRequest.evidence_refs` in, `covered_evidence_refs` and `evidence_coverage` out; it "integrates into the assessment / recommendation workflow only" `[V]` | `contracts/assertion.py:32-45`; `packages/providers/tap/README.md:3-8` |
 | The contracts-only shape has three precedents, two shipped this wave `[V]` | `packages/integration/ai-system-registry`, `data-use-admission`, `vendor-dependency` |
 
-The sequencing ADR's prohibition (line 85) is satisfied only if the package is
-**not** named "adversarial": that word names every package's own probe suite.
+The sequencing ADR's prohibition (line 85) is satisfied: the package is named for
+what it records and takes neither "adversarial" nor "red-team".
 
-## 3 — A first slice, by analogy `[I]`
+## 3 — The first slice
 
-Following `vendor-dependency`: an `AssuranceFindingDeclaration` binding one
-`AssessedSystemBinding` re-exported from governance-contracts, one
-`EvidenceReference` re-exported the same way (so the finding *is* evidence, with an
-`evidence_kind` the declarer chose), an opaque `exercise_ref` naming the exercise
-that produced it, a `Validity` window and an optional `supersedes`. Refusal reasons
-for a blank reference, a look-alike binding or reference, a subject that disagrees
-with the binding, and a mismatched tenant. Pure selectors, in-force first. One
-read-only Protocol, no implementation.
+Following `vendor-dependency`: an `AssuranceFindingDeclaration` binding exactly one
+`AssessedSystemBinding` and exactly one existing `EvidenceReference`, both
+re-exported from governance-contracts (AE-2), an `AssuranceFindingLabel`
+re-exported from governance-contracts as what the exercise found (AE-3, AE-5), an
+opaque `exercise_ref` naming the exercise that produced it, a `Validity` window
+and an optional `supersedes`. The evidence reference is the finding's **sole
+evidence identity**: no competing reference is minted and no provenance field is
+copied. Refusal reasons for a blank reference, a look-alike binding, reference or
+label, a mismatched tenant, and a reference whose `subject_id` disagrees with the
+binding's. Pure selectors, in-force first. One read-only Protocol, no implementation.
 
 **Structurally unable:** no probe runner, no attack corpus, no scorer, no admission
-engine, no control evaluation, no clock; and no import of Risk Authority, TAP, or
-the evidence runtime. The finding is an *input* to `EvidenceAdmissionPort`; the
-package never calls it.
+engine, no control evaluation, no clock, no store, no network; and no import of
+Risk Authority, TAP or the evidence runtime. A finding is an *input* to
+`EvidenceAdmissionPort` and a citation for TAP; the package calls neither.
 
-## 4 — Decisions to rule `[R]`
+## 4 — Ratified decisions
 
-| # | Decision | What turns on it |
+| # | Decision | Ruling |
 |---|---|---|
-| **AE-1** | The noun and package name, avoiding "adversarial". | "assurance-finding" or "agent-assurance-evidence" name what is recorded; "adversarial" and "red-team" name how it was produced, and the first already means a probe suite here. |
-| **AE-2** | Is a finding a new record type, or an `EvidenceReference` with provenance? | Reuse means TAP and the evidence runtime consume it with no new adapter; a new type needs a mapping before either can see it. |
-| **AE-3** | Does a finding carry an uninterpreted label, or reuse `VerificationStatus`? | An uninterpreted label follows DE-3 and VR-3; `VerificationStatus` is already neutral but says whether a claim was checked, not what was found. |
-| **AE-4** | How does a finding reach Risk Authority without the package importing it? | As a `ControlEvidenceRecord` built by a composition root from the finding, through `EvidenceAdmissionPort`; or as an `EvidenceReference` TAP cites. Either keeps admission on Risk Authority's side. |
-| **AE-5** | Does any neutral type land in governance-contracts first? | No new type if AE-2 reuses `EvidenceReference`; a neutral `AssuranceFindingLabel` if AE-3 chooses a label, following DE-5 and VR-5. |
+| AE-1 | The noun and package name, avoiding "adversarial" | **`packages/integration/agent-assurance-evidence`**, distribution `ugence-agent-assurance-evidence`, namespace `ugence_agent_assurance_evidence`. It records assurance evidence; it is neither a probe runner nor an authority. |
+| AE-2 | Is a finding a new record type, or an `EvidenceReference` with provenance? | **`NEW_RECORD_TYPE`.** `AssuranceFindingDeclaration` binds exactly one canonical `AssessedSystemBinding` to exactly one existing `EvidenceReference`. The evidence reference remains the finding's sole evidence identity; no competing reference is minted and no provenance field is copied. |
+| AE-3 | Does a finding carry an uninterpreted label, or reuse `VerificationStatus`? | **`UNINTERPRETED_LABEL`.** `AssuranceFindingLabel`: an immutable, non-empty opaque label with no taxonomy, severity, score, ordering or implied verification. `VerificationStatus` remains an independent statement about whether a claim was checked and must not represent what the exercise found. |
+| AE-4 | How does a finding reach Risk Authority without the package importing it? | **`BOTH`.** TAP may cite the declaration's existing `EvidenceReference`; separately, a composition root may construct Risk Authority's `ControlEvidenceRecord` from the declaration and submit it through `EvidenceAdmissionPort`. Both routes preserve the same evidence identity. A TAP citation is not Risk Authority admission, and neither route upgrades the other. |
+| AE-5 | Does any neutral type land in governance-contracts first? | **Yes — `AssuranceFindingLabel`.** Landed first in `packages/governance-contracts` as a neutral structural contract. It grants no authority and performs no verification or risk interpretation. |
 
-## 5 — Next step
+## 5 — Maturity ceiling, stated once
 
-Rule AE-1 to AE-5. Nothing is implemented by this record.
+**`REFERENCE_GRADE_CONTRACT_ONLY`.** The package records what a declarer asserted
+an exercise found. Nothing here runs a probe, holds a corpus, scores a finding,
+admits evidence, evaluates a control, or proves that the referenced evidence exists,
+that the exercise was sound, or that the named system was the one exercised.
+Neither consumer route is built in this slice: no composition root constructs a
+`ControlEvidenceRecord`, and no TAP request is issued. `ENFORCEMENT_ENABLED` is
+`False` and stays so until a further ruling authorizes a route. A finding is a
+record, not a verdict.
+
+## 6 — Next step
+
+Implement `packages/integration/agent-assurance-evidence` 0.1.0 under the decisions
+above, after `AssuranceFindingLabel` lands in governance-contracts.
