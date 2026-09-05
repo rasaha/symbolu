@@ -1,0 +1,61 @@
+# Ugence Authority Directory — time-bounded organizational role grants: who holds
+# which role, in which scope, until when (gap-sequencing ADR wave 2).
+#
+# Scoped and ratified by docs/architecture/ADR_UGENCE_AUTHORITY_DIRECTORY_SCOPING.md.
+#
+#   THIS PACKAGE REPORTS ROLE GRANTS. IT NEVER AUTHENTICATES, NEVER APPROVES,
+#   NEVER MINTS AUTHORITY, AND HOLDS CUSTODY OF NOTHING.
+#
+# Deliberately not an "Authority": every ...Authority package here decides
+# something, and this one decides nothing.
+#
+# Two adapters implement one port:
+#     AuthorityDirectoryPort  <- InMemoryAuthorityDirectory (reference; refused in production)
+#                             <- SqliteAuthorityDirectory   (single-node durable, stdlib sqlite3)
+# and one adapter satisfies a consumer's port without importing it:
+#     DirectoryApproverEligibility -> ApproverEligibilityPort (owned by approval-workflow)
+#
+# Dependency direction (one-way):
+#     ugence-governance-contracts (leaf)   <- Validity / ValidityStatus
+#         ▲
+#     ugence-authority-directory (this package)
+#
+# Nothing else: not the approval workflow, not Decision Authority, not Risk
+# Authority, not Policy Authority, no IdP client, no LDAP or SCIM library, no
+# network client, no cloud SDK, no pydantic.
+#
+# Build:   python -m build packages/integration/authority-directory
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ugence-authority-directory"
+dynamic = ["version"]
+description = "Ugence Authority Directory — time-bounded organizational role grants, bounded delegation and committee reporting. Reports grants; never authenticates, approves, or holds custody of anything."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "Proprietary" }
+authors = [{ name = "Rakesh Mohan" }]
+keywords = ["governance", "authority", "directory", "roles", "delegation", "ugence"]
+classifiers = ["Typing :: Typed"]
+dependencies = [
+    "ugence-governance-contracts>=0.4.0",
+]
+
+[project.optional-dependencies]
+test = ["pytest>=7.0"]
+
+[tool.setuptools.dynamic]
+version = { attr = "ugence_authority_directory.version.__version__" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["ugence_authority_directory*"]
+
+[tool.setuptools.package-data]
+ugence_authority_directory = ["py.typed"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
