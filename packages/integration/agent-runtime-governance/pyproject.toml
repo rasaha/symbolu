@@ -1,0 +1,55 @@
+# Ugence Agent Runtime Governance — the production GovernanceHook adapter.
+#
+# Scoped by docs/architecture/ADR_DBOS_DURABLE_EXECUTION_INTEGRATION.md (GAS-3).
+#
+#   COMPOSE, THEN PROJECT. MINT NOTHING.
+#   NO COMPOSITION LOGIC, NO AUTHORITY, NO CREDENTIALS.
+#
+# Dependency direction is one-way and asserted by tests/test_boundaries.py:
+#
+#     ugence-agent-runtime            (leaf, UNTOUCHED)
+#     risk_authority                  (leaf)
+#     ugence-risk-authority-runtime   (RA-4.5 composition — used, never re-implemented)
+#     ugence-risk-authority-status-runtime (RA-6 — supplies make_pre_effect_recheck)
+#         ▲
+#     ugence-agent-runtime-governance (this package)
+#
+# Agent Runtime gains no import from this package.
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ugence-agent-runtime-governance"
+dynamic = ["version"]
+description = "Ugence Agent Runtime Governance — production GovernanceHook adapter projecting GovernedExecutionDecision onto the Agent Runtime governance boundary. Core implemented; not pilot-validated, not production-certified."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "Proprietary" }
+authors = [{ name = "Rakesh Mohan" }]
+keywords = ["governance", "agent-runtime", "risk-authority", "fail-closed", "ugence"]
+dependencies = [
+    "ugence-agent-runtime>=0.7.0",
+    "ugence-risk-authority-runtime>=0.1.0",
+]
+
+[project.optional-dependencies]
+recheck = ["ugence-risk-authority-status-runtime>=0.1.0"]
+test = ["pytest>=7.0"]
+
+[tool.setuptools.dynamic]
+version = { attr = "ugence_agent_runtime_governance.version.__version__" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["ugence_agent_runtime_governance*"]
+
+[tool.setuptools.package-data]
+ugence_agent_runtime_governance = ["py.typed"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+markers = [
+    "adversarial: proves a restrictive disposition can never widen to CLEAR",
+]
