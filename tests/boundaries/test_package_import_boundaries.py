@@ -50,6 +50,7 @@ def test_the_scan_actually_found_the_packages():
     "ugence_approval_workflow",
     "ugence_authority_directory",
     "ugence_ai_system_registry",
+    "ugence_data_use_admission",
     "ugence_decision_authority",
 ])
 def test_the_packages_that_state_this_rule_are_in_scope(namespace):
