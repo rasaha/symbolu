@@ -39,7 +39,8 @@ class ApprovalWorkflowPort(Protocol):
     def decide(self, approval_id: str, *, approver: ApproverRef, decision: ReviewDecision,
                as_of: datetime, justification: str = "",
                accepted_finding_ids: tuple[str, ...] = (),
-               signature_reference: str = "") -> ApprovalRecord: ...
+               signature_reference: str = "",
+               authentication_reference: str = "") -> ApprovalRecord: ...
 
     def request_exception(self, approval_id: str, *, requested_by: str, justification: str,
                           exception_validity: Validity, as_of: datetime) -> ApprovalRecord: ...

@@ -1,5 +1,18 @@
 # Changelog — ugence-approval-workflow
 
+## 0.2.0 — 2026-09-05 — AI-D (approver-identity ruling ID-2)
+
+- `ApprovalRecord.authentication_reference`: an additive, optional, digest-bound
+  reference to the verified authentication claims behind `decided_by`; never a token.
+  Serialised only when recorded, so every artifact digest computed before the field
+  existed still re-derives. `signature_reference` stays unused.
+- `decide(..., authentication_reference="")` on the port and both adapters. The SQLite
+  ledger writes the reference into the hash-linked decision event's detail, so an
+  altered reference breaks `verify_chain()` as an altered decision does; the record's
+  artifact digest refuses an altered `decided_by` or reference on read.
+- Nothing verifies the reference here: the package records it as it records
+  `decided_authority_reference`.
+
 ## 0.1.0 — wave 2, initial release
 
 Scoped and ratified by `docs/architecture/ADR_UGENCE_APPROVAL_WORKFLOW_SCOPING.md`.

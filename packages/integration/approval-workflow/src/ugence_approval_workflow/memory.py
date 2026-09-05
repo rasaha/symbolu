@@ -140,7 +140,8 @@ class InMemoryApprovalWorkflowStore:
     def decide(self, approval_id: str, *, approver: ApproverRef, decision: ReviewDecision,
                as_of: datetime, justification: str = "",
                accepted_finding_ids: tuple[str, ...] = (),
-               signature_reference: str = "") -> ApprovalRecord:
+               signature_reference: str = "",
+               authentication_reference: str = "") -> ApprovalRecord:
         with self._lock:
             self._guard()
             record = self._require(approval_id)
@@ -148,7 +149,8 @@ class InMemoryApprovalWorkflowStore:
                 record, approver=approver, decision=decision,
                 eligibility=self._eligibility_for(record, approver, as_of), as_of=as_of,
                 justification=justification, accepted_finding_ids=accepted_finding_ids,
-                signature_reference=signature_reference)
+                signature_reference=signature_reference,
+                authentication_reference=authentication_reference)
             return self._store(evolved, as_of, approver.approver_id, decision.value)
 
     def request_exception(self, approval_id: str, *, requested_by: str, justification: str,

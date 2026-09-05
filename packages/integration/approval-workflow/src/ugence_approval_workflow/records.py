@@ -71,8 +71,14 @@ class ApprovalRecord:
     decided_role: str = ""
     decided_authority_reference: str = ""
     decided_at: Optional[datetime] = None
-    #: A non-secret reference to a detached signature, when one exists.
+    #: A non-secret reference to a detached signature, when one exists. Unused on the
+    #: human-review path (approver-identity ruling ID-2).
     signature_reference: str = ""
+    #: ID-2 (AI-D): a deterministic, digest-bound reference to the verified
+    #: authentication claims behind ``decided_by``; never a token. Additive and
+    #: optional: a record decided without a proof carries none, and its artifact
+    #: digest is unchanged from before the field existed.
+    authentication_reference: str = ""
     #: True when this record is a labeled offline example, not a real authority.
     is_fixture: bool = False
     exception_requested_by: str = ""
@@ -87,6 +93,7 @@ class ApprovalRecord:
             object.__setattr__(self, name, require_nonempty(getattr(self, name), f"ApprovalRecord.{name}"))
         for name in ("subject_ref", "required_role", "supersedes", "justification", "decided_by",
                      "decided_role", "decided_authority_reference", "signature_reference",
+                     "authentication_reference",
                      "exception_requested_by", "exception_justification", "consumer_ref"):
             object.__setattr__(self, name, optional_text(getattr(self, name), f"ApprovalRecord.{name}"))
         if not isinstance(self.state, ApprovalState):
@@ -139,7 +146,7 @@ class ApprovalRecord:
 
     # ------------------------------------------------------------------ #
     def to_dict(self) -> dict:
-        return {
+        out = {
             "approval_id": self.approval_id, "tenant_id": self.tenant_id,
             "subject_kind": self.subject_kind, "subject_digest": self.subject_digest,
             "subject_ref": self.subject_ref, "requested_by": self.requested_by,
@@ -157,6 +164,11 @@ class ApprovalRecord:
             "consumer_ref": self.consumer_ref,
             "consumed_at": iso(self.consumed_at, "consumed_at") if self.consumed_at else "",
         }
+        if self.authentication_reference:
+            # Present only when recorded, so every artifact digest computed before the
+            # field existed still re-derives (AI-D: additive, never a migration).
+            out["authentication_reference"] = self.authentication_reference
+        return out
 
     @classmethod
     def from_dict(cls, d: dict) -> "ApprovalRecord":
@@ -172,6 +184,7 @@ class ApprovalRecord:
             decided_authority_reference=d.get("decided_authority_reference", ""),
             decided_at=from_iso(d["decided_at"]) if d.get("decided_at") else None,
             signature_reference=d.get("signature_reference", ""),
+            authentication_reference=d.get("authentication_reference", ""),
             is_fixture=bool(d.get("is_fixture", False)),
             exception_requested_by=d.get("exception_requested_by", ""),
             exception_justification=d.get("exception_justification", ""),
