@@ -380,6 +380,11 @@ merged; GAS-5 is deferred; GAS-6 remains gated; GAS-7 is ruled and not entered.
 | HE-3 | **`JOURNAL_IS_THE_RECORD`** — the checkpoint's execution-state journal is the authoritative evaluation record for the linkage; no dedicated evaluation store | same, §5a |
 | HE-4 | **`RATIFY_STORE_REFS_AS_SPELLED`** — `approval-workflow/ledger_events`, `durable-execution/runtime_events`, `durable-execution/runtime_state.execution_state_journal` are the ratified store references | same, §5a |
 | HE-5 | **`EXPOSE_ON_RUN_DETAIL_LATER`** — once HE-1 lands, run detail returns the reconstructed linkage read-only and the studio renders it as history | same, §5a |
+| ID-1 | **`PASS_THROUGH_OPAQUE_TOKEN`** (2026-09-05) — the studio may forward one IdP-issued token audience-bound to the review service; never parsed, logged, persisted or reused | `ADR_UGENCE_APPROVER_IDENTITY_SCOPING.md` §5 |
+| ID-2 | **`SEPARATE_AUTHENTICATION_AND_AUTHORITY_REFERENCES`** — `decided_by` an issuer-qualified subject; `decided_authority_reference` the directory grant; a distinct digest-bound `authentication_reference` to the verified claims, never the token; `signature_reference` unused | same, §5 |
+| ID-3 | **`SERVICE_LOCAL_PORT_UNTIL_SECOND_CONSUMER`** — `ApproverIdentityPort` in `governed-review-service`, compatible with the existing seam, importing no Decision Authority package; promotion needs a second consumer and a separate ruling | same, §5 |
+| ID-4 | **`TENANT_FROM_PROOF_WITH_EXPLICIT_SINGLE_TENANT_FALLBACK`** — a verified tenant claim is authoritative; configured fallback only in explicit `SINGLE_TENANT` mode; multi-tenant mode refuses missing, ambiguous or mismatched claims | same, §5 |
+| ID-5 | **`RECORD_NOW_ENFORCE_BEFORE_LIVE`** — `acr`/`amr` recorded without a threshold while shadow-only; a ratified assurance policy is a mandatory gate before enforcement or LIVE, absent policy fails closed | same, §5 |
 | GAS-5 | **`DEFER_LANGFLOW_CUSTOMER_GATED`** (2026-09-05) — Langflow import is removed from the current sequence and MVP scope; preserved only as a possible future import adapter, requiring a demonstrated customer or design-partner need and a new owner ruling. No audit, importer, endpoint, dependency or implementation now. React Flow remains the Ugence-owned authoring surface | this section, GAS-5 and GAS-R4; `GOVERNED_AGENT_STUDIO_V1_SCREEN_AUDIT.md` |
 
 
