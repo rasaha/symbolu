@@ -230,3 +230,32 @@ def test_nothing_in_the_package_can_deliver_the_payload():
             for name, member in inspect.getmembers(value, callable):
                 if not name.startswith("_"):
                     check(exported, name, member)
+
+
+def test_the_payload_refuses_a_reference_that_names_nothing():
+    """Blank or non-string reference entries, on both reference tuples."""
+
+    base = dict(schema_version="1", event_id="e", tenant_id=TENANT,
+                target_type=SignalTargetType.TENANT, target_id="",
+                change_type=SignalChangeType.RUNTIME_RISK_ESCALATED, source="s",
+                source_version="v", observed_at=T1, reason="r", correlation_id="c")
+    for field in ("evidence_refs", "control_refs"):
+        for bad in ("   ",), (object(),):
+            with pytest.raises(ContractViolation, match="non-blank strings"):
+                ReassessmentSignalPayload(**dict(base, **{field: bad}))
+    # The empty tuple is not a bad value: a signal may name no control.
+    assert ReassessmentSignalPayload(**base).control_refs == ()
+
+
+def test_the_payload_refuses_a_raw_string_where_an_enum_belongs():
+    """RA-6 ``isinstance``-checks its own enums, so a value that merely *looks* right
+    would be rejected there rather than here. It is rejected here."""
+
+    base = dict(schema_version="1", event_id="e", tenant_id=TENANT,
+                target_type=SignalTargetType.TENANT, target_id="",
+                change_type=SignalChangeType.RUNTIME_RISK_ESCALATED, source="s",
+                source_version="v", observed_at=T1, reason="r", correlation_id="c")
+    with pytest.raises(ContractViolation, match="target_type must be"):
+        ReassessmentSignalPayload(**dict(base, target_type="TENANT"))
+    with pytest.raises(ContractViolation, match="change_type must be"):
+        ReassessmentSignalPayload(**dict(base, change_type="RUNTIME_RISK_ESCALATED"))

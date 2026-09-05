@@ -275,3 +275,127 @@ def test_every_instant_must_be_timezone_aware():
         containment(at=naive)
     with pytest.raises(ContractViolation, match="timezone-aware"):
         proposal(at=naive)
+
+
+# --------------------------------------------------------------------------- #
+# The refusals themselves. A refusal nobody exercises is a refusal nobody has.
+# --------------------------------------------------------------------------- #
+def test_containment_may_be_requested_once_and_only_for_this_incident():
+    """Every guard on the one mutator that opens containment.
+
+    A third review found all three of these untested: the happy path was the only
+    call site in the suite, so the "a second request is a new incident, not a
+    re-request" rule the docstring names could have been deleted silently.
+    """
+
+    record = incident().advanced_to(IncidentState.CONTAINMENT_REQUESTED)
+    request = containment(record)
+
+    with pytest.raises(ContractViolation, match="must be a ContainmentRequest"):
+        record.containment_requested(object())
+
+    other = containment(incident(subject="envelope:env-2"))
+    with pytest.raises(ContractViolation, match="different incident"):
+        record.containment_requested(other)
+    cross_tenant = dataclasses.replace(request, tenant_id="tenant-b")
+    with pytest.raises(ContractViolation, match="different incident"):
+        record.containment_requested(cross_tenant)
+
+    contained_record = record.containment_requested(request)
+    with pytest.raises(ContractViolation, match="already REQUESTED"):
+        contained_record.containment_requested(request)
+
+
+def test_the_containment_fields_must_hold_the_records_they_claim_to():
+    """Direct construction is checked exactly as the mutators are."""
+
+    record, request = contained()
+
+    with pytest.raises(ContractViolation, match="must be a ContainmentRequest"):
+        dataclasses.replace(record, containment_request="not-a-record")
+    with pytest.raises(ContractViolation, match="must be a ContainmentLift"):
+        dataclasses.replace(record.containment_lifted(lift(request)),
+                            containment_lift="not-a-record")
+    with pytest.raises(ContractViolation, match="REQUESTED carries no lift"):
+        dataclasses.replace(record, containment_lift=lift(request))
+    with pytest.raises(ContractViolation, match="different incident"):
+        dataclasses.replace(record, containment_request=dataclasses.replace(
+            request, tenant_id="tenant-b"))
+    with pytest.raises(ContractViolation, match="requires the ContainmentRequest"):
+        dataclasses.replace(record, containment_request=None)
+
+
+def test_the_state_fields_must_be_the_enums_they_declare():
+    record = incident()
+    with pytest.raises(ContractViolation, match="must be a IncidentState"):
+        dataclasses.replace(record, state="OPEN")
+    with pytest.raises(ContractViolation, match="must be a ContainmentState"):
+        dataclasses.replace(record, containment="NONE")
+
+
+def test_the_transition_tables_agree_with_the_forward_only_rule():
+    """The rank check in ``require_transition`` is redundant with the table *today*.
+
+    That is the point of asserting it: if a later edit adds a backward or sideways
+    edge to ``LEGAL_TRANSITIONS``, this names it rather than letting the two
+    disagree silently.
+    """
+
+    for current, targets in LEGAL_TRANSITIONS.items():
+        for target in targets:
+            assert STATE_RANK[target] > STATE_RANK[current], (current, target)
+    assert set(LEGAL_TRANSITIONS) == set(IncidentState)
+    assert all(LEGAL_TRANSITIONS[s] == frozenset() for s in TERMINAL_STATES)
+
+
+def test_a_non_datetime_instant_is_refused_before_the_timezone_is_read():
+    with pytest.raises(ContractViolation, match="must be a datetime"):
+        incident(opened="2026-03-01T09:00:00Z")
+    with pytest.raises(ContractViolation, match="must be a datetime"):
+        containment(at=1772355600)
+
+
+def test_optional_text_refuses_a_non_string():
+    record = incident()
+    with pytest.raises(ContractViolation):
+        dataclasses.replace(record, summary=object())
+
+
+# --------------------------------------------------------------------------- #
+# Mutation coverage, stated honestly
+# --------------------------------------------------------------------------- #
+# Disabling any guard in src/ fails this suite, with four exceptions. Each is a
+# guard whose twin runs downstream on the same call, so removing one alone changes
+# no behaviour:
+#
+#   records.py:240  cross-incident check in containment_requested()  -> the same
+#                   rule re-runs in _require_containment_evidence via replace()
+#   records.py:264  the lift_refusals re-check in containment_lifted() -> likewise
+#   states.py:83/86 the table check and the forward-only rank check are mutually
+#                   redundant for every state pair the tables define today
+#
+# They are kept as defence in depth, not deleted, because each becomes load-bearing
+# the moment its twin's inputs change. What is asserted instead is that they cannot
+# silently diverge:
+# test_the_transition_tables_agree_with_the_forward_only_rule pins states.py's pair,
+# and the two records.py guards are pinned below.
+def test_the_redundant_containment_guards_have_a_twin_that_agrees():
+    """The downstream invariant refuses exactly what the method's own guard refuses."""
+
+    record, request = contained()
+    foreign = containment(incident(subject="envelope:env-2"))
+
+    # containment_requested's cross-incident guard, and its twin on construction.
+    fresh = incident().advanced_to(IncidentState.CONTAINMENT_REQUESTED)
+    with pytest.raises(ContractViolation, match="different incident"):
+        fresh.containment_requested(foreign)
+    with pytest.raises(ContractViolation, match="different incident"):
+        dataclasses.replace(fresh, containment=ContainmentState.REQUESTED,
+                            containment_request=foreign)
+
+    # containment_lifted's refusal check, and its twin on construction.
+    with pytest.raises(ContainmentLiftRefused, match="request_digest does not match"):
+        record.containment_lifted(lift(foreign))
+    with pytest.raises(ContainmentLiftRefused, match="admissible lift"):
+        dataclasses.replace(record, containment=ContainmentState.LIFTED,
+                            containment_lift=lift(foreign))

@@ -95,12 +95,15 @@ class IncidentRecord:
     #: writing the decision down. Subclassing is refused outright, because a
     #: subclass could replace the invariant with nothing.
     #:
-    #: What this does **not** stop is ``object.__setattr__`` on a live instance.
-    #: Nothing in Python can: frozen dataclasses raise from ``__setattr__``, and
-    #: that is the method being stepped around. So the guarantee is exactly this —
-    #: a record you were *given* has an admissible containment state, and reaching
-    #: an inadmissible one takes deliberately dismantling the object model rather
-    #: than any ordinary use of the type.
+    #: What none of it stops is code that steps around Python's object model
+    #: outright — ``object.__setattr__`` on a live instance, ``__dict__`` assignment
+    #: onto a raw ``__new__``, a ``copyreg`` reducer registered for this class. No
+    #: frozen dataclass can stop those, because they bypass the very methods a
+    #: dataclass defines. Naming them individually would understate it, so state
+    #: the class: **anything already running arbitrary code in the process can
+    #: fabricate a record, and this package is not a defence against that.** What
+    #: it is: every route that goes through the type — construction, ``replace``,
+    #: the mutators, unpickling, subclassing — refuses an unjustified ``LIFTED``.
     containment_request: Optional["ContainmentRequest"] = None
     containment_lift: Optional["ContainmentLift"] = None
     summary: str = ""

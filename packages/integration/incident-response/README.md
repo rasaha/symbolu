@@ -79,11 +79,17 @@ nothing. Reaching `LIFTED` therefore requires a real, admissible `ContainmentLif
 and constructing one is writing the decision down, with its own author and
 justification.
 
-The one thing this does not stop is `object.__setattr__` on a live instance, and
-nothing in Python can: frozen dataclasses raise from `__setattr__`, which is the
-method being stepped around. So the guarantee is stated precisely — a record you
-were **given** has an admissible containment state, and reaching an inadmissible one
-takes deliberately dismantling the object model, not any ordinary use of the type.
+None of that defends against code that steps around Python's object model outright:
+`object.__setattr__` on a live instance, `__dict__` assignment onto a raw `__new__`,
+or a `copyreg` reducer registered for this class — which, once registered, corrupts
+even an ordinary `pickle` round-trip. No frozen dataclass can stop these, because
+they bypass the methods a dataclass defines.
+
+So the guarantee is stated as a class rather than a list: **every route through the
+type** — construction, `replace`, the mutators, unpickling, subclassing — refuses an
+unjustified `LIFTED`; and **anything already executing arbitrary code in the process
+can fabricate a record**, which this package does not claim to prevent and no
+comparable package does.
 
 ## The RA-6 payload
 
