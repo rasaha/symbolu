@@ -36,7 +36,11 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install pytest
+          # pydantic is not this package's dependency; it is Decision Authority's, which
+          # the risk-authority-runtime suite re-run below imports. Installed here so the
+          # "must be unaffected" step actually runs those suites rather than failing at
+          # collection.
+          pip install pytest pydantic
 
       - name: Adversarial suite (no restrictive disposition may widen to CLEAR)
         run: |
@@ -63,6 +67,11 @@ jobs:
           fi
 
       - name: Risk Authority composition must be unaffected
+        env:
+          # The RA-6 status-runtime suite exercises the Agent Runtime clearance seam and
+          # imports ugence_agent_runtime; its own conftest adds only risk_authority. Scoped
+          # to this step so the steps above keep proving this package needs no PYTHONPATH.
+          PYTHONPATH: packages/runtime/agent-runtime/src
         run: |
           # This package uses RA-4.5 composition and RA-6's recheck; it must change
           # neither. Re-running their own suites is the cheap way to know.
