@@ -41,8 +41,10 @@ artifact (line 26-30), which is what settles the shape.
 | `RiskEvaluationSeam.production(...)` **fails closed on any reference-grade or missing dependency** `[V]`; that the maturity of what a root composes is therefore an operational input rather than a label is an inference from it `[I]` | `packages/risk_authority/README.md:109` |
 | The productization roadmap **is** in this repository, and its §3 names exactly what the sequencing ADR attributes to it: an "Evidence & audit service — durable, tamper-evident, replayable records", a "Console — operator UI", and a "Connector framework" `[V]` | `Project_documentation/repository/ugence_platform/UGENCE_PRODUCTIZATION_ROADMAP.md:75-87` |
 | Its §4 puts durable tamper-evident audit **and** the console **in v1**, and defers only *additional systems-of-record* connectors — two runtime connectors and one Kubernetes execution-target connector also ship in v1 `[V]` | ibid. `:91-102` |
-| "AI Control Plane" is not an unclaimed noun: it names an existing product with its own tracked documentation tree, including a unified console plan `[V]` | `Project_documentation/control_plane/` (104 tracked files); `.../aicp_v3_research/UGENCE_AI_CONTROL_PLANE_PRODUCTIZATION_PLAN.md:23-24`; `.../ACP/UGENCE_UNIFIED_CONSOLE_PLAN.md` |
-| No package owns connectors; every package that mentions them disclaims them `[G]` | `packages/integration/ai-system-registry/README.md:18,22,132`; `packages/tooling/policy-workflow-compiler/docs/KNOWN_LIMITATIONS.md:22-25`; `packages/products/procurement/docs/PRODUCT_BOUNDARY.md:31,44` |
+| "AI Control Plane" is not an unclaimed noun: it names an existing product with its own tracked documentation tree **and a shipped console** `[V]` | `Project_documentation/control_plane/` (104 tracked files); `.../aicp_v3_research/UGENCE_AI_CONTROL_PLANE_PRODUCTIZATION_PLAN.md:23-24`; `ugence_console_api/README.md:1-4` |
+| Every package **under `packages/`** that mentions connectors disclaims owning one `[V]` | `packages/integration/ai-system-registry/README.md:18,22,132`; `packages/tooling/policy-workflow-compiler/docs/KNOWN_LIMITATIONS.md:22-25`; `packages/products/procurement/docs/PRODUCT_BOUNDARY.md:31,44` |
+| But one connector **does** exist, outside `packages/`: a read-only, fixture-backed GitHub *evidence* connector that "owns no governance authority" and "emits neutral product records, never mutations" `[V]` | `products/code-governance/src/ugence_code_governance/github/__init__.py:1-6` — note root-level `products/` is a **different tree** from `packages/products/`; both exist |
+| The console is not a plan: it is built and classified `CANONICAL_IMPLEMENTATION`, and is already "the unified AI Control Plane console" `[V]` | `ugence_console_api/README.md:1-4`; `apps/console/`; `Project_documentation/repository/restructuring/UGENCE_REPOSITORY_RESTRUCTURING_PLAN.md:228,232` |
 
 ## Ratified decisions
 
@@ -52,7 +54,7 @@ artifact (line 26-30), which is what settles the shape.
 | D-2 | What the artifact is | **A composition root, not a capability.** It wires packages that already exist, mints no authority, owns no domain vocabulary, and adds nothing to the capability count — which is what line 26-30 anticipates, and it is that line, not the noun argument, that settles the shape. **On the name, the prohibition at line 85-86 is not dispositive and this record does not claim it is**: that rule protects a noun an existing README *reserves*, and the three packages cited *disclaim* "AI Control Plane" rather than reserving it — the opposite move `[I]`. The noun is nevertheless unavailable, for a stronger reason: it already names a product with its own tracked documentation tree and its own console plan `[V]`, so a package taking it would collide with that product, not with the three disclaimers. Name: `packages/integration/control-plane-root`, distribution `ugence-control-plane-root` — a root *under* the AI Control Plane, never the thing itself. |
 | D-3 | Where the audit-ledger service lives | **Under this root, per D-4 of the sequencing ADR.** The service composes the durable-audit shape (copied from storygraph, never imported, as D-3 of that ADR already ruled for Policy Authority) and mints `AuditReference`s into it. It **unifies no existing store**: the seven stores stay where they are, and G4's contract remains the only thing that correlates them. |
 | D-4 | What the root may never own | **No policy, no decision, no envelope, no revocation, no credential, no queue, no clock of its own beyond a single injected instant per act, and no second copy of any vocabulary.** It refuses; it does not decide. Every authority it touches is exercised by the package that already owns it. |
-| D-5 | Scope of the first slice | **The audit-ledger service and nothing else.** Not because the rest is unscoped — roadmap §3 exists and §4 puts the console and two runtime connectors **in v1** `[V]` — but because they are that product's scope, owned by the AI Control Plane plan and its console plan, and reachable from this root only by becoming something other than a root. The ledger is the one §3 service that is a composition of packages this repository already ships; the console is a UI and the connector framework is an execution-target concern the cloud-scaling ladder is already building phase by phase. A root that grew a console would stop being a root. |
+| D-5 | Scope of the first slice | **The audit-ledger service and nothing else.** Not because the rest is unscoped, and not because it is unbuilt: roadmap §3 exists, §4 puts the console and two runtime connectors **in v1**, the console is already shipped and classified `CANONICAL_IMPLEMENTATION`, and a read-only GitHub evidence connector already exists `[V]`. The reason is narrower and survives all of that — **the ledger is the only §3 service that is a composition of packages under `packages/`, which is the only thing a root in `packages/integration/` may be.** The console is a running FastAPI service outside that tree and is already *the* AI Control Plane console; a root that grew one would not be duplicating a plan, it would be duplicating a shipped service. |
 
 ## What the root composes
 
@@ -102,17 +104,26 @@ with, at minimum:
   no such test, D-1 is the ruling to revisit — not something to work around.
 * **The integration hub is deferred, but not for want of a plan** `[R]`. Roadmap §4
   ships two runtime connectors and one Kubernetes execution-target connector in v1
-  and defers only *additional systems-of-record* connectors. Meanwhile every package
-  that mentions connectors disclaims them, and the cloud-scaling ladder is building
-  execution-target connectors phase by phase without calling itself a hub. Whether
-  the hub is a real gap or an already-owned milestone under another name needs the
-  owner's ruling; it is not this root's to answer.
-* An earlier draft of this record claimed the productization roadmap was absent from
-  the repository. It is not: it is at
-  `Project_documentation/repository/ugence_platform/UGENCE_PRODUCTIZATION_ROADMAP.md`,
-  and the claim came from a search that covered only `docs/` and `packages/`. The
-  correction is recorded here rather than silently applied, because D-5's original
-  rationale rested on it.
+  and defers only *additional systems-of-record* connectors. One connector already
+  exists — read-only, fixture-backed, evidence-only, in `products/code-governance`
+  `[V]` — and the cloud-scaling ladder is building execution-target connectors phase
+  by phase without calling itself a hub. Whether the hub is a real gap or an
+  already-owned milestone under another name needs the owner's ruling; it is not
+  this root's to answer.
+* **Two earlier drafts of this record asserted absences that a wider search
+  falsified**, and both corrections are recorded here rather than applied silently,
+  because D-5's rationale rested on each in turn. The first claimed the
+  productization roadmap was absent; it is at
+  `Project_documentation/repository/ugence_platform/UGENCE_PRODUCTIZATION_ROADMAP.md`.
+  The second claimed no package owns a connector and implied the console was
+  unbuilt; `products/code-governance` owns a read-only evidence connector, and
+  `ugence_console_api/` is a shipped, classified console. Both came from searching
+  `docs/` and `packages/` and treating the result as repository-wide.
+  **The methodological point outlives the two facts**: this repository has major
+  trees outside `packages/` — `products/` (distinct from `packages/products/`),
+  `ugence_console_api/`, `apps/`, `Project_documentation/` — so an absence claimed
+  from `packages/` alone is not a repository-wide absence, and no `[V]` or `[G]` in
+  any successor record should be granted on that basis.
 * This root composes reference-grade packages, so it inherits that maturity `[V]`
   (D-1). Nothing here is production-ready, and no slice of it should be described
   as such.
