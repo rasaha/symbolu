@@ -492,12 +492,23 @@ to be quietly skipped.** They are named here so that skipping one is visible.
 
 ---
 
-## 9 — Owner decisions this record does not take `[R]`
+## 9 — Owner decisions (ruled 2026-09-05)
 
-| # | Decision |
+Both were ruled by the repository owner before GAS-2 began. They are no longer open.
+
+| # | Ruling |
 |---|---|
-| **OD-1** | Whether the DBOS step record and the three Agent Runtime tables can commit in **one** Postgres transaction. If they cannot, §8 row 3 carries a permanent residual that must be stated in the adapter README rather than engineered around. |
-| **OD-2** | R-5 says the engine and Agent Runtime share one Postgres. Risk Authority's durable persistence is separately ratified as **SQLite, Posture B** `[V]` (`ADR_RISK_AUTHORITY_DURABLE_PERSISTENCE_SCOPING.md` D-1), as is execution reservation. Whether governance stores move to that Postgres, or the two backends coexist with a documented consistency boundary, is unruled. Nothing in §5 depends on the answer; §8 row 8 does. |
+| **OD-1** | **`REQUIRE_SINGLE_TRANSACTION`.** Atomic commit is a **DBOS ratification gate**, not a documented residual. The DBOS step record, the `RuntimeStateStore` update, the `CheckpointStore` append and the `RuntimeEventStore` appends must commit in **one supported Postgres transaction**. If DBOS cannot provide this, **DBOS remains a candidate and GAS-2 stops and reports the evidence** — a permanent split-commit residual is neither accepted nor engineered around. This *strengthens* what §5.4 and §8 row 3 previously contemplated: those passages are read subject to this ruling. |
+| **OD-2** | **`COEXIST_WITH_BOUNDARY`.** Risk Authority and execution-reservation persistence stay on their separately ratified SQLite Posture B `[V]` (`ADR_RISK_AUTHORITY_DURABLE_PERSISTENCE_SCOPING.md` D-1). DBOS and the three Agent Runtime stores share Postgres. The two backends coexist behind an **explicitly documented consistency boundary**, stated in the adapter README. GAS-2 migrates and redesigns no governance store. §8 row 8's budget ledger therefore lives in the shared Postgres. |
+
+### What OD-1 changes in this record
+
+§5.4 previously left the atomicity question open and offered a conservative fallback
+for §8 row 3. Under OD-1 there is no fallback: **row 3 is a gate**. The adapter must
+demonstrate one transaction covering the engine's step record and all three store
+writes, or GAS-2 halts. The row 3 evidence column is read accordingly — the clause
+"if they cannot, this row's expected behaviour is the conservative one" is superseded
+and is retained only to show what was rejected.
 
 ---
 

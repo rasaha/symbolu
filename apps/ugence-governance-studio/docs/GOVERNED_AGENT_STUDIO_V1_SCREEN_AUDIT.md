@@ -170,12 +170,23 @@ only prose drifts; this one can be a test.
 
 ---
 
-## Owner decisions this audit surfaces `[R]`
+## Owner decisions (ruled 2026-09-05)
 
-| # | Decision |
+Both were ruled by the repository owner. They are no longer open; GAS-4 may start on
+them when it is reached.
+
+| # | Ruling |
 |---|---|
-| **SD-1** | How to widen `_PROHIBITED_IMPORTS` (§ the finding above): an explicit public-entry-point allowlist, or a different boundary. Recommended: allowlist; keep private submodules and database drivers prohibited. GAS-4 cannot start without this. |
-| **SD-2** | Confirm the studio never issues, activates, revokes, grants, authorizes, clears or executes — Constitution preflights only, Publish reaches shadow only. Recommended: confirm, and enforce it as the operation-id test above. |
+| **SD-1** | **`EXPLICIT_PUBLIC_ALLOWLIST`.** The studio backend boundary is widened **only** through an explicit per-package allowlist of public entry points. All private submodules and all database drivers stay prohibited, and `backend/tests/test_architecture.py` is **retained** — extended, never deleted or weakened. A package reaches the studio by having one documented public surface added to the allowlist, or it does not reach the studio at all. |
+| **SD-2** | **`NON_AUTHORITY_STUDIO`.** The studio never issues, activates, revokes, grants, authorizes, clears or executes. Constitution **preflights only**; Publish reaches **shadow only**. This is enforced by the v2 operation-id prohibition test sketched above, not by prose. |
+
+Under SD-1, the allowlist that GAS-4 must add is exactly the entry points named in the
+screen map above and no others — `ActivationRoot.preflight_issuance`, the compiler's
+`validate` / `synthesize` / `compile_policy_pack`, the `PolicyRegistry` read surface,
+the Decision Authority read surface, and the Agent Runtime public API. Under SD-2,
+`ActivationRoot.issue_constitution` and `.activate_constitution`, `issue_policy`, and
+the console's `/v1/actions/authorize` and `/v1/actions/clear` are named here as
+**permanently out of the allowlist**.
 
 ## Gaps carried into GAS-4 `[G]`
 
