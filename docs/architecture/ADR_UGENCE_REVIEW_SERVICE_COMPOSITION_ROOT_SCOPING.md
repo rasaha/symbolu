@@ -1,9 +1,13 @@
 # Ugence governed review service composition root — scoping record
 
-**Status: SCOPED, AWAITING RULING — nothing here is implemented.** This record scopes
-where `ReviewService` is composed and served, with the identity port (AI-C), the
-linkage appender (HE-1) and the durable adapter it needs. It authorizes no code, adds
-no dependency, provisions no secret and reopens no ruling of P3E, GAS-7, HE or ID.
+**Status: SCOPED AND RULED — nothing here is implemented.** This record scopes where
+`ReviewService` is composed and served, with the identity port (AI-C), the linkage
+appender (HE-1) and the durable adapter it needs. The five decisions in §5 were ruled
+by the owner on 2026-09-05. Implementation is entered only by its own prompt. This
+record adds no dependency, provisions no secret and reopens no ruling of P3E, GAS-7,
+HE or ID. `REFERENCE_GRADE_SHADOW_ONLY` is preserved throughout: a `production=True`
+switch anywhere in this topology selects fail-closed posture and never implies
+production certification, pilot validation or LIVE execution.
 
 Evidence labels: `[V]` verified against this repository at the merge of PR #1635,
 `[I]` inferred, `[R]` requires ratification, `[G]` gap.
@@ -42,7 +46,18 @@ it in the studio backend would breach the studio's driver boundary. The root is 
 deployment unit, and the studio needs one new configuration value and the v2 app served
 to reach it.
 
-## 3 — What the root composes `[I]`
+## 3 — Topology and configuration (ruled)
+
+Two deployment units on one private network segment:
+
+| Unit | Process | Serves | Holds |
+|---|---|---|---|
+| **Governance Studio** (P3E, amended under CR-2) | the existing single ASGI process behind its TLS listener and Basic gate | the SPA and, after CR-2, the combined v1 and v2 API under the same gate | no database, no driver, no identity, one new value `UGENCE_STUDIO_REVIEW_SERVICE_URL` |
+| **Governed runtime worker** (new under CR-1) | one process: DBOS engine, runtime host, providers, governed hook, review service HTTP | `build_app(service)` on a private TLS listener | the two Postgres DSNs, three SQLite stores on a durable volume, the JWKS adapter configuration |
+
+The studio relays the five review routes and the one proof header to the worker over
+HTTPS; the worker never calls the studio. The worker's only outbound connection is the
+JWKS URL (CR-5). Configuration of the worker, all explicit:
 
 | Concern | Source | Production posture |
 |---|---|---|
@@ -58,9 +73,14 @@ to reach it.
 
 Everything the root reads is configuration; nothing it holds is a credential except
 the database DSNs. The proof arrives in `X-Ugence-Approver-Proof` from the studio and
-is never stored (AI-B, AI-C).
+is never stored (AI-B, AI-C). Under CR-4 one `UGENCE_REVIEW_DEPLOYMENT_MODE=production`
+sets every production switch in the table together and refuses, at composition, any
+static identity or eligibility adapter, any in-memory store and any non-authoritative
+bundle. The same switch never enables LIVE execution: `ENFORCEMENT_ENABLED` stays
+`False` in every package the worker composes, and the label stays
+`REFERENCE_GRADE_SHADOW_ONLY`.
 
-## 4 — Constraints the root must satisfy `[I]`
+## 4 — P3E and secret boundary (ruled)
 
 - **P3E stays as ratified.** The studio container keeps `single_process`, no egress,
   no database. What changes on the studio side is one configuration value and the v2
@@ -74,21 +94,45 @@ is never stored (AI-B, AI-C).
   Under P3E's precedent for platform controls (the Vercel record), an allowlisted
   egress rule is `EXTERNAL_DEPLOYMENT_EVIDENCE`, never application behaviour.
 - **No container gate evidence transfers.** The thirteen P3E-CTR gates verify the
-  studio image; the worker image would need its own gate set, and until it has one it
-  carries none.
-- **Label.** `REFERENCE_GRADE_SHADOW_ONLY`: every provider the worker invokes is a
-  fixture, every decision is `PRESENTED_UNPROVEN` until AI-C runs against a real
-  issuer, and `ENFORCEMENT_ENABLED` stays `False`.
+  studio image. Ruled: the worker image needs its own P3E-equivalent gate set and
+  evidence manifest, separate from the studio's, and until it has one it carries no
+  gate evidence and none may be described as passed or waived on its account.
+- **Secrets.** The worker holds exactly two: the application and system Postgres DSNs,
+  supplied as environment or a read-only mounted file, never logged, never in an
+  image layer. The JWKS adapter holds public keys only. The studio gains no secret:
+  the review-service URL is configuration, and the approver proof passes through
+  unread (ID-1). No secret is ever committed.
+- **Label and ceiling.** `REFERENCE_GRADE_SHADOW_ONLY`: every provider the worker
+  invokes is a fixture, every decision is `PRESENTED_UNPROVEN` until AI-C runs against
+  a real issuer, `ENFORCEMENT_ENABLED` stays `False`, and `production=True` on any
+  component is a posture (fail closed, no fixtures) and never a certification.
 
-## 5 — Owner decisions `[R]`
+## 4a — Failure matrix
 
-| # | Decision | Recommendation |
-|---|---|---|
-| **CR-1** | Placement: a separate governed runtime worker deployment unit hosting the DBOS engine, the three stores and the review service; or extend the P3E container; or compose inside the studio backend. | **Separate worker unit.** Facts 2, 5, 6 and 7 rule out the other two without reopening P3E or the studio's driver boundary. |
-| **CR-2** | The studio side: add `UGENCE_STUDIO_REVIEW_SERVICE_URL` to the P3E configuration allowlist and serve `create_combined_app` under the existing gate, amending `approved-runtime-config`; or keep P3E at v1 and reach the review screens only from a non-P3E profile. | **Amend P3E to serve v2 with the one new variable.** Otherwise the ratified deployment can never show the review screens. |
-| **CR-3** | Protection of the service listener: private-network reachability plus TLS with the identity port mandatory in production; or an access gate of its own in front of `build_app`. | **Private network, TLS, identity port mandatory.** A second Basic gate would hold a second credential in the studio, which HR-1 and ID-1 forbid. |
-| **CR-4** | Production posture: one `UGENCE_REVIEW_DEPLOYMENT_MODE` that sets the four production switches together and fails closed on any static adapter or in-memory store; or leave them independent. | **One switch.** Four independent flags are four ways to ship a fixture as production. |
-| **CR-5** | Egress: allowlist exactly the JWKS host as platform configuration, recorded as external evidence; or require the issuer inside the private network with no egress at all. | **Allowlisted single host.** Enterprise issuers are rarely inside the segment; the rule is recorded, not assumed. |
+| # | Failure | Required property | Holds today `[V]` | Gap `[G]` | Proving test |
+|---|---|---|---|---|---|
+| 1 | The worker is composed with the static identity adapter or an in-memory store in production mode | Refused at composition, before any listener opens | Each package refuses its own fixture in its own production mode | One switch sets all (CR-4) | Mode production, fixture supplied: composition raises; no port bound |
+| 2 | The worker listener is reached from outside the studio's segment | Unreachable: the listener binds the private interface only and TLS is mandatory | Nothing: `build_app` has no gate and no bind rule | CR-3 | Bind configuration refuses a public interface in production; plain HTTP refused |
+| 3 | A decision reaches the worker without a proof | `REFUSED_UNAUTHENTICATED`, ledger unchanged | Holds when an identity port is configured (AI-A row 1) | Port mandatory in production (CR-3) | Production mode with no identity port: composition refused |
+| 4 | The studio is deployed without the review-service URL | The review screens report a typed gap, never an empty queue | `ReviewRelayService` reports `LEDGER`-style gaps today | The variable itself (CR-2) | Unset variable: `/api/v2/review/queue` answers `available: false` |
+| 5 | The worker attempts any egress other than the JWKS host | Refused by platform allowlist; recorded as external evidence | Nothing | CR-5 | Egress test: only the configured JWKS host is reachable; docker.io and the issuer's discovery document are not |
+| 6 | The worker image is described as gate-evidenced because the studio image is | Never; separate gate set | Nothing | Evidence ruling, §6 step 4 | The worker's evidence manifest is absent until its own gates run; the studio manifest names only the studio image |
+| 7 | `production=True` is read as production certification or as LIVE | Never: labels stay `REFERENCE_GRADE_SHADOW_ONLY`, `ENFORCEMENT_ENABLED` `False` | Every package declares both constants | None; a test must pin it in the worker | Worker maturity test asserts both constants across every composed package |
+| 8 | A database DSN appears in a log, an answer or an image layer | Never | Studio logging discipline exists; the worker has none yet | Worker logging and image-layer secret scan | Redaction test over startup and every route; layer scan in the worker gate set |
+
+## 5 — Owner decisions (ruled 2026-09-05)
+
+| # | Ruling |
+|---|---|
+| **CR-1** | **`SEPARATE_WORKER_UNIT`.** A companion deployment unit, the governed runtime worker, hosts the DBOS engine, the runtime host, the three SQLite stores and the review service. The P3E container is not extended and the studio backend composes nothing. |
+| **CR-2** | **`AMEND_P3E_SERVE_V2`.** The P3E profile gains one configuration value, `UGENCE_STUDIO_REVIEW_SERVICE_URL`, and serves the combined v1 and v2 application under its existing gate; `approved-runtime-config` and its freeze test are amended to say so. |
+| **CR-3** | **`PRIVATE_NETWORK_TLS_IDENTITY_MANDATORY`.** The worker's listener binds the private segment only, over TLS, and in production mode an identity port is mandatory. No second access gate and no second credential. |
+| **CR-4** | **`ONE_DEPLOYMENT_MODE_SWITCH`.** `UGENCE_REVIEW_DEPLOYMENT_MODE=production` sets every production switch together and refuses any fixture adapter, in-memory store or non-authoritative bundle at composition. It certifies nothing and enables no LIVE execution. |
+| **CR-5** | **`ALLOWLISTED_JWKS_HOST`.** The worker's only egress is the configured JWKS host over HTTPS, as platform configuration recorded as `EXTERNAL_DEPLOYMENT_EVIDENCE`; no discovery document, no docker.io, nothing else. |
+
+Ruled alongside, on evidence: **`SEPARATE_P3E_EQUIVALENT_EVIDENCE`**. The worker image
+gets its own P3E-equivalent gate set and evidence manifest; the studio profile is not
+extended to cover it (§4, §6 step 4).
 
 Prohibitions, stated once: no database driver, DSN or store in the studio; no
 credential beyond the database DSNs in the worker; no second identity provider; no
@@ -97,7 +141,7 @@ as passed on account of the worker; no LIVE execution.
 
 ## 6 — Sequence and ceiling
 
-1. **Ruling** on CR-1 to CR-5 (documentation only).
+1. **Ruling** on CR-1 to CR-5 (documentation only). Done, above.
 2. **Worker composition root**: a `deployment/governed-runtime-worker` profile with its
    configuration, the four-switch production mode, the SQLite volume, the JWKS egress
    record, TLS on the listener, and tests that a fixture adapter or in-memory store is
@@ -115,4 +159,6 @@ review and the mirror.
 
 ## 7 — Next step
 
-Rule on CR-1 to CR-5. No implementation prompt is issued while they are open.
+Step 2, the worker composition root, under CR-1, CR-3, CR-4 and CR-5, labelled
+`REFERENCE_GRADE_SHADOW_ONLY`; then step 3, the P3E amendment under CR-2. Step 4 waits
+on the mirror.
