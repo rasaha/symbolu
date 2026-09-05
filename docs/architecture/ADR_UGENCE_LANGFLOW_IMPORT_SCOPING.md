@@ -3,8 +3,9 @@
 **Status:** scoping, 2026-09-05, under owner ruling `ENTER_LANGFLOW_IMPORT_FIRST`
 (roadmap §11.3, superseding `DEFER_LANGFLOW_CUSTOMER_GATED`). **Contract-only.** No
 importer, route, dependency or test exists; nothing here is implemented. Owner
-decisions LI-1 to LI-5 in §7 are open. Labels: `[V]` verified, `[I]` inferred, `[R]`
-requires ratification, `[G]` gap.
+decisions LI-1 to LI-5 were ruled on 2026-09-05 (§7). **Implementation is blocked**
+until a genuine, secret-free Langflow export fixture is supplied as evidence (§8).
+Labels: `[V]` verified, `[I]` inferred, `[R]` requires ratification, `[G]` gap.
 
 ## 1 — The question
 
@@ -99,18 +100,31 @@ fixture is refused with its typed error and the importer's evaluation counter is
   against fixture providers once `provider_id` placeholders are bound.
 - Maturity flag `langflow_import_implemented` flips only at the GAS-5 exit.
 
-## 7 — Owner decisions `[R]`
+## 7 — Owner decisions (ruled 2026-09-05)
 
-| # | Decision | Options | Recommendation |
-|---|---|---|---|
-| LI-1 | The compile target | `TWO_ARTIFACTS` (WorkflowDefinition + draft PolicyPack, §4) \| `POLICY_PACK_ONLY` (as GAS-5 text says) | `TWO_ARTIFACTS`; a flow graph is not a policy pack |
-| LI-2 | Reasoning-interior components (model, prompt, memory) | `RECORD_AS_DIAGNOSTIC` \| `REFUSE_IMPORT` | `RECORD_AS_DIAGNOSTIC`; refusing every flow with a model node would refuse every flow |
-| LI-3 | Unmapped node types | `REFUSE` (GAS-5 exit as written) \| `DIAGNOSTIC_AND_DROP` | `REFUSE` |
-| LI-4 | Provider binding for imported tools | `PLACEHOLDER_BOUND_BY_OPERATOR` \| `REFUSE_UNTIL_REGISTERED` | `PLACEHOLDER_BOUND_BY_OPERATOR`; Simulate refuses an unbound placeholder |
-| LI-5 | Format verification | `PIN_ONE_VERIFIED_VERSION` (allowlist verified against one real export, others `UNVERIFIED_FORMAT_VERSION`) \| `BEST_EFFORT_ANY_VERSION` | `PIN_ONE_VERIFIED_VERSION` |
+| # | Ruling |
+|---|---|
+| **LI-1** | **`TWO_ARTIFACTS`.** The importer produces a Workflow IR artifact preserving the accepted graph (the runtime `WorkflowDefinition` of §4) and a separate `PolicyPack`. The pack enters as an ordinary unapproved pack. Import confers no approval, maturity, authority or permission to execute. |
+| **LI-2** | **`RECORD_AS_DIAGNOSTIC`, narrowly.** A diagnostic may record only explicitly allowlisted, non-semantic Langflow metadata that cannot affect graph meaning, bindings, policy, authority or execution (display names, descriptions, positions, and the fact that a reasoning-interior component of an allowlisted type was present). Unknown semantic fields, code-bearing fields and executable content refuse the import; they never become diagnostics. |
+| **LI-3** | **`REFUSE`.** Any unknown or unmapped node type refuses the entire import with a typed error and zero evaluation. No node is ever silently dropped or degraded. |
+| **LI-4** | **`PLACEHOLDER_BOUND_BY_OPERATOR`.** An accepted external tool, provider or resource reference compiles only into an inert unresolved placeholder. An operator must explicitly bind it to an already registered Ugence resource before any later use. A placeholder is non-executable, carries no credential, grants no authority and cannot enter LIVE execution; Simulate refuses an unbound placeholder. |
+| **LI-5** | **`PIN_ONE_VERIFIED_VERSION`.** The first implementation supports exactly one explicitly identified Langflow export-schema version, verified against at least one genuine, secret-free Langflow export fixture. Any other or missing version refuses with a typed unsupported-version error. No best-effort parsing. |
+
+**Refusal precedence, stated once.** LI-2 never overrides §5. Malformed JSON, an
+oversized or deeply nested document, a cyclic graph, a code-bearing field, an unknown
+node type, a duplicate identifier, an inconsistent declared count, or a structurally
+ambiguous edge refuses the whole import with its typed error before any diagnostic is
+recorded and before any evaluation. `§5` gains two rows accordingly: `COUNT_MISMATCH`
+(a declared node or edge count that disagrees with the arrays) and `EDGE_AMBIGUOUS` (an
+edge whose handles do not identify exactly one source field and one target field).
 
 ## 8 — Next step
 
-Ruling on LI-1 to LI-5. No implementation prompt is issued while they are open. The
-first implementation step after ruling is obtaining one real Langflow export from a
-reachable environment and verifying §3 against it, before any parser is written.
+**Blocked on evidence.** A genuine, secret-free Langflow export (any small flow, with
+every credential, key and URL removed) is required before implementation begins: §3 is
+recorded from general knowledge `[I]` because the public schema is unreachable from
+the build environment, and LI-5 forbids parsing an unverified version. Until such a
+fixture is supplied and committed under the importer's test fixtures, no implementation
+prompt is issued and the maturity flag `langflow_import_implemented` stays `False`.
+Once it is, the first implementation step is to verify §3 against the fixture and pin
+its version, before any parser is written.
