@@ -109,5 +109,7 @@ follow and are unchanged by this record.
 
 ## 7 — Next step
 
-AI-D (`ADR_UGENCE_APPROVER_IDENTITY_SCOPING.md` §6). Enterprise-issuer validation of
-this adapter waits on an owner-provisioned issuer and is not claimed.
+AI-D shipped (`ADR_UGENCE_APPROVER_IDENTITY_SCOPING.md` §6). Fact 9, the composition
+root, is scoped in `ADR_UGENCE_REVIEW_SERVICE_COMPOSITION_ROOT_SCOPING.md`, awaiting
+rulings CR-1 to CR-5. Enterprise-issuer validation of this adapter waits on an
+owner-provisioned issuer and is not claimed.
