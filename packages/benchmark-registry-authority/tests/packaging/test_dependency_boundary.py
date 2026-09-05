@@ -1,4 +1,10 @@
-"""Exactly one runtime dependency, in one direction, and none the other way."""
+"""The frozen BR-1 layer plus the D-41 pair, in one direction, and none the other way.
+
+The candidate rung's ratified release transition (D-40 as applied to
+``BR-2C-RC``) admits exactly two third-party distributions — ``cryptography``
+and ``PyNaCl`` — imported only inside the dedicated verifier module and only
+for their D-41 roles. Every other prohibition here is unmoved.
+"""
 
 from __future__ import annotations
 
@@ -74,20 +80,52 @@ def _absolute_imports(path):
     return modules
 
 
-def test_happy_the_declared_dependency_list_is_exactly_the_frozen_br1_layer():
+#: The verifier module — the only file the transition lets import the pair.
+VERIFIER_MODULE = SRC / "verifier.py"
+
+#: The ratified dependency set at the candidate rung, in declaration order:
+#: the frozen BR-1 layer, then the D-41 pair, bounded on both sides in the same
+#: style the trusted-evidence layer declares them (a selection, never an import).
+RATIFIED_DEPENDENCIES = [
+    "ugence-benchmark-registry==0.1.*",
+    "cryptography>=41.0.7,<47.0.0",
+    "PyNaCl>=1.5.0,<2.0.0",
+]
+
+
+def test_happy_the_declared_dependency_list_is_exactly_br1_plus_the_d41_pair():
     match = re.search(r"^dependencies = \[(.*?)\]", PYPROJECT, re.M | re.S)
     assert match, "no dependencies key in pyproject.toml"
     declared = re.findall(r'"([^"]+)"', match.group(1))
-    assert declared == ["ugence-benchmark-registry==0.1.*"]
+    assert declared == RATIFIED_DEPENDENCIES
 
 
 def test_the_dependency_is_pinned_to_the_br1_zero_one_line():
     assert 'ugence-benchmark-registry==0.1.*' in PYPROJECT
 
 
-def test_no_cryptographic_dependency_is_declared():
-    for banned in ("cryptography", "PyNaCl", "pynacl", "pyca", "nacl"):
-        assert banned not in PYPROJECT, banned
+def test_no_cryptographic_dependency_beyond_the_d41_pair_is_declared():
+    """D-41 selected two. A third backend, a pure-Python Ed25519 or a Ugence
+    authority's own implementation stays out, and the pair stays bounded."""
+
+    match = re.search(r"^dependencies = \[(.*?)\]", PYPROJECT, re.M | re.S)
+    declared = re.findall(r'"([^"]+)"', match.group(1))
+    lowered = " ".join(declared).lower()
+    for banned in ("ed25519", "pycryptodome", "pycrypto", "pyopenssl", "ecdsa",
+                   "libsodium", "trusted-evidence", "policy-authority",
+                   "risk-authority", "governance-contracts"):
+        assert banned not in lowered, banned
+    for pin in ("cryptography>=", "cryptography>=41.0.7,<", "PyNaCl>=1.5.0,<"):
+        assert pin in " ".join(declared), pin
+
+
+def test_the_d41_pair_is_imported_only_inside_the_verifier_module():
+    for path in sorted(SRC.rglob("*.py")):
+        imported = _absolute_imports(path) & {"cryptography", "nacl"}
+        if path == VERIFIER_MODULE:
+            assert imported == {"cryptography", "nacl"}, path.name
+        else:
+            assert imported == set(), (path.name, imported)
 
 
 @pytest.mark.parametrize("forbidden", FORBIDDEN_PACKAGES)
@@ -99,7 +137,7 @@ def test_no_module_imports_a_forbidden_package(forbidden):
     assert offenders == [], offenders
 
 
-def test_the_only_non_stdlib_import_is_the_frozen_br1_layer():
+def test_the_only_non_stdlib_imports_are_br1_and_the_pair_in_the_verifier_module():
     stdlib = {
         "__future__",
         "dataclasses",
@@ -114,8 +152,11 @@ def test_the_only_non_stdlib_import_is_the_frozen_br1_layer():
     }
     offenders = []
     for path in sorted(SRC.rglob("*.py")):
+        permitted = {"cryptography", "nacl"} if path == VERIFIER_MODULE else set()
         for module in sorted(_absolute_imports(path)):
             if module in stdlib or module == "ugence_benchmark_registry":
+                continue
+            if module in permitted:
                 continue
             offenders.append(f"{path.name}: {module}")
     assert offenders == [], offenders

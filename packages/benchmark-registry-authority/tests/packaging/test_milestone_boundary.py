@@ -41,14 +41,14 @@ FORBIDDEN_CAPABILITY_UNLOCK = {
     "registryengine": "BR-2D",
     "storage": "BR-2D",
     "store_impl": "BR-2D",
-    "signatureverifier": "BR-2C",
-    "signature_verifier": "BR-2C",
-    "keyparser": "BR-2C",
-    "key_parser": "BR-2C",
-    "trustanchorstore": "BR-2C",
-    "trust_anchor_store": "BR-2C",
-    "approvalverifier": "BR-2C",
-    "approval_verifier": "BR-2C",
+    "signatureverifier": "BR-2C-RC",
+    "signature_verifier": "BR-2C-RC",
+    "keyparser": "BR-2C-RC",
+    "key_parser": "BR-2C-RC",
+    "trustanchorstore": "BR-2C-RC",
+    "trust_anchor_store": "BR-2C-RC",
+    "approvalverifier": "BR-2C-RC",
+    "approval_verifier": "BR-2C-RC",
     "resolverimpl": "BR-2D",
     "resolver_impl": "BR-2D",
     "convenienceresolver": None,
@@ -145,6 +145,28 @@ BR2A_FROZEN_CAPABILITY_TOKENS = frozenset(
 )
 
 
+#: The eight tree-wide tokens D-33 records as BR-2C's (twelve across both
+#: maps, with ``EXPORTED_IMPLEMENTATION_UNLOCK``'s four). The ratified release
+#: transition for the candidate rung lifts **exactly these** at ``BR-2C-RC``:
+#: the candidate ships the capability they name, and a token whose unlock
+#: stayed at ``BR-2C`` while the capability shipped under another name would
+#: make the unlock map a statement about spelling rather than capability.
+#: Everything else — every BR-2D token and every permanent ban — is untouched,
+#: and :func:`test_the_effective_ban_set_is_exactly_what_the_transition_leaves`
+#: pins that in both directions.
+BR2C_CAPABILITY_TOKENS = frozenset(
+    {
+        "signatureverifier",
+        "signature_verifier",
+        "keyparser",
+        "key_parser",
+        "trustanchorstore",
+        "trust_anchor_store",
+        "approvalverifier",
+        "approval_verifier",
+    }
+)
+
 #: The tokens banned at the subphase this distribution currently is.
 FORBIDDEN_CAPABILITY_TOKENS = tuple(
     sorted(
@@ -155,28 +177,53 @@ FORBIDDEN_CAPABILITY_TOKENS = tuple(
 )
 
 
-def test_happy_the_package_version_is_the_br2c_0_rung():
-    """D-33's rung: BR-2C's contracts landed, no BR-2C capability did."""
+def test_happy_the_package_version_is_the_br2c_candidate_rung():
+    """The owner's candidate ruling: ``0.3.0rc1`` on ``BR-2C-RC``, never ``0.3.0``.
 
-    assert api.__version__ == "0.2.3"
-    assert VERSION_SUBPHASE[api.__version__] == "BR-2C-0"
+    The candidate ships BR-2C's capability and not BR-2C's closure. ``0.3.0``
+    stays reserved for the reviewed verifier, and a head wearing it would be
+    claiming a review that has not occurred.
+    """
+
+    assert api.__version__ == "0.3.0rc1"
+    assert VERSION_SUBPHASE[api.__version__] == "BR-2C-RC"
+    assert api.__version__ != "0.3.0"
+    assert "rc" in api.__version__
+
+
+def test_the_br2c_0_rung_still_bans_everything_br2a_froze():
+    """The previous rung is unmoved by the candidate: the lift is at RC only."""
+
+    assert banned_capability_tokens("BR-2C-0", FORBIDDEN_CAPABILITY_UNLOCK) == (
+        BR2A_FROZEN_CAPABILITY_TOKENS
+    )
 
 
 # --------------------------------------------------------------------------- #
 # D-19: the bans became milestone-conditional. They did not become weaker.
 # --------------------------------------------------------------------------- #
-def test_the_effective_ban_set_is_exactly_what_br2a_froze():
-    """The whole point of the restructuring: nothing unlocks at BR-2B.
+def test_the_effective_ban_set_is_exactly_what_the_transition_leaves():
+    """The candidate lifts the eight BR-2C tokens and nothing else — both ways.
 
-    D-19 makes the capability bans milestone-conditional. This asserts the
-    change is structural rather than permissive — at this version the effective
-    ban set must equal BR-2A's frozen set **exactly**, in both directions. A
-    token that quietly acquired an already-reached unlock phase would show up
-    here as a missing element, not as a silently passing suite.
+    D-19 makes the capability bans milestone-conditional. At the candidate rung
+    the effective ban set must equal BR-2A's frozen set **minus exactly the
+    eight BR-2C tokens**, in both directions: a BR-2D or permanent token that
+    quietly acquired an already-reached unlock phase would show up here as a
+    missing element, and a BR-2C token still banned would show up as an extra
+    one, so the unlock map cannot drift in either direction silently.
     """
 
     assert FORBIDDEN_CAPABILITY_TOKENS != ()
-    assert set(FORBIDDEN_CAPABILITY_TOKENS) == BR2A_FROZEN_CAPABILITY_TOKENS
+    assert set(FORBIDDEN_CAPABILITY_TOKENS) == (
+        BR2A_FROZEN_CAPABILITY_TOKENS - BR2C_CAPABILITY_TOKENS
+    )
+    assert BR2C_CAPABILITY_TOKENS < BR2A_FROZEN_CAPABILITY_TOKENS
+    assert {
+        token
+        for token, unlock in FORBIDDEN_CAPABILITY_UNLOCK.items()
+        if unlock == "BR-2C-RC"
+    } == BR2C_CAPABILITY_TOKENS
+    assert not any(unlock == "BR-2C" for unlock in FORBIDDEN_CAPABILITY_UNLOCK.values())
 
 
 def test_every_frozen_token_still_carries_an_unlock_ruling():
@@ -220,14 +267,21 @@ def test_every_unlock_phase_named_is_a_real_subphase():
         assert unlock is None or unlock in SUBPHASE_LADDER, token
 
 
-def test_no_capability_is_scheduled_to_unlock_at_or_before_this_version():
-    """An unlock in the past would be a ban this release already lifted."""
+def test_no_capability_beyond_br2c_is_scheduled_to_unlock_at_or_before_this_version():
+    """An unlock in the past would be a ban this release already lifted.
+
+    The only unlocks at or below the candidate rung are the eight BR-2C tokens
+    the transition names, and theirs is exactly **at** the rung, never below.
+    """
 
     reached = SUBPHASE_LADDER.index(VERSION_SUBPHASE[api.__version__])
     for token, unlock in FORBIDDEN_CAPABILITY_UNLOCK.items():
         if unlock is None:
             continue
-        assert SUBPHASE_LADDER.index(unlock) > reached, token
+        if token in BR2C_CAPABILITY_TOKENS:
+            assert SUBPHASE_LADDER.index(unlock) == reached, token
+        else:
+            assert SUBPHASE_LADDER.index(unlock) > reached, token
 
 
 # --------------------------------------------------------------------------- #
@@ -242,6 +296,7 @@ _PER_VERSION_LADDER = (
     "BR-2C-0/0.2.1",
     "BR-2C-0/0.2.2",
     "BR-2C-0/0.2.3",
+    "BR-2C-RC",
     "BR-2C",
     "BR-2D",
     "BR-2E",
@@ -317,7 +372,7 @@ def test_splitting_the_br2c_0_rung_per_version_changes_no_ban_set():
                 f"{name}: splitting BR-2C-0 changed the ban set at {rung}"
             )
 
-        for rung in ("BR-2C", "BR-2D", "BR-2E"):
+        for rung in ("BR-2C-RC", "BR-2C", "BR-2D", "BR-2E"):
             assert banned_capability_tokens(
                 rung, unlock_map, _PER_VERSION_LADDER
             ) == banned_capability_tokens(rung, unlock_map), (
@@ -390,6 +445,7 @@ def test_the_hypothetical_ladder_is_never_the_real_one():
         "BR-2A",
         "BR-2B",
         "BR-2C-0",
+        "BR-2C-RC",
         "BR-2C",
         "BR-2D",
         "BR-2E",
@@ -639,13 +695,89 @@ def test_no_dormant_or_reserved_future_field_exists():
                 assert token not in f.name.lower(), f"{symbol}.{f.name}"
 
 
-def test_nothing_in_the_package_performs_cryptography():
+#: The one module the ratified release transition lets perform cryptography.
+VERIFIER_MODULE = SRC / "verifier.py"
+
+#: D-41's assignment, exactly: one call into each backend, for one role each.
+D41_BACKEND_CALLS = {
+    "cryptography": {"verify"},
+    "nacl": {"crypto_core_ed25519_is_valid_point"},
+}
+
+
+def _crypto_imports(path: pathlib.Path) -> set:
+    roots = set()
+    for node in ast.walk(ast.parse(path.read_text())):
+        if isinstance(node, ast.Import):
+            roots.update(alias.name.split(".")[0] for alias in node.names)
+        elif isinstance(node, ast.ImportFrom) and node.level == 0 and node.module:
+            roots.add(node.module.split(".")[0])
+    return roots & {"cryptography", "nacl", "OpenSSL", "Crypto", "ed25519", "hmac", "secrets"}
+
+
+def test_nothing_outside_the_verifier_module_performs_cryptography():
+    """The transition moved this gate by exactly one module, and no further."""
+
     banned_calls = ("hmac", "sign", "verify_signature", "ed25519", "x25519")
     for path in sorted(SRC.rglob("*.py")):
+        if path == VERIFIER_MODULE:
+            continue
+        assert _crypto_imports(path) == set(), path.name
         tree = ast.parse(path.read_text())
         for node in ast.walk(tree):
             if isinstance(node, ast.Call) and isinstance(node.func, ast.Name):
                 assert node.func.id.lower() not in banned_calls, path.name
+            if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute):
+                assert node.func.attr.lower() not in banned_calls, path.name
+
+
+def test_the_verifier_module_imports_exactly_the_d41_pair():
+    """``cryptography`` and ``PyNaCl``, both, and nothing else cryptographic."""
+
+    assert VERIFIER_MODULE.exists()
+    assert _crypto_imports(VERIFIER_MODULE) == {"cryptography", "nacl"}
+
+
+def test_the_verifier_module_uses_each_backend_for_its_d41_role_only():
+    """One call into each backend: ``verify`` and the libsodium point check.
+
+    Measured on the calls the module makes, so a signing call, a key-generation
+    call or a second point-validation path could not enter without moving this.
+    """
+
+    tree = ast.parse(VERIFIER_MODULE.read_text())
+    imported = {}
+    for node in ast.walk(tree):
+        if isinstance(node, ast.ImportFrom) and node.module:
+            for alias in node.names:
+                imported[alias.asname or alias.name] = node.module.split(".")[0]
+    assert imported.get("Ed25519PublicKey") == "cryptography"
+    assert imported.get("InvalidSignature") == "cryptography"
+    assert imported.get("crypto_core_ed25519_is_valid_point") == "nacl"
+    assert "Ed25519PrivateKey" not in imported
+    calls = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Call):
+            func = node.func
+            if isinstance(func, ast.Attribute):
+                calls.add(func.attr)
+            elif isinstance(func, ast.Name):
+                calls.add(func.id)
+    assert "verify" in calls
+    assert "crypto_core_ed25519_is_valid_point" in calls
+    for forbidden in ("sign", "generate", "private_bytes", "derive", "exchange",
+                      "crypto_sign", "crypto_sign_open", "crypto_sign_seed_keypair",
+                      "from_private_bytes", "Ed25519PrivateKey"):
+        assert forbidden not in calls, forbidden
+
+
+def test_the_verifier_module_reuses_no_other_ugence_ed25519_code():
+    """D-40: no TEA, Policy Authority or Risk Authority code, by import graph."""
+
+    text = VERIFIER_MODULE.read_text()
+    for forbidden in ("ugence_trusted_evidence_authority", "ugence_policy_authority",
+                      "risk_authority", "trusted_evidence", "policy_authority"):
+        assert forbidden not in text.replace("``ugence_trusted_evidence_authority``", ""), forbidden
 
 
 def test_the_only_hash_used_is_sha256_over_canonical_bytes():

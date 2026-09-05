@@ -215,12 +215,13 @@ def test_no_module_imports_a_source_of_nondeterminism():
     assert offenders == [], offenders
 
 
-def test_the_only_non_stdlib_import_anywhere_is_the_frozen_br1_layer():
-    """Every absolute import is either the standard library or BR-1.
+def test_the_only_non_stdlib_imports_are_br1_and_the_d41_pair_in_the_verifier():
+    """Every absolute import is the standard library, BR-1, or — in the one
+    dedicated verifier module only — the D-41 pair.
 
     This is the import-graph half of the dependency boundary: the declared
-    metadata names exactly one runtime dependency, and the code imports exactly
-    that one.
+    metadata names three runtime dependencies, and the code imports exactly
+    those, with the two cryptographic ones confined to ``verifier.py``.
     """
 
     allowed_stdlib = {
@@ -237,8 +238,11 @@ def test_the_only_non_stdlib_import_anywhere_is_the_frozen_br1_layer():
     }
     offenders = []
     for path in sorted(SRC.rglob("*.py")):
+        permitted = {"cryptography", "nacl"} if path.name == "verifier.py" else set()
         for module in sorted(_absolute_imports(path)):
             if module in allowed_stdlib or module == "ugence_benchmark_registry":
+                continue
+            if module in permitted:
                 continue
             offenders.append(f"{path.name}: {module}")
     assert offenders == [], offenders

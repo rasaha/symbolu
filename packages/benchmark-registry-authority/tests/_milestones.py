@@ -22,10 +22,12 @@ unlock phase is ``"BR-2C"`` stays banned at every rung below ``BR-2C``.
 
 from __future__ import annotations
 
-#: The ratified version ladder, in order (ADR §35.1, D-01 as amended, and D-33).
-#: Five of the six rungs are D-01's five subphases. ``BR-2C-0`` is D-33's
-#: contract-only **version rung**, sitting between BR-2B and BR-2C.
-SUBPHASE_LADDER = ("BR-2A", "BR-2B", "BR-2C-0", "BR-2C", "BR-2D", "BR-2E")
+#: The ratified version ladder, in order (ADR §35.1, D-01 as amended, D-33, and
+#: the owner's BR-2C candidate ruling). Five of the seven rungs are D-01's five
+#: subphases. ``BR-2C-0`` is D-33's contract-only **version rung**, sitting
+#: between BR-2B and BR-2C; ``BR-2C-RC`` is the candidate **version rung**,
+#: sitting between BR-2C-0 and BR-2C.
+SUBPHASE_LADDER = ("BR-2A", "BR-2B", "BR-2C-0", "BR-2C-RC", "BR-2C", "BR-2D", "BR-2E")
 
 #: Version → rung. Read from the live ``api.__version__`` by the callers, so
 #: the effective ban set follows the distribution rather than a constant someone
@@ -46,12 +48,23 @@ SUBPHASE_LADDER = ("BR-2A", "BR-2B", "BR-2C-0", "BR-2C", "BR-2D", "BR-2E")
 #: and all three are BR-2C's contract surface with no BR-2C capability, so all
 #: three must ban the same twelve tokens. A rung per version would add ladder
 #: indices whose ban sets are identical to ``BR-2C-0``'s, and so rule nothing.
+#:
+#: ``0.3.0rc1`` is the **BR-2C candidate rung**, ``BR-2C-RC``, ratified by the
+#: owner as a candidate version only. It sits between ``BR-2C-0`` and ``BR-2C``
+#: because it ships what neither neighbour does: BR-2C's capability — the
+#: candidate verifier — without BR-2C's closure, which D-32(4) and D-38(i)
+#: reserve for ``0.3.0`` after an independent external cryptographic review
+#: that has not occurred. The ratified release transition (D-40, as applied to
+#: this rung) lifts exactly the twelve capability tokens D-33 records as
+#: BR-2C's, and nothing else: every other prohibition, permanent or later,
+#: stands. It is a version rung, not a subphase, and it mints no closure audit.
 VERSION_SUBPHASE = {
     "0.1.0": "BR-2A",
     "0.2.0": "BR-2B",
     "0.2.1": "BR-2C-0",
     "0.2.2": "BR-2C-0",
     "0.2.3": "BR-2C-0",
+    "0.3.0rc1": "BR-2C-RC",
     "0.3.0": "BR-2C",
     "0.4.0": "BR-2D",
     "0.5.0": "BR-2E",

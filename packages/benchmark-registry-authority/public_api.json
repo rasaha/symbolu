@@ -1,7 +1,7 @@
 {
   "distribution": "ugence-benchmark-registry-authority",
   "namespace": "ugence_benchmark_registry_authority",
-  "package_version": "0.2.3",
+  "package_version": "0.3.0rc1",
   "curated_api_module": "ugence_benchmark_registry_authority.api",
   "note": "Machine-readable snapshot of the curated public API (ugence_benchmark_registry_authority.api.__all__). __version__ is carried separately as package_version and is NOT a member of 'symbols', so symbols is exactly one shorter than api.__all__ — both counts are asserted, and neither is 'corrected' to match the other. tests/packaging/test_public_api.py asserts this file equals the actual package surface, and verify_benchmark_registry_authority_distribution.py asserts the same for the built wheel, the built sdist and the isolated installed runtime.",
   "symbols": {
@@ -580,6 +580,16 @@
       "members": [
         "EXPLICITLY_PROHIBITED"
       ]
+    },
+    "BenchmarkDenyAllVerifier": {
+      "kind": "candidate_verifier_implementation",
+      "port": "BenchmarkApprovalVerifierPort",
+      "maturity": "CANDIDATE_NOT_REVIEWED"
+    },
+    "BenchmarkEd25519Verifier": {
+      "kind": "candidate_verifier_implementation",
+      "port": "BenchmarkApprovalVerifierPort",
+      "maturity": "CANDIDATE_NOT_REVIEWED"
     },
     "BenchmarkExactResolutionRequest": {
       "kind": "contract",
