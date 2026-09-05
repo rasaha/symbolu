@@ -210,7 +210,8 @@ stated ceiling. HE-1 to HE-5 are ruled (§5a) and HE-1 and HE-5 are implemented:
 and appends it to the control-plane audit ledger once, idempotently per linkage
 digest, returning the `AuditReference` on the decision outcome and the linkage on
 run detail; a round trip not yet complete is the typed, non-blocking `NOT_YET`.
-Rows 8 and 9 hold with the ledger in the loop. The studio does not yet render the
-linkage; that is a small HR-D follow-up. The identity provider and the private OCI
+Rows 8 and 9 hold with the ledger in the loop. The studio's Run Detail screen renders
+the linkages as history: the appended ones with their audit reference, `NOT_YET` and
+`LEDGER_UNCONFIGURED` as the review service's typed answer, never as an error. The identity provider and the private OCI
 mirror remain owner-side and outside this sequence. Nothing is implemented by this
 record.
