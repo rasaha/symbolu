@@ -245,9 +245,10 @@ v1 is complete when, for the Kubernetes infrastructure-agent wedge:
 
 > **Scope note.** This section sequences the Governed Agent Studio and the durable
 > execution engine beneath it. It is an engineering sequencing record, not a budget
-> input: it adds no line to §8 and re-derives no figure in §8c. Every item below is
-> **planned**; nothing in it is implemented, piloted or certified at the time of
-> writing. Evidence labels follow the repository convention — `[V]` verified against
+> input: it adds no line to §8 and re-derives no figure in §8c. Each item carries its
+> own status row; GAS-1 through GAS-4 are implemented and merged, GAS-5 is deferred by
+> owner ruling, GAS-6 is gated. Nothing in it is piloted or certified. Evidence labels
+> follow the repository convention — `[V]` verified against
 > this repository, `[I]` inferred, `[R]` requires owner ratification, `[G]` gap.
 >
 > **Why this section is here rather than in the research roadmap.** `[V]`
@@ -265,7 +266,7 @@ These are settled and are not reopened by any item below.
 | GAS-R1 | **DBOS is the initial standalone durable-execution engine**, and is a **candidate** until every row of the durability and failure matrix in `docs/architecture/ADR_DBOS_DURABLE_EXECUTION_INTEGRATION.md` has passing evidence. |
 | GAS-R2 | **Temporal is the future regulated-enterprise adapter.** The execution adapter must make that swap possible without touching Workflow IR, governance state or receipts. |
 | GAS-R3 | **React Flow is the Ugence-owned studio canvas**, added as a feature inside `apps/ugence-governance-studio`. No third app; no Langflow fork. |
-| GAS-R4 | **Langflow is an import source only.** Its exported JSON is untrusted input: validate, never execute, compile to Workflow IR. |
+| GAS-R4 | **Langflow is an import source only.** Its exported JSON is untrusted input: validate, never execute, compile to Workflow IR. The import itself is **deferred and customer-gated** (GAS-5 ruling, §11.3); this frame binds any future adapter. |
 | GAS-R5 | **Workflow IR and governance state are always owned by Ugence.** The engine owns scheduling and recovery only; Agent Runtime owns proposal binding, the governance hook, budgets, checkpoints and receipts. The engine is never the source of truth for governance state. |
 | GAS-R6 | **The governance hook runs inside the durable step.** The engine executes Agent Runtime transitions; Agent Runtime calls the hook before any provider invocation, so a retry can never replay a consequential call without re-clearing it. |
 
@@ -316,14 +317,15 @@ inside `apps/ugence-governance-studio`.
 | **Entry** | GAS-3 exit met. The screen-to-type audit (`apps/ugence-governance-studio/docs/GOVERNED_AGENT_STUDIO_V1_SCREEN_AUDIT.md`) accepted. |
 | **Work** | An additive `governance_studio.api.v2` contract alongside the frozen `governance_studio.api.v1` `[V]` (`apps/ugence-governance-studio/contracts/openapi.json`); the studio backend as **thin orchestration only** over the existing packages; the six screens against frozen fixtures. |
 | **Exit** | `v1` byte-frozen and still passing its freeze test `[V]` (`backend/tests/test_freeze.py`); every `v2` route delegates to a package entry point with no re-implemented governance logic; no route grants, authorizes or executes; determinism tests pass for all six screens. |
-| **Status (2026-09-05)** | **Backend and all six screens implemented.** Frontend suite 197 passed (was 150), ten verifier gates green, `reactflow` the only new dependency; v1's contract, generated client and 17-operation allowlist byte-identical. Langflow import remains GAS-5. Previously: **backend implemented; no screen shipped.** 12 additive v2 routes across the six screens; backend suite 175 passed (was 142). `contracts/openapi.json` is byte-identical and its freeze test passes unmodified. SD-1 allowlist and SD-2 operation-id guard are enforced by tests. Evidence: `apps/ugence-governance-studio/docs/GOVERNED_AGENT_STUDIO_V1_SCREEN_AUDIT.md`. |
+| **Status (2026-09-05)** | **Backend and all six screens implemented.** Frontend suite 197 passed (was 150), ten verifier gates green, `reactflow` the only new dependency; v1's contract, generated client and 17-operation allowlist byte-identical. The three review gaps (simulate mode threading, publish release binding, bounded clearance record) were closed in PR #1609. Langflow import is deferred (GAS-5, §11.3). Previously: **backend implemented; no screen shipped.** 12 additive v2 routes across the six screens; backend suite 175 passed (was 142). `contracts/openapi.json` is byte-identical and its freeze test passes unmodified. SD-1 allowlist and SD-2 operation-id guard are enforced by tests. Evidence: `apps/ugence-governance-studio/docs/GOVERNED_AGENT_STUDIO_V1_SCREEN_AUDIT.md`. |
 | **Label on completion** | **Core implemented** for the studio feature. The studio's own posture — synthetic data, planning only, no execution or permission granting `[V]` (the frozen OpenAPI description) — is preserved verbatim for `v2`. |
 
-#### GAS-5 · Langflow importer
+#### GAS-5 · Langflow importer — **deferred, customer-gated (ruled 2026-09-05)**
 
 | | |
 |---|---|
-| **Entry** | GAS-4 exit met. |
+| **Status (2026-09-05)** | **Removed from the current implementation sequence and from MVP scope** by owner ruling `DEFER_LANGFLOW_CUSTOMER_GATED` (§11.3). Langflow is preserved only as a possible future import adapter. No audit, importer, endpoint, dependency or implementation exists or is scheduled `[V]` (`langflow_import_implemented: False` in the studio's maturity flags; no `/policy/from-langflow` route in `contracts/openapi_v2.json`). React Flow remains the Ugence-owned authoring surface (GAS-R3). |
+| **Entry** | A demonstrated customer or design-partner need **and** a new owner ruling. Not entered on schedule, and not entered by GAS-4's exit alone. |
 | **Work** | A one-way importer: parse exported Langflow JSON, validate against a strict allowlist schema, reject anything unmapped, compile the accepted subset to Workflow IR v2 through `compile_policy_pack` `[V]` (`packages/tooling/policy-workflow-compiler/.../compiler.py:222`). |
 | **Exit** | An adversarial corpus of malformed, oversized, cyclic, deeply nested and code-bearing Langflow exports is refused with typed errors and zero evaluation; the importer executes nothing from the file and imports no Langflow package; unmapped node types refuse rather than degrade. |
 | **Label on completion** | **Core implemented** for the importer. It confers no maturity on the imported graph, which enters as an ordinary unapproved policy pack. |
@@ -347,7 +349,8 @@ production certification, on any item, at any exit above.
 
 ### 11.3 Owner decisions — ruled 2026-09-05
 
-All four are ruled and recorded at source; GAS-1 is complete and GAS-2 is open.
+All are ruled and recorded at source. GAS-1 through GAS-4 are complete and merged;
+GAS-5 is deferred; GAS-6 remains gated.
 
 | # | Ruling | Recorded in |
 |---|---|---|
@@ -356,6 +359,7 @@ All four are ruled and recorded at source; GAS-1 is complete and GAS-2 is open.
 | OD-3 | **`RATIFY`** (2026-09-05) — the CI-verified matrix promotes DBOS from *candidate* to *ratified as the initial engine*; `DBOS_ENGINE_STATUS = "RATIFIED"` | same, §8A and §9 |
 | SD-1 | `EXPLICIT_PUBLIC_ALLOWLIST` — the studio boundary widens only by a per-package public-entry-point allowlist; the architecture test is retained | `apps/ugence-governance-studio/docs/GOVERNED_AGENT_STUDIO_V1_SCREEN_AUDIT.md` |
 | SD-2 | `NON_AUTHORITY_STUDIO` — the studio never issues, activates, revokes, grants, authorizes, clears or executes | same |
+| GAS-5 | **`DEFER_LANGFLOW_CUSTOMER_GATED`** (2026-09-05) — Langflow import is removed from the current sequence and MVP scope; preserved only as a possible future import adapter, requiring a demonstrated customer or design-partner need and a new owner ruling. No audit, importer, endpoint, dependency or implementation now. React Flow remains the Ugence-owned authoring surface | this section, GAS-5 and GAS-R4; `GOVERNED_AGENT_STUDIO_V1_SCREEN_AUDIT.md` |
 
 
 ---

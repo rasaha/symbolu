@@ -148,7 +148,7 @@ grants, authorizes or executes.
 | Policy | `POST /api/v2/policy/validate` | `GovernedWorkflowCompiler.validate` |
 | Policy | `POST /api/v2/policy/synthesize` | `GovernedWorkflowCompiler.synthesize` |
 | Policy | `POST /api/v2/policy/compile` | `compile_policy_pack` (`require_approval=True`) |
-| Policy | `POST /api/v2/policy/from-langflow` | GAS-5 importer → `PolicyPack`, never executed |
+| Policy | `POST /api/v2/policy/from-langflow` | **not built; deferred and customer-gated** (GAS-5 ruling `DEFER_LANGFLOW_CUSTOMER_GATED`, roadmap §11.3) — if ever built, an importer → `PolicyPack`, never executed |
 | Authority | `GET /api/v2/authority/policies` | `PolicyRegistry` reads |
 | Authority | `GET /api/v2/authority/policies/{coordinate}` | policy resolution |
 | Authority | `GET /api/v2/authority/decisions/{decision_id}` | Decision Authority read |
@@ -212,8 +212,9 @@ Backend suite **175 passed** (was 142). No screen ships yet.
 | Observe | `GET /api/v2/observe/audit` | console `GET /v1/audit` |
 | Observe | `GET /api/v2/observe/audit/{correlation_id}` | console `GET /v1/audit/{id}` |
 
-**Deferred, deliberately.** `POST /api/v2/policy/from-langflow` is GAS-5 and was not
-added; `GET /api/v2/simulate/{run_id}/trace` was folded into the `run` response, since
+**Deferred, deliberately.** `POST /api/v2/policy/from-langflow` is GAS-5, which the
+owner has removed from the current sequence and MVP scope (`DEFER_LANGFLOW_CUSTOMER_GATED`,
+roadmap §11.3); it was not added and is not scheduled; `GET /api/v2/simulate/{run_id}/trace` was folded into the `run` response, since
 the studio holds no run store and a route that implied one would be misleading.
 
 ### v1 is untouched `[V]`
@@ -303,7 +304,9 @@ against the contract by a separate manifest and verifier.
 The studio API types no 200 response — every route emits `"schema": {}` — so v2 request
 bodies are generated and cannot drift, while response shapes are the studio's own
 reading, exactly as in v1. Closing it means declaring `response_model` on the routes.
-Langflow import (`/policy/from-langflow`) remains GAS-5 and is not built.
+Langflow import (`/policy/from-langflow`) is not built and is deferred by owner ruling
+(GAS-5, `DEFER_LANGFLOW_CUSTOMER_GATED`, roadmap §11.3); it needs a demonstrated customer
+or design-partner need and a new ruling before any work.
 
 ---
 
