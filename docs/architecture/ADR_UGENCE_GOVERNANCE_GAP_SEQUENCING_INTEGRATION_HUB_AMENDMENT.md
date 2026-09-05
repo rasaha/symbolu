@@ -27,9 +27,18 @@ record. Ratified in `ADR_UGENCE_RUNTIME_CONNECTOR_AND_KUBERNETES_BACKEND_AMENDME
 ## The two rulings
 
 **IH-1 — `INTEGRATION_HUB_FOLDED_TO_EXISTING_SEAMS`.** No integration-hub package
-or ADR is created. The missing Kubernetes `ScalingBackend` is an **execution-target
-adapter** owned by `cloud-scaling-operations` and sequenced through the
-cloud-scaling ladder.
+or ADR is created. The ~~missing~~ Kubernetes `ScalingBackend` is an
+**execution-target adapter** owned by `cloud-scaling-operations` and sequenced
+through the cloud-scaling ladder.
+
+> **Annotation, 2026-09-05.** The ruling is preserved as ratified, including the
+> word "missing", because a ruling is not rewritten after the fact. But that word
+> rested on a premise this record supplied and got wrong: the adapter was **not**
+> missing — `KubernetesScalingExecutor` already shipped, and the CORRECTION note
+> above explains how the error was made. **IH-1's disposition is unaffected**:
+> ownership by `cloud-scaling-operations` and sequencing through the ladder are
+> exactly right, and are what the ruling turns on. What is missing is narrower —
+> the deployment-side factory (§3) — and KBE-1 places that outside the repository.
 
 **IH-2 — `SIGNAL_AND_WEBHOOK_DO_NOT_COUNT_AS_RUNTIME_CONNECTORS`.** The Prometheus
 client is a **signal/evidence-source connector**; the GitHub webhook receiver is
