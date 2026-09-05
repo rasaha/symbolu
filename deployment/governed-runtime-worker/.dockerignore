@@ -1,0 +1,18 @@
+# Keep secrets, VCS metadata and test/build cruft out of the image.
+.git
+.gitignore
+**/.git
+**/node_modules
+**/dist
+**/build
+**/__pycache__
+**/*.pyc
+**/.pytest_cache
+**/.mypy_cache
+**/*.egg-info
+**/.env
+**/*.env
+**/.env.*
+**/tests/certs
+*.key
+*.pem

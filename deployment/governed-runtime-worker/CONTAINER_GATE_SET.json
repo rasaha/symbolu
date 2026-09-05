@@ -1,0 +1,36 @@
+{
+  "schema": "governed-runtime-worker.container-gate-set.v1",
+  "deployment": "governed-runtime-worker",
+  "ruling": "SEPARATE_P3E_EQUIVALENT_EVIDENCE (ADR_UGENCE_REVIEW_SERVICE_COMPOSITION_ROOT_SCOPING.md section 5; section 6 step 4)",
+  "ratification_status": "DEFINED_NOT_RATIFIED",
+  "ratification_note": "This is the worker's own gate set, defined so it can execute the moment the owner-approved mirror serves the ratified digest. It is not part of the ratified studio family (docs/audits/ugence_governance_studio_p3e/CONTAINER_GATE_FAMILY.json), reuses none of its identifiers, and adds nothing to that record; ratifying this set is a separate owner decision. No gate below is marked passed by this file.",
+  "execution_state": "NOT_EXECUTED",
+  "execution_note": "Every gate halts at mirror-digest-conformance with RESOURCE_BLOCKER_MIRROR_UNCONFIGURED until BASE_IMAGE_MIRROR_DECISION.json carries owner-supplied mirror coordinates. The runtime verification script has been validated by static parsing only; it has never run against a built image.",
+  "workflow": ".github/workflows/governed-runtime-worker-ci.yml",
+  "workflow_job": "container",
+  "base_image_rule": "the ratified python:3.11-slim-bookworm digest only; no new digest, no node image; base-images.json == BASE_IMAGE_MIRROR_DECISION.json == Dockerfile FROM lines",
+  "never": [
+    "docker.io fallback",
+    "continue-on-error on any step",
+    "a re-pin, substitution or placeholder mirror coordinate",
+    "a gate marked passed without a real build from the ratified digest",
+    "a credential value printed, stored or committed"
+  ],
+  "gates": {
+    "GRW-CTR-01": {"requirement": "base-images.json and every Dockerfile FROM pin equal the ratified python digest; the worker pins no other image", "workflow_step": "ratified-pin-conformance", "script": "deployment/governed-runtime-worker/ci/verify_ratified_pins.py", "requires_container_runtime": false, "requires_registry_access": false, "blocking": true, "execution_state": "EXECUTES_ON_EVERY_RUN_OFFLINE"},
+    "GRW-CTR-02": {"requirement": "the owner-approved mirror serves the ratified digest content-addressed to itself; docker.io never consulted", "workflow_step": "mirror-digest-conformance", "script": "deployment/governance-studio/ci/verify_mirror_digest.py (shared; worker pins file)", "requires_container_runtime": false, "requires_registry_access": true, "blocking": true, "execution_state": "NOT_EXECUTED"},
+    "GRW-CTR-03": {"requirement": "the image builds from the pinned Dockerfile for linux/amd64 through the mirror", "workflow_step": "container-build", "requires_container_runtime": true, "requires_registry_access": true, "blocking": true, "execution_state": "NOT_EXECUTED"},
+    "GRW-CTR-04": {"requirement": "runtime user 10001:10001; exposes 8444/tcp only; no compiler, npm or node in the runtime layer", "workflow_step": "image-inspection", "requires_container_runtime": true, "blocking": true, "execution_state": "NOT_EXECUTED"},
+    "GRW-CTR-05": {"requirement": "the runtime package inventory is recorded from the built image", "workflow_step": "runtime-package-inventory", "evidence": "runtime-image-packages.txt", "requires_container_runtime": true, "blocking": true, "execution_state": "NOT_EXECUTED"},
+    "GRW-CTR-06": {"requirement": "no secret in any layer: config, history and per-layer content scanned; no DSN, key or token", "workflow_step": "image-layer-secret-scan", "script": "deployment/governance-studio/ci/scan_image_layers.py (shared)", "evidence": "secret-scan.json", "requires_container_runtime": true, "blocking": true, "execution_state": "NOT_EXECUTED"},
+    "GRW-CTR-07": {"requirement": "against the running container: every production refusal happens in preflight (public bind, plain HTTP, http JWKS, no identity port, in-memory store, missing DSN, unknown mode); non-root, no capabilities, no new privileges, read-only root with the volume and /tmp writable, stores on the volume; one private TLS listener with no published port, TLS <= 1.1 refused, no plaintext; healthz and an empty queue answer over TLS; no DSN in logs; egress observed and recorded as external evidence", "workflow_step": "container-runtime-verification", "script": "deployment/governed-runtime-worker/ci/verify_container.sh", "evidence": "runtime-egress-report.json", "requires_container_runtime": true, "requires_database": "PostgreSQL 16 on the runner, reachable at the bridge gateway", "blocking": true, "execution_state": "NOT_EXECUTED"},
+    "GRW-CTR-08": {"requirement": "a CycloneDX SBOM bound to the built image", "workflow_step": "image-sbom", "evidence": "sbom.image.cdx.json", "requires_container_runtime": true, "blocking": true, "execution_state": "NOT_EXECUTED"},
+    "GRW-CTR-09": {"requirement": "no HIGH or CRITICAL vulnerability in the built image", "workflow_step": "container-vulnerability-scan", "evidence": "container-scan.json", "requires_container_runtime": true, "blocking": true, "execution_state": "NOT_EXECUTED"},
+    "GRW-CTR-10": {"requirement": "the evidence manifest hashes only artifacts this run produced; INCOMPLETE whenever any mandatory producer did not succeed; marks no gate passed", "workflow_step": "evidence-manifest", "script": "deployment/governance-studio/ci/build_evidence_manifest.py (shared builder; worker run, worker artifact)", "evidence": "evidence-manifest.json", "requires_container_runtime": false, "blocking": false, "execution_state": "EXECUTES_ON_EVERY_RUN (INCOMPLETE until the gates run)"}
+  },
+  "evidence_manifest": {
+    "artifact": "grw-container-evidence (uploaded by the worker container job)",
+    "separate_from": "p3e-container-evidence (the studio's)",
+    "current_state": "INCOMPLETE on every run: no producer succeeds before the mirror is configured"
+  }
+}
