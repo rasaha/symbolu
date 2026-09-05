@@ -17,6 +17,10 @@ for path in (
     REPO / "packages" / "risk_authority" / "src",
     REPO / "packages" / "capabilities" / "decision-authority" / "src",
     REPO / "packages" / "providers" / "actiongate" / "src",
+    # The recheck tests reuse the RA-6 status runtime's scenario builder (a real
+    # Ed25519-signed envelope) rather than inventing a second one. That module lives in
+    # the sibling package's tests directory, not its src, so it needs its own entry.
+    REPO / "packages" / "integration" / "risk-authority-status-runtime" / "tests",
 ):
     p = str(path)
     if path.is_dir() and p not in sys.path:
