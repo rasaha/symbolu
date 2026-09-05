@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build, install offline, and verify the BR-2C-0 distribution — with negative controls.
+"""Build, install offline, and verify the BR-2C candidate (0.3.0rc1) distribution — with negative controls.
 
 Builds a wheel and an sdist from a clean tree, installs the wheel **genuinely
 offline** into a throwaway virtual environment, and asserts that the installed
@@ -167,8 +167,21 @@ def main() -> int:  # noqa: C901 - a verifier is a long list of assertions
         sdist = _latest(findlinks, f"{NAMESPACE}-*.tar.gz")
         br1_wheel = _latest(findlinks, "ugence_benchmark_registry-*.whl")
         print(f"      built {wheel.name}, {sdist.name}, {br1_wheel.name}")
-        check("the wheel carries the BR-2C-0 version", "0.2.3" in wheel.name, wheel.name)
-        check("the sdist carries the BR-2C-0 version", "0.2.3" in sdist.name, sdist.name)
+        check("the wheel carries the BR-2C candidate version", "0.3.0rc1" in wheel.name, wheel.name)
+        check("the sdist carries the BR-2C candidate version", "0.3.0rc1" in sdist.name, sdist.name)
+        check("the wheel never carries the reserved closure version 0.3.0",
+              "-0.3.0-" not in wheel.name and "-0.3.0." not in wheel.name, wheel.name)
+        # The D-41 pair, fetched into the SAME local wheelhouse so the install
+        # below stays --no-index. The download is the only network step this
+        # verifier performs, and it happens before the isolated environment
+        # exists; the install itself sees a directory of wheels and nothing else.
+        print("      fetch the D-41 pair (and their transitive wheels) into the wheelhouse")
+        _run(
+            [sys.executable, "-m", "pip", "download", "-q",
+             "cryptography>=41.0.7,<47.0.0", "PyNaCl>=1.5.0,<2.0.0",
+             "--dest", str(findlinks)],
+            cwd=str(REPO),
+        )
 
         # ------------------------------------------------------------- #
         # 2. Artifact hygiene — both artifacts, negative-controlled
@@ -248,9 +261,9 @@ def main() -> int:  # noqa: C901 - a verifier is a long list of assertions
         )
 
         # ------------------------------------------------------------- #
-        # 3. Declared metadata — exactly one dependency
+        # 3. Declared metadata — exactly BR-1 plus the D-41 pair
         # ------------------------------------------------------------- #
-        print("[3/8] assert the declared dependency is exactly the frozen BR-1 layer")
+        print("[3/8] assert the declared dependencies are exactly BR-1 and the D-41 pair")
         with zipfile.ZipFile(wheel) as handle:
             metadata_name = next(
                 n for n in handle.namelist() if n.endswith("METADATA")
@@ -258,27 +271,32 @@ def main() -> int:  # noqa: C901 - a verifier is a long list of assertions
             metadata = handle.read(metadata_name).decode("utf-8")
         requires = re.findall(r"^Requires-Dist: (.+)$", metadata, re.M)
         runtime_requires = [r for r in requires if "extra ==" not in r]
+        normalized = [r.replace(" ", "") for r in runtime_requires]
         check(
-            "the wheel declares exactly one runtime dependency",
-            len(runtime_requires) == 1,
+            "the wheel declares exactly three runtime dependencies",
+            len(runtime_requires) == 3,
             str(runtime_requires),
         )
         check(
-            "that dependency is ugence-benchmark-registry pinned to 0.1.*",
-            runtime_requires
-            and runtime_requires[0].replace(" ", "").startswith(
-                "ugence-benchmark-registry==0.1."
-            ),
+            "the first is ugence-benchmark-registry pinned to 0.1.*",
+            bool(normalized) and normalized[0].startswith("ugence-benchmark-registry==0.1."),
             str(runtime_requires),
         )
-        for banned in ("cryptography", "PyNaCl", "pynacl", "nacl"):
+        check(
+            "the D-41 pair is declared, bounded on both sides, and nothing else",
+            normalized[1:] == ["cryptography<47.0.0,>=41.0.7", "PyNaCl<2.0.0,>=1.5.0"]
+            or normalized[1:] == ["cryptography>=41.0.7,<47.0.0", "PyNaCl>=1.5.0,<2.0.0"],
+            str(runtime_requires),
+        )
+        for banned in ("trusted-evidence", "policy-authority", "risk-authority",
+                       "governance-contracts", "pycryptodome", "ed25519", "ecdsa"):
             check(
-                f"no cryptographic dependency {banned!r} is declared",
-                banned.lower() not in metadata.lower(),
+                f"no dependency beyond the ratified three ({banned!r}) is declared",
+                not any(banned in r.lower() for r in runtime_requires),
             )
 
-        # NEGATIVE CONTROL 3 — a declared dependency beyond the allowed one.
-        fake_metadata = metadata + "Requires-Dist: cryptography>=41\n"
+        # NEGATIVE CONTROL 3 — a declared dependency beyond the ratified three.
+        fake_metadata = metadata + "Requires-Dist: ugence-trusted-evidence-authority>=0.1\n"
         fake_requires = [
             r
             for r in re.findall(r"^Requires-Dist: (.+)$", fake_metadata, re.M)
@@ -286,7 +304,7 @@ def main() -> int:  # noqa: C901 - a verifier is a long list of assertions
         ]
         control(
             "an extra declared runtime dependency in the wheel metadata",
-            len(fake_requires) != 1,
+            len(fake_requires) != 3,
         )
 
         # ------------------------------------------------------------- #
@@ -323,12 +341,23 @@ def main() -> int:  # noqa: C901 - a verifier is a long list of assertions
             entry["name"].lower().replace("_", "-")
             for entry in json.loads(installed)
         }
-        allowed = {DISTRIBUTION, BR1_DISTRIBUTION, "pip", "setuptools", "wheel"}
+        # The three declared dependencies, plus the pair's own transitive
+        # wheels (PyNaCl -> cffi -> pycparser), and pip's bootstrap trio.
+        allowed = {
+            DISTRIBUTION, BR1_DISTRIBUTION, "cryptography", "pynacl", "cffi",
+            "pycparser", "pip", "setuptools", "wheel",
+        }
         extra = names - allowed
         check(
-            "the isolated environment holds only the package and its one dependency",
+            "the isolated environment holds only the package, BR-1, the D-41 pair "
+            "and the pair's transitive wheels",
             extra == set(),
             str(sorted(extra)),
+        )
+        check(
+            "the D-41 pair is genuinely installed in the isolated environment",
+            {"cryptography", "pynacl"} <= names,
+            str(sorted(names)),
         )
 
         # NEGATIVE CONTROL 4 — an injected extra distribution must be detected.
@@ -361,8 +390,8 @@ def main() -> int:  # noqa: C901 - a verifier is a long list of assertions
         )
         check(
             "installed api.__all__ count and manifest symbol count both hold",
-            installed_facts["api_all_count"] == 108
-            and len(source_manifest["symbols"]) == 107,
+            installed_facts["api_all_count"] == 110
+            and len(source_manifest["symbols"]) == 109,
             f"{installed_facts['api_all_count']} / {len(source_manifest['symbols'])}",
         )
         check(
@@ -533,11 +562,12 @@ def main() -> int:  # noqa: C901 - a verifier is a long list of assertions
         # ------------------------------------------------------------- #
         # 8. The dependency really is required
         # ------------------------------------------------------------- #
-        print("[8/8] confirm the one dependency is genuinely required, not optional")
+        print("[8/8] confirm the dependencies are genuinely required, not optional")
         bare = work / "bare"
         _run([sys.executable, "-m", "venv", str(bare)])
         bare_python = bare / bin_dir / ("python.exe" if os.name == "nt" else "python")
         # Install ONLY this distribution's wheel with no dependency available at all.
+        # BR-1 is absent from this wheelhouse, so the resolver must fail closed.
         empty = work / "empty-wheelhouse"
         empty.mkdir()
         shutil.copy(wheel, empty)
@@ -555,7 +585,7 @@ def main() -> int:  # noqa: C901 - a verifier is a long list of assertions
             env=_clean_env(),
         )
         control(
-            "installing with the one dependency unavailable",
+            "installing with the declared dependencies unavailable",
             failed.returncode != 0,
             failed.stderr.strip().splitlines()[-1] if failed.stderr else "",
         )

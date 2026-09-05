@@ -18,7 +18,16 @@
 # domains. It determines what transition WOULD BE valid; nothing here makes one
 # occur.
 #
-# BR-2C-0 (this release, 0.2.3; the rung carries 0.2.1, 0.2.2 and 0.2.3) —
+# BR-2C-RC (this release, 0.3.0rc1) — the BR-2C CANDIDATE HEAD. The three
+# verification seams of BenchmarkApprovalVerifierPort implemented on the D-41
+# pair inside one dedicated verifier module, and the exact deny-all default
+# (BenchmarkDenyAllVerifier). The D-42 key-identifier and D-43 actor-identity
+# grammar applied at construction. A CANDIDATE VERSION ONLY (owner ruling): it
+# conveys no audit, independent-review or production-release claim; 0.3.0 is
+# not taken until the D-38 independent external cryptographic reviewer is
+# named and the review commissioned and completed.
+#
+# BR-2C-0 (0.2.1, 0.2.2 and 0.2.3) —
 # BR-2C's ratified
 # CONTRACT SURFACE, and no
 # BR-2C capability (ADR §35.2 D-33 mints the rung and D-36 places all three
@@ -30,19 +39,15 @@
 # BENCHMARK_VERIFICATION_REFUSAL_REASONS (D-35), the twelve of the twenty-four a
 # REFUSED verified result may carry, derived from the fault-class map and never
 # written out. Four
-# further digest domains. NO VERIFIER, no anchor resolution, no key parsing, no
-# clock read and no cryptographic dependency — and THE VERIFIER THOSE CONTRACTS
-# DESCRIBE DOES NOT EXIST AND HAS NOT BEEN AUDITED.
+# further digest domains.
 #
-# NOT in this distribution and not started:
-#   BR-2C (0.3.0) cryptographic trust authority: audited Ed25519 verifier,
-#                 signing-frame verification, composition-root trust-resolver
-#                 adapter, key entitlements and revocation. The injected
-#                 verifier arrives here, defaulting to exact deny-all. Still
-#                 blocked on a secure cryptographic verifier and trust-resolver
-#                 design, specified and EXTERNALLY AUDITED — D-32 waives only
-#                 the distinct in-repo reviewer, and makes that external
-#                 cryptographic audit a hard precondition to any production use.
+# NOT in this distribution:
+#   BR-2C (0.3.0) closure: the SAME verifier after the D-38 independent
+#                 external cryptographic review and D-32(4)'s external
+#                 cryptographic audit are commissioned, completed and recorded.
+#                 Neither has occurred. The composition-root trust-resolver
+#                 adapter and key entitlements remain with the composition root
+#                 (D-04) and are not here.
 #   BR-2D (0.4.0) durable registry authority: persistence, the trusted clock,
 #                 compare-and-set transitions, immutable event history, the
 #                 process-local in-memory adapter, registry-event signing, and
@@ -53,20 +58,21 @@
 #                 service APIs, deployment controls, migrations,
 #                 backup/recovery, observability, audit export.
 #
-# This package ships NO store of any kind, signature verifier, key parser,
-# trust-anchor store, approval verifier, clock read, append path,
-# authority-issued result, resolver, convenience resolver, selection API,
-# supersession implementation, adapter registry, identity allow-list,
-# production composition root, or cryptographic dependency. BR-2B is
-# non-authoritative BY CONSTRUCTION, not by an injected default: there is
-# nothing here for a substituted component to unlock. A capability that does
-# not exist is unrepresentable in the type surface, not merely unimplemented.
-# Automated tests enforce every one of those facts.
+# This package ships NO store of any kind, trust-anchor store, clock read,
+# append path, authority-issued result, resolver, convenience resolver,
+# selection API, supersession implementation, adapter registry, identity
+# allow-list or production composition root. The candidate verifier
+# establishes cryptographic verification against one anchor revision at one
+# caller-supplied instant and nothing else: it cannot admit, register, revoke
+# or resolve, holds no anchors and reads no clock. Every other capability that
+# does not exist is unrepresentable in the type surface, not merely
+# unimplemented. Automated tests enforce every one of those facts.
 #
-# EXACTLY ONE runtime dependency: the frozen BR-1 identity layer, pinned to its
-# 0.1 line. Nothing else, Ugence or third party. The isolated --no-index install
-# proof is therefore exact: only ugence-benchmark-registry may be resolved, from
-# a local wheelhouse, and the verifier fails if anything else is.
+# EXACTLY THREE runtime dependencies: the frozen BR-1 identity layer, pinned to
+# its 0.1 line, and the D-41 pair. Nothing else, Ugence or third party. The
+# isolated --no-index install proof is exact: only those three (and the pair's
+# own transitive dependencies) may be resolved, from a local wheelhouse, and the
+# verifier fails if anything else is.
 #
 # Build:    python -m build packages/benchmark-registry-authority
 # Verify:   python packages/benchmark-registry-authority/verify_benchmark_registry_authority_distribution.py
@@ -77,7 +83,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "ugence-benchmark-registry-authority"
 dynamic = ["version"]
-description = "Ugence Benchmark Registry Authority — BR-2C-0 contract surface over BR-2B's non-authoritative lifecycle kernel and BR-2A's registry and exact-resolution contracts: the administrative lifecycle and its closed transition relation, nested-binding record and event shapes, typed refusals, inert ports, transition planning over caller-asserted state, the role-scoped trust-anchor record and the three exact verified-result types, BenchmarkTrustAnchorResolution (an anchor record XOR a typed refusal at the trust-directory seam) and BENCHMARK_VERIFICATION_REFUSAL_REASONS (the twelve of the twenty-four a refused verified result may carry) (internal platform infrastructure; no store, no verifier, no clock, no append path, no authority-issued result, and the verifier these contracts describe does not exist and has not been audited)."
+description = "Ugence Benchmark Registry Authority — BR-2C candidate head (0.3.0rc1): the candidate Ed25519 verifier (three verification seams on the cryptography + PyNaCl pair, inside one dedicated module) and the exact deny-all default, over BR-2C's contract surface, BR-2B's non-authoritative lifecycle kernel and BR-2A's registry and exact-resolution contracts: the administrative lifecycle and its closed transition relation, nested-binding record and event shapes, typed refusals, inert ports, transition planning over caller-asserted state, the role-scoped trust-anchor record, the three exact verified-result types, BenchmarkTrustAnchorResolution and BENCHMARK_VERIFICATION_REFUSAL_REASONS (internal platform infrastructure; no store, no clock, no append path, no authority-issued result; a CANDIDATE verifier only — engineered and tested, awaiting the D-38 independent external cryptographic review, and never described as reviewed or production-ready)."
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "Proprietary" }
@@ -86,11 +92,23 @@ keywords = [
     "ugence", "benchmark-registry", "benchmark-registry-authority",
     "contracts", "platform", "registry-lifecycle", "canonicalization", "digest",
 ]
-# The frozen BR-1 identity layer, and the standard library. Nothing else.
-# Pinned to the 0.1 line: BR-2A binds BR-1's exact contract shapes, its
-# canonicalization version and its pinned digests, so a minor-version bump of
-# the identity layer is a BR-2 decision, not an automatic upgrade.
-dependencies = ["ugence-benchmark-registry==0.1.*"]
+# The frozen BR-1 identity layer, the D-41 pair, and the standard library.
+# Nothing else. BR-1 is pinned to the 0.1 line: BR-2A binds BR-1's exact
+# contract shapes, its canonicalization version and its pinned digests, so a
+# minor-version bump of the identity layer is a BR-2 decision, not an
+# automatic upgrade.
+dependencies = [
+    "ugence-benchmark-registry==0.1.*",
+    # The D-41 pair, for the BR-2C candidate verifier and nothing else:
+    # cryptography verifies Ed25519 signatures; PyNaCl (libsodium) validates
+    # public-key points at anchor admission. Imported only inside
+    # src/ugence_benchmark_registry_authority/verifier.py, under the release
+    # transition the owner ratified for the candidate rung (D-40, D-41). Bounded
+    # on both sides in the same style the trusted-evidence layer declares them —
+    # the same SELECTION, never an import of that layer's code.
+    "cryptography>=41.0.7,<47.0.0",
+    "PyNaCl>=1.5.0,<2.0.0",
+]
 
 [project.optional-dependencies]
 test = ["pytest>=7.0"]

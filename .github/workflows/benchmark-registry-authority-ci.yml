@@ -3,24 +3,28 @@ name: benchmark-registry-authority-ci
 # Scoped, ADDITIVE CI for the independent ugence-benchmark-registry-authority
 # package — the authority/registry layer of the shared, platform-wide Benchmark
 # Registry (ADR_UGENCE_TRUSTED_EVIDENCE_AND_BENCHMARK_REGISTRY.md, B-1/§6.2 as
-# amended), at milestone BR-2A: "Registry and exact-resolution CONTRACTS."
+# amended), at the BR-2C candidate rung (0.3.0rc1): the candidate verifier,
+# engineered and tested, awaiting the D-38 independent external review.
 #
 # This workflow is NEW and path-scoped. It modifies nothing: benchmark-registry-ci.yml
 # and every other existing workflow are untouched. The BR-1 jobs below run BR-1's
 # OWN suite, probes and distribution verifier UNMODIFIED, so a BR-1 regression
 # fails here as well as there.
 #
-# The package declares exactly one runtime dependency — ugence-benchmark-registry
-# ==0.1.* — and the standard library. The isolated install proof is therefore
-# exact: only that one distribution may be resolved, from a local wheelhouse
-# containing it, and the verifier fails if anything else is present, if
-# PYTHONPATH leaks, if monorepo source shadows the wheel, if either artifact
-# carries tests/probes/fixtures, or if a pinned digest moves.
+# The package declares exactly three runtime dependencies — ugence-benchmark-
+# registry ==0.1.* and the D-41 pair, cryptography and PyNaCl — and the standard
+# library. The isolated install proof is exact: only those three (and the
+# pair's own transitive wheels) may be resolved, from a local wheelhouse, and
+# the verifier fails if anything else is present, if PYTHONPATH leaks, if
+# monorepo source shadows the wheel, if either artifact carries
+# tests/probes/fixtures, or if a pinned digest moves.
 #
-# Nothing here publishes, uses a secret, contacts a network service or touches
-# key material of any kind. BR-2A performs no cryptography at all: it ships no
-# cryptographic dependency, no verifier, no signer and no key parser, and its
-# only hash is one sha-256 digest path over canonical bytes.
+# Nothing here publishes, uses a secret or touches production key material. The
+# only private keys anywhere are fixed-seed TEST keys inside the verifier test
+# module, used to sign test fixtures; the shipped verifier imports no signing
+# primitive, which a gate asserts. The D-41 pair is imported only inside the
+# dedicated verifier module, and the isolated-install job fetches the pair
+# into the local wheelhouse before installing --no-index.
 
 on:
   pull_request:
@@ -34,6 +38,7 @@ on:
       - "claude/br-2a-**"
       - "claude/br2a-**"
       - "claude/benchmark-registry-authority-**"
+      - "claude/br-2c-**"
     paths:
       - "packages/benchmark-registry-authority/**"
       - "docs/architecture/ADR_UGENCE_TRUSTED_EVIDENCE_AND_BENCHMARK_REGISTRY.md"
@@ -51,7 +56,7 @@ jobs:
     # matrix is what makes requires-python = ">=3.10" an honest claim rather
     # than an aspiration: narrowing the declaration is the alternative, and it
     # is a reviewed decision, not a CI convenience.
-    name: BR-2A package suite (source, Python ${{ matrix.python-version }})
+    name: BR-2C candidate package suite (source, Python ${{ matrix.python-version }})
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -64,13 +69,14 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "${{ matrix.python-version }}"
-      - name: Install test tooling only
-        # pytest and nothing else. The package's one runtime dependency resolves
-        # from the sibling BR-1 source tree via conftest, so nothing is
-        # installed that the dependency-boundary job could then hide.
+      - name: Install test tooling and the D-41 pair
+        # pytest plus the two declared third-party dependencies, at the bounds
+        # pyproject declares. BR-1 still resolves from the sibling source tree
+        # via conftest; nothing else is installed, so the dependency-boundary
+        # gates measure exactly the declared set.
         run: |
           python -m pip install --upgrade pip
-          pip install pytest
+          pip install pytest "cryptography>=41.0.7,<47.0.0" "PyNaCl>=1.5.0,<2.0.0"
       - name: Full package suite
         run: python -m pytest packages/benchmark-registry-authority/tests -q
       - name: Canonicalization — pinned byte vectors and pinned digests
@@ -120,15 +126,20 @@ jobs:
             packages/benchmark-registry-authority/tests/contract/test_requests.py \
             packages/benchmark-registry-authority/tests/contract/test_scope_expectations.py \
             packages/benchmark-registry-authority/tests/contract/test_read_payloads.py -q
-      - name: Inert ports, inert descriptor, confusable comparison contract
+      - name: Inert ports, the two candidate implementations, confusable comparison contract
         run: |
           python -m pytest \
             packages/benchmark-registry-authority/tests/contract/test_confusable_and_ports.py -q
+      - name: The candidate verifier — three seams, strict anchor corpus, RFC 8032 decoding
+        run: |
+          python -m pytest \
+            packages/benchmark-registry-authority/tests/contract/test_verifier.py \
+            packages/benchmark-registry-authority/tests/contract/test_identifier_grammar.py -q
       - name: Dependency and reverse-dependency guards
         run: |
           python -m pytest \
             packages/benchmark-registry-authority/tests/packaging/test_dependency_boundary.py -q
-      - name: Milestone boundary — BR-2A stops where the ratification says it stops
+      - name: Milestone boundary — the candidate lifts the twelve BR-2C tokens and nothing else
         run: |
           python -m pytest \
             packages/benchmark-registry-authority/tests/packaging/test_milestone_boundary.py -q
@@ -145,9 +156,14 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+      - name: Install the D-41 pair
+        run: |
+          python -m pip install --upgrade pip
+          pip install "cryptography>=41.0.7,<47.0.0" "PyNaCl>=1.5.0,<2.0.0"
       - name: Independent probe harness (curated API + stdlib only)
-        # Imports no test module, no _builders helper, no conftest and no
-        # private submodule; reconstructs canonical bytes by hand.
+        # Imports no test module, no _builders helper, no conftest, no private
+        # submodule and no cryptographic library; reconstructs canonical bytes
+        # by hand and verifies pinned signature literals through the public API.
         env:
           PYTHONPATH: packages/benchmark-registry-authority/src:packages/benchmark-registry/src
         run: python packages/benchmark-registry-authority/adversarial_probes.py
@@ -160,10 +176,10 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-      - name: Install test tooling
+      - name: Install test tooling and the D-41 pair
         run: |
           python -m pip install --upgrade pip
-          pip install pytest
+          pip install pytest "cryptography>=41.0.7,<47.0.0" "PyNaCl>=1.5.0,<2.0.0"
       - name: Neutralize each load-bearing gate in turn; every mutant must be KILLED
         # Operates on a copy of the tree, restores from a pristine snapshot after
         # each mutant, and fails if any mutant survives unclassified.
@@ -183,11 +199,13 @@ jobs:
           pip install build
       - name: Build both distributions, install --no-index, run every negative control
         # Installs with --no-index and PIP_NO_INDEX=1 into a venv with no system
-        # site packages and no PYTHONPATH, from a wheelhouse containing only the
-        # frozen BR-1 layer. Fails on an injected extra distribution, a leaked
-        # PYTHONPATH, monorepo source shadowing the wheel, a declared dependency
-        # beyond the allowed one, a test/conftest/probe/fixture inside either
-        # artifact, or a moved pinned digest.
+        # site packages and no PYTHONPATH, from a wheelhouse containing the
+        # frozen BR-1 layer and the D-41 pair (fetched into the wheelhouse first,
+        # the verifier's one network step). Fails on an injected extra
+        # distribution, a leaked PYTHONPATH, monorepo source shadowing the
+        # wheel, a declared dependency beyond the ratified three, a
+        # test/conftest/probe/fixture inside either artifact, or a moved pinned
+        # digest.
         run: python packages/benchmark-registry-authority/verify_benchmark_registry_authority_distribution.py
 
   api-and-inventory-parity:
@@ -198,10 +216,10 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-      - name: Install test tooling
+      - name: Install test tooling and the D-41 pair
         run: |
           python -m pip install --upgrade pip
-          pip install pytest
+          pip install pytest "cryptography>=41.0.7,<47.0.0" "PyNaCl>=1.5.0,<2.0.0"
       - name: public_api.json equals the actual curated surface
         run: |
           python -m pytest \
