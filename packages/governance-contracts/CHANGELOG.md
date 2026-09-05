@@ -1,5 +1,29 @@
 # Changelog — ugence-governance-contracts
 
+## [0.6.0] — neutral data-classification label (DE-5) (additive)
+
+**Additive, backward-compatible.** No existing public symbol, field, enum value,
+default, constructor signature, serialization or authority meaning changed.
+`CONTRACT_VERSION` (the **provider** contract surface) is **unchanged at `1.0.0`**;
+only the package `__version__` advances, to `0.6.0`. Remains a stdlib-only leaf.
+Ruled by `docs/architecture/ADR_UGENCE_DATA_EGRESS_AUTHORITY_SCOPING.md` (DE-5),
+which lands the vocabulary here — as D-4 did for `AuditReference` — before the
+package that first consumes it, `ugence-data-use-admission`, exists.
+
+- `DataClassificationLabel` — an immutable, non-empty, **uninterpreted** label
+  (`label`, stored stripped, otherwise verbatim) with `canonical_bytes()` /
+  `canonical_digest()`. Equality is exact text equality and nothing else.
+- `DataClassificationContractError` — every refusal is typed; a blank label, a
+  non-string, or text carrying a control character or line break is rejected at
+  construction. An **unknown** label is never rejected, because there is no
+  recognized set.
+- **No ordering operation** (DE-3): the dataclass is `order=False` and defines no
+  rich comparison, so `sorted()` over labels raises; there is no `dominates`,
+  `is_compatible_with`, `rank`, `severity` or `tier`, and no enum, taxonomy,
+  lattice or hierarchy ships with the family. A test pins the whole surface.
+- It classifies nothing, decides nothing and grants no authority: it records what
+  a declarer *called* some data, never what that means.
+
 ## [0.5.0] — neutral audit reference (G4), contract half (additive)
 
 **Additive, backward-compatible.** No existing public symbol, field, enum value,

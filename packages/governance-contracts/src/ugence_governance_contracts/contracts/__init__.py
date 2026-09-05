@@ -42,6 +42,10 @@ from .audit import (
     AuditContractError,
     AuditReference,
 )
+from .data_classification import (
+    DataClassificationContractError,
+    DataClassificationLabel,
+)
 from .evidence import (
     AssessmentWindow,
     AttestationStatus,
@@ -87,4 +91,6 @@ __all__ = [
     "ValidityStatus", "Validity", "ValidityContractError",
     # G4 neutral audit reference (additive)
     "AuditReference", "AuditContractError",
+    # DE-5 neutral data-classification label (additive)
+    "DataClassificationLabel", "DataClassificationContractError",
 ]
