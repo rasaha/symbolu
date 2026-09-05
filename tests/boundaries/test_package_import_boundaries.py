@@ -18,6 +18,8 @@ _REPO_ROOT = pathlib.Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(_REPO_ROOT / "scripts"))
 
 from check_package_import_boundaries import (  # noqa: E402
+    COMPOSED_LAYERS,
+    COMPOSING_LAYERS,
     LEAF_LAYER,
     check,
     discover_packages,
@@ -154,6 +156,98 @@ def test_integration_may_import_a_capability(tmp_path):
 def test_a_third_party_or_stdlib_import_is_never_a_violation(tmp_path):
     root = _world(tmp_path, capability_body="import json\nimport pytest\nimport nonexistent_pkg\n")
     assert check(root).ok
+
+
+# --------------------------------------------------------------------------- #
+# Regressions from the independent review of this gate
+# --------------------------------------------------------------------------- #
+@pytest.mark.parametrize("wrapper", [
+    "with contextlib.suppress(ImportError):\n    {imp}\n",
+    "for _ in range(1):\n    {imp}\n",
+    "while True:\n    {imp}\n    break\n",
+    "class Holder:\n    {imp}\n",
+    "if True:\n    with contextlib.suppress(Exception):\n        {imp}\n",
+])
+def test_an_import_nested_at_module_scope_is_still_caught(tmp_path, wrapper):
+    """Anything that runs at import time counts, however deeply nested.
+
+    The first version only recursed into ``if`` and ``try``, so
+    ``with contextlib.suppress(ImportError): import x`` — which binds exactly as
+    hard as a bare import — was invisible.
+    """
+
+    body = "import contextlib\n" + wrapper.format(imp="import ugence_thing_workflow")
+    root = _world(tmp_path, capability_body=body, declares=("ugence-thing-workflow",))
+    assert [v.rule for v in check(root).violations] == ["layering"], body
+
+
+def test_a_namespace_package_without_an_init_is_discovered(tmp_path):
+    """PEP 420 namespace packages ship real code and must not read as third-party.
+
+    ``packages/products/procurement/src`` ships ``applications`` and ``domains``
+    exactly this way; missing them made every import of them invisible.
+    """
+
+    integration = tmp_path / "packages" / "integration" / "thing-workflow"
+    shipped = integration / "src" / "thing_namespace" / "inner"
+    shipped.mkdir(parents=True)
+    (shipped / "__init__.py").write_text("", encoding="utf-8")   # no __init__ one level up
+    (integration / "pyproject.toml").write_text(
+        '[project]\nname = "ugence-thing-workflow"\nversion = "0.1.0"\ndependencies = []\n',
+        encoding="utf-8")
+    assert "thing_namespace" in {n for p in discover_packages(tmp_path) for n in p.namespaces}
+
+    _write_package(tmp_path, "capabilities", "thing-capability", "ugence-thing-capability",
+                   "ugence_thing_capability", dependencies=("ugence-thing-workflow",),
+                   body="import thing_namespace\n")
+    assert [v.rule for v in check(tmp_path).violations] == ["layering"]
+
+
+def test_the_real_repository_registers_its_namespace_packages():
+    owner = check(_REPO_ROOT).namespace_owner
+    for namespace in ("applications", "domains"):
+        assert namespace in owner, namespace
+        assert owner[namespace] == "ugence-procurement"
+
+
+def test_an_extra_counts_as_a_declaration(tmp_path):
+    """A dependency declared only under [project.optional-dependencies] is declared."""
+
+    _write_package(tmp_path, "capabilities", "thing-capability", "ugence-thing-capability",
+                   "ugence_thing_capability")
+    other = tmp_path / "packages" / "capabilities" / "other-capability"
+    (other / "src" / "ugence_other_capability").mkdir(parents=True)
+    (other / "src" / "ugence_other_capability" / "__init__.py").write_text(
+        "import ugence_thing_capability\n", encoding="utf-8")
+    (other / "pyproject.toml").write_text(
+        '[project]\nname = "ugence-other-capability"\nversion = "0.1.0"\n'
+        'dependencies = []\n\n'
+        '[project.optional-dependencies]\nreference = ["ugence-thing-capability"]\n',
+        encoding="utf-8")
+    assert check(tmp_path).ok
+
+
+def test_the_layer_model_is_deliberate():
+    """Pin which layers are constrained, so the choice stays visible.
+
+    providers / products / runtime / tooling are unconstrained on purpose: a
+    product or composition root is supposed to import an integration package.
+    Changing this set should require changing this test.
+    """
+
+    assert COMPOSING_LAYERS == ("integration",)
+    assert COMPOSED_LAYERS == ("capabilities", LEAF_LAYER)
+    report = check(_REPO_ROOT)
+    unconstrained = {p.layer for p in report.packages} - set(COMPOSED_LAYERS) - set(COMPOSING_LAYERS)
+    assert unconstrained == {"providers", "products", "runtime", "tooling"}
+
+
+def test_the_dynamic_import_blind_spot_is_documented():
+    """The gate must state what it cannot see; overselling manufactures false confidence."""
+
+    source = (_REPO_ROOT / "scripts" / "check_package_import_boundaries.py").read_text()
+    assert "static imports only" in source
+    assert "importlib.import_module" in source and "workflow-fit-pilot" in source
 
 
 # --------------------------------------------------------------------------- #

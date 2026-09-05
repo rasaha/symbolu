@@ -134,5 +134,7 @@ roots, products and applications may import it; no capability package may — en
 - No store, so nothing persists; a composition root holds whatever it registers.
 - The classification vocabulary is unratified, so the label stays uninterpreted
   until an owner fixes a taxonomy.
-- (Closed) The repository now enforces "no capability package may import it"
-  repository-wide, in `scripts/check_package_import_boundaries.py`.
+- (Closed for static imports) The repository now enforces "no capability package
+  may import it" repository-wide, in `scripts/check_package_import_boundaries.py`.
+  A dynamic `importlib.import_module(name)` cannot be caught by any static
+  checker; that seam remains a reviewer's judgement.

@@ -25,9 +25,20 @@ repository's established optional-dependency idiom — see
 Imports inside ``if TYPE_CHECKING:`` or ``try:`` blocks at module scope *are*
 counted: they name a real coupling a reader must be able to find in the manifest.
 
-What this does NOT do: it reads source and manifests only. It imports nothing,
-installs nothing, and executes no package code, so it cannot be defeated by a
-side effect and needs no dependency to be present.
+What this does NOT do, stated plainly because a gate that oversells its coverage
+manufactures the false confidence it exists to prevent:
+
+* it reads source and manifests only — it imports nothing, installs nothing and
+  executes no package code, so it needs no dependency present;
+* it therefore sees **static imports only**. ``importlib.import_module(name)`` and
+  ``__import__(name)`` with a computed name are invisible to it, and that pattern
+  is live in this repository — ``workflow-fit-pilot/.../boundary/entry.py:21``
+  imports a caller-supplied ``provider_factory`` module path. No static checker
+  can close that; a composition root that wires a forbidden package in by string
+  will not be caught here.
+
+The rules below are enforced for every import a reader can see in the source. A
+dynamic import is a seam the reviewer must judge.
 
 Exit code 0 = no violations; 1 = one or more violations.
 
@@ -53,6 +64,14 @@ LEAF_LAYER = "leaf"
 COMPOSING_LAYERS = ("integration",)
 
 #: Layers that are composed and must therefore never import a composing layer.
+#:
+#: ``providers``, ``products``, ``runtime`` and ``tooling`` are deliberately NOT
+#: here. A product or a composition root is *supposed* to import an integration
+#: package — that is what composition means — and constraining them would forbid
+#: the intended direction. ``providers`` is the arguable one: it is structurally
+#: leaf-like, and no provider imports an integration package today, but no ADR
+#: has ruled on it, so this gate does not invent the rule. ``test_the_layer_model_is_deliberate``
+#: pins this list so the choice stays visible rather than accidental.
 COMPOSED_LAYERS = ("capabilities", LEAF_LAYER)
 
 
@@ -122,26 +141,51 @@ def discover_packages(repo_root: pathlib.Path) -> list[Package]:
         distribution = project.get("name")
         if not distribution:
             continue
+        # A ``src/`` child is a shipped namespace if it is a regular package
+        # (``__init__.py``) *or* a PEP 420 namespace package — a directory with no
+        # ``__init__.py`` that still ships modules below it. The repository has
+        # both: ``packages/products/procurement/src`` ships ``ugence_procurement``
+        # (regular) alongside ``applications`` and ``domains`` (namespace). Missing
+        # the latter would make every import of them look third-party.
         namespaces = frozenset(
             child.name for child in src.iterdir()
-            if child.is_dir() and (child / "__init__.py").is_file())
+            if child.is_dir() and child.name != "__pycache__"
+            and ((child / "__init__.py").is_file()
+                 or any(p for p in child.rglob("*.py") if "__pycache__" not in p.parts)))
         if not namespaces:
             continue
         relative = directory.relative_to(packages_root).parts
         layer = relative[0] if len(relative) > 1 else LEAF_LAYER
-        declared = frozenset(
-            _requirement_name(r) for r in (project.get("dependencies") or []))
+        # An extra is still a declaration: a namespace reachable only through
+        # ``[project.optional-dependencies]`` is documented in the manifest, which
+        # is what rule 2 is for. Counting only the required list would flag it.
+        requirements = list(project.get("dependencies") or [])
+        for extra in (project.get("optional-dependencies") or {}).values():
+            requirements.extend(extra or [])
+        declared = frozenset(_requirement_name(r) for r in requirements)
         found.append(Package(directory=directory, distribution=distribution, layer=layer,
                              namespaces=namespaces, declared_distributions=declared))
     return found
 
 
+#: Bodies that do NOT run at import time. Everything else does, so an import
+#: anywhere else in the module is a real, load-bearing dependency.
+_DEFERRED_SCOPES = (ast.FunctionDef, ast.AsyncFunctionDef, ast.Lambda)
+
+
 def module_scope_imports(path: pathlib.Path) -> Iterable[tuple[str, int]]:
     """Root package names imported at module scope, with line numbers.
 
-    Module scope includes ``if TYPE_CHECKING:`` and ``try:`` blocks — those name a
-    real coupling — but not imports inside a function or method, which are this
-    repository's optional-dependency idiom and bind nothing at import time.
+    "Module scope" is defined by *execution*, not by nesting depth: every
+    statement that runs when the module is imported counts, however deeply it is
+    nested. So ``if TYPE_CHECKING:``, ``try:``, ``with``, ``for``, ``while``,
+    ``match`` and class bodies are all walked — each names a coupling a reader
+    must be able to find in the manifest, and ``with contextlib.suppress(...):
+    import x`` binds exactly as hard as a bare import.
+
+    Only function, method and lambda bodies are skipped: those run on call, not on
+    import, and a function-local import is this repository's established
+    optional-dependency idiom.
     """
 
     try:
@@ -151,18 +195,17 @@ def module_scope_imports(path: pathlib.Path) -> Iterable[tuple[str, int]]:
 
     seen: list[tuple[str, int]] = []
 
-    def collect(node: ast.AST) -> None:
-        if isinstance(node, ast.Import):
-            seen.extend((alias.name.split(".")[0], node.lineno) for alias in node.names)
-        elif isinstance(node, ast.ImportFrom) and not node.level and node.module:
-            seen.append((node.module.split(".")[0], node.lineno))
+    def walk(node: ast.AST) -> None:
+        for child in ast.iter_child_nodes(node):
+            if isinstance(child, _DEFERRED_SCOPES):
+                continue  # runs on call, not on import
+            if isinstance(child, ast.Import):
+                seen.extend((alias.name.split(".")[0], child.lineno) for alias in child.names)
+            elif isinstance(child, ast.ImportFrom) and not child.level and child.module:
+                seen.append((child.module.split(".")[0], child.lineno))
+            walk(child)
 
-    for statement in tree.body:
-        if isinstance(statement, (ast.If, ast.Try)):
-            for nested in ast.walk(statement):
-                collect(nested)
-        else:
-            collect(statement)
+    walk(tree)
     return seen
 
 
