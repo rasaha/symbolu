@@ -1,33 +1,42 @@
 #!/usr/bin/env python3
 """Disable each refusal in ``src/`` in turn and report which ones no test catches.
 
-Four review rounds each found a guard this package refused to enforce, or a claim
-about coverage broader than the coverage itself. Two of those rounds found the
-sweep behind the claim was narrower than the claim: first it saw only ``raise``
-guards and missed ``reasons.append``; then it reached only ``records.py`` and
-``states.py`` and missed ``journal.py``'s tenant filters entirely.
+Five review rounds each found a guard this package refused to enforce, or a claim
+about coverage broader than the coverage itself. Three of those rounds found the
+sweep behind the claim narrower than the claim: first it saw only ``raise`` guards
+and missed ``reasons.append``; then it reached only ``records.py`` and ``states.py``
+and missed ``journal.py``'s tenant filters entirely; then it skipped ``else``-bearing
+guards and unconditional raises while claiming all of ``src/``.
 
 So the sweep ships, rather than being described. Run it and the number is whatever
 it is today::
 
     python3 scripts/mutation_sweep.py
 
-**Scope, stated so it can be checked**: every module under ``src/``. Three refusal
-shapes are recognized, which is what the earlier sweeps got wrong by taking one or
-two:
+**Scope, stated so it can be checked**: every module under ``src/``. Four refusal
+shapes are recognized — the count rose because each earlier version's scope was
+narrower than its own description of itself:
 
 1. ``if <cond>: raise ...`` — a guard that refuses outright.
 2. ``if <cond>: <seq>.append(...)`` — a guard that records a refusal reason.
 3. a comparison inside a generator or comprehension ``if`` clause — a filter
    clause, which is how the read seam enforces tenant and subject isolation.
+4. a ``raise`` that no ``if`` guards at all — an invariant that refuses
+   unconditionally, such as ``IncidentRecord.__init_subclass__``.
+
+Shapes 1 and 2 are enumerated whether or not the ``if`` carries an ``else``.
 
 Sites are reported as ``file:line:column`` because one line often holds several —
 a filter with two clauses is two independent refusals, and reporting only the line
 hides which of them a survivor is. That ambiguity concealed a real hole once.
 
-Each site is disabled in place (the condition forced to the value that skips the
-refusal, or the filter clause forced true), the package suite is run, and the file
-is restored. A site that "SURVIVED" is one no test distinguishes from its absence.
+**How a refusal is disabled**: for shapes 1, 2 and 4, the refusing statements
+themselves are replaced with ``pass``; for shape 3, the filter clause is forced
+true. The refusing statements rather than the enclosing condition, because those
+differ whenever an ``else`` exists — forcing the condition there diverts control
+flow into the ``else`` instead of disabling a refusal, which would report a false
+result on exactly the guard shape an audit found this script missing. The suite is
+then run and the file restored.
 
 Surviving is not automatically a defect: a guard redundant with a twin that runs
 downstream on the same call cannot be killed alone. Those are listed in
