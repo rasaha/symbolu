@@ -63,6 +63,11 @@ class DeploymentConfig:
     #: listener). Unset means the review screens report a typed gap; nothing else in the
     #: deployment reads it. It is the profile's one permitted outbound destination.
     review_service_url: str = ""
+    #: Front-door seam 1 (FD-1, FD-5): the durable sqlite policy registry the studio's
+    #: activation root is composed over. Unset means the Constitution screen reports
+    #: its typed gap. Read here, handed to build_studio_context(activation_root=...)
+    #: and nowhere else. Must lie under the writable runtime volume.
+    constitution_registry_path: str = ""
     _errors: List[str] = field(default_factory=list, compare=False)
 
     @property
@@ -76,6 +81,10 @@ class DeploymentConfig:
     @property
     def review_service_configured(self) -> bool:
         return bool(self.review_service_url)
+
+    @property
+    def constitution_registry_configured(self) -> bool:
+        return bool(self.constitution_registry_path)
 
     @classmethod
     def from_env(cls, **overrides) -> "DeploymentConfig":
@@ -98,6 +107,8 @@ class DeploymentConfig:
             enable_access_log=bool(overrides.get("enable_access_log", _env("UGENCE_STUDIO_ACCESS_LOG") == "1")),
             review_service_url=(overrides.get("review_service_url")
                                 or _env("UGENCE_STUDIO_REVIEW_SERVICE_URL") or "").strip().rstrip("/"),
+            constitution_registry_path=(overrides.get("constitution_registry_path")
+                                        or _env("UGENCE_STUDIO_CONSTITUTION_REGISTRY_PATH") or "").strip(),
         )
         return cfg
 
@@ -144,7 +155,33 @@ class DeploymentConfig:
         if self.review_service_url:
             errors.extend(_review_url_errors(self.review_service_url, self.is_production))
 
+        # constitution registry (front-door seam 1): optional; a file under the runtime volume
+        if self.constitution_registry_path:
+            errors.extend(_registry_path_errors(self.constitution_registry_path, self.runtime_dir))
+
         return errors
+
+
+def _registry_path_errors(path: str, runtime_dir: str) -> List[str]:
+    """Why ``UGENCE_STUDIO_CONSTITUTION_REGISTRY_PATH`` must not be used, or nothing.
+
+    The registry is a sqlite file (Posture B) and lives only under the writable
+    runtime volume: an absolute path below ``runtime_dir``, never in memory, never a
+    directory. Whether it is writable is the startup-integrity gate's question.
+    """
+    if path in (":memory:",) or path.startswith("file:"):
+        return ["UGENCE_STUDIO_CONSTITUTION_REGISTRY_PATH must be a file path; an in-memory "
+                "registry is not durable and is refused"]
+    if not os.path.isabs(path):
+        return ["UGENCE_STUDIO_CONSTITUTION_REGISTRY_PATH must be an absolute path"]
+    root = os.path.realpath(runtime_dir) if runtime_dir else ""
+    candidate = os.path.realpath(path)
+    if not root or not (candidate == root or candidate.startswith(root + os.sep)) or candidate == root:
+        return ["UGENCE_STUDIO_CONSTITUTION_REGISTRY_PATH must lie under the writable runtime "
+                "volume (UGENCE_STUDIO_RUNTIME_DIR); no other path is writable"]
+    if os.path.isdir(candidate):
+        return ["UGENCE_STUDIO_CONSTITUTION_REGISTRY_PATH names a directory, not a file"]
+    return []
 
 
 def _review_url_errors(url: str, production: bool) -> List[str]:

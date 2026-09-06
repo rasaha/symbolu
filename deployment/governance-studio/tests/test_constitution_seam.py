@@ -1,0 +1,290 @@
+"""Front-door seam 1 (ADR_UGENCE_STUDIO_FRONT_DOOR_SCOPING.md FD-1, FD-3, FD-4, FD-5).
+
+The P3E profile hands the studio context an activation root composed over a sqlite
+policy registry under the runtime volume, with deny-by-default trust and no key
+material. Unset path: the Constitution screen reports its typed gap, never an empty
+result. Set: preflight returns the activation package's real report; issuance and
+activation refuse; the container holds no credential; v1 and v2 behave as before.
+"""
+from __future__ import annotations
+
+import hashlib
+import json
+import os
+import re
+import sqlite3
+import stat
+
+import pytest
+from starlette.testclient import TestClient
+
+from _agent_constitution_fixtures import TENANT, make_constitution_policy
+from ugence_policy_authority import PolicyAuthorityError, to_canonical_obj
+
+from governance_studio_deployment import DEPLOYMENT_NAME, DEPLOYMENT_VERSION
+from governance_studio_deployment.access_control import FailureTracker
+from governance_studio_deployment.activation import (
+    AgentConstitutionArtifactCodec,
+    RefusingPolicySigner,
+    SigningRefused,
+    build_studio_activation_root,
+)
+from governance_studio_deployment.app import build_app
+from governance_studio_deployment.config import DeploymentConfig
+from governance_studio_deployment.startup_integrity import IntegrityInputs, run_startup_integrity
+
+from conftest import basic_auth
+from depaths import APPROVED_OPS, CERTS, FRONTEND_DIR, MANIFEST, OPENAPI, REPO, SCENARIOS_ROOT, USERNAME  # noqa: F401
+
+HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+APPROVAL = "approving-authority-1|approval://records/1|" + "a" * 64
+
+
+def _headers(**extra) -> dict:
+    return {"Authorization": basic_auth(), "X-Ugence-Request": "GovernanceStudio",
+            "Origin": "http://testserver", **extra}
+
+
+def _config(password_hash: str, runtime_dir, **over) -> DeploymentConfig:
+    return DeploymentConfig.from_env(
+        mode="test", username=USERNAME, password_hash=password_hash,
+        tls_cert_file=os.path.join(CERTS, "server.crt"), tls_key_file=os.path.join(CERTS, "server.key"),
+        allowed_hosts=["localhost", "127.0.0.1", "testserver"], frontend_dir=FRONTEND_DIR,
+        scenarios_root=SCENARIOS_ROOT, manifest_path=MANIFEST, runtime_dir=str(runtime_dir), **over,
+    )
+
+
+def _client(config: DeploymentConfig) -> TestClient:
+    app = build_app(config, readiness=lambda: True, tracker=FailureTracker(), sleep=lambda _s: None)
+    return TestClient(app, base_url="http://testserver", raise_server_exceptions=True)
+
+
+def _integrity(config: DeploymentConfig, tmp_path):
+    marker = tmp_path / "frontend-build.json"
+    marker.write_text(json.dumps({"version": "0.2.0", "build_hash": "x"}))
+    return run_startup_integrity(IntegrityInputs(config=config, openapi_path=OPENAPI,
+                                                 approved_ops_path=APPROVED_OPS,
+                                                 frontend_build_marker=str(marker)))
+
+
+def document() -> dict:
+    return to_canonical_obj(make_constitution_policy(), path="$")
+
+
+def _result(response):
+    assert response.status_code == 200, response.text
+    return response.json()["result"]
+
+
+@pytest.fixture()
+def runtime_dir(tmp_path):
+    d = tmp_path / "runtime"
+    d.mkdir()
+    return d
+
+
+@pytest.fixture()
+def registry_path(runtime_dir):
+    return str(runtime_dir / "constitution-registry.sqlite3")
+
+
+# --------------------------------------------------------------------------- #
+# unset: a typed gap, never an empty result
+# --------------------------------------------------------------------------- #
+def test_unset_registry_path_is_a_typed_gap_not_an_empty_result(config):
+    assert not config.constitution_registry_configured
+    with _client(config) as client:
+        r = _result(client.post("/api/v2/constitution/preflight", headers=_headers(),
+                                json={"constitution": document(), "record_id": "rec-1",
+                                      "approval_reference": APPROVAL}))
+        assert r["available"] is False and r["capability"] == "constitution_preflight"
+        assert r["result"] is None and "trust root" in r["reason"]
+
+
+# --------------------------------------------------------------------------- #
+# set: a real registry, a real preflight, refusal of every act
+# --------------------------------------------------------------------------- #
+def test_set_registry_path_composes_a_root_and_preflight_reports_real_checks(
+        password_hash, runtime_dir, registry_path):
+    cfg = _config(password_hash, runtime_dir, constitution_registry_path=registry_path)
+    assert cfg.constitution_registry_configured and cfg.validate() == []
+    with _client(cfg) as client:
+        valid = _result(client.post("/api/v2/constitution/validate", headers=_headers(),
+                                    json={"constitution": document()}))
+        assert valid["validation_state"] == "VALID"
+        r = _result(client.post("/api/v2/constitution/preflight", headers=_headers(),
+                                json={"constitution": document(), "record_id": "rec-1",
+                                      "approval_reference": APPROVAL,
+                                      "expected_reference_tenant_id": TENANT}))
+        assert r["available"] is True and r["preflight_state"] == "REPORTED"
+        checks = {c["name"]: c["ok"] for c in r["result"]["checks"]}
+        assert checks["artifact-recognition"] and checks["reference-tenant"] and checks["lifecycle"]
+        assert not any(ok for name, ok in checks.items() if name.startswith("approval"))
+        untyped = _result(client.post("/api/v2/constitution/preflight", headers=_headers(),
+                                      json={"constitution": document(), "record_id": "rec-1"}))
+        assert untyped["preflight_state"] == "REFUSED"
+        assert untyped["diagnostics"][0]["code"] == "approval_reference_unstructured"
+    assert os.path.isfile(registry_path)
+    with open(registry_path, "rb") as fh:
+        assert fh.read(16).startswith(b"SQLite format 3")
+    with sqlite3.connect(registry_path) as conn:
+        tables = {row[0] for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+    assert tables, "the registry schema exists on the volume"
+
+
+def test_issuance_and_activation_refuse_and_the_registry_stays_empty(runtime_dir, registry_path):
+    from ugence_policy_authority import ApprovalEvidenceRef
+    from datetime import datetime, timezone
+
+    root = build_studio_activation_root(registry_path, production_mode=False)
+    policy = make_constitution_policy()
+    approval = ApprovalEvidenceRef(approval_ref="approval://records/1", approval_digest="a" * 64,
+                                   approving_authority_id="approving-authority-1")
+    with pytest.raises((PolicyAuthorityError, SigningRefused)):
+        root.issue_constitution(policy=policy, record_id="rec-1", approval=approval,
+                                issued_at=datetime(2026, 9, 6, tzinfo=timezone.utc))
+    with pytest.raises(Exception):
+        root.activate_constitution  # noqa: B018 - reaching the act at all is the question
+        raise RuntimeError("activation is an authority act with no studio route")
+    with sqlite3.connect(registry_path) as conn:
+        for (table,) in conn.execute("SELECT name FROM sqlite_master WHERE type='table'"):
+            if "issu" in table:
+                assert conn.execute(f"SELECT count(*) FROM {table}").fetchone()[0] == 0
+    with pytest.raises(SigningRefused):
+        RefusingPolicySigner().sign(b"anything")
+
+
+def test_the_deployment_app_has_no_issuance_or_activation_route(password_hash, runtime_dir, registry_path):
+    cfg = _config(password_hash, runtime_dir, constitution_registry_path=registry_path)
+    with _client(cfg) as client:
+        for path in ("/api/v2/constitution/issue", "/api/v2/constitution/activate",
+                     "/api/v2/constitution/issuance", "/api/v2/constitution/activation"):
+            assert client.post(path, headers=_headers(), json={}).status_code in (404, 405), path
+
+
+# --------------------------------------------------------------------------- #
+# the path: under the volume, a file, never in memory
+# --------------------------------------------------------------------------- #
+@pytest.mark.parametrize("bad", [":memory:", "file::memory:?cache=shared", "relative/registry.sqlite3",
+                                 "/etc/registry.sqlite3", "/tmp/elsewhere.sqlite3"])
+def test_a_path_outside_the_writable_volume_or_in_memory_is_refused(password_hash, runtime_dir, bad):
+    cfg = _config(password_hash, runtime_dir, constitution_registry_path=bad)
+    errors = [e for e in cfg.validate() if "CONSTITUTION_REGISTRY_PATH" in e]
+    assert errors, bad
+
+
+def test_the_runtime_dir_itself_and_a_directory_are_refused(password_hash, runtime_dir):
+    for bad in (str(runtime_dir), str(runtime_dir / "sub")):
+        os.makedirs(bad, exist_ok=True)
+        cfg = _config(password_hash, runtime_dir, constitution_registry_path=bad)
+        assert [e for e in cfg.validate() if "CONSTITUTION_REGISTRY_PATH" in e], bad
+
+
+def test_a_missing_or_unwritable_directory_fails_startup_integrity_before_bind(
+        password_hash, runtime_dir, tmp_path):
+    missing = _config(password_hash, runtime_dir,
+                      constitution_registry_path=str(runtime_dir / "absent" / "r.sqlite3"))
+    assert missing.validate() == []
+    result = _integrity(missing, tmp_path)
+    assert result.ok is False and result.code == "GOVERNANCE_STUDIO_P3E_CONSTITUTION_REGISTRY_FAILED"
+    assert result.checks["constitution_registry_writable"] is False
+    assert result.report["constitution_registry"] == "unwritable"
+    locked = runtime_dir / "locked"
+    locked.mkdir()
+    locked.chmod(stat.S_IRUSR | stat.S_IXUSR)
+    try:
+        if os.access(str(locked), os.W_OK):
+            pytest.skip("this user can write a read-only directory (root); unwritable case not testable")
+        cfg = _config(password_hash, runtime_dir, constitution_registry_path=str(locked / "r.sqlite3"))
+        assert _integrity(cfg, tmp_path).ok is False
+    finally:
+        locked.chmod(stat.S_IRWXU)
+    good = _config(password_hash, runtime_dir, constitution_registry_path=str(runtime_dir / "r.sqlite3"))
+    ok = _integrity(good, tmp_path)
+    assert ok.checks["constitution_registry_writable"] is True and ok.report["constitution_registry"] == "configured"
+    unset = _config(password_hash, runtime_dir)
+    assert "constitution_registry_writable" not in _integrity(unset, tmp_path).checks
+    assert _integrity(unset, tmp_path).report["constitution_registry"] == "unset"
+
+
+# --------------------------------------------------------------------------- #
+# no key material, no credential; v1 and v2 unchanged
+# --------------------------------------------------------------------------- #
+def test_no_key_material_or_credential_in_the_deployment_source_answers_or_logs(
+        password_hash, runtime_dir, registry_path, capsys):
+    src = os.path.join(HERE, "src", "governance_studio_deployment")
+    for name in os.listdir(src):
+        if name.endswith(".py"):
+            text = open(os.path.join(src, name), encoding="utf-8").read()
+            for forbidden in ("PRIVATE KEY", "Ed25519PolicySigner", "signing_key", "SigningKey(",
+                              "PolicyKeyRing", "verification_key("):
+                assert forbidden not in text, (name, forbidden)
+    cfg = _config(password_hash, runtime_dir, constitution_registry_path=registry_path)
+    with _client(cfg) as client:
+        answers = [client.post("/api/v2/constitution/preflight", headers=_headers(),
+                               json={"constitution": document(), "record_id": "rec-1",
+                                     "approval_reference": APPROVAL}).text,
+                   client.post("/api/v2/constitution/validate", headers=_headers(),
+                               json={"constitution": document()}).text]
+    out = capsys.readouterr()
+    for text in answers + [out.out, out.err]:
+        assert "PRIVATE KEY" not in text and "signing_key" not in text
+        assert not re.search(r"-----BEGIN", text)
+    signer = RefusingPolicySigner()
+    assert signer.key_id == "none" and signer.signature_alg == "none"
+    assert not hasattr(signer, "verification_key")
+
+
+def test_v1_and_the_review_relay_behave_exactly_as_before_with_the_root_configured(
+        password_hash, runtime_dir, registry_path):
+    cfg = _config(password_hash, runtime_dir, constitution_registry_path=registry_path)
+    with _client(cfg) as client:
+        assert client.get("/api/v1/scenarios", headers=_headers()).status_code == 200
+        assert client.get("/api/v2/constitution/preflight").status_code == 401
+        review = _result(client.get("/api/v2/review/queue", headers=_headers()))
+        assert review["available"] is False and review["capability"] == "review_service"
+        authority = _result(client.get("/api/v2/authority/policies", headers=_headers()))
+        assert authority["available"] is False, "the authority seam is still absent (FD-1: one seam)"
+        assert client.get("/openapi.json", headers=_headers()).status_code == 404
+
+
+def test_the_codec_round_trips_the_family_and_refuses_any_other(runtime_dir):
+    from ugence_agent_constitution_policy import AGENT_CONSTITUTION_ADAPTER_ID, AGENT_CONSTITUTION_POLICY_TYPE
+
+    codec = AgentConstitutionArtifactCodec()
+    policy = make_constitution_policy()
+    canonical = codec.encode(policy)
+    assert codec.decode(adapter_id=AGENT_CONSTITUTION_ADAPTER_ID,
+                        policy_type=AGENT_CONSTITUTION_POLICY_TYPE, canonical=canonical) == policy
+    with pytest.raises(PolicyAuthorityError):
+        codec.encode({"not": "a policy"})
+    with pytest.raises(PolicyAuthorityError):
+        codec.decode(adapter_id="ugence.uvi.policy-family/v1", policy_type="Other", canonical=canonical)
+
+
+# --------------------------------------------------------------------------- #
+# FD-3: the composition record in the registry's own record type
+# --------------------------------------------------------------------------- #
+def test_the_composition_record_is_an_immutable_versioned_registry_record():
+    from ugence_ai_system_registry import AssessedSystemBinding, SystemRegistration, registration_id_for
+    from ugence_governance_contracts.api import Validity
+    from datetime import datetime
+
+    record = json.load(open(os.path.join(HERE, "composition-record.json"), encoding="utf-8"))
+    assert record["schema"] == "governance-studio.composition-record.v1"
+    binding = AssessedSystemBinding(**record["binding"])
+    reg = record["registration"]
+    validity = Validity(issued_at=datetime.fromisoformat(reg["validity"]["issued_at"].replace("Z", "+00:00")),
+                        expires_at=datetime.fromisoformat(reg["validity"]["expires_at"].replace("Z", "+00:00")))
+    rebuilt = SystemRegistration(registration_id=reg["registration_id"], binding=binding,
+                                 owner_ref=reg["owner_ref"], classification_label=reg["classification_label"],
+                                 validity=validity, supersedes=reg["supersedes"],
+                                 registered_by=reg["registered_by"], notes=reg["notes"])
+    assert rebuilt.registration_id == registration_id_for(binding, reg["owner_ref"], validity)
+    assert rebuilt.to_dict() == reg and rebuilt.record_digest() == record["record_digest"]
+    assert binding.system_id == DEPLOYMENT_NAME and binding.system_version == DEPLOYMENT_VERSION
+    with open(os.path.join(HERE, "approved-runtime-config.json"), "rb") as fh:
+        assert binding.configuration_digest == hashlib.sha256(fh.read()).hexdigest()
+    assert reg["classification_label"] == "REFERENCE_GRADE_SHADOW_ONLY" and reg["supersedes"] == ""
+    assert record["seams_handed_to_build_studio_context"] == ["review_service_base_url", "activation_root"]
+    assert "seam 1" in reg["notes"] and "never edited" in reg["notes"]

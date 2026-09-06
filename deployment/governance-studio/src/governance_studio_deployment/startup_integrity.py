@@ -86,6 +86,19 @@ def run_startup_integrity(inputs: IntegrityInputs) -> IntegrityResult:
     dev_material = ("tests/certs" in cfg.tls_cert_file.replace(os.sep, "/")) or cfg.bind_host.startswith("127.")
     check("no_dev_mode_in_production", not (cfg.is_production and dev_material))
 
+    # constitution registry (front-door seam 1): configured means its directory exists
+    # and is writable, and an existing file is writable, before anything binds
+    registry_state = "unset"
+    if cfg.constitution_registry_path:
+        parent = os.path.dirname(cfg.constitution_registry_path)
+        writable = os.path.isdir(parent) and os.access(parent, os.W_OK) and (
+            not os.path.exists(cfg.constitution_registry_path)
+            or (os.path.isfile(cfg.constitution_registry_path)
+                and os.access(cfg.constitution_registry_path, os.W_OK)))
+        registry_state = "configured" if writable else "unwritable"
+        check("constitution_registry_writable", writable,
+              "the registry directory does not exist or is not writable")
+
     # frontend build
     index_ok = bool(cfg.frontend_dir) and os.path.isfile(os.path.join(cfg.frontend_dir, "index.html"))
     check("frontend_build_exists", index_ok)
@@ -169,6 +182,7 @@ def run_startup_integrity(inputs: IntegrityInputs) -> IntegrityResult:
         "api_contract": API_CONTRACT,
         "openapi_sha256": openapi_hash,
         "synthetic_bundle_hash": _bundle_hash_of(cfg),
+        "constitution_registry": registry_state,
         "checks": checks,
         "result": "PASS" if ok else "FAIL",
         "failure_code": code,
@@ -195,6 +209,8 @@ def _classify(failures: List[str]) -> str:
         return "GOVERNANCE_STUDIO_P3E_ACCESS_CONTROL_FAILED"
     if "openapi" in joined:
         return "GOVERNANCE_STUDIO_P3E_OPENAPI_DRIFT"
+    if "registry" in joined:
+        return "GOVERNANCE_STUDIO_P3E_CONSTITUTION_REGISTRY_FAILED"
     return "STARTUP_INTEGRITY_FAILED"
 
 

@@ -109,8 +109,28 @@ def test_approved_runtime_config_permits_exactly_one_egress_the_review_relay():
     assert len(permitted["routes"]) == 5 and permitted["routes"][-1] == "POST /review/decisions"
     assert permitted["forwarded_header"].startswith("X-Ugence-Approver-Proof")
     assert "unset" in egress["container_gate_note"]
-    assert list(cfg["configuration_added"]) == ["UGENCE_STUDIO_REVIEW_SERVICE_URL"]
-    assert cfg["deployment_version"] == "0.2.0"
+    assert list(cfg["configuration_added"]) == ["UGENCE_STUDIO_REVIEW_SERVICE_URL",
+                                                "UGENCE_STUDIO_CONSTITUTION_REGISTRY_PATH"]
+    assert cfg["deployment_version"] == "0.3.0"
+
+
+def test_approved_runtime_config_records_the_constitution_registry_seam_exactly():
+    """Front-door seam 1 (FD-5): a sqlite file under the runtime volume, deny-by-default
+    trust, no key material, preflight only, and the persistent-database prohibition
+    standing. The image's first-party package list is pinned against the Dockerfile."""
+    import json
+    cfg = json.load(open(os.path.join(HERE, "approved-runtime-config.json"), encoding="utf-8"))
+    seam = cfg["constitution_registry"]
+    assert "SqlitePolicyRegistry" in seam["store"] and "/var/run/ugence-studio" in seam["store"]
+    assert "no key material" in seam["trust"] and "DenyAll" in seam["trust"]
+    assert seam["reachable_acts"].startswith("preflight only")
+    assert "persistent_database" in cfg["prohibited"] and "persistent_database" in seam["durability"]
+    assert cfg["writable_paths"] == ["/tmp", "/var/run/ugence-studio"]
+    assert seam["composition_record"].startswith("composition-record.json")
+    df = _read("Dockerfile")
+    for distribution in cfg["first_party_packages_in_image"]:
+        assert f"COPY {distribution} /build/" in df, distribution
+    assert len(cfg["first_party_packages_in_image"]) == 12
 
 
 def _sha256(path: str) -> str:

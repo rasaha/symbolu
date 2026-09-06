@@ -191,7 +191,7 @@ def test_the_variable_is_read_by_the_config_and_handed_to_the_studio_context_onl
     assert readers == ["config.py"]
     app_src = open(os.path.join(src, "app.py"), encoding="utf-8").read()
     assert app_src.count("review_service_url") == 1
-    assert "build_studio_context(review_service_base_url=config.review_service_url" in app_src
+    assert "review_service_base_url=config.review_service_url or None" in app_src
 
 
 @pytest.mark.parametrize("url,production,ok", [
@@ -228,17 +228,32 @@ def test_from_env_reads_the_variable_and_strips_a_trailing_slash(monkeypatch, pa
 # the image carries what the served backend imports, and nothing else new
 # --------------------------------------------------------------------------- #
 def test_the_dockerfile_installs_every_distribution_the_served_backend_imports(config):
-    with _client(config) as client:
-        client.get("/api/v2/review/queue", headers=_headers())
-    distributions = set()
-    for name, module in list(sys.modules.items()):
-        location = getattr(module, "__file__", None) or ""
-        if name.startswith("ugence_") and "/src/" in location:
-            distributions.add(os.path.relpath(location.split("/src/")[0], REPO))
+    """Derived in a fresh interpreter that imports exactly what the container imports
+    (the deployment app, its activation seam and the served backend), so a test-only
+    import in this process cannot widen or narrow the set."""
+    import subprocess
+
+    snippet = (
+        "import os, sys\n"
+        "import governance_studio_deployment.app, governance_studio_deployment.server\n"
+        "import tempfile\n"
+        "from governance_studio_deployment.activation import build_studio_activation_root\n"
+        "build_studio_activation_root(os.path.join(tempfile.mkdtemp(), 'r.sqlite3'), production_mode=False)\n"
+        "import ugence_governance_studio_api.app_v2\n"
+        "found = set()\n"
+        "for name, module in list(sys.modules.items()):\n"
+        "    location = getattr(module, '__file__', None) or ''\n"
+        "    if name.startswith('ugence_') and '/src/' in location:\n"
+        f"        found.add(os.path.relpath(location.split('/src/')[0], {REPO!r}))\n"
+        "print('\\n'.join(sorted(found)))\n"
+    )
+    env = dict(os.environ, PYTHONPATH=os.pathsep.join(p for p in sys.path if p))
+    out = subprocess.run([sys.executable, "-c", snippet], env=env, capture_output=True, text=True, check=True)
+    distributions = {line for line in out.stdout.splitlines() if line}
     dockerfile = open(os.path.join(REPO, "deployment", "governance-studio", "Dockerfile"), encoding="utf-8").read()
     for distribution in sorted(distributions):
         assert f"COPY {distribution} /build/" in dockerfile, distribution
-    assert distributions == {"apps/ugence-governance-studio/backend",
-                             "packages/capabilities/agent-workforce-composer",
-                             "packages/runtime/agent-runtime",
-                             "packages/tooling/policy-workflow-compiler"}
+    import json
+    pinned = json.load(open(os.path.join(REPO, "deployment", "governance-studio",
+                                         "approved-runtime-config.json"), encoding="utf-8"))
+    assert distributions == set(pinned["first_party_packages_in_image"])
