@@ -1,5 +1,5 @@
 {
-  "count": 124,
+  "count": 130,
   "fingerprints": {
     "APPROVAL_SENSITIVE_OBJECT_TYPES": {
       "kind": "object",
@@ -1218,6 +1218,58 @@
         "TERMINAL_OUTCOME"
       ]
     },
+    "NodeObservation": {
+      "kind": "class",
+      "members": [
+        "construct",
+        "copy",
+        "dict",
+        "from_orm",
+        "json",
+        "model_computed_fields",
+        "model_config",
+        "model_construct",
+        "model_copy",
+        "model_dump",
+        "model_dump_json",
+        "model_extra",
+        "model_fields",
+        "model_fields_set",
+        "model_json_schema",
+        "model_parametrized_name",
+        "model_post_init",
+        "model_rebuild",
+        "model_validate",
+        "model_validate_json",
+        "model_validate_strings",
+        "parse_file",
+        "parse_obj",
+        "parse_raw",
+        "schema",
+        "schema_json",
+        "update_forward_refs",
+        "validate"
+      ]
+    },
+    "NodeOutcome": {
+      "kind": "enum",
+      "members": [
+        "MISSING_FACT",
+        "NOT_EVALUABLE",
+        "REQUIREMENT_OBSERVED",
+        "SATISFIED",
+        "TERMINAL",
+        "UNSATISFIED"
+      ],
+      "values": [
+        "MISSING_FACT",
+        "NOT_EVALUABLE",
+        "REQUIREMENT_OBSERVED",
+        "SATISFIED",
+        "TERMINAL",
+        "UNSATISFIED"
+      ]
+    },
     "NodeOutputDeclaration": {
       "kind": "class",
       "members": [
@@ -1331,6 +1383,40 @@
         "SEQUENCE_RISK_PATTERN",
         "SOURCE_DOCUMENT",
         "TEST_SCENARIO"
+      ]
+    },
+    "OracleComparison": {
+      "kind": "class",
+      "members": [
+        "agrees",
+        "construct",
+        "copy",
+        "dict",
+        "from_orm",
+        "json",
+        "model_computed_fields",
+        "model_config",
+        "model_construct",
+        "model_copy",
+        "model_dump",
+        "model_dump_json",
+        "model_extra",
+        "model_fields",
+        "model_fields_set",
+        "model_json_schema",
+        "model_parametrized_name",
+        "model_post_init",
+        "model_rebuild",
+        "model_validate",
+        "model_validate_json",
+        "model_validate_strings",
+        "parse_file",
+        "parse_obj",
+        "parse_raw",
+        "schema",
+        "schema_json",
+        "update_forward_refs",
+        "validate"
       ]
     },
     "OverrideRule": {
@@ -2315,6 +2401,40 @@
         "WARNING"
       ]
     },
+    "SimulationRun": {
+      "kind": "class",
+      "members": [
+        "construct",
+        "copy",
+        "dict",
+        "from_orm",
+        "json",
+        "logical_digest",
+        "model_computed_fields",
+        "model_config",
+        "model_construct",
+        "model_copy",
+        "model_dump",
+        "model_dump_json",
+        "model_extra",
+        "model_fields",
+        "model_fields_set",
+        "model_json_schema",
+        "model_parametrized_name",
+        "model_post_init",
+        "model_rebuild",
+        "model_validate",
+        "model_validate_json",
+        "model_validate_strings",
+        "parse_file",
+        "parse_obj",
+        "parse_raw",
+        "schema",
+        "schema_json",
+        "update_forward_refs",
+        "validate"
+      ]
+    },
     "SourceDocument": {
       "kind": "class",
       "members": [
@@ -2546,15 +2666,18 @@
         "build_commit",
         "capability_requirement_extraction_implemented",
         "dependency_semantics_implemented",
+        "deterministic_replay_of_simulation_verified",
         "deterministic_replay_verified",
         "diff_driven_review_implemented",
         "enterprise_policy_evaluation_implemented",
         "human_review_semantics_implemented",
+        "offline_simulation_implemented",
         "policy_pack_v2_supported",
         "policy_provenance_implemented",
         "release_validation_implemented",
         "runtime_execution_implemented",
         "semantic_node_enrichment_implemented",
+        "simulation_grants_authorization",
         "source_declared_semantics_implemented",
         "supported_workflow_ir_versions",
         "team_composition_implemented",
@@ -2898,6 +3021,19 @@
         "dst"
       ]
     },
+    "simulate": {
+      "kind": "function",
+      "parameters": [
+        "package",
+        "scenario"
+      ]
+    },
+    "simulate_all": {
+      "kind": "function",
+      "parameters": [
+        "package"
+      ]
+    },
     "upgrade_workflow_ir": {
       "kind": "function",
       "parameters": [
@@ -2979,9 +3115,12 @@
     "LegitimateCounterexample",
     "NodeInputRequirement",
     "NodeKind",
+    "NodeObservation",
+    "NodeOutcome",
     "NodeOutputDeclaration",
     "ObjectChange",
     "ObjectType",
+    "OracleComparison",
     "OverrideRule",
     "PolicyObject",
     "PolicyPack",
@@ -3019,6 +3158,7 @@
     "SemanticFeatureName",
     "SequenceRiskPattern",
     "Severity",
+    "SimulationRun",
     "SourceDocument",
     "TestCategory",
     "TestScenario",
@@ -3051,6 +3191,8 @@
     "digest_compiler_version_for",
     "enrich_workflow",
     "is_legal_transition",
+    "simulate",
+    "simulate_all",
     "upgrade_workflow_ir",
     "validate_compiled_release",
     "validate_policy_pack",

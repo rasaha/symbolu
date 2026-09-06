@@ -273,6 +273,15 @@ Design: `../policy_workflow_compiler_pack_v2/DESIGN.md`.
 
 Design and flow: `../policy_workflow_compiler_x1/COMPOSITION_ROOT.md`.
 
+## PWC-P3C rulings
+
+| Ruling | Decision |
+| --- | --- |
+| **P3C-1** | A simulation run is **evidence, not a gate**. It produces a report and never blocks compilation; no compiler entry point accepts a simulation result. Gating compilation on a simulation would put the simulator on the execution path and begin the coupling the phase exists to avoid. |
+| **P3C-2** | A contradicted oracle is an `OracleComparison` **field on the run**, not a validation diagnostic and not a separate report. It is a property of that run against that scenario, not of the release — and a diagnostic would feed validation, which gates compilation, which P3C-1 forbids. |
+
+Design: `../policy_workflow_compiler_p3c/DESIGN.md`.
+
 ## What this ratification does not authorize
 
 - No change to `workflow_ir.v1` or `workflow_ir.v2` canonical output. `[V]` Pinned:

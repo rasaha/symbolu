@@ -42,6 +42,8 @@ as importantly — what is not.
 | `source_declared_semantics_implemented` | `true` | `workflow_ir.v2` enrichment reads declared data classification, permission intent, required tools and contract versions into node semantics, each with `EXPLICIT` per-value provenance. An undeclared value stays unresolved and is never defaulted. |
 | `authoritative_source_carriage_implemented` | `true` | A `policy_pack.v2` pack may carry the exact Policy Authority issuance it was compiled from; the reference is digest-bound, structurally validated and denormalized into the release manifest. See `AUTHORITATIVE_SOURCE.md`. |
 | `binding_conformance_validation_implemented` | `true` | Every capability binding `workflow_ir.v2` emits is validated against the capability registry — unknown capabilities, advisory-on-authoritative misuse, optionality conflicts, contract-target disagreement and unresolved required bindings all refuse. Validation only: no provider is imported and nothing is emitted. See `BINDING_CONFORMANCE.md`. |
+| `offline_simulation_implemented` | `true` | A compiled release can be exercised under a scenario's facts in a reproducible offline traversal that observes requirements and never resolves them. Evidence, not a gate — no compiler entry point consumes a run. See `OFFLINE_SIMULATION.md`. |
+| `deterministic_replay_of_simulation_verified` | `true` | A run's digest is a pure function of the release, the scenario and the trace, so replay is digest equality. |
 
 ## Explicit non-goals
 
@@ -59,6 +61,7 @@ each belongs to a different component.
 | `action_authorization_implemented` | `false` | Authorization is held by canonical capabilities, never the compiler. |
 | `enterprise_policy_evaluation_implemented` | `false` | Enterprise deployment-policy overlay evaluation stays outside the portable compiled workflow. |
 | `authoritative_source_verification_implemented` | `false` | The compiler attests carriage, not authenticity: it never verifies a Policy Authority signature, establishes key trust, or consults revocation state. |
+| `simulation_grants_authorization` | `false` | A simulation observes that a requirement exists; it never grants, approves or clears one. Permanent. |
 
 ### `awc_adapter_updated` is deprecated
 

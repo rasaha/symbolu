@@ -135,15 +135,25 @@ None. P3C reads a compiled release and writes nothing into it — no pack field,
 IR field, no manifest field. `policy_pack.v1`/`v2`, `workflow_ir.v1`/`v2` and every
 approval are untouched, and a test pins them.
 
-## Open rulings `[R]`
+## Rulings
 
-**P3C-1 — simulation is evidence, not a gate.** A run should produce a report and
-must not block compilation. Making compilation depend on a simulation result would
-put the simulator on the execution path and begin exactly the coupling this phase
-exists to avoid. Recommendation: the pilot evidence list consumes simulation
-reports; the compiler does not.
+### P3C-1 — simulation is evidence, not a gate. **RULED.**
 
-**P3C-2 — where a simulator's own failure is reported.** Whether a scenario whose
-observation contradicts its oracle is a `SimulationRun` field, a validation
-diagnostic, or a separate report object. Recommendation: a field on the run, since
-a contradicted oracle is a property of that run rather than of the release.
+A run produces a report. It **must not** block compilation, and no compiler entry
+point takes a simulation result. Making compilation depend on one would put the
+simulator on the execution path and begin exactly the coupling this phase exists to
+avoid — the pilot evidence list consumes simulation reports; the compiler does not.
+
+A test asserts that no compiler signature accepts a `SimulationRun`.
+
+### P3C-2 — a contradicted oracle is a field on the run. **RULED.**
+
+When an observation disagrees with a scenario's `ExpectedOutcome`, that is recorded
+on the `SimulationRun` as an `OracleComparison`, not as a validation diagnostic and
+not in a separate report.
+
+A contradicted oracle is a property of *that run against that scenario*, not of the
+release: the same release may satisfy one scenario and contradict another, and a
+validation diagnostic would wrongly attribute the disagreement to the artifact. It
+also keeps the boundary clean — a diagnostic feeds validation, and validation gates
+compilation, which P3C-1 has just forbidden.
