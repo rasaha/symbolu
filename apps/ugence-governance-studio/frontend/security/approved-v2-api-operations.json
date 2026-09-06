@@ -1,8 +1,8 @@
 {
   "$schema": "governance_studio.approved_v2_api_operations.v1",
-  "description": "The closed set of v2 operations the studio frontend may consume, including the GAS-7 HR-D review routes (display and verbatim relay only, owner ruling HR-1) and, since front-door seam 6 (FD-10), the one relayed start of the worker's own shadow run, and since seam 7 (FD-11) the one read of the worker's own audit ledger by correlation id. Separate from the v1 manifest because the two contracts are frozen independently. Under owner ruling SD-2 no operation naming issue, activate, revoke, grant, authorize, clear or execute may ever appear here; verify-v2-api-boundary.mjs re-derives that from the contract rather than trusting this file.",
+  "description": "The closed set of v2 operations the studio frontend may consume, including the GAS-7 HR-D review routes (display and verbatim relay only, owner ruling HR-1) and, since front-door seam 6 (FD-10), the one relayed start of the worker's own shadow run, since seam 7 (FD-11) the one read of the worker's own audit ledger by correlation id, and since seam 8 (FD-12) the typed data-use declaration intake whose only write is declare. Separate from the v1 manifest because the two contracts are frozen independently. Under owner ruling SD-2 no operation naming issue, activate, revoke, grant, authorize, clear or execute may ever appear here; verify-v2-api-boundary.mjs re-derives that from the contract rather than trusting this file.",
   "contract": "governance_studio.api.v2",
-  "openapi_sha256": "6346f2b7cd10430874f2f077ac69c12ce74be138a9462b0c4ccdcb503c624d7b",
+  "openapi_sha256": "956c8289e77c31afa304a58a2cf94023b057a44f78c9159c83496338202b3b51",
   "approved_operation_ids": [
     "v2_authority_list_policies",
     "v2_authority_read_decision",
@@ -24,7 +24,9 @@
     "v2_registry_register",
     "v2_registry_list",
     "v2_review_start_shadow_run",
-    "v2_observe_ledger_chain"
+    "v2_observe_ledger_chain",
+    "v2_data_use_declare",
+    "v2_data_use_list"
   ],
   "approved_paths": [
     "GET /api/v2/authority/decisions/{decision_id}",
@@ -46,7 +48,8 @@
     "POST /api/v2/simulate/run",
     "/api/v2/registry/registrations",
     "POST /api/v2/review/runs",
-    "GET /api/v2/observe/ledger/{correlation_id}"
+    "GET /api/v2/observe/ledger/{correlation_id}",
+    "/api/v2/data-use/declarations"
   ],
   "prohibited_verbs": [
     "issue",

@@ -170,3 +170,57 @@ class RegistryRegisterRequest(StrictModel):
     validity: RegistryValidityInput
     supersedes: str = ""
     notes: str = ""
+
+
+# --------------------------------------------------------------------------- #
+# Data-use declarations (front-door seam 8, FD-12)
+# --------------------------------------------------------------------------- #
+class DeclarationBindingInput(StrictModel):
+    """The exact system and configuration a declaration is about, as typed fields.
+
+    No ``tenant_id``: the tenant is the deployment's and is never caller-supplied.
+    The two required digests are lowercase sha-256 hex the declarer asserts; the
+    studio computes none of them.
+    """
+
+    binding_id: str
+    subject_id: str
+    context_id: str
+    context_digest: str
+    system_id: str
+    system_version: str
+    configuration_id: str
+    configuration_digest: str
+    deployment_environment_ref: str = ""
+
+
+class DeclarationValidityInput(StrictModel):
+    """The declaration window, as ISO-8601 instants with a timezone."""
+
+    issued_at: str
+    expires_at: Optional[str] = None
+    stale_after: Optional[str] = None
+
+
+class DataUseDeclareRequest(StrictModel):
+    """Declare one data use for this deployment's tenant (typed intake only, FD-4).
+
+    No ``declaration_id`` (derived by the package, never chosen) and no ``tenant_id``
+    (the deployment's). ``data_ref`` is an opaque, non-secret reference — never the
+    data, and there is no field that could carry it. ``classification_label``,
+    ``purpose_label`` and ``residency_label`` are recorded uninterpreted (DE-2, DE-3),
+    and ``declared_by`` is an opaque handle recorded as presented and unproven
+    (FD-12.3). Nothing here restricts egress: FD-12.5 invents no restriction for the
+    absent egress package.
+    """
+
+    binding: DeclarationBindingInput
+    data_ref: str
+    classification_label: str
+    purpose_label: str
+    validity: DeclarationValidityInput
+    residency_label: str = ""
+    supersedes: str = ""
+    declared_by: str = ""
+    correlation_id: str = ""
+    notes: str = ""

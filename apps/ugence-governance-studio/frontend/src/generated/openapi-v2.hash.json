@@ -1,5 +1,5 @@
 {
-  "source_openapi_sha256": "6346f2b7cd10430874f2f077ac69c12ce74be138a9462b0c4ccdcb503c624d7b",
+  "source_openapi_sha256": "956c8289e77c31afa304a58a2cf94023b057a44f78c9159c83496338202b3b51",
   "api_contract_version": "governance_studio.api.v2",
   "required_operations": [
     "v2_constitution_validate",
@@ -22,7 +22,9 @@
     "v2_registry_register",
     "v2_registry_list",
     "v2_review_start_shadow_run",
-    "v2_observe_ledger_chain"
+    "v2_observe_ledger_chain",
+    "v2_data_use_declare",
+    "v2_data_use_list"
   ],
   "operation_ids": [
     "v2_authority_list_policies",
@@ -30,6 +32,8 @@
     "v2_authority_read_policy",
     "v2_constitution_preflight",
     "v2_constitution_validate",
+    "v2_data_use_declare",
+    "v2_data_use_list",
     "v2_observe_audit_chain",
     "v2_observe_audit_ids",
     "v2_observe_ledger_chain",

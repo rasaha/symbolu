@@ -1,6 +1,6 @@
 // AUTO-GENERATED from apps/ugence-governance-studio/contracts/openapi_v2.json
 // DO NOT EDIT BY HAND. Regenerate with: npm run generate:api-v2
-// source_openapi_sha256: 6346f2b7cd10430874f2f077ac69c12ce74be138a9462b0c4ccdcb503c624d7b
+// source_openapi_sha256: 956c8289e77c31afa304a58a2cf94023b057a44f78c9159c83496338202b3b51
 // api_contract_version: governance_studio.api.v2
 
 export interface paths {
@@ -101,6 +101,38 @@ export interface paths {
          * @description Structural validation of a constitution document. Mutation-free.
          */
         post: operations["v2_constitution_validate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v2/data-use/declarations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Data Use Declarations
+         * @description The declarations in force for this deployment's tenant at ``as_of``.
+         *
+         *     ``as_of`` is an ISO-8601 instant with a timezone; absent, the request's own instant
+         *     is used and reported back. A declaration outside its window is absent from the
+         *     answer, never flagged.
+         */
+        get: operations["v2_data_use_list"];
+        put?: never;
+        /**
+         * Declare Data Use
+         * @description Record one typed data-use declaration for this deployment's tenant.
+         *
+         *     Every field is validated by data-use-admission's own refusal reasons; a superseding
+         *     declaration is admitted only by ``supersession_refusals``. ``data_ref`` is an opaque
+         *     handle and the record carries no data. A refusal is typed, never a 500.
+         */
+        post: operations["v2_data_use_declare"];
         delete?: never;
         options?: never;
         head?: never;
@@ -487,6 +519,96 @@ export interface components {
                 [key: string]: unknown;
             };
         };
+        /**
+         * DataUseDeclareRequest
+         * @description Declare one data use for this deployment's tenant (typed intake only, FD-4).
+         *
+         *     No ``declaration_id`` (derived by the package, never chosen) and no ``tenant_id``
+         *     (the deployment's). ``data_ref`` is an opaque, non-secret reference — never the
+         *     data, and there is no field that could carry it. ``classification_label``,
+         *     ``purpose_label`` and ``residency_label`` are recorded uninterpreted (DE-2, DE-3),
+         *     and ``declared_by`` is an opaque handle recorded as presented and unproven
+         *     (FD-12.3). Nothing here restricts egress: FD-12.5 invents no restriction for the
+         *     absent egress package.
+         */
+        DataUseDeclareRequest: {
+            binding: components["schemas"]["DeclarationBindingInput"];
+            /** Classification Label */
+            classification_label: string;
+            /**
+             * Correlation Id
+             * @default
+             */
+            correlation_id: string;
+            /** Data Ref */
+            data_ref: string;
+            /**
+             * Declared By
+             * @default
+             */
+            declared_by: string;
+            /**
+             * Notes
+             * @default
+             */
+            notes: string;
+            /** Purpose Label */
+            purpose_label: string;
+            /**
+             * Residency Label
+             * @default
+             */
+            residency_label: string;
+            /**
+             * Supersedes
+             * @default
+             */
+            supersedes: string;
+            validity: components["schemas"]["DeclarationValidityInput"];
+        };
+        /**
+         * DeclarationBindingInput
+         * @description The exact system and configuration a declaration is about, as typed fields.
+         *
+         *     No ``tenant_id``: the tenant is the deployment's and is never caller-supplied.
+         *     The two required digests are lowercase sha-256 hex the declarer asserts; the
+         *     studio computes none of them.
+         */
+        DeclarationBindingInput: {
+            /** Binding Id */
+            binding_id: string;
+            /** Configuration Digest */
+            configuration_digest: string;
+            /** Configuration Id */
+            configuration_id: string;
+            /** Context Digest */
+            context_digest: string;
+            /** Context Id */
+            context_id: string;
+            /**
+             * Deployment Environment Ref
+             * @default
+             */
+            deployment_environment_ref: string;
+            /** Subject Id */
+            subject_id: string;
+            /** System Id */
+            system_id: string;
+            /** System Version */
+            system_version: string;
+        };
+        /**
+         * DeclarationValidityInput
+         * @description The declaration window, as ISO-8601 instants with a timezone.
+         */
+        DeclarationValidityInput: {
+            /** Expires At */
+            expires_at?: string | null;
+            /** Issued At */
+            issued_at: string;
+            /** Stale After */
+            stale_after?: string | null;
+        };
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
@@ -829,6 +951,70 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["ConstitutionValidateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    v2_data_use_list: {
+        parameters: {
+            query?: {
+                as_of?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    v2_data_use_declare: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DataUseDeclareRequest"];
             };
         };
         responses: {
