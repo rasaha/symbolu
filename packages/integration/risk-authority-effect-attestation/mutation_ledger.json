@@ -1,6 +1,6 @@
 {
-  "gates_inventoried": 30,
-  "killed": 27,
+  "gates_inventoried": 36,
+  "killed": 33,
   "survived": 3,
   "ledger": [
     {
@@ -262,6 +262,60 @@
       "description": "aware instant required at the seam",
       "status": "KILLED",
       "first_failure": "FAILED tests/test_refusals.py::test_a_naive_as_of_is_a_caller_contract_violation_and_the_directory_is_never_asked",
+      "classification": null
+    },
+    {
+      "gate": "G-31",
+      "category": "trust-state",
+      "module": "verification.py",
+      "description": "the trust-anchor-set reasons keep their identity",
+      "status": "KILLED",
+      "first_failure": "FAILED tests/test_trust_state_refusals.py::test_stale_unavailable_unknown_and_resolver_fault_are_four_distinct_reasons",
+      "classification": null
+    },
+    {
+      "gate": "G-32",
+      "category": "trust-state",
+      "module": "trust.py",
+      "description": "stale and unavailable map to different reasons",
+      "status": "KILLED",
+      "first_failure": "FAILED tests/packaging/test_packaging.py::test_the_public_api_manifest_equals_the_live_package_surface",
+      "classification": null
+    },
+    {
+      "gate": "G-33",
+      "category": "production-posture",
+      "module": "verification.py",
+      "description": "a non-serving resolver is refused before consultation",
+      "status": "KILLED",
+      "first_failure": "FAILED tests/test_trust_state_refusals.py::test_a_resolver_whose_snapshot_failed_to_load_is_admitted_and_refuses_everything",
+      "classification": null
+    },
+    {
+      "gate": "G-34",
+      "category": "production-posture",
+      "module": "trust.py",
+      "description": "a resolver must declare the production contract",
+      "status": "KILLED",
+      "first_failure": "FAILED tests/test_production_posture.py::test_a_resolver_without_a_production_claim_is_refused_in_production",
+      "classification": null
+    },
+    {
+      "gate": "G-35",
+      "category": "production-posture",
+      "module": "trust.py",
+      "description": "the declaration must be an exact bool",
+      "status": "KILLED",
+      "first_failure": "FAILED tests/test_trust_state_refusals.py::test_a_resolver_declaring_no_posture_is_still_refused_at_composition",
+      "classification": null
+    },
+    {
+      "gate": "G-36",
+      "category": "production-posture",
+      "module": "trust.py",
+      "description": "serving requires exactly True",
+      "status": "KILLED",
+      "first_failure": "FAILED tests/test_trust_state_refusals.py::test_a_resolver_whose_snapshot_failed_to_load_is_admitted_and_refuses_everything",
       "classification": null
     },
     {

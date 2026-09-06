@@ -36,7 +36,7 @@ FORBIDDEN = {
     "boto3", "kubernetes", "azure", "google", "os", "pathlib", "socket", "ssl", "secrets",
     "random", "subprocess", "urllib", "http", "asyncio", "threading",
 }
-#: The exact TEA symbols the 0.4.0 consumer grant permits production source to import.
+#: The exact TEA symbols the consumer grant permits production source to import.
 TEA_GRANT = {
     "TrustAnchorCoordinate", "TrustAnchorRecord", "TrustAnchorCapability",
     "TrustAnchorResolution", "TrustAnchorResolverPort", "KeyRevocation",
@@ -77,9 +77,9 @@ def test_pyproject_declares_exactly_the_two_ratified_dependencies():
     assert data["project"]["name"] == "ugence-risk-authority-effect-attestation"
     assert data["project"]["dependencies"] == [
         "ugence-governance-contracts>=0.8.0",
-        "ugence-trusted-evidence-authority>=0.4.0",
+        "ugence-trusted-evidence-authority>=0.5.0",
     ]
-    assert pkg.__version__ == "0.1.0"
+    assert pkg.__version__ == "0.2.0"
 
 
 def test_the_package_does_not_touch_execution_observation_itself():

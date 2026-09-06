@@ -40,6 +40,17 @@ class EffectAttestationRefusalReason(str, Enum):
     # --- 4. anchor resolution at the exact coordinate --------------------------
     ANCHOR_UNKNOWN = "ANCHOR_UNKNOWN"
     ANCHOR_UNAVAILABLE = "ANCHOR_UNAVAILABLE"
+    #: TW-1 — the trust-anchor **set** could not be consulted at the caller's
+    #: instant: its snapshot was never admitted, or its publication root or
+    #: validity window does not cover that instant. Distinct from
+    #: :attr:`ANCHOR_SET_STALE` because D-28 ratifies unavailable and stale as
+    #: separate refusals, and distinct from :attr:`ANCHOR_UNAVAILABLE`, which
+    #: means the resolver itself misbehaved.
+    ANCHOR_SET_UNAVAILABLE = "ANCHOR_SET_UNAVAILABLE"
+    #: TW-1 — the trust-anchor set was admitted but is no longer fresh at the
+    #: caller's instant. The operator action is to publish a newer snapshot;
+    #: that is why it may not read as merely unavailable.
+    ANCHOR_SET_STALE = "ANCHOR_SET_STALE"
     ANCHOR_COORDINATE_MISMATCH = "ANCHOR_COORDINATE_MISMATCH"
     WRONG_CAPABILITY = "WRONG_CAPABILITY"
     # --- 5. anchor lifecycle at the trusted instant, in TEA's order -------------

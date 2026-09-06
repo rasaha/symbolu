@@ -48,11 +48,27 @@ __all__ = [
     "anchor_lifecycle_refusal",
     "anchor_verification_key",
     "require_production_resolver",
+    "TRUST_ANCHOR_SET_REASONS",
+    "resolver_serves_production",
 ]
 
 #: Resolver types this repository documents as reference grade. Refused in
 #: production, **including every subclass**.
 REFERENCE_GRADE_RESOLVERS: tuple = (StaticTrustAnchorDirectory,)
+
+#: TEA trust-anchor-**set** refusal -> this package's typed reason (TW-1).
+#: One-to-one, so D-28's ratified distinction between unavailable and stale
+#: trust state survives into this vocabulary instead of collapsing into
+#: ``ANCHOR_UNAVAILABLE``. ``TRUSTED_EVIDENCE_TRUST_ANCHOR_SET_INSTANT_REQUIRED``
+#: is deliberately **absent** (TW-2): this package always hands the resolver a
+#: validated aware instant, so a resolver returning it is non-conforming, and a
+#: non-conforming resolver is a resolver fault rather than a trust-state fact.
+TRUST_ANCHOR_SET_REASONS = {
+    TrustedEvidenceRefusalReason.TRUSTED_EVIDENCE_TRUST_ANCHOR_SET_UNAVAILABLE:
+        _Reason.ANCHOR_SET_UNAVAILABLE,
+    TrustedEvidenceRefusalReason.TRUSTED_EVIDENCE_TRUST_ANCHOR_SET_STALE:
+        _Reason.ANCHOR_SET_STALE,
+}
 
 #: TEA lifecycle refusal -> this package's typed reason. Exhaustive over what
 #: ``TrustAnchorRecord.lifecycle_refusal_at`` returns.
@@ -134,13 +150,40 @@ def anchor_verification_key(anchor: TrustAnchorRecord) -> TrustedEvidenceVerific
     return anchor.verification_key()
 
 
+def resolver_serves_production(resolver: object) -> bool:
+    """Whether a resolver that **declares** the production contract can serve now.
+
+    ``True`` only when the resolver declares ``is_production_authoritative`` and
+    its value is exactly ``True``. A resolver that declares no posture at all —
+    ``DenyAllTrustAnchorDirectory`` is the ratified one — is not covered by this
+    predicate; see :func:`require_production_resolver`.
+    """
+
+    return getattr(resolver, "is_production_authoritative", None) is True
+
+
+def declares_production_posture(resolver: object) -> bool:
+    """Whether a resolver states the production contract at all, either way."""
+
+    return type(getattr(resolver, "is_production_authoritative", None)) is bool
+
+
 def require_production_resolver(resolver: object) -> object:
     """Refuse a reference-grade or unattested resolver under production mode.
 
     A reference-grade resolver — that type or **any subclass** — is refused
     outright. ``DenyAllTrustAnchorDirectory`` is admitted by exact type because
-    it can only refuse. Every other resolver must opt in explicitly with
-    ``is_production_authoritative = True``; silence is refusal.
+    it can only refuse. Every other resolver must **declare** the production
+    contract by carrying ``is_production_authoritative`` as an exact ``bool``;
+    silence, and a truthy stand-in for the declaration, are still refusal.
+
+    TW-3 separates *declaring the contract* from *being able to serve*.
+    Declaring is checked here, once, at composition. Being able to serve is
+    checked per verification, because a resolver whose snapshot failed to load
+    declares ``False`` and must yield a typed refusal an operator can read
+    rather than crashing the composition root. Admitting it is safe by
+    construction: the verifier refuses **before consulting** any declaring
+    resolver whose posture is not ``True``, so no anchor can come from one.
     """
 
     if resolver is None:
@@ -157,12 +200,13 @@ def require_production_resolver(resolver: object) -> object:
             "suitable for tests and local use. Declaring is_production_authoritative on it "
             "does not lift this refusal."
         )
-    if getattr(resolver, "is_production_authoritative", False) is not True:
+    if not declares_production_posture(resolver):
         raise _ConfigError(
-            "a production TrustAnchorResolverPort must be production-authoritative "
-            "(is_production_authoritative=True); a resolver that has not declared itself "
-            f"production-grade cannot supply an effect attester's key (got "
-            f"{type(resolver).__name__})"
+            "a production TrustAnchorResolverPort must declare is_production_authoritative "
+            "as an exact bool; a resolver that has not declared the production contract "
+            f"cannot supply an effect attester's key (got {type(resolver).__name__}). A "
+            "resolver that declares False is admitted and refuses every verification "
+            "(TW-3), so a snapshot that failed to load is a typed refusal, not a crash."
         )
     if not isinstance(resolver, TrustAnchorResolverPort):
         raise _ConfigError("the resolver must implement resolve(coordinate) -> TrustAnchorResolution")

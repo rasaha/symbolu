@@ -1,4 +1,4 @@
-# ugence-risk-authority-effect-attestation — 0.1.0
+# ugence-risk-authority-effect-attestation — 0.2.0
 
 **Signed external-effect verification, contracts first.** The wave 5 successor
 to RA-8's non-cryptographic effect-source trust, scoped and ratified by
@@ -69,11 +69,35 @@ Maturity: **REFERENCE-GRADE / NOT PRODUCTION-READY.** Not wired into RA-8.
 A resolver that raises, returns the wrong type or answers another coordinate
 refuses closed. Nothing is memoized.
 
+## Trust state is distinguishable (TW-1 to TW-3)
+
+Wiring this package to a signed-snapshot resolver is ruled by
+[`ADR_UGENCE_TR5_EFFECT_ATTESTATION_RESOLVER_WIRING.md`](../../../docs/architecture/ADR_UGENCE_TR5_EFFECT_ATTESTATION_RESOLVER_WIRING.md).
+Four conditions an operator must act on differently stay four typed reasons:
+
+| Reason | What happened | Operator action |
+| --- | --- | --- |
+| `ANCHOR_SET_STALE` | the trust-anchor set is admitted but no longer fresh at the instant | publish a newer snapshot |
+| `ANCHOR_SET_UNAVAILABLE` | its snapshot never loaded, or its window does not cover the instant, or the resolver declares it cannot serve | fix or republish the snapshot |
+| `ANCHOR_UNKNOWN` | no anchor is configured at that exact coordinate | onboard the attester |
+| `ANCHOR_UNAVAILABLE` | the resolver itself misbehaved | fix the resolver |
+
+A resolver that declares `is_production_authoritative = False` — a snapshot that
+failed to load, most plainly — is **admitted** at composition and refuses every
+verification **before being consulted**, so a startup file problem is a typed
+refusal rather than a crash. A resolver that declares no posture at all is still
+refused, and the reference directory and its subclasses are still refused.
+
+The composition root supplies five things and this package reads none of them
+from disk: the complete snapshot bytes, the pinned publication root, the maximum
+snapshot age, the last accepted set version, and a trusted `as_of` per
+verification.
+
 ## Dependencies
 
 ```
 ugence-governance-contracts (>=0.8.0)        ExecutionObservation, wrapped unchanged
-ugence-trusted-evidence-authority (>=0.4.0)  trust-anchor contracts, resolver port,
+ugence-trusted-evidence-authority (>=0.5.0)  trust-anchor contracts, resolver port,
                                              Ed25519 key/codec types — exact grant
         ▲
 ugence-risk-authority-effect-attestation (this package)

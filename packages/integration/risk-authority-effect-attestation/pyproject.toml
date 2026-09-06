@@ -41,7 +41,7 @@ keywords = ["governance", "risk-authority", "effect", "attestation", "ed25519", 
 classifiers = ["Typing :: Typed"]
 dependencies = [
     "ugence-governance-contracts>=0.8.0",
-    "ugence-trusted-evidence-authority>=0.4.0",
+    "ugence-trusted-evidence-authority>=0.5.0",
 ]
 
 [project.optional-dependencies]
