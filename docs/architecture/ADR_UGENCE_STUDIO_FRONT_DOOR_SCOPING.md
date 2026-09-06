@@ -145,3 +145,107 @@ The shape every seam follows: the CR-2 shape (one configuration value, one freez
 maturity statement, one PR), preserving `REFERENCE_GRADE_SHADOW_ONLY`, the frozen
 runtime configuration, existing v1 and v2 behaviour, and every credential and LIVE
 prohibition. Issued by its own implementation prompt.
+
+## 8 — Seam 3 audit: `GOVERNANCE_HOOK_AND_PROVIDER_REGISTRY` (2026-09-06)
+
+**The question.** Can the P3E profile hand the Simulate screen a provider registry
+and a governance hook without breaching its own `agent_execution` prohibition?
+**Only by owner ruling.** The Simulate screen runs the Agent Runtime in the studio
+process; over an in-image fixture provider that performs no I/O, and under the
+runtime's own fail-closed default hook, nothing acts on the world, but P3E's
+ratified profile lists `agent_execution` as prohibited and `LIMITATIONS.md` reads
+"does not … execute agents". Whether a fixture-only run is "agent execution" is a
+product-intent question, not a repository fact. Everything below is documentation;
+no seam is activated.
+
+### 8.1 What exists today `[V]`
+
+- **The seams.** `build_studio_context(governance_hook=, provider_registry=)` reach
+  `SimulateService` only (`app_v2.py:64-89`, `services/studio_v2.py:398-520`). With no
+  registry the run answers the typed gap `simulation_providers`. With a registry and
+  no hook the runtime's default `UnconfiguredGovernanceHook` BLOCKs every
+  consequential task with `GOVERNANCE_NOT_CONFIGURED` (`governance/hooks.py:31-43`,
+  engine: task FAILED, category `GOVERNANCE_BLOCK`); the response carries
+  `governance_hook_configured` and `governance_hook_permissive`, and the screen
+  renders a permissive hook as a red alert (screen audit rows 4 and 265). LIVE is
+  refused before any runtime is built; the accepted mode is placed in every task's
+  arguments and a task declaring another mode is refused (`studio_v2.py:431-447`).
+  Quanta are capped at 64. The frontend submits one fixed sample workflow
+  (`SimulateScreen.tsx:17-20`, `provider_id: "fixture"`); the user types nothing, so
+  FD-4 is satisfied by construction for this step.
+- **The registry.** `ProviderRegistry` is explicit and injected: `register` refuses a
+  provider without a string `provider_id` and refuses a duplicate; a task naming an
+  unregistered provider fails with `PROVIDER_NOT_FOUND` and no attempt is made
+  (`providers/registry.py`, `runtime/execution.py:145-156`). A `Provider` is
+  `provider_id`, `version`, `execute(ToolInvocation) -> ToolResult`.
+- **The hooks.** Three implementations exist: `UnconfiguredGovernanceHook` (BLOCK,
+  the default), `AllowAllGovernanceHook` (CLEARs everything; documented as unsafe and
+  never a default), and `GovernedExecutionHook` (`agent-runtime-governance`), which
+  composes through `RiskAuthorityCompositionEngine.compose` over a deployment-supplied
+  `GovernanceInputSource` and fails closed with typed reasons: source raised →
+  `GOVERNANCE_INPUT_SOURCE_UNAVAILABLE`; source returned `None` →
+  `GOVERNANCE_PROPOSAL_NOT_AUTHORITY_BOUND`; malformed inputs, composition failure,
+  GRANT without an envelope id, record capacity (`hook.py:44-63, 174-270`). Its
+  maturity is `Core implemented`; Risk Authority `production_mode` raises
+  `ProductionContainmentError`, and HOLD, DEFER, ESCALATE and MANUAL_REVIEW have no
+  sink in the studio (`agent_runtime_governance.maturity()`, screen audit "Gaps").
+- **The worker already composes this seam.** `governed-runtime-worker` wires
+  `GovernedExecutionHook` over `ApprovalBoundInputSource` and a `ProviderRegistry`
+  holding one `ShadowProvider` (`FIXTURE_ONLY`, records in memory, returns success)
+  whose upstream source parks every proposal on ESCALATE (`composition.py:227-238`,
+  `workload.py`). CR-1 ruled that execution lives in the worker, not P3E.
+- **The image.** P3E carries `agent-runtime` (the studio backend imports it) but
+  not `agent-runtime-governance`, `risk-authority-runtime`, `risk-authority`,
+  `decision-authority` or `actiongate-provider` (`approved-runtime-config.json`
+  `first_party_packages_in_image`; the hook's dependency chain). A governed hook in
+  P3E is five Dockerfile additions; a fixture registry under the default hook is none.
+- **The profile.** `prohibited` includes `agent_execution`, `external_tool_calls`,
+  `external_model_calls`, `credential_provisioning`; `approved-runtime-config.json`
+  lists `governance_hook` and `provider_registry` as `absent_by_ruling`. Startup
+  integrity classifies any failure text containing "fixture" as
+  `SYNTHETIC_DATA_BOUNDARY_FAILED` (`startup_integrity.py:205`), so a configuration
+  variable or error message for this seam must not carry that word.
+
+### 8.2 Failure matrix (what the code does today; rows marked `[G]` need a test)
+
+| # | Case | Result |
+|---|---|---|
+| 1 | no registry handed | typed gap `simulation_providers`, `result: null` `[V]` |
+| 2 | registry, no hook | every consequential task BLOCKs `GOVERNANCE_NOT_CONFIGURED`; trace shows the block; both flags `false` `[V]` |
+| 3 | task names an unregistered provider | `PROVIDER_NOT_FOUND`, zero attempts, no provider invoked `[V]` |
+| 4 | task with no `provider_id` | not exercised by any test `[G]` |
+| 5 | malformed workflow (mode conflict, unknown mode, LIVE) | refused before a runtime exists `[V]` |
+| 6 | permissive hook injected | run CLEARs by construction; `governance_hook_permissive: true`; red banner `[V]`; nothing refuses it in production mode `[G]` |
+| 7 | governed hook, source raises / returns `None` / GRANT without envelope | BLOCK with the typed reason above `[V]` (unit level, in the governance package) |
+| 8 | governed hook, ESCALATE | task WAITING, workflow PAUSED; no sink reachable from the studio `[V]`, `[G]` by design |
+| 9 | cross-tenant | the hook and registry seams carry no tenant: a `TransitionProposal` has a correlation id, not a tenant; only an input source can bind one `[V]`; under the default hook nothing tenant-bound is read `[V]` |
+| 10 | credential, key material, egress | none in either seam: the registry is in-process, the fixture provider opens no socket, the hook holds no key ring (the source would) `[V]` |
+
+### 8.3 Prohibitions preserved by any admissible shape `[V]`
+
+No credential, key material or DSN enters the studio; `external_tool_calls` and
+`external_model_calls` stay prohibited, so the only admissible provider performs no I/O;
+LIVE stays absent from the mode list and refused by the service; `ENFORCEMENT_ENABLED`
+stays `False`; `REFERENCE_GRADE_SHADOW_ONLY` stands; the v1 and v2 contract bytes are
+untouched (the response fields already exist); no FROM line or ratified digest changes;
+the mirror blocker is unchanged.
+
+### 8.4 Proposed ruling FD-7 `[R]` (five decisions, recommended option first)
+
+| # | Decision | Options |
+|---|---|---|
+| **FD-7.1** | Is a fixture-only run in P3E `agent_execution`? | **`FIXTURE_RUN_ADMISSIBLE`**: a run whose every provider is an in-image, no-I/O fixture and whose modes exclude LIVE is a demonstration, not agent execution; the profile's `prohibited` entry is re-worded to "agent execution against any non-fixture provider". `FIXTURE_RUN_PROHIBITED`: seam 3 stays absent in P3E; the Simulate screen keeps its typed gap until a worker relay is separately ruled. |
+| **FD-7.2** | Host | **`P3E_IN_PROCESS`** (the studio's own runtime, as the service is written). `WORKER_RELAY` (a sixth relayed route on the worker's review service; amends CR-2's five-route allowlist and the worker; not in this step). |
+| **FD-7.3** | Hook for this step | **`RUNTIME_DEFAULT_BLOCK`**: only `provider_registry` is handed; `governance_hook` stays the runtime's fail-closed default and the trace shows every BLOCK honestly; no new package. `GOVERNED_HOOK_OVER_FIXTURE_SOURCE`: `GovernedExecutionHook` over a source shaped like the worker's, five packages added to the image, ESCALATE with no sink. |
+| **FD-7.4** | Provider set | **`ONE_PINNED_FIXTURE_PROVIDER`**: one provider in the deployment package, id and version recorded in `approved-runtime-config.json`, records in memory and returns success, no I/O, enabled by one boolean configuration value; no provider list is read from the environment (FD-4: no discovery). `CONFIGURED_PROVIDER_IDS`: a typed list, each resolving to an in-image implementation. |
+| **FD-7.5** | Permissive hook | **`PROHIBITED_IN_PROFILE`**: the P3E root never constructs `AllowAllGovernanceHook`, startup integrity fails if `governance_hook_permissive` could be true, and the composition record states it. `LABELLED_ONLY` (today's behaviour). |
+
+Under the recommended options seam 3 is: one configuration value, one fixture provider
+in `governance-studio-deployment`, `provider_registry` handed and `governance_hook`
+absent by ruling, a superseding composition record, the profile's `agent_execution`
+entry re-worded, and matrix rows 1 to 6 as tests. The governed hook then becomes a
+later seam of its own (FD-1), entered only when a sink for ESCALATE exists in the studio
+or the worker relay is ruled.
+
+The ruling authorizes documentation only. No implementation prompt is issued while
+FD-7.1 to FD-7.5 remain open.
