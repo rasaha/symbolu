@@ -404,3 +404,99 @@ The Publish screen, which sends no `scenario_id`, now renders the typed refusal
 rather than a console gap; offering a scenario selector is a frontend change for a
 later step. Maturity: **Core implemented** for the pin and the refusal; the console
 itself remains a prototype (FD-8.1, FD-8.3).
+
+## 10 — Next-step audit under FD-1 (2026-09-06)
+
+**The question.** With seams 1 to 3 shipped and seam 4 absent by ruling, which of
+the three remaining front-door candidates can be entered next as one bounded seam?
+**Screen 1, a typed registration form over `ai-system-registry`.** The governed hook
+has no admissible home in P3E, and a durable Decision Authority store would hold
+nothing because no deployment produces decision records. Everything below is
+documentation; no seam is activated.
+
+### 10.1 The governed hook seam `[V]`
+
+- `GovernedExecutionHook` composes over a deployment-supplied `GovernanceInputSource`;
+  an ESCALATE leaves the task WAITING and the workflow PAUSED, and the runtime proceeds
+  only through `resume_workflow`, which HR-4 keeps bare and unexposed: the DBOS adapter
+  is the only caller (`engine.py:8-10, 195-203`; human-review ADR §5 HR-4).
+- The only ESCALATE sink in the repository is the worker: `ApprovalBoundInputSource`
+  over the approval ledger and directory, the review service's queue and the bounded
+  resume (HR-A to HR-E, `governed-runtime-worker/composition.py:227-238`). The
+  service's five routes carry no ingest for a run that lives elsewhere (`http.py:33-39`).
+- The studio's simulation runtime is in-process and in-memory: no checkpoint, state or
+  event store is handed (`SimulateService.run`, `studio_v2.py`), so a parked run cannot outlive the
+  request, let alone reach a queue.
+- Therefore the hook in P3E is either a hook whose ESCALATE has no sink, which FD-7.3
+  already refused, or the worker's stack composed into P3E, which reopens CR-1. `[I]`
+  Its admissible shape is `WORKER_RELAY` (the FD-7.2 alternative): a Simulate run
+  executed by the worker and relayed like the review screens, which amends CR-2's
+  five-route allowlist and the worker itself. Not a front-door seam of the studio
+  alone; not next.
+
+### 10.2 The durable Decision Authority store `[V]`
+
+- `decision-authority` 1.0.0 is frozen (gap-sequencing D-2) and ships in-memory
+  repositories only; `DecisionCaseRepository` is a seventeen-method append-only port
+  with no durable implementation and no ruling on its persistence posture (Risk
+  Authority has one; Decision Authority does not).
+- No deployment produces a decision record. The worker's hook consumes Decision
+  Authority as a `GovernanceVetoResult` mapped from outcome values
+  (`risk-authority-runtime/decision_authority_adapter.py:74-149`); nothing calls
+  `create_case` or `record_decision`. A durable store handed to P3E would be empty,
+  and the studio must not write it (SD-2).
+- The studio's read does not fit the port: `AuthorityService.decision` calls
+  `decision_store.get(decision_id)` (`studio_v2.py:389-395`) where the port offers
+  `get_decision` and returns a `DecisionRecord`; the same class of mismatch seam 2
+  corrected for the policy registry `[G]`.
+- Therefore a durable Decision Authority store is a package decision (persistence
+  posture, a producer, and the studio read corrected) before it can be a seam. Not next.
+
+### 10.3 Screen 1, a typed registration form over `ai-system-registry` `[V]`
+
+- The package ships `SystemRegistration`, `AssessedSystemBinding`, deterministic
+  `registration_id_for`, `supersession_refusals` and one read-only `SystemRegistryPort`
+  Protocol with no implementation and no store (registry ADR D-4); it records and
+  never gates (D-5); the classification label is uninterpreted (D-2); a changed system
+  is a new registration carrying `supersedes` (D-3). Three front-door composition
+  records already exercise exactly this record type and chain (FD-3, §7).
+- FD-4 is satisfied by the record itself: every field is typed and validated by the
+  package's own refusal reasons; nothing is inferred; a blank label or owner is
+  refused. §4 of this ADR already names a typed registration form over
+  `ai-system-registry` as admissible, and forbids prose intake.
+- What the seam needs that does not exist: (a) a durable home, since "a composition
+  root holds whatever it registers" and the registry ADR places the operational
+  registry and its systems-of-record connectors post-v1 under D-5 `[R]` whether a
+  local sqlite store under the runtime volume, in the seam-1 posture, is inside or
+  outside that line; (b) a registrant: `owner_ref` is a non-secret directory handle,
+  never an authenticated identity, and no IdP exists (AI-C waits on an issuer), so the
+  registrant is presented and unproven `[R]`; (c) two v2 operations, which change the
+  frozen `openapi_v2.json` bytes and the generated client for the first time since
+  the freeze `[R]`; (d) one screen, under the same frontend version, as HR-D added the
+  review screens `[I]`.
+- The seam's only write would be `register`. SD-2's verbs (issue, activate, revoke,
+  grant, authorize, clear, execute) do not cover it, D-5 makes a registration an input
+  to somebody else's decision, and the record confers nothing; but it is the front
+  door's first mutation from the studio, and FD-6 recorded seam 2 as conferring no
+  mutation, so the boundary needs its own ruling `[R]`.
+
+### 10.4 Recommendation and proposed ruling FD-9 `[R]` (five decisions, recommended first)
+
+Screen 1 is the only candidate whose prerequisites are rulings rather than packages
+or deployment units.
+
+| # | Decision | Options |
+|---|---|---|
+| **FD-9.1** | Next seam | **`SCREEN_1_TYPED_REGISTRATION`**: seam 5 is a typed registration form over `ai-system-registry`, composed through the P3E root, tenant-bound to `UGENCE_STUDIO_TENANT_ID`. `GOVERNED_HOOK_VIA_WORKER_RELAY` (amends CR-2 and the worker). `DECISION_STORE_PACKAGE_FIRST` (a package decision, not a seam). |
+| **FD-9.2** | Durable home | **`LOCAL_SQLITE_UNDER_RUNTIME_VOLUME`**: `ai-system-registry` 0.2.0 adds one sqlite implementation of `SystemRegistryPort` plus a single append, `register`, in the seam-1 posture (a file under the runtime volume; no server, driver or DSN; the `persistent_database` prohibition stands); D-5's post-v1 line is read as the systems-of-record connectors, which stay unbuilt. `COMPOSITION_ROOT_MEMORY`: held in process, lost on restart, labelled. |
+| **FD-9.3** | Registrant | **`OWNER_REF_PRESENTED_UNPROVEN`**: `owner_ref` is a typed opaque handle the form supplies, recorded as presented and unproven; `registered_by` is the deployment name and version; no identity is claimed until an issuer exists (AI-C). `REQUIRE_IDENTITY` (blocks on the issuer). |
+| **FD-9.4** | Contract | **`V2_AMENDMENT_TWO_OPERATIONS`**: `v2_registry_register` and `v2_registry_list`, validated by the package's own refusal reasons and `supersession_refusals`, with `openapi_v2.json` and the generated client re-frozen by their own amendment record in the same step. `NO_CONTRACT_CHANGE` (not possible: no operation exists). |
+| **FD-9.5** | Mutation boundary | **`REGISTER_IS_THE_ONLY_WRITE`**: the seam writes registrations and nothing else; no edit, no revocation, no gate, no admission, no attestation; a changed system is a new registration superseding the old (D-3); the record confers no approval, maturity, authority or permission; SD-2 and every credential and LIVE prohibition unchanged. |
+
+Under the recommended options seam 5 ships in its own implementation step: the
+package release, the two operations with a re-frozen contract, the screen, the
+deployment composition (one registry file under the runtime volume, tenant-bound),
+a superseding composition record, and a failure matrix (missing tenant, blank owner
+or label, inadmissible supersession, cross-tenant read, restart, contract-byte
+amendment recorded). The ruling authorizes documentation only. No implementation
+prompt is issued while FD-9.1 to FD-9.5 remain open.
