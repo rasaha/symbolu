@@ -10,6 +10,7 @@ import pytest
 from ugence_governance_contracts.api import AuditReference
 
 from ugence_control_plane_root import (
+    GENESIS_DIGEST,
     STORE_REF,
     AuditLedger,
     ContractViolation,
@@ -285,3 +286,88 @@ def test_the_ledger_appends_and_verifies_from_threads_other_than_the_opening_one
             t.join()
     assert done == [True]
     ledger.close()
+
+
+# --------------------------------------------------------------------------- #
+# The one read (0.2.0, front-door ruling FD-11.2): raw, tenant-scoped, in chain order
+# --------------------------------------------------------------------------- #
+def test_read_entries_returns_a_tenants_own_rows_for_one_correlation_id_in_chain_order(tmp_path):
+    log = AuditLedger(str(tmp_path / "ledger.sqlite"))
+    first = append(log, entry(correlation="corr-1", payload={"step": 1}))
+    between = append(log, entry(at=T1, kind="other.kind", correlation="corr-2"))
+    append(log, entry(at=T1, tenant="tenant-b", correlation="corr-1"))
+    second = append(log, entry(at=T2, correlation="corr-1", payload={"step": 2}))
+
+    rows = log.read_entries(tenant_id=TENANT, correlation_id="corr-1")
+    assert [r.entry.payload["step"] for r in rows] == [1, 2], "chain order, this tenant only"
+    assert [r.entry_ref for r in rows] == [first.entry_ref, second.entry_ref]
+    assert [r.record_digest for r in rows] == [first.entry_digest, second.entry_digest]
+    # the links are the tenant chain's own: the corr-2 entry sits between the two
+    assert rows[0].prev_digest == GENESIS_DIGEST and rows[1].prev_digest == between.entry_digest
+    assert rows[0].entry.tenant_id == TENANT and rows[0].entry.correlation_id == "corr-1"
+    assert rows[0].entry.recorded_at == T0 and rows[0].entry.recorded_by == "operator-1"
+    assert rows[0].entry.kind == "incident.opened"
+    # rebuilt from the row as written: the content digest recomputes
+    assert rows[0].entry.content_digest() == log._conn.execute(  # noqa: SLF001
+        "SELECT content_digest FROM ledger_entries WHERE seq=?", (rows[0].seq,)).fetchone()[0]
+    assert log.read_entries(tenant_id=TENANT, correlation_id="corr-nope") == ()
+    assert log.read_entries(tenant_id="tenant-c", correlation_id="corr-1") == ()
+    assert log.verify_chain(tenant_id=TENANT) is True
+    log.close()
+
+
+def test_read_entries_interprets_nothing_and_writes_nothing(tmp_path):
+    path = str(tmp_path / "ledger.sqlite")
+    log = AuditLedger(path)
+    append(log, entry(correlation="corr-1"))
+    before = log.entry_count()
+    (row,) = log.read_entries(tenant_id=TENANT, correlation_id="corr-1")
+    assert isinstance(row.entry, LedgerEntry) and row.entry.payload == {"subject_ref": "envelope:env-1"}
+    assert log.entry_count() == before
+    log.close()
+
+
+def test_read_entries_refuses_an_in_memory_store_and_blank_keys():
+    log = ledger()
+    append(log, entry(correlation="corr-1"))
+    with pytest.raises(ContractViolation, match="in-memory store is not a durable record"):
+        log.read_entries(tenant_id=TENANT, correlation_id="corr-1")
+    for blank in ("", "   "):
+        with pytest.raises(ContractViolation):
+            log.read_entries(tenant_id=blank, correlation_id="corr-1")
+        with pytest.raises(ContractViolation):
+            log.read_entries(tenant_id=TENANT, correlation_id=blank)
+
+
+def test_read_entries_refuses_a_schema_version_swapped_underneath_it(tmp_path):
+    path = str(tmp_path / "ledger.sqlite")
+    log = AuditLedger(path)
+    append(log, entry(correlation="corr-1"))
+    raw = sqlite3.connect(path)
+    raw.execute("UPDATE meta SET value='someone.else/9.9' WHERE key='schema_version'")
+    raw.commit()
+    raw.close()
+    with pytest.raises(SchemaVersionMismatch, match="refused rather than reinterpreted"):
+        log.read_entries(tenant_id=TENANT, correlation_id="corr-1")
+    log.close()
+
+
+def test_a_read_after_an_in_place_edit_returns_rows_whose_chain_no_longer_verifies(tmp_path):
+    """The read is raw: it returns what is there. Verification is the separate call,
+    and a caller that wants both asks for both (the review service does)."""
+
+    path = str(tmp_path / "ledger.sqlite")
+    log = AuditLedger(path)
+    append(log, entry(correlation="corr-1"))
+    append(log, entry(at=T1, correlation="corr-1"))
+    log.close()
+    raw = sqlite3.connect(path)
+    raw.execute("DROP TRIGGER ledger_no_update")
+    raw.execute("UPDATE ledger_entries SET content_digest=? WHERE tenant_seq=0", ("0" * 64,))
+    raw.commit()
+    raw.close()
+    reopened = AuditLedger(path)
+    assert len(reopened.read_entries(tenant_id=TENANT, correlation_id="corr-1")) == 2
+    with pytest.raises(LedgerIntegrityError):
+        reopened.verify_chain(tenant_id=TENANT)
+    reopened.close()

@@ -1,5 +1,19 @@
 # Changelog — ugence-control-plane-root
 
+## 0.2.0 — the one read (front-door seam 7, ruling FD-11.2)
+
+- `AuditLedger.read_entries(tenant_id=..., correlation_id=...)`: a tenant's own rows
+  for one correlation id, in `tenant_seq` order, as `StoredEntry` objects rebuilt from
+  the rows as written (the re-validated `LedgerEntry`, `seq`, `prev_digest`,
+  `record_digest`, and so `entry_ref`). Raw and uninterpreted: no join, no ordering
+  across tenants, no meaning attached to a `kind`. Refuses a blank tenant or
+  correlation id, an in-memory store, and a store whose schema version is not this
+  package's, re-checked at read time. Ruled by
+  `docs/architecture/ADR_UGENCE_STUDIO_FRONT_DOOR_SCOPING.md` FD-11.2 and recorded as
+  an amendment of this package's ADR D-5: a raw read of a tenant's own rows is not the
+  reconstruction API the root disclaims. No append, edit or vocabulary added;
+  `CONTRACT_VERSION` unchanged (an additive read helper).
+
 ## 0.1.1 — the ledger behind a thread pool
 
 - `AuditLedger` opens its one SQLite connection with `check_same_thread=False` and
