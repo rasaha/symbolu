@@ -480,7 +480,7 @@ documentation; no seam is activated.
   door's first mutation from the studio, and FD-6 recorded seam 2 as conferring no
   mutation, so the boundary needs its own ruling `[R]`.
 
-### 10.4 Recommendation and proposed ruling FD-9 `[R]` (five decisions, recommended first)
+### 10.4 Recommendation and proposed ruling FD-9 (five decisions, recommended first; ruled in §10.5)
 
 Screen 1 is the only candidate whose prerequisites are rulings rather than packages
 or deployment units.
@@ -498,5 +498,24 @@ package release, the two operations with a re-frozen contract, the screen, the
 deployment composition (one registry file under the runtime volume, tenant-bound),
 a superseding composition record, and a failure matrix (missing tenant, blank owner
 or label, inadmissible supersession, cross-tenant read, restart, contract-byte
-amendment recorded). The ruling authorizes documentation only. No implementation
-prompt is issued while FD-9.1 to FD-9.5 remain open.
+amendment recorded).
+
+### 10.5 Ruling FD-9 (owner, 2026-09-06)
+
+| # | Ruling |
+|---|---|
+| **FD-9.1** | **`SCREEN_1_TYPED_REGISTRATION`.** Seam 5 is a typed registration form over `ai-system-registry`, composed through the P3E root and tenant-bound to `UGENCE_STUDIO_TENANT_ID`. The governed hook stays a later seam in the worker-relay shape, and a durable Decision Authority store stays a package decision. |
+| **FD-9.2** | **`LOCAL_SQLITE_UNDER_RUNTIME_VOLUME`.** `ai-system-registry` 0.2.0 adds one sqlite implementation of `SystemRegistryPort` plus a single append, `register`, in the seam-1 posture: a file under the writable runtime volume, no server, no driver, no DSN, the `persistent_database` prohibition standing. D-5's post-v1 line is read as the systems-of-record connectors, which stay unbuilt. |
+| **FD-9.3** | **`OWNER_REF_PRESENTED_UNPROVEN`.** `owner_ref` is a typed opaque handle the form supplies, recorded as presented and unproven; `registered_by` is the deployment name and version; no identity is claimed until an issuer exists (AI-C). |
+| **FD-9.4** | **`V2_AMENDMENT_TWO_OPERATIONS`.** `v2_registry_register` and `v2_registry_list`, validated by the package's own refusal reasons and `supersession_refusals`; `openapi_v2.json` and the generated client are re-frozen by their own amendment record in the same step, the first amendment since the v2 freeze. |
+| **FD-9.5** | **`REGISTER_IS_THE_ONLY_WRITE`.** The seam writes registrations and nothing else: no edit, no revocation, no gate, no admission, no attestation; a changed system is a new registration superseding the old (D-3); the record confers no approval, maturity, authority or permission; SD-2 and every credential and LIVE prohibition unchanged. |
+
+**What the ruling authorizes.** Documentation only. No seam is activated, no code is
+changed, no package is released and no contract byte moves. Seam 5 activates by its
+own implementation prompt, which will ship in one step: `ai-system-registry` 0.2.0,
+the two operations with the re-frozen contract and generated client, the screen, the
+deployment composition (one registry file under the runtime volume, tenant-bound,
+one configuration value), a superseding composition record (FD-3), and the failure
+matrix named in §10.4. FD-1, FD-3, FD-4, the `REFERENCE_GRADE_SHADOW_ONLY` ceiling,
+`ENFORCEMENT_ENABLED = False`, the frozen v1 contract, every FROM line and ratified
+digest, and every credential, egress and LIVE prohibition are preserved.
