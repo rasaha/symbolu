@@ -66,7 +66,7 @@ exact grounds: it owns the wrapper contract and the verifier only. It imports TE
 **Role and capability.** One role for this slice, `COMPARISON_ENGINE`, establishing
 "which engine produced this result under which key; not that the comparison is
 correct." It resolves under one new lent capability,
-`TrustAnchorCapability.COMPARISON_RESULT_ATTESTATION`, added beside the four
+`TrustAnchorCapability.COMPARISON_RESULT_ATTESTATION`, added beside the five
 existing members and covered by TEA's disjointness tests. The coordinate the engine
 identity resolves to is therefore
 `TrustAnchorCoordinate("ugence-readiness-comparison", <deployment key id>,
