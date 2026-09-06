@@ -141,6 +141,12 @@ to infer it.
 
 ## 9 — The prerequisite the ballot cannot decide `[G]`
 
+> **Corrected 2026-09-06 by §11.** The paragraph below offered implementation two
+> paths and called the choice between them an implementation consequence. One of the
+> two paths does not exist: no allowlisted package can relay a clearance receipt. The
+> claim is left in place because it is what the ballot was ruled against; §11 records
+> what implementation actually found, and §12 puts the resulting decisions.
+
 `ugence_action_clearance` is **not** on the studio's SD-1 public-entry-point
 allowlist `[V]`. Whatever CE-2 and CE-5 rule, the export seam requires either that
 allowlist entry or a relay through a package that already has one. That is an
@@ -171,3 +177,100 @@ FD-8.4 and `REFERENCE_GRADE_SHADOW_ONLY` are preserved.
 is not on the studio's SD-1 allowlist, so the implementation step must add that entry
 or relay through a package that has one. That is the reason this seam is larger than
 seams 8 and 9, and the ruling does not make it smaller.
+
+## 11 — What implementation found, and why it stopped (2026-09-06)
+
+Implementation of CE-1 to CE-5 began from `9724fc97` and stopped before writing a
+file. CE-1 to CE-4 are implementable as ruled: the record type, the one-member
+`identity_assurance`, the explicit `authenticity: UNSIGNED` and the pure verifier are
+all determined, and `ClearanceReceiptBody` (`action-clearance/.../models/result.py:73`,
+sixteen fields, content-addressed) is the spine §2 describes. Both blockers are in
+CE-5's seam, and each falsifies a premise the ballot was ruled on.
+
+### 11.1 — The relay §9 assumed does not exist `[V]`
+
+§9's either/or holds only if some allowlisted package can relay a receipt. None can.
+The SD-1 allowlist is `apps/ugence-governance-studio/backend/tests/test_architecture.py:69-113`
+and contains exactly ten packages: `ugence_agent_workforce_composer`,
+`ugence_policy_workflow_compiler`, `ugence_agent_constitution_activation`,
+`ugence_agent_constitution_policy`, `ugence_policy_authority`,
+`ugence_decision_authority`, `ugence_agent_runtime`, `ugence_ai_system_registry`,
+`ugence_data_use_admission`, `ugence_vendor_dependency`.
+
+Not one re-exports `ClearanceReceiptBody`, a receipt read, or anything from
+`ugence_action_clearance`. The single occurrence of the namespace across all ten is
+`policy-workflow-compiler/.../compiler/capability_registry.py:87`, where
+`public_contract="ugence_action_clearance.api"` is a **registry string** naming a
+canonical surface — a catalogue entry, not an import and not a relay.
+
+So the second path is empty, and CE-5's seam requires a **new SD-1 entry**. SD-1 is
+itself an owner ruling — "the studio backend boundary widens ONLY through an explicit
+per-package allowlist" — enforced by
+`test_every_governance_import_is_an_allowlisted_public_entry_point` and
+`test_no_package_outside_the_allowlist_is_imported`. Widening it is an owner act, and
+which package receives the entry decides what the studio can reach for good.
+
+### 11.2 — The deployment holds no clearance, and has no way to hold one `[V]`
+
+CE-5 returns "the artifact for a clearance the deployment already holds". It holds
+none, and no path in the repository leads to it holding one:
+
+| Route to a held clearance | State |
+|---|---|
+| the studio mints one | closed — `/v1/actions/clear` is unserved under CP-3, and CE-1 forbids minting anyway |
+| a receipt store is wired in | absent — `ugence_execution_reservation`, the only package that persists a received body (`receipts.py:160` `ClearanceReceipt`, `:300` `ClearanceReceiptRepository`, `sqlite.py:219`), has **zero** references in the studio backend or the P3E deployment |
+| a v2 operation receives one | absent — none of the 25 approved v2 operations is clearance-shaped |
+| the deployment receives one | absent — none of the 18 deployment modules names a clearance or a receipt |
+| synthetic fixtures supply one | absent — `synthetic.py:135` `enforce` **verifies** a pinned hashed manifest; it seeds no store |
+
+Implemented exactly as ruled, CE-5's read can only ever answer "not found". Making it
+answer anything requires a receipt to enter the deployment first — and every way of
+doing that is a write, which CE-5 forbids in terms.
+
+## 12 — Proposed ballot CE-6 and CE-7 (two decisions, recommended option first)
+
+Not ruled. These are the two decisions §11 forces; no third is proposed, and neither
+reopens CE-1 to CE-4.
+
+| # | Decision | Options |
+|---|---|---|
+| **CE-6** | Which package gets the new SD-1 entry | **`ONE_ENTRY_EXPORT_PACKAGE`**: add only `ugence_clearance_export`, the contracts-only package CE-2 creates. `TWO_ENTRIES`: also admit `ugence_execution_reservation` so the studio reads the receipt store directly. `ENTRY_FOR_ACTION_CLEARANCE`: admit the evaluator package itself. |
+| **CE-7** | Where a held clearance comes from | **`SYNTHETIC_SEEDED_RECEIPTS`**: the deployment seeds a receipt store from pinned fixtures under the existing `SYNTHETIC_DEMONSTRATION_ONLY` manifest discipline; no route writes and CE-5's read stays a read. `RULED_INTAKE`: a separate ruling admits one receipt-intake write. `NO_SEAM_YET`: ship the CE-2 package now and defer the route. |
+
+**CE-6 — why `ONE_ENTRY_EXPORT_PACKAGE`.** It is the smallest widening that can work,
+and it is the shape the front door already ratified twice: FD-12 and FD-13 admitted
+`ugence_data_use_admission` and `ugence_vendor_dependency` on exactly these terms — one
+contracts-only package, one curated public surface, nothing reached behind it. Under
+it the studio never imports `ugence_action_clearance` or `ugence_execution_reservation`,
+so neither a clearance evaluator nor a receipt store becomes reachable from the studio
+process, by design or by accident. `TWO_ENTRIES` puts a persistence surface inside the
+studio's boundary to save one indirection, which is the trade SD-1 exists to refuse.
+`ENTRY_FOR_ACTION_CLEARANCE` is the option CE-2 already declined at the package level,
+and admitting the evaluator to the studio would make it harder, not easier, to keep
+CE-1's "received, never minted" true.
+
+**CE-7 — why `SYNTHETIC_SEEDED_RECEIPTS`, and what it does not prove.** It is the only
+option that leaves CE-5 intact: no write, no intake route, no new egress destination,
+no credential. It also stays inside a boundary the deployment already ratified rather
+than opening a new one — `synthetic.py` already fails closed unless fixtures match a
+pinned hash and carry `SYNTHETIC_DEMONSTRATION_ONLY`, so a seeded receipt inherits that
+discipline instead of needing its own. `RULED_INTAKE` contradicts CE-5 as ruled and
+would require reopening it. `NO_SEAM_YET` is the option CE-5 refused, and shipping a
+record type with nothing that returns it leaves the export path unexercised — the
+failure mode this programme has repeatedly paid for.
+
+The honest limit, which the artifact must carry rather than the reader infer: **a
+seeded receipt exercises the export path and the verifier; it is evidence about
+serialization and integrity, and evidence about nothing else.** It is not a clearance
+any authority granted, it confers no approval, and it says nothing about whether the
+platform can produce a real one — which it currently cannot, per §11.2. An export of a
+synthetic receipt must be labelled `SYNTHETIC_DEMONSTRATION_ONLY` in the artifact
+itself, alongside the `authenticity: UNSIGNED` CE-4 already requires and the
+`PRESENTED_UNPROVEN` ceiling CE-3 makes travel.
+
+**What ratifying CE-6 and CE-7 would not authorize.** Everything §8 excludes stays
+excluded. `LIVE` stays absent from `SIMULATION_MODES`, `ENFORCEMENT_ENABLED` stays
+`False`, no credential is introduced, no clearance is minted in the studio, no second
+egress destination appears, no authenticity is claimed, and the frozen v1 and v2
+contracts, every `FROM` line and ratified digest, SD-2, FD-8.1, FD-8.4 and
+`REFERENCE_GRADE_SHADOW_ONLY` are preserved.
