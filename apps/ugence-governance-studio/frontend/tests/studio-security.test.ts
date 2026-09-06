@@ -57,14 +57,14 @@ describe("SD-2 — no screen can reach an authority act", () => {
     expect(detectAuthorityActs(poisoned, manifest.prohibited_verbs).length).toBeGreaterThan(0);
   });
 
-  it("the v2 client consumes exactly the twenty-five approved operations", () => {
-    // seventeen since GAS-7 HR-D, plus the two registry operations of front-door seam 5
-    // (FD-9.4), the one worker shadow-run relay of seam 6 (FD-10.4) and the one worker
-    // ledger read of seam 7 (FD-11.5)
+  it("the v2 client consumes exactly the approved operations, and no others", () => {
+    // The property is the equality, not a number: each ruled seam adds its own
+    // operations and a literal count would move with every one of them while saying
+    // nothing about whether the client consumes anything unapproved.
     const { consumed, unmatched } = detectV2Consumption(clientText, spec);
     expect(unmatched).toEqual([]);
     expect([...consumed].sort()).toEqual([...manifest.approved_operation_ids].sort());
-    expect(consumed.size).toBe(25);
+    expect(consumed.size).toBe(manifest.approved_operation_ids.length);
     expect([...V2_OPERATIONS].sort()).toEqual([...manifest.approved_operation_ids].sort());
   });
 

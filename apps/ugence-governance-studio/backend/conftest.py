@@ -33,6 +33,12 @@ _PACKAGE_SRC = [
     os.path.join(_REPO, "packages", "integration", "data-use-admission", "src"),
     # Front-door seam 9 (FD-13): the vendor-dependency intake's package.
     os.path.join(_REPO, "packages", "integration", "vendor-dependency", "src"),
+    # Clearance export (CE-6): the export package, and the evaluator package whose
+    # frozen receipt type it imports. action-clearance is on the path so the export
+    # package can be imported at all; it is NOT on the SD-1 allowlist, so the studio's
+    # own source still may not import it.
+    os.path.join(_REPO, "packages", "integration", "clearance-export", "src"),
+    os.path.join(_REPO, "packages", "capabilities", "action-clearance", "src"),
 ]
 
 for p in [_SRC, *_PACKAGE_SRC]:

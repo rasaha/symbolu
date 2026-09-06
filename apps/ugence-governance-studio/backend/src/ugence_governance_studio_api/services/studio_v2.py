@@ -30,6 +30,17 @@ from typing import Any, Dict, List, Optional, Tuple
 import ugence_agent_runtime.api as art
 import ugence_policy_workflow_compiler.api as compiler
 
+from ugence_clearance_export import (
+    ClearanceExportError,
+    ContractViolation as ExportContractViolation,
+    ExportAuthenticity,
+    ExportDataClassification,
+    ExportIntegrityError,
+    IdentityAssurance,
+    artifact_to_dict,
+    build_export,
+    verify_export,
+)
 from ugence_vendor_dependency import (
     ContractViolation as VendorContractViolation,
     CrossTenantRefused as VendorCrossTenantRefused,
@@ -73,6 +84,7 @@ from ..clients.console import ConsoleClient, ConsoleUnavailable
 from ..serialization.canonical import canonical_digest, to_jsonable
 
 __all__ = [
+    "ClearanceExportService",
     "ConstitutionService",
     "PolicyService",
     "AuthorityService",
@@ -1278,4 +1290,120 @@ class VendorDeclarationService:
             "risk_posture": VENDOR_RISK_POSTURE_NOTE,
             "confers": VENDOR_DECLARATION_CONFERS,
             "result": records,
+        }
+
+
+#: CE-1, stated on every answer. Exporting is not clearing: this service copies a
+#: clearance the deployment received and mints nothing.
+EXPORT_IS_NOT_CLEARING = (
+    "EXPORT_IS_A_READ: this operation returns a copy of a clearance the deployment "
+    "already received. It does not evaluate, grant, sign, approve or clear anything, "
+    "and holding the artifact confers nothing."
+)
+
+#: §13.1, stated on every answer alongside the artifact's own three labels. The
+#: service repeats it rather than relying on a reader opening the artifact.
+EXPORT_CONFERS = (
+    "NOTHING: a seeded receipt exercises the export path and the verifier. No "
+    "authority granted it, it satisfies no obligation, and it is not evidence that "
+    "any action may proceed."
+)
+
+
+class ClearanceExportService:
+    """The one v2 read CE-5 ruled: the export artifact for a clearance already held.
+
+    **A read, structurally.** The deployment hands this service a
+    ``ReceivedClearanceSource``, whose port has two reads and no write, so there is no
+    method here that could accept, store or mint a clearance (CE-5, §13.3). The
+    service never constructs a ``ClearanceResult``: it reads a receipt somebody else
+    evaluated and wraps it.
+
+    **Three ceilings travel, and the service re-states them.** ``build_export``
+    already refuses any artifact that omits or softens ``PRESENTED_UNPROVEN``,
+    ``UNSIGNED`` or ``SYNTHETIC_DEMONSTRATION_ONLY``; this service passes exactly
+    those three and echoes them in its own answer, so a caller reading only the
+    envelope still sees all three.
+
+    **A missing source is reported, never faked.** Absent a source the operation
+    returns a typed ``unavailable`` naming the gap, rather than an empty list that
+    would read as "this tenant holds no clearances".
+    """
+
+    CAPABILITY = "clearance_export"
+
+    def __init__(self, source: Any = None, tenant_id: str = "") -> None:
+        self._source = source
+        self._tenant_id = tenant_id
+
+    def _gap(self) -> Dict[str, Any]:
+        return _unavailable(
+            self.CAPABILITY,
+            "no received-clearance source is configured: this deployment holds no "
+            "clearance receipts, so there is nothing to export",
+        )
+
+    @staticmethod
+    def _refused(code: str, message: str) -> Dict[str, Any]:
+        return {"available": True, "refused": True, "code": code, "reason": message,
+                "result": None}
+
+    def read(self, *, receipt_id: str) -> Dict[str, Any]:
+        """Return the export artifact for one clearance this deployment already holds.
+
+        Unknown ids are refused typed, never 404-shaped as an empty success: "the
+        deployment holds no such clearance" and "the deployment holds no clearances"
+        must not look alike to an external runtime.
+        """
+        if self._source is None:
+            return self._gap()
+        if not isinstance(receipt_id, str) or not receipt_id.strip():
+            return self._refused("receipt_id_untyped",
+                                 "receipt_id must be a non-empty string")
+        tenant_id = self._tenant_id
+        try:
+            body = self._source.read_receipt(
+                tenant_id=tenant_id, receipt_id=receipt_id.strip())
+        except ClearanceExportError as exc:
+            return self._refused("clearance_export_refused", str(exc))
+        except (OSError, ValueError) as exc:
+            return _unavailable(
+                self.CAPABILITY,
+                f"the received-clearance source could not be read: {exc}")
+        if body is None:
+            return self._refused(
+                "clearance_not_held",
+                f"this deployment holds no clearance receipt {receipt_id.strip()!r}")
+
+        try:
+            artifact = build_export(
+                body,
+                identity_assurance=IdentityAssurance.PRESENTED_UNPROVEN,
+                authenticity=ExportAuthenticity.UNSIGNED,
+                data_classification=(
+                    ExportDataClassification.SYNTHETIC_DEMONSTRATION_ONLY),
+            )
+            verification = verify_export(artifact)
+        except ExportIntegrityError as exc:
+            return self._refused("clearance_export_integrity_refused", str(exc))
+        except (ExportContractViolation, ClearanceExportError) as exc:
+            return self._refused("clearance_export_refused", str(exc))
+
+        record = artifact_to_dict(artifact)
+        return {
+            "available": True,
+            "tenant_id": tenant_id,
+            "source_kind": type(self._source).__name__,
+            "artifact_id": artifact.artifact_id,
+            "receipt_id": artifact.receipt_id,
+            "identity_assurance": artifact.identity_assurance.value,
+            "authenticity": artifact.authenticity.value,
+            "authenticity_prerequisite": artifact.authenticity_prerequisite,
+            "data_classification": artifact.data_classification.value,
+            "integrity_verified": verification.integrity_verified,
+            "uncheckable": list(verification.uncheckable),
+            "export_is_not_clearing": EXPORT_IS_NOT_CLEARING,
+            "confers": EXPORT_CONFERS,
+            "artifact": record,
+            "result": record,
         }

@@ -276,7 +276,9 @@ def test_no_vendor_approval_or_onboarding_status_is_expressible_through_the_prof
 # --------------------------------------------------------------------------- #
 def test_the_approved_runtime_config_records_the_seam_and_the_fifth_amendment():
     cfg = json.load(open(os.path.join(HERE, "approved-runtime-config.json"), encoding="utf-8"))
-    assert cfg["deployment_version"] == DEPLOYMENT_VERSION == "0.10.0"
+    # The literal is gone: seam 9 shipped at 0.10.0 and a later seam moves the
+    # version. What seam 9 asserts is that the config and the package agree.
+    assert cfg["deployment_version"] == DEPLOYMENT_VERSION
     added = cfg["configuration_added"]["UGENCE_STUDIO_VENDOR_DECLARATIONS_PATH"]
     assert "requires UGENCE_STUDIO_TENANT_ID" in added and "front-door seam 9" in added
     seam = cfg["vendor_declarations"]
@@ -293,10 +295,15 @@ def test_the_approved_runtime_config_records_the_seam_and_the_fifth_amendment():
         committed = hashlib.sha256(fh.read()).hexdigest()
     assert cfg["frozen"]["openapi_v2_sha256"] == committed
     record = json.load(open(os.path.join(contract, "openapi_v2.amendments.json"), encoding="utf-8"))
-    latest = record["amendments"][-1]
-    assert latest["amendment_id"] == "v2-A5" and latest["sha256"] == committed
-    assert set(latest["operations_added"]) == {"v2_vendor_declare", "v2_vendor_list"}
-    assert cfg["frozen"]["openapi_v2_amendment"].startswith("v2-A5 (FD-13.3")
+    # Found by id, not by position: a later seam appends its own amendment, and the
+    # sha this seam recorded is the one the contract carried when seam 9 shipped.
+    (mine,) = [a for a in record["amendments"] if a["amendment_id"] == "v2-A5"]
+    assert mine["sha256"] == "907f360f2ba2127d005c140d6146ab441056794ba2b1f1a35580cf4148956e73"
+    assert record["amendments"][-1]["sha256"] == committed
+    assert set(mine["operations_added"]) == {"v2_vendor_declare", "v2_vendor_list"}
+    # The freeze note is prepended by each new amendment, so seam 9's entry is
+    # somewhere in it rather than at the front.
+    assert "v2-A5 (FD-13.3" in cfg["frozen"]["openapi_v2_amendment"]
     # FD-1: the ratified v1 bytes and the shadow-only ceiling are untouched
     assert cfg["frozen"]["api_contract"] == "governance_studio.api.v1"
     assert cfg["frozen"]["openapi_sha256"] == \

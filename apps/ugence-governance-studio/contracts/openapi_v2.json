@@ -992,6 +992,47 @@
         ]
       }
     },
+    "/api/v2/exports/{receipt_id}": {
+      "get": {
+        "description": "The export artifact for one clearance receipt this deployment holds.\n\nThe tenant is the deployment's, never the caller's. An id the deployment does\nnot hold is refused typed, never answered as an empty success: \"no such\nclearance\" and \"no clearances\" must not look alike to an external runtime. The\nartifact is content-addressed, and the answer says in four separate ways what\nrecomputing that fingerprint does not establish.",
+        "operationId": "v2_export_read",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "receipt_id",
+            "required": true,
+            "schema": {
+              "title": "Receipt Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Read Export",
+        "tags": [
+          "exports"
+        ]
+      }
+    },
     "/api/v2/observe/audit": {
       "get": {
         "description": "Known correlation ids, as the console reports them.",

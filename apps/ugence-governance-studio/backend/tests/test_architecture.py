@@ -110,6 +110,17 @@ _PUBLIC_ENTRY_ALLOWLIST = {
         "from ugence_vendor_dependency import ",
         "import ugence_vendor_dependency",
     ),
+    # Clearance export (CE-6 ONE_ENTRY_EXPORT_PACKAGE): the contracts-only export
+    # package over its curated public surface only. This is the ONE entry that ruling
+    # authorized and the whole of it. `ugence_action_clearance` (the evaluator) and
+    # `ugence_execution_reservation` (the receipt store) stay off this list
+    # deliberately: the studio reaches the export type, never a clearance evaluator
+    # and never a store. Admitting either later is a new owner decision, not a
+    # follow-on from CE-6 (ADR §13.3).
+    "ugence_clearance_export": (
+        "from ugence_clearance_export import ",
+        "import ugence_clearance_export",
+    ),
 }
 
 # SD-2 — permanently outside the allowlist. These are authority acts, and the

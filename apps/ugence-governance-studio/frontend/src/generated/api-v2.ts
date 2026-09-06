@@ -1,6 +1,6 @@
 // AUTO-GENERATED from apps/ugence-governance-studio/contracts/openapi_v2.json
 // DO NOT EDIT BY HAND. Regenerate with: npm run generate:api-v2
-// source_openapi_sha256: 907f360f2ba2127d005c140d6146ab441056794ba2b1f1a35580cf4148956e73
+// source_openapi_sha256: f42472ab78a34cd24be4c9454c532074c5d000009c3ca72da243cc9139874431
 // api_contract_version: governance_studio.api.v2
 
 export interface paths {
@@ -133,6 +133,32 @@ export interface paths {
          *     handle and the record carries no data. A refusal is typed, never a 500.
          */
         post: operations["v2_data_use_declare"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v2/exports/{receipt_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read Export
+         * @description The export artifact for one clearance receipt this deployment holds.
+         *
+         *     The tenant is the deployment's, never the caller's. An id the deployment does
+         *     not hold is refused typed, never answered as an empty success: "no such
+         *     clearance" and "no clearances" must not look alike to an external runtime. The
+         *     artifact is content-addressed, and the answer says in four separate ways what
+         *     recomputing that fingerprint does not establish.
+         */
+        get: operations["v2_export_read"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -1136,6 +1162,37 @@ export interface operations {
                 "application/json": components["schemas"]["DataUseDeclareRequest"];
             };
         };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    v2_export_read: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                receipt_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
         responses: {
             /** @description Successful Response */
             200: {

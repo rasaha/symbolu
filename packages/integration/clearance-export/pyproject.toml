@@ -1,0 +1,61 @@
+# Ugence Clearance Export — a received clearance, made portable and honest about itself.
+#
+# Scoped and ratified by docs/architecture/ADR_UGENCE_CLEARANCE_EXPORT_SCOPING.md
+# §10 (CE-1 RECEIVED_CLEARANCE_ONLY, CE-2 NEW_CONTRACTS_ONLY_PACKAGE,
+# CE-3 ONE_MEMBER_NOW, CE-4 INTEGRITY_ONLY_AND_SAY_SO, CE-5 EXPORT_IS_A_READ)
+# and §13 (CE-6 ONE_ENTRY_EXPORT_PACKAGE, CE-7 SYNTHETIC_SEEDED_RECEIPTS).
+#
+#   THIS PACKAGE SERIALIZES A CLEARANCE SOMEBODY ELSE EVALUATED AND REPORTS WHAT
+#   A READER CAN CHECK ABOUT IT. IT NEVER CLEARS, AUTHORIZES, APPROVES, SIGNS,
+#   MINTS, STORES OR DECIDES.
+#
+# Contracts only: a record type, three one-member enums, refusal reasons, pure
+# selectors, one read-only Protocol and one pure verifier. No store, no adapter,
+# no connector, no clock, no network.
+#
+# The one dependency is deliberate and minimal. CE-2 forbids extending
+# action-clearance, so this package imports its frozen receipt type rather than
+# redefining it — a second definition of a content-addressed record is a second
+# fingerprint waiting to disagree. ugence-execution-reservation is NOT a
+# dependency: it persists receipts, and CE-2 gives this package no store.
+#
+# Dependency direction (one-way):
+#     ugence-action-clearance (evaluator partition)  <- ClearanceReceiptBody / ClearanceResult
+#         ▲
+#     ugence-clearance-export (this package)
+#
+# Build:   python -m build packages/integration/clearance-export
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ugence-clearance-export"
+dynamic = ["version"]
+description = "Ugence Clearance Export — the portable, content-addressed form of a clearance receipt a deployment received, carrying its own identity-assurance ceiling, an explicit UNSIGNED authenticity and its data classification. Serializes a clearance somebody else evaluated; never clears, authorizes, signs, mints or stores."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "Proprietary" }
+authors = [{ name = "Rakesh Mohan" }]
+keywords = ["governance", "clearance", "export", "portable", "contracts", "ugence"]
+classifiers = ["Typing :: Typed"]
+dependencies = [
+    "ugence-action-clearance>=0.1.0",
+]
+
+[project.optional-dependencies]
+test = ["pytest>=7.0"]
+
+[tool.setuptools.dynamic]
+version = { attr = "ugence_clearance_export.version.__version__" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["ugence_clearance_export*"]
+
+[tool.setuptools.package-data]
+ugence_clearance_export = ["py.typed"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"

@@ -33,6 +33,7 @@ from .security.middleware import (
     SecurityHeadersMiddleware,
 )
 from .services.studio_v2 import (
+    ClearanceExportService,
     AuthorityService,
     ConstitutionService,
     ObserveService,
@@ -76,6 +77,7 @@ def build_studio_context(
     data_use_declarations: Any = None,
     recorded_by: str = "",
     vendor_declarations: Any = None,
+    received_clearances: Any = None,
 ) -> V2Context:
     """Wire the six services from whatever this deployment actually has.
 
@@ -107,6 +109,9 @@ def build_studio_context(
                                     recorded_by=recorded_by),
         vendor=VendorDeclarationService(declarations=vendor_declarations,
                                         recorded_by=recorded_by),
+        clearance_export=ClearanceExportService(
+            source=received_clearances,
+            tenant_id=getattr(received_clearances, "tenant_id", "")),
         start_run=StartRunService(review=review),
         ledger_observe=LedgerObserveService(review=review),
     )

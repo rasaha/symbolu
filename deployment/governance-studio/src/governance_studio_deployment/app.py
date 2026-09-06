@@ -120,6 +120,13 @@ def _build_backend(config: DeploymentConfig):
             config.vendor_declarations_path, tenant_id=config.tenant_id,
             production_mode=config.is_production)
         recorded_by = recorded_by or VENDOR_RECORDED_BY
+    # Clearance export (CE-7): the receipts this image shipped with, read from the
+    # scenario fixtures the pinned synthetic manifest already covers. Composition,
+    # not a route — nothing at runtime can add one.
+    from .clearances import open_received_clearances
+
+    received_clearances = open_received_clearances(
+        config.scenarios_root, tenant_id=config.tenant_id)
     studio = build_studio_context(
         activation_root=activation_root,
         policy_registry=policy_registry,
@@ -131,6 +138,7 @@ def _build_backend(config: DeploymentConfig):
         data_use_declarations=data_use_declarations,
         recorded_by=recorded_by,
         vendor_declarations=vendor_declarations,
+        received_clearances=received_clearances,
     )
     from .simulation import refuse_permissive_hook
 

@@ -60,10 +60,26 @@ def packages_with_suites() -> list[str]:
     return found
 
 
+#: ``NAME: packages/foo`` in a workflow ``env:`` block, later used as
+#: ``${{ env.NAME }}``. Without resolving these the check reports a false positive:
+#: the package IS run by CI, through one level of indirection the regexes cannot see.
+_ENV_PACKAGE = re.compile(r"^\s*([A-Z_][A-Z0-9_]*):\s*(packages/[A-Za-z0-9/_.\-]+)\s*$",
+                          re.MULTILINE)
+
+
+def _resolve_env(text: str) -> str:
+    """Substitute workflow-level env vars that hold a package path."""
+
+    for name, path in _ENV_PACKAGE.findall(text):
+        for form in (f"${{{{ env.{name} }}}}", f"${{{{env.{name}}}}}"):
+            text = text.replace(form, path)
+    return text
+
+
 def packages_named_by_ci() -> set[str]:
     named: set[str] = set()
     for workflow in sorted(WORKFLOWS.glob("*.yml")) + sorted(WORKFLOWS.glob("*.yaml")):
-        text = workflow.read_text(encoding="utf-8")
+        text = _resolve_env(workflow.read_text(encoding="utf-8"))
         for match in _PYTEST_PATH.finditer(text):
             named.add(_package_root(match.group(1)))
         for match in _CD_PATH.finditer(text):
