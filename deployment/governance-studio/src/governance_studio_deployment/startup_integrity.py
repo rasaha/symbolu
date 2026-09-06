@@ -99,6 +99,19 @@ def run_startup_integrity(inputs: IntegrityInputs) -> IntegrityResult:
         check("constitution_registry_writable", writable,
               "the registry directory does not exist or is not writable")
 
+    # system registry (front-door seam 5): configured means its directory exists and is
+    # writable, and an existing file is writable, before anything binds
+    system_registry_state = "unset"
+    if cfg.system_registry_path:
+        parent = os.path.dirname(cfg.system_registry_path)
+        writable = os.path.isdir(parent) and os.access(parent, os.W_OK) and (
+            not os.path.exists(cfg.system_registry_path)
+            or (os.path.isfile(cfg.system_registry_path)
+                and os.access(cfg.system_registry_path, os.W_OK)))
+        system_registry_state = "configured" if writable else "unwritable"
+        check("system_registry_writable", writable,
+              "the system registry directory does not exist or is not writable")
+
     # simulation provider (front-door seam 3): FD-7.5, nothing in this package can
     # construct or hand a permissive governance hook, whether or not the seam is enabled
     from .simulation import permissive_hook_source_findings
@@ -193,6 +206,7 @@ def run_startup_integrity(inputs: IntegrityInputs) -> IntegrityResult:
         "constitution_registry": registry_state,
         "authority_reads": "configured" if cfg.policy_identities else "unset",
         "simulation_provider": "configured" if cfg.simulation_provider_enabled else "unset",
+        "system_registry": system_registry_state,
         "checks": checks,
         "result": "PASS" if ok else "FAIL",
         "failure_code": code,
@@ -215,6 +229,8 @@ def _classify(failures: List[str]) -> str:
         return "SYNTHETIC_DATA_BOUNDARY_FAILED"
     if "tls" in joined.lower() or "certificate" in joined.lower():
         return "GOVERNANCE_STUDIO_P3E_HTTPS_FAILED"
+    if "SYSTEM_REGISTRY" in joined or "system_registry" in joined:
+        return "GOVERNANCE_STUDIO_P3E_REGISTRATION_SEAM_FAILED"
     if "POLICY_IDENTITIES" in joined or "TENANT_ID" in joined:
         return "GOVERNANCE_STUDIO_P3E_AUTHORITY_SEAM_FAILED"
     if "SIMULATION_PROVIDER" in joined or "simulation_no_permissive_hook" in joined:

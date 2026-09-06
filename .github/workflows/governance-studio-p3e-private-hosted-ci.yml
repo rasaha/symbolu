@@ -16,6 +16,7 @@ on:
       - "packages/integration/agent-constitution-activation/**"
       - "packages/integration/agent-constitution-policy/**"
       - "packages/policy-authority/**"
+      - "packages/integration/ai-system-registry/**"
       - "apps/ugence-governance-studio/demo_data/**"
       - "docs/audits/ugence_governance_studio_p3e/**"
       - ".github/workflows/governance-studio-p3e-private-hosted-ci.yml"
@@ -168,7 +169,7 @@ jobs:
           echo "evidence dir initialised empty: $DIR"
 
       - name: install-e2e-driver-deps
-        run: pip install -e packages/governance-contracts -e packages/jcs -e packages/uvi-policy-contracts -e packages/policy-authority -e packages/capabilities/agentic-proposer -e packages/integration/agent-constitution-policy -e packages/integration/agent-constitution-conformance -e packages/integration/agent-constitution-activation -e packages/tooling/policy-workflow-compiler -e packages/capabilities/agent-workforce-composer -e packages/runtime/agent-runtime -e apps/ugence-governance-studio/backend -e deployment/governance-studio
+        run: pip install -e packages/governance-contracts -e packages/jcs -e packages/uvi-policy-contracts -e packages/policy-authority -e packages/capabilities/agentic-proposer -e packages/integration/agent-constitution-policy -e packages/integration/agent-constitution-conformance -e packages/integration/agent-constitution-activation -e packages/integration/ai-system-registry -e packages/tooling/policy-workflow-compiler -e packages/capabilities/agent-workforce-composer -e packages/runtime/agent-runtime -e apps/ugence-governance-studio/backend -e deployment/governance-studio
 
       - name: ratified-pin-conformance
         # BLOCKING, and deliberately ahead of every other container step. Asserts

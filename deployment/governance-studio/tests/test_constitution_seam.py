@@ -315,9 +315,16 @@ def test_the_composition_record_is_an_immutable_versioned_registry_record():
     assert seam2["registration"]["supersedes"] == seam1_reg.registration_id
     assert seam2_reg.system_version == "0.4.0"
     assert supersession_refusals(seam2_reg, seam1_reg) == ()
-    assert reg["supersedes"] == seam2_reg.registration_id
-    assert supersession_refusals(rebuilt, seam2_reg) == ()
-    assert record["supersedes_record"] == "composition-record.seam-2.json"
+    seam3, seam3_reg = _load("composition-record.seam-3.json")
+    assert seam3_reg.record_digest() == seam3["record_digest"] == \
+        "76dbab3ca097796a" + seam3["record_digest"][16:]
+    assert seam3_reg.registration_id == "reg_7c8c090b23a64c2a34f31ff87b69dc66"
+    assert seam3["registration"]["supersedes"] == seam2_reg.registration_id
+    assert seam3_reg.system_version == "0.5.0"
+    assert supersession_refusals(seam3_reg, seam2_reg) == ()
+    assert reg["supersedes"] == seam3_reg.registration_id
+    assert supersession_refusals(rebuilt, seam3_reg) == ()
+    assert record["supersedes_record"] == "composition-record.seam-3.json"
     assert record["seams_handed_to_build_studio_context"] == [
         "review_service_base_url", "activation_root", "policy_registry", "policy_identities",
-        "provider_registry"]
+        "provider_registry", "system_registry"]
