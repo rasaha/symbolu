@@ -14,6 +14,7 @@ from typing import Optional, Tuple
 
 from pydantic import Field
 
+from ..models.pack_view import canonical_pack_view
 from ..models.approvals import HumanApprovalRecord
 from ..models.assurance import AssuranceManifest, CoverageMatrix
 from ..models.audit import AuditSchema
@@ -115,15 +116,13 @@ def build_capability_manifest(
 
 
 def _pack_logical(pack: PolicyPack) -> dict:
-    """A status-independent view of the pack for the logical digest.
+    """The pack's contribution to the logical digest.
 
-    The lifecycle ``status`` is excluded so the digest is identical across the
-    ``APPROVED -> COMPILED`` transition — reproducibility is about content, not
-    lifecycle position.
+    Delegates to :func:`~ugence_policy_workflow_compiler.models.pack_view.canonical_pack_view`,
+    which is also what an approval record binds to. Keeping one definition is what
+    stops a future change from moving one digest and not the other.
     """
-    data = pack.model_dump(mode="python")
-    data.pop("status", None)
-    return data
+    return canonical_pack_view(pack)
 
 
 def _logical_payload(

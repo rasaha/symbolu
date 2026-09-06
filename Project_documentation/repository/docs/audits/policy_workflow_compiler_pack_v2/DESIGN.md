@@ -1,7 +1,8 @@
 # `policy_pack.v2` — Source-Declarable Semantics: Design
 
-**Status:** design. No source change is authorized by this document, and two rulings
-remain open (recorded at the end).
+**Status:** design. **V2-A is ruled and delivered** (the shared canonical-view
+extraction); **V2-B remains open**. No further source change is authorized by this
+document.
 **Scope:** `packages/tooling/policy-workflow-compiler`. Ratified as decision **D2**
 (`../policy_workflow_compiler_ratification/RATIFICATION.md`) and required by the X1
 carriage design (`../policy_workflow_compiler_x1/DESIGN.md`), which cannot bind an
@@ -150,11 +151,13 @@ un-portable across enterprises.
 
 ## Open rulings — required before implementation `[R]`
 
-**V2-A — sequencing of the canonical-view extraction.** Whether the shared
-canonical-view refactor is step one *inside* the v2 change or its own prior commit.
-Recommendation: **its own commit**, with digests pinned, so a refactor that could
-silently invalidate every approval is reviewable in isolation from the schema
-change that follows it.
+**V2-A — sequencing of the canonical-view extraction. RULED: its own prior
+commit — and delivered.** `models/pack_view.py::canonical_pack_view` is now the one
+definition of a pack's logical content; `compiler/release.py::_pack_logical` and
+`approval/records.py::compute_pack_digest` both delegate to it, and a test asserts
+that no other module reconstructs the view. No schema gate is present yet: the
+refactor moved no digest, so it is reviewable in isolation from the schema change
+that follows. Step two adds the `schema_version` gate to that single function.
 
 **V2-B — is `SemanticDeclaration` approval-sensitive?** Whether it becomes a
 `PolicyObject` with a new `ObjectType.SEMANTIC_DECLARATION` and joins

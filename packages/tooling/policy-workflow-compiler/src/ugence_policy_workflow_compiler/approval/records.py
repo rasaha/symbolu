@@ -9,6 +9,7 @@ this digest; recompiling a materially different pack invalidates the approval.
 from __future__ import annotations
 
 from ..models.approvals import ApprovalDecision, HumanApprovalRecord
+from ..models.pack_view import canonical_pack_view
 from ..models.policy_pack import PolicyPack
 from ..serialization import hashing
 
@@ -18,10 +19,12 @@ COMPILER_PRINCIPAL = "ugence_policy_workflow_compiler:process"
 
 
 def compute_pack_digest(pack: PolicyPack) -> str:
-    """Status-independent structural digest of a policy pack."""
-    data = pack.model_dump(mode="python")
-    data.pop("status", None)
-    return hashing.digest(data)
+    """Status-independent structural digest of a policy pack.
+
+    The view is :func:`~ugence_policy_workflow_compiler.models.pack_view.canonical_pack_view`
+    — the same one the compiled release commits to. One definition, two callers.
+    """
+    return hashing.digest(canonical_pack_view(pack))
 
 
 def build_approval_record(

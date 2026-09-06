@@ -254,6 +254,15 @@ valid that the existing approval gate would reject. The gates compose as AND —
 satisfied review cannot rescue a failed approval, and a valid approval cannot excuse
 an unsatisfied review. Design: `../policy_workflow_compiler_p3a/DESIGN.md`.
 
+## `policy_pack.v2` rulings
+
+| Ruling | Decision |
+| --- | --- |
+| **V2-A** | The shared canonical-pack-view extraction is **its own prior commit**, with digests pinned, so a refactor that could silently invalidate every approval is reviewable apart from the schema change. **Delivered**: `models/pack_view.py::canonical_pack_view`, with both the release payload and the approval digest delegating to it. |
+| **V2-B** | *Open.* Whether `SemanticDeclaration` becomes a `PolicyObject` in `APPROVAL_SENSITIVE_OBJECT_TYPES`. Recommendation: yes — a changed data classification should route to P3A review. |
+
+Design: `../policy_workflow_compiler_pack_v2/DESIGN.md`.
+
 ## What this ratification does not authorize
 
 - No change to `workflow_ir.v1` or `workflow_ir.v2` canonical output. `[V]` Pinned:
