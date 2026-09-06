@@ -1,0 +1,366 @@
+{
+  "distribution": "ugence-risk-authority-effect-attestation",
+  "namespace": "ugence_risk_authority_effect_attestation",
+  "package_version": "0.1.0",
+  "maturity": "REFERENCE_GRADE_NOT_PRODUCTION_READY",
+  "curated_api_module": "ugence_risk_authority_effect_attestation",
+  "note": "Machine-readable snapshot of the curated public API (ugence_risk_authority_effect_attestation.__all__). tests/packaging/test_packaging.py asserts this file equals the live package surface. Regenerate with scripts/generate_public_api.py when the curated API changes deliberately. A VERIFIED result establishes provenance and integrity only.",
+  "symbols": {
+    "DenyAllTrustAnchorDirectory": {
+      "kind": "class",
+      "methods": [
+        "resolve"
+      ]
+    },
+    "EFFECT_ATTESTATION_ESTABLISHES": {
+      "kind": "constant",
+      "value": "PROVENANCE_AND_INTEGRITY_ONLY"
+    },
+    "EFFECT_ATTESTATION_SCHEMA_VERSION": {
+      "kind": "constant",
+      "value": "risk_authority.effect_attestation.v1"
+    },
+    "EFFECT_ATTESTATION_SIGNATURE_ALGORITHM": {
+      "kind": "constant",
+      "value": "Ed25519"
+    },
+    "EFFECT_ATTESTATION_SIGNATURE_ENCODING": {
+      "kind": "constant",
+      "value": "ugence.trusted-evidence-authority/encoding/base16-lower/v1"
+    },
+    "EFFECT_ATTESTATION_SIGNATURE_PROFILE": {
+      "kind": "constant",
+      "value": "ugence.trusted-evidence-authority/signature/ed25519-sha512-pure/v1"
+    },
+    "EFFECT_ATTESTATION_SIGNED_FIELDS": {
+      "kind": "tuple",
+      "values": [
+        "attested_at",
+        "attester_identity",
+        "attester_key_id",
+        "attester_role",
+        "observation",
+        "observation_digest",
+        "schema_version",
+        "signature_algorithm",
+        "signature_encoding",
+        "signature_profile",
+        "signing_domain",
+        "tenant_id"
+      ]
+    },
+    "EFFECT_ATTESTATION_SIGNING_DOMAIN": {
+      "kind": "constant",
+      "value": "ugence.risk-authority-effect-attestation/effect-attestation-signing/v1"
+    },
+    "EFFECT_ATTESTER_ROLE_CAPABILITY": {
+      "kind": "mapping",
+      "entries": {
+        "EXECUTING_PROVIDER": "EFFECT_ATTESTATION_EXECUTING_PROVIDER",
+        "INDEPENDENT_OBSERVER": "EFFECT_ATTESTATION_INDEPENDENT_OBSERVER"
+      }
+    },
+    "EFFECT_ATTESTER_ROLE_ESTABLISHES": {
+      "kind": "mapping",
+      "entries": {
+        "EXECUTING_PROVIDER": "which executing provider reported this effect; not that the effect occurred, and not independent verification of it",
+        "INDEPENDENT_OBSERVER": "the identity and authorized observer role of the party that signed; not the truth of its observation"
+      }
+    },
+    "Ed25519EffectAttestationVerifier": {
+      "kind": "class",
+      "methods": [
+        "verify"
+      ]
+    },
+    "EffectAttestation": {
+      "kind": "dataclass",
+      "fields": [
+        "observation",
+        "tenant_id",
+        "attester_role",
+        "attester_identity",
+        "attester_key_id",
+        "attested_at",
+        "signature",
+        "schema_version",
+        "signing_domain",
+        "signature_algorithm",
+        "signature_profile",
+        "signature_encoding"
+      ]
+    },
+    "EffectAttestationConfigurationError": {
+      "kind": "error"
+    },
+    "EffectAttestationContractError": {
+      "kind": "error"
+    },
+    "EffectAttestationError": {
+      "kind": "error"
+    },
+    "EffectAttestationRefusalReason": {
+      "kind": "enum",
+      "values": [
+        "ATTESTATION_ABSENT",
+        "UNSUPPORTED_EXACT_TYPE",
+        "UNSUPPORTED_SCHEMA_VERSION",
+        "UNSUPPORTED_SIGNING_DOMAIN",
+        "UNSUPPORTED_ALGORITHM",
+        "UNSUPPORTED_PROFILE",
+        "UNSUPPORTED_ENCODING",
+        "ROLE_MISMATCH",
+        "WRONG_TENANT",
+        "OBSERVATION_MISMATCH",
+        "ANCHOR_UNKNOWN",
+        "ANCHOR_UNAVAILABLE",
+        "ANCHOR_COORDINATE_MISMATCH",
+        "WRONG_CAPABILITY",
+        "ANCHOR_REVOKED",
+        "ANCHOR_DISABLED",
+        "ANCHOR_NOT_YET_VALID",
+        "ANCHOR_EXPIRED",
+        "ANCHOR_REVISION_MISMATCH",
+        "KEY_MATERIAL_INVALID",
+        "PAYLOAD_MISMATCH",
+        "MALFORMED_SIGNATURE",
+        "SIGNATURE_INVALID",
+        "VERIFICATION_UNAVAILABLE"
+      ]
+    },
+    "EffectAttestationSignerPort": {
+      "kind": "protocol",
+      "methods": [
+        "attester_identity",
+        "attester_key_id",
+        "attester_role",
+        "sign_effect_attestation"
+      ]
+    },
+    "EffectAttestationSigningBoundaryError": {
+      "kind": "error"
+    },
+    "EffectAttestationVerificationOutcome": {
+      "kind": "enum",
+      "values": [
+        "VERIFIED",
+        "REFUSED"
+      ]
+    },
+    "EffectAttestationVerificationResult": {
+      "kind": "dataclass",
+      "fields": [
+        "outcome",
+        "refusal_reason",
+        "attester_role",
+        "attester_identity",
+        "attester_key_id",
+        "tenant_id",
+        "observation_digest",
+        "signing_payload_digest",
+        "anchor_coordinate_digest",
+        "anchor_record_digest",
+        "evaluated_at",
+        "detail"
+      ]
+    },
+    "EffectAttestationVerifierPort": {
+      "kind": "protocol",
+      "methods": [
+        "verify"
+      ]
+    },
+    "EffectAttesterRole": {
+      "kind": "enum",
+      "values": [
+        "EXECUTING_PROVIDER",
+        "INDEPENDENT_OBSERVER"
+      ]
+    },
+    "KeyRevocation": {
+      "kind": "dataclass",
+      "fields": [
+        "effective_at",
+        "reason_ref"
+      ]
+    },
+    "MATURITY": {
+      "kind": "constant",
+      "value": "REFERENCE_GRADE_NOT_PRODUCTION_READY"
+    },
+    "REFERENCE_GRADE_RESOLVERS": {
+      "kind": "tuple",
+      "values": [
+        "StaticTrustAnchorDirectory"
+      ]
+    },
+    "ReferenceEd25519EffectAttestationSigner": {
+      "kind": "class",
+      "methods": [
+        "sign_effect_attestation",
+        "trust_anchor"
+      ]
+    },
+    "StaticTrustAnchorDirectory": {
+      "kind": "class",
+      "methods": [
+        "resolve",
+        "with_anchor"
+      ]
+    },
+    "TrustAnchorCapability": {
+      "kind": "enum",
+      "values": [
+        "EVIDENCE_PRODUCTION",
+        "RECEIPT_ISSUANCE",
+        "CLOUD_SCALING_RECOMMENDATION_ATTESTATION",
+        "EFFECT_ATTESTATION_EXECUTING_PROVIDER",
+        "EFFECT_ATTESTATION_INDEPENDENT_OBSERVER"
+      ]
+    },
+    "TrustAnchorCoordinate": {
+      "kind": "dataclass",
+      "fields": [
+        "authority_id",
+        "key_id",
+        "capability"
+      ]
+    },
+    "TrustAnchorRecord": {
+      "kind": "dataclass",
+      "fields": [
+        "authority_id",
+        "key_id",
+        "capability",
+        "public_key",
+        "trust_anchor_set_id",
+        "trust_anchor_set_version",
+        "signature_profile",
+        "signature_encoding",
+        "effective_from",
+        "effective_to",
+        "disabled",
+        "revocation"
+      ]
+    },
+    "TrustAnchorResolution": {
+      "kind": "dataclass",
+      "fields": [
+        "coordinate",
+        "anchor",
+        "refusal_reason"
+      ]
+    },
+    "TrustAnchorResolverPort": {
+      "kind": "protocol",
+      "methods": [
+        "resolve"
+      ]
+    },
+    "__version__": {
+      "kind": "constant",
+      "value": "0.1.0"
+    },
+    "anchor_coordinate_digest": {
+      "kind": "function",
+      "parameters": [
+        "coordinate"
+      ]
+    },
+    "anchor_lifecycle_refusal": {
+      "kind": "function",
+      "parameters": [
+        "anchor",
+        "as_of"
+      ]
+    },
+    "anchor_record_digest": {
+      "kind": "function",
+      "parameters": [
+        "anchor"
+      ]
+    },
+    "anchor_verification_key": {
+      "kind": "function",
+      "parameters": [
+        "anchor"
+      ]
+    },
+    "canonical_bytes": {
+      "kind": "function",
+      "parameters": [
+        "value"
+      ]
+    },
+    "canonical_digest": {
+      "kind": "function",
+      "parameters": [
+        "value"
+      ]
+    },
+    "canonical_observation": {
+      "kind": "function",
+      "parameters": [
+        "observation"
+      ]
+    },
+    "capability_for_role": {
+      "kind": "function",
+      "parameters": [
+        "role"
+      ]
+    },
+    "effect_attestation_signing_bytes": {
+      "kind": "function",
+      "parameters": [
+        "payload"
+      ]
+    },
+    "effect_attestation_signing_payload": {
+      "kind": "function",
+      "parameters": [
+        "observation",
+        "tenant_id",
+        "attester_role",
+        "attester_identity",
+        "attester_key_id",
+        "attested_at",
+        "schema_version",
+        "signing_domain",
+        "signature_algorithm",
+        "signature_profile",
+        "signature_encoding"
+      ]
+    },
+    "effect_attester_coordinate": {
+      "kind": "function",
+      "parameters": [
+        "role",
+        "attester_identity",
+        "attester_key_id"
+      ]
+    },
+    "mint_effect_attestation": {
+      "kind": "function",
+      "parameters": [
+        "observation",
+        "signer",
+        "tenant_id",
+        "attested_at",
+        "production_mode"
+      ]
+    },
+    "observation_digest": {
+      "kind": "function",
+      "parameters": [
+        "observation"
+      ]
+    },
+    "require_production_resolver": {
+      "kind": "function",
+      "parameters": [
+        "resolver"
+      ]
+    }
+  }
+}
