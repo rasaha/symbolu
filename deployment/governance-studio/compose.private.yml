@@ -31,6 +31,10 @@ services:
       # Front-door seam 1: the sqlite policy registry under the runtime volume; unset =
       # the Constitution screen reports a typed gap. No key material is ever mounted.
       UGENCE_STUDIO_CONSTITUTION_REGISTRY_PATH: ${UGENCE_STUDIO_CONSTITUTION_REGISTRY_PATH:-}
+      # Front-door seam 2: the tenant displayed and the typed policy identities the
+      # Authority screen may list; read-only; unset = typed gap.
+      UGENCE_STUDIO_TENANT_ID: ${UGENCE_STUDIO_TENANT_ID:-}
+      UGENCE_STUDIO_POLICY_IDENTITIES: ${UGENCE_STUDIO_POLICY_IDENTITIES:-}
     volumes:
       # certificate material is mounted READ-ONLY; the private key is never baked in
       - type: bind

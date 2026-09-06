@@ -28,7 +28,7 @@ on:
 
 env:
   PYTHONPATH: >-
-    deployment/governance-studio/src:apps/ugence-governance-studio/backend/src:packages/capabilities/agent-workforce-composer/src:packages/tooling/policy-workflow-compiler/src:packages/runtime/agent-runtime/src:packages/integration/agent-constitution-activation/src:packages/integration/agent-constitution-policy/src:packages/integration/agent-constitution-conformance/src:packages/capabilities/agentic-proposer/src:packages/policy-authority/src:packages/uvi-policy-contracts/src:packages/governance-contracts/src:packages/jcs/src:packages/integration/ai-system-registry/src:packages/integration/agent-constitution-policy/tests
+    deployment/governance-studio/src:apps/ugence-governance-studio/backend/src:packages/capabilities/agent-workforce-composer/src:packages/tooling/policy-workflow-compiler/src:packages/runtime/agent-runtime/src:packages/integration/agent-constitution-activation/src:packages/integration/agent-constitution-policy/src:packages/integration/agent-constitution-conformance/src:packages/capabilities/agentic-proposer/src:packages/policy-authority/src:packages/uvi-policy-contracts/src:packages/governance-contracts/src:packages/jcs/src:packages/integration/ai-system-registry/src:packages/integration/agent-constitution-policy/tests:packages/integration/agent-constitution-activation/tests:packages/policy-authority/tests
 
 jobs:
   application:

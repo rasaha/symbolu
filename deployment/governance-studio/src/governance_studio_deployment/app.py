@@ -45,10 +45,12 @@ def _build_backend(config: DeploymentConfig):
     """Instantiate the FROZEN v1 backend with v2 mounted behind it (CR-2), pinned to
     the synthetic scenario root.
 
-    The v2 studio context receives exactly two things from this deployment: the review
-    service base URL (CR-2) and, when a registry path is configured, the activation
-    root of front-door seam 1 (FD-5), each or neither. Every other v2 dependency stays
-    absent, so those screens report their gaps rather than a fixture.
+    The v2 studio context receives from this deployment: the review service base URL
+    (CR-2); when a registry path is configured, the activation root of front-door seam
+    1 (FD-5); and when policy identities are configured too, the Authority screen's
+    read-only, tenant-bound registry view and those identities (seam 2, FD-6). No
+    decision store, governance hook, provider registry or console URL: those screens
+    report their gaps rather than a fixture.
     """
     from ugence_governance_studio_api.app_v2 import build_studio_context, create_combined_app
     from ugence_governance_studio_api.settings import ApiSettings
@@ -61,13 +63,27 @@ def _build_backend(config: DeploymentConfig):
         scenario_root=os.path.abspath(config.scenarios_root),
     )
     activation_root = None
+    policy_registry = None
+    policy_identities: tuple = ()
     if config.constitution_registry_path:
-        from .activation import build_studio_activation_root
+        from .activation import (
+            ReadOnlyTenantBoundRegistry,
+            build_studio_activation_root_over,
+            open_studio_policy_registry,
+        )
 
-        activation_root = build_studio_activation_root(
-            config.constitution_registry_path, production_mode=config.is_production)
+        # One registry, opened once: the activation root (seam 1) and the Authority
+        # screen's read-only, tenant-bound view (seam 2) share the same instance.
+        registry = open_studio_policy_registry(config.constitution_registry_path,
+                                               production_mode=config.is_production)
+        activation_root = build_studio_activation_root_over(registry)
+        if config.policy_identities:
+            policy_registry = ReadOnlyTenantBoundRegistry(registry, tenant_id=config.tenant_id)
+            policy_identities = tuple(f"{entry}|{config.tenant_id}" for entry in config.policy_identities)
     studio = build_studio_context(
         activation_root=activation_root,
+        policy_registry=policy_registry,
+        policy_identities=policy_identities,
         review_service_base_url=config.review_service_url or None,
     )
     return create_combined_app(settings, studio=studio)

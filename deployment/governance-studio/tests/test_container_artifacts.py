@@ -110,8 +110,26 @@ def test_approved_runtime_config_permits_exactly_one_egress_the_review_relay():
     assert permitted["forwarded_header"].startswith("X-Ugence-Approver-Proof")
     assert "unset" in egress["container_gate_note"]
     assert list(cfg["configuration_added"]) == ["UGENCE_STUDIO_REVIEW_SERVICE_URL",
-                                                "UGENCE_STUDIO_CONSTITUTION_REGISTRY_PATH"]
-    assert cfg["deployment_version"] == "0.3.0"
+                                                "UGENCE_STUDIO_CONSTITUTION_REGISTRY_PATH",
+                                                "UGENCE_STUDIO_TENANT_ID",
+                                                "UGENCE_STUDIO_POLICY_IDENTITIES"]
+    assert cfg["deployment_version"] == "0.4.0"
+
+
+def test_approved_runtime_config_records_front_door_seam_2_exactly():
+    """FD-6: read-only, tenant-bound authority reads over the seam-1 registry; the
+    decision store, hook, provider registry and console stay absent; packages unchanged."""
+    import json
+    cfg = json.load(open(os.path.join(HERE, "approved-runtime-config.json"), encoding="utf-8"))
+    seams = cfg["front_door_seams"]
+    assert [s.split(" ")[0] for s in seams["handed_to_build_studio_context"]] == [
+        "review_service_base_url", "activation_root", "policy_registry", "policy_identities"]
+    assert [s.split(" ")[0] for s in seams["absent_by_ruling"]] == [
+        "decision_store", "governance_hook", "provider_registry", "console_base_url"]
+    assert "refused" in seams["tenant_binding"] and "never displayed" in seams["tenant_binding"]
+    assert "prohibition stands" in seams["persistent_database"]
+    assert "read-only, tenant-bound" in cfg["constitution_registry"]["reachable_acts"]
+    assert len(cfg["first_party_packages_in_image"]) == 12
 
 
 def test_approved_runtime_config_records_the_constitution_registry_seam_exactly():

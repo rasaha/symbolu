@@ -262,12 +262,44 @@ class PolicyService:
 # --------------------------------------------------------------------------- #
 # 3 · Authority
 # --------------------------------------------------------------------------- #
-class AuthorityService:
-    """Read-only view of issued policies and recorded decisions.
+def _public_view(obj: Any) -> Any:
+    """A registry record as the screen displays it: every canonical reference, never
+    the signature bytes and never the policy body (the body is reachable through the
+    coordinate's content digest; display is by reference, FD-6)."""
+    import dataclasses
+    import enum
+    from datetime import datetime
 
-    A reader. It calls no issue and no revoke path, and those entry points are
-    permanently outside the SD-1 allowlist (SD-2).
+    if dataclasses.is_dataclass(obj) and not isinstance(obj, type):
+        return {f.name: _public_view(getattr(obj, f.name)) for f in dataclasses.fields(obj)
+                if f.name not in ("signature", "policy")}
+    if isinstance(obj, enum.Enum):
+        return obj.value
+    if isinstance(obj, datetime):
+        return obj.isoformat()
+    if isinstance(obj, (list, tuple)):
+        return [_public_view(v) for v in obj]
+    if isinstance(obj, dict):
+        return {str(k): _public_view(v) for k, v in obj.items()}
+    if isinstance(obj, bytes):
+        return None
+    return obj
+
+
+class AuthorityService:
+    """Read-only view of issued policies and recorded decisions (front-door seam 2, FD-6).
+
+    A reader. It calls no issue, revoke or supersede path, and those entry points are
+    permanently outside the SD-1 allowlist (SD-2). Typed retrieval and display only:
+    every record is returned with its canonical references (the registry's
+    ``PolicyCoordinate`` including its tenant, the record id, revocation and
+    supersession ids) exactly as the registry stores them. A policy identity is typed:
+    ``<policy_family>|<policy_id>|<scope>|<tenant_id>``, every part required. Anything
+    the registry refuses, and anything malformed, is a typed refusal, never inferred,
+    repaired or synthesized.
     """
+
+    CAPABILITY = "authority_registry"
 
     def __init__(
         self,
@@ -279,41 +311,77 @@ class AuthorityService:
         self._decisions = decision_store
         self._identities = tuple(identities or ())
 
+    @staticmethod
+    def _identity(text: str) -> Dict[str, str]:
+        if not isinstance(text, str) or text.count("|") != 3:
+            raise ValueError(
+                "a policy identity must be '<policy_family>|<policy_id>|<scope>|<tenant_id>'; "
+                f"got {text!r}")
+        family, policy_id, scope, tenant = text.split("|")
+        if not family or not policy_id or not scope or not tenant:
+            raise ValueError(f"a policy identity has an empty part: {text!r}")
+        return {"policy_family": family, "policy_id": policy_id, "scope": scope, "tenant_id": tenant}
+
+    @staticmethod
+    def _refused(code: str, message: str) -> Dict[str, Any]:
+        return {"available": True, "refused": True, "code": code, "reason": message, "result": None}
+
+    def _records(self):
+        """Every issued record of every configured identity, in registry order."""
+        for text in self._identities:
+            for record in self._registry.issued_records_for_identity(**self._identity(text)):
+                yield record
+
     def policies(self) -> Dict[str, Any]:
         if self._registry is None:
             return _unavailable(
-                "authority_registry",
+                self.CAPABILITY,
                 "no PolicyRegistry is configured: the only reachable implementation is "
                 "in-memory and holds one process's view, so an empty list would "
                 "misrepresent an enterprise registry",
             )
+        from ugence_policy_authority import PolicyAuthorityError
+
         # ``PolicyRegistry`` is keyed by policy identity, so "list everything" is not a
         # read the port offers. The studio asks for the identities it was configured
         # with rather than inventing an enumeration the registry does not support.
-        records = []
-        for identity in self._identities:
-            records.extend(self._registry.issued_records_for_identity(identity))
+        try:
+            records = [_public_view(r) for r in self._records()]
+        except ValueError as exc:
+            return self._refused("policy_identity_unstructured", str(exc))
+        except PolicyAuthorityError as exc:
+            return self._refused("authority_read_refused", str(exc))
         return {
             "available": True,
-            "result": [to_jsonable(r) for r in records],
+            "result": records,
             "registry_kind": type(self._registry).__name__,
             "identities_queried": list(self._identities),
         }
 
     def policy(self, record_id: str) -> Dict[str, Any]:
         if self._registry is None:
-            return _unavailable("authority_registry", "no PolicyRegistry is configured")
-        record = self._registry.get_issued(record_id)
-        if record is None:
-            return {"available": True, "found": False, "result": None}
+            return _unavailable(self.CAPABILITY, "no PolicyRegistry is configured")
+        from ugence_policy_authority import PolicyAuthorityError
+
+        # The registry is addressed by exact coordinate, never by record id; the record
+        # id is resolved through the configured identities' records, read-only.
+        try:
+            record = next((r for r in self._records() if r.record_id == record_id), None)
+            if record is None:
+                return {"available": True, "found": False, "result": None}
+            coordinate = record.coordinate
+            revocations = [_public_view(r) for r in self._registry.revocations_for(coordinate)]
+            supersessions = [_public_view(s) for s in self._registry.supersessions_for(coordinate)]
+        except ValueError as exc:
+            return self._refused("policy_identity_unstructured", str(exc))
+        except PolicyAuthorityError as exc:
+            return self._refused("authority_read_refused", str(exc))
         return {
             "available": True,
             "found": True,
-            "result": to_jsonable(record),
-            "revocations": [to_jsonable(r) for r in self._registry.revocations_for(record_id)],
-            "supersessions": [
-                to_jsonable(s) for s in self._registry.supersessions_for(record_id)
-            ],
+            "result": _public_view(record),
+            "revocations": revocations,
+            "supersessions": supersessions,
         }
 
     def decision(self, decision_id: str) -> Dict[str, Any]:
