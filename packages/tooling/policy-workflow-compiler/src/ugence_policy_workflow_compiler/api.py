@@ -15,6 +15,7 @@ from __future__ import annotations
 # -- object model --------------------------------------------------------------
 from .models import (
     ActionConstraint,
+    AuthoritativeSourceRef,
     ApprovalDecision,
     ApprovalPath,
     ApprovalStep,
@@ -30,6 +31,7 @@ from .models import (
     Comparator,
     ConnectorMapping,
     ConstraintKind,
+    DeclaredContractRef,
     CoverageMatrix,
     DecisionRule,
     EvidenceKind,
@@ -38,6 +40,8 @@ from .models import (
     HumanApprovalRecord,
     LegitimateCounterexample,
     ObjectType,
+    SCHEMA_VERSION_V2,
+    SemanticDeclaration,
     OverrideRule,
     PolicyObject,
     PolicyPack,
@@ -88,6 +92,29 @@ from .approval import ApprovalService, build_approval_record, compute_pack_diges
 # -- diff ----------------------------------------------------------------------
 from .diff import ChangeType, ImpactSummary, ObjectChange, PolicyPackDiff, diff_policy_packs
 
+# -- authoritative source linkage (PA/PWC-X1) ----------------------------------
+# Carriage checks only: presence, shape, completeness and internal agreement. This
+# package never verifies a signature, key trust or revocation state.
+from .validation.authoritative_source import (
+    check_authoritative_source,
+    check_release_source_agreement,
+)
+
+# -- governed diff-driven review (P3A) -----------------------------------------
+from .diff.change_impact import APPROVAL_SENSITIVE_OBJECT_TYPES
+from .review import (
+    REVIEW_ENFORCEMENT,
+    REVIEWER_IDENTITY,
+    ReviewCheck,
+    ReviewCode,
+    ReviewDisposition,
+    ReviewLedger,
+    ReviewRequirement,
+    ReviewStepRequirement,
+    check_review,
+    derive_review_requirement,
+)
+
 # -- verification --------------------------------------------------------------
 from .verification import (
     CompiledPackageVerifier,
@@ -97,6 +124,7 @@ from .verification import (
 
 # -- P2: workflow_ir.v2 semantic enrichment (additive) -------------------------
 from .semantics import (
+    DeclaredValueProvenance,
     CapabilityRequirement,
     CapabilityRequirementSource,
     DataContractRef,
@@ -213,6 +241,27 @@ __all__ = [
     "ImpactSummary",
     "ChangeType",
     "diff_policy_packs",
+    # policy_pack.v2 source-declared semantics
+    "SCHEMA_VERSION_V2",
+    "SemanticDeclaration",
+    "DeclaredContractRef",
+    "DeclaredValueProvenance",
+    # authoritative source linkage (PA/PWC-X1)
+    "AuthoritativeSourceRef",
+    "check_authoritative_source",
+    "check_release_source_agreement",
+    # governed diff-driven review (P3A)
+    "APPROVAL_SENSITIVE_OBJECT_TYPES",
+    "REVIEW_ENFORCEMENT",
+    "REVIEWER_IDENTITY",
+    "ReviewCode",
+    "ReviewStepRequirement",
+    "ReviewRequirement",
+    "ReviewDisposition",
+    "ReviewLedger",
+    "ReviewCheck",
+    "derive_review_requirement",
+    "check_review",
     # verification
     "VerificationReport",
     "CompiledPackageVerifier",

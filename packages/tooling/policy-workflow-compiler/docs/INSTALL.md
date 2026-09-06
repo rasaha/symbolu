@@ -35,7 +35,7 @@ pip install "ugence-policy-workflow-compiler[dev]"
 
 ```python
 import ugence_policy_workflow_compiler.api as api
-# The public surface (71 names) is exposed through this one module.
+# The public surface (105 names) is exposed through this one module.
 ```
 
 See `PUBLIC_API.md` for the curated public surface.

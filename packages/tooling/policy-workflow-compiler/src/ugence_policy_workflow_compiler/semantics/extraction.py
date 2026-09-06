@@ -29,6 +29,7 @@ from .contracts import (
 from .models import (
     CapabilityRequirement,
     DataContractRef,
+    DeclaredValueProvenance,
     HumanReviewRequirement,
     NodeInputRequirement,
     NodeOutputDeclaration,
@@ -160,19 +161,80 @@ def _capabilities(pack_id: str, pack_version: int, node: WorkflowNode,
 
 
 def _contract_ref(pack_id: str, pack_version: int, node: WorkflowNode,
-                  contract_id: str, compiler_version: str) -> DataContractRef:
+                  contract_id: str, compiler_version: str,
+                  declared_versions: Optional[Dict[str, str]] = None) -> DataContractRef:
+    # The v1 IR carries no per-contract version. A `policy_pack.v2` policy may
+    # declare one; where it does, the value is carried verbatim and marked EXPLICIT.
+    # Where it does not, the version stays empty — never inferred from anything.
+    version = (declared_versions or {}).get(contract_id, "")
     return DataContractRef(
         contract_id=contract_id,
-        contract_data_version="",  # v1 IR carries no explicit contract version
+        contract_data_version=version,
         resolution=ResolutionStatus.EXPLICITLY_DECLARED,
         provenance=_prov(pack_id, pack_version, node,
-                         DerivationClass.DERIVED_FROM_CONTRACT,
-                         "node_output_contract", compiler_version),
+                         DerivationClass.EXPLICIT if version
+                         else DerivationClass.DERIVED_FROM_CONTRACT,
+                         "source_declared_contract_version" if version
+                         else "node_output_contract", compiler_version),
     )
 
 
+#: The `WorkflowNodeSemantics` fields a source policy may declare directly. Each
+#: maps to the `SemanticDeclaration` attribute carrying it. Declared values are
+#: preserved verbatim; an undeclared field stays empty and unresolved.
+_DECLARED_FIELDS = (
+    ("data_classification_refs", "data_classification_refs"),
+    ("permission_intent_refs", "permission_intent_refs"),
+    ("required_tool_refs", "required_tool_refs"),
+)
+
+
+def _declarations_for(pack: PolicyPack, node: WorkflowNode) -> Tuple:
+    """The `policy_pack.v2` declarations attached to this node's source objects.
+
+    Returns them in canonical order. A v1 pack has none, so every value below stays
+    empty and this is a no-op — which is what keeps v1-sourced enrichment identical.
+    """
+    subjects = set(node.input_object_ids)
+    declarations = getattr(pack, "semantic_declarations", ())
+    return tuple(
+        sorted(
+            (d for d in declarations if d.subject_object_id in subjects),
+            key=lambda d: d.object_id,
+        )
+    )
+
+
+def _declared_values(declarations, attribute: str) -> Tuple[str, ...]:
+    """Union the declared values across a node's declarations, canonically ordered.
+
+    De-duplicated and sorted so the result is a pure function of what was declared,
+    not of declaration order.
+    """
+    values = []
+    for declaration in declarations:
+        for value in getattr(declaration, attribute, ()):
+            if value not in values:
+                values.append(value)
+    return tuple(sorted(values))
+
+
+def _declared_contract_versions(declarations) -> Dict[str, str]:
+    """contract_id -> the version the source policy requires, where declared."""
+    versions: Dict[str, str] = {}
+    for declaration in declarations:
+        refs = tuple(declaration.input_contract_refs) + tuple(
+            declaration.output_contract_refs
+        )
+        for ref in refs:
+            if ref.contract_data_version and ref.contract_id not in versions:
+                versions[ref.contract_id] = ref.contract_data_version
+    return versions
+
+
 def _io_contracts(pack: PolicyPack, ir: WorkflowIR, node: WorkflowNode,
-                  by_id: Dict[str, WorkflowNode], compiler_version: str
+                  by_id: Dict[str, WorkflowNode], compiler_version: str,
+                  declared_versions: Optional[Dict[str, str]] = None
                   ) -> Tuple[Tuple[NodeInputRequirement, ...], Tuple[NodeOutputDeclaration, ...]]:
     pid, pver = ir.policy_pack_id, ir.policy_pack_version
     # outputs: this node's declared output contract, with spine consumers.
@@ -182,7 +244,8 @@ def _io_contracts(pack: PolicyPack, ir: WorkflowIR, node: WorkflowNode,
             e.target_id for e in ir.edges
             if e.source_id == node.node_id and e.kind in _SPINE_EDGES))
         outputs.append(NodeOutputDeclaration(
-            contract_ref=_contract_ref(pid, pver, node, node.output_contract, compiler_version),
+            contract_ref=_contract_ref(pid, pver, node, node.output_contract,
+                                       compiler_version, declared_versions),
             consumer_node_ids=consumers,
             resolution=ResolutionStatus.EXPLICITLY_DECLARED))
     # inputs: the output contracts of spine predecessors (typed data flow).
@@ -194,7 +257,8 @@ def _io_contracts(pack: PolicyPack, ir: WorkflowIR, node: WorkflowNode,
         if producer is None or not producer.output_contract:
             continue
         inputs.append(NodeInputRequirement(
-            contract_ref=_contract_ref(pid, pver, producer, producer.output_contract, compiler_version),
+            contract_ref=_contract_ref(pid, pver, producer, producer.output_contract,
+                                       compiler_version, declared_versions),
             producer_node_id=producer.node_id,
             compatibility_requirement="exact_or_unversioned",
             resolution=ResolutionStatus.EXPLICITLY_DECLARED))
@@ -227,7 +291,12 @@ def extract_node_semantics(pack: PolicyPack, ir: WorkflowIR, node: WorkflowNode,
                            ) -> WorkflowNodeSemantics:
     relevance = classify_role_relevance(node)
     caps = _capabilities(ir.policy_pack_id, ir.policy_pack_version, node, relevance, compiler_version)
-    inputs, outputs = _io_contracts(pack, ir, node, by_id, compiler_version)
+    # policy_pack.v2 source declarations attached to this node's source objects.
+    # A v1 pack declares none, so every value below stays empty.
+    declarations = _declarations_for(pack, node)
+    declared_versions = _declared_contract_versions(declarations)
+    inputs, outputs = _io_contracts(pack, ir, node, by_id, compiler_version,
+                                    declared_versions)
     hr = _human_review(ir.policy_pack_id, ir.policy_pack_version, node, relevance, compiler_version)
     governance_refs = ()
     if relevance in (RoleRelevance.GOVERNANCE_OWNED, RoleRelevance.HUMAN_AUTHORITY,
@@ -242,8 +311,9 @@ def extract_node_semantics(pack: PolicyPack, ir: WorkflowIR, node: WorkflowNode,
         required_capability_refs=caps,
         required_input_contract_refs=inputs,
         produced_output_contract_refs=outputs,
-        data_classification_refs=(),
-        permission_intent_refs=(),
+        required_tool_refs=_declared_values(declarations, "required_tool_refs"),
+        data_classification_refs=_declared_values(declarations, "data_classification_refs"),
+        permission_intent_refs=_declared_values(declarations, "permission_intent_refs"),
         authority_disposition=node.disposition.value,
         canonical_capability_owner=node.owning_capability.value,
         human_review_requirement=hr,
@@ -304,6 +374,38 @@ def extract_dependencies(ir: WorkflowIR, by_id: Dict[str, WorkflowNode],
     return tuple(deps)
 
 
+def _declared_value_provenance(pack: PolicyPack, ir: WorkflowIR, node: WorkflowNode,
+                               semantics: WorkflowNodeSemantics, compiler_version: str
+                               ) -> Tuple[DeclaredValueProvenance, ...]:
+    """One EXPLICIT provenance entry per field the source policy actually declared.
+
+    Nothing is emitted for a field the policy left undeclared: an absent value is
+    unresolved, never defaulted, so it has no explicit provenance to record.
+    """
+    declarations = _declarations_for(pack, node)
+    if not declarations:
+        return ()
+    declaration_ids = tuple(d.object_id for d in declarations)
+    out: List[DeclaredValueProvenance] = []
+    for field_name, _attribute in _DECLARED_FIELDS:
+        values = getattr(semantics, field_name, ())
+        if not values:
+            continue
+        out.append(
+            DeclaredValueProvenance(
+                node_id=node.node_id,
+                field_name=field_name,
+                declared_values=tuple(values),
+                provenance=_prov(
+                    ir.policy_pack_id, ir.policy_pack_version, node,
+                    DerivationClass.EXPLICIT, "source_declared_semantics",
+                    compiler_version, source_refs=declaration_ids,
+                ),
+            )
+        )
+    return tuple(out)
+
+
 def enrich_workflow(ir: WorkflowIR, pack: Optional[PolicyPack] = None, *,
                     compiler_version: str) -> WorkflowIRv2:
     """Enrich a compiled v1 IR into a ``workflow_ir.v2`` artifact. Deterministic
@@ -317,6 +419,17 @@ def enrich_workflow(ir: WorkflowIR, pack: Optional[PolicyPack] = None, *,
          for n in ir.nodes),
         key=lambda s: s.node_id))
     deps = extract_dependencies(ir, by_id, relevance_of, compiler_version)
+
+    # Per-value provenance for what the source policy declared. Empty for a v1 pack,
+    # and omitted from the digest when empty, so v1-sourced fingerprints are stable.
+    semantics_by_node = {s.node_id: s for s in node_semantics}
+    declared_provenance = tuple(
+        entry
+        for n in sorted(ir.nodes, key=lambda x: x.node_id)
+        for entry in _declared_value_provenance(
+            effective_pack, ir, n, semantics_by_node[n.node_id], compiler_version
+        )
+    )
 
     cap_ids = sorted({c.capability_id
                       for s in node_semantics for c in s.required_capability_refs}
@@ -347,6 +460,7 @@ def enrich_workflow(ir: WorkflowIR, pack: Optional[PolicyPack] = None, *,
         capability_reference_manifest=tuple(cap_ids),
         contract_reference_manifest=tuple(contract_ids),
         provenance_manifest=tuple(prov_refs),
+        declared_value_provenance=declared_provenance,
         diagnostics=(),
         compiler_version=compiler_version,
     )

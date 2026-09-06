@@ -26,6 +26,7 @@ from .extraction import (
 from .models import (
     CapabilityRequirement,
     DataContractRef,
+    DeclaredValueProvenance,
     HumanReviewRequirement,
     NodeInputRequirement,
     NodeOutputDeclaration,
@@ -51,6 +52,7 @@ __all__ = [
     "PolicyProvenanceRef",
     "CapabilityRequirement",
     "DataContractRef",
+    "DeclaredValueProvenance",
     "NodeInputRequirement",
     "NodeOutputDeclaration",
     "HumanReviewRequirement",

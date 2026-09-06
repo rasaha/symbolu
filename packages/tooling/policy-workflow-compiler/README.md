@@ -98,7 +98,9 @@ the bump to 0.2.0 leaves every existing v1 fingerprint byte-identical.
 
 The compiler still **describes** the governed workflow; it never selects, ranks, or
 assigns agents, never embeds enterprise deployment policy, and never grants or
-executes. Consuming the enriched contract downstream is a separate phase (AWC P2.1).
+executes. Consuming the enriched contract downstream is a separate concern, owned by
+the consumer: the Agent Workforce Composer does that in its own delivered P2.1
+adapter (see `docs/AWC_CONSUMER_BOUNDARY.md`).
 
 See `docs/WORKFLOW_IR_V2.md`, `docs/NODE_SEMANTICS.md`,
 `docs/CAPABILITY_REQUIREMENTS.md`, `docs/DATA_CONTRACTS.md`,

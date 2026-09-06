@@ -46,6 +46,9 @@ WORKFLOW_IR_V2 = "workflow_ir.v2"
 SUPPORTED_WORKFLOW_IR_VERSIONS = (WORKFLOW_IR_V1, WORKFLOW_IR_V2)
 #: The source policy-pack schema version (unchanged).
 POLICY_PACK_SCHEMA_VERSION = "policy_pack.v1"
+#: Every policy-pack schema this build accepts. v2 adds source-declarable semantics
+#: and the authoritative-source coordinate; v1 packs are byte-identical under it.
+SUPPORTED_POLICY_PACK_SCHEMA_VERSIONS = ("policy_pack.v1", "policy_pack.v2")
 
 #: FROZEN semantic identity committed to by every workflow_ir.v1 logical digest.
 #: This is legacy and must never change or track the package version — it is what
@@ -128,6 +131,17 @@ class VersionInfo:
     policy_provenance_implemented: bool = False
     release_validation_implemented: bool = False
     deterministic_replay_verified: bool = False
+    # -- P3A governed diff-driven review --
+    diff_driven_review_implemented: bool = False
+    # -- policy_pack.v2 source-declarable semantics --
+    policy_pack_v2_supported: bool = False
+    source_declared_semantics_implemented: bool = False
+    #: X1: the authoritative-source coordinate is carried, digest-bound for a v2
+    #: pack, and structurally validated. Authenticity is never asserted here.
+    authoritative_source_carriage_implemented: bool = False
+    #: Explicit non-goal: this package never verifies a Policy Authority signature,
+    #: key trust or revocation state. Those belong to Policy Authority.
+    authoritative_source_verification_implemented: bool = False
     # -- explicit NON-goals (remain false; this package makes no such claim) --
     awc_adapter_updated: bool = False
     agent_eligibility_implemented: bool = False
@@ -172,6 +186,17 @@ class VersionInfo:
             "policy_provenance_implemented": self.policy_provenance_implemented,
             "release_validation_implemented": self.release_validation_implemented,
             "deterministic_replay_verified": self.deterministic_replay_verified,
+            "diff_driven_review_implemented": self.diff_driven_review_implemented,
+            "policy_pack_v2_supported": self.policy_pack_v2_supported,
+            "source_declared_semantics_implemented": (
+                self.source_declared_semantics_implemented
+            ),
+            "authoritative_source_carriage_implemented": (
+                self.authoritative_source_carriage_implemented
+            ),
+            "authoritative_source_verification_implemented": (
+                self.authoritative_source_verification_implemented
+            ),
             "awc_adapter_updated": self.awc_adapter_updated,
             "agent_eligibility_implemented": self.agent_eligibility_implemented,
             "agent_ranking_implemented": self.agent_ranking_implemented,
@@ -228,6 +253,19 @@ def version_info() -> VersionInfo:
         policy_provenance_implemented=True,
         release_validation_implemented=True,
         deterministic_replay_verified=True,
+        # P3A: governed diff-driven review routing and a fail-closed review gate.
+        # Contracts and gate only — it routes and records a human review, and never
+        # performs, grants or waives one.
+        diff_driven_review_implemented=True,
+        # policy_pack.v2: the schema, the sidecar carriage and the fail-closed gate.
+        policy_pack_v2_supported=True,
+        # workflow_ir.v2 enrichment reads declared values into node semantics and
+        # records EXPLICIT per-value provenance. Declared, never inferred: an
+        # undeclared value stays unresolved.
+        source_declared_semantics_implemented=True,
+        authoritative_source_carriage_implemented=True,
+        # Never claimed: the compiler attests carriage, not authenticity.
+        authoritative_source_verification_implemented=False,
         # explicit non-goals — never claimed by this package.
         awc_adapter_updated=False,
         agent_eligibility_implemented=False,
@@ -255,6 +293,7 @@ __all__ = [
     "WORKFLOW_IR_V2",
     "SUPPORTED_WORKFLOW_IR_VERSIONS",
     "POLICY_PACK_SCHEMA_VERSION",
+    "SUPPORTED_POLICY_PACK_SCHEMA_VERSIONS",
     "WORKFLOW_IR_V1_DIGEST_COMPILER_VERSION",
     "WORKFLOW_IR_V2_DIGEST_COMPILER_VERSION",
     "digest_compiler_version_for",

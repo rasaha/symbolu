@@ -9,12 +9,13 @@ and illegal jumps (``DRAFT -> RELEASED``, ``REVIEW_REQUIRED -> COMPILED``,
 
 from __future__ import annotations
 
-from typing import Dict, Iterator, Mapping, Tuple
+from typing import Dict, Iterator, Mapping, Optional, Tuple
 
 from pydantic import Field
 
 from .actions import ActionConstraint
 from .approvals import HumanApprovalRecord
+from .declarations import AuthoritativeSourceRef, SemanticDeclaration
 from .assurance import ReplayCase, TestScenario
 from .audit import AuditRequirement
 from .authority import ApprovalPath, ApprovalStep, AuthorityRequirement
@@ -102,6 +103,12 @@ class PolicyPack(CompilerModel):
     replay_cases: Tuple[ReplayCase, ...] = ()
     approval_records: Tuple[HumanApprovalRecord, ...] = ()
 
+    # -- policy_pack.v2 only ---------------------------------------------------
+    # Excluded from a v1 pack's canonical view, so every v1 digest and approval is
+    # unaffected; a v1 pack declaring either of these is refused, never pruned.
+    semantic_declarations: Tuple[SemanticDeclaration, ...] = ()
+    authoritative_source: Optional[AuthoritativeSourceRef] = None
+
     # -- object access -------------------------------------------------------
 
     def all_objects(self) -> Iterator[PolicyObject]:
@@ -125,6 +132,7 @@ class PolicyPack(CompilerModel):
             self.test_scenarios,
             self.replay_cases,
             self.approval_records,
+            self.semantic_declarations,
         ):
             yield from collection
 

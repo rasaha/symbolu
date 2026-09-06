@@ -26,9 +26,13 @@ from .api import (
     GovernedWorkflowCompiler,
     HumanApprovalRecord,
     PolicyPack,
+    ReviewLedger,
+    ReviewRequirement,
     WorkflowIR,
     WorkflowIRv2,
+    check_review,
     compile_workflow_v2,
+    derive_review_requirement,
     diff_policy_packs,
     enrich_workflow,
     upgrade_workflow_ir,
@@ -231,6 +235,33 @@ def cmd_diff(args) -> int:
     return 0
 
 
+def _load_requirement(path: str) -> ReviewRequirement:
+    text = pathlib.Path(path).read_text(encoding="utf-8")
+    return ReviewRequirement.model_validate(canonical_json.loads(text))
+
+
+def _load_ledger(path: str) -> ReviewLedger:
+    text = pathlib.Path(path).read_text(encoding="utf-8")
+    return ReviewLedger.model_validate(canonical_json.loads(text))
+
+
+def cmd_review_requirements(args) -> int:
+    """Derive what a change from OLD to NEW obliges, per the pack's declared path."""
+    requirement = derive_review_requirement(_load_pack(args.old), _load_pack(args.new))
+    _print(requirement.model_dump(mode="python"))
+    # A derivation that already refuses (no covering approval path) exits non-zero.
+    return 1 if requirement.unresolved_codes else 0
+
+
+def cmd_check_review(args) -> int:
+    """Check a ledger against a requirement. A refusal exits non-zero."""
+    requirement = _load_requirement(args.requirement)
+    ledger = _load_ledger(args.ledger) if args.ledger else None
+    check = check_review(requirement, ledger)
+    _print(check.model_dump(mode="python"))
+    return 0 if check.ok else 1
+
+
 def cmd_inspect(args) -> int:
     files = package_io.read_package_files(args.package)
     manifest = files.get("manifest.json", {})
@@ -388,6 +419,21 @@ def build_parser() -> argparse.ArgumentParser:
     p_diff.add_argument("old")
     p_diff.add_argument("new")
     p_diff.set_defaults(func=cmd_diff)
+
+    p_revreq = sub.add_parser(
+        "review-requirements",
+        help="derive the review requirement for a change between two packs",
+    )
+    p_revreq.add_argument("old")
+    p_revreq.add_argument("new")
+    p_revreq.set_defaults(func=cmd_review_requirements)
+
+    p_chkrev = sub.add_parser(
+        "check-review", help="check a review ledger against a review requirement"
+    )
+    p_chkrev.add_argument("requirement")
+    p_chkrev.add_argument("ledger", nargs="?", default=None)
+    p_chkrev.set_defaults(func=cmd_check_review)
 
     p_inspect = sub.add_parser("inspect", help="inspect a compiled package directory")
     p_inspect.add_argument("package")

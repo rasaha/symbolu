@@ -22,8 +22,14 @@ from pydantic import BaseModel, ConfigDict, Field
 #: whose ``schema_version`` it does not support.
 SCHEMA_VERSION = "policy_pack.v1"
 
+#: Additive schema permitting source-declared semantics: data classification,
+#: permission intent, required tools, typed contract versions, and the
+#: authoritative-source coordinate. A v1 pack must never carry these — see
+#: :mod:`ugence_policy_workflow_compiler.models.pack_view`.
+SCHEMA_VERSION_V2 = "policy_pack.v2"
+
 #: Every schema version this build of the compiler can validate/compile.
-SUPPORTED_SCHEMA_VERSIONS: Tuple[str, ...] = (SCHEMA_VERSION,)
+SUPPORTED_SCHEMA_VERSIONS: Tuple[str, ...] = (SCHEMA_VERSION, SCHEMA_VERSION_V2)
 
 
 class ObjectType(str, Enum):
@@ -49,6 +55,8 @@ class ObjectType(str, Enum):
     REPLAY_CASE = "REPLAY_CASE"
     EXPECTED_OUTCOME = "EXPECTED_OUTCOME"
     HUMAN_APPROVAL_RECORD = "HUMAN_APPROVAL_RECORD"
+    #: policy_pack.v2 only: a source-declared semantic statement about one object.
+    SEMANTIC_DECLARATION = "SEMANTIC_DECLARATION"
 
 
 class PolicyPackStatus(str, Enum):

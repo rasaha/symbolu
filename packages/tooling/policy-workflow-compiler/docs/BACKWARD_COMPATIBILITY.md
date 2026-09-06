@@ -3,7 +3,7 @@
 P2 is strictly additive.
 
 - All P1 tests pass; all `workflow_ir.v1` fixtures remain readable.
-- All P1 public API names remain available (surface grows additively 71 → 101).
+- All P1 public API names remain available (surface grows additively 71 → 105).
 - P1 CLI commands are unchanged; `compile` gains an optional `--contract`
   (default `workflow_ir.v1`).
 - v1 canonical fingerprints are byte-stable (pinned: release `sha256:fb9fd4b9…`,

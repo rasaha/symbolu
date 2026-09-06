@@ -14,6 +14,7 @@ import re
 from typing import List
 
 from ..models.common import (
+    SCHEMA_VERSION_V2,
     SUPPORTED_SCHEMA_VERSIONS,
     ObjectType,
     PolicyObject,
@@ -72,6 +73,81 @@ def check_schema_version(pack: PolicyPack) -> List[ValidationDiagnostic]:
             )
         ]
     return []
+
+
+def check_schema_declarations(pack: PolicyPack) -> List[ValidationDiagnostic]:
+    """Fail closed on `policy_pack.v2` content that is misplaced or unresolvable.
+
+    A v1 pack carrying v2 content is refused rather than pruned: a field that is
+    present, reviewed, approved and then silently excluded from the digest is worse
+    than one either accepted or rejected.
+    """
+    out: List[ValidationDiagnostic] = []
+    is_v2 = pack.schema_version == SCHEMA_VERSION_V2
+
+    if not is_v2:
+        if pack.semantic_declarations or pack.authoritative_source is not None:
+            out.append(
+                _diag(
+                    "V2_FIELD_IN_V1_PACK",
+                    Severity.FATAL,
+                    f"pack declares policy_pack.v2 content but its schema_version is "
+                    f"'{pack.schema_version}'; the content would not be part of the "
+                    f"pack's digest",
+                    object_id=pack.pack_id,
+                    remediation=(
+                        "declare schema_version 'policy_pack.v2', or remove the "
+                        "semantic declarations and authoritative source"
+                    ),
+                )
+            )
+        return out
+
+    known = {obj.object_id for obj in pack.all_objects()}
+    seen_subjects = {}
+    for declaration in pack.semantic_declarations:
+        subject = declaration.subject_object_id
+        if subject not in known:
+            out.append(
+                _diag(
+                    "DANGLING_DECLARATION_SUBJECT",
+                    Severity.ERROR,
+                    f"semantic declaration '{declaration.object_id}' declares about "
+                    f"unknown object '{subject}'",
+                    object_id=declaration.object_id,
+                    remediation="reference an object that exists in this pack",
+                )
+            )
+        elif subject in seen_subjects:
+            out.append(
+                _diag(
+                    "DUPLICATE_DECLARATION_SUBJECT",
+                    Severity.ERROR,
+                    f"object '{subject}' is declared about by both "
+                    f"'{seen_subjects[subject]}' and '{declaration.object_id}'; which "
+                    f"governs is not a question the compiler may answer",
+                    object_id=declaration.object_id,
+                    remediation="merge the declarations into one",
+                )
+            )
+        else:
+            seen_subjects[subject] = declaration.object_id
+
+        for ref in tuple(declaration.input_contract_refs) + tuple(
+            declaration.output_contract_refs
+        ):
+            if not ref.contract_id.strip():
+                out.append(
+                    _diag(
+                        "MALFORMED_CONTRACT_VERSION_REF",
+                        Severity.ERROR,
+                        f"semantic declaration '{declaration.object_id}' carries a "
+                        f"contract reference with no contract id",
+                        object_id=declaration.object_id,
+                        remediation="declare a contract id, or omit the reference",
+                    )
+                )
+    return out
 
 
 def check_provenance(pack: PolicyPack) -> List[ValidationDiagnostic]:
@@ -190,6 +266,7 @@ def check_determinism(pack: PolicyPack) -> List[ValidationDiagnostic]:
 def check_all(pack: PolicyPack) -> List[ValidationDiagnostic]:
     out: List[ValidationDiagnostic] = []
     out.extend(check_schema_version(pack))
+    out.extend(check_schema_declarations(pack))
     out.extend(check_provenance(pack))
     out.extend(check_secrets(pack))
     out.extend(check_determinism(pack))

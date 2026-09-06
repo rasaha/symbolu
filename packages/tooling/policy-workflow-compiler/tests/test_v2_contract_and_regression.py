@@ -24,6 +24,11 @@ _PINNED_V1_RELEASE_DIGEST = "sha256:fb9fd4b934cb94425a67b0f6b469ca0bbc198b356cd2
 # The v1 IR-only digest (WorkflowIR.logical_digest over ordered nodes+edges), which
 # v2 embeds as base_ir_digest. Also pinned for regression.
 _PINNED_V1_IR_DIGEST = "sha256:169ad24c09e45ac7176a75a2708ff4687085f2f8f878990862542df0c20ca1e1"
+# The exact v2 workflow fingerprint of the same procurement reference (the v2
+# logical digest over the base digest plus every enriched field). Pinned for the
+# same reason as the v1 constants above: v2 canonical output must stay byte-stable
+# across maintenance changes, and a doc/CI/packaging change must never move it.
+_PINNED_V2_WORKFLOW_FINGERPRINT = "sha256:2e031c78918f5d62378d460a6e1efd311f823ba234576f33ba8097739b29a0d7"
 
 
 def _pack():
@@ -46,6 +51,29 @@ def test_distribution_bumped_but_v1_digest_frozen():
     assert result.logical_digest == _PINNED_V1_RELEASE_DIGEST
     assert result.workflow_ir.logical_digest() == _PINNED_V1_IR_DIGEST
     assert result.workflow_ir.ir_version == WORKFLOW_IR_V1
+
+
+def test_v2_canonical_fingerprint_is_byte_stable():
+    # v2 enrichment is a pure function of the compiled v1 graph, so its fingerprint
+    # is as much a frozen output as the v1 digests. Pinning it here means any change
+    # that perturbs canonical v2 bytes fails in this package's own suite rather than
+    # surfacing later as an integrity failure in a downstream release validation.
+    pack, appr = _pack()
+    v2 = compile_workflow_v2(pack, appr)
+    assert v2.ir_version == WORKFLOW_IR_V2
+    assert v2.base_ir_digest == _PINNED_V1_IR_DIGEST
+    assert v2.workflow_fingerprint == _PINNED_V2_WORKFLOW_FINGERPRINT
+    # Recomputing the digest from the stored object reproduces the stored value.
+    assert v2.logical_digest() == _PINNED_V2_WORKFLOW_FINGERPRINT
+    # Enriching the already-compiled v1 graph by the other entry point agrees, when
+    # given the same frozen v2 semantic identity the digest commits to.
+    from ugence_policy_workflow_compiler.version import digest_compiler_version_for
+    enriched = enrich_workflow(
+        api.compile_policy_pack(pack, appr).workflow_ir,
+        pack,
+        compiler_version=digest_compiler_version_for(WORKFLOW_IR_V2),
+    )
+    assert enriched.workflow_fingerprint == _PINNED_V2_WORKFLOW_FINGERPRINT
 
 
 def test_product_version_bumped_to_p2():

@@ -1,0 +1,53 @@
+# The Authoritative Policy Compilation composition root (PA/PWC-X1).
+#
+# Orchestration, not authority. Every issuance, resolution and revocation act is
+# the Policy Authority's, under trust the operator injects already constructed;
+# every validation act is the compiler's. This package adds exactly one thing
+# neither can do alone: it DERIVES the authoritative-source reference from a
+# verified resolution, so a compiled release is bound to an issuance that was
+# actually resolved rather than one a caller asserted.
+#
+# Two first-party dependencies, both reached through their public api module ONLY:
+#
+#   * ugence-policy-authority — resolution, the family-neutral coordinate and
+#     record types, and the canonicalization helpers used to re-verify the body
+#     digest. Never reimplemented here.
+#   * ugence-policy-workflow-compiler — the policy_pack.v2 schema, the
+#     AuthoritativeSourceRef contract and compilation.
+#
+# No key-management, networking, storage or plugin-loading dependency: custody and
+# trust stay outside this package, as they do in the constitution-activation root.
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ugence-authoritative-policy-compilation"
+dynamic = ["version"]
+description = "The PA/PWC-X1 composition root: derives an authoritative-source reference from a verified Policy Authority resolution and drafts a policy_pack.v2 compilation."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "Proprietary" }
+authors = [{ name = "Rakesh Mohan" }]
+keywords = ["ugence", "policy", "authority", "compiler", "composition-root", "governance"]
+dependencies = [
+    "ugence-policy-authority>=0.1.0",
+    "ugence-policy-workflow-compiler>=0.2.0",
+]
+
+[project.optional-dependencies]
+test = ["pytest>=7.0"]
+dev = ["pytest>=7.0", "build>=1.0"]
+
+[tool.setuptools.dynamic]
+version = { attr = "ugence_authoritative_policy_compilation.version.__version__" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["ugence_authoritative_policy_compilation*"]
+
+[tool.setuptools.package-data]
+ugence_authoritative_policy_compilation = ["py.typed"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
