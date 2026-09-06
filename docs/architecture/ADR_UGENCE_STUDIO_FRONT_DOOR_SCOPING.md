@@ -83,6 +83,24 @@ here is implemented.
 | **FD-4** | **`TYPED_INTAKE_ONLY`.** The first front door accepts only versioned, schema-validated typed input. It performs no prose-to-contract conversion, LLM interpretation, inferred defaults or silent repair. Prose assistance remains a later, separately ruled capability. |
 | **FD-5** | **`SCREEN_1_ONLY`.** Only screen 1 enters the next implementation step, as the activation root. Screens 4, 5 and 10 remain unchanged and are introduced only through later, separately validated seams. |
 
+| **FD-6** | **Seam 2 = `POLICY_REGISTRY_AND_DECISION_STORE`** (ruled 2026-09-06). The Authority screen's reads enter next under FD-1. |
+
+**Shape of seam 2, and one gap `[G]`.** The Authority screen reads a `PolicyRegistry`
+(`issued_records_for_identity`, `get_issued`, `revocations_for`, `supersessions_for`)
+for the identities it is configured with, and a Decision Authority record store
+(`get(decision_id)`) `[V]` (`services/studio_v2.py`, `AuthorityService`). The registry
+half is the seam-1 store: the same `SqlitePolicyRegistry` file the activation root
+opens, handed once more as `policy_registry`, plus a typed, versioned list of policy
+identities to enumerate (FD-4: no discovery, no default). The decision-store half has
+no durable implementation in the repository: Decision Authority ships in-memory
+repositories only (`InMemoryDecisionCaseRepository` and siblings) and
+`execution-reservation` is the durable backend of its execution ledger, not of
+decision cases `[V]`. Seam 2 therefore hands `policy_registry` and
+`policy_identities` and leaves `decision_store` absent, so the decision read keeps
+its typed gap `decision_authority_store`; a durable Decision Authority record store
+is a separate package decision, not part of this seam. The ruling authorizes
+documentation only; the seam activates by its own implementation prompt.
+
 **What the rulings authorize.** Documentation only. No seam is activated, no code is
 changed, and the P3E container still hands the studio context the review-service URL
 alone until the next implementation prompt is issued and its PR merges.
@@ -110,7 +128,7 @@ not exist; a bare-string approval reference where an `ApprovalEvidenceRef` is
 required) and made `decode_dataclass` public in policy-authority 0.3.1. The frozen v2
 request still carries the approval reference as one string, read as a typed
 three-part encoding; a structured field is a v2 contract amendment for a later,
-separately ruled step. The next seam waits on its own ruling under FD-1.
+separately ruled step. Seam 2 is ruled (FD-6) and waits on its own implementation prompt.
 
 The shape every seam follows: the CR-2 shape (one configuration value, one freeze-test amendment, its own failure tests and
 maturity statement, one PR), preserving `REFERENCE_GRADE_SHADOW_ONLY`, the frozen

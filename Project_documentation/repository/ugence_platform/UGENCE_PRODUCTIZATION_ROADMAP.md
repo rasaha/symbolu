@@ -406,6 +406,7 @@ merged; GAS-5 is deferred; GAS-6 remains gated; GAS-7 is ruled and not entered.
 | FD-3 | **`COMPOSITION_RECORD_IN_REGISTRY`** — the front-door composition is an immutable, versioned registry record under existing registry ownership (`ai-system-registry`); no new package for composition metadata | same, §6 |
 | FD-4 | **`TYPED_INTAKE_ONLY`** — the first front door accepts only versioned, schema-validated typed input; no prose-to-contract conversion, LLM interpretation, inferred defaults or silent repair; prose assistance is a later, separately ruled capability | same, §6 |
 | FD-5 | **`SCREEN_1_ONLY`** — only screen 1 enters the next implementation step, as the activation root; screens 4, 5 and 10 unchanged until later, separately validated seams; the ruling authorizes documentation only and does not activate the seam | same, §6 and §7 |
+| FD-6 | **Seam 2 = `POLICY_REGISTRY_AND_DECISION_STORE`** (2026-09-06) — the Authority screen's reads enter next under FD-1: the seam-1 `SqlitePolicyRegistry` handed once more as `policy_registry` with a typed list of policy identities; `decision_store` stays absent because no durable Decision Authority record store exists (in-memory repositories only), so the decision read keeps its typed gap; documentation only, activates no seam | `ADR_UGENCE_STUDIO_FRONT_DOOR_SCOPING.md` §6 |
 
 
 ---
