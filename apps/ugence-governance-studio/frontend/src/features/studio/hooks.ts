@@ -14,6 +14,7 @@ import type {
   PublishShadowBody,
   RegistryRegisterBody,
   ReviewDecisionBody,
+  ReviewStartShadowRunBody,
   SimulateRunBody,
 } from "@/api/types-v2";
 
@@ -91,6 +92,10 @@ export const useSubmitReviewDecision = () =>
     mutationFn: ({ body, proof }: { body: ReviewDecisionBody; proof?: string }) =>
       v2.submitReviewDecision(body, proof ?? ""),
   });
+
+// -- 4b · The worker shadow-run relay (front-door seam 6, FD-10) -------------
+export const useStartWorkerShadowRun = () =>
+  useMutation({ mutationFn: (b: ReviewStartShadowRunBody) => v2.startWorkerShadowRun(b) });
 
 // -- 8 · Registration (front-door seam 5, FD-9) ------------------------------
 export const useRegisterSystem = () =>
