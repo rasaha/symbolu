@@ -106,3 +106,53 @@ class ReviewDecisionRequest(StrictModel):
     decision: Literal["GRANT", "REJECT"]
     presented_approver: Dict[str, Any]
     justification: str = Field(min_length=1)
+
+
+# --------------------------------------------------------------------------- #
+# Registration (front-door seam 5, FD-9)
+# --------------------------------------------------------------------------- #
+class RegistryBindingInput(StrictModel):
+    """The exact system and configuration a registration is about, as typed fields.
+
+    No ``tenant_id``: the tenant is the deployment's and is never caller-supplied.
+    The two required digests are lowercase sha-256 hex the administrator asserts; the
+    studio computes none of them.
+    """
+
+    binding_id: str
+    subject_id: str
+    context_id: str
+    context_digest: str
+    system_id: str
+    system_version: str
+    configuration_id: str
+    configuration_digest: str
+    canonical_subject_context_ref: str = ""
+    system_manifest_ref: str = ""
+    system_manifest_digest: str = ""
+    deployment_environment_ref: str = ""
+
+
+class RegistryValidityInput(StrictModel):
+    """The registration window, as ISO-8601 instants with a timezone."""
+
+    issued_at: str
+    expires_at: Optional[str] = None
+    stale_after: Optional[str] = None
+
+
+class RegistryRegisterRequest(StrictModel):
+    """Register one system for this deployment's tenant (typed intake only, FD-4).
+
+    No ``registration_id`` (derived by the package, never chosen), no ``tenant_id``
+    (the deployment's), no ``registered_by`` (the deployment's name and version). The
+    ``owner_ref`` is an opaque handle recorded as presented and unproven (FD-9.3); the
+    ``classification_label`` is recorded uninterpreted (registry ADR D-2).
+    """
+
+    binding: RegistryBindingInput
+    owner_ref: str
+    classification_label: str
+    validity: RegistryValidityInput
+    supersedes: str = ""
+    notes: str = ""

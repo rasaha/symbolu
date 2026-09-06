@@ -23,6 +23,12 @@ def _absent_review() -> Any:
     return ReviewRelayService(review=None)
 
 
+def _absent_registry() -> Any:
+    from ...services.studio_v2 import RegistryService
+
+    return RegistryService(registry=None)
+
+
 class V2Context:
     """The six services, plus whatever optional dependencies were configured.
 
@@ -41,6 +47,7 @@ class V2Context:
         publish: Any,
         observe: Any,
         review: Any = None,
+        registry: Any = None,
     ) -> None:
         self.constitution = constitution
         self.policy = policy
@@ -51,6 +58,9 @@ class V2Context:
         # GAS-7 HR-D: the review relay. Optional so a context built before it existed
         # keeps working; absent, the review routes report the gap.
         self.review = review if review is not None else _absent_review()
+        # Front-door seam 5 (FD-9): the registration intake. Optional for the same reason;
+        # absent, the registry routes report the gap.
+        self.registry = registry if registry is not None else _absent_registry()
 
 
 def studio(request: Request) -> V2Context:

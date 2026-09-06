@@ -19,6 +19,7 @@ import {
   type PolicyCompileBody,
   type PolicyPackBody,
   type PublishShadowBody,
+  type RegistryRegisterBody,
   type ReviewDecisionBody,
   type SimulateRunBody,
   type V2Envelope,
@@ -44,6 +45,10 @@ export const V2_OPERATIONS = [
   "v2_review_read_run_events",
   "v2_review_read_approval",
   "v2_review_submit_decision",
+  // Front-door seam 5 (FD-9): the Registration screen. Typed intake; register is the
+  // only write, and it records what an administrator asserted, conferring nothing.
+  "v2_registry_register",
+  "v2_registry_list",
 ] as const;
 
 async function v2Request<T>(pathAndQuery: string, init?: RequestInit): Promise<T> {
@@ -180,4 +185,19 @@ export const submitReviewDecision = (body: ReviewDecisionBody, proof = "") => {
     init.headers = { ...(init.headers as Record<string, string>), [APPROVER_PROOF_HEADER]: proof };
   }
   return gap("/api/v2/review/decisions", init);
+};
+
+// -- 8 · Registration (front-door seam 5, FD-9) ------------------------------
+/**
+ * Record one typed system registration for this deployment's tenant. The tenant,
+ * the derived registration id and `registered_by` are never sent from here; the
+ * `owner_ref` is recorded as presented and unproven (FD-9.3).
+ */
+export const registerSystem = (body: RegistryRegisterBody) =>
+  gap("/api/v2/registry/registrations", postJson(body));
+
+/** The registrations in force for this deployment's tenant at `asOf` (or now). */
+export const listRegistrations = (asOf = "") => {
+  const query = asOf ? `?as_of=${enc(asOf)}` : "";
+  return gap("/api/v2/registry/registrations" + query);
 };

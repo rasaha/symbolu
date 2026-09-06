@@ -266,7 +266,10 @@ def test_v1_and_v2_contract_bytes_and_the_generated_client_are_unchanged():
     v1 = os.path.join(_APP, "contracts", "openapi.json")
     v2 = os.path.join(_APP, "contracts", "openapi_v2.json")
     assert _sha256(v1) == "dc309eab216e1a4c2f63f286887a4ef218a96ac34f8fa8614bff176db7c36656"
-    assert _sha256(v2) == "dd63180dc91ba7842dc1dc2b6efb3dbc155ea3bd47200f40de7bac85d373f39a"
+    # the v2 bytes are frozen by the amendment record's latest entry (FD-9.4 amended the
+    # original dd63180d… freeze); the record itself is verified in test_registry_seam
+    record = json.load(open(os.path.join(_APP, "contracts", "openapi_v2.amendments.json"), encoding="utf-8"))
+    assert _sha256(v2) == record["amendments"][-1]["sha256"]
     assert open(v1, "rb").read() == canonical_openapi_bytes()
     assert open(v2, "rb").read() == canonical_v2_openapi_bytes()
     generated = json.load(open(os.path.join(_APP, "frontend", "src", "generated", "openapi-v2.hash.json")))

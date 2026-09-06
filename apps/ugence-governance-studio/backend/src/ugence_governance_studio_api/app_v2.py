@@ -38,6 +38,7 @@ from .services.studio_v2 import (
     ObserveService,
     PolicyService,
     PublishService,
+    RegistryService,
     ReviewRelayService,
     SimulateService,
 )
@@ -66,6 +67,8 @@ def build_studio_context(
     hook_is_permissive: bool = False,
     console_base_url: Optional[str] = None,
     review_service_base_url: Optional[str] = None,
+    system_registry: Any = None,
+    registered_by: str = "",
 ) -> V2Context:
     """Wire the six services from whatever this deployment actually has.
 
@@ -92,6 +95,7 @@ def build_studio_context(
         publish=PublishService(console=console),
         observe=ObserveService(console=console),
         review=ReviewRelayService(review=review),
+        registry=RegistryService(registry=system_registry, registered_by=registered_by),
     )
 
 
@@ -130,7 +134,7 @@ def create_v2_app(
         f"{_V2_SUMMARY}\n\n"
         f"- API contract: {API_V2_CONTRACT_VERSION}\n"
         f"- Frozen companion contract: governance_studio.api.v1 (unchanged)\n"
-        f"- Screens: Constitution, Policy, Authority, Simulate, Publish, Observe, Review"
+        f"- Screens: Registration, Constitution, Policy, Authority, Simulate, Publish, Observe, Review"
     )
     app.openapi_version = "3.1.0"
     return app

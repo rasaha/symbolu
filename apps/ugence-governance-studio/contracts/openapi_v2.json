@@ -138,6 +138,151 @@
         "title": "PublishShadowRequest",
         "type": "object"
       },
+      "RegistryBindingInput": {
+        "additionalProperties": false,
+        "description": "The exact system and configuration a registration is about, as typed fields.\n\nNo ``tenant_id``: the tenant is the deployment's and is never caller-supplied.\nThe two required digests are lowercase sha-256 hex the administrator asserts; the\nstudio computes none of them.",
+        "properties": {
+          "binding_id": {
+            "title": "Binding Id",
+            "type": "string"
+          },
+          "canonical_subject_context_ref": {
+            "default": "",
+            "title": "Canonical Subject Context Ref",
+            "type": "string"
+          },
+          "configuration_digest": {
+            "title": "Configuration Digest",
+            "type": "string"
+          },
+          "configuration_id": {
+            "title": "Configuration Id",
+            "type": "string"
+          },
+          "context_digest": {
+            "title": "Context Digest",
+            "type": "string"
+          },
+          "context_id": {
+            "title": "Context Id",
+            "type": "string"
+          },
+          "deployment_environment_ref": {
+            "default": "",
+            "title": "Deployment Environment Ref",
+            "type": "string"
+          },
+          "subject_id": {
+            "title": "Subject Id",
+            "type": "string"
+          },
+          "system_id": {
+            "title": "System Id",
+            "type": "string"
+          },
+          "system_manifest_digest": {
+            "default": "",
+            "title": "System Manifest Digest",
+            "type": "string"
+          },
+          "system_manifest_ref": {
+            "default": "",
+            "title": "System Manifest Ref",
+            "type": "string"
+          },
+          "system_version": {
+            "title": "System Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "binding_id",
+          "subject_id",
+          "context_id",
+          "context_digest",
+          "system_id",
+          "system_version",
+          "configuration_id",
+          "configuration_digest"
+        ],
+        "title": "RegistryBindingInput",
+        "type": "object"
+      },
+      "RegistryRegisterRequest": {
+        "additionalProperties": false,
+        "description": "Register one system for this deployment's tenant (typed intake only, FD-4).\n\nNo ``registration_id`` (derived by the package, never chosen), no ``tenant_id``\n(the deployment's), no ``registered_by`` (the deployment's name and version). The\n``owner_ref`` is an opaque handle recorded as presented and unproven (FD-9.3); the\n``classification_label`` is recorded uninterpreted (registry ADR D-2).",
+        "properties": {
+          "binding": {
+            "$ref": "#/components/schemas/RegistryBindingInput"
+          },
+          "classification_label": {
+            "title": "Classification Label",
+            "type": "string"
+          },
+          "notes": {
+            "default": "",
+            "title": "Notes",
+            "type": "string"
+          },
+          "owner_ref": {
+            "title": "Owner Ref",
+            "type": "string"
+          },
+          "supersedes": {
+            "default": "",
+            "title": "Supersedes",
+            "type": "string"
+          },
+          "validity": {
+            "$ref": "#/components/schemas/RegistryValidityInput"
+          }
+        },
+        "required": [
+          "binding",
+          "owner_ref",
+          "classification_label",
+          "validity"
+        ],
+        "title": "RegistryRegisterRequest",
+        "type": "object"
+      },
+      "RegistryValidityInput": {
+        "additionalProperties": false,
+        "description": "The registration window, as ISO-8601 instants with a timezone.",
+        "properties": {
+          "expires_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expires At"
+          },
+          "issued_at": {
+            "title": "Issued At",
+            "type": "string"
+          },
+          "stale_after": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stale After"
+          }
+        },
+        "required": [
+          "issued_at"
+        ],
+        "title": "RegistryValidityInput",
+        "type": "object"
+      },
       "ReviewDecisionRequest": {
         "additionalProperties": false,
         "description": "A human's decision on a parked proposal, relayed verbatim (HR-1).\n\n``decision`` is the human's word — GRANT or REJECT — and the studio forwards it as\ntyped. ``presented_approver`` is the approver reference the review service listed\nas eligible; the studio holds no identity of its own and proves none, which is why\nthe review service labels every decision ``PRESENTED_UNPROVEN``. ``justification``\nis required: a decision without one is not relayed.",
@@ -255,7 +400,7 @@
     }
   },
   "info": {
-    "description": "Additive Governed Agent Studio surface over the Ugence governance packages. Thin orchestration only; synthetic and fixture data; planning and observation only. No route issues, activates, revokes, grants, authorizes, clears or executes.\n\n- API contract: governance_studio.api.v2\n- Frozen companion contract: governance_studio.api.v1 (unchanged)\n- Screens: Constitution, Policy, Authority, Simulate, Publish, Observe, Review",
+    "description": "Additive Governed Agent Studio surface over the Ugence governance packages. Thin orchestration only; synthetic and fixture data; planning and observation only. No route issues, activates, revokes, grants, authorizes, clears or executes.\n\n- API contract: governance_studio.api.v2\n- Frozen companion contract: governance_studio.api.v1 (unchanged)\n- Screens: Registration, Constitution, Policy, Authority, Simulate, Publish, Observe, Review",
     "summary": "Additive Governed Agent Studio surface over the Ugence governance packages. Thin orchestration only; synthetic and fixture data; planning and observation only. No route issues, activates, revokes, grants, authorizes, clears or executes.",
     "title": "Ugence Governed Agent Studio API v2",
     "version": "governance_studio.api.v2"
@@ -662,6 +807,92 @@
         "summary": "Publish Shadow",
         "tags": [
           "publish"
+        ]
+      }
+    },
+    "/api/v2/registry/registrations": {
+      "get": {
+        "description": "The registrations in force for this deployment's tenant at ``as_of``.\n\n``as_of`` is an ISO-8601 instant with a timezone; absent, the request's own instant\nis used and reported back. A registration outside its window is absent from the\nanswer, never flagged.",
+        "operationId": "v2_registry_list",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "as_of",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "As Of"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Registrations",
+        "tags": [
+          "registry"
+        ]
+      },
+      "post": {
+        "description": "Record one typed system registration for this deployment's tenant.\n\nEvery field is validated by ai-system-registry's own refusal reasons; the\nclassification label is recorded uninterpreted; a superseding registration is\nadmitted only by the package's supersession rule. A refusal is typed, never a 500.",
+        "operationId": "v2_registry_register",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegistryRegisterRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Register System",
+        "tags": [
+          "registry"
         ]
       }
     },
