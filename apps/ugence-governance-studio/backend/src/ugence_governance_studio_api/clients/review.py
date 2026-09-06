@@ -6,12 +6,16 @@ the durable-execution adapter and a database driver, both prohibited in the stud
 and it uses the standard library.
 
 The route restriction is the real content. ``REVIEW_ALLOWED_ROUTES`` is a closed set of
-five — four reads and one relay — and :meth:`ReviewServiceClient._request` refuses
+six — four reads and two relays — and :meth:`ReviewServiceClient._request` refuses
 anything outside it *before* opening a connection. Owner ruling HR-1
-(``DISPLAY_AND_TRANSMIT``): the studio renders what the review service holds and relays a
-human's decision verbatim to it. It holds no approver identity, computes no
-eligibility, consumes nothing, signals nothing and resumes nothing; the review service
-exposes no route for any of those, and this client could not reach one if it did.
+(``DISPLAY_AND_TRANSMIT``, amended by FD-10.4): the studio renders what the review
+service holds, relays a human's decision verbatim to it and, since front-door seam 6,
+asks it to start the worker's own shadow run (FD-10.1 ``START_IS_A_RELAY``). It holds
+no approver identity, computes no eligibility, consumes nothing, signals nothing and
+resumes nothing; the review service exposes no route for any of those, and this client
+could not reach one if it did. On the start relay nothing of the studio's crosses: no
+workflow, task, provider, digest or mode choice (FD-10.3); the mode word is pinned to
+``shadow`` here and the worker refuses any other.
 
 Owner ruling ID-1 (``PASS_THROUGH_OPAQUE_TOKEN``, AI-B): the one thing the studio may
 carry besides the body is a single opaque proof the operator's request presented,
@@ -35,18 +39,28 @@ __all__ = [
     "REVIEW_ALLOWED_ROUTES",
     "PROOF_HEADER",
     "PROOF_ROUTE",
+    "START_ROUTE",
+    "SHADOW_RUN_MODE",
 ]
 
-#: The complete set of review-service routes the studio may reach. Four reads and one
-#: relay. Nothing that grants, authorizes, clears, executes, signals or resumes
-#: appears here, and nothing may be added without an owner ruling that revisits HR-1.
+#: The complete set of review-service routes the studio may reach. Four reads and two
+#: relays: the decision (HR-1) and the start of the worker's own shadow run (FD-10.2).
+#: Nothing that grants, authorizes, clears, executes, signals or resumes appears here,
+#: and nothing may be added without an owner ruling that revisits HR-1.
 REVIEW_ALLOWED_ROUTES: Tuple[Tuple[str, str], ...] = (
     ("GET", "/review/queue"),
     ("GET", "/review/runs/{instance_id}"),
     ("GET", "/review/runs/{instance_id}/events"),
     ("GET", "/review/approvals/{approval_id}"),
     ("POST", "/review/decisions"),
+    ("POST", "/review/runs"),
 )
+
+#: FD-10.2: the start relay, and the one mode word it ever sends. The worker's route
+#: starts its own shadow workflow and refuses any other mode; the studio has no other
+#: word to send, so LIVE is not expressible on this path.
+START_ROUTE: Tuple[str, str] = ("POST", "/review/runs")
+SHADOW_RUN_MODE = "shadow"
 
 _ALLOWED_TEMPLATES = {(m, p) for m, p in REVIEW_ALLOWED_ROUTES}
 
@@ -81,7 +95,7 @@ class ReviewServiceClient:
         self._base = base_url.rstrip("/")
         self._timeout = timeout_s
 
-    # -- the five permitted operations ----------------------------------------
+    # -- the six permitted operations -----------------------------------------
     def queue(self, required_role: str = "") -> Any:
         """``GET /review/queue`` — parked ESCALATE instances awaiting a decision."""
         query = {"required_role": required_role} if required_role else None
@@ -112,6 +126,20 @@ class ReviewServiceClient:
         typed outcome, whether it recorded, replayed or refused.
         """
         return self._request(*PROOF_ROUTE, body=body, proof=proof)
+
+    def start_shadow_run(self, correlation_id: Optional[str] = None) -> Any:
+        """``POST /review/runs`` — ask the worker to start its own shadow run (FD-10).
+
+        The body is the typed correlation id the operator supplied, if any, and the
+        pinned mode word. Nothing else exists to send: no workflow, task, provider or
+        digest parameter is offered by this method (FD-10.3), and no proof accompanies
+        it (ID-1). The answer is the worker's typed outcome, whether it started,
+        replayed or refused.
+        """
+        body: Dict[str, Any] = {"mode": SHADOW_RUN_MODE}
+        if correlation_id is not None:
+            body["correlation_id"] = correlation_id
+        return self._request(*START_ROUTE, body=body)
 
     # -- internals ------------------------------------------------------------
     def _request(

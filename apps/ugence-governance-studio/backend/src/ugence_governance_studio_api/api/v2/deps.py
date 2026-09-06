@@ -29,6 +29,12 @@ def _absent_registry() -> Any:
     return RegistryService(registry=None)
 
 
+def _absent_start_run() -> Any:
+    from ...services.studio_v2 import StartRunService
+
+    return StartRunService(review=None)
+
+
 class V2Context:
     """The six services, plus whatever optional dependencies were configured.
 
@@ -48,6 +54,7 @@ class V2Context:
         observe: Any,
         review: Any = None,
         registry: Any = None,
+        start_run: Any = None,
     ) -> None:
         self.constitution = constitution
         self.policy = policy
@@ -61,6 +68,9 @@ class V2Context:
         # Front-door seam 5 (FD-9): the registration intake. Optional for the same reason;
         # absent, the registry routes report the gap.
         self.registry = registry if registry is not None else _absent_registry()
+        # Front-door seam 6 (FD-10): the worker shadow-run relay. Absent, the start route
+        # reports the same review_service gap as the review screens.
+        self.start_run = start_run if start_run is not None else _absent_start_run()
 
 
 def studio(request: Request) -> V2Context:

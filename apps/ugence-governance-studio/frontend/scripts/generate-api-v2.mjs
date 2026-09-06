@@ -43,6 +43,8 @@ export const REQUIRED_V2_OPERATIONS = [
   // Front-door seam 5 (FD-9): the Registration screen (typed intake; register is the only write).
   "v2_registry_register",
   "v2_registry_list",
+  // Front-door seam 6 (FD-10): the worker shadow-run relay (start is a relay, FD-10.1).
+  "v2_review_start_shadow_run",
 ];
 
 // SD-2, enforced at generation time as well as in the backend suite. If a route

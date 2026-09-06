@@ -320,6 +320,28 @@
         "title": "ReviewDecisionRequest",
         "type": "object"
       },
+      "ReviewStartShadowRunRequest": {
+        "additionalProperties": false,
+        "description": "Ask the governed runtime worker to start its own shadow run (front-door seam 6,\nFD-10.2), relayed as typed (FD-10.1).\n\nThe one field is the operator's correlation id, a typed token, or nothing. No\nworkflow, task, provider, mode or definition digest can be carried here, by\nconstruction (FD-10.3): the worker holds the definition and its own digest binds\nthe run, and the mode word the studio sends is pinned to ``shadow`` in the client.",
+        "properties": {
+          "correlation_id": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "minLength": 1,
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,63}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Correlation Id"
+          }
+        },
+        "title": "ReviewStartShadowRunRequest",
+        "type": "object"
+      },
       "SimulateRunRequest": {
         "additionalProperties": false,
         "description": "Run a workflow against fixtures, recording every governance decision.\n\n``execution_mode`` is constrained to the non-mutating modes. LIVE is not a member\nof the accepted set and cannot be requested.",
@@ -1014,6 +1036,46 @@
           }
         },
         "summary": "List Queue",
+        "tags": [
+          "review"
+        ]
+      }
+    },
+    "/api/v2/review/runs": {
+      "post": {
+        "description": "Relay a start of the worker's own shadow run (front-door seam 6, FD-10).\n\nNothing of the studio's crosses: the body is the operator's correlation id or\nnothing, the client pins the mode word ``shadow``, and the worker's own definition\ndigest binds the run (FD-10.3). The worker's answer, whether it started, replayed or\nrefused, is returned as the worker said it; a missing review-service URL or an\nolder worker without the route is a typed gap.",
+        "operationId": "v2_review_start_shadow_run",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReviewStartShadowRunRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Start Shadow Run",
         "tags": [
           "review"
         ]
