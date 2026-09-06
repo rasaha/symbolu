@@ -21,7 +21,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "ugence-reasoning-method-advisor"
 # Static: tests/test_public_api.py pins this to ugence_reasoning_method_advisor.__version__.
-version = "0.2.0"
+version = "0.3.0"
 description = "Ugence Reasoning Method Advisor — research-only, deterministic, rule-derived design-time advisor over the slice 1 reasoning-method contracts."
 readme = "README.md"
 requires-python = ">=3.10"

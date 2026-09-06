@@ -284,6 +284,10 @@ def test_the_catch_all_is_the_load_bearing_capability_separation():
         TrustAnchorCapability.EFFECT_ATTESTATION_EXECUTING_PROVIDER,
         TrustAnchorCapability.EFFECT_ATTESTATION_INDEPENDENT_OBSERVER,
         TrustAnchorCapability.TRUST_ANCHOR_SET_PUBLICATION,
+        # TEV 0.6.0 (SCR-1): the comparison-result capability lent to the
+        # reasoning-method result-attestation consumer. Refused here by the
+        # catch-all alone, like the two effect ones and the publication root.
+        TrustAnchorCapability.COMPARISON_RESULT_ATTESTATION,
     }
     assert set(TrustAnchorCapability) == named | {dedicated} | catch_all_only, (
         "TEV's capability roster changed; a member outside the dedicated one, the two "

@@ -51,7 +51,7 @@ import sys
 from datetime import datetime, timezone
 import ugence_agentic_proposer as ap
 
-assert ap.__version__ == "0.5.0", ap.__version__
+assert ap.__version__ == "0.6.0", ap.__version__
 assert "site-packages" in ap.__file__, ap.__file__
 assert not any("/symbolu" in p for p in sys.path), sys.path
 
@@ -77,7 +77,8 @@ assert ap.SemanticAuditorFindingStatus.INDETERMINATE.value == "INDETERMINATE"
 # 2 injected protocols, 12 enums, 5 builders, 2 equation functions, 2 identity
 # functions, 6 verifiers, 3 exceptions, 4 constants, __version__ = 52 names. The
 # thirty-nine 0.1.0 froze are all still here; no release removes any of them
-# (`S2B-S1-Q6=A`: no removals, no renames; RM-3 adds exactly one at 0.5.0).
+# (`S2B-S1-Q6=A`: no removals, no renames; RM-3 adds exactly one at 0.5.0; SCR-1 adds
+# none at 0.6.0 — one optional field on the nested input shape only).
 EXPECTED_SURFACE = {
     "AgentIdentityRef", "CognitiveRoleContract", "WorkMandate",
     "BoundedContextEnvelope", "ToolObservation", "AdvisoryCandidateSet",

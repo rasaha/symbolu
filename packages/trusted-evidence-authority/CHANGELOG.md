@@ -1,5 +1,38 @@
 # Changelog — ugence-trusted-evidence-authority
 
+## [0.6.0] — a third named consumer exception, and one lent comparison-result capability
+
+Additive and backward-compatible over 0.5.0. **Every 0.5.0 symbol remains exported
+unchanged**, every pinned digest is byte-identical, the six existing
+`TrustAnchorCapability` members and the forty-three refusal reasons keep their
+names, spellings and declaration order, and every evidence, receipt and resolver
+behaviour is unchanged. The curated export count stays at 99.
+
+Ratified by `docs/architecture/ADR_UGENCE_SIGNED_COMPARISON_RESULT_SCOPING.md`
+(SCR-1). Maturity is unchanged: the signed-snapshot resolver remains a
+production-shaped candidate, and nothing here is production-ready.
+
+### Added
+
+- `TrustAnchorCapability.COMPARISON_RESULT_ATTESTATION`, appended after
+  `TRUST_ANCHOR_SET_PUBLICATION`. The anchor's key signs a reasoning-method
+  comparison result **as the engine that produced it**. A verified signature under
+  it proves which engine produced the result under which key, never that the
+  comparison is correct. This package defines the coordinate and **verifies
+  nothing** under it; no evidence path, receipt path or snapshot path admits it,
+  and holding it confers no other entitlement
+  (`tests/authority/test_lent_capability_disjointness.py`).
+- A third named consumer exception in the dependency boundary:
+  `packages/integration/reasoning-method-result-attestation`, under the same exact
+  symbol grant as the two existing consumers. The allowlist is still a closed
+  three-element tuple asserted by exact equality.
+
+### Unchanged
+
+- No key for any comparison engine exists here or anywhere in the repository;
+  the reference directory holds only what a test constructs, and the deny-all
+  default applies to a deployment that configures nothing.
+
 ## [0.5.0] — the production-shaped trust-anchor resolver candidate (TR-1 to TR-5)
 
 Additive and backward-compatible over 0.4.0. **Every 0.4.0 symbol remains exported

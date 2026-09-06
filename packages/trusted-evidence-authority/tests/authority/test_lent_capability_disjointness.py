@@ -47,7 +47,8 @@ from _authority_builders import (
 CS = TrustAnchorCapability.CLOUD_SCALING_RECOMMENDATION_ATTESTATION
 EP = TrustAnchorCapability.EFFECT_ATTESTATION_EXECUTING_PROVIDER
 IO = TrustAnchorCapability.EFFECT_ATTESTATION_INDEPENDENT_OBSERVER
-LENT = (CS, EP, IO)
+CR = TrustAnchorCapability.COMPARISON_RESULT_ATTESTATION
+LENT = (CS, EP, IO, CR)
 PKG_ROOT = pathlib.Path(ugence_trusted_evidence_authority.__file__).resolve().parent
 
 
@@ -68,7 +69,8 @@ def test_the_pre_existing_members_keep_their_spelling_and_declaration_order():
     assert members[4] is IO and IO.value == "EFFECT_ATTESTATION_INDEPENDENT_OBSERVER"
     assert members[5] is TrustAnchorCapability.TRUST_ANCHOR_SET_PUBLICATION
     assert members[5].value == "TRUST_ANCHOR_SET_PUBLICATION"
-    assert len(members) == 6
+    assert members[6] is CR and CR.value == "COMPARISON_RESULT_ATTESTATION"
+    assert len(members) == 7
 
 
 def test_the_new_member_is_distinct_from_both_existing_ones():
@@ -78,13 +80,18 @@ def test_the_new_member_is_distinct_from_both_existing_ones():
     assert CS is not TrustAnchorCapability.RECEIPT_ISSUANCE
     assert CS != TrustAnchorCapability.EVIDENCE_PRODUCTION
     assert CS != TrustAnchorCapability.RECEIPT_ISSUANCE
-    assert len({m.value for m in TrustAnchorCapability}) == 6
+    assert len({m.value for m in TrustAnchorCapability}) == 7
     # The two effect capabilities are distinct from each other and from every
     # earlier member: a provider anchor never answers an observer coordinate.
     assert EP is not IO and EP != IO
     for lent in (EP, IO):
         assert lent not in (TrustAnchorCapability.EVIDENCE_PRODUCTION,
                             TrustAnchorCapability.RECEIPT_ISSUANCE, CS)
+    # The comparison-result capability (0.6.0, SCR-1) is distinct from every
+    # earlier member: an engine anchor never answers an evidence, receipt, Cloud
+    # Scaling, effect or set-publication coordinate.
+    assert CR not in (TrustAnchorCapability.EVIDENCE_PRODUCTION, TrustAnchorCapability.RECEIPT_ISSUANCE,
+                      CS, EP, IO, TrustAnchorCapability.TRUST_ANCHOR_SET_PUBLICATION)
 
 
 # --------------------------------------------------------------------------------- #
@@ -163,8 +170,8 @@ def test_the_lent_capability_is_never_substitutable_for_either_existing_one():
         capability: TrustAnchorCoordinate(**base, capability=capability)
         for capability in TrustAnchorCapability
     }
-    assert len(set(coordinates.values())) == 6
-    assert len({c.canonical_digest() for c in coordinates.values()}) == 6
+    assert len(set(coordinates.values())) == 7
+    assert len({c.canonical_digest() for c in coordinates.values()}) == 7
 
 
 # --------------------------------------------------------------------------------- #
@@ -182,7 +189,8 @@ def test_this_package_defines_the_lent_capability_and_verifies_nothing_under_it(
 
     for spelling in ("CLOUD_SCALING_RECOMMENDATION_ATTESTATION",
                      "EFFECT_ATTESTATION_EXECUTING_PROVIDER",
-                     "EFFECT_ATTESTATION_INDEPENDENT_OBSERVER"):
+                     "EFFECT_ATTESTATION_INDEPENDENT_OBSERVER",
+                     "COMPARISON_RESULT_ATTESTATION"):
         referencing = []
         for path in sorted(PKG_ROOT.rglob("*.py")):
             text = path.read_text(encoding="utf-8")
@@ -191,9 +199,11 @@ def test_this_package_defines_the_lent_capability_and_verifies_nothing_under_it(
         assert referencing == ["authority/trust.py"], (spelling, referencing)
 
 
-@pytest.mark.parametrize("lent", [EP, IO], ids=["executing-provider", "independent-observer"])
+@pytest.mark.parametrize("lent", [EP, IO, CR],
+                         ids=["executing-provider", "independent-observer", "comparison-engine"])
 def test_an_effect_attestation_anchor_can_neither_produce_evidence_nor_issue_a_receipt(lent):
-    """The two effect capabilities grant nothing here, exactly as the Cloud Scaling one."""
+    """The two effect capabilities and the comparison-result capability grant nothing
+    here, exactly as the Cloud Scaling one."""
 
     from _authority_builders import envelope
 
@@ -222,7 +232,8 @@ def test_no_effect_attestation_module_is_imported_or_named_by_this_package():
             elif isinstance(node, ast.ImportFrom) and node.module:
                 modules = [node.module]
             for module in modules:
-                if "effect_attestation" in module or "execution_assurance" in module:
+                if ("effect_attestation" in module or "execution_assurance" in module
+                        or "result_attestation" in module or "reasoning_method" in module):
                     offenders.append(f"{path.name}: {module}")
     assert offenders == [], offenders
 

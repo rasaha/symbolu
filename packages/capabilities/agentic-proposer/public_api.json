@@ -2,7 +2,7 @@
   "note": "Machine-readable snapshot of the curated public API (ugence_agentic_proposer.__all__). Generated from the installed package; tests/test_public_api.py asserts this file equals the actual package surface. Regenerate when the curated API changes, which for this package means a ratified amendment to docs/S1_CONTRACT_AND_EQUATION_SPECIFICATION.md.",
   "distribution": "ugence-agentic-proposer",
   "namespace": "ugence_agentic_proposer",
-  "package_version": "0.5.0",
+  "package_version": "0.6.0",
   "symbols": {
     "ADVISORY_IDENTITY_NFC_PATHS": {
       "kind": "constant",
@@ -272,7 +272,8 @@
         "usage_scope",
         "qualifying_method_ids",
         "primary_method_id",
-        "evidence_refs"
+        "evidence_refs",
+        "result_signature_receipt_digest"
       ]
     },
     "ReasoningStrategy": {
@@ -382,7 +383,7 @@
     },
     "__version__": {
       "kind": "constant",
-      "value": "0.5.0"
+      "value": "0.6.0"
     },
     "build_advisory_candidate_set": {
       "kind": "function"

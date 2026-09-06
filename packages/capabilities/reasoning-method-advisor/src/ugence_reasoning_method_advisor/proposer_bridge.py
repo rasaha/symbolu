@@ -5,7 +5,8 @@
 only: this package knows the proposer's input shape; the proposer never imports
 a research package (its own boundary guard enforces that). The mapping is
 **input, never authority** — it names methods, a rule set and evidence digests,
-and carries no disposition, clearance or selection.
+and carries no disposition, clearance or selection. The signature verification
+record, when the admission cites one, crosses as one more digest (SCR-1).
 
 Only a ``ReasoningMethodAdvisoryAdmission`` crosses. A bare slice 2 advisory —
 ``COMPARISON_EVIDENCE_ABSENT`` / ``RESEARCH_ONLY`` by construction — is refused
@@ -44,6 +45,7 @@ def to_proposer_input(admission: ReasoningMethodAdvisoryAdmission) -> Dict[str, 
         "reasoning_advisory_digest": _c6(admission.advisory_digest),
         "admission_digest": _c6(admission.admission_digest),
         "comparison_result_digest": _c6(admission.comparison_result_digest),
+        "result_signature_receipt_digest": None if admission.result_signature_receipt_digest is None else _c6(admission.result_signature_receipt_digest),
         "rule_set_id": admission.rule_set.rule_set_id,
         "rule_set_version": admission.rule_set.rule_set_version,
         "rule_set_digest": _c6(admission.rule_set.rule_set_digest),

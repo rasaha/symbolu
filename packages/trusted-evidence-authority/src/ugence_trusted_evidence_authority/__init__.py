@@ -76,7 +76,7 @@ Import the curated surface from :mod:`ugence_trusted_evidence_authority.api`.
 
 from __future__ import annotations
 
-__version__ = "0.5.0"
+__version__ = "0.6.0"
 
 from .contracts import (  # noqa: E402
     EVIDENCE_IDENTITY_DIGEST_DOMAIN,

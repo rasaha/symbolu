@@ -280,6 +280,115 @@ def test_the_bridge_mapping_validates_as_the_proposer_input():
     ap = pytest.importorskip("ugence_agentic_proposer")
     if not hasattr(ap, "ReasoningMethodAdvisoryInput"):
         pytest.skip("installed proposer predates the typed input")
+    if "result_signature_receipt_digest" not in ap.ReasoningMethodAdvisoryInput.model_fields:
+        pytest.skip("installed proposer predates the signature receipt field (0.6.0)")
     rq, adv, res = world(TWO, "map_reduce", "linear_chain")
     model = ap.ReasoningMethodAdvisoryInput.model_validate(to_proposer_input(admit(adv, rq, res, admitted_at=fx.NOW)))
     assert model.primary_method_id is None and sorted(model.qualifying_method_ids) == ["linear_chain", "map_reduce"]
+
+
+# ------------------------------------------------------------------ SCR-1: the signed-result posture
+
+from ugence_reasoning_method_advisor.api import ADMISSION_SCHEMA_VERSION, VerifiedResultSignature  # noqa: E402
+
+
+def verified_for(res, *, signer=COMPARISON_ENGINE_IDENTITY, receipt=fx.HEX_B, result_digest=None):
+    """The typed fact a composition root constructs after running the attestation
+    package's verifier; this suite never runs one, and the advisor never imports it."""
+    return VerifiedResultSignature(
+        result_digest=result_digest or res.result_digest, signer_identity=signer, signer_key_id="engine-key-1",
+        verification_receipt_digest=receipt, verifier_identity="ugence-reasoning-method-result-attestation",
+        verified_at=fx.NOW,
+    )
+
+
+def test_the_admission_schema_is_v3_and_the_research_posture_cites_no_signature():
+    rq, adv, res = world(ONE, "map_reduce")
+    adm = admit(adv, rq, res, admitted_at=fx.NOW)
+    assert ADMISSION_SCHEMA_VERSION == "reasoning_method.advisory_admission.v3" == adm.schema_version
+    assert adm.result_signature_receipt_digest is None
+    assert to_proposer_input(adm)["result_signature_receipt_digest"] is None
+    validate_admission(adm, adv, res)
+
+
+def test_requiring_a_signature_refuses_an_unsigned_result():
+    rq, adv, res = world(ONE, "map_reduce")
+    refuses(A.COMPARISON_RESULT_UNSIGNED, lambda: admit(adv, rq, res, admitted_at=fx.NOW, require_signature=True))
+    adm = admit(adv, rq, res, admitted_at=fx.NOW)
+    refuses(A.COMPARISON_RESULT_UNSIGNED, lambda: validate_admission(adm, adv, res, require_signature=True))
+
+
+def test_a_verified_signature_for_this_result_admits_and_is_cited():
+    rq, adv, res = world(ONE, "map_reduce")
+    v = verified_for(res)
+    adm = admit(adv, rq, res, admitted_at=fx.NOW, verified=v, require_signature=True)
+    assert adm.result_signature_receipt_digest == fx.HEX_B
+    assert adm.comparison_result_digest == res.result_digest == v.result_digest
+    unsigned = admit(adv, rq, res, admitted_at=fx.NOW)
+    assert adm.admission_digest != unsigned.admission_digest
+    validate_admission(adm, adv, res, verified=v, require_signature=True)
+    mapping = to_proposer_input(adm)
+    assert mapping["result_signature_receipt_digest"] == "sha256:" + fx.HEX_B
+
+
+def test_a_signature_over_another_result_is_a_mismatch():
+    rq, adv, res = world(ONE, "map_reduce")
+    other = result(assessment("map_reduce", rq, assessment_id="a.other"))
+    refuses(A.COMPARISON_RESULT_SIGNATURE_MISMATCH,
+            lambda: admit(adv, rq, res, admitted_at=fx.NOW, verified=verified_for(other), require_signature=True))
+    # Checked whenever a record is handed in, required or not.
+    refuses(A.COMPARISON_RESULT_SIGNATURE_MISMATCH, lambda: admit(adv, rq, res, admitted_at=fx.NOW, verified=verified_for(other)))
+
+
+def test_a_signature_by_any_other_signer_is_unbound():
+    rq, adv, res = world(ONE, "map_reduce")
+    refuses(A.COMPARISON_EVIDENCE_UNBOUND,
+            lambda: admit(adv, rq, res, admitted_at=fx.NOW, verified=verified_for(res, signer="someone-else"), require_signature=True))
+
+
+def test_a_signature_record_that_is_not_the_typed_fact_is_a_type_error():
+    rq, adv, res = world(ONE, "map_reduce")
+    with pytest.raises(TypeError):
+        admit(adv, rq, res, admitted_at=fx.NOW, verified={"result_digest": res.result_digest})
+    with pytest.raises(TypeError):
+        admit(adv, rq, res, admitted_at=fx.NOW, require_signature="yes")
+
+
+def test_the_typed_fact_is_shape_checked():
+    rq, adv, res = world(ONE, "map_reduce")
+    refuses(C.DIGEST_MALFORMED, lambda: verified_for(res, receipt="sha256:" + fx.HEX_B))
+    refuses(C.DIGEST_MALFORMED, lambda: verified_for(res, result_digest="short"))
+    refuses(C.REF_BLANK_FIELD, lambda: verified_for(res, signer=" "))
+    refuses(C.DATETIME_NAIVE, lambda: VerifiedResultSignature(res.result_digest, COMPARISON_ENGINE_IDENTITY, "k", fx.HEX_B, "v", fx.NOW.replace(tzinfo=None)))
+
+
+def test_replay_binds_the_cited_signature_record():
+    rq, adv, res = world(ONE, "map_reduce")
+    v = verified_for(res)
+    adm = admit(adv, rq, res, admitted_at=fx.NOW, verified=v, require_signature=True)
+    # Replayed without the record: the admission cites one the replay was not handed.
+    refuses(C.DIGEST_MALFORMED, lambda: validate_admission(adm, adv, res))
+    # Replayed with a different record: the citation does not match.
+    refuses(C.DIGEST_MALFORMED, lambda: validate_admission(adm, adv, res, verified=verified_for(res, receipt=fx.HEX_C)))
+    # A tampered citation on the admission.
+    forged = _rebuild(adm, result_signature_receipt_digest=fx.HEX_C)
+    refuses(C.DIGEST_MALFORMED, lambda: validate_admission(forged, adv, res, verified=v))
+    refuses(C.DIGEST_MALFORMED, lambda: _rebuild(adm, result_signature_receipt_digest="not-a-digest"))
+    # An unsigned admission replayed with a record it never cited.
+    unsigned = admit(adv, rq, res, admitted_at=fx.NOW)
+    refuses(C.DIGEST_MALFORMED, lambda: validate_admission(unsigned, adv, res, verified=v))
+
+
+def test_the_typed_fact_carries_no_scalar_label():
+    for f in dataclasses.fields(VerifiedResultSignature):
+        assert "int" not in str(f.type) and "float" not in str(f.type) and "Decimal" not in str(f.type), f.name
+
+
+def test_the_bridge_mapping_with_a_signature_validates_as_the_proposer_input():
+    ap = pytest.importorskip("ugence_agentic_proposer")
+    if "result_signature_receipt_digest" not in ap.ReasoningMethodAdvisoryInput.model_fields:
+        pytest.skip("installed proposer predates the signature receipt field")
+    rq, adv, res = world(ONE, "map_reduce")
+    adm = admit(adv, rq, res, admitted_at=fx.NOW, verified=verified_for(res), require_signature=True)
+    model = ap.ReasoningMethodAdvisoryInput.model_validate(to_proposer_input(adm))
+    assert model.result_signature_receipt_digest == "sha256:" + fx.HEX_B

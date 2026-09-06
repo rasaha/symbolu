@@ -265,6 +265,8 @@ FIELD_CLASSIFICATION = {
         "rule_set_digest": OTHER_PATTERN, "task_class_digest": OTHER_PATTERN,
         "evidence_status": CLOSED, "usage_scope": CLOSED,
         "qualifying_method_ids": C5B, "primary_method_id": C5B, "evidence_refs": OTHER_PATTERN,
+        # SCR-1 (0.6.0): the signature verification record, by digest, optional.
+        "result_signature_receipt_digest": OTHER_PATTERN,
     },
 }
 
@@ -306,7 +308,9 @@ CONTRACT_CARDINALITY = {
     # admitted reasoning-method advisory as typed input, outside ``P_unsigned``.
     "ProposerProcessRecord": 19,
     "ProposerProcessStateTransition": 2,
-    "ReasoningMethodAdvisoryInput": 13,
+    # SCR-1 (0.6.0) took this 13 -> 14: one optional C6 digest citing the signature
+    # verification record; ``None`` when the advisory was admitted unsigned.
+    "ReasoningMethodAdvisoryInput": 14,
 }
 
 #: The C2 common fields every top-level contract carries and neither nested shape does.

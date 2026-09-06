@@ -1517,7 +1517,8 @@ reconciled backward into the specification.
 
 ### `ReasoningMethodAdvisoryInput` — nested public shape (`RM-3`, 0.5.0)
 
-**Cardinality: 13 fields** — the thirteen below. It carries **no** C2 common field, for
+**Cardinality: 14 fields** — the fourteen below (thirteen at 0.5.0; `SCR-1` added the
+last at 0.6.0). It carries **no** C2 common field, for
 the reason C2 gives for `CandidateAdvisory`: it is a nested public shape, not a contract.
 Ratified by the three owner rulings in `ADR_UGENCE_REASONING_METHOD_PRODUCT_ENTRY.md`.
 
@@ -1550,6 +1551,7 @@ package imports nothing from the research packages (`test_boundaries.py`).
 | `qualifying_method_ids` | `list[str]` | yes | no | none | C5b; non-empty, no duplicates |
 | `primary_method_id` | `str \| None` | no | yes | `None` | C5b; present iff exactly one method qualifies, and then equal to it |
 | `evidence_refs` | `list[str]` | yes | no | none | C6; non-empty, no duplicates |
+| `result_signature_receipt_digest` | `str \| None` | no | yes | `None` | C6; the record under which the engine's signature over the comparison result was verified (`SCR-1`, `ADR_UGENCE_SIGNED_COMPARISON_RESULT_SCOPING.md`); `None` when admitted unsigned |
 
 The digest fields carry the C6 grammar (an algorithm prefix), which the advisor's own
 bare-hex digests do not; the advisor's bridge translates, one way.

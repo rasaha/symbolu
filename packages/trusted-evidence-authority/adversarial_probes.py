@@ -795,7 +795,7 @@ def probe_the_package_version_and_typing_marker():
 
     import ugence_trusted_evidence_authority as pkg
 
-    assert pkg.__version__ == "0.5.0"
+    assert pkg.__version__ == "0.6.0"
     assert not hasattr(pkg, "CONTRACT_VERSION")
     assert (pathlib.Path(pkg.__file__).resolve().parent / "py.typed").is_file()
 

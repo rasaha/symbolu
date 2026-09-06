@@ -1,5 +1,13 @@
 """Single source of truth for the ugence-agentic-proposer distribution version.
 
+0.6.0 is the `SCR-1` signed-comparison-result change set, authorized by the owner
+ruling recorded in ``docs/architecture/ADR_UGENCE_SIGNED_COMPARISON_RESULT_SCOPING.md``.
+It adds **no** public name — the curated surface stays at fifty-two — and **one**
+optional field, ``ReasoningMethodAdvisoryInput.result_signature_receipt_digest``
+(13 -> 14), the C6 digest of the record under which the engine's signature over the
+comparison result was verified, ``None`` when the advisory was admitted unsigned.
+``P_unsigned`` is untouched. Existing input constructions are unchanged.
+
 0.5.0 is the `RM-3` product-entry change set, authorized by the three owner rulings
 recorded in ``docs/architecture/ADR_UGENCE_REASONING_METHOD_PRODUCT_ENTRY.md``. It
 adds **one** public name — the nested ``ReasoningMethodAdvisoryInput`` shape —
@@ -105,4 +113,4 @@ the four ratified constants. That surface remains exported unchanged; 0.2.0 remo
 name from it. See ``CHANGELOG.md`` for what this release implements and what remains
 deferred to a later ruling — substantive multi-candidate ranking above all.
 """
-__version__ = "0.5.0"
+__version__ = "0.6.0"

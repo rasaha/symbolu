@@ -1,5 +1,28 @@
 # Changelog — ugence-agentic-proposer
 
+## 0.6.0 — `SCR-1`: the signature verification record on the reasoning-method input
+
+Authorized by the owner ruling recorded in
+[`ADR_UGENCE_SIGNED_COMPARISON_RESULT_SCOPING.md`](../../../docs/architecture/ADR_UGENCE_SIGNED_COMPARISON_RESULT_SCOPING.md).
+**No public name added; the curated surface stays at fifty-two.** `P_unsigned` is
+untouched: no advisory digest moves.
+
+### Added
+
+- **`ReasoningMethodAdvisoryInput.result_signature_receipt_digest`**, optional,
+  default `None` (13 -> 14). The C6 digest of the record under which the engine's
+  signature over the comparison result was verified — by the advisor's composition
+  root, through the Trusted Evidence Authority, outside this package — and `None`
+  when the advisory was admitted unsigned. A reference, never a verdict: this
+  package neither verifies a signature nor imports the package that does. Existing
+  input constructions are unchanged.
+
+### Unchanged
+
+- `ProposerProcessRecord` stays at 19 fields; the builder signature is unchanged.
+- This package still imports nothing from the research packages or the attestation
+  package; the advisor's bridge produces the mapping, one way.
+
 ## 0.5.0 — `RM-3`: the admitted reasoning-method advisory as typed input
 
 Authorized by the three owner rulings recorded in

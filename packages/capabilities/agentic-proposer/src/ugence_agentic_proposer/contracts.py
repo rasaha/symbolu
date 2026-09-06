@@ -1219,7 +1219,10 @@ class ReasoningMethodAdvisoryInput(BaseModel):
     ``declared_strategy`` and touches no ``DEPENDENT_FIELDS``. A reader who
     wants to know whether the recorded input was genuine resolves the digests
     against the advisor's own ``validate_admission``, outside this package.
-    Thirteen fields, no C2 common field (C2).
+    Fourteen fields, no C2 common field (C2): the fourteenth (0.6.0, SCR-1,
+    ``ADR_UGENCE_SIGNED_COMPARISON_RESULT_SCOPING.md``) is the optional digest of
+    the record under which the engine's signature over the comparison result was
+    verified, ``None`` when the advisory was admitted unsigned.
     """
 
     model_config = _MODEL_CONFIG
@@ -1237,6 +1240,9 @@ class ReasoningMethodAdvisoryInput(BaseModel):
     qualifying_method_ids: Annotated[list[Token], AfterValidator(_require_non_empty_no_duplicates)]
     primary_method_id: Optional[Token] = None
     evidence_refs: Annotated[list[DigestShaped], AfterValidator(_require_non_empty_no_duplicates)]
+    #: SCR-1 (0.6.0): the signature verification record the admission cites, by
+    #: digest; ``None`` in the research posture. A reference, never a verdict.
+    result_signature_receipt_digest: Optional[DigestShaped] = None
 
     @model_validator(mode="after")
     def _primary_is_a_sole_qualifier_or_absent(self):

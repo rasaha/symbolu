@@ -4,7 +4,9 @@
 in §7 plus ``CATALOG_METHOD_VERSION_AMBIGUOUS`` from the post-implementation
 audit correction, §11) and the three slice 3 adds for comparison evidence
 (``COMPARISON_EVIDENCE_UNBOUND``, ``COMPARISON_EVIDENCE_CONTRADICTED``,
-``RESEARCH_ONLY_REFUSED_IN_PRODUCT``). Slice 1's ``ContractError`` /
+``RESEARCH_ONLY_REFUSED_IN_PRODUCT``), plus the two SCR-1 adds for signed results
+(``COMPARISON_RESULT_UNSIGNED``, ``COMPARISON_RESULT_SIGNATURE_MISMATCH``). Slice 1's
+``ContractError`` /
 ``ContractErrorCode`` are reused unchanged for ``REF_BLANK_FIELD``,
 ``DIGEST_MALFORMED``, ``SIGNAL_TOKEN_UNKNOWN``, ``SCALAR_LABEL_FIELD_PRESENT``
 and ``DATETIME_NAIVE``.
@@ -38,6 +40,13 @@ class AdvisorErrorCode(str, Enum):
     #: ``COMPARISON_EVIDENCE_ABSENT``: a research-only advisory never enters the
     #: product, which is also how the ``rules.research.v0`` fixture is kept out.
     RESEARCH_ONLY_REFUSED_IN_PRODUCT = "RESEARCH_ONLY_REFUSED_IN_PRODUCT"
+    # SCR-1 — signed comparison results (ADR_UGENCE_SIGNED_COMPARISON_RESULT_SCOPING).
+    #: ``require_signature=True`` and no ``VerifiedResultSignature`` was handed in:
+    #: an unsigned result admits nothing under the signed posture.
+    COMPARISON_RESULT_UNSIGNED = "COMPARISON_RESULT_UNSIGNED"
+    #: A ``VerifiedResultSignature`` was handed in whose ``result_digest`` is not the
+    #: digest of the result being admitted: the signature verified some other result.
+    COMPARISON_RESULT_SIGNATURE_MISMATCH = "COMPARISON_RESULT_SIGNATURE_MISMATCH"
 
 
 class AdvisorError(ValueError):

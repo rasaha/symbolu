@@ -187,10 +187,11 @@ def test_a_resolver_may_not_answer_a_question_it_was_not_asked():
 def test_an_anchor_holds_exactly_one_capability():
     """One key, one role — unrepresentable to violate.
 
-    The role vocabulary carries three lent members beyond the two evidence roles:
+    The role vocabulary carries four lent members beyond the two evidence roles:
     ``CLOUD_SCALING_RECOMMENDATION_ATTESTATION`` (0.3.0, Cloud Scaling producer
-    attestation) and the two effect-attestation capabilities (0.4.0, Risk Authority
-    effect attestation). None changes anything here: an anchor still holds exactly
+    attestation), the two effect-attestation capabilities (0.4.0, Risk Authority
+    effect attestation) and ``COMPARISON_RESULT_ATTESTATION`` (0.6.0, reasoning-method
+    result attestation), plus the set-publication root (0.5.0). None changes anything here: an anchor still holds exactly
     one capability, the two evidence roles keep their spelling and order, and no
     path in this package resolves any lent member (see
     ``test_lent_capability_disjointness.py``).
@@ -203,6 +204,7 @@ def test_an_anchor_holds_exactly_one_capability():
         "EFFECT_ATTESTATION_EXECUTING_PROVIDER",
         "EFFECT_ATTESTATION_INDEPENDENT_OBSERVER",
         "TRUST_ANCHOR_SET_PUBLICATION",
+        "COMPARISON_RESULT_ATTESTATION",
     ]
     anchor = authority_anchor()
     assert isinstance(anchor.capability, TrustAnchorCapability)

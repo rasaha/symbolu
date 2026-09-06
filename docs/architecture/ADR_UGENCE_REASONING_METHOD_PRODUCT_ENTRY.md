@@ -52,7 +52,10 @@ additions beside them:
   and cites the result by `comparison_result_digest`; `validate_admission` replays
   coverage against that result at any later time. (Amended 2026-09-06: the first
   version took a bare `ComparisonEvidence` bundle, so a hand-built assessment could
-  admit; study-plan requirement A1 closed that structurally.)
+  admit; study-plan requirement A1 closed that structurally. Amended again the same
+  day under SCR-1: `admit` takes `verified=` and `require_signature=`, and the
+  admission — schema `advisory_admission.v3` — cites `result_signature_receipt_digest`;
+  see `ADR_UGENCE_SIGNED_COMPARISON_RESULT_SCOPING.md` §6.)
 - `to_proposer_input(admission)` — the one-way bridge. Refuses a bare advisory. Adds
   the proposer's C6 `sha256:` prefix to every digest; the advisor's own digests stay
   bare hex.

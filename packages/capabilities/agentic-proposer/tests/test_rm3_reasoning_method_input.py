@@ -104,6 +104,19 @@ def test_the_record_defaults_to_no_input_and_accepts_one():
     assert with_input.advisory_digest == bare.advisory_digest
 
 
+def test_the_signature_receipt_citation_is_optional_and_c6_shaped():
+    """SCR-1 (0.6.0): the fourteenth field cites the signature verification record by
+    digest and defaults to ``None``; it is a reference, never a verdict."""
+    assert _input().result_signature_receipt_digest is None
+    m = _input(result_signature_receipt_digest=P + "9" * 64)
+    assert m.result_signature_receipt_digest == P + "9" * 64
+    with pytest.raises(pydantic.ValidationError):
+        _input(result_signature_receipt_digest="9" * 64)  # bare hex is the advisor's grammar, not C6
+    with pytest.raises(pydantic.ValidationError):
+        _input(result_signature_receipt_digest="VERIFIED")
+    assert len(ap.ReasoningMethodAdvisoryInput.model_fields) == 14
+
+
 def test_the_builder_takes_the_input_as_a_defaulted_keyword():
     import inspect
 

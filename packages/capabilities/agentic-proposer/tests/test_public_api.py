@@ -148,7 +148,7 @@ def test_the_snapshot_carries_exactly_the_fifty_two_authorized_names():
     fifty-one, and the amendment moves field lists only.
     """
     documented = json.loads(_PUBLIC_API_JSON.read_text())
-    assert documented["package_version"] == "0.5.0"
+    assert documented["package_version"] == "0.6.0"
     assert len(documented["symbols"]) == 52
     rm3_added = {"ReasoningMethodAdvisoryInput"}
     assert rm3_added <= set(documented["symbols"])

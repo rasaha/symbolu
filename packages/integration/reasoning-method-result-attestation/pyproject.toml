@@ -1,0 +1,64 @@
+# Ugence Reasoning-Method Result Attestation — signed comparison results, contracts
+# first. Closes requirement A3 of docs/REASONING_METHOD_FIRST_ADMISSION_STUDY_PLAN.md
+# structurally; Trusted Evidence Authority DD-10 custody.
+#
+# Scoped and ratified by docs/architecture/ADR_UGENCE_SIGNED_COMPARISON_RESULT_SCOPING.md
+# (SCR-1: a new package wrapping an unmodified ReadinessComparisonResult; one
+# COMPARISON_ENGINE role under one lent capability COMPARISON_RESULT_ATTESTATION; signing
+# at the study harness's composition root behind a signer port with a production signer
+# outside the slice; verification by a role-typed verifier through TEA's resolver).
+#
+#   THIS PACKAGE VERIFIES WHO SIGNED A COMPARISON RESULT AND THAT THE BYTES ARE INTACT.
+#   IT NEVER RUNS A COMPARISON, ADMITS AN ADVISORY OR JUDGES A METHOD FIT, AND A
+#   VERIFIED SIGNATURE NEVER MEANS THE COMPARISON IS CORRECT.
+#
+# Dependency direction (one-way):
+#     ugence-reasoning-method-governance (>=0.2.0)  <- ReadinessComparisonResult, wrapped unchanged
+#     ugence-trusted-evidence-authority (>=0.6.0)   <- trust-anchor contracts, resolver port,
+#         ▲                                            Ed25519 key/codec types (exact grant)
+#     ugence-reasoning-method-result-attestation (this package)
+#
+# Never imported: the comparison engine (readiness-comparison), the advisor, the
+# workflow-fit pilot, the Agentic Proposer, cryptography or nacl directly.
+#
+# Maturity: REFERENCE-GRADE / NOT PRODUCTION-READY. No production signer, key loading,
+# key generation, network, filesystem, environment-variable, credential or discovery code.
+# No key for any comparison engine exists anywhere in the repository.
+#
+# Build:   python -m build packages/integration/reasoning-method-result-attestation
+# Verify:  python packages/integration/reasoning-method-result-attestation/scripts/verify_isolated_install.py
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ugence-reasoning-method-result-attestation"
+dynamic = ["version"]
+description = "Ugence Reasoning-Method Result Attestation — signed comparison results, contracts first: an immutable wrapper binding one unmodified ReadinessComparisonResult, one COMPARISON_ENGINE role resolved under the Trusted Evidence Authority's lent COMPARISON_RESULT_ATTESTATION capability, and one verifier. A verified signature proves which engine produced the result under which key, never that the comparison is correct. Reference-grade, not production-ready; no engine key exists."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "Proprietary" }
+authors = [{ name = "Rakesh Mohan" }]
+keywords = ["governance", "reasoning-method", "comparison", "attestation", "ed25519", "contracts", "ugence"]
+classifiers = ["Typing :: Typed"]
+dependencies = [
+    "ugence-reasoning-method-governance>=0.2.0",
+    "ugence-trusted-evidence-authority>=0.6.0",
+]
+
+[project.optional-dependencies]
+test = ["pytest>=7.0"]
+
+[tool.setuptools.dynamic]
+version = { attr = "ugence_reasoning_method_result_attestation.version.__version__" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["ugence_reasoning_method_result_attestation*"]
+
+[tool.setuptools.package-data]
+ugence_reasoning_method_result_attestation = ["py.typed"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"

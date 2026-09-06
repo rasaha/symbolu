@@ -1,6 +1,7 @@
 # ADR — Signed comparison results: scoping
 
-**Status:** scoping, 2026-09-06. Documentation only; no package, key or seam exists.
+**Status:** ratified and implemented as a contracts-only slice, 2026-09-06 (owner ruling
+SCR-1 = YES, §5; implementation record in §6). No key exists: see §4.
 Closes requirement A3 of `docs/REASONING_METHOD_FIRST_ADMISSION_STUDY_PLAN.md` on the
 precedent of `ADR_UGENCE_SIGNED_EFFECT_ATTESTATION_SCOPING.md` (SE-1 to SE-5). Labels:
 `[V]` verified, `[I]` inferred, `[R]` requires ratification, `[G]` gap.
@@ -30,9 +31,11 @@ in the repository; none of it is built, and the key does not exist.
   (`DenyAllTrustAnchorDirectory`, `trust.py:704`).
 - **The capability vocabulary is built to be extended.** `TrustAnchorCapability` is
   single-valued per anchor, so a new member is a disjoint entitlement that grants
-  nothing to any existing member `[V]` (`trust.py:142-160`). Five members exist today:
-  `EVIDENCE_PRODUCTION`, `RECEIPT_ISSUANCE`, `CLOUD_SCALING_RECOMMENDATION_ATTESTATION`,
-  and the effect-attestation pair `[V]` (`trust.py:165-197`).
+  nothing to any existing member `[V]` (`trust.py:142-160`). Six members existed before
+  this ADR: `EVIDENCE_PRODUCTION`, `RECEIPT_ISSUANCE`,
+  `CLOUD_SCALING_RECOMMENDATION_ATTESTATION`, the effect-attestation pair, and
+  `TRUST_ANCHOR_SET_PUBLICATION` `[V]` (`trust.py:165-211`). (Corrected: an earlier
+  revision of this ADR counted five.)
 - **The signing pattern.** A signer sits behind a port that advertises the authority
   and key it speaks for, so the issuer binds those coordinates into the frame before
   signing `[V]` (`authority/signing.py:160-190`); the key object exposes only
@@ -66,7 +69,7 @@ exact grounds: it owns the wrapper contract and the verifier only. It imports TE
 **Role and capability.** One role for this slice, `COMPARISON_ENGINE`, establishing
 "which engine produced this result under which key; not that the comparison is
 correct." It resolves under one new lent capability,
-`TrustAnchorCapability.COMPARISON_RESULT_ATTESTATION`, added beside the five
+`TrustAnchorCapability.COMPARISON_RESULT_ATTESTATION`, appended after the six
 existing members and covered by TEA's disjointness tests. The coordinate the engine
 identity resolves to is therefore
 `TrustAnchorCoordinate("ugence-readiness-comparison", <deployment key id>,
@@ -124,7 +127,7 @@ gains one optional field (13 → 14). `validate_admission` replays the same chec
 - Until all four exist, `require_signature=True` refuses every result, which is the
   correct behaviour and also means the first admission study runs unsigned `[R]`.
 
-## 5 — Ruling `[R]`
+## 5 — Ruling — ratified 2026-09-06 (SCR-1 = YES)
 
 **SCR-1 — SIGNED_RESULT = WRAP_AND_LEND.** Adopt §3 as scoped: a new
 `reasoning-method-result-attestation` package wrapping an unmodified
@@ -135,3 +138,34 @@ verifier through TEA's resolver; `admit()` consuming a typed `VerifiedResultSign
 and citing its receipt digest, refusing an unsigned result only when
 `require_signature` is set. The first admission study may run unsigned under this ADR's
 §4, and its admission is research evidence only until a signed result exists.
+
+## 6 — Implementation record `[V]`
+
+The contracts-only slice of §3 is built; nothing in §4 has changed.
+
+- **TEA 0.6.0.** `TrustAnchorCapability.COMPARISON_RESULT_ATTESTATION` appended as
+  the seventh member; the disjointness, lifecycle and roster tests extended; a third
+  named consumer, `packages/integration/reasoning-method-result-attestation`, in the
+  closed allowlist under the same exact symbol grant
+  (`tests/packaging/test_dependency_boundary.py`). TEA verifies nothing under it.
+- **`ugence-reasoning-method-result-attestation` 0.1.0**, mirroring
+  `risk-authority-effect-attestation` file for file: `SignedComparisonResult` over an
+  unmodified `ReadinessComparisonResult`, whose `result_digest` is recomputed through
+  the governance contract at every read; `ComparisonResultAttesterRole.COMPARISON_ENGINE`
+  → `COMPARISON_RESULT_ATTESTATION`, with the signer identity bound to the result's
+  `engine_identity`; `ComparisonResultSignerPort`; a seed-derived reference signer
+  refused in production; `Ed25519ComparisonResultVerifier` over TEA's resolver with
+  TW-1..3 posture; `verification_result_digest` as the citation. Suite, measured
+  mutation sweep (38 gates, four classified survivors) and offline isolated install
+  all pass; CI workflow `reasoning-method-result-attestation-ci.yml`.
+- **Advisor 0.3.0.** `VerifiedResultSignature`; `admit`/`validate_admission`/
+  `evidence_from_result` take `verified=` and `require_signature=`; codes
+  `COMPARISON_RESULT_UNSIGNED` and `COMPARISON_RESULT_SIGNATURE_MISMATCH`; admission
+  schema `advisory_admission.v3` with `result_signature_receipt_digest`; the bridge
+  carries it with the C6 prefix.
+- **Proposer 0.6.0.** `ReasoningMethodAdvisoryInput.result_signature_receipt_digest`,
+  optional (13 → 14 fields); no public name added; `P_unsigned` untouched.
+- **Shipped nothing of §4**: no key, no key loading, no production signer, no
+  trust-anchor set naming the engine, no harness composition root. The first
+  admission study still runs unsigned, and `require_signature=True` refuses every
+  result today.

@@ -1,0 +1,407 @@
+{
+  "distribution": "ugence-reasoning-method-result-attestation",
+  "namespace": "ugence_reasoning_method_result_attestation",
+  "package_version": "0.1.0",
+  "maturity": "REFERENCE_GRADE_NOT_PRODUCTION_READY",
+  "curated_api_module": "ugence_reasoning_method_result_attestation",
+  "note": "Machine-readable snapshot of the curated public API (ugence_reasoning_method_result_attestation.__all__). tests/packaging/test_packaging.py asserts this file equals the live package surface. Regenerate with scripts/generate_public_api.py when the curated API changes deliberately. A VERIFIED result establishes provenance and integrity only.",
+  "symbols": {
+    "COMPARISON_RESULT_ATTESTATION_ESTABLISHES": {
+      "kind": "constant",
+      "value": "PROVENANCE_AND_INTEGRITY_ONLY"
+    },
+    "COMPARISON_RESULT_ATTESTATION_SCHEMA_VERSION": {
+      "kind": "constant",
+      "value": "reasoning_method.signed_comparison_result.v1"
+    },
+    "COMPARISON_RESULT_ATTESTATION_SIGNATURE_ALGORITHM": {
+      "kind": "constant",
+      "value": "Ed25519"
+    },
+    "COMPARISON_RESULT_ATTESTATION_SIGNATURE_ENCODING": {
+      "kind": "constant",
+      "value": "ugence.trusted-evidence-authority/encoding/base16-lower/v1"
+    },
+    "COMPARISON_RESULT_ATTESTATION_SIGNATURE_PROFILE": {
+      "kind": "constant",
+      "value": "ugence.trusted-evidence-authority/signature/ed25519-sha512-pure/v1"
+    },
+    "COMPARISON_RESULT_ATTESTATION_SIGNING_DOMAIN": {
+      "kind": "constant",
+      "value": "ugence.reasoning-method-result-attestation/comparison-result-signing/v1"
+    },
+    "COMPARISON_RESULT_ATTESTER_ROLE_CAPABILITY": {
+      "kind": "mapping",
+      "entries": {
+        "COMPARISON_ENGINE": "COMPARISON_RESULT_ATTESTATION"
+      }
+    },
+    "COMPARISON_RESULT_ATTESTER_ROLE_ESTABLISHES": {
+      "kind": "mapping",
+      "entries": {
+        "COMPARISON_ENGINE": "which engine produced this comparison result under which key; not that the comparison is correct, and not that any method is fit for any task"
+      }
+    },
+    "COMPARISON_RESULT_PROJECTED_FIELDS": {
+      "kind": "tuple",
+      "values": [
+        "authority_resolution_basis",
+        "engine_identity",
+        "engine_version",
+        "produced_at",
+        "request_digest",
+        "request_id",
+        "result_digest",
+        "schema_version"
+      ]
+    },
+    "COMPARISON_RESULT_SIGNED_FIELDS": {
+      "kind": "tuple",
+      "values": [
+        "result",
+        "result_digest",
+        "schema_version",
+        "signature_algorithm",
+        "signature_encoding",
+        "signature_profile",
+        "signed_at",
+        "signer_identity",
+        "signer_key_id",
+        "signer_role",
+        "signing_domain"
+      ]
+    },
+    "ComparisonResultAttestationConfigurationError": {
+      "kind": "error"
+    },
+    "ComparisonResultAttestationContractError": {
+      "kind": "error"
+    },
+    "ComparisonResultAttestationError": {
+      "kind": "error"
+    },
+    "ComparisonResultAttestationSigningBoundaryError": {
+      "kind": "error"
+    },
+    "ComparisonResultAttesterRole": {
+      "kind": "enum",
+      "values": [
+        "COMPARISON_ENGINE"
+      ]
+    },
+    "ComparisonResultRefusalReason": {
+      "kind": "enum",
+      "values": [
+        "ATTESTATION_ABSENT",
+        "UNSUPPORTED_EXACT_TYPE",
+        "UNSUPPORTED_SCHEMA_VERSION",
+        "UNSUPPORTED_SIGNING_DOMAIN",
+        "UNSUPPORTED_ALGORITHM",
+        "UNSUPPORTED_PROFILE",
+        "UNSUPPORTED_ENCODING",
+        "ROLE_MISMATCH",
+        "WRONG_ENGINE_IDENTITY",
+        "RESULT_MISMATCH",
+        "ANCHOR_UNKNOWN",
+        "ANCHOR_UNAVAILABLE",
+        "ANCHOR_SET_UNAVAILABLE",
+        "ANCHOR_SET_STALE",
+        "ANCHOR_COORDINATE_MISMATCH",
+        "WRONG_CAPABILITY",
+        "ANCHOR_REVOKED",
+        "ANCHOR_DISABLED",
+        "ANCHOR_NOT_YET_VALID",
+        "ANCHOR_EXPIRED",
+        "ANCHOR_REVISION_MISMATCH",
+        "KEY_MATERIAL_INVALID",
+        "PAYLOAD_MISMATCH",
+        "MALFORMED_SIGNATURE",
+        "SIGNATURE_INVALID",
+        "VERIFICATION_UNAVAILABLE"
+      ]
+    },
+    "ComparisonResultSignerPort": {
+      "kind": "protocol",
+      "methods": [
+        "sign_comparison_result",
+        "signer_identity",
+        "signer_key_id",
+        "signer_role"
+      ]
+    },
+    "ComparisonResultVerificationOutcome": {
+      "kind": "enum",
+      "values": [
+        "VERIFIED",
+        "REFUSED"
+      ]
+    },
+    "ComparisonResultVerificationResult": {
+      "kind": "dataclass",
+      "fields": [
+        "outcome",
+        "refusal_reason",
+        "signer_role",
+        "signer_identity",
+        "signer_key_id",
+        "engine_identity",
+        "result_digest",
+        "signing_payload_digest",
+        "anchor_coordinate_digest",
+        "anchor_record_digest",
+        "evaluated_at",
+        "detail"
+      ]
+    },
+    "ComparisonResultVerifierPort": {
+      "kind": "protocol",
+      "methods": [
+        "verify"
+      ]
+    },
+    "DenyAllTrustAnchorDirectory": {
+      "kind": "class",
+      "methods": [
+        "resolve"
+      ]
+    },
+    "Ed25519ComparisonResultVerifier": {
+      "kind": "class",
+      "methods": [
+        "verify"
+      ]
+    },
+    "KeyRevocation": {
+      "kind": "dataclass",
+      "fields": [
+        "effective_at",
+        "reason_ref"
+      ]
+    },
+    "MATURITY": {
+      "kind": "constant",
+      "value": "REFERENCE_GRADE_NOT_PRODUCTION_READY"
+    },
+    "REFERENCE_GRADE_RESOLVERS": {
+      "kind": "tuple",
+      "values": [
+        "StaticTrustAnchorDirectory"
+      ]
+    },
+    "ReferenceEd25519ComparisonResultSigner": {
+      "kind": "class",
+      "methods": [
+        "sign_comparison_result",
+        "trust_anchor"
+      ]
+    },
+    "SignedComparisonResult": {
+      "kind": "dataclass",
+      "fields": [
+        "result",
+        "signer_role",
+        "signer_identity",
+        "signer_key_id",
+        "signed_at",
+        "signature",
+        "schema_version",
+        "signing_domain",
+        "signature_algorithm",
+        "signature_profile",
+        "signature_encoding"
+      ]
+    },
+    "StaticTrustAnchorDirectory": {
+      "kind": "class",
+      "methods": [
+        "resolve",
+        "with_anchor"
+      ]
+    },
+    "TRUST_ANCHOR_SET_REASONS": {
+      "kind": "mapping",
+      "entries": {
+        "TRUSTED_EVIDENCE_TRUST_ANCHOR_SET_UNAVAILABLE": "ANCHOR_SET_UNAVAILABLE",
+        "TRUSTED_EVIDENCE_TRUST_ANCHOR_SET_STALE": "ANCHOR_SET_STALE"
+      }
+    },
+    "TrustAnchorCapability": {
+      "kind": "enum",
+      "values": [
+        "EVIDENCE_PRODUCTION",
+        "RECEIPT_ISSUANCE",
+        "CLOUD_SCALING_RECOMMENDATION_ATTESTATION",
+        "EFFECT_ATTESTATION_EXECUTING_PROVIDER",
+        "EFFECT_ATTESTATION_INDEPENDENT_OBSERVER",
+        "TRUST_ANCHOR_SET_PUBLICATION",
+        "COMPARISON_RESULT_ATTESTATION"
+      ]
+    },
+    "TrustAnchorCoordinate": {
+      "kind": "dataclass",
+      "fields": [
+        "authority_id",
+        "key_id",
+        "capability"
+      ]
+    },
+    "TrustAnchorRecord": {
+      "kind": "dataclass",
+      "fields": [
+        "authority_id",
+        "key_id",
+        "capability",
+        "public_key",
+        "trust_anchor_set_id",
+        "trust_anchor_set_version",
+        "signature_profile",
+        "signature_encoding",
+        "effective_from",
+        "effective_to",
+        "disabled",
+        "revocation"
+      ]
+    },
+    "TrustAnchorResolution": {
+      "kind": "dataclass",
+      "fields": [
+        "coordinate",
+        "anchor",
+        "refusal_reason"
+      ]
+    },
+    "TrustAnchorResolverPort": {
+      "kind": "protocol",
+      "methods": [
+        "resolve"
+      ]
+    },
+    "__version__": {
+      "kind": "constant",
+      "value": "0.1.0"
+    },
+    "anchor_coordinate_digest": {
+      "kind": "function",
+      "parameters": [
+        "coordinate"
+      ]
+    },
+    "anchor_lifecycle_refusal": {
+      "kind": "function",
+      "parameters": [
+        "anchor",
+        "as_of"
+      ]
+    },
+    "anchor_record_digest": {
+      "kind": "function",
+      "parameters": [
+        "anchor"
+      ]
+    },
+    "anchor_verification_key": {
+      "kind": "function",
+      "parameters": [
+        "anchor"
+      ]
+    },
+    "canonical_bytes": {
+      "kind": "function",
+      "parameters": [
+        "value"
+      ]
+    },
+    "canonical_comparison_result": {
+      "kind": "function",
+      "parameters": [
+        "result"
+      ]
+    },
+    "canonical_digest": {
+      "kind": "function",
+      "parameters": [
+        "value"
+      ]
+    },
+    "capability_for_role": {
+      "kind": "function",
+      "parameters": [
+        "role"
+      ]
+    },
+    "comparison_result_digest": {
+      "kind": "function",
+      "parameters": [
+        "result"
+      ]
+    },
+    "comparison_result_signer_coordinate": {
+      "kind": "function",
+      "parameters": [
+        "role",
+        "signer_identity",
+        "signer_key_id"
+      ]
+    },
+    "comparison_result_signing_bytes": {
+      "kind": "function",
+      "parameters": [
+        "payload"
+      ]
+    },
+    "comparison_result_signing_payload": {
+      "kind": "function",
+      "parameters": [
+        "result",
+        "signer_role",
+        "signer_identity",
+        "signer_key_id",
+        "signed_at",
+        "schema_version",
+        "signing_domain",
+        "signature_algorithm",
+        "signature_profile",
+        "signature_encoding"
+      ]
+    },
+    "declares_production_posture": {
+      "kind": "function",
+      "parameters": [
+        "resolver"
+      ]
+    },
+    "recomputed_result_digest": {
+      "kind": "function",
+      "parameters": [
+        "result"
+      ]
+    },
+    "require_production_resolver": {
+      "kind": "function",
+      "parameters": [
+        "resolver"
+      ]
+    },
+    "resolver_serves_production": {
+      "kind": "function",
+      "parameters": [
+        "resolver"
+      ]
+    },
+    "sign_comparison_result": {
+      "kind": "function",
+      "parameters": [
+        "result",
+        "signer",
+        "signed_at",
+        "production_mode"
+      ]
+    },
+    "verification_result_digest": {
+      "kind": "function",
+      "parameters": [
+        "result"
+      ]
+    }
+  }
+}

@@ -1,0 +1,129 @@
+name: reasoning-method-result-attestation-ci
+
+# Scoped CI for the "Signed comparison results" slice
+# (ugence-reasoning-method-result-attestation), scoped by
+# docs/architecture/ADR_UGENCE_SIGNED_COMPARISON_RESULT_SCOPING.md (SCR-1).
+#
+# A verified signed result proves which engine produced a comparison result under
+# which key, never that the comparison is correct. The package is REFERENCE-GRADE /
+# NOT PRODUCTION-READY, and no key for any comparison engine exists.
+#
+# ADDITIVE and PATH-SCOPED. It does not touch or weaken trusted-evidence-authority-ci,
+# risk-authority-effect-attestation-ci or the reasoning-method workflows. It runs the
+# package suite, the measured mutation sweep, the offline isolated-install proof, and
+# the neighbouring baselines this slice touches or borrows from (the Trusted Evidence
+# Authority, whose enum lent one capability and whose consumer allowlist names a third
+# package; the effect-attestation package this one mirrors; the governance contracts it
+# wraps; and the advisor that consumes the typed fact).
+
+on:
+  pull_request:
+    paths:
+      - "packages/integration/reasoning-method-result-attestation/**"
+      - "packages/trusted-evidence-authority/**"
+      - "packages/capabilities/reasoning-method-governance/**"
+      - "packages/capabilities/reasoning-method-advisor/**"
+      - "docs/architecture/ADR_UGENCE_SIGNED_COMPARISON_RESULT_SCOPING.md"
+      - ".github/workflows/reasoning-method-result-attestation-ci.yml"
+  push:
+    branches:
+      - "claude/**"
+    paths:
+      - "packages/integration/reasoning-method-result-attestation/**"
+      - "packages/trusted-evidence-authority/**"
+      - "packages/capabilities/reasoning-method-governance/**"
+      - ".github/workflows/reasoning-method-result-attestation-ci.yml"
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  comparison-result-attestation-suite:
+    name: Package suite + public-API parity + measured mutation sweep
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest build pyflakes \
+                      "cryptography>=41.0.7,<47.0.0" "PyNaCl>=1.5.0,<2.0.0"
+          pip install --no-deps \
+            -e packages/jcs \
+            -e packages/governance-contracts \
+            -e packages/uvi-policy-contracts \
+            -e packages/capabilities/reasoning-method-governance \
+            -e packages/trusted-evidence-authority \
+            -e packages/integration/reasoning-method-result-attestation
+      - name: Static hygiene
+        run: |
+          cd packages/integration/reasoning-method-result-attestation
+          python -m pyflakes src tests scripts conftest.py
+      - name: Package suite (from the package directory; its conftest owns sys.path)
+        run: |
+          cd packages/integration/reasoning-method-result-attestation
+          python -m pytest tests -q -p no:cacheprovider
+      - name: Public-API manifest is generated, not hand-edited
+        run: |
+          cd packages/integration/reasoning-method-result-attestation
+          python scripts/generate_public_api.py --check
+      - name: Measured mutation sweep — every survivor classified or the job fails
+        run: python packages/integration/reasoning-method-result-attestation/scripts/mutation_sweep.py
+      - name: The committed mutation ledger equals the one just measured
+        run: git diff --exit-code -- packages/integration/reasoning-method-result-attestation/mutation_ledger.json
+
+  neighbouring-baselines:
+    name: TEA, effect-attestation, governance and advisor baselines remain green
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest numpy build pydantic \
+                      "cryptography>=41.0.7,<47.0.0" "PyNaCl>=1.5.0,<2.0.0"
+          pip install --no-deps \
+            -e packages/jcs \
+            -e packages/governance-contracts \
+            -e packages/uvi-policy-contracts \
+            -e packages/trusted-evidence-authority \
+            -e packages/capabilities/reasoning-method-governance \
+            -e packages/capabilities/reasoning-method-advisor \
+            -e packages/capabilities/readiness-comparison \
+            -e packages/capabilities/agentic-proposer \
+            -e packages/integration/risk-authority-effect-attestation \
+            -e packages/integration/reasoning-method-result-attestation
+      - name: Trusted Evidence Authority (lent one comparison-result capability; third consumer named)
+        run: python -m pytest packages/trusted-evidence-authority -q -p no:cacheprovider
+      - name: Risk Authority effect attestation (the package this one mirrors)
+        run: python -m pytest packages/integration/risk-authority-effect-attestation -q -p no:cacheprovider
+      - name: Reasoning-method governance (the wrapped contract, unchanged)
+        run: python -m pytest packages/capabilities/reasoning-method-governance -q -p no:cacheprovider
+      - name: Reasoning-method advisor (consumes the typed VerifiedResultSignature)
+        run: python -m pytest packages/capabilities/reasoning-method-advisor -q -p no:cacheprovider
+      - name: Repository import boundaries and package-CI coverage
+        run: |
+          python -m pytest tests/boundaries/test_package_import_boundaries.py tests/boundaries/test_package_ci_coverage.py -q -p no:cacheprovider
+          python scripts/check_package_ci_coverage.py
+
+  isolated-install:
+    name: Offline isolated install, negative controls, source-vs-installed parity
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install build tooling (host environment only)
+        run: |
+          python -m pip install --upgrade pip
+          pip install build wheel
+      - name: Phase A online, phases B–D offline
+        run: python packages/integration/reasoning-method-result-attestation/scripts/verify_isolated_install.py
