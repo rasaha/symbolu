@@ -34,9 +34,22 @@ COPY packages/tooling/policy-workflow-compiler /build/compiler
 # CR-2: the combined application imports the v2 surface, whose services import the
 # agent runtime (dependency-free) at module import. Nothing else is added to the layer.
 COPY packages/runtime/agent-runtime /build/agent-runtime
+# Front-door seam 1 (FD-5): the activation root the Constitution screen preflights
+# against, and the packages it imports. Deny-by-default trust; no key material.
+COPY packages/governance-contracts /build/pkgs/governance-contracts
+COPY packages/jcs /build/pkgs/jcs
+COPY packages/uvi-policy-contracts /build/pkgs/uvi-policy-contracts
+COPY packages/policy-authority /build/pkgs/policy-authority
+COPY packages/capabilities/agentic-proposer /build/pkgs/agentic-proposer
+COPY packages/integration/agent-constitution-policy /build/pkgs/agent-constitution-policy
+COPY packages/integration/agent-constitution-conformance /build/pkgs/agent-constitution-conformance
+COPY packages/integration/agent-constitution-activation /build/pkgs/agent-constitution-activation
 COPY deployment/governance-studio /build/deployment
 RUN pip install --no-cache-dir "pydantic>=2" "fastapi>=0.110" "uvicorn>=0.27" "starlette>=0.36" \
- && pip install --no-cache-dir /build/compiler /build/awc /build/agent-runtime /build/backend /build/deployment
+ && pip install --no-cache-dir /build/compiler /build/awc /build/agent-runtime \
+      /build/pkgs/governance-contracts /build/pkgs/jcs /build/pkgs/uvi-policy-contracts /build/pkgs/policy-authority \
+      /build/pkgs/agentic-proposer /build/pkgs/agent-constitution-policy /build/pkgs/agent-constitution-conformance \
+      /build/pkgs/agent-constitution-activation /build/backend /build/deployment
 
 # ---- Stage 3: minimal runtime image -----------------------------------------
 FROM python:3.11-slim-bookworm@sha256:b18992999dbe963a45a8a4da40ac2b1975be1a776d939d098c647482bcad5cba AS runtime

@@ -41,7 +41,7 @@ from .core.canonical import (
     sha256_hex,
     to_canonical_obj,
 )
-from .core.codec import PolicyArtifactCodec
+from .core.codec import PolicyArtifactCodec, decode_dataclass
 from .core.consistency import (
     PolicyRegistryConsistencyClaim,
     PolicyRegistryConsistencyDescriptor,
@@ -188,6 +188,7 @@ __all__ = [
     "SqlitePolicyRegistry",
     "SQLITE_REGISTRY_SCHEMA_VERSION",
     "PolicyArtifactCodec",
+    "decode_dataclass",
     "UviPolicyArtifactCodec",
     "PolicyRegistryConsistencyScope",
     "PolicyRegistryConsistencyClaim",

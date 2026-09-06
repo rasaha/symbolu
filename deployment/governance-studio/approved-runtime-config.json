@@ -1,7 +1,7 @@
 {
   "schema_version": "1",
   "deployment": "governance-studio-private-hosted",
-  "deployment_version": "0.2.0",
+  "deployment_version": "0.3.0",
   "single_process": true,
   "exposed_ports": [
     "8443/tcp"
@@ -67,6 +67,30 @@
     "persistent_database"
   ],
   "configuration_added": {
-    "UGENCE_STUDIO_REVIEW_SERVICE_URL": "optional; read by DeploymentConfig and handed to build_studio_context(review_service_base_url=...) and nowhere else"
-  }
+    "UGENCE_STUDIO_REVIEW_SERVICE_URL": "optional; read by DeploymentConfig and handed to build_studio_context(review_service_base_url=...) and nowhere else",
+    "UGENCE_STUDIO_CONSTITUTION_REGISTRY_PATH": "optional; read by DeploymentConfig and handed to build_studio_context(activation_root=...) and nowhere else; an absolute sqlite file path under the writable runtime volume (front-door seam 1, FD-5)"
+  },
+  "constitution_registry": {
+    "ruling": "ADR_UGENCE_STUDIO_FRONT_DOOR_SCOPING.md FD-1 ONE_SEAM_PER_STEP, FD-5 SCREEN_1_ONLY (activation root)",
+    "store": "SqlitePolicyRegistry (policy-authority Posture B) at UGENCE_STUDIO_CONSTITUTION_REGISTRY_PATH, a file under the writable runtime volume /var/run/ugence-studio",
+    "durability": "that of the runtime volume's mount; the prohibited persistent_database (an external database server, driver or DSN) stands: no server, no driver, no DSN",
+    "trust": "the constitution authority's DenyAllSignatureVerifier and DenyAllApprovalVerifier and a signer that refuses every act; no key material, no trust anchor, no credential in the image or the container",
+    "reachable_acts": "preflight only (mutation-free); issuance and activation have no route and refuse if invoked",
+    "unset": "the Constitution screen reports the typed gap constitution_preflight (available false)",
+    "composition_record": "composition-record.json (an ai-system-registry SystemRegistration, FD-3)"
+  },
+  "first_party_packages_in_image": [
+    "apps/ugence-governance-studio/backend",
+    "packages/capabilities/agent-workforce-composer",
+    "packages/tooling/policy-workflow-compiler",
+    "packages/runtime/agent-runtime",
+    "packages/governance-contracts",
+    "packages/jcs",
+    "packages/uvi-policy-contracts",
+    "packages/policy-authority",
+    "packages/capabilities/agentic-proposer",
+    "packages/integration/agent-constitution-policy",
+    "packages/integration/agent-constitution-conformance",
+    "packages/integration/agent-constitution-activation"
+  ]
 }

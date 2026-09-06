@@ -28,6 +28,9 @@ services:
       # CR-2: the governed runtime worker's private TLS listener; unset = review screens
       # report a typed gap. The only outbound destination this profile permits.
       UGENCE_STUDIO_REVIEW_SERVICE_URL: ${UGENCE_STUDIO_REVIEW_SERVICE_URL:-}
+      # Front-door seam 1: the sqlite policy registry under the runtime volume; unset =
+      # the Constitution screen reports a typed gap. No key material is ever mounted.
+      UGENCE_STUDIO_CONSTITUTION_REGISTRY_PATH: ${UGENCE_STUDIO_CONSTITUTION_REGISTRY_PATH:-}
     volumes:
       # certificate material is mounted READ-ONLY; the private key is never baked in
       - type: bind

@@ -5,6 +5,14 @@ All notable changes to this package are documented here. The surface snapshot in
 `tests/packaging/test_public_api.py`, including dataclass field order and the
 exact value of every string constant.
 
+## 0.3.1 — decode_dataclass is public
+
+- `decode_dataclass(cls, value, *, path)` is exported from the curated surface. It is
+  the strict canonical-structure decoder the registry codecs already use (typed,
+  refusing anything the contracts refuse at construction). A composition root or a
+  thin studio rebuilds a family artifact from its canonical document through it
+  instead of reaching into `core`. No behaviour changed.
+
 ## 0.3.0 — durable single-node registry (ADR §15.7, decision D-3)
 
 Closes the persistence deferral recorded in ADR §15.7, under decision D-3 of

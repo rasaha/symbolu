@@ -1,0 +1,39 @@
+{
+  "schema": "governance-studio.composition-record.v1",
+  "ruling": "ADR_UGENCE_STUDIO_FRONT_DOOR_SCOPING.md FD-3 COMPOSITION_RECORD_IN_REGISTRY: an ai-system-registry SystemRegistration; immutable and versioned by system_version; no new package",
+  "binding": {
+    "binding_id": "governance-studio-private-hosted/front-door/seam-1",
+    "tenant_id": "ugence-platform",
+    "subject_id": "governance-studio",
+    "context_id": "p3e-private-hosted",
+    "context_digest": "a5a8baa3a6d105d23181eaf0dae0c58dbe1e8a51eb5b6b46bbce3c4c2635cdbb",
+    "system_id": "governance-studio-private-hosted",
+    "system_version": "0.3.0",
+    "configuration_id": "approved-runtime-config.json",
+    "configuration_digest": "7bb1d07e03a2bb351eaf825317d55d89ab4cee4a448d055c37c91f65f8ddb15e",
+    "deployment_environment_ref": "private-hosted"
+  },
+  "registration": {
+    "registration_id": "reg_ae7d03070a79245ca5a31eb83c2fffb8",
+    "binding_digest": "ec4d36306169eb650e244a3a9883a1b90143514afcbd3f11a46982ec36573c36",
+    "tenant_id": "ugence-platform",
+    "system_id": "governance-studio-private-hosted",
+    "system_version": "0.3.0",
+    "owner_ref": "rasaha",
+    "classification_label": "REFERENCE_GRADE_SHADOW_ONLY",
+    "validity": {
+      "issued_at": "2026-09-06T00:00:00.000000+00:00",
+      "expires_at": "2027-09-06T00:00:00.000000+00:00",
+      "stale_after": ""
+    },
+    "supersedes": "",
+    "registered_by": "governance-studio-deployment/0.3.0",
+    "notes": "Front-door composition, seam 1 (FD-1 ONE_SEAM_PER_STEP, FD-5 SCREEN_1_ONLY): build_studio_context receives review_service_base_url (CR-2) and activation_root over SqlitePolicyRegistry at UGENCE_STUDIO_CONSTITUTION_REGISTRY_PATH with DenyAll verifiers and a refusing signer; every other seam absent. A later seam registers a new record superseding this one; this record is never edited."
+  },
+  "record_digest": "6416a5984823f7e230fa0429918b22766b86f40e6edac1c6fd6db3ed8f9201d2",
+  "seams_handed_to_build_studio_context": [
+    "review_service_base_url",
+    "activation_root"
+  ],
+  "configuration_digest_of": "deployment/governance-studio/approved-runtime-config.json (sha-256 of the file bytes)"
+}

@@ -100,8 +100,19 @@ reports its real result and issuance refuses.
 
 ## 7 — Next step
 
-The next P3E amendment under FD-1 and FD-5: one seam, the activation root, in the CR-2
-shape (one configuration value, one freeze-test amendment, its own failure tests and
+**Seam 1 shipped** (`governance-studio-deployment` 0.3.0): `UGENCE_STUDIO_CONSTITUTION_REGISTRY_PATH`
+composes `build_activation_root` over `SqlitePolicyRegistry` under the runtime volume
+with `DenyAll` verifiers and a refusing signer; preflight reports the activation
+package's real result, issuance and activation refuse, no key material exists; the
+composition is `composition-record.json`, an `ai-system-registry` record (FD-3).
+Composing surfaced two studio-backend defects fixed alongside (a `from_dict` that did
+not exist; a bare-string approval reference where an `ApprovalEvidenceRef` is
+required) and made `decode_dataclass` public in policy-authority 0.3.1. The frozen v2
+request still carries the approval reference as one string, read as a typed
+three-part encoding; a structured field is a v2 contract amendment for a later,
+separately ruled step. The next seam waits on its own ruling under FD-1.
+
+The shape every seam follows: the CR-2 shape (one configuration value, one freeze-test amendment, its own failure tests and
 maturity statement, one PR), preserving `REFERENCE_GRADE_SHADOW_ONLY`, the frozen
 runtime configuration, existing v1 and v2 behaviour, and every credential and LIVE
 prohibition. Issued by its own implementation prompt.

@@ -45,9 +45,10 @@ def _build_backend(config: DeploymentConfig):
     """Instantiate the FROZEN v1 backend with v2 mounted behind it (CR-2), pinned to
     the synthetic scenario root.
 
-    The v2 studio context receives exactly one thing from this deployment: the review
-    service base URL, or nothing. Every other v2 dependency stays absent, so those
-    screens report their gaps rather than a fixture.
+    The v2 studio context receives exactly two things from this deployment: the review
+    service base URL (CR-2) and, when a registry path is configured, the activation
+    root of front-door seam 1 (FD-5), each or neither. Every other v2 dependency stays
+    absent, so those screens report their gaps rather than a fixture.
     """
     from ugence_governance_studio_api.app_v2 import build_studio_context, create_combined_app
     from ugence_governance_studio_api.settings import ApiSettings
@@ -59,7 +60,16 @@ def _build_backend(config: DeploymentConfig):
         enable_authentication=False,      # deployment access gate performs authentication
         scenario_root=os.path.abspath(config.scenarios_root),
     )
-    studio = build_studio_context(review_service_base_url=config.review_service_url or None)
+    activation_root = None
+    if config.constitution_registry_path:
+        from .activation import build_studio_activation_root
+
+        activation_root = build_studio_activation_root(
+            config.constitution_registry_path, production_mode=config.is_production)
+    studio = build_studio_context(
+        activation_root=activation_root,
+        review_service_base_url=config.review_service_url or None,
+    )
     return create_combined_app(settings, studio=studio)
 
 

@@ -79,17 +79,52 @@ class ConstitutionService:
     ``activation_root`` is injected. When none is configured — the repository ships no
     signing key or trust root — preflight reports itself unavailable and names that,
     rather than preflighting against an ephemeral key and implying a real check ran.
+
+    Input is typed only (front-door ruling FD-4): a constitution document is decoded
+    by the policy authority's own typed decoder into the family's artifact, and an
+    approval reference must carry every field an ``ApprovalEvidenceRef`` needs. No
+    default is inferred and nothing is repaired; what does not decode is refused with
+    a typed diagnostic.
     """
+
+    CAPABILITY = "constitution_preflight"
 
     def __init__(self, activation_root: Any = None) -> None:
         self._root = activation_root
 
-    def validate(self, constitution: Dict[str, Any]) -> Dict[str, Any]:
-        """Structural validation through the constitution policy package's own model."""
+    @staticmethod
+    def _decode(constitution: Dict[str, Any]) -> Any:
+        """The family artifact from its canonical document, or a typed error."""
         from ugence_agent_constitution_policy import AgentConstitutionPolicy
+        from ugence_policy_authority import decode_dataclass
 
+        return decode_dataclass(AgentConstitutionPolicy, constitution, path="$")
+
+    @staticmethod
+    def _approval_evidence_ref(text: Optional[str]) -> Any:
+        """``ApprovalEvidenceRef`` from the v2 request's reference string.
+
+        The frozen v2 contract carries one string. It is read as exactly three
+        ``|``-separated parts, ``<approving_authority_id>|<approval_ref>|<digest>`` (the digest a bare lowercase
+        64-character sha-256 hex string), every part required; anything else is refused. This is a typed encoding, not
+        an inference: a missing or partial reference never becomes a default.
+        """
+        from ugence_policy_authority import ApprovalEvidenceRef
+
+        if not isinstance(text, str) or text.count("|") != 2:
+            raise ValueError(
+                "approval_reference must be '<approving_authority_id>|<approval_ref>|<digest>'; "
+                "preflight needs the approval artifact's authority, reference and digest and "
+                "infers none of them"
+            )
+        authority, ref, digest = (part.strip() for part in text.split("|"))
+        return ApprovalEvidenceRef(approval_ref=ref, approval_digest=digest,
+                                   approving_authority_id=authority)
+
+    def validate(self, constitution: Dict[str, Any]) -> Dict[str, Any]:
+        """Structural validation through the family's own typed decoder."""
         try:
-            policy = AgentConstitutionPolicy.from_dict(constitution)
+            policy = self._decode(constitution)
         except Exception as exc:  # noqa: BLE001 - an invalid document is a 422, not a 500
             return {
                 "available": True,
@@ -102,7 +137,7 @@ class ConstitutionService:
             "validation_state": "VALID",
             "diagnostics": [],
             "digest": canonical_digest(constitution),
-            "constitution_id": getattr(policy, "constitution_id", None),
+            "constitution_id": getattr(policy, "agent_constitution_ref", None),
         }
 
     def preflight(
@@ -114,24 +149,44 @@ class ConstitutionService:
         expected_reference_tenant_id: Optional[str],
         as_of: Any,
     ) -> Dict[str, Any]:
-        """Dry-run every pre-signing check. Mutation-free by the entry point's contract."""
+        """Dry-run every pre-signing check. Mutation-free by the entry point's contract.
+
+        With a root configured, the answer is the activation package's own: its report
+        when the request is well-formed, its typed refusal when it is not. Neither
+        issues, signs or stores anything.
+        """
         if self._root is None:
             return _unavailable(
-                "constitution_preflight",
+                self.CAPABILITY,
                 "no ActivationRoot is configured: this repository ships no signing key "
                 "and no trust root, so a preflight would check nothing real",
             )
-        from ugence_agent_constitution_policy import AgentConstitutionPolicy
+        from ugence_agent_constitution_activation import AgentConstitutionActivationError
+        from ugence_policy_authority import PolicyAuthorityError
 
-        policy = AgentConstitutionPolicy.from_dict(constitution)
-        report = self._root.preflight_issuance(
-            policy=policy,
-            record_id=record_id,
-            approval=approval_reference,
-            as_of=as_of,
-            expected_reference_tenant_id=expected_reference_tenant_id,
-        )
-        return {"available": True, "result": to_jsonable(report)}
+        def refused(code: str, message: str) -> Dict[str, Any]:
+            return {"available": True, "preflight_state": "REFUSED", "result": None,
+                    "diagnostics": [{"code": code, "message": message}]}
+
+        try:
+            policy = self._decode(constitution)
+        except Exception as exc:  # noqa: BLE001 - typed refusal, never a 500
+            return refused("invalid_constitution", str(exc))
+        try:
+            approval = self._approval_evidence_ref(approval_reference)
+        except Exception as exc:  # noqa: BLE001
+            return refused("approval_reference_unstructured", str(exc))
+        try:
+            report = self._root.preflight_issuance(
+                policy=policy,
+                record_id=record_id,
+                approval=approval,
+                as_of=as_of,
+                expected_reference_tenant_id=expected_reference_tenant_id,
+            )
+        except (AgentConstitutionActivationError, PolicyAuthorityError, ValueError) as exc:
+            return refused("preflight_refused", str(exc))
+        return {"available": True, "preflight_state": "REPORTED", "result": to_jsonable(report)}
 
 
 # --------------------------------------------------------------------------- #
