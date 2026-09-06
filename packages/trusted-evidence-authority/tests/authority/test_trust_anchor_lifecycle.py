@@ -202,6 +202,7 @@ def test_an_anchor_holds_exactly_one_capability():
         "CLOUD_SCALING_RECOMMENDATION_ATTESTATION",
         "EFFECT_ATTESTATION_EXECUTING_PROVIDER",
         "EFFECT_ATTESTATION_INDEPENDENT_OBSERVER",
+        "TRUST_ANCHOR_SET_PUBLICATION",
     ]
     anchor = authority_anchor()
     assert isinstance(anchor.capability, TrustAnchorCapability)

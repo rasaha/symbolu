@@ -202,6 +202,14 @@ class TrustAnchorCapability(str, Enum):
     #: the truth of its observation. This package defines both effect
     #: coordinates and **verifies nothing** under either.
     EFFECT_ATTESTATION_INDEPENDENT_OBSERVER = "EFFECT_ATTESTATION_INDEPENDENT_OBSERVER"
+    #: The anchor's key signs a **trust-anchor-set manifest** (TR-2,
+    #: ADR_UGENCE_TEA_PRODUCTION_TRUST_ANCHOR_RESOLVER). Held only by a pinned
+    #: bootstrap root provisioned at the composition boundary; a snapshot may
+    #: never carry an anchor under this capability, so a set can never
+    #: authenticate itself. Confers no evidence production, receipt issuance,
+    #: Cloud Scaling or effect-attestation entitlement, and none of those
+    #: capabilities may authenticate a set.
+    TRUST_ANCHOR_SET_PUBLICATION = "TRUST_ANCHOR_SET_PUBLICATION"
 
 
 @dataclass(frozen=True)
@@ -522,8 +530,24 @@ class TrustAnchorResolverPort(Protocol):
     with.
     """
 
-    def resolve(self, coordinate: TrustAnchorCoordinate) -> TrustAnchorResolution:
-        """Return the typed resolution for this exact coordinate."""
+    def resolve(
+        self,
+        coordinate: TrustAnchorCoordinate,
+        *,
+        as_of: Optional[datetime] = None,
+    ) -> TrustAnchorResolution:
+        """Return the typed resolution for this exact coordinate.
+
+        ``as_of`` is the additive TR-3-PROTOCOL amendment: the explicit,
+        timezone-aware instant of **this** resolution. The default exists for
+        source compatibility only. The reference and deny-all directories
+        accept and ignore it; a resolver declaring
+        ``is_production_authoritative = True`` **requires** it on every call
+        and refuses ``TRUSTED_EVIDENCE_TRUST_ANCHOR_SET_INSTANT_REQUIRED``
+        otherwise, so no production resolution can succeed at ``as_of=None``.
+        A third-party resolver that lacks the keyword is not
+        production-conformant under this release.
+        """
         ...
 
 
@@ -640,8 +664,18 @@ class StaticTrustAnchorDirectory:
             trust_anchor_set_version=self._set_version,
         )
 
-    def resolve(self, coordinate: TrustAnchorCoordinate) -> TrustAnchorResolution:
-        """Exact-triple lookup. A near miss is a miss."""
+    def resolve(
+        self,
+        coordinate: TrustAnchorCoordinate,
+        *,
+        as_of: Optional[datetime] = None,
+    ) -> TrustAnchorResolution:
+        """Exact-triple lookup. A near miss is a miss.
+
+        ``as_of`` is accepted for protocol compatibility and ignored: this is
+        the reference directory, it enforces no freshness, and it is refused as
+        a production resolver by every consumer for exactly that reason.
+        """
 
         require_exact_type(
             coordinate,
@@ -683,7 +717,15 @@ class DenyAllTrustAnchorDirectory:
 
     __slots__ = ()
 
-    def resolve(self, coordinate: TrustAnchorCoordinate) -> TrustAnchorResolution:
+    def resolve(
+        self,
+        coordinate: TrustAnchorCoordinate,
+        *,
+        as_of: Optional[datetime] = None,
+    ) -> TrustAnchorResolution:
+        """Refuse. ``as_of`` is accepted for protocol compatibility; there is
+        nothing it could change, because there is nothing here to be fresh."""
+
         require_exact_type(
             coordinate,
             TrustAnchorCoordinate,

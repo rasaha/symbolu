@@ -73,14 +73,23 @@ TEV2_EXPECTED_ORDER = [
     "TRUSTED_EVIDENCE_RECEIPT_EXPIRED",
 ]
 
-EXPECTED_ORDER = TEV1_EXPECTED_ORDER + TEV2_EXPECTED_ORDER
+#: The 0.5.0 additive block (TR-3, ADR_UGENCE_TEA_PRODUCTION_TRUST_ANCHOR_RESOLVER),
+#: appended after every TEV-2 member so no earlier ordinal moves.
+TR3_EXPECTED_ORDER = [
+    "TRUSTED_EVIDENCE_TRUST_ANCHOR_SET_INSTANT_REQUIRED",
+    "TRUSTED_EVIDENCE_TRUST_ANCHOR_SET_UNAVAILABLE",
+    "TRUSTED_EVIDENCE_TRUST_ANCHOR_SET_STALE",
+]
+
+EXPECTED_ORDER = TEV1_EXPECTED_ORDER + TEV2_EXPECTED_ORDER + TR3_EXPECTED_ORDER
 
 
 def test_the_vocabulary_is_exactly_the_ratified_set_in_order():
     assert [m.name for m in R] == EXPECTED_ORDER
     assert len(TEV1_EXPECTED_ORDER) == 19
     assert len(TEV2_EXPECTED_ORDER) == 21
-    assert len(EXPECTED_ORDER) == 40
+    assert len(TR3_EXPECTED_ORDER) == 3
+    assert len(EXPECTED_ORDER) == 43
 
 
 def test_the_tev1_nineteen_are_still_the_first_nineteen_in_order():
@@ -97,7 +106,12 @@ def test_the_tev1_nineteen_are_still_the_first_nineteen_in_order():
 
 
 def test_the_tev2_block_is_appended_and_disjoint_from_tev1():
-    assert [m.name for m in R][19:] == TEV2_EXPECTED_ORDER
+    assert [m.name for m in R][19:40] == TEV2_EXPECTED_ORDER
+    # 0.5.0 appends the TR-3 block after every TEV-2 member; the exported
+    # ``TEV2_TRUSTED_EVIDENCE_REFUSAL_REASONS`` set is "everything after TEV-1"
+    # and therefore contains the TR-3 members too, which is what the
+    # disjointness below asserts.
+    assert [m.name for m in R][40:] == TR3_EXPECTED_ORDER
     assert TEV1_TRUSTED_EVIDENCE_REFUSAL_REASONS.isdisjoint(
         TEV2_TRUSTED_EVIDENCE_REFUSAL_REASONS
     )

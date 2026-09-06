@@ -76,7 +76,7 @@ Import the curated surface from :mod:`ugence_trusted_evidence_authority.api`.
 
 from __future__ import annotations
 
-__version__ = "0.4.0"
+__version__ = "0.5.0"
 
 from .contracts import (  # noqa: E402
     EVIDENCE_IDENTITY_DIGEST_DOMAIN,
@@ -157,6 +157,18 @@ from .authority import (  # noqa: E402
     TrustAnchorRecord,
     TrustAnchorResolution,
     TrustAnchorResolverPort,
+    TRUST_ANCHOR_SET_MANIFEST_SCHEMA_V1,
+    TRUST_ANCHOR_SET_DOCUMENT_SCHEMA_V1,
+    TRUST_ANCHOR_SET_PUBLICATION_SIGNING_DOMAIN,
+    TRUST_ANCHOR_SET_COLLECTION_DIGEST_DOMAIN,
+    TrustAnchorSetManifest,
+    TrustAnchorSetSnapshot,
+    TrustAnchorSetLoadFailure,
+    SignedSnapshotTrustAnchorResolver,
+    trust_anchor_collection_digest,
+    trust_anchor_set_signing_bytes,
+    parse_trust_anchor_set_document,
+    render_trust_anchor_set_document,
     TrustedEvidenceSigningKey,
     TrustedEvidenceVerificationKey,
     audit_record_for_determination,
@@ -234,6 +246,18 @@ __all__ = [
     "TrustAnchorRecord",
     "TrustAnchorResolution",
     "TrustAnchorResolverPort",
+    "TRUST_ANCHOR_SET_MANIFEST_SCHEMA_V1",
+    "TRUST_ANCHOR_SET_DOCUMENT_SCHEMA_V1",
+    "TRUST_ANCHOR_SET_PUBLICATION_SIGNING_DOMAIN",
+    "TRUST_ANCHOR_SET_COLLECTION_DIGEST_DOMAIN",
+    "TrustAnchorSetManifest",
+    "TrustAnchorSetSnapshot",
+    "TrustAnchorSetLoadFailure",
+    "SignedSnapshotTrustAnchorResolver",
+    "trust_anchor_collection_digest",
+    "trust_anchor_set_signing_bytes",
+    "parse_trust_anchor_set_document",
+    "render_trust_anchor_set_document",
     "StaticTrustAnchorDirectory",
     "DenyAllTrustAnchorDirectory",
     # the two signed artifacts and their signed-byte reconstruction

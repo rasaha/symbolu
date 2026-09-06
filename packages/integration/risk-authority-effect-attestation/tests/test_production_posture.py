@@ -31,7 +31,7 @@ def test_a_subclass_of_the_static_directory_is_refused_in_production():
 
 def test_a_resolver_without_a_production_claim_is_refused_in_production():
     class Quiet:
-        def resolve(self, coordinate):
+        def resolve(self, coordinate, *, as_of=None):
             return ea.DenyAllTrustAnchorDirectory().resolve(coordinate)
 
     with pytest.raises(ea.EffectAttestationConfigurationError):

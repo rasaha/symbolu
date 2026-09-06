@@ -25,7 +25,15 @@ def _sources():
 
 
 def test_the_package_version_is_the_expected_additive_minor_bump():
-    """0.3.0 -> 0.4.0: additive, backward-compatible.
+    """0.4.0 -> 0.5.0: additive, backward-compatible.
+
+    One further :class:`TrustAnchorCapability` member, ``TRUST_ANCHOR_SET_PUBLICATION``,
+    three appended refusal reasons, the keyword-only ``as_of`` on the resolver port
+    (TR-3-PROTOCOL) and the signed-snapshot resolver candidate, per
+    ADR_UGENCE_TEA_PRODUCTION_TRUST_ANCHOR_RESOLVER. Nothing existing moved.
+
+    The 0.4.0 rationale, kept for the record:
+    0.3.0 -> 0.4.0: additive, backward-compatible.
 
     The same rule as 0.2.0 -> 0.3.0, applied a third time: two further
     :class:`TrustAnchorCapability` members, ``EFFECT_ATTESTATION_EXECUTING_PROVIDER``
@@ -50,8 +58,8 @@ def test_the_package_version_is_the_expected_additive_minor_bump():
     path admits it (see the disjointness tests below).
     """
 
-    assert ugence_trusted_evidence_authority.__version__ == "0.4.0"
-    assert api.__version__ == "0.4.0"
+    assert ugence_trusted_evidence_authority.__version__ == "0.5.0"
+    assert api.__version__ == "0.5.0"
 
 
 def test_no_separate_contract_version_constant_is_minted():
@@ -331,9 +339,13 @@ def test_hashlib_is_used_only_for_digests_and_the_rfc8032_hash():
                 a.name == "hashlib" for a in node.names
             ):
                 users.append(path.name)
+    # 0.5.0: ``authority/trust_snapshot.py`` uses sha-256 for the complete-
+    # collection digest of a trust-anchor set (TR-2), over a framed sequence of
+    # each record's canonical bytes; a digest, never a signature.
     assert sorted(set(users)) == [
         "canonical.py",
         "reverification.py",
+        "trust_snapshot.py",
         "verification.py",
     ]
 

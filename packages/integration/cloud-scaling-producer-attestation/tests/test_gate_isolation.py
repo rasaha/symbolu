@@ -283,6 +283,7 @@ def test_the_catch_all_is_the_load_bearing_capability_separation():
     catch_all_only = {
         TrustAnchorCapability.EFFECT_ATTESTATION_EXECUTING_PROVIDER,
         TrustAnchorCapability.EFFECT_ATTESTATION_INDEPENDENT_OBSERVER,
+        TrustAnchorCapability.TRUST_ANCHOR_SET_PUBLICATION,
     }
     assert set(TrustAnchorCapability) == named | {dedicated} | catch_all_only, (
         "TEV's capability roster changed; a member outside the dedicated one, the two "

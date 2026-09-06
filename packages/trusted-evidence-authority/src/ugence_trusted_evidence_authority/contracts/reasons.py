@@ -265,6 +265,25 @@ class TrustedEvidenceRefusalReason(str, Enum):
     #: end bound. Distinct from `TRUSTED_EVIDENCE_STALE`, which is the evidence's.
     TRUSTED_EVIDENCE_RECEIPT_EXPIRED = "TRUSTED_EVIDENCE_RECEIPT_EXPIRED"
 
+    # -- trust-anchor set (TR-3; ADR_UGENCE_TEA_PRODUCTION_TRUST_ANCHOR_RESOLVER) -- #
+    #: TR-3-PROTOCOL — a production resolver was asked to resolve without an
+    #: explicit timezone-aware ``as_of``. Refused before any snapshot content is
+    #: consulted; the compatibility default is never a production fallback.
+    TRUSTED_EVIDENCE_TRUST_ANCHOR_SET_INSTANT_REQUIRED = (
+        "TRUSTED_EVIDENCE_TRUST_ANCHOR_SET_INSTANT_REQUIRED"
+    )
+    #: TR-3 — the trust state could not be consulted: the snapshot was not
+    #: admitted (unreadable, malformed, tampered, rolled back, self-authenticating
+    #: or signed by no pinned root), or its publication root or validity window
+    #: does not cover ``as_of``. Distinct from stale, and never a cached answer.
+    TRUSTED_EVIDENCE_TRUST_ANCHOR_SET_UNAVAILABLE = (
+        "TRUSTED_EVIDENCE_TRUST_ANCHOR_SET_UNAVAILABLE"
+    )
+    #: TR-3 — the snapshot was admitted but is no longer fresh at ``as_of``:
+    #: the earlier of its signed ``effective_to`` and ``published_at`` plus the
+    #: owner-configured maximum age has passed. Half-open, per ADR §17.9.
+    TRUSTED_EVIDENCE_TRUST_ANCHOR_SET_STALE = "TRUSTED_EVIDENCE_TRUST_ANCHOR_SET_STALE"
+
 
 #: The nineteen refusal codes ratified and shipped by TEV-1, frozen for
 #: backward compatibility.

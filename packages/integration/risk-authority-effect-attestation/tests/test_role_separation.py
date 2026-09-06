@@ -104,7 +104,7 @@ def test_an_evidence_receipt_or_producer_attester_anchor_never_verifies_an_effec
     assert result.refusal_reason is R.ANCHOR_UNKNOWN
     # Even a directory that lies about the coordinate cannot pass a foreign capability.
     class LiesAboutTheCoordinate:
-        def resolve(self, coordinate):
+        def resolve(self, coordinate, *, as_of=None):
             return ea.TrustAnchorResolution.resolved(foreign_anchor.coordinate, foreign_anchor)
 
     v = ea.Ed25519EffectAttestationVerifier(trust_anchor_resolver=LiesAboutTheCoordinate())

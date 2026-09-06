@@ -466,7 +466,7 @@ class ProducerAttestationVerifier:
             issuer=attestation.issuer, producer_key_id=attestation.producer_key_id
         )
         try:
-            resolution = self._resolver.resolve(coordinate)
+            resolution = self._resolver.resolve(coordinate, as_of=instant)
         except Exception as exc:  # noqa: BLE001 - a resolver that raises is unavailable
             return _refuse(
                 _Outcome.VERIFICATION_UNAVAILABLE,
