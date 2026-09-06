@@ -1,9 +1,10 @@
 # ADR — Trusted Evidence Authority production trust-anchor resolver (TR-1 to TR-5)
 
-**Status:** rulings ratified by the owner, 2026-09-06. **Implementation halted at
-the TR-3 protocol check**: enforcing snapshot freshness on every resolution
-requires an additive amendment to a public contract, presented in §5 for owner
-ruling. No resolver code exists yet.
+**Status:** rulings TR-1 to TR-5 ratified by the owner, 2026-09-06; the §5
+protocol amendment ratified the same day as **TR-3-PROTOCOL =
+KEYWORD_ONLY_AS_OF_ON_RESOLVE**; implemented in
+`ugence-trusted-evidence-authority` 0.5.0 as a production-shaped resolver
+candidate.
 **Maturity of the eventual result:** a production-shaped resolver candidate only.
 Not independently reviewed, not externally cryptographically audited, not
 production-ready. D-38 and D-32(4) remain applicable.
@@ -65,7 +66,7 @@ package may read no clock, and an injected "current instant" supplier would be a
 clock by another name, which D-11, D-28 and the 5B-2 ratification all reject in
 favour of an explicit instant input. Enforcing TR-3 on every resolution therefore
 requires changing the public `TrustAnchorResolverPort`. Per the ruling,
-implementation stops here.
+implementation stopped at this finding until the amendment below was ruled.
 
 **Smallest additive amendment (recommended).** Add one keyword-only optional
 parameter to the port and to both shipped directories:
@@ -92,8 +93,57 @@ instant-free resolver precedent, but it makes the resolver unable to refuse a
 stale snapshot itself, which TR-3 requires, and it spreads the freshness rule
 across four verifiers instead of one resolver.
 
-**Owner decision required.** Ratify the keyword-only `as_of` amendment, ratify
-the alternative, or rule a third shape. Until ruled, no resolver code is written.
+**Ruled: TR-3-PROTOCOL = KEYWORD_ONLY_AS_OF_ON_RESOLVE.** The port is amended
+additively to `resolve(coordinate, *, as_of=None)`. Consequences, as ratified
+and as implemented `[V]`:
+
+1. callers that omit `as_of` remain source-compatible;
+2. `StaticTrustAnchorDirectory` and `DenyAllTrustAnchorDirectory` accept the
+   keyword and preserve their behaviour;
+3. a resolver declaring `is_production_authoritative = True` requires an explicit
+   timezone-aware `as_of` on every resolution;
+4. a missing, naive, malformed or wrong-type `as_of` returns the typed refusal
+   `TRUSTED_EVIDENCE_TRUST_ANCHOR_SET_INSTANT_REQUIRED` (the package's
+   `TRUSTED_EVIDENCE_` prefix applied to the ruled name);
+5. the production resolver reads no clock, environment, filesystem metadata
+   time or hidden time supplier;
+6. freshness is evaluated against the `as_of` of that exact resolution;
+7. the alternative is rejected because it delegates enforcement to consumers;
+8. the default exists for compatibility only; no production resolution
+   succeeds at `as_of=None`.
+
+The four existing call sites forward their instant (`verification.py`,
+`reverification.py`, 5B-0A, effect attestation), which is contract migration
+only and not production consumer wiring; every in-repository double accepts the
+keyword. A third-party resolver that lacks the keyword is not
+production-conformant under 0.5.0.
+
+## 5a — Reconciliation with the package's filesystem ban `[V]`
+
+TR-1 says the snapshot is "loaded at the deployment composition root", and
+`tests/packaging/test_no_clock_or_environment.py` bans `open(`, `os`, `pathlib`
+and every clock call across the package's source tree. Both hold: the
+composition root performs the file read and hands the **complete bytes** to
+`SignedSnapshotTrustAnchorResolver.from_document`, which verifies atomically and
+admits nothing on any failure. An unreadable file is passed as `None` and yields
+the typed unavailable state. No file is opened inside the package.
+
+## 5b — What 0.5.0 ships `[V]`
+
+`TrustAnchorCapability.TRUST_ANCHOR_SET_PUBLICATION`; `TrustAnchorSetManifest`,
+`TrustAnchorSetSnapshot`, the wire document (`parse_…`/`render_…`), the
+complete-collection digest and the publication signing bytes;
+`SignedSnapshotTrustAnchorResolver.from_document(document, publication_root=,
+max_snapshot_age=, last_accepted_set_version=)`; `TrustAnchorSetLoadFailure`;
+the three appended refusal reasons; the resolver conformance harness
+(`tests/authority/resolver_conformance.py`); a measured mutation sweep. Every
+snapshot check runs in the ruled order: instant, admission, publication root
+lifecycle and set window at `as_of`, freshness, exact coordinate, typed
+resolution. Anchor lifecycle stays with the verifier.
+
+Not-yet-valid sets refuse as unavailable, not stale: the ruling minted three
+reasons, and a set that is not yet in force is trust state that cannot be
+consulted at that instant rather than trust state that has aged out.
 
 ## 6 — Stated explicitly
 
@@ -106,5 +156,5 @@ the alternative, or rule a third shape. Until ruled, no resolver code is written
 
 ## 7 — Next step
 
-Owner ruling on §5. Then implement the resolver, capability, contracts and
-conformance suite as a TEA minor release on this branch, one PR.
+Separate acceptance of 0.5.0, then wire effect attestation to the resolver at
+reference grade under TR-5, still without a production claim.
