@@ -127,7 +127,9 @@ def _run_suite(working: pathlib.Path) -> tuple:
         return True, ""
     lines = [l for l in result.stdout.splitlines() if l.startswith("FAILED") or l.startswith("ERROR")]
     if lines:
-        return False, lines[0]
+        # Keep only the node id: newer pytest appends " - <assertion text>" to the
+        # short summary, and that suffix is not stable across versions or machines.
+        return False, lines[0].split(" - ", 1)[0].strip()
     tail = result.stdout.strip().splitlines()
     return False, tail[-1] if tail else "no output"
 

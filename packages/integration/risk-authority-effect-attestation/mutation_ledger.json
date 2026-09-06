@@ -189,7 +189,7 @@
       "module": "roles.py",
       "description": "provider role maps to the provider capability",
       "status": "KILLED",
-      "first_failure": "ERROR tests/packaging/test_packaging.py - AssertionError",
+      "first_failure": "ERROR tests/packaging/test_packaging.py",
       "classification": null
     },
     {
