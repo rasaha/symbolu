@@ -108,6 +108,20 @@ class ReviewDecisionRequest(StrictModel):
     justification: str = Field(min_length=1)
 
 
+class ReviewStartShadowRunRequest(StrictModel):
+    """Ask the governed runtime worker to start its own shadow run (front-door seam 6,
+    FD-10.2), relayed as typed (FD-10.1).
+
+    The one field is the operator's correlation id, a typed token, or nothing. No
+    workflow, task, provider, mode or definition digest can be carried here, by
+    construction (FD-10.3): the worker holds the definition and its own digest binds
+    the run, and the mode word the studio sends is pinned to ``shadow`` in the client.
+    """
+
+    correlation_id: Optional[str] = Field(
+        default=None, min_length=1, max_length=64, pattern=r"^[A-Za-z0-9][A-Za-z0-9._:-]{0,63}$")
+
+
 # --------------------------------------------------------------------------- #
 # Registration (front-door seam 5, FD-9)
 # --------------------------------------------------------------------------- #

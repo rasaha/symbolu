@@ -159,8 +159,49 @@ once (v2-A1, `openapi_v2.amendments.json`) by `v2_registry_register` and
 `v2_registry_list`, the generated client regenerated, the P3E freeze carrying the
 new digest; `register` is the only write; the composition record supersedes the
 seam-3 record (`composition-record.seam-3.json`, unchanged); §10.4's failure matrix
-is tests. The next seam (the governed hook in the worker-relay shape, or the console
-once FD-8.3 is complete) waits on its own ruling under FD-1.
+is tests. **Seam 6 shipped** (`governance-studio-deployment` 0.7.0, FD-10, with
+`governed-review-service` 0.5.0 and `governed-runtime-worker` 0.2.0): the worker's
+sixth route `POST /review/runs` (`review_start_shadow_run`) asks a `ShadowRunStarter`
+the worker composes to start the worker's own `wf-shadow` under the worker's own
+definition digest, minting the instance id from the caller's typed correlation id and
+running the first bounded quantum so the run parks on ESCALATE in the existing queue;
+the adapter's `DefinitionVersionMismatch` and `InstanceIdentityError` are the typed
+`REFUSED_DEFINITION` and `REFUSED_CONFLICT`, a retried start is `REPLAYED`, any mode
+word but `shadow` is `REFUSED_MODE`, and any other body key is refused with 422 so no
+workflow, task, provider, mode or digest crosses (FD-10.3). The studio's review client
+is six routes (four reads, two relays), `StartRunService` relays the typed request and
+returns the worker's answer unchanged, the v2 contract is amended once more (v2-A2,
+`v2_review_start_shadow_run`) with its generated client and the frontend manifest, the
+Simulate screen shows the seam-3 in-process run and the worker relay as two labelled
+paths (FD-10.5), the P3E egress record and its freeze test name six routes over the one
+existing destination, CR-2 and HR-1 are amended in their ADRs, and §11.3's matrix is
+tests in the worker, the studio backend and the profile. No configuration value, image
+package, credential or second egress destination was added; the composition record
+supersedes the seam-5 record (`composition-record.seam-5.json`, unchanged). **Seam 7
+shipped** (`governance-studio-deployment` 0.8.0, FD-11, with `control-plane-root` 0.2.0,
+`governed-review-service` 0.6.0 and `governed-runtime-worker` 0.3.0): the ledger's one
+raw read, `read_entries`, returns a tenant's own rows for one correlation id in chain
+order, refusing a blank key, an in-memory store and a foreign schema version, and its
+ADR D-5 and README say a raw read is not reconstruction; the worker's seventh route
+`GET /review/audit/{correlation_id}` (`review_read_audit`) returns the worker's own
+tenant's rows with `chain_verified` as a typed field, a chain that does not verify is
+`REFUSED_INTEGRITY` with the entries withheld, another schema version `REFUSED_SCHEMA`,
+no reader `REFUSED_UNCONFIGURED`, unknown 404, malformed 422, no list-all route and no
+write; the studio's review client is seven routes (five reads, two relays),
+`LedgerObserveService` returns the worker's answer unchanged under a backend-stated
+source label, the v2 contract is amended a third time (v2-A3, `v2_observe_ledger_chain`)
+with its generated client and the frontend manifest, the Observe screen shows the
+worker ledger and the console's typed gap as two labelled sources (FD-11.4) and
+re-derives nothing, the P3E egress record and freeze test name seven routes over the
+one destination, CR-2 is amended again in its ADR, and §12.4 is tests in
+control-plane-root, the review service, the worker, the studio backend and the profile.
+No configuration value, image package, credential or second egress destination was
+added; the composition record supersedes the seam-6 record
+(`composition-record.seam-6.json`, unchanged). What remains is audited in §13: one
+studio-alone seam (typed data-use declarations, outline screen 5) is still enterable
+and waits on ruling FD-12; the console is a packaging body of work, a durable Decision
+Authority store a package decision, and the mirror coordinates, Langflow fixture and
+enterprise issuer are owner inputs.
 
 The shape every seam follows: the CR-2 shape (one configuration value, one freeze-test amendment, its own failure tests and
 maturity statement, one PR), preserving `REFERENCE_GRADE_SHADOW_ONLY`, the frozen
@@ -529,3 +570,444 @@ one configuration value), a superseding composition record (FD-3), and the failu
 matrix named in §10.4. FD-1, FD-3, FD-4, the `REFERENCE_GRADE_SHADOW_ONLY` ceiling,
 `ENFORCEMENT_ENABLED = False`, the frozen v1 contract, every FROM line and ratified
 digest, and every credential, egress and LIVE prohibition are preserved.
+
+## 11 — Audit: the governed hook in the worker-relay shape (2026-09-06)
+
+**The question.** With seams 1, 2, 3 and 5 shipped and seam 4 absent by ruling, can
+the governed hook reach the Simulate screen as a run executed by the worker and
+relayed like the review screens? **Yes, in exactly one shape:** the studio asks the
+worker to start the worker's own shadow workflow and reads it back through the routes
+that already exist; nothing the studio holds crosses the wire. Whether asking another
+unit to start its fixture run is the studio "executing" under SD-2 is the owner's
+call. Everything below is documentation; no seam is activated.
+
+### 11.1 What exists today `[V]`
+
+- **No route starts a run.** The review service exposes five routes (four reads, one
+  relayed decision; `http.py:33-39`); its only adapter calls are `status`, `signal`
+  and `resume` (`service.py:309, 530, 554`). The worker's own end-to-end test starts
+  its run in process, `worker.adapter.start(workflow_id=ShadowWorkload.WORKFLOW_ID, …)`
+  (`test_end_to_end.py:115`). The studio's review client is a closed set of the same
+  five routes with one proof route (`clients/review.py`), the P3E egress record names
+  the five (`approved-runtime-config.json`, `external_network_egress.permitted[0].routes`),
+  and the frontend manifest freezes them (`review_service_routes_reachable_from_the_studio`).
+- **The worker runs one definition.** `ShadowWorkload` defines `wf-shadow` only, one
+  consequential task on the `FIXTURE_ONLY` `ShadowProvider`, and its upstream source
+  parks every proposal on ESCALATE (`workload.py`). The DBOS adapter binds every
+  instance to the worker's `definition_digest` at composition and refuses a start under
+  any other (`DefinitionVersionMismatch`, `dbos_engine.py:222-236`), refuses a
+  conflicting duplicate start and returns the existing handle for an identical one
+  (`InstanceIdentityError`, idempotent on `instance_id`). A studio-supplied workflow
+  therefore cannot run on the worker at all; that is a property, not a choice.
+- **The sink exists.** ESCALATE from the governed hook lands in the approval ledger
+  and the review queue; the existing decision relay resumes the bounded quantum
+  (HR-A to HR-E). A relayed run needs no new sink.
+- **The worker's postures hold.** Private TLS listener, identity port mandatory in
+  production (CR-3), one deployment-mode switch (CR-4), JWKS as its only egress (CR-5),
+  `SINGLE_TENANT` with its own configured tenant.
+- **What the rulings say.** CR-2 names one configuration value and the five routes;
+  HR-1 says the studio "holds no approver identity, computes no eligibility, consumes
+  nothing, signals nothing and resumes nothing"; SD-2 says the studio never executes;
+  FD-7.1 admitted a fixture-only, non-LIVE run in P3E as a demonstration, not agent
+  execution; FD-7.3 kept the hook out of P3E because ESCALATE had no sink there.
+
+### 11.2 The one admissible shape `[I]`
+
+A sixth worker route, `POST /review/runs`, that starts the worker's own `wf-shadow`
+with a worker-minted instance id and an optional typed correlation id, idempotent by
+the adapter's own rule; the studio relays it through its client, then reads the run,
+its events and its approvals through the four routes it already has, and a human's
+decision travels through the one relay it already has. No workflow, task, provider,
+mode or digest is sent: the digest binding makes any other shape unrunnable, and FD-4
+forbids untyped intake. The Simulate screen would show two labelled paths: the seam-3
+in-process fixture run (hook absent, every consequential task BLOCKs) and the worker
+relay (the governed hook over the approval-bound source, ESCALATE parked in the
+review queue, resumed only by a recorded decision).
+
+What it amends: the worker (one route, one `adapter.start` call, tests); the review
+service (`ROUTES` gains one entry whose operation id passes the prohibition scan); the
+studio's review client (six routes, the proof route unchanged); CR-2 and the P3E
+egress record and its freeze test (six routes); the frontend manifest; the v2 contract
+(a second amendment, one operation) and its generated client; HR-1's wording (the
+studio may start the worker's own shadow run; it still signals and resumes nothing).
+It adds no configuration value, no package to the P3E image, no credential and no
+second egress destination.
+
+### 11.3 Failure matrix (what the code does today, or would by construction)
+
+| # | Case | Result |
+|---|---|---|
+| 1 | review URL unset | typed gap `review_service`, as the review screens `[V]` |
+| 2 | worker unreachable, or the route absent on an older worker | typed gap naming the failure, never an empty run `[V]` (HTTP 404 surfaces as unavailable) |
+| 3 | a studio-supplied workflow, provider, mode or digest | not expressible: the route takes none; a foreign digest is refused by the adapter `[V]` |
+| 4 | duplicate start | idempotent on the instance id; a conflicting one refused `[V]` |
+| 5 | ESCALATE | parked in the existing queue; visible on Review, resumed only by a recorded decision `[V]` |
+| 6 | decision without a proof | `PRESENTED_UNPROVEN`, as today; production requires the identity port (CR-3) `[V]` |
+| 7 | cross-tenant | the worker is `SINGLE_TENANT` with its own tenant; the studio names none `[V]` |
+| 8 | LIVE | the worker's providers are `FIXTURE_ONLY`; the route names no mode `[V]` |
+| 9 | credential | none crosses on the start; the proof header stays on the decision route only (ID-1) `[V]` |
+| 10 | the studio's in-process Simulate | unchanged; a second, labelled path, never merged `[G]` until built |
+
+### 11.4 Prohibitions any admissible shape must preserve `[V]`
+
+No credential in the studio; no second egress destination (the worker's listener is
+the one already permitted); the worker's only egress stays the JWKS host (CR-5); no
+studio-supplied definition, provider or mode; SD-2's seven verbs absent from every
+operation id and path; LIVE absent; `ENFORCEMENT_ENABLED` False; the frozen v1 bytes,
+every FROM line and ratified digest untouched; `REFERENCE_GRADE_SHADOW_ONLY`; the
+worker image's own gate set unchanged.
+
+### 11.5 Proposed ruling FD-10 (five decisions, recommended first; ruled in §11.6)
+
+| # | Decision | Options |
+|---|---|---|
+| **FD-10.1** | Is starting the worker's own shadow run the studio executing (SD-2)? | **`START_IS_A_RELAY`**: asking a separate unit to start the fixture workflow it already owns, over `FIXTURE_ONLY` providers, with nothing supplied by the studio, is display and transmit in FD-7.1's sense, not execution; SD-2's verbs stay absent from the route. `START_IS_EXECUTION`: the relay stays absent. |
+| **FD-10.2** | The route | **`SIXTH_ROUTE_START_SHADOW_RUN`**: `POST /review/runs` on the worker, body an optional typed correlation id, the worker mints the instance id, idempotent by the adapter's rule. `SEPARATE_SIMULATE_SERVICE` (a new unit; not next). |
+| **FD-10.3** | What crosses | **`NO_DEFINITION_CROSSES`**: no workflow, task, provider, mode or digest is sent; the worker's definition digest binds. `TYPED_DEFINITION_UPLOAD` (refused by the digest binding). |
+| **FD-10.4** | The amendment set | **`ONE_STEP_AMENDMENT`**: CR-2 (six routes), HR-1 (start of the worker's own shadow run added; signal and resume still absent), the P3E egress record and freeze test, the frontend manifest, the v2 contract (amendment v2-A2, one operation) and generated client, in one step with tests. |
+| **FD-10.5** | The Simulate screen | **`TWO_LABELLED_PATHS`**: the in-process fixture run and the worker relay are distinct, each labelled with its executor, hook and maturity; never merged into one "run". |
+
+### 11.6 Ruling FD-10 (owner, 2026-09-06)
+
+| # | Ruling |
+|---|---|
+| **FD-10.1** | **`START_IS_A_RELAY`.** Asking the separate governed runtime worker to start the fixture workflow it already owns, over `FIXTURE_ONLY` providers, with nothing supplied by the studio, is display and transmit in FD-7.1's sense, not execution. SD-2's seven verbs stay absent from every operation id and path; the studio still executes nothing. |
+| **FD-10.2** | **`SIXTH_ROUTE_START_SHADOW_RUN`.** Seam 6 is `POST /review/runs` on the worker: the body is an optional typed correlation id, the worker mints the instance id, the start is idempotent by the DBOS adapter's own rule, and the run is read back through the four existing reads and resumed only through the existing decision relay. |
+| **FD-10.3** | **`NO_DEFINITION_CROSSES`.** No workflow, task, provider, mode or digest is sent by the studio; the worker's `definition_digest` binds every instance to the definition it already runs, and the adapter's refusal of any other digest stands as the property that makes the seam safe. |
+| **FD-10.4** | **`ONE_STEP_AMENDMENT`.** CR-2 (six routes), HR-1's wording (the studio may start the worker's own shadow run; it still signals and resumes nothing), the P3E egress record and its freeze test, the frontend manifest, and the v2 contract (amendment v2-A2, one operation) with its generated client are amended together, in one step, with tests. No configuration value, image package, credential or second egress destination is added. |
+| **FD-10.5** | **`TWO_LABELLED_PATHS`.** The Simulate screen shows the seam-3 in-process fixture run and the worker relay as distinct paths, each labelled with its executor, its hook and its maturity; they are never merged into one "run". |
+
+**What the ruling authorizes.** Documentation only. No seam is activated, no route
+exists, no contract byte moves and no code changes. Seam 6 activates by its own
+implementation prompt (issued and shipped 2026-09-06; see §7), which ships in one step: the worker route and its
+`adapter.start` call with tests, the review service's sixth `ROUTES` entry, the
+studio's review client and relay service, the v2 amendment v2-A2 with the regenerated
+client, the frontend manifest and the Simulate screen's second labelled path, the P3E
+egress record and freeze test, CR-2 and HR-1 amended in their ADRs, and the failure
+matrix of §11.3 as tests. FD-1, FD-3, FD-4, SD-2, CR-3, CR-4, CR-5, the
+`REFERENCE_GRADE_SHADOW_ONLY` ceiling, `ENFORCEMENT_ENABLED = False`, the frozen v1
+contract, every FROM line and ratified digest, the worker image's gate set, and every
+credential, egress and LIVE prohibition are preserved.
+
+## 12 — Next-step audit under FD-1 (2026-09-06, after seam 6)
+
+**The question.** With seams 1, 2, 3, 5 and 6 shipped and seam 4 absent by ruling,
+which of the three remaining candidates can be entered next as one bounded seam: the
+console once FD-8.3 is satisfiable, a durable Decision Authority record store as a
+package decision, or Observe over the worker's ledger (FD-8.5's later seam)?
+**Observe over the worker's ledger.** The console is a package-and-deployment body of
+work that FD-8.3 says does not begin here, and a durable Decision Authority store
+would still hold nothing. Everything below is documentation; no seam is activated.
+
+### 12.1 The console once FD-8.3 is satisfiable `[V]`
+
+- **Unchanged since §9.1.** `ugence_console_api/` is still the root-level prototype:
+  two commits in its history (`785f49e56`, `6509dc5fa`), no distribution under
+  `packages/` or `products/` (a name search finds none), plain HTTP on `0.0.0.0:8090`
+  with CORS `*` (`app.py:42-56`), and an in-memory `AuditStore` documented as "a
+  prototype seam" (`audit.py:8-11`). Its audit record is the console's own shape
+  (`AuditChain`: `correlation_id`, `cer_id`, `mode`, `final_disposition`, stage
+  entries; `models.py:169-182`), read by `list_ids` and `get` (`audit.py:26-34`).
+- **FD-8.3 is not satisfiable by a front-door step.** The ruling names what must be
+  true first (a bounded, installable, tested package or deployment unit with explicit
+  public API, configuration, persistence boundary, authentication boundary, maturity
+  label and import restrictions) and says "packaging is a separately scoped future body
+  of work; it does not begin here" (§9.5). None of those exists. The console's
+  capabilities import root legacy modules under fail-safe imports (§9.1), so the
+  import-restriction boundary alone is a scoping question of its own.
+- **What entering it would amend.** A new package or third deployment unit with its
+  own scoping ADR, gate set and evidence manifest (as the worker has); FD-8.4's second
+  egress destination, moving the P3E freeze from one destination to two, https only,
+  with the four console routes named; the console client unchanged; the Observe screen
+  labelled per FD-8.5. **What it must preserve.** No credential in the studio; SD-2's
+  four console routes and nothing that authorizes, clears or executes; the mode pinned
+  to shadow by the studio (FD-8.2); LIVE absent; `REFERENCE_GRADE_SHADOW_ONLY`;
+  `ENFORCEMENT_ENABLED` False; the frozen v1 bytes, every FROM line and ratified
+  digest.
+- `[I]` At least three ruled steps stand between here and seam 4: the console's own
+  scoping and packaging ADR, its deployment unit and evidence, then FD-8.4's egress
+  amendment. Not a front-door seam; not next.
+
+### 12.2 A durable Decision Authority record store `[V]`
+
+- **Frozen and in-memory.** `decision-authority` 1.0.0 "stays frozen" (gap-sequencing
+  ratification D-2). `DecisionCaseRepository` is an eighteen-method append-only Protocol
+  (`repositories/decision_case_repository.py:29-52`; §10.2 counted seventeen, corrected
+  here) with `InMemoryDecisionCaseRepository` as its only implementation, alongside the
+  in-memory action-request and execution repositories; no sqlite or other durable
+  implementation exists in the package.
+- **No producer.** Outside the package, `create_case` and `record_decision` are called
+  only by test harnesses and the external-consumer packaging example
+  (`packages/providers/actiongate/tests/lifecycle_harness.py:74-76`,
+  `packages/governance-provider-framework/tests/kernel_lifecycle.py:47-49`,
+  `packaging/external_consumer/consumer.py:85-89`). No deployment unit produces a
+  decision record; the worker consumes Decision Authority as a `GovernanceVetoResult`
+  (§10.2). A durable store handed to P3E would be empty, and the studio must not write
+  it (SD-2).
+- **The studio read still mismatches the port.** `AuthorityService.decision` calls
+  `decision_store.get(decision_id)` (`studio_v2.py:406-412`) where the port offers
+  `get_decision` and returns a `DecisionRecord` `[G]`, the same class of mismatch seam 2
+  corrected for the policy registry.
+- **What entering it would amend.** A persistence posture ruling for a frozen 1.0.0
+  package (or a sqlite implementation in a sibling integration package, as
+  `ai-system-registry` 0.2.0 did for its own port); a producer, which none of the
+  deployed units is; the studio read corrected; one P3E configuration value and one
+  file under the runtime volume; a composition record. **What it must preserve.** SD-2
+  (the studio never creates a case or records a decision); the `persistent_database`
+  prohibition (a file under the volume, no server, no driver, no DSN); tenant binding;
+  every credential and LIVE prohibition.
+- `[I]` A package decision first, a front-door seam only once a deployed unit produces
+  records. Not next.
+
+### 12.3 Observe over the worker's ledger `[V]`
+
+- **The record exists and is durable.** The worker composes the control-plane-root
+  `AuditLedger` at `<data_dir>/audit-ledger.sqlite3` (`composition.py:214`): per-tenant,
+  hash-chained, append-only by database triggers, schema-versioned (`ledger.py:96-140`).
+  Since HE-1 the review service appends one `governed_review.linkage.v2` entry per
+  completed round trip, carrying the checkpoint's `correlation_id`, `recorded_by` the
+  worker, and the `ReviewLinkage` payload (instance, task, consumer ref, proposal
+  fingerprint, approval id and state, decider, timestamps; `linkage.py:167-215`,
+  `governed-review/linkage.py:118-132`). Seam 6's relayed runs land in it on a GRANT.
+- **The ledger has no read for observation.** Its public reads are `entry_count` and
+  `verify_chain`, "for verification only" (`ledger.py:200-236`); the README states "no
+  console, no connector, no reconstruction API" (`README.md:115`), and the
+  control-plane-root ADR scopes the first slice to "the audit-ledger service and
+  nothing else" (D-5) and forbids the root to own any decision, queue or second
+  vocabulary (D-4). `StoredEntry` (`ledger.py:57-75`) is what a row is: the entry, its
+  sequence, `prev_digest` and `record_digest`, and `entry_ref = <tenant>/<seq>`.
+- **A read-only precedent exists.** `LedgerLinkageIndex` in the review service opens
+  the ledger file `mode=ro`, refuses any schema version but the one the installed
+  package declares, and reads one row by digest, "writes nothing and interprets
+  nothing else" (`linkage.py:114-165`). Run detail already returns the linkages of
+  one instance with their `AuditReference` (HE-5, `service.py:296-314`), and the
+  studio's Run Detail screen renders them as history.
+- **What Observe would add.** What §3 row 10 and §4 named: the durable, chain-verified
+  record read by correlation id rather than by instance, which is what the Observe
+  screen's subtitle promises ("reconstruct a decision chain by correlation id") and
+  what the console path cannot deliver while it is absent (FD-8.1). The record type
+  differs from the console's stage chain: it is receipts, digests and references, not
+  stage narratives; the screen must say so (FD-8.5's labelling, extended).
+- **What entering it would amend.** (a) A ledger read: either a read port in
+  `control-plane-root` (`read_entries(tenant_id, correlation_id)` returning stored
+  entries in `tenant_seq` order plus the chain verification, which touches D-5 and the
+  README's "no reconstruction API" and needs the owner to rule that a raw, uninterpreted
+  read is not reconstruction `[R]`), or a second read-only index in the review service
+  on the `LedgerLinkageIndex` precedent, which changes no package API but puts schema
+  knowledge in a second place `[I]`. (b) The review service: a seventh route, a read,
+  whose operation id passes the prohibition scan; CR-2 amended to seven routes. (c) The
+  studio's review client (seven routes, the proof route unchanged), an Observe relay
+  service that returns the worker's answer unchanged, the v2 contract (amendment v2-A3,
+  one operation) and its generated client, the frontend manifest, and the Observe screen
+  showing the worker ledger as a labelled source beside the console's typed gap. (d) The
+  P3E egress record and freeze test (seven routes over the one destination), a
+  superseding composition record. No configuration value, image package, credential or
+  second egress destination is added. **What it must preserve.** Read-only: no append,
+  edit or verification-trigger route from the studio (the append is the review
+  service's own act on a GRANT); the studio re-derives, re-orders and re-hashes nothing
+  and shows the worker's verification result as the worker's; the worker reads its own
+  tenant only (`SINGLE_TENANT`; the studio names none); the proof header stays on the
+  decision route (ID-1); SD-2's verbs absent from every operation id and path; no
+  credential; LIVE absent; `ENFORCEMENT_ENABLED` False; the frozen v1 bytes, every
+  FROM line and ratified digest; `REFERENCE_GRADE_SHADOW_ONLY`; FD-8.1 (the console
+  stays absent) and FD-8.5 (the source is labelled).
+
+### 12.4 Failure matrix for seam 7 (what the code does today, or would by construction)
+
+| # | Case | Result |
+|---|---|---|
+| 1 | review URL unset | typed gap `review_service`, as the review screens and the worker path `[V]` |
+| 2 | older worker without the route, or unreachable | typed gap naming the failure, never an empty chain `[V]` (404 surfaces as unavailable) |
+| 3 | unknown correlation id | typed not-found from the worker, distinguished from unreachable `[G]` until built |
+| 4 | chain fails verification | the ledger raises `LedgerIntegrityError` (`ledger.py:224-232`); the route must answer a typed integrity refusal, never a 500 and never the entries alone `[G]` |
+| 5 | ledger schema version differs | refused by the read, as the index refuses today `[V]` |
+| 6 | ledger file absent or in memory | refused before a connection: the index refuses `:memory:` today `[V]` |
+| 7 | cross-tenant | the worker reads its own configured tenant; the ledger is keyed per tenant; the studio names none `[V]` |
+| 8 | a write from the studio | not expressible: the route is a read; the ledger refuses UPDATE and DELETE by trigger `[V]` |
+| 9 | credential or proof on the read | none crosses; the proof route stays the decision relay (ID-1) `[V]` |
+| 10 | the console path | unchanged: the typed gap `console_api` beside the labelled worker source (FD-8.1, FD-8.5) `[G]` until built |
+
+### 12.5 Recommendation and proposed ruling FD-11 (five decisions, recommended first; ruled in §12.6)
+
+Observe over the worker's ledger is the only candidate whose prerequisites are rulings
+rather than packages, deployment units or producers, and it follows the seam-6 shape
+exactly: one relayed route, one contract amendment, no new destination.
+
+| # | Decision | Options |
+|---|---|---|
+| **FD-11.1** | Next seam | **`OBSERVE_OVER_WORKER_LEDGER`**: seam 7 is a read of the worker's control-plane audit ledger by correlation id, relayed through the review service like seam 6. `CONSOLE_PACKAGING_BODY_OF_WORK` (FD-8.3; not a front-door seam). `DECISION_STORE_PACKAGE_DECISION` (empty until a producer exists). |
+| **FD-11.2** | Where the read lives | **`READ_PORT_IN_CONTROL_PLANE_ROOT`**: `control-plane-root` 0.2.0 adds one read-only, tenant-scoped `read_entries(tenant_id, correlation_id)` returning stored entries in chain order with their digests, plus the existing `verify_chain`; the ADR's D-5 and the README's "no reconstruction API" are amended to say a raw, uninterpreted read of a tenant's own rows is not reconstruction; the ledger stays the one owner of its schema. `REVIEW_SERVICE_READ_INDEX`: a second read-only index on the `LedgerLinkageIndex` precedent; no package change, schema knowledge in two places. |
+| **FD-11.3** | The route | **`SEVENTH_ROUTE_LEDGER_READ`**: `GET /review/audit/{correlation_id}` on the worker returns its own tenant's entries for that correlation id in `tenant_seq` order (kind, `recorded_at`, `recorded_by`, payload, `entry_ref`, `record_digest`, `prev_digest`) and the chain verification result as a typed field; an integrity failure is a typed refusal; unknown is a typed not-found; no list-all route. `LINKAGES_ON_RUN_DETAIL_ONLY` (exists already; no seam). |
+| **FD-11.4** | The Observe screen | **`TWO_LABELLED_SOURCES`**: the worker ledger (durable, per-tenant, hash-chained, `REFERENCE_GRADE`, receipts not stage narratives) and the console (the typed gap `console_api` while FD-8.1 holds), each labelled with its record type, executor and maturity, never merged; the screen re-derives nothing and shows the worker's verification result as the worker's. `REPLACE_CONSOLE_PATH`. |
+| **FD-11.5** | The amendment set and mutation boundary | **`READ_ONLY_ONE_STEP_AMENDMENT`**: CR-2 (seven routes), the P3E egress record and freeze test, the frontend manifest, the v2 contract (amendment v2-A3, one operation) with its generated client, and `control-plane-root` 0.2.0, in one step with tests; no append, edit or verification-trigger route from the studio; no configuration value, image package, credential or second egress destination. |
+
+Under the recommended options seam 7 ships in its own implementation step: the
+read port with tests, the seventh route and its `ROUTES` entry, the studio's client
+and relay service, the v2 amendment and generated client, the frontend manifest and
+the Observe screen's labelled worker source, the P3E egress record and freeze test,
+CR-2 amended, a superseding composition record, and §12.4 as tests. Owner decisions
+remaining before implementation: the five above, of which FD-11.2 carries the one
+`[R]` (whether a raw read amends D-5 or falls outside it).
+
+### 12.6 Ruling FD-11 (owner, 2026-09-06)
+
+| # | Ruling |
+|---|---|
+| **FD-11.1** | **`OBSERVE_OVER_WORKER_LEDGER`.** Seam 7 is a read of the worker's control-plane audit ledger by correlation id, relayed through the review service as seam 6 relays the start. The console stays a packaging body of work under FD-8.3, and a durable Decision Authority store stays a package decision; neither is a front-door seam. |
+| **FD-11.2** | **`READ_PORT_IN_CONTROL_PLANE_ROOT`.** `control-plane-root` 0.2.0 adds one read-only, tenant-scoped read of a tenant's own rows by correlation id, returning stored entries in chain order with their digests, beside the existing `verify_chain`; its ADR's D-5 and its README's "no reconstruction API" are amended to say that a raw, uninterpreted read of a tenant's own rows is not reconstruction, and the ledger stays the one owner of its schema. The owner records `REVIEW_SERVICE_READ_INDEX` (a second read-only index on the `LedgerLinkageIndex` precedent, no package change) as the admissible alternative; seam 7's implementation prompt names which of the two it ships, and the control-plane-root amendment is the recommended one. |
+| **FD-11.3** | **`SEVENTH_ROUTE_LEDGER_READ`.** `GET /review/audit/{correlation_id}` on the worker returns its own tenant's entries for that correlation id in `tenant_seq` order (kind, `recorded_at`, `recorded_by`, payload, `entry_ref`, `record_digest`, `prev_digest`) and the chain verification result as a typed field. An integrity failure is a typed refusal, never a 500 and never the entries alone; an unknown correlation id is a typed not-found; there is no list-all route. |
+| **FD-11.4** | **`TWO_LABELLED_SOURCES`.** The Observe screen shows the worker ledger (durable, per-tenant, hash-chained, `REFERENCE_GRADE`, receipts rather than stage narratives) and the console (the typed gap `console_api` while FD-8.1 holds) as distinct sources, each labelled with its record type, executor and maturity, never merged. The screen re-derives, re-orders and re-hashes nothing and shows the worker's verification result as the worker's. |
+| **FD-11.5** | **`READ_ONLY_ONE_STEP_AMENDMENT`.** CR-2 (seven routes), the P3E egress record and its freeze test, the frontend manifest, the v2 contract (amendment v2-A3, one operation) with its generated client, and `control-plane-root` 0.2.0 are amended together, in one step, with tests. No append, edit or verification-trigger route exists from the studio; no configuration value, image package, credential or second egress destination is added. |
+
+**What the ruling authorizes.** Documentation only. No seam is activated, no route
+exists, no package is released, no contract byte moves and no code changes. Seam 7
+activates by its own implementation prompt (issued and shipped 2026-09-06; see §7),
+which ships in one step: the read
+port in `control-plane-root` 0.2.0 with tests and its ADR and README amended, the
+review service's seventh `ROUTES` entry and route with tests, the studio's review
+client and Observe relay service, the v2 amendment v2-A3 with the regenerated client,
+the frontend manifest and the Observe screen's labelled worker source beside the
+console's gap, the P3E egress record and freeze test, CR-2 amended in its ADR, a
+superseding composition record, and the failure matrix of §12.4 as tests. FD-1, FD-3,
+FD-4, FD-8.1, FD-8.5, SD-2, CR-3, CR-4, CR-5, ID-1, the `REFERENCE_GRADE_SHADOW_ONLY`
+ceiling, `ENFORCEMENT_ENABLED = False`, the frozen v1 contract, every FROM line and
+ratified digest, the worker image's gate set, and every credential, egress and LIVE
+prohibition are preserved.
+
+## 13 — Remaining front-door audit under FD-1 (2026-09-06, after seam 7)
+
+**The question.** With seams 1, 2, 3, 5, 6 and 7 shipped and seam 4 absent by ruling,
+is any front-door seam of the studio alone still enterable, or is what remains the
+console packaging body of work (FD-8.3), a durable Decision Authority store as a
+package decision, or the three owner-blocked inputs? **One studio-alone seam remains:
+outline screen 5, a typed declaration form over `data-use-admission` in the seam-5
+shape.** Everything else is a package decision, a separately scoped body of work, an
+owner input, or a non-goal. Everything below is documentation; no seam is activated.
+
+### 13.1 The outline rows still without a screen `[V]`
+
+- **Row 5, data and tool connections.** `data-use-admission` 0.1.0 and
+  `vendor-dependency` 0.1.0 are both `CONTRACTS_ONLY` (`version.py:16` in each): each
+  ships one typed record (`DataUseDeclaration`: binding, `data_ref`, an uninterpreted
+  classification label, `purpose_label`, validity, `residency_label`, `supersedes`,
+  `declared_by`; `VendorDependencyDeclaration` likewise with `vendor_ref` and a risk
+  posture label), a deterministic `declaration_id_for`, `supersession_refusals`, and
+  one read-only port (`DataUseDeclarationPort`, `VendorDependencyPort`;
+  `selectors.py:131` and `:135`) with no implementation and no store. Each README
+  says the package "records what a declarer asserted" and never inspects, verifies,
+  scores, persists or decides. That is exactly `ai-system-registry`'s state before
+  FD-9, and seam 5 is the proven shape for it. The row's third element, egress
+  restrictions, has a ratified ADR and no package (§3), and stays `[G]`.
+- **Row 4, model and reasoning selector.** `model-selection` and
+  `reasoning-method-governance` are 0.1.0 research-only slices (§3); roadmap §11.2 rules
+  "no research-only package in the product". Not enterable as a screen `[V]`.
+- **Row 7's evidence half.** `agent-assurance-evidence` is
+  `REFERENCE_GRADE_CONTRACT_ONLY` with a read-only `AssuranceFindingPort` and no
+  producer; a finding typed by an administrator would be the same shape as a
+  declaration, but the Simulate paths already produce the studio's evidence and no
+  ruling names a finding as front-door intake. Later, if at all `[I]`.
+- **Row 9 beyond shadow and row 10 interventions** are non-goals (§4, roadmap §11.2).
+- **The Publish scenario selector** left open by FD-8.2 (§9.5) is a frontend change
+  with no reachable console while FD-8.1 holds; not next `[V]`.
+- **The Authority decision read** still calls `decision_store.get` where the port
+  offers `get_decision` (`studio_v2.py:408-414`) `[G]`; a correction that belongs to
+  the step that first hands a decision store, not a seam.
+
+### 13.2 What is not a front-door seam `[V]`
+
+- **The console (FD-8.3).** Unchanged since §12.1: a root prototype, no package, no
+  deployment unit, an in-memory audit store. Packaging "does not begin here" (§9.5);
+  it needs its own scoping ADR, deployment unit and evidence, then FD-8.4. A body of
+  work, not a seam.
+- **A durable Decision Authority store.** Unchanged since §12.2: frozen 1.0.0,
+  in-memory repositories, no producing deployment; a store handed to P3E would be
+  empty. A package decision first.
+- **The owner-blocked inputs.** The mirror record is
+  `RATIFIED_PENDING_MIRROR_COORDINATES` with `registry_host`, `repository_prefix` and
+  `secret_name` all null and provisioning `PENDING_OUTSIDE_REPOSITORY`
+  (`docs/audits/ugence_governance_studio_p3e/BASE_IMAGE_MIRROR_DECISION.json`); every
+  container gate set halts on it, and no repository change may fill those fields. The
+  Langflow importer is ruled entered and blocked on a genuine secret-free export fixture
+  (LI-5, roadmap §11.3). Real approver identity waits on an enterprise issuer (AI-E).
+  None of the three is repository work; each unblocks work that is.
+
+### 13.3 The one remaining seam: typed data-use declarations `[V]`
+
+What it would amend, in the seam-5 shape: `data-use-admission` 0.2.0 adds one sqlite
+implementation of `DataUseDeclarationPort` plus a single append, `declare`, under the
+runtime volume (no server, driver or DSN); the studio backend adds a `DeclarationService`
+over it with two v2 operations (declare, list-for-tenant), validated by the package's
+own refusal reasons and `supersession_refusals`, the tenant the deployment's and never
+the caller's; the frontend adds one screen with typed fields and a single Declare
+control; P3E adds one configuration value naming the file, requires
+`UGENCE_STUDIO_TENANT_ID`, records the seam, and supersedes the composition record; the
+v2 contract is amended once more (v2-A4, two operations). **What it must preserve.**
+FD-4 (typed intake, no inference, no repair); the package's own prohibitions (the
+record carries no data, only a `data_ref`; the classification, purpose and residency
+labels are uninterpreted; nothing is inspected, verified, scored, admitted or
+enforced); the `persistent_database` prohibition; tenant binding; SD-2 (declare is
+not an authority act and confers nothing); no egress restriction is invented for the
+absent egress package; every credential and LIVE prohibition; the frozen v1 bytes,
+FROM lines and ratified digests; `REFERENCE_GRADE_SHADOW_ONLY` and
+`ENFORCEMENT_ENABLED = False`. `vendor-dependency` is the same shape again and, under
+FD-1, its own later seam.
+
+### 13.4 Failure matrix for seam 8 (by construction, on the seam-5 precedent)
+
+| # | Case | Result |
+|---|---|---|
+| 1 | file path unset | typed gap `data_use_declarations` on both routes `[G]` until built |
+| 2 | tenant unset with the path set | refused before bind, as seam 5 `[V]` shape |
+| 3 | blank `data_ref` or `purpose_label`, malformed validity | the package's typed refusal, nothing written `[V]` shape |
+| 4 | a caller-supplied `tenant_id` | contract refusal (unknown field); the tenant is the deployment's `[V]` shape |
+| 5 | inadmissible supersession | `supersession_refusals` as the package states it `[V]` |
+| 6 | cross-tenant read, a file bound to another tenant | typed refusal, never an empty answer; refused before bind `[V]` shape |
+| 7 | any payload, dataset or record content | not expressible: `data_ref` is an opaque handle and no field carries data `[V]` |
+| 8 | a write other than declare | no route: no edit, revocation, admission or enforcement `[V]` shape |
+| 9 | restart | records survive on the volume `[V]` shape |
+| 10 | egress restrictions | absent; the screen says the egress package does not exist and invents nothing `[G]` |
+
+### 13.5 Recommendation and proposed ruling FD-12 (five decisions, recommended first; ruled in §13.6)
+
+Seam 8 is the only remaining item whose prerequisites are rulings rather than a
+package decision, a packaging body of work or an owner input, and it is the last
+outline row a studio-alone seam can reach. After it, the front door under FD-1 is at
+its ceiling until the owner inputs arrive or the console is packaged.
+
+| # | Decision | Options |
+|---|---|---|
+| **FD-12.1** | Next seam | **`SCREEN_5_TYPED_DATA_USE_DECLARATIONS`**: seam 8 is a typed declaration form over `data-use-admission`, composed through the P3E root and tenant-bound. `FRONT_DOOR_CEILING_REACHED`: no further studio-alone seam; the remaining work is the owner inputs and the console packaging body of work. `CONSOLE_PACKAGING_BODY_OF_WORK` (FD-8.3; its own ADR first). |
+| **FD-12.2** | Durable home | **`LOCAL_SQLITE_UNDER_RUNTIME_VOLUME`**: `data-use-admission` 0.2.0 adds one sqlite implementation of `DataUseDeclarationPort` plus a single append, `declare`, in the seam-5 posture; one configuration value names the file. `COMPOSITION_ROOT_MEMORY`. |
+| **FD-12.3** | Declarer | **`DECLARED_BY_PRESENTED_UNPROVEN`**: `declared_by` is a typed opaque handle the form supplies, recorded as presented and unproven, with the deployment's name and version as the recording composition; no identity is claimed until an issuer exists (AI-E). `REQUIRE_IDENTITY`. |
+| **FD-12.4** | Contract | **`V2_AMENDMENT_TWO_OPERATIONS`**: `v2_data_use_declare` and `v2_data_use_list`, validated by the package's own refusal reasons and `supersession_refusals`, with `openapi_v2.json` and the generated client re-frozen by amendment v2-A4 in the same step. |
+| **FD-12.5** | Mutation boundary | **`DECLARE_IS_THE_ONLY_WRITE`**: the seam writes declarations and nothing else; no edit, revocation, admission, verification, scoring or enforcement; a changed declaration is a new one superseding the old; the record carries no data and confers nothing; egress restrictions are not invented; `vendor-dependency` is a later seam of its own under FD-1. |
+
+Under the recommended options seam 8 ships in its own implementation step: the
+package release, the two operations with a re-frozen contract, the screen, the
+deployment composition (one declarations file under the runtime volume, tenant-bound),
+a superseding composition record, and §13.4 as tests. Owner decisions remaining before
+implementation: the five above; none carries an `[R]` beyond the choice itself, since
+seam 5 already settled the durable-home and registrant questions for this shape.
+
+### 13.6 Ruling FD-12 (owner, 2026-09-06)
+
+| # | Ruling |
+|---|---|
+| **FD-12.1** | **`SCREEN_5_TYPED_DATA_USE_DECLARATIONS`.** Seam 8 is a typed declaration form over `data-use-admission`, composed through the P3E root and tenant-bound to `UGENCE_STUDIO_TENANT_ID`. It is the last outline row a studio-alone seam can reach: the console stays a packaging body of work under FD-8.3, a durable Decision Authority store a package decision, and the mirror coordinates, Langflow fixture and enterprise issuer owner inputs. `vendor-dependency` is the same shape again and its own later seam under FD-1. |
+| **FD-12.2** | **`LOCAL_SQLITE_UNDER_RUNTIME_VOLUME`.** `data-use-admission` 0.2.0 adds one sqlite implementation of `DataUseDeclarationPort` plus a single append, `declare`, in the seam-5 posture: a file under the writable runtime volume named by one configuration value, no server, no driver, no DSN, the `persistent_database` prohibition standing. The file is bound to the deployment's tenant at first open and never re-bound. |
+| **FD-12.3** | **`DECLARED_BY_PRESENTED_UNPROVEN`.** `declared_by` is a typed opaque handle the form supplies, recorded as presented and unproven; the recording composition is this deployment's name and version; no identity is claimed until an enterprise issuer exists (AI-E). |
+| **FD-12.4** | **`V2_AMENDMENT_TWO_OPERATIONS`.** `v2_data_use_declare` and `v2_data_use_list`, validated by the package's own refusal reasons and `supersession_refusals`; `openapi_v2.json` and the generated client are re-frozen by amendment v2-A4 in the same step, the fourth amendment since the v2 freeze. |
+| **FD-12.5** | **`DECLARE_IS_THE_ONLY_WRITE`.** The seam writes declarations and nothing else: no edit, revocation, admission, verification, scoring or enforcement has a route. A changed declaration is a new one superseding the old; the record carries no data, only an opaque `data_ref`, and its classification, purpose and residency labels stay uninterpreted; the record confers no approval, admission, authority or permission. Egress restrictions are not invented for the absent egress package. SD-2 and every credential and LIVE prohibition are unchanged. |
+
+**What the ruling authorizes.** Documentation only. No seam is activated, no route
+exists, no package is released, no contract byte moves and no code changes. Seam 8
+activates by its own implementation prompt, which will ship in one step: the
+`data-use-admission` 0.2.0 release with its sqlite store and tests, the studio
+backend's declaration service and the two v2 operations with amendment v2-A4 and the
+regenerated client, the frontend manifest and the declaration screen, the P3E
+composition (one configuration value, one file under the runtime volume, tenant-bound)
+with a superseding composition record, and the failure matrix of §13.4 as tests. FD-1,
+FD-3, FD-4, FD-8.1, FD-8.3, SD-2, the `persistent_database` prohibition, the
+`REFERENCE_GRADE_SHADOW_ONLY` ceiling, `ENFORCEMENT_ENABLED = False`, the frozen v1
+contract, every FROM line and ratified digest, and every credential, egress and LIVE
+prohibition are preserved.

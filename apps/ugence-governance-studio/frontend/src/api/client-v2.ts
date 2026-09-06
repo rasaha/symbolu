@@ -21,6 +21,7 @@ import {
   type PublishShadowBody,
   type RegistryRegisterBody,
   type ReviewDecisionBody,
+  type ReviewStartShadowRunBody,
   type SimulateRunBody,
   type V2Envelope,
 } from "./types-v2";
@@ -49,6 +50,12 @@ export const V2_OPERATIONS = [
   // only write, and it records what an administrator asserted, conferring nothing.
   "v2_registry_register",
   "v2_registry_list",
+  // Front-door seam 6 (FD-10.1 START_IS_A_RELAY): ask the governed runtime worker to
+  // start the worker's own shadow run. Nothing of the studio's crosses (FD-10.3).
+  "v2_review_start_shadow_run",
+  // Front-door seam 7 (FD-11.1 OBSERVE_OVER_WORKER_LEDGER): the worker's own tenant's
+  // audit-ledger rows by correlation id, as the worker read them (FD-11.3).
+  "v2_observe_ledger_chain",
 ] as const;
 
 async function v2Request<T>(pathAndQuery: string, init?: RequestInit): Promise<T> {
@@ -149,6 +156,14 @@ export const listAuditCorrelationIds = () => gap("/api/v2/observe/audit");
 export const readAuditChain = (correlationId: string) =>
   gap(`/api/v2/observe/audit/${enc(correlationId)}`);
 
+/**
+ * Front-door seam 7 (FD-11): the worker's own tenant's audit-ledger rows for one
+ * correlation id, with the worker's chain verification, returned as the worker read
+ * them. No tenant, filter or proof is sent; nothing is re-derived here (FD-11.4).
+ */
+export const readLedgerChain = (correlationId: string) =>
+  gap(`/api/v2/observe/ledger/${enc(correlationId)}`);
+
 // -- 7 · Review (GAS-7 HR-D; owner ruling HR-1: display and transmit) -------
 export const listReviewQueue = (requiredRole = "") => {
   const query = requiredRole ? `?required_role=${enc(requiredRole)}` : "";
@@ -186,6 +201,17 @@ export const submitReviewDecision = (body: ReviewDecisionBody, proof = "") => {
   }
   return gap("/api/v2/review/decisions", init);
 };
+
+/**
+ * Front-door seam 6 (FD-10): ask the worker to start the worker's own shadow run.
+ *
+ * The body is the operator's correlation id or nothing. There is no parameter for a
+ * workflow, task, provider, mode or digest: the worker holds the definition, the backend
+ * pins the mode word `shadow`, and the worker refuses any other (FD-10.3). No proof
+ * header travels here (ID-1). The answer is the worker's typed outcome, unchanged.
+ */
+export const startWorkerShadowRun = (body: ReviewStartShadowRunBody) =>
+  gap("/api/v2/review/runs", postJson(body));
 
 // -- 8 · Registration (front-door seam 5, FD-9) ------------------------------
 /**

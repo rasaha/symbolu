@@ -1,5 +1,6 @@
-"""The HTTP presentation of the service: five routes, named as the screen/API audit
-proposed them, carrying none of the SD-2 verbs in any path or operation id.
+"""The HTTP presentation of the service: seven routes, named as the screen/API audit
+proposed them and as front-door rulings FD-10 and FD-11 added the sixth and seventh,
+carrying none of the SD-2 verbs in any path or operation id.
 
 FastAPI is a presentation dependency and an optional extra; it is imported inside
 ``build_app`` so the service core, and every test of it, runs without it. The routes
@@ -14,19 +15,41 @@ it, unparsed, to the service, which relays it to the configured identity port. T
 header value is never echoed, logged, stored or placed in any answer; when no port is
 configured it is ignored. A deployment that fronts this app with an identity provider
 does so behind that port, in its own composition root.
+
+Since 0.5.0 (front-door seam 6, FD-10.2) the sixth route ``POST /review/runs`` asks the
+composed starter for the deployment's own shadow run. Its body is at most a typed
+correlation id and the mode word ``shadow``; every other key is refused with 422, so no
+workflow, task, provider, mode or digest can be sent (FD-10.3). Without a composed
+starter the answer is the typed ``REFUSED_UNCONFIGURED``.
+
+Since 0.6.0 (front-door seam 7, FD-11.3) the seventh route ``GET
+/review/audit/{correlation_id}`` returns the deployment's own tenant's audit-ledger
+rows for that correlation id in chain order and the chain verification as a typed
+field. A chain that does not verify is a typed 409 with the entries withheld, never
+a 500 and never the entries alone; an unknown id is 404; there is no list-all route.
 """
 
-
+import json
 from typing import Any, Mapping
 
 from ugence_approval_workflow import ApproverKind, ApproverRef, ReviewDecision
 
+from .errors import ContractViolation
 from .identity import PROOF_HEADER
 from .linkage import linkage_view
-from .service import DecisionOutcome, QueueEntry, ReviewService
+from .service import (
+    SHADOW_RUN_MODE,
+    AuditReadOutcome,
+    AuditReadResult,
+    DecisionOutcome,
+    QueueEntry,
+    ReviewService,
+    StartOutcome,
+)
 from .version import CONTRACT_VERSION, IDENTITY_PROOF, MATURITY, __version__
 
-__all__ = ["ROUTES", "build_app", "queue_entry_view", "decision_view"]
+__all__ = ["ROUTES", "START_BODY_KEYS", "build_app", "queue_entry_view", "decision_view",
+           "start_view", "audit_view"]
 
 #: (method, path, operation id). The prohibition scan in the boundary tests runs
 #: over this table, so a route cannot be added without passing it.
@@ -36,7 +59,15 @@ ROUTES = (
     ("GET", "/review/runs/{instance_id}/events", "review_read_run_events"),
     ("GET", "/review/approvals/{approval_id}", "review_read_approval"),
     ("POST", "/review/decisions", "review_submit_decision"),
+    # Front-door seam 6 (FD-10.2 SIXTH_ROUTE_START_SHADOW_RUN): the start relay.
+    ("POST", "/review/runs", "review_start_shadow_run"),
+    # Front-door seam 7 (FD-11.3 SEVENTH_ROUTE_LEDGER_READ): the ledger read.
+    ("GET", "/review/audit/{correlation_id}", "review_read_audit"),
 )
+
+#: The complete set of keys the start body may carry (FD-10.3). Typed intake (FD-4):
+#: an unknown key is refused, never ignored, so nothing can be smuggled past the route.
+START_BODY_KEYS = frozenset({"correlation_id", "mode"})
 
 
 def _approver_view(approver: Any) -> dict:
@@ -93,6 +124,40 @@ def decision_view(outcome: DecisionOutcome) -> dict:
         "authentication_reference": outcome.authentication_reference,
         "tenant_source": outcome.tenant_source,
         "assurance": None if outcome.assurance is None else outcome.assurance.to_dict(),
+    }
+
+
+def start_view(outcome: StartOutcome) -> dict:
+    return {
+        "result": outcome.result.value,
+        "started": outcome.started,
+        "mode": SHADOW_RUN_MODE,
+        "instance_id": outcome.instance_id,
+        "workflow_id": outcome.workflow_id,
+        "correlation_id": outcome.correlation_id,
+        "definition_digest": outcome.definition_digest,
+        "advanced": outcome.advanced,
+        "awaiting_external": outcome.awaiting_external,
+        "stop_reason": outcome.stop_reason,
+        "reason": outcome.reason,
+        "workload_maturity": outcome.workload_maturity,
+        "maturity": MATURITY,
+        "identity_proof": IDENTITY_PROOF,
+    }
+
+
+def audit_view(outcome: AuditReadOutcome) -> dict:
+    return {
+        "result": outcome.result.value,
+        "read": outcome.read,
+        "tenant_id": outcome.tenant_id,
+        "correlation_id": outcome.correlation_id,
+        "entries": list(outcome.entries),
+        "entry_count": len(outcome.entries),
+        "chain_verified": outcome.chain_verified,
+        "reason": outcome.reason,
+        "record_type": "control_plane_root audit-ledger rows, raw and uninterpreted",
+        "maturity": MATURITY,
     }
 
 
@@ -168,5 +233,45 @@ def build_app(service: ReviewService) -> Any:
         )
         status = 200 if outcome.recorded else 409
         return JSONResponse(status_code=status, content=decision_view(outcome))
+
+    @app.post(ROUTES[5][1], operation_id=ROUTES[5][2])
+    async def review_start_shadow_run(request: Request) -> Any:
+        raw = await request.body()
+        try:
+            body = json.loads(raw) if raw else {}
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail="the body must be a JSON object") from exc
+        if not isinstance(body, Mapping):
+            raise HTTPException(status_code=422, detail="the body must be an object")
+        unknown = sorted(set(body) - START_BODY_KEYS)
+        if unknown:
+            raise HTTPException(
+                status_code=422,
+                detail=f"the start body carries only {sorted(START_BODY_KEYS)}; refused keys "
+                       f"{unknown}: no workflow, task, provider, mode or digest crosses (FD-10.3)")
+        correlation_id = body.get("correlation_id")
+        mode = body.get("mode")
+        if correlation_id is not None and not isinstance(correlation_id, str):
+            raise HTTPException(status_code=422, detail="correlation_id must be a string or absent")
+        if mode is not None and not isinstance(mode, str):
+            raise HTTPException(status_code=422, detail="mode must be a string or absent")
+        try:
+            outcome = service.start_shadow_run(correlation_id=correlation_id, mode=mode)
+        except ContractViolation as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        status = 200 if outcome.started else 409
+        return JSONResponse(status_code=status, content=start_view(outcome))
+
+    @app.get(ROUTES[6][1], operation_id=ROUTES[6][2])
+    def review_read_audit(correlation_id: str) -> Any:
+        try:
+            outcome = service.read_audit(correlation_id)
+        except ContractViolation as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        if outcome.result is AuditReadResult.NOT_FOUND:
+            raise HTTPException(status_code=404, detail="no entry of this tenant carries that "
+                                                        "correlation id")
+        status = 200 if outcome.read else 409
+        return JSONResponse(status_code=status, content=audit_view(outcome))
 
     return app

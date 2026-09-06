@@ -14,6 +14,7 @@ import type {
   PublishShadowBody,
   RegistryRegisterBody,
   ReviewDecisionBody,
+  ReviewStartShadowRunBody,
   SimulateRunBody,
 } from "@/api/types-v2";
 
@@ -50,6 +51,15 @@ export const useAuditChain = (correlationId: string | null) =>
   useQuery({
     queryKey: ["v2", "observe", "audit", correlationId],
     queryFn: () => v2.readAuditChain(correlationId as string),
+    enabled: correlationId !== null && correlationId !== "",
+    retry: RETRY,
+  });
+
+// -- 6b · Observe over the worker's ledger (front-door seam 7, FD-11) --------
+export const useLedgerChain = (correlationId: string | null) =>
+  useQuery({
+    queryKey: ["v2", "observe", "ledger", correlationId],
+    queryFn: () => v2.readLedgerChain(correlationId as string),
     enabled: correlationId !== null && correlationId !== "",
     retry: RETRY,
   });
@@ -91,6 +101,10 @@ export const useSubmitReviewDecision = () =>
     mutationFn: ({ body, proof }: { body: ReviewDecisionBody; proof?: string }) =>
       v2.submitReviewDecision(body, proof ?? ""),
   });
+
+// -- 4b · The worker shadow-run relay (front-door seam 6, FD-10) -------------
+export const useStartWorkerShadowRun = () =>
+  useMutation({ mutationFn: (b: ReviewStartShadowRunBody) => v2.startWorkerShadowRun(b) });
 
 // -- 8 · Registration (front-door seam 5, FD-9) ------------------------------
 export const useRegisterSystem = () =>

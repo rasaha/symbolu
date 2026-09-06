@@ -1,5 +1,36 @@
 # Changelog
 
+## 0.6.0 — 2026-09-06 — front-door seam 7 (FD-11)
+
+Contract `governed_review_service.v6`: the six routes plus one ledger read.
+
+- `GET /review/audit/{correlation_id}` (`review_read_audit`): the deployment's own
+  tenant's control-plane audit-ledger rows for one correlation id, in chain order,
+  each as the ledger stored it (seq, entry_ref, kind, recorded_at, recorded_by,
+  correlation_id, payload, prev_digest, record_digest), with the chain verification
+  as the typed field `chain_verified`. A chain that does not verify is the typed
+  `REFUSED_INTEGRITY` (409) with the entries withheld; a ledger at another schema
+  version is `REFUSED_SCHEMA`; no composed reader is `REFUSED_UNCONFIGURED`; an unknown
+  correlation id is 404; a malformed one is 422. There is no list-all route and no
+  write. Requires `ugence-control-plane-root` 0.2.0 (`read_entries`).
+- `ReviewService(ledger_reader=...)`, `read_audit`, `AuditLedgerReader`,
+  `AuditReadOutcome`, `AuditReadResult`, `audit_view`.
+
+## 0.5.0 — 2026-09-06 — front-door seam 6 (FD-10)
+
+Contract `governed_review_service.v5`: the same five routes plus one start relay.
+
+- `POST /review/runs` (`review_start_shadow_run`): asks the composition root's
+  `ShadowRunStarter` for the deployment's own shadow run. The body carries at most a
+  typed `correlation_id` and the word `mode: "shadow"`; any other key is 422, so no
+  workflow, task, provider, mode or digest crosses (FD-10.3). Any other mode is the
+  typed `REFUSED_MODE`; no composed starter is `REFUSED_UNCONFIGURED`; the starter
+  reports `STARTED`, `REPLAYED` (the adapter's idempotency rule), `REFUSED_DEFINITION`
+  or `REFUSED_CONFLICT`. Refusals answer 409 with the typed outcome.
+- `ReviewService(starter=...)`, `start_shadow_run`, `StartOutcome`, `StartResult`,
+  `ShadowRunStarter`, `start_view`. The service still holds no definition, provider or
+  adapter `start` of its own: signal and resume remain the only adapter calls here.
+
 ## 0.4.0 — 2026-09-05 — AI-D (approver-identity ruling ID-2)
 
 Contract `governed_review_service.v4`: the same five routes; the approval view and the

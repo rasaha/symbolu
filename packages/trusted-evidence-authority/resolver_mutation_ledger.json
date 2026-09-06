@@ -1,0 +1,277 @@
+{
+  "gates_inventoried": 30,
+  "killed": 27,
+  "survived": 3,
+  "ledger": [
+    {
+      "gate": "S-01",
+      "category": "instant",
+      "module": "trust_snapshot.py",
+      "description": "as_of exact aware datetime required",
+      "status": "KILLED",
+      "first_failure": "FAILED tests/authority/test_signed_snapshot_resolver_conformance.py::test_conformance[datetime_subclass_is_not_an_instant]",
+      "classification": null
+    },
+    {
+      "gate": "S-02",
+      "category": "admission",
+      "module": "trust_snapshot.py",
+      "description": "unadmitted snapshot refuses every resolution",
+      "status": "SURVIVED",
+      "first_failure": "",
+      "classification": "EQUIVALENT_DEFENSE_IN_DEPTH: the constructor sets snapshot=None whenever load_failure is set, so the remaining `snapshot is None or root is None` test refuses every unadmitted resolver identically."
+    },
+    {
+      "gate": "S-03",
+      "category": "root-lifecycle",
+      "module": "trust_snapshot.py",
+      "description": "publication root usable at as_of",
+      "status": "KILLED",
+      "first_failure": "FAILED tests/authority/test_signed_snapshot_resolver_conformance.py::test_conformance[revoked_or_expired_root_makes_the_set_unavailable_at_that_instant]",
+      "classification": null
+    },
+    {
+      "gate": "S-04",
+      "category": "window",
+      "module": "trust_snapshot.py",
+      "description": "set published and in force at as_of",
+      "status": "KILLED",
+      "first_failure": "FAILED tests/authority/test_signed_snapshot_resolver_conformance.py::test_conformance[set_not_yet_in_force_is_unavailable_not_stale]",
+      "classification": null
+    },
+    {
+      "gate": "S-05",
+      "category": "freshness",
+      "module": "trust_snapshot.py",
+      "description": "signed effective_to bounds freshness",
+      "status": "KILLED",
+      "first_failure": "FAILED tests/authority/test_signed_snapshot_resolver_conformance.py::test_conformance[signed_effective_to_bounds_freshness_when_earlier_than_max_age]",
+      "classification": null
+    },
+    {
+      "gate": "S-06",
+      "category": "freshness",
+      "module": "trust_snapshot.py",
+      "description": "published_at + max age bounds freshness",
+      "status": "KILLED",
+      "first_failure": "FAILED tests/authority/test_signed_snapshot_resolver_conformance.py::test_conformance[no_cached_fallback_after_unavailable_or_stale]",
+      "classification": null
+    },
+    {
+      "gate": "S-07",
+      "category": "freshness",
+      "module": "trust_snapshot.py",
+      "description": "half-open age boundary (>= not >)",
+      "status": "KILLED",
+      "first_failure": "FAILED tests/authority/test_signed_snapshot_resolver_conformance.py::test_conformance[no_cached_fallback_after_unavailable_or_stale]",
+      "classification": null
+    },
+    {
+      "gate": "S-08",
+      "category": "coordinate",
+      "module": "trust_snapshot.py",
+      "description": "exact coordinate lookup, miss refuses",
+      "status": "KILLED",
+      "first_failure": "FAILED tests/authority/test_signed_snapshot_resolver_conformance.py::test_conformance[valid_instant_resolves_exact_coordinate]",
+      "classification": null
+    },
+    {
+      "gate": "S-09",
+      "category": "root",
+      "module": "trust_snapshot.py",
+      "description": "absent root refuses",
+      "status": "SURVIVED",
+      "first_failure": "",
+      "classification": "EQUIVALENT_DEFENSE_IN_DEPTH: the exact-type check on the next line refuses None with the same PUBLICATION_ROOT_ABSENT failure."
+    },
+    {
+      "gate": "S-10",
+      "category": "root",
+      "module": "trust_snapshot.py",
+      "description": "root must hold the publication capability",
+      "status": "KILLED",
+      "first_failure": "FAILED tests/authority/test_signed_snapshot_resolver_conformance.py::test_conformance[wrong_capability_root_refuses]",
+      "classification": null
+    },
+    {
+      "gate": "S-11",
+      "category": "root",
+      "module": "trust_snapshot.py",
+      "description": "manifest publisher must be the pinned root",
+      "status": "KILLED",
+      "first_failure": "FAILED tests/authority/test_signed_snapshot_resolver_conformance.py::test_conformance[absent_or_unknown_root_refuses]",
+      "classification": null
+    },
+    {
+      "gate": "S-12",
+      "category": "self-authentication",
+      "module": "trust_snapshot.py",
+      "description": "publisher's key inside the set refuses",
+      "status": "KILLED",
+      "first_failure": "FAILED tests/authority/test_signed_snapshot_resolver_conformance.py::test_conformance[self_authenticating_snapshot_refuses]",
+      "classification": null
+    },
+    {
+      "gate": "S-13",
+      "category": "self-authentication",
+      "module": "trust_snapshot.py",
+      "description": "root public key inside the set refuses",
+      "status": "KILLED",
+      "first_failure": "FAILED tests/authority/test_signed_snapshot_resolver_conformance.py::test_conformance[self_authenticating_snapshot_refuses]",
+      "classification": null
+    },
+    {
+      "gate": "S-14",
+      "category": "signature",
+      "module": "trust_snapshot.py",
+      "description": "manifest signature must verify",
+      "status": "KILLED",
+      "first_failure": "FAILED tests/authority/test_signed_snapshot_resolver_conformance.py::test_conformance[signature_by_another_key_refuses]",
+      "classification": null
+    },
+    {
+      "gate": "S-15",
+      "category": "rollback",
+      "module": "trust_snapshot.py",
+      "description": "version must exceed the last accepted",
+      "status": "KILLED",
+      "first_failure": "FAILED tests/authority/test_signed_snapshot_resolver_conformance.py::test_conformance[rollback_and_duplicate_versions_refuse]",
+      "classification": null
+    },
+    {
+      "gate": "S-16",
+      "category": "rollback",
+      "module": "trust_snapshot.py",
+      "description": "equal version is a rollback (<= not <)",
+      "status": "KILLED",
+      "first_failure": "FAILED tests/authority/test_signed_snapshot_resolver_conformance.py::test_conformance[rollback_and_duplicate_versions_refuse]",
+      "classification": null
+    },
+    {
+      "gate": "S-17",
+      "category": "document",
+      "module": "trust_snapshot.py",
+      "description": "unavailable document refuses",
+      "status": "KILLED",
+      "first_failure": "FAILED tests/authority/test_signed_snapshot_resolver_conformance.py::test_conformance[unavailable_document_refuses_everything]",
+      "classification": null
+    },
+    {
+      "gate": "S-18",
+      "category": "document",
+      "module": "trust_snapshot.py",
+      "description": "canonical rendering required",
+      "status": "KILLED",
+      "first_failure": "FAILED tests/authority/test_signed_snapshot_resolver_conformance.py::test_conformance[malformed_and_partial_documents_refuse]",
+      "classification": null
+    },
+    {
+      "gate": "S-19",
+      "category": "collection",
+      "module": "trust_snapshot.py",
+      "description": "collection digest must match",
+      "status": "KILLED",
+      "first_failure": "FAILED tests/authority/test_signed_snapshot_resolver_conformance.py::test_conformance[tampered_manifest_collection_anchor_or_digest_refuses]",
+      "classification": null
+    },
+    {
+      "gate": "S-20",
+      "category": "collection",
+      "module": "trust_snapshot.py",
+      "description": "anchor count must match",
+      "status": "KILLED",
+      "first_failure": "FAILED tests/authority/test_signed_snapshot_resolver_conformance.py::test_conformance[publisher_signed_structural_defects_refuse]",
+      "classification": null
+    },
+    {
+      "gate": "S-21",
+      "category": "collection",
+      "module": "trust_snapshot.py",
+      "description": "duplicate coordinate refuses",
+      "status": "KILLED",
+      "first_failure": "FAILED tests/authority/test_signed_snapshot_resolver_conformance.py::test_conformance[duplicate_coordinate_refuses]",
+      "classification": null
+    },
+    {
+      "gate": "S-22",
+      "category": "collection",
+      "module": "trust_snapshot.py",
+      "description": "canonical record order required",
+      "status": "KILLED",
+      "first_failure": "FAILED tests/authority/test_signed_snapshot_resolver_conformance.py::test_conformance[publisher_signed_structural_defects_refuse]",
+      "classification": null
+    },
+    {
+      "gate": "S-23",
+      "category": "collection",
+      "module": "trust_snapshot.py",
+      "description": "no publication-capability anchor inside a set",
+      "status": "KILLED",
+      "first_failure": "FAILED tests/authority/test_signed_snapshot_resolver_conformance.py::test_conformance[self_authenticating_snapshot_refuses]",
+      "classification": null
+    },
+    {
+      "gate": "S-24",
+      "category": "collection",
+      "module": "trust_snapshot.py",
+      "description": "every record names this set and version",
+      "status": "KILLED",
+      "first_failure": "FAILED tests/authority/test_signed_snapshot_resolver_conformance.py::test_conformance[publisher_signed_structural_defects_refuse]",
+      "classification": null
+    },
+    {
+      "gate": "S-25",
+      "category": "posture",
+      "module": "trust_snapshot.py",
+      "description": "production authority only after admission",
+      "status": "KILLED",
+      "first_failure": "FAILED tests/authority/test_signed_snapshot_resolver_conformance.py::test_conformance[duplicate_coordinate_refuses]",
+      "classification": null
+    },
+    {
+      "gate": "S-26",
+      "category": "frame",
+      "module": "trust_snapshot.py",
+      "description": "publication domain bound into the signed bytes",
+      "status": "KILLED",
+      "first_failure": "FAILED tests/authority/test_signed_snapshot_resolver_conformance.py::test_conformance[publisher_signing_bytes_are_domain_separated_and_pinned]",
+      "classification": null
+    },
+    {
+      "gate": "S-27",
+      "category": "manifest",
+      "module": "trust_snapshot.py",
+      "description": "set version must be a positive int",
+      "status": "KILLED",
+      "first_failure": "FAILED tests/authority/test_signed_snapshot_resolver_conformance.py::test_manifest_construction_refuses_bad_shapes",
+      "classification": null
+    },
+    {
+      "gate": "S-28",
+      "category": "manifest",
+      "module": "trust_snapshot.py",
+      "description": "validity window strictly ordered",
+      "status": "KILLED",
+      "first_failure": "FAILED tests/authority/test_signed_snapshot_resolver_conformance.py::test_manifest_construction_refuses_bad_shapes",
+      "classification": null
+    },
+    {
+      "gate": "S-29",
+      "category": "directories",
+      "module": "trust.py",
+      "description": "deny-all keeps refusing with as_of",
+      "status": "KILLED",
+      "first_failure": "FAILED tests/authority/test_signed_snapshot_resolver_conformance.py::test_deny_all_accepts_as_of_and_remains_the_exact_type_deny_default",
+      "classification": null
+    },
+    {
+      "gate": "S-30",
+      "category": "parse",
+      "module": "trust_snapshot.py",
+      "description": "document schema pinned",
+      "status": "SURVIVED",
+      "first_failure": "",
+      "classification": "EQUIVALENT_DEFENSE_IN_DEPTH: the canonical-rendering check re-renders the document with the pinned schema constant, so a document naming any other schema differs from its own re-rendering and is refused as malformed."
+    }
+  ]
+}

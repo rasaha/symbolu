@@ -1,6 +1,6 @@
 // AUTO-GENERATED from apps/ugence-governance-studio/contracts/openapi_v2.json
 // DO NOT EDIT BY HAND. Regenerate with: npm run generate:api-v2
-// source_openapi_sha256: 1dbc612681b37b4b82a244a3c30631000856accfd8869f74a3c7a0b69e63cf97
+// source_openapi_sha256: 6346f2b7cd10430874f2f077ac69c12ce74be138a9462b0c4ccdcb503c624d7b
 // api_contract_version: governance_studio.api.v2
 
 export interface paths {
@@ -142,6 +142,31 @@ export interface paths {
          *     the record, and a studio-side reconstruction would be a second unverified account.
          */
         get: operations["v2_observe_audit_chain"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v2/observe/ledger/{correlation_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Ledger Chain
+         * @description The worker's own tenant's audit-ledger rows for one correlation id, as the
+         *     worker read them, with the worker's chain verification (FD-11.3, FD-11.4).
+         *
+         *     The studio names no tenant and re-derives, re-orders and re-hashes nothing: what
+         *     is returned is the worker's answer, including its typed refusal when the chain
+         *     does not verify.
+         */
+        get: operations["v2_observe_ledger_chain"];
         put?: never;
         post?: never;
         delete?: never;
@@ -329,6 +354,32 @@ export interface paths {
         get: operations["v2_review_list_queue"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v2/review/runs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Start Shadow Run
+         * @description Relay a start of the worker's own shadow run (front-door seam 6, FD-10).
+         *
+         *     Nothing of the studio's crosses: the body is the operator's correlation id or
+         *     nothing, the client pins the mode word ``shadow``, and the worker's own definition
+         *     digest binds the run (FD-10.3). The worker's answer, whether it started, replayed or
+         *     refused, is returned as the worker said it; a missing review-service URL or an
+         *     older worker without the route is a typed gap.
+         */
+        post: operations["v2_review_start_shadow_run"];
         delete?: never;
         options?: never;
         head?: never;
@@ -593,6 +644,20 @@ export interface components {
             };
         };
         /**
+         * ReviewStartShadowRunRequest
+         * @description Ask the governed runtime worker to start its own shadow run (front-door seam 6,
+         *     FD-10.2), relayed as typed (FD-10.1).
+         *
+         *     The one field is the operator's correlation id, a typed token, or nothing. No
+         *     workflow, task, provider, mode or definition digest can be carried here, by
+         *     construction (FD-10.3): the worker holds the definition and its own digest binds
+         *     the run, and the mode word the studio sends is pinned to ``shadow`` in the client.
+         */
+        ReviewStartShadowRunRequest: {
+            /** Correlation Id */
+            correlation_id?: string | null;
+        };
+        /**
          * SimulateRunRequest
          * @description Run a workflow against fixtures, recording every governance decision.
          *
@@ -808,6 +873,37 @@ export interface operations {
         };
     };
     v2_observe_audit_chain: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                correlation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    v2_observe_ledger_chain: {
         parameters: {
             query?: never;
             header?: never;
@@ -1108,6 +1204,39 @@ export interface operations {
             cookie?: never;
         };
         requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    v2_review_start_shadow_run: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReviewStartShadowRunRequest"];
+            };
+        };
         responses: {
             /** @description Successful Response */
             200: {

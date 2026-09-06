@@ -363,7 +363,7 @@ def test_an_anchor_whose_profile_differs_from_the_envelope_is_refused():
     """No negotiation: a profile mismatch is a refusal, not a retry."""
 
     class DriftingResolver:
-        def resolve(self, coordinate):
+        def resolve(self, coordinate, *, as_of=None):
             from ugence_trusted_evidence_authority.api import TrustAnchorResolution
 
             # A resolver returning a *valid* anchor whose profile has moved on.

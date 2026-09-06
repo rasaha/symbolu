@@ -6,6 +6,14 @@ its caller supplied, writes it into that tenant's hash-linked chain, and returns
 back for interpretation, does not decide anything about them, and does not know what
 any ``kind`` means.
 
+**The one read, since 0.2.0 (front-door ruling FD-11.2).** ``read_entries`` returns a
+tenant's own rows for one correlation id, in chain order, exactly as they were
+written: the entry, its sequence, its digests. It is raw and uninterpreted, which is
+why it is not the reconstruction API the README still disclaims: nothing here joins,
+orders across tenants, explains a ``kind`` or says whether an entry is true. It refuses
+a foreign schema version and an in-memory store, because a read that a second process
+could never repeat against the same file would be an answer about nothing durable.
+
 **It unifies nothing.** Seven audit stores already exist and none of them is *the*
 audit service (``ugence_governance_contracts.contracts.audit:9-13``). This is an
 eighth store — deliberately — and G4's ``AuditReference`` stays the only thing that
@@ -22,8 +30,10 @@ modification. It is not tamper-proof and this package never says otherwise.
 
 from __future__ import annotations
 
+import json
 import sqlite3
 import threading
+from datetime import datetime
 from typing import Optional, Protocol, runtime_checkable
 
 from ._canon import canonical_bytes, domain_digest, iso, require_nonempty
@@ -196,6 +206,44 @@ class AuditLedger:
         if row is None:
             return 0, GENESIS_DIGEST
         return int(row[0]) + 1, row[1]
+
+    # -- the one read (FD-11.2): a tenant's own rows, raw, in chain order ------- #
+    def read_entries(self, *, tenant_id: str, correlation_id: str) -> tuple:
+        """One tenant's entries for one correlation id, in ``tenant_seq`` order.
+
+        Returns ``StoredEntry`` objects rebuilt from the rows as written: the entry
+        (``LedgerEntry``, re-validated), its global ``seq``, ``prev_digest`` and
+        ``record_digest``. Nothing is interpreted, joined or ordered across tenants;
+        an empty tuple means no row carries that correlation id for that tenant.
+        Refused: a blank tenant or correlation id, an in-memory store, and a store
+        whose schema version is not this package's (checked again at read time, so a
+        file swapped underneath an open ledger is refused rather than misread).
+        """
+        with self._lock:
+            tenant = require_nonempty(tenant_id, "tenant_id")
+            correlation = require_nonempty(correlation_id, "correlation_id")
+            if self.path == ":memory:":
+                raise ContractViolation(
+                    "read_entries needs a file-backed ledger: an in-memory store is not a "
+                    "durable record and is refused for reading")
+            stored = self.schema_version()
+            if stored != SCHEMA_VERSION:
+                raise SchemaVersionMismatch(
+                    f"store at {self.path!r} is schema {stored!r}, this package reads "
+                    f"{SCHEMA_VERSION!r} only; refused rather than reinterpreted")
+            rows = self._conn.execute(
+                "SELECT seq, tenant_id, kind, recorded_at, recorded_by, correlation_id, "
+                "payload_json, prev_digest, record_digest FROM ledger_entries "
+                "WHERE tenant_id=? AND correlation_id=? ORDER BY tenant_seq",
+                (tenant, correlation)).fetchall()
+        entries = []
+        for seq, t, kind, recorded_at, recorded_by, corr, payload_json, prev, record in rows:
+            entry = LedgerEntry(tenant_id=t, kind=kind,
+                                recorded_at=datetime.fromisoformat(recorded_at),
+                                recorded_by=recorded_by, payload=json.loads(payload_json),
+                                correlation_id=corr)
+            entries.append(StoredEntry(int(seq), entry, prev, record))
+        return tuple(entries)
 
     # -- reading, for verification only ------------------------------------ #
     def entry_count(self, *, tenant_id: Optional[str] = None) -> int:

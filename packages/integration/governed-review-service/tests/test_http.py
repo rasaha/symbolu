@@ -1,4 +1,4 @@
-"""The five routes, through Starlette's test client, over the service core."""
+"""The seven routes, through Starlette's test client, over the service core."""
 
 from __future__ import annotations
 
@@ -139,3 +139,128 @@ def test_the_queue_view_renders_a_directory_projection_that_is_not_an_approver_r
         "approver_id": Projection.approver_id, "approver_kind": "HUMAN",
         "role": S.F.ROLE, "authority_reference": Projection.authority_reference}]
     assert queue_entry_view(replace(entry, eligible_approvers=()))["eligible_approvers"] == []
+
+
+# --------------------------------------------------------------------------- #
+# the sixth route (front-door seam 6, FD-10)
+# --------------------------------------------------------------------------- #
+def test_the_start_route_without_a_composed_starter_is_the_typed_unconfigured_refusal(client):
+    c, _aid, adapter = client
+    r = c.post("/review/runs", json={})
+    assert r.status_code == 409
+    body = r.json()
+    assert body["result"] == "REFUSED_UNCONFIGURED" and body["started"] is False
+    assert body["mode"] == "shadow" and body["instance_id"] == ""
+    assert body["maturity"] == "REFERENCE_GRADE_SHADOW_ONLY"
+    assert adapter.signals == [] and adapter.resumes == []
+
+
+def test_the_start_route_refuses_any_mode_but_shadow_before_the_starter(tmp_path):
+    clock, ledger = F.Clock(), F.sqlite_ledger(tmp_path)
+    starter = S.RecordingStarter()
+    svc = S.service(ledger, clock, starter=starter)
+    with TestClient(build_app(svc)) as c:
+        for mode in ("live", "LIVE", "dry_run", "simulation", ""):
+            r = c.post("/review/runs", json={"mode": mode})
+            assert r.status_code == 409 and r.json()["result"] == "REFUSED_MODE", mode
+        assert starter.calls == [], "nothing reached the starter"
+        ok = c.post("/review/runs", json={"mode": "shadow", "correlation_id": "c-1"})
+        assert ok.status_code == 200 and ok.json()["result"] == "STARTED"
+        same = c.post("/review/runs", json={"correlation_id": "c-1"})
+        assert same.json()["result"] == "REPLAYED" and same.json()["instance_id"] == ok.json()["instance_id"]
+        assert starter.calls == ["c-1", "c-1"]
+
+
+def test_the_start_route_takes_no_definition_provider_mode_word_or_digest(tmp_path):
+    clock, ledger = F.Clock(), F.sqlite_ledger(tmp_path)
+    starter = S.RecordingStarter()
+    svc = S.service(ledger, clock, starter=starter)
+    with TestClient(build_app(svc)) as c:
+        for extra in ({"workflow": {}}, {"workflow_id": "wf"}, {"tasks": []}, {"provider_id": "p"},
+                      {"definition_digest": "d"}, {"execution_mode": "LIVE"}, {"inputs": {}},
+                      {"instance_id": "chosen"}, {"tenant_id": "other"}):
+            r = c.post("/review/runs", json={"correlation_id": "c", **extra})
+            assert r.status_code == 422, extra
+            assert "FD-10.3" in r.json()["detail"]
+        assert c.post("/review/runs", json={"correlation_id": "has space"}).status_code == 422
+        assert c.post("/review/runs", json={"correlation_id": 7}).status_code == 422
+        assert c.post("/review/runs", json=[1]).status_code == 422
+        assert c.post("/review/runs", content=b"not json",
+                      headers={"Content-Type": "application/json"}).status_code == 422
+        assert starter.calls == []
+
+
+# --------------------------------------------------------------------------- #
+# the seventh route (front-door seam 7, FD-11)
+# --------------------------------------------------------------------------- #
+def _entry(correlation: str, step: int, at):
+    return dict(tenant_id=F.TENANT, kind="governed_review.linkage.v2", recorded_at=at,
+                recorded_by="governed-review-service", payload={"step": step},
+                correlation_id=correlation)
+
+
+def test_the_audit_route_without_a_composed_reader_is_the_typed_unconfigured_refusal(client):
+    c, _aid, _adapter = client
+    r = c.get("/review/audit/corr-1")
+    assert r.status_code == 409
+    body = r.json()
+    assert body["result"] == "REFUSED_UNCONFIGURED" and body["read"] is False
+    assert body["entries"] == [] and body["chain_verified"] is False
+    assert body["maturity"] == "REFERENCE_GRADE_SHADOW_ONLY"
+
+
+def test_the_audit_route_reads_the_tenants_rows_in_chain_order_with_the_verification(tmp_path):
+    from datetime import timedelta
+
+    clock, ledger = F.Clock(), F.sqlite_ledger(tmp_path)
+    t0 = clock.datetime()
+    _path, audit = S.file_audit_ledger(
+        tmp_path,
+        _entry("corr-1", 1, t0), _entry("corr-2", 9, t0 + timedelta(minutes=1)),
+        _entry("corr-1", 2, t0 + timedelta(minutes=2)),
+        dict(tenant_id="tenant-other", kind="k", recorded_at=t0, recorded_by="x",
+             payload={"step": 7}, correlation_id="corr-1"))
+    svc = S.service(ledger, clock, ledger_reader=audit)
+    with TestClient(build_app(svc)) as c:
+        r = c.get("/review/audit/corr-1")
+        assert r.status_code == 200, r.text
+        body = r.json()
+        assert body["result"] == "READ" and body["read"] is True and body["chain_verified"] is True
+        assert body["tenant_id"] == F.TENANT and body["correlation_id"] == "corr-1"
+        assert [e["payload"]["step"] for e in body["entries"]] == [1, 2], "own tenant, chain order"
+        assert body["entry_count"] == 2
+        first = body["entries"][0]
+        assert set(first) == {"seq", "entry_ref", "kind", "recorded_at", "recorded_by",
+                              "correlation_id", "payload", "prev_digest", "record_digest"}
+        assert first["entry_ref"] == f"{F.TENANT}/{first['seq']}"
+        assert first["kind"] == "governed_review.linkage.v2" and len(first["record_digest"]) == 64
+        assert "raw and uninterpreted" in body["record_type"]
+        assert c.get("/review/audit/corr-nope").status_code == 404
+        assert c.get("/review/audit/has%20space").status_code == 422
+        # no list-all and no write
+        assert c.get("/review/audit").status_code in (404, 405)
+        assert c.post("/review/audit/corr-1", json={}).status_code == 405
+        assert c.delete("/review/audit/corr-1").status_code == 405
+    audit.close()
+
+
+def test_a_chain_that_does_not_verify_is_a_typed_refusal_with_the_entries_withheld(tmp_path):
+    import sqlite3
+
+    clock, ledger = F.Clock(), F.sqlite_ledger(tmp_path)
+    t0 = clock.datetime()
+    path, audit = S.file_audit_ledger(tmp_path, _entry("corr-1", 1, t0), _entry("corr-1", 2, t0))
+    raw = sqlite3.connect(path)
+    raw.execute("DROP TRIGGER ledger_no_update")
+    raw.execute("UPDATE ledger_entries SET content_digest=? WHERE tenant_seq=0", ("0" * 64,))
+    raw.commit()
+    raw.close()
+    svc = S.service(ledger, clock, ledger_reader=audit)
+    with TestClient(build_app(svc)) as c:
+        r = c.get("/review/audit/corr-1")
+        assert r.status_code == 409, r.text
+        body = r.json()
+        assert body["result"] == "REFUSED_INTEGRITY" and body["read"] is False
+        assert body["entries"] == [] and body["chain_verified"] is False
+        assert "does not verify" in body["reason"] and "withheld" in body["reason"]
+    audit.close()

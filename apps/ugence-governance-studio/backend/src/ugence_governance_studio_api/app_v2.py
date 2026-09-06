@@ -40,6 +40,8 @@ from .services.studio_v2 import (
     PublishService,
     RegistryService,
     ReviewRelayService,
+    StartRunService,
+    LedgerObserveService,
     SimulateService,
 )
 from .settings import ApiSettings
@@ -96,6 +98,8 @@ def build_studio_context(
         observe=ObserveService(console=console),
         review=ReviewRelayService(review=review),
         registry=RegistryService(registry=system_registry, registered_by=registered_by),
+        start_run=StartRunService(review=review),
+        ledger_observe=LedgerObserveService(review=review),
     )
 
 

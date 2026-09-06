@@ -5,6 +5,10 @@ service holds and transmits a human's decision to it. The decision route is name
 the act of submitting, not for its outcome: no path or operation id here names an
 authority act, and the studio's review client cannot reach a resume, release, continue
 or signal route because the review service exposes none.
+
+Since front-door seam 6 (FD-10, amending HR-1's wording) one more relay: the studio may
+ask the worker to start the worker's own shadow run. The route carries a correlation id
+and nothing else; the answer is the worker's typed outcome, returned unchanged.
 """
 from __future__ import annotations
 
@@ -12,7 +16,7 @@ from fastapi import APIRouter
 from starlette.requests import Request
 
 from ...clients.review import PROOF_HEADER
-from ...contracts.v2 import ReviewDecisionRequest
+from ...contracts.v2 import ReviewDecisionRequest, ReviewStartShadowRunRequest
 from .deps import studio, v2_response
 
 router = APIRouter(prefix="/api/v2/review", tags=["review"])
@@ -70,3 +74,17 @@ def submit_decision(request: Request, req: ReviewDecisionRequest):
     proof = request.headers.get(PROOF_HEADER, "")
     result = studio(request).review.submit_decision(req.model_dump(), proof=proof)
     return v2_response(request, operation="review.submit_decision", result=result)
+
+
+@router.post("/runs", operation_id="v2_review_start_shadow_run")
+def start_shadow_run(request: Request, req: ReviewStartShadowRunRequest):
+    """Relay a start of the worker's own shadow run (front-door seam 6, FD-10).
+
+    Nothing of the studio's crosses: the body is the operator's correlation id or
+    nothing, the client pins the mode word ``shadow``, and the worker's own definition
+    digest binds the run (FD-10.3). The worker's answer, whether it started, replayed or
+    refused, is returned as the worker said it; a missing review-service URL or an
+    older worker without the route is a typed gap.
+    """
+    result = studio(request).start_run.start(correlation_id=req.correlation_id)
+    return v2_response(request, operation="review.start_shadow_run", result=result)

@@ -236,13 +236,15 @@ def probe_no_verified_state_exists():
 def probe_every_refusal_reason_is_a_refusal():
     assert set(R) == set(TRUSTED_EVIDENCE_REFUSAL_REASONS)
     assert R.TRUSTED_EVIDENCE_INDETERMINATE in TRUSTED_EVIDENCE_REFUSAL_REASONS
-    assert len(list(R)) == 40
+    assert len(list(R)) == 43  # 19 TEV-1 + 21 TEV-2 + 3 TR-3 (0.5.0), appended in order
     # TEV-1's nineteen keep their exact ordinal positions; TEV-2 appended 21.
     assert [m.name for m in R][:19] == sorted(
         [m.name for m in R][:19], key=[m.name for m in R].index
     )
     assert list(R)[18] is R.TRUSTED_EVIDENCE_INDETERMINATE
     assert list(R)[19] is R.TRUSTED_EVIDENCE_ENVELOPE_MALFORMED
+    assert list(R)[40] is R.TRUSTED_EVIDENCE_TRUST_ANCHOR_SET_INSTANT_REQUIRED
+    assert list(R)[42] is R.TRUSTED_EVIDENCE_TRUST_ANCHOR_SET_STALE
     # Still no success state anywhere in the vocabulary.
     for member in R:
         head = member.value.removeprefix("TRUSTED_EVIDENCE_").split("NOT_", 1)[0]
@@ -793,7 +795,7 @@ def probe_the_package_version_and_typing_marker():
 
     import ugence_trusted_evidence_authority as pkg
 
-    assert pkg.__version__ == "0.4.0"
+    assert pkg.__version__ == "0.5.0"
     assert not hasattr(pkg, "CONTRACT_VERSION")
     assert (pathlib.Path(pkg.__file__).resolve().parent / "py.typed").is_file()
 
@@ -1596,7 +1598,7 @@ def probe_every_principal_refusal_class_is_demonstrable():
     assert demonstrated["anchor_missing"] is R.TRUSTED_EVIDENCE_TRUST_ANCHOR_MISSING
 
     class AmbiguousResolver:
-        def resolve(self, coordinate):
+        def resolve(self, coordinate, *, as_of=None):
             return TrustAnchorResolution.refused(
                 coordinate, R.TRUSTED_EVIDENCE_TRUST_ANCHOR_AMBIGUOUS)
 

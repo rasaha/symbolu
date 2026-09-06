@@ -224,7 +224,10 @@ def test_the_contract_amendment_is_recorded_in_the_p3e_freeze():
     assert cfg["frozen"]["openapi_v2_sha256"] == current == last["sha256"]
     assert last["amendment_id"] in cfg["frozen"]["openapi_v2_amendment"]
     assert record["original_sha256"] in cfg["frozen"]["openapi_v2_amendment"]
-    assert set(last["operations_added"]) == {"v2_registry_register", "v2_registry_list"}
+    # v2-A1 is this seam's amendment; a later seam (6, FD-10.4) amended once more
+    (a1,) = [a for a in record["amendments"] if a["amendment_id"] == "v2-A1"]
+    assert set(a1["operations_added"]) == {"v2_registry_register", "v2_registry_list"}
+    assert "v2-A1" in cfg["frozen"]["openapi_v2_amendment"]
     # v1 stays frozen
     assert cfg["frozen"]["openapi_sha256"] == "dc309eab216e1a4c2f63f286887a4ef218a96ac34f8fa8614bff176db7c36656"
 

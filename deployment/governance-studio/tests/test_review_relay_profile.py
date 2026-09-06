@@ -125,6 +125,9 @@ def test_row_4_unset_review_url_is_a_typed_gap_on_every_review_route(config):
         assert r.status_code == 200
         gap = r.json()["result"]
         assert gap["available"] is False and gap["capability"] == "review_service"
+        # front-door seam 6 (FD-10): the start relay shares the variable and the gap
+        r = client.post("/api/v2/review/runs", headers=_headers(**{"Content-Type": "application/json"}), json={})
+        assert r.status_code == 200 and r.json()["result"]["capability"] == "review_service"
 
 
 def test_the_review_routes_sit_behind_the_same_gate_as_v1(config):

@@ -291,3 +291,95 @@ def test_a_naive_clock_is_refused(tmp_path):
                         tenant_id=F.TENANT, clock=lambda: datetime(2026, 1, 1))
     with pytest.raises(ClockDisciplineError):
         svc.list_queue()
+
+
+# --------------------------------------------------------------------------- #
+# the start relay (front-door seam 6, FD-10)
+# --------------------------------------------------------------------------- #
+def test_start_shadow_run_without_a_starter_is_refused_and_touches_nothing(world):
+    from ugence_governed_review_service import StartResult
+
+    svc = world["svc"]
+    assert svc.starter_configured is False
+    out = svc.start_shadow_run()
+    assert out.result is StartResult.REFUSED_UNCONFIGURED and not out.started
+    assert out.instance_id == "" and "starts nothing of its own" in out.reason
+    assert world["adapter"].signals == [] and world["adapter"].resumes == []
+
+
+def test_start_shadow_run_refuses_every_other_mode_before_the_starter_and_typed_ids_only(tmp_path):
+    from ugence_governed_review_service import SHADOW_RUN_MODE, StartResult
+
+    clock, ledger = F.Clock(), F.sqlite_ledger(tmp_path)
+    starter = S.RecordingStarter()
+    svc = S.service(ledger, clock, starter=starter)
+    assert svc.starter_configured is True and SHADOW_RUN_MODE == "shadow"
+    for mode in ("live", "LIVE", "DRY_RUN", "simulation", "SHADOW", ""):
+        out = svc.start_shadow_run(mode=mode)
+        assert out.result is StartResult.REFUSED_MODE and not out.started, mode
+    assert starter.calls == []
+    for bad in ("has space", "a" * 65, "/etc", "x;y", ""):
+        with pytest.raises(ContractViolation):
+            svc.start_shadow_run(correlation_id=bad)
+    assert starter.calls == []
+    first = svc.start_shadow_run(correlation_id="c.1:a-b_c")
+    again = svc.start_shadow_run(correlation_id="c.1:a-b_c", mode="shadow")
+    minted = svc.start_shadow_run()
+    assert first.result is StartResult.STARTED and first.advanced
+    assert again.result is StartResult.REPLAYED and again.instance_id == first.instance_id
+    assert not again.advanced and again.started
+    assert minted.result is StartResult.STARTED and minted.correlation_id.startswith("minted-")
+    assert starter.calls == ["c.1:a-b_c", "c.1:a-b_c", None]
+
+
+def test_a_starter_that_is_not_one_is_refused_at_construction(tmp_path):
+    clock, ledger = F.Clock(), F.sqlite_ledger(tmp_path)
+    with pytest.raises(ContractViolation, match="starter"):
+        S.service(ledger, clock, starter=object())
+
+
+# --------------------------------------------------------------------------- #
+# the ledger read (front-door seam 7, FD-11)
+# --------------------------------------------------------------------------- #
+def test_read_audit_without_a_reader_is_refused_and_a_malformed_id_is_a_contract_violation(world):
+    from ugence_governed_review_service import AuditReadResult
+
+    svc = world["svc"]
+    assert svc.ledger_reader_configured is False
+    out = svc.read_audit("corr-1")
+    assert out.result is AuditReadResult.REFUSED_UNCONFIGURED and not out.read
+    assert out.tenant_id == F.TENANT and out.entries == ()
+    for bad in ("", "has space", "a" * 65, "/etc"):
+        with pytest.raises(ContractViolation):
+            svc.read_audit(bad)
+
+
+def test_read_audit_names_the_configured_tenant_only_and_never_writes(tmp_path):
+    from ugence_governed_review_service import AuditReadResult
+
+    clock, ledger = F.Clock(), F.sqlite_ledger(tmp_path)
+    t0 = clock.datetime()
+    _path, audit = S.file_audit_ledger(
+        tmp_path,
+        dict(tenant_id=F.TENANT, kind="k", recorded_at=t0, recorded_by="r", payload={"n": 1},
+             correlation_id="corr-1"),
+        dict(tenant_id="tenant-other", kind="k", recorded_at=t0, recorded_by="r", payload={"n": 2},
+             correlation_id="corr-1"))
+    svc = S.service(ledger, clock, ledger_reader=audit)
+    assert svc.ledger_reader_configured is True
+    out = svc.read_audit("corr-1")
+    assert out.result is AuditReadResult.READ and out.read and out.chain_verified
+    assert [e["payload"]["n"] for e in out.entries] == [1]
+    assert svc.read_audit("corr-none").result is AuditReadResult.NOT_FOUND
+    assert audit.entry_count() == 2, "a read writes nothing"
+    import inspect
+
+    assert set(inspect.signature(svc.read_audit).parameters) == {"correlation_id"}, \
+        "no tenant parameter: the tenant is the service's own"
+    audit.close()
+
+
+def test_a_reader_that_is_not_one_is_refused_at_construction(tmp_path):
+    clock, ledger = F.Clock(), F.sqlite_ledger(tmp_path)
+    with pytest.raises(ContractViolation, match="ledger_reader"):
+        S.service(ledger, clock, ledger_reader=object())

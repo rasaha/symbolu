@@ -2,7 +2,7 @@
 
 **The audit-ledger service — and nothing else.** Distribution
 `ugence-control-plane-root` · namespace `ugence_control_plane_root` · version
-**0.1.1** · maturity **reference-grade**.
+**0.2.0** · maturity **reference-grade**.
 
 > Append one entry, at one caller-supplied instant, into one tenant's chain.
 > Return the `AuditReference` naming it. This package decides nothing, owns no
@@ -113,7 +113,11 @@ coverage claim can be run instead of believed.
 
 - Reference-grade, composing reference-grade parts (D-1). **Not production-ready.**
 - No console, no connector, no reconstruction API — the rest of roadmap §3 is that
-  product's scope, not a root's.
+  product's scope, not a root's. Since 0.2.0 (front-door ruling FD-11.2) the ledger
+  has one raw read, `read_entries(tenant_id=, correlation_id=)`: a tenant's own rows
+  for one correlation id, in chain order, as written. That is not reconstruction: it
+  joins nothing, explains no `kind`, orders nothing across tenants and says nothing
+  about whether an entry is true. Reconstruction stays the console product's scope.
 - Nothing here observes or notifies. The ledger records what a caller already decided
   to record, and says nothing about whether it is true or whether the writer was
   entitled to write it — the same limit `AuditReference` states about itself.

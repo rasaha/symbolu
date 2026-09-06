@@ -295,7 +295,7 @@ def test_an_unattested_resolver_is_refused_in_production():
     """S-14: silence is refusal. A resolver must opt in explicitly."""
 
     class QuietResolver:
-        def resolve(self, coordinate):  # pragma: no cover - construction fails first
+        def resolve(self, coordinate, *, as_of=None):  # pragma: no cover - construction fails first
             raise AssertionError("never reached")
 
     with pytest.raises(ProducerAttestationConfigurationError):

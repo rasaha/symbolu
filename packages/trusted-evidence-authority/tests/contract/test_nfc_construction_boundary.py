@@ -49,6 +49,7 @@ from ugence_trusted_evidence_authority.api import (
     ReceiptScopeExpectation,
     TrustAnchorCapability,
     TrustAnchorCoordinate,
+    TrustAnchorSetSnapshot,
     TrustedEvidenceCanonicalizationError,
     TrustedEvidenceContractError,
     canonical_bytes,
@@ -126,6 +127,31 @@ def test_rejection_is_never_silent_normalization():
 # --------------------------------------------------------------------------- #
 # The boundary is uniform — every string coordinate, nested contracts included
 # --------------------------------------------------------------------------- #
+
+def _manifest(**overrides):
+    from datetime import timedelta
+
+    from ugence_trusted_evidence_authority.api import (
+        TRUST_ANCHOR_SET_MANIFEST_SCHEMA_V1,
+        TrustAnchorSetManifest,
+        trust_anchor_collection_digest,
+    )
+
+    fields = dict(
+        schema_version=TRUST_ANCHOR_SET_MANIFEST_SCHEMA_V1,
+        trust_anchor_set_id="set-1",
+        trust_anchor_set_version=1,
+        publisher_authority_id="publisher-1",
+        publisher_key_id="pub-key-1",
+        published_at=RECEIPT_VALID_FROM,
+        effective_from=RECEIPT_VALID_FROM,
+        effective_to=RECEIPT_VALID_FROM + timedelta(days=30),
+        anchor_count=0,
+        anchor_collection_digest=trust_anchor_collection_digest(()),
+    )
+    fields.update(overrides)
+    return TrustAnchorSetManifest(**fields)
+
 
 def audit(**kw):
     """A minimal audit record with one overridable string coordinate."""
@@ -251,6 +277,13 @@ STRING_COORDINATES = [
      lambda v: dataclasses.replace(envelope(), signature=v)),
     ("SignedEvidenceSubmission.signature", lambda v: submission(signature=v)),
     ("TrustAnchorRecord.public_key", lambda v: producer_anchor(public_key=v)),
+    # -- 0.5.0: the signed trust-anchor-set snapshot (TR-2) -----------------
+    ("TrustAnchorSetManifest.schema_version", lambda v: _manifest(schema_version=v)),
+    ("TrustAnchorSetManifest.trust_anchor_set_id", lambda v: _manifest(trust_anchor_set_id=v)),
+    ("TrustAnchorSetManifest.publisher_authority_id", lambda v: _manifest(publisher_authority_id=v)),
+    ("TrustAnchorSetManifest.publisher_key_id", lambda v: _manifest(publisher_key_id=v)),
+    ("TrustAnchorSetSnapshot.signature",
+     lambda v: TrustAnchorSetSnapshot(manifest=_manifest(), anchors=(), signature=v)),
 ]
 
 

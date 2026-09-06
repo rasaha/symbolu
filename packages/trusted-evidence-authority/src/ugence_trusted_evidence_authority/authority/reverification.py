@@ -739,7 +739,7 @@ class SignedReceiptVerifier:
             return state.refused(_R.TRUSTED_EVIDENCE_PAYLOAD_DIGEST_MISMATCH)
 
         # 3. trust-anchor resolution at the exact coordinate.
-        resolution = self._trust_anchors.resolve(coordinate)
+        resolution = self._trust_anchors.resolve(coordinate, as_of=evaluated_at)
         if type(resolution) is not TrustAnchorResolution:
             return state.refused(_R.TRUSTED_EVIDENCE_VERIFIER_UNAVAILABLE)
         if resolution.anchor is None:

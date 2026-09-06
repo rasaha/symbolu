@@ -66,7 +66,9 @@ def test_the_pre_existing_members_keep_their_spelling_and_declaration_order():
     assert CS.value == "CLOUD_SCALING_RECOMMENDATION_ATTESTATION"
     assert members[3] is EP and EP.value == "EFFECT_ATTESTATION_EXECUTING_PROVIDER"
     assert members[4] is IO and IO.value == "EFFECT_ATTESTATION_INDEPENDENT_OBSERVER"
-    assert len(members) == 5
+    assert members[5] is TrustAnchorCapability.TRUST_ANCHOR_SET_PUBLICATION
+    assert members[5].value == "TRUST_ANCHOR_SET_PUBLICATION"
+    assert len(members) == 6
 
 
 def test_the_new_member_is_distinct_from_both_existing_ones():
@@ -76,7 +78,7 @@ def test_the_new_member_is_distinct_from_both_existing_ones():
     assert CS is not TrustAnchorCapability.RECEIPT_ISSUANCE
     assert CS != TrustAnchorCapability.EVIDENCE_PRODUCTION
     assert CS != TrustAnchorCapability.RECEIPT_ISSUANCE
-    assert len({m.value for m in TrustAnchorCapability}) == 5
+    assert len({m.value for m in TrustAnchorCapability}) == 6
     # The two effect capabilities are distinct from each other and from every
     # earlier member: a provider anchor never answers an observer coordinate.
     assert EP is not IO and EP != IO
@@ -161,8 +163,8 @@ def test_the_lent_capability_is_never_substitutable_for_either_existing_one():
         capability: TrustAnchorCoordinate(**base, capability=capability)
         for capability in TrustAnchorCapability
     }
-    assert len(set(coordinates.values())) == 5
-    assert len({c.canonical_digest() for c in coordinates.values()}) == 5
+    assert len(set(coordinates.values())) == 6
+    assert len({c.canonical_digest() for c in coordinates.values()}) == 6
 
 
 # --------------------------------------------------------------------------------- #

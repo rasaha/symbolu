@@ -424,12 +424,30 @@ def test_there_is_exactly_one_public_serialization_and_one_digest_function():
     from ugence_trusted_evidence_authority.authority import envelope as envelope_mod
 
     digesters = [n for n in api.__all__ if "digest" in n.lower() and not n.isupper()]
-    assert digesters == ["canonical_digest"]
+    # 0.5.0 adds exactly one more: the complete-collection digest of a
+    # trust-anchor set (TR-2), which digests an *ordered sequence* of contracts
+    # that ``canonical_digest`` cannot express. It is not a second encoder: it
+    # frames each record's ``canonical_bytes`` and hashes the frame, proved below.
+    assert digesters == ["canonical_digest", "trust_anchor_collection_digest"]
+    from ugence_trusted_evidence_authority.authority import trust_snapshot as snapshot_mod
+
+    for node in ast.walk(ast.parse(inspect.getsource(snapshot_mod))):
+        if isinstance(node, ast.FunctionDef) and node.name == "trust_anchor_collection_digest":
+            called_attrs = {n.func.attr for n in ast.walk(node)
+                            if isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute)}
+            called_names = {n.func.id for n in ast.walk(node)
+                            if isinstance(n, ast.Call) and isinstance(n.func, ast.Name)}
+            assert "canonical_bytes" in called_attrs
+            assert "framed_signed_input" in called_names
+            assert "dumps" not in called_attrs
 
     signing_input_builders = {
         "signed_evidence_input_bytes",
         "signed_receipt_input_bytes",
         "framed_signed_input",
+        # 0.5.0: the trust-anchor-set manifest signing input (TR-2); it frames
+        # the manifest's canonical_bytes under the publication domain.
+        "trust_anchor_set_signing_bytes",
     }
     serializers = [n for n in api.__all__ if "bytes" in n or "dumps" in n]
     assert set(serializers) - signing_input_builders == {"canonical_bytes"}

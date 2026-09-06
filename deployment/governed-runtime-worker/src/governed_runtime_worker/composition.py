@@ -8,9 +8,14 @@ in production mode an identity port is mandatory, a fixture identity or eligibil
 adapter is refused, an in-memory store or a non-authoritative bundle is refused, a
 public bind or a plain-HTTP listener is refused. ``compose`` then opens the stores,
 launches DBOS, builds the runtime host over the governed hook and the approval-bound
-source, and hands the review service its four seams plus the linkage appender and the
-identity port. The result carries no secret but the two DSNs already inside the
-datasource, and renders none.
+source, and hands the review service its four seams plus the linkage appender, the
+identity port and, since 0.2.0, the shadow-run starter of front-door seam 6 (FD-10):
+the sixth route starts the workload's own ``wf-shadow`` under this deployment's own
+definition digest, and nothing the caller sends can name another. Since 0.3.0 the
+same audit ledger the linkage appender writes is handed to the service as its ledger
+reader (front-door seam 7, FD-11): the seventh route reads this deployment's own
+tenant's rows, raw, and nothing else. The result carries no secret but the two DSNs
+already inside the datasource, and renders none.
 """
 
 from __future__ import annotations
@@ -44,8 +49,9 @@ from ugence_governed_review_service import (
 )
 
 from .config import WorkerConfig, WorkerConfigError
+from .starter import ShadowRunStarter
 from .version import DEPLOYMENT_NAME, MATURITY
-from .workload import Workload
+from .workload import ShadowWorkload, Workload
 
 __all__ = [
     "PostureRefused",
@@ -108,6 +114,7 @@ class Worker:
     bundle: Any
     identity_port: Optional[Any]
     workload: Any
+    starter: Optional[ShadowRunStarter] = None
     maturity: str = MATURITY
     _closers: list = field(default_factory=list, repr=False)
 
@@ -177,9 +184,14 @@ def build_identity_port(config: WorkerConfig, clock: WorkerClock) -> Optional[Jw
 
 def compose(config: WorkerConfig, *, clock: WorkerClock, workload: Workload,
             identity_port: Any = None, eligibility: Any = None, bundle: Any = None,
-            dbos_name: str = DEPLOYMENT_NAME) -> Worker:
+            dbos_name: str = DEPLOYMENT_NAME,
+            shadow_workflow_id: str = ShadowWorkload.WORKFLOW_ID) -> Worker:
     """Wire the worker. Order: refusals, stores, engine, hook and host, adapter,
-    reader and appender, identity, service, app."""
+    reader and appender, identity, starter, service, app.
+
+    ``shadow_workflow_id`` names the one workflow the sixth route may start (FD-10.2);
+    the workload must define it, and the adapter binds it to ``config.definition_digest``.
+    """
 
     preflight(config, identity_port=identity_port, eligibility=eligibility, bundle=bundle)
     if not isinstance(clock, WorkerClock):
@@ -257,14 +269,21 @@ def compose(config: WorkerConfig, *, clock: WorkerClock, workload: Workload,
     appender = LinkageAppender(ledger=audit, index=index, reader=reader, approvals=ledger,
                                tenant_id=config.tenant_id, recorded_by=DEPLOYMENT_NAME)
     port = identity_port if identity_port is not None else build_identity_port(config, clock)
+    # -- front-door seam 6 (FD-10): the start relay over this deployment's own digest ----
+    starter = ShadowRunStarter(adapter=adapter, workflow_id=shadow_workflow_id,
+                               definition_digest=config.definition_digest,
+                               workload_maturity=str(getattr(workload, "maturity", "")))
     service = ReviewService(
         ledger=ledger, adapter=adapter, reader=reader, tenant_id=config.tenant_id,
         clock=clock.datetime, eligibility=listing, linkage_appender=appender,
         identity_port=port, tenant_mode=TenantMode.SINGLE_TENANT, production=production,
+        starter=starter,
+        # front-door seam 7 (FD-11.2): the one ledger, read raw by the seventh route
+        ledger_reader=audit,
     )
     app = build_app(service)
     app.add_api_route("/healthz", _healthz, methods=["GET"], include_in_schema=False)
     return Worker(config=config, service=service, app=app, adapter=adapter,
                   reader=reader, ledger=ledger, directory=directory, audit=audit,
                   datasource=datasource, bundle=bundle, identity_port=port, workload=workload,
-                  _closers=closers)
+                  starter=starter, _closers=closers)

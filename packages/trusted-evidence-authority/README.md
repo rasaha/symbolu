@@ -743,6 +743,45 @@ never established, by anything, ever (§12).
 
 ---
 
+### The signed-snapshot resolver (0.5.0, a production-shaped candidate)
+
+`SignedSnapshotTrustAnchorResolver` is the one production-shaped
+`TrustAnchorResolverPort` this package ships, ruled by
+`docs/architecture/ADR_UGENCE_TEA_PRODUCTION_TRUST_ANCHOR_RESOLVER.md`. The
+composition root reads a snapshot file and hands over the **complete bytes**
+together with a **pinned publication root** (an anchor under
+`TRUST_ANCHOR_SET_PUBLICATION`, never drawn from the snapshot), the
+owner-configured **maximum snapshot age** and the **last accepted set version**:
+
+```python
+resolver = SignedSnapshotTrustAnchorResolver.from_document(
+    document_bytes,                      # None when the file could not be read
+    publication_root=pinned_root,        # TrustAnchorRecord, TRUST_ANCHOR_SET_PUBLICATION
+    max_snapshot_age=timedelta(days=30),
+    last_accepted_set_version=41,        # from the deployment's own audit record
+)
+resolver.is_production_authoritative     # True only after complete admission
+resolver.resolve(coordinate, as_of=trusted_instant)
+```
+
+Every resolution re-checks, in order: the instant (an aware `datetime`, else
+`TRUSTED_EVIDENCE_TRUST_ANCHOR_SET_INSTANT_REQUIRED`), admission, the root's
+lifecycle and the set's window at `as_of` (else `…_SET_UNAVAILABLE`), freshness
+against the earlier of the signed `effective_to` and `published_at` plus the
+maximum age (else `…_SET_STALE`), then the exact coordinate. It reads no file,
+clock, environment or network, signs nothing, refreshes nothing and offers no
+widening method: a new snapshot means a new resolver. Anchor lifecycle stays
+with the verifier. The publication, rotation and revocation process (TR-4) is
+specified by the ADR and implemented nowhere in this repository.
+
+The port is `resolve(coordinate, *, as_of=None)`. The default exists for
+source compatibility; the reference and deny-all directories ignore the keyword,
+and no production resolution succeeds without it.
+
+**Maturity:** a production-shaped resolver candidate. Not independently reviewed,
+not externally cryptographically audited, not production-ready. D-38 and D-32(4)
+remain applicable. No consumer is wired to it.
+
 ## TEV-2 delegated decisions
 
 Each decision below was delegated to this milestone by the ADR, and is recorded
@@ -782,6 +821,7 @@ python packages/trusted-evidence-authority/verify_trusted_evidence_authority_dis
 python -m pytest packages/trusted-evidence-authority -q
 PYTHONPATH=packages/trusted-evidence-authority/src \
   python packages/trusted-evidence-authority/adversarial_probes.py
+python packages/trusted-evidence-authority/scripts/resolver_mutation_sweep.py
 ```
 
 The distribution verifier builds the wheel, asserts it ships exactly one

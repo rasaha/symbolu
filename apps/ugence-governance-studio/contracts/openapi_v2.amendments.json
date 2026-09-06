@@ -19,6 +19,36 @@
         "/api/v2/registry/registrations"
       ],
       "note": "Front-door seam 5: typed registration intake over ai-system-registry 0.2.0. The write records what an administrator asserted and confers nothing (registry ADR D-5); no other operation changed."
+    },
+    {
+      "amendment_id": "v2-A2",
+      "date": "2026-09-06",
+      "ruling": "ADR_UGENCE_STUDIO_FRONT_DOOR_SCOPING.md FD-10.4 ONE_STEP_AMENDMENT (with FD-10.1 START_IS_A_RELAY, FD-10.2 SIXTH_ROUTE_START_SHADOW_RUN, FD-10.3 NO_DEFINITION_CROSSES)",
+      "previous_sha256": "1dbc612681b37b4b82a244a3c30631000856accfd8869f74a3c7a0b69e63cf97",
+      "sha256": "9d958f9c70ca133509aa7cff02657f7f39c5f98068f9dc6fd12bfb9c2a665cdb",
+      "operations_added": [
+        "v2_review_start_shadow_run"
+      ],
+      "operations_removed": [],
+      "paths_added": [
+        "/api/v2/review/runs"
+      ],
+      "note": "Front-door seam 6: one relay operation asking the governed runtime worker to start the worker's own shadow run. The request carries an optional typed correlation_id and nothing else; the studio's client pins the mode word shadow and the worker's own definition digest binds the run. No other operation changed."
+    },
+    {
+      "amendment_id": "v2-A3",
+      "date": "2026-09-06",
+      "ruling": "ADR_UGENCE_STUDIO_FRONT_DOOR_SCOPING.md FD-11.5 READ_ONLY_ONE_STEP_AMENDMENT (with FD-11.1 OBSERVE_OVER_WORKER_LEDGER, FD-11.3 SEVENTH_ROUTE_LEDGER_READ, FD-11.4 TWO_LABELLED_SOURCES)",
+      "previous_sha256": "9d958f9c70ca133509aa7cff02657f7f39c5f98068f9dc6fd12bfb9c2a665cdb",
+      "sha256": "6346f2b7cd10430874f2f077ac69c12ce74be138a9462b0c4ccdcb503c624d7b",
+      "operations_added": [
+        "v2_observe_ledger_chain"
+      ],
+      "operations_removed": [],
+      "paths_added": [
+        "/api/v2/observe/ledger/{correlation_id}"
+      ],
+      "note": "Front-door seam 7: one read relaying the governed runtime worker's own tenant's audit-ledger rows for a correlation id, with the worker's chain verification, returned unchanged. The studio names no tenant and re-derives nothing. No other operation changed."
     }
   ]
 }

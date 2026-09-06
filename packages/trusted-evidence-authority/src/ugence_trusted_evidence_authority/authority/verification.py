@@ -416,7 +416,7 @@ class Ed25519EvidenceAuthenticityProtocol:
             key_id=submission.producer_key_id,
             capability=TrustAnchorCapability.EVIDENCE_PRODUCTION,
         )
-        resolution = trust_anchors.resolve(coordinate)
+        resolution = trust_anchors.resolve(coordinate, as_of=as_of)
         if resolution.anchor is None:
             return refused(resolution.refusal_reason)
         anchor = resolution.anchor

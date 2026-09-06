@@ -160,7 +160,7 @@ def test_review_client_cannot_reach_a_resume_signal_or_authority_route():
         ReviewServiceUnavailable,
     )
 
-    assert len(REVIEW_ALLOWED_ROUTES) == 5
+    assert len(REVIEW_ALLOWED_ROUTES) == 7
     for _method, path in REVIEW_ALLOWED_ROUTES:
         assert not any(v in path.lower() for v in PROHIBITED_VERBS + ("resume", "signal")), path
 

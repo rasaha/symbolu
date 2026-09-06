@@ -1,0 +1,44 @@
+{
+  "schema": "governance-studio.composition-record.v1",
+  "ruling": "ADR_UGENCE_STUDIO_FRONT_DOOR_SCOPING.md FD-3 COMPOSITION_RECORD_IN_REGISTRY: an ai-system-registry SystemRegistration; immutable and versioned by system_version; supersedes composition-record.seam-5.json; no new package for composition metadata",
+  "binding": {
+    "binding_id": "governance-studio-private-hosted/front-door/seam-6",
+    "tenant_id": "ugence-platform",
+    "subject_id": "governance-studio",
+    "context_id": "p3e-private-hosted",
+    "context_digest": "b52067a7d56de06cb0eeaadc7830206147e1e334480835fbd03f73e36b913afe",
+    "system_id": "governance-studio-private-hosted",
+    "system_version": "0.7.0",
+    "configuration_id": "approved-runtime-config.json",
+    "configuration_digest": "658ccff5ece55d7658dd0d7729719e549e497dc66595adbe0a6486926eb57b45",
+    "deployment_environment_ref": "private-hosted"
+  },
+  "registration": {
+    "registration_id": "reg_4042e1b0e7af45eebb5a627fd5a59b33",
+    "binding_digest": "247e9d014de5e1ca3ce04e407a55e69f0f30c909f48b884d7161edf31a8c903f",
+    "tenant_id": "ugence-platform",
+    "system_id": "governance-studio-private-hosted",
+    "system_version": "0.7.0",
+    "owner_ref": "rasaha",
+    "classification_label": "REFERENCE_GRADE_SHADOW_ONLY",
+    "validity": {
+      "issued_at": "2026-09-06T00:00:00.000000+00:00",
+      "expires_at": "2027-09-06T00:00:00.000000+00:00",
+      "stale_after": ""
+    },
+    "supersedes": "reg_2843f940c721c998ca68b690986ae627",
+    "registered_by": "governance-studio-deployment/0.7.0",
+    "notes": "Front-door composition, seam 6 (FD-1 ONE_SEAM_PER_STEP, FD-10 as ruled: START_IS_A_RELAY, SIXTH_ROUTE_START_SHADOW_RUN, NO_DEFINITION_CROSSES, ONE_STEP_AMENDMENT, TWO_LABELLED_PATHS): build_studio_context receives review_service_base_url (CR-2; since this seam also the Simulate screen's worker shadow-run relay over the worker's sixth route POST /review/runs), activation_root (seam 1), policy_registry and policy_identities (seam 2), provider_registry while UGENCE_STUDIO_SIMULATION_PROVIDER=1 (seam 3) and system_registry while UGENCE_STUDIO_SYSTEM_REGISTRY_PATH is set (seam 5); the frozen v2 contract is amended a second time (v2-A2) by the one operation v2_review_start_shadow_run; no configuration value, image package, credential or second egress destination is added; decision_store, governance_hook and console_base_url stay absent. Supersedes the seam-5 registration, which is never edited; a later seam registers a new record superseding this one."
+  },
+  "record_digest": "d0c133cbaf045e01280ee0e1f57d7d042f17a49353451103c182b457f00e6ffc",
+  "supersedes_record": "composition-record.seam-5.json",
+  "seams_handed_to_build_studio_context": [
+    "review_service_base_url",
+    "activation_root",
+    "policy_registry",
+    "policy_identities",
+    "provider_registry",
+    "system_registry"
+  ],
+  "configuration_digest_of": "deployment/governance-studio/approved-runtime-config.json (sha-256 of the file bytes)"
+}

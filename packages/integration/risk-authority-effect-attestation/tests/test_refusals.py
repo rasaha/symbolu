@@ -170,7 +170,7 @@ def test_the_wrong_tenant_refuses_before_the_directory_is_asked():
     asked = []
 
     class Spy:
-        def resolve(self, coordinate):
+        def resolve(self, coordinate, *, as_of=None):
             asked.append(coordinate)
             return directory(anchor_of(provider_signer())).resolve(coordinate)
 
@@ -249,7 +249,7 @@ def test_a_naive_as_of_is_a_caller_contract_violation_and_the_directory_is_never
     asked = []
 
     class Spy:
-        def resolve(self, coordinate):
+        def resolve(self, coordinate, *, as_of=None):
             asked.append(coordinate)
             return directory(anchor_of(provider_signer())).resolve(coordinate)
 
@@ -264,28 +264,28 @@ def test_a_naive_as_of_is_a_caller_contract_violation_and_the_directory_is_never
 # 5. Directory failures: never a fallback
 # --------------------------------------------------------------------------- #
 class _Raises:
-    def resolve(self, coordinate):
+    def resolve(self, coordinate, *, as_of=None):
         raise RuntimeError("offline")
 
 
 class _WrongType:
-    def resolve(self, coordinate):
+    def resolve(self, coordinate, *, as_of=None):
         return anchor_of(provider_signer())
 
 
 class _None:
-    def resolve(self, coordinate):
+    def resolve(self, coordinate, *, as_of=None):
         return None
 
 
 class _AnswersAnotherCoordinate:
-    def resolve(self, coordinate):
+    def resolve(self, coordinate, *, as_of=None):
         other = anchor_of(provider_signer(attester_key_id="provider-key-9"))
         return ea.TrustAnchorResolution.resolved(other.coordinate, other)
 
 
 class _SwapsAnchorAfterConstruction:
-    def resolve(self, coordinate):
+    def resolve(self, coordinate, *, as_of=None):
         genuine = directory(anchor_of(provider_signer())).resolve(coordinate)
         swapped = anchor_of(provider_signer(attester_key_id="provider-key-9"))
         object.__setattr__(genuine, "anchor", swapped)
@@ -293,7 +293,7 @@ class _SwapsAnchorAfterConstruction:
 
 
 class _DuckTypedAnchorInGenuineResolution:
-    def resolve(self, coordinate):
+    def resolve(self, coordinate, *, as_of=None):
         genuine = directory(anchor_of(provider_signer())).resolve(coordinate)
         real = genuine.anchor
 
@@ -312,7 +312,7 @@ class _DuckTypedAnchorInGenuineResolution:
 
 
 class _LookalikeResolution:
-    def resolve(self, coordinate):
+    def resolve(self, coordinate, *, as_of=None):
         class Fake(ea.TrustAnchorResolution):
             pass
 
@@ -353,7 +353,7 @@ def test_nothing_is_memoized_the_directory_is_consulted_every_time():
     store = directory(anchor_of(provider_signer()))
 
     class Spy:
-        def resolve(self, coordinate):
+        def resolve(self, coordinate, *, as_of=None):
             asked.append(coordinate)
             return store.resolve(coordinate)
 

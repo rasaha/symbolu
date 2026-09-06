@@ -1,7 +1,7 @@
 {
   "schema_version": "1",
   "deployment": "governance-studio-private-hosted",
-  "deployment_version": "0.6.0",
+  "deployment_version": "0.8.0",
   "single_process": true,
   "exposed_ports": [
     "8443/tcp"
@@ -26,18 +26,22 @@
     "default": "none",
     "permitted": [
       {
-        "purpose": "governed review relay (ADR_UGENCE_REVIEW_SERVICE_COMPOSITION_ROOT_SCOPING.md, CR-2)",
+        "purpose": "governed review relay (ADR_UGENCE_REVIEW_SERVICE_COMPOSITION_ROOT_SCOPING.md, CR-2, amended to six routes under ADR_UGENCE_STUDIO_FRONT_DOOR_SCOPING.md FD-10.4 and to seven under FD-11.5)",
         "destination": "UGENCE_STUDIO_REVIEW_SERVICE_URL: the governed runtime worker's private TLS listener",
         "scheme": "https",
-        "condition": "only while the variable is set; unset, the review screens report a typed gap and the profile makes no outbound connection",
+        "condition": "only while the variable is set; unset, the review screens, the Simulate screen's worker path and the Observe screen's worker-ledger source report a typed gap and the profile makes no outbound connection",
         "routes": [
           "GET /review/queue",
           "GET /review/runs/{instance_id}",
           "GET /review/runs/{instance_id}/events",
           "GET /review/approvals/{approval_id}",
-          "POST /review/decisions"
+          "POST /review/decisions",
+          "POST /review/runs",
+          "GET /review/audit/{correlation_id}"
         ],
-        "forwarded_header": "X-Ugence-Approver-Proof on POST /review/decisions only, verbatim, never parsed, logged or persisted (ID-1)"
+        "forwarded_header": "X-Ugence-Approver-Proof on POST /review/decisions only, verbatim, never parsed, logged or persisted (ID-1)",
+        "start_relay": "POST /review/runs (front-door seam 6, FD-10.1 START_IS_A_RELAY, FD-10.2 SIXTH_ROUTE_START_SHADOW_RUN): the studio asks the worker to start the worker's own shadow workflow; the body is an optional typed correlation_id and the pinned mode word shadow; no workflow, task, provider, digest or credential crosses (FD-10.3) and no proof header travels on it (ID-1)",
+        "ledger_read": "GET /review/audit/{correlation_id} (front-door seam 7, FD-11.1 OBSERVE_OVER_WORKER_LEDGER, FD-11.3 SEVENTH_ROUTE_LEDGER_READ): the studio asks the worker for the worker's own tenant's audit-ledger rows for one correlation id, raw and in chain order, with the worker's chain verification as a typed field; the studio names no tenant, sends no filter, credential or proof (ID-1), and re-derives nothing; a chain that does not verify is the worker's typed refusal with the entries withheld; no write route exists"
       }
     ],
     "container_gate_note": "the container gate runs with the variable unset, so its egress evidence records no outbound connection; the relay's egress is exercised in the deployment suite against a loopback stand-in"
@@ -53,8 +57,8 @@
     "openapi_sha256": "dc309eab216e1a4c2f63f286887a4ef218a96ac34f8fa8614bff176db7c36656",
     "served_api": "create_combined_app: governance_studio.api.v1 with governance_studio.api.v2 mounted behind it (CR-2)",
     "api_v2_contract": "governance_studio.api.v2",
-    "openapi_v2_sha256": "1dbc612681b37b4b82a244a3c30631000856accfd8869f74a3c7a0b69e63cf97",
-    "openapi_v2_amendment": "v2-A1 (FD-9.4, 2026-09-06): previous dd63180dc91ba7842dc1dc2b6efb3dbc155ea3bd47200f40de7bac85d373f39a; record apps/ugence-governance-studio/contracts/openapi_v2.amendments.json; operations added v2_registry_register, v2_registry_list"
+    "openapi_v2_sha256": "6346f2b7cd10430874f2f077ac69c12ce74be138a9462b0c4ccdcb503c624d7b",
+    "openapi_v2_amendment": "v2-A3 (FD-11.5, 2026-09-06): previous 9d958f9c70ca133509aa7cff02657f7f39c5f98068f9dc6fd12bfb9c2a665cdb; record apps/ugence-governance-studio/contracts/openapi_v2.amendments.json; operations added v2_observe_ledger_chain. v2-A2 (FD-10.4, 2026-09-06): previous 1dbc612681b37b4b82a244a3c30631000856accfd8869f74a3c7a0b69e63cf97; record apps/ugence-governance-studio/contracts/openapi_v2.amendments.json; operations added v2_review_start_shadow_run. v2-A1 (FD-9.4, 2026-09-06): previous dd63180dc91ba7842dc1dc2b6efb3dbc155ea3bd47200f40de7bac85d373f39a; operations added v2_registry_register, v2_registry_list"
   },
   "prohibited": [
     "permission_granting",
@@ -100,9 +104,9 @@
     "packages/integration/ai-system-registry"
   ],
   "front_door_seams": {
-    "ruling": "ADR_UGENCE_STUDIO_FRONT_DOOR_SCOPING.md FD-1 ONE_SEAM_PER_STEP; FD-5 seam 1; FD-6 seam 2; FD-7 seam 3; FD-9 seam 5",
+    "ruling": "ADR_UGENCE_STUDIO_FRONT_DOOR_SCOPING.md FD-1 ONE_SEAM_PER_STEP; FD-5 seam 1; FD-6 seam 2; FD-7 seam 3; FD-9 seam 5; FD-10 seam 6; FD-11 seam 7",
     "handed_to_build_studio_context": [
-      "review_service_base_url (CR-2)",
+      "review_service_base_url (CR-2; since seam 6 also the Simulate screen's worker shadow-run relay, FD-10; since seam 7 also the Observe screen's worker-ledger read, FD-11)",
       "activation_root (seam 1)",
       "policy_registry (seam 2: read-only, tenant-bound view of the seam-1 registry)",
       "policy_identities (seam 2: typed, '<policy_family>|<policy_id>|<scope>|<tenant_id>')",
@@ -118,7 +122,7 @@
     "persistent_database": "prohibition stands: the registry is the seam-1 sqlite file under the runtime volume; no server, no driver, no DSN"
   },
   "prohibited_definitions": {
-    "agent_execution": "agent execution against any non-fixture provider (FD-7.1 FIXTURE_RUN_ADMISSIBLE, ruled 2026-09-06): a run whose every provider is the in-image no-I/O simulation provider, under DRY_RUN, SIMULATION or SHADOW, is a demonstration and not agent execution; LIVE is absent from the mode list and refused by the studio; external_model_calls and external_tool_calls stand unchanged"
+    "agent_execution": "agent execution against any non-fixture provider (FD-7.1 FIXTURE_RUN_ADMISSIBLE, ruled 2026-09-06): a run whose every provider is the in-image no-I/O simulation provider, under DRY_RUN, SIMULATION or SHADOW, is a demonstration and not agent execution; LIVE is absent from the mode list and refused by the studio; external_model_calls and external_tool_calls stand unchanged; asking the separate governed runtime worker to start the fixture workflow it already owns, over FIXTURE_ONLY providers, with nothing supplied by the studio, is display and transmit in FD-7.1's sense and not execution (FD-10.1 START_IS_A_RELAY, ruled 2026-09-06)"
   },
   "simulation": {
     "ruling": "ADR_UGENCE_STUDIO_FRONT_DOOR_SCOPING.md FD-7.1 FIXTURE_RUN_ADMISSIBLE, FD-7.2 P3E_IN_PROCESS, FD-7.3 RUNTIME_DEFAULT_BLOCK, FD-7.4 ONE_PINNED_FIXTURE_PROVIDER, FD-7.5 PROHIBITED_IN_PROFILE",
@@ -151,5 +155,26 @@
     "contract": "v2_registry_register and v2_registry_list, the first amendment of the frozen v2 contract, recorded in frozen.openapi_v2_amendment",
     "unset": "the Registration screen reports the typed gap system_registry (available false)",
     "composition_record": "composition-record.json (an ai-system-registry SystemRegistration, FD-3), superseding the seam-3 record kept byte-for-byte as composition-record.seam-3.json"
+  },
+  "worker_shadow_run": {
+    "ruling": "ADR_UGENCE_STUDIO_FRONT_DOOR_SCOPING.md FD-10.1 START_IS_A_RELAY, FD-10.2 SIXTH_ROUTE_START_SHADOW_RUN, FD-10.3 NO_DEFINITION_CROSSES, FD-10.4 ONE_STEP_AMENDMENT, FD-10.5 TWO_LABELLED_PATHS",
+    "route": "POST /review/runs on the governed runtime worker (governed-review-service 0.5.0, governed-runtime-worker 0.2.0), reached through the same UGENCE_STUDIO_REVIEW_SERVICE_URL as the review screens; no configuration value, image package, credential or second egress destination is added",
+    "what_crosses": "an optional typed correlation_id and the pinned mode word shadow, nothing else; the worker holds the definition, mints the instance id and binds the run to its own definition digest; a foreign digest, a conflicting duplicate and any other mode are the worker's typed refusals; a retried start is REPLAYED",
+    "sink": "ESCALATE parks in the worker's existing review queue, read through the four existing reads and resumed only through the existing decision relay (HR-1 as amended by FD-10.4)",
+    "simulate_screen": "two labelled paths, never merged (FD-10.5): the seam-3 in-process fixture run and this worker relay, each with its executor, hook and maturity; no path is chosen for the operator",
+    "contract": "v2_review_start_shadow_run, the second amendment of the frozen v2 contract (v2-A2), recorded in frozen.openapi_v2_amendment",
+    "unset": "the worker path reports the typed gap review_service (available false); an older worker without the route is the same gap naming it",
+    "composition_record": "composition-record.json (an ai-system-registry SystemRegistration, FD-3), superseding the seam-5 record kept byte-for-byte as composition-record.seam-5.json"
+  },
+  "worker_ledger_observe": {
+    "ruling": "ADR_UGENCE_STUDIO_FRONT_DOOR_SCOPING.md FD-11.1 OBSERVE_OVER_WORKER_LEDGER, FD-11.2 READ_PORT_IN_CONTROL_PLANE_ROOT, FD-11.3 SEVENTH_ROUTE_LEDGER_READ, FD-11.4 TWO_LABELLED_SOURCES, FD-11.5 READ_ONLY_ONE_STEP_AMENDMENT",
+    "route": "GET /review/audit/{correlation_id} on the governed runtime worker (control-plane-root 0.2.0 read_entries, governed-review-service 0.6.0, governed-runtime-worker 0.3.0), reached through the same UGENCE_STUDIO_REVIEW_SERVICE_URL as the review screens; no configuration value, image package, credential or second egress destination is added",
+    "what_crosses": "a typed correlation id in the path and nothing else; the worker reads its own tenant's rows; the answer is the worker's entries (seq, entry_ref, kind, recorded_at, recorded_by, correlation_id, payload, prev_digest, record_digest) and its own chain verification, returned unchanged",
+    "refusals": "REFUSED_INTEGRITY (chain does not verify; entries withheld), REFUSED_SCHEMA, REFUSED_UNCONFIGURED as the worker said them; an unknown correlation id is a typed not-found, distinguished from unreachable; the studio re-derives, re-orders and re-hashes nothing",
+    "observe_screen": "two labelled sources, never merged (FD-11.4): the worker audit ledger (receipts and references, raw, REFERENCE_GRADE, durable and hash-chained) and the console's typed gap console_api while FD-8.1 holds; each labelled with its record type, executor and maturity; no source is chosen for the operator",
+    "mutation_boundary": "read-only: no append, edit or verification-trigger route exists from the studio; the ledger's only writer stays the review service's own linkage append on a GRANT (HE-1)",
+    "contract": "v2_observe_ledger_chain, the third amendment of the frozen v2 contract (v2-A3), recorded in frozen.openapi_v2_amendment",
+    "unset": "the worker-ledger source reports the typed gap review_service (available false); an older worker without the route is a typed not-found",
+    "composition_record": "composition-record.json (an ai-system-registry SystemRegistration, FD-3), superseding the seam-6 record kept byte-for-byte as composition-record.seam-6.json"
   }
 }

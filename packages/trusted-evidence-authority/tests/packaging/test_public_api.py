@@ -123,7 +123,7 @@ def test_py_typed_marker_present():
 
 def test_the_manifest_records_the_package_version():
     documented = json.loads(_PUBLIC_API_JSON.read_text(encoding="utf-8"))
-    assert documented["package_version"] == pkg.__version__ == "0.4.0"
+    assert documented["package_version"] == pkg.__version__ == "0.5.0"
 
 
 def test_pinned_constants_are_snapshotted_with_their_values():
@@ -162,6 +162,11 @@ def test_pinned_constants_are_snapshotted_with_their_values():
         "TRUSTED_EVIDENCE_PROTOCOL_V1_VERSION",
         "TRUSTED_EVIDENCE_RECEIPT_ID_DOMAIN",
         "RECEIPT_SCOPE_EXPECTATION_DIGEST_DOMAIN",
+        # -- 0.5.0 (TR-2, signed trust-anchor-set snapshot) -----------------
+        "TRUST_ANCHOR_SET_MANIFEST_SCHEMA_V1",
+        "TRUST_ANCHOR_SET_DOCUMENT_SCHEMA_V1",
+        "TRUST_ANCHOR_SET_PUBLICATION_SIGNING_DOMAIN",
+        "TRUST_ANCHOR_SET_COLLECTION_DIGEST_DOMAIN",
     }
     for entry in constants.values():
         assert "value" in entry
@@ -263,9 +268,9 @@ def test_the_curated_surface_size_is_pinned():
     """A symbol added or removed without updating the manifest fails here."""
 
     exported = [n for n in api.__all__ if n != "__version__"]
-    assert len(exported) == 87
+    assert len(exported) == 99
     tev2_only = set(exported) - set(TEV1_CURATED_SYMBOLS)
-    assert len(tev2_only) == 58
+    assert len(tev2_only) == 70
 
 
 def test_enum_member_order_is_snapshotted_not_just_the_member_set():
@@ -276,8 +281,11 @@ def test_enum_member_order_is_snapshotted_not_just_the_member_set():
     # TEV-1's nineteen keep their exact ordinal positions; TEV-2 appended.
     assert values[18] == "TRUSTED_EVIDENCE_INDETERMINATE"
     assert values[19] == "TRUSTED_EVIDENCE_ENVELOPE_MALFORMED"
-    assert values[-1] == "TRUSTED_EVIDENCE_RECEIPT_EXPIRED"
-    assert len(values) == 40
+    assert values[39] == "TRUSTED_EVIDENCE_RECEIPT_EXPIRED"
+    # 0.5.0 appended the TR-3 trust-anchor-set block after every TEV-2 member.
+    assert values[40] == "TRUSTED_EVIDENCE_TRUST_ANCHOR_SET_INSTANT_REQUIRED"
+    assert values[-1] == "TRUSTED_EVIDENCE_TRUST_ANCHOR_SET_STALE"
+    assert len(values) == 43
 
 
 def test_every_tev1_dataclass_keeps_its_exact_field_order():

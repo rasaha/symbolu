@@ -264,7 +264,7 @@ def test_a_declared_production_resolver_is_admitted():
     class ManagedKeyServiceResolver:
         is_production_authoritative = True
 
-        def resolve(self, coordinate):
+        def resolve(self, coordinate, *, as_of=None):
             return TrustAnchorResolution.refused(
                 coordinate,
                 tev.TrustedEvidenceRefusalReason.TRUSTED_EVIDENCE_TRUST_ANCHOR_MISSING,
@@ -282,7 +282,7 @@ def test_a_truthy_non_true_production_declaration_is_refused():
     class SloppyResolver:
         is_production_authoritative = "yes"
 
-        def resolve(self, coordinate):  # pragma: no cover - construction fails first
+        def resolve(self, coordinate, *, as_of=None):  # pragma: no cover - construction fails first
             raise AssertionError
 
     with pytest.raises(ProducerAttestationConfigurationError):
@@ -351,7 +351,7 @@ class _WrappingResolver:
     def __init__(self) -> None:
         self._inner = build_directory()
 
-    def resolve(self, coordinate):  # pragma: no cover - refused before use
+    def resolve(self, coordinate, *, as_of=None):  # pragma: no cover - refused before use
         return self._inner.resolve(coordinate)
 
 
@@ -360,7 +360,7 @@ class _IndependentProductionResolver:
 
     is_production_authoritative = True
 
-    def resolve(self, coordinate):
+    def resolve(self, coordinate, *, as_of=None):
         return TrustAnchorResolution.refused(
             coordinate,
             tev.TrustedEvidenceRefusalReason.TRUSTED_EVIDENCE_TRUST_ANCHOR_MISSING,
@@ -469,7 +469,7 @@ def test_a_deny_all_subclass_does_not_inherit_the_exemption():
     """
 
     class _PermissiveDenyAll(DenyAllTrustAnchorDirectory):
-        def resolve(self, coordinate):  # pragma: no cover - refused before use
+        def resolve(self, coordinate, *, as_of=None):  # pragma: no cover - refused before use
             raise AssertionError("never reached")
 
     with pytest.raises(ProducerAttestationConfigurationError) as exc:

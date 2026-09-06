@@ -319,7 +319,7 @@ for label, factory in (
 class _IndependentProductionResolver:
     is_production_authoritative = True
 
-    def resolve(self, coordinate):
+    def resolve(self, coordinate, *, as_of=None):
         return p5b.TrustAnchorResolution.refused(
             coordinate,
             tev.TrustedEvidenceRefusalReason.TRUSTED_EVIDENCE_TRUST_ANCHOR_MISSING,
@@ -334,7 +334,7 @@ class _WrappingResolver:
     def __init__(self):
         self._inner = directory()
 
-    def resolve(self, coordinate):
+    def resolve(self, coordinate, *, as_of=None):
         return self._inner.resolve(coordinate)
 
 try:

@@ -35,10 +35,11 @@ Any other second decision is refused and the first stands.
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Any, Callable, Mapping, Optional, Sequence
+from typing import Any, Callable, Mapping, Optional, Protocol, Sequence, runtime_checkable
 
 from ugence_approval_workflow import (
     ApprovalRecord,
@@ -51,6 +52,8 @@ from ugence_approval_workflow import (
     ReviewDecision,
 )
 from ugence_governed_review import SUBJECT_KIND
+
+from ugence_control_plane_root import LedgerIntegrityError, SchemaVersionMismatch
 
 from .errors import ClockDisciplineError, ContractViolation
 from .identity import (
@@ -67,12 +70,20 @@ from .version import IDENTITY_PROOF
 
 __all__ = [
     "SIGNAL_NAME",
+    "SHADOW_RUN_MODE",
+    "CORRELATION_ID_PATTERN",
     "TENANT_SOURCE_CONFIGURED",
     "TENANT_SOURCE_PROOF",
     "DecisionResult",
     "DecisionOutcome",
     "QueueEntry",
     "ReviewService",
+    "ShadowRunStarter",
+    "StartOutcome",
+    "StartResult",
+    "AuditLedgerReader",
+    "AuditReadOutcome",
+    "AuditReadResult",
     "instance_of",
 ]
 
@@ -90,6 +101,137 @@ TENANT_SOURCE_CONFIGURED = "CONFIGURED_SINGLE_TENANT"
 #: The decisions this service records. ``REQUEST_CHANGES`` is a ledger state with no
 #: runtime meaning on this path and is refused here rather than mapped to anything.
 _ACCEPTED_DECISIONS = (ReviewDecision.GRANT, ReviewDecision.REJECT)
+
+
+#: Front-door seam 6 (FD-10.2): the one mode the sixth route starts. It is a property of
+#: the route, not a caller's choice: a body naming any other mode is refused before the
+#: starter is consulted, and a body naming none is the same request.
+SHADOW_RUN_MODE = "shadow"
+
+#: FD-4: a correlation id is a typed token, never free text. Nothing else crosses on the
+#: start: no workflow, task, provider, mode or digest (FD-10.3).
+CORRELATION_ID_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{0,63}$")
+
+
+class StartResult(str, Enum):
+    """The typed answer to a start request on the sixth route."""
+
+    STARTED = "STARTED"
+    #: The instance the correlation id names already exists under this worker's own
+    #: definition; the adapter's idempotency rule returned it and nothing was re-run.
+    REPLAYED = "REPLAYED"
+    REFUSED_MODE = "REFUSED_MODE"
+    #: The composition root has no starter: the service lists, renders and records.
+    REFUSED_UNCONFIGURED = "REFUSED_UNCONFIGURED"
+    #: The adapter refused the digest (``DefinitionVersionMismatch``) or the composed
+    #: workload defines no shadow workflow.
+    REFUSED_DEFINITION = "REFUSED_DEFINITION"
+    #: The instance exists under different identifying fields (``InstanceIdentityError``).
+    REFUSED_CONFLICT = "REFUSED_CONFLICT"
+
+    @property
+    def started(self) -> bool:
+        return self in (StartResult.STARTED, StartResult.REPLAYED)
+
+
+@dataclass(frozen=True)
+class StartOutcome:
+    """What starting the worker's own shadow run did, or why it was refused."""
+
+    result: StartResult
+    instance_id: str = ""
+    workflow_id: str = ""
+    correlation_id: str = ""
+    definition_digest: str = ""
+    #: True when the first bounded quantum ran on this call (a fresh start only).
+    advanced: bool = False
+    #: The engine's coarse fact after that quantum: parked pending something external.
+    awaiting_external: bool = False
+    stop_reason: str = ""
+    reason: str = ""
+    #: The composed workload's own label (``FIXTURE_ONLY`` for the shadow workload).
+    workload_maturity: str = ""
+
+    @property
+    def started(self) -> bool:
+        return self.result.started
+
+
+@runtime_checkable
+class ShadowRunStarter(Protocol):
+    """What a composition root supplies for the sixth route (FD-10.2).
+
+    It starts the one workflow the deployment already runs, under the deployment's own
+    definition digest, with an instance id it mints itself; the caller supplies at most
+    a correlation id. The review service never holds a definition, a provider or an
+    adapter ``start`` of its own.
+    """
+
+    workflow_id: str
+
+    def start(self, *, correlation_id: Optional[str]) -> StartOutcome: ...
+
+
+@runtime_checkable
+class AuditLedgerReader(Protocol):
+    """What the seventh route reads (front-door ruling FD-11.2): the composed
+    control-plane audit ledger's one raw read and its chain verification. The
+    ``AuditLedger`` of ``ugence_control_plane_root`` 0.2.0 satisfies it."""
+
+    def read_entries(self, *, tenant_id: str, correlation_id: str) -> tuple: ...
+
+    def verify_chain(self, *, tenant_id: str) -> bool: ...
+
+
+class AuditReadResult(str, Enum):
+    """The typed answer to a ledger read on the seventh route."""
+
+    READ = "READ"
+    NOT_FOUND = "NOT_FOUND"
+    #: The tenant's chain does not verify: the entries are withheld (FD-11.3).
+    REFUSED_INTEGRITY = "REFUSED_INTEGRITY"
+    #: The ledger file is not at this package's schema version.
+    REFUSED_SCHEMA = "REFUSED_SCHEMA"
+    #: The composition root handed no ledger reader.
+    REFUSED_UNCONFIGURED = "REFUSED_UNCONFIGURED"
+
+    @property
+    def read(self) -> bool:
+        return self is AuditReadResult.READ
+
+
+@dataclass(frozen=True)
+class AuditReadOutcome:
+    """What reading the worker's own tenant's rows for one correlation id gave."""
+
+    result: AuditReadResult
+    tenant_id: str = ""
+    correlation_id: str = ""
+    #: Each entry as the ledger stored it: seq, entry_ref, kind, recorded_at,
+    #: recorded_by, correlation_id, payload, prev_digest, record_digest. Raw.
+    entries: tuple = ()
+    #: The ledger's own verification of this tenant's whole chain, as a typed field.
+    chain_verified: bool = False
+    reason: str = ""
+
+    @property
+    def read(self) -> bool:
+        return self.result.read
+
+
+def _entry_view(stored: Any) -> dict:
+    entry = stored.entry
+    return {
+        "seq": int(stored.seq),
+        "entry_ref": stored.entry_ref,
+        "kind": entry.kind,
+        "recorded_at": entry.recorded_at.isoformat(),
+        "recorded_by": entry.recorded_by,
+        "correlation_id": entry.correlation_id,
+        "payload": dict(entry.payload),
+        "prev_digest": stored.prev_digest,
+        "record_digest": stored.record_digest,
+    }
 
 
 class DecisionResult(str, Enum):
@@ -200,6 +342,8 @@ class ReviewService:
         identity_port: Optional[ApproverIdentityPort] = None,
         tenant_mode: Optional[TenantMode] = None,
         production: bool = False,
+        starter: Optional[ShadowRunStarter] = None,
+        ledger_reader: Optional[AuditLedgerReader] = None,
     ) -> None:
         if not isinstance(ledger, ApprovalWorkflowPort):
             raise ContractViolation("ledger must satisfy ApprovalWorkflowPort")
@@ -225,6 +369,10 @@ class ReviewService:
                                         "is configured (ID-4)")
         if tenant_mode is not None and not isinstance(tenant_mode, TenantMode):
             raise ContractViolation("tenant_mode must be a TenantMode")
+        if starter is not None and not isinstance(starter, ShadowRunStarter):
+            raise ContractViolation("starter must provide workflow_id and start(correlation_id=...)")
+        if ledger_reader is not None and not isinstance(ledger_reader, AuditLedgerReader):
+            raise ContractViolation("ledger_reader must provide read_entries(...) and verify_chain(...)")
         self._ledger = ledger
         self._adapter = adapter
         self._reader = reader
@@ -241,6 +389,10 @@ class ReviewService:
         # is the only source and the service is labelled SINGLE_TENANT.
         self._identity = identity_port
         self._tenant_mode = tenant_mode or TenantMode.SINGLE_TENANT
+        # FD-10: absent, the sixth route answers REFUSED_UNCONFIGURED and starts nothing.
+        self._starter = starter
+        # FD-11: absent, the seventh route answers REFUSED_UNCONFIGURED and reads nothing.
+        self._ledger_reader = ledger_reader
 
     @property
     def tenant_mode(self) -> TenantMode:
@@ -249,6 +401,87 @@ class ReviewService:
     @property
     def identity_port_configured(self) -> bool:
         return self._identity is not None
+
+    @property
+    def starter_configured(self) -> bool:
+        return self._starter is not None
+
+    @property
+    def ledger_reader_configured(self) -> bool:
+        return self._ledger_reader is not None
+
+    # -- the ledger read (front-door seam 7, FD-11) ---------------------------------------
+    def read_audit(self, correlation_id: str) -> AuditReadOutcome:
+        """This deployment's own tenant's ledger rows for one correlation id, in chain
+        order, with the chain verification as a typed field (FD-11.3).
+
+        The tenant is the service's configured one; a caller names none. A chain that
+        does not verify is ``REFUSED_INTEGRITY`` and the entries are withheld: rows
+        from a broken chain must never be shown as a record. An unknown correlation id
+        is ``NOT_FOUND``. Nothing is interpreted, re-ordered or re-hashed here.
+        """
+
+        if not isinstance(correlation_id, str) or not CORRELATION_ID_PATTERN.fullmatch(correlation_id):
+            raise ContractViolation(
+                "correlation_id must be a typed token (letters, digits, '.', '_', ':' and '-', "
+                "at most 64 characters)")
+        if self._ledger_reader is None:
+            return AuditReadOutcome(
+                AuditReadResult.REFUSED_UNCONFIGURED, tenant_id=self._tenant,
+                correlation_id=correlation_id,
+                reason="no audit ledger reader is composed: this service reads no ledger of its own")
+        try:
+            verified = bool(self._ledger_reader.verify_chain(tenant_id=self._tenant))
+            stored = tuple(self._ledger_reader.read_entries(tenant_id=self._tenant,
+                                                            correlation_id=correlation_id))
+        except LedgerIntegrityError as exc:
+            return AuditReadOutcome(
+                AuditReadResult.REFUSED_INTEGRITY, tenant_id=self._tenant,
+                correlation_id=correlation_id, chain_verified=False,
+                reason=f"the tenant's chain does not verify; entries withheld: {exc}")
+        except SchemaVersionMismatch as exc:
+            return AuditReadOutcome(
+                AuditReadResult.REFUSED_SCHEMA, tenant_id=self._tenant,
+                correlation_id=correlation_id, reason=str(exc))
+        if not stored:
+            return AuditReadOutcome(
+                AuditReadResult.NOT_FOUND, tenant_id=self._tenant, correlation_id=correlation_id,
+                chain_verified=verified,
+                reason="no entry of this tenant carries that correlation id")
+        return AuditReadOutcome(
+            AuditReadResult.READ, tenant_id=self._tenant, correlation_id=correlation_id,
+            entries=tuple(_entry_view(e) for e in stored), chain_verified=verified)
+
+    # -- the start relay (front-door seam 6, FD-10) --------------------------------------
+    def start_shadow_run(self, *, correlation_id: Optional[str] = None,
+                         mode: Optional[str] = None) -> StartOutcome:
+        """Ask the composed starter for the worker's own shadow run (FD-10.1, FD-10.2).
+
+        The mode is a property of the route: ``None`` and ``SHADOW_RUN_MODE`` are the
+        same request, anything else is ``REFUSED_MODE`` before the starter is consulted.
+        A correlation id is a typed token or absent; a malformed one is a contract
+        violation, never repaired. No definition, provider or digest can be supplied
+        here because no parameter carries one (FD-10.3).
+        """
+
+        if mode is not None and mode != SHADOW_RUN_MODE:
+            return StartOutcome(
+                StartResult.REFUSED_MODE,
+                reason=f"the sixth route starts the worker's own {SHADOW_RUN_MODE} run and "
+                       f"nothing else; mode {mode!r} is refused and nothing was started",
+            )
+        if correlation_id is not None and (
+                not isinstance(correlation_id, str) or not CORRELATION_ID_PATTERN.fullmatch(correlation_id)):
+            raise ContractViolation(
+                "correlation_id must be a typed token (letters, digits, '.', '_', ':' and '-', "
+                "at most 64 characters) or absent")
+        if self._starter is None:
+            return StartOutcome(
+                StartResult.REFUSED_UNCONFIGURED,
+                reason="no shadow-run starter is composed: this service lists, renders and "
+                       "records, and starts nothing of its own",
+            )
+        return self._starter.start(correlation_id=correlation_id)
 
     # -- reads ---------------------------------------------------------------------
     def list_queue(self, *, required_role: str = "") -> tuple[QueueEntry, ...]:

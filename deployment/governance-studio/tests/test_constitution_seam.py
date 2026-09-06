@@ -322,9 +322,25 @@ def test_the_composition_record_is_an_immutable_versioned_registry_record():
     assert seam3["registration"]["supersedes"] == seam2_reg.registration_id
     assert seam3_reg.system_version == "0.5.0"
     assert supersession_refusals(seam3_reg, seam2_reg) == ()
-    assert reg["supersedes"] == seam3_reg.registration_id
-    assert supersession_refusals(rebuilt, seam3_reg) == ()
-    assert record["supersedes_record"] == "composition-record.seam-3.json"
+    seam5, seam5_reg = _load("composition-record.seam-5.json")
+    assert seam5_reg.record_digest() == seam5["record_digest"] == \
+        "92cd24847e3c6c70" + seam5["record_digest"][16:]
+    assert seam5_reg.registration_id == "reg_2843f940c721c998ca68b690986ae627"
+    assert seam5["registration"]["supersedes"] == seam3_reg.registration_id
+    assert seam5_reg.system_version == "0.6.0"
+    assert supersession_refusals(seam5_reg, seam3_reg) == ()
+    seam6, seam6_reg = _load("composition-record.seam-6.json")
+    assert seam6_reg.record_digest() == seam6["record_digest"] == \
+        "d0c133cbaf045e01" + seam6["record_digest"][16:]
+    assert seam6_reg.registration_id == "reg_4042e1b0e7af45eebb5a627fd5a59b33"
+    assert seam6["registration"]["supersedes"] == seam5_reg.registration_id
+    assert seam6_reg.system_version == "0.7.0"
+    assert supersession_refusals(seam6_reg, seam5_reg) == ()
+    assert reg["supersedes"] == seam6_reg.registration_id
+    assert supersession_refusals(rebuilt, seam6_reg) == ()
+    assert rebuilt.registration_id == "reg_36a76ca07c81cfa0e1e360f296b77e7f"
+    assert record["record_digest"].startswith("9967538f9814acea")
+    assert record["supersedes_record"] == "composition-record.seam-6.json"
     assert record["seams_handed_to_build_studio_context"] == [
         "review_service_base_url", "activation_root", "policy_registry", "policy_identities",
         "provider_registry", "system_registry"]
