@@ -81,6 +81,21 @@
         "/api/v2/vendor/declarations"
       ],
       "note": "Front-door seam 9: typed vendor-dependency intake over vendor-dependency 0.2.0. The write records what a declarer asserted and confers nothing (VR-1, FD-13.4); vendor_ref is an opaque handle and no field carries an address, endpoint or credential; the risk posture is recorded uninterpreted and never ordered, ranked or scored, and no approval or onboarding status is expressible; policy_ref is recorded and never resolved. No other operation changed."
+    },
+    {
+      "amendment_id": "v2-A6",
+      "date": "2026-09-06",
+      "ruling": "ADR_UGENCE_CLEARANCE_EXPORT_SCOPING.md CE-5 EXPORT_IS_A_READ (with CE-1 RECEIVED_CLEARANCE_ONLY, CE-3 ONE_MEMBER_NOW, CE-4 INTEGRITY_ONLY_AND_SAY_SO, CE-6 ONE_ENTRY_EXPORT_PACKAGE, CE-7 SYNTHETIC_SEEDED_RECEIPTS)",
+      "previous_sha256": "907f360f2ba2127d005c140d6146ab441056794ba2b1f1a35580cf4148956e73",
+      "sha256": "f42472ab78a34cd24be4c9454c532074c5d000009c3ca72da243cc9139874431",
+      "operations_added": [
+        "v2_export_read"
+      ],
+      "operations_removed": [],
+      "paths_added": [
+        "/api/v2/exports/{receipt_id}"
+      ],
+      "note": "Clearance export: one read, and only a read. It returns the portable, content-addressed form of a clearance receipt the deployment already received (CE-1) \u2014 never one the studio minted and never a compile result; the reconstruction path refuses compile-shaped keys outright. No write, no operation that accepts a receipt, no new egress destination and no credential. The artifact carries three honesty claims that cannot be omitted, softened or stripped without changing its fingerprint: identity_assurance PRESENTED_UNPROVEN, authenticity UNSIGNED with the unfed trust-anchor prerequisite named, and data_classification SYNTHETIC_DEMONSTRATION_ONLY. The route is named exports, not clearances, so the SD-2 verb scan over operation ids and paths is left exactly as it was. No other operation changed."
     }
   ]
 }

@@ -1,5 +1,5 @@
 {
-  "count": 114,
+  "count": 115,
   "covers": [
     "scenario manifests",
     "workflows",
@@ -86,6 +86,7 @@
     "demo_data/cybersecurity_success/ranking_policy.json": "4c3736a83422e5c8dfee4b30cf7705773ebfc3089f9943926f4f44bc6d9ac8cb",
     "demo_data/cybersecurity_success/scenario_manifest.json": "5f3eb1dd9f5783c8bbd8bf163c169e46e73e614c551f5cfc5f554e06d504cf69",
     "demo_data/procurement/agent_registry_snapshot.json": "d4729e33c6e4cf5e6c6de273c935aa9e10a3cbdaac38fa0efb762096645c8676",
+    "demo_data/procurement/clearance_receipts.json": "26d89f70067446f368f4b7accbd2010e38d617d61eb72fa32a1cfb627c4c5821",
     "demo_data/procurement/compiled_workflow.json": "07a010387450da9323d9612edb84527aa03519da8ea64a2f6bcbc2724bd1d86d",
     "demo_data/procurement/composition_policy.json": "1fbada6d8c843f034d9695e11a5f73a8e8062bdae29bccfd636b28bc57eee348",
     "demo_data/procurement/eligibility_policy.json": "cfdeb5506554786a84cc97db8ef6ad2f6f42fa1b55ee10702ad8edfe5d232665",
@@ -125,6 +126,6 @@
     "expected_outputs/procurement/ranking.json": "0e095ff6c7b678064625a247a5bcc9492b00dfc2de31ba6573523572cf059afd",
     "expected_outputs/procurement/replay_record.json": "d4238e36933c5f1c453dc4c1321a88691a6e869ad1bfaf5c1648046121c13ba1"
   },
-  "manifest_digest": "b98a5886ee01d88ffa4457cae9777a82f32fea068978ec19b63c6742fdca1cb1",
+  "manifest_digest": "c607fd0c778ce0cc71626325f09c1daadfabcf64fe62fefd190e22de8b10fddb",
   "schema": "governance_studio.bundled_fixture_manifest.v1"
 }

@@ -333,3 +333,53 @@ Three further exclusions follow from CE-6 and CE-7 specifically:
 - **No promotion of a synthetic receipt.** Nothing may strip, default, or condition
   away the `SYNTHETIC_DEMONSTRATION_ONLY` label, and no later ruling is implied by its
   presence.
+
+## 14 — Implementation record (2026-09-06)
+
+Shipped as `ugence-clearance-export` 0.1.0, studio contract amendment v2-A6, and
+`governance-studio-deployment` 0.11.0. What each ruling became:
+
+| # | Implementation | Checked by |
+|---|---|---|
+| CE-1 | `build_export` accepts only a `ClearanceReceiptBody`; the reconstruction path refuses the four compile-shaped keys outright. | `test_boundaries.py` (CE-1 group) |
+| CE-2 | `packages/integration/clearance-export`: a record type, three enums, refusal reasons, pure selectors, one read-only Protocol, one pure verifier. One declared dependency, `ugence-action-clearance`. No store, adapter, connector, clock or network — enforced by an import ban, not by prose. | `test_boundaries.py`; distribution proofs 1–2 |
+| CE-3 | `IdentityAssurance.PRESENTED_UNPROVEN`, single member. | `test_honesty_labels.py`; distribution proof 3 |
+| CE-4 | `ExportAuthenticity.UNSIGNED`, single member, with `AUTHENTICITY_PREREQUISITE` fixed text in the artifact. `verify_export` returns a report naming four unestablished things and `confers = NOTHING`. | `test_verifier.py`; distribution proof 3 |
+| CE-5 | One v2 read, `GET /api/v2/exports/{receipt_id}` (`v2_export_read`), amendment v2-A6. The port has two reads and no write; the service surface is `{CAPABILITY, read}`; every other method on the prefix answers 405. | `test_clearance_export_seam.py` (both suites); distribution proof 4 |
+| CE-6 | Exactly one SD-1 line, for `ugence_clearance_export`. Neither `ugence_action_clearance` nor `ugence_execution_reservation` is allowlisted, and the studio's own source imports neither. | `test_clearance_export_seam.py` asserts the allowlist **count**, not just the entry |
+| CE-7 | `clearance_receipts.json` inside the scenario directories the pinned synthetic manifest already hashes; read once at composition time by `SeededClearanceSource`. | P3E `test_clearance_export_seam.py`, including a test that an edited receipt fails `verify_bundle` |
+
+### 14.1 — Three decisions the rulings forced, recorded rather than made quietly
+
+**The route is named `exports`, not `clearances`.** SD-2 is enforced by a test that
+scans every v2 operation id *and path* for seven prohibited verbs, one of which is
+`clear`. That ratchet was not loosened to make room for a name: the operation exports,
+it does not clear, so `exports` is both the accurate word and the one that leaves the
+guard exactly as it was.
+
+**A foreign tenant's seeded receipt is skipped, never rebound.** The tenant is part of
+what a receipt says and part of its fingerprint, so rewriting it at load time would
+forge a clearance for a tenant nobody evaluated one for. A deployment whose tenant
+matches no shipped receipt holds none, and the studio says exactly that.
+
+**The frontend allowlist stays at twenty-five operations.** CE-5 ruled one server-side
+read and no screen. The generated client carries the twenty-sixth operation because it
+is generated from the contract, but the frontend consumes nothing new, so the
+browser-reachable surface is unchanged. Approving it in
+`security/approved-v2-api-operations.json` would widen the frontend boundary without a
+ruling that asked for it; the manifest records why it is absent.
+
+### 14.2 — Verified against the built artifact
+
+`scripts/verify_clearance_export_distribution.py` builds the wheel, installs it into a
+clean `--no-index` virtual environment with only its one declared dependency, and
+interrogates the installed package — including the proof no source test can make: that
+withholding `ugence-action-clearance` makes the install **fail**. Twenty-two checks,
+all passing, run in CI by the `clearance-export-distribution` job.
+
+### 14.3 — What is still absent
+
+The deployment still holds no clearance any authority granted, and this seam does not
+change that: §11.2 stands. What ships is the export path, its verifier, and honest
+labelling of what a seeded receipt is worth. A real clearance needs a producer, and a
+producer needs the rulings §11.2 named — none of which this implementation anticipates.

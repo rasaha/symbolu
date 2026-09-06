@@ -1,0 +1,64 @@
+{
+  "schema_version": "1",
+  "data_classification": "SYNTHETIC_DEMONSTRATION_ONLY",
+  "note": "Seeded clearance receipts (ADR_UGENCE_CLEARANCE_EXPORT_SCOPING.md CE-7). Demonstration data: no authority granted these, they confer nothing, and they satisfy no obligation. They exist so the export path and its verifier run against something, and they are evidence about serialization and integrity and nothing else. The deployment reads this file and never writes it; no route can add a receipt.",
+  "tenant_id": "acme-demo",
+  "receipts": [
+    {
+      "receipt_version": "action_clearance.receipt.v1",
+      "tenant_id": "acme-demo",
+      "request_id": "demo-cleared",
+      "authorization_ref": "authz-demo-cleared",
+      "authorized_action_fingerprint": "actfp-demo-cleared",
+      "clearance_status": "CLEAR",
+      "reason_codes": [
+        "OPERATIONALLY_SAFE"
+      ],
+      "effective_constraints": [
+        "change-window:business-hours"
+      ],
+      "obligations": [
+        "record-outcome"
+      ],
+      "signal_refs": [
+        "sig-actor-status",
+        "sig-artifact-identity"
+      ],
+      "signal_bundle_fingerprint": "bundlefp-demo-cleared",
+      "policy_refs": [
+        "policy:procurement-clearance:v1"
+      ],
+      "evaluated_at": "2026-09-06T09:30:00.000000+00:00",
+      "valid_until": "2026-09-06T10:00:00.000000+00:00",
+      "request_fingerprint": "reqfp-demo-cleared",
+      "result_fingerprint": "84602268f9faf0c7fa8485c1fd11fd673312b08debbaf5bb920b68e218a73dfb"
+    },
+    {
+      "receipt_version": "action_clearance.receipt.v1",
+      "tenant_id": "acme-demo",
+      "request_id": "demo-held",
+      "authorization_ref": "authz-demo-held",
+      "authorized_action_fingerprint": "actfp-demo-held",
+      "clearance_status": "HOLD",
+      "reason_codes": [
+        "CHANGE_FREEZE_ACTIVE"
+      ],
+      "effective_constraints": [
+        "change-window:business-hours"
+      ],
+      "obligations": [],
+      "signal_refs": [
+        "sig-actor-status",
+        "sig-artifact-identity"
+      ],
+      "signal_bundle_fingerprint": "bundlefp-demo-held",
+      "policy_refs": [
+        "policy:procurement-clearance:v1"
+      ],
+      "evaluated_at": "2026-09-06T09:30:00.000000+00:00",
+      "valid_until": "2026-09-06T10:00:00.000000+00:00",
+      "request_fingerprint": "reqfp-demo-held",
+      "result_fingerprint": "ad9912c560037d5fe330ce824d73c59bd5e7fef8ef44214169fe9c0a2e15d7f4"
+    }
+  ]
+}

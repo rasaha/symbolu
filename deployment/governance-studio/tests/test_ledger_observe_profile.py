@@ -221,9 +221,11 @@ def test_the_egress_record_names_seven_routes_one_destination_and_the_manifest_a
         "UGENCE_STUDIO_DATA_USE_DECLARATIONS_PATH",
         "UGENCE_STUDIO_VENDOR_DECLARATIONS_PATH"], "later values belong to seams 8 and 9"
     assert cfg["first_party_packages_in_image"][:13][-1] == "packages/integration/ai-system-registry"
-    assert cfg["first_party_packages_in_image"][13:] == [
-        "packages/integration/data-use-admission",
-        "packages/integration/vendor-dependency"], "later packages belong to seams 8 and 9"
+    # Membership, not the whole tail: a later seam appends its own packages and
+    # the two named here stay in the image either way.
+    for later in ("packages/integration/data-use-admission",
+                  "packages/integration/vendor-dependency"):
+        assert later in cfg["first_party_packages_in_image"], "seams 8 and 9"
 
 
 def test_the_third_contract_amendment_is_recorded_in_the_p3e_freeze():

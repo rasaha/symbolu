@@ -1,5 +1,5 @@
 {
-  "source_openapi_sha256": "907f360f2ba2127d005c140d6146ab441056794ba2b1f1a35580cf4148956e73",
+  "source_openapi_sha256": "f42472ab78a34cd24be4c9454c532074c5d000009c3ca72da243cc9139874431",
   "api_contract_version": "governance_studio.api.v2",
   "required_operations": [
     "v2_constitution_validate",
@@ -36,6 +36,7 @@
     "v2_constitution_validate",
     "v2_data_use_declare",
     "v2_data_use_list",
+    "v2_export_read",
     "v2_observe_audit_chain",
     "v2_observe_audit_ids",
     "v2_observe_ledger_chain",

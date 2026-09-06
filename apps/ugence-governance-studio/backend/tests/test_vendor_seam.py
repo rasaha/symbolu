@@ -280,10 +280,11 @@ def test_the_v2_contract_carries_exactly_the_two_ruled_operations_and_the_amendm
     assert not any(o.startswith("v2_vendor_") for o in ops - ruled)
     record = json.load(open(os.path.join(_APP, "contracts", "openapi_v2.amendments.json"),
                             encoding="utf-8"))
-    latest = record["amendments"][-1]
-    assert latest["amendment_id"] == "v2-A5"
-    assert set(latest["operations_added"]) == ruled
-    assert latest["paths_added"] == ["/api/v2/vendor/declarations"]
+    # Found by id, not by position: a later seam appends its own amendment, and this
+    # test is about seam 9's, which never moves once written.
+    (mine,) = [a for a in record["amendments"] if a["amendment_id"] == "v2-A5"]
+    assert set(mine["operations_added"]) == ruled
+    assert mine["paths_added"] == ["/api/v2/vendor/declarations"]
     previous = record["original_sha256"]
     for amendment in record["amendments"]:
         assert amendment["previous_sha256"] == previous

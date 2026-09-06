@@ -120,7 +120,11 @@ def test_approved_runtime_config_permits_exactly_one_egress_the_review_relay():
                                                 "UGENCE_STUDIO_SYSTEM_REGISTRY_PATH",
                                                 "UGENCE_STUDIO_DATA_USE_DECLARATIONS_PATH",
                                                 "UGENCE_STUDIO_VENDOR_DECLARATIONS_PATH"]
-    assert cfg["deployment_version"] == "0.10.0"
+    # Against the constant, not a literal: the version moves with every seam and
+    # what matters is that the config and the package agree.
+    from governance_studio_deployment import DEPLOYMENT_VERSION
+
+    assert cfg["deployment_version"] == DEPLOYMENT_VERSION
 
 
 def test_approved_runtime_config_records_front_door_seam_3_exactly():
@@ -158,7 +162,18 @@ def test_approved_runtime_config_records_front_door_seam_3_exactly():
     assert cfg["prohibited_definitions"]["agent_execution"].startswith(
         "agent execution against any non-fixture provider")
     assert "external_tool_calls" in cfg["prohibited"] and "external_model_calls" in cfg["prohibited"]
-    assert len(cfg["first_party_packages_in_image"]) == 15
+    df = _read("Dockerfile")
+    # Derived, not pinned: the list and the Dockerfile must name the same
+    # distributions. A count literal here would move with every seam and say nothing
+    # about whether the image actually installs what the config claims.
+    import re
+    repo = os.path.dirname(os.path.dirname(HERE))
+    copied = {
+        path for path in re.findall(r"^COPY ((?:packages|apps)/\S+) /build/", df,
+                                    re.MULTILINE)
+        if os.path.isfile(os.path.join(repo, path, "pyproject.toml"))
+    }
+    assert set(cfg["first_party_packages_in_image"]) == copied
 
 
 def test_approved_runtime_config_records_the_constitution_registry_seam_exactly():
@@ -177,7 +192,17 @@ def test_approved_runtime_config_records_the_constitution_registry_seam_exactly(
     df = _read("Dockerfile")
     for distribution in cfg["first_party_packages_in_image"]:
         assert f"COPY {distribution} /build/" in df, distribution
-    assert len(cfg["first_party_packages_in_image"]) == 15
+    # Derived, not pinned: the list and the Dockerfile must name the same
+    # distributions. A count literal here would move with every seam and say nothing
+    # about whether the image actually installs what the config claims.
+    import re
+    repo = os.path.dirname(os.path.dirname(HERE))
+    copied = {
+        path for path in re.findall(r"^COPY ((?:packages|apps)/\S+) /build/", df,
+                                    re.MULTILINE)
+        if os.path.isfile(os.path.join(repo, path, "pyproject.toml"))
+    }
+    assert set(cfg["first_party_packages_in_image"]) == copied
 
 
 def _sha256(path: str) -> str:
@@ -204,8 +229,11 @@ def test_approved_runtime_config_records_front_door_seam_5_exactly():
     assert seam["composition_record"].startswith("composition-record.json")
     assert "persistent_database" in cfg["prohibited"] and "prohibited persistent_database" in seam["durability"]
     assert "packages/integration/ai-system-registry" in cfg["first_party_packages_in_image"]
-    assert cfg["first_party_packages_in_image"][-2:] == [
-        "packages/integration/data-use-admission", "packages/integration/vendor-dependency"]
+    # Membership, not position: a later seam appends its own packages and the two
+    # named here stay in the image either way.
+    for seam_package in ("packages/integration/data-use-admission",
+                         "packages/integration/vendor-dependency"):
+        assert seam_package in cfg["first_party_packages_in_image"]
     for package in cfg["first_party_packages_in_image"]:
         assert f"COPY {package} /build/" in _read("Dockerfile"), package
     assert "openapi_v2_amendment" in cfg["frozen"] and "v2-A1" in cfg["frozen"]["openapi_v2_amendment"]

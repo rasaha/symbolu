@@ -50,6 +50,12 @@ COPY packages/integration/ai-system-registry /build/pkgs/ai-system-registry
 COPY packages/integration/data-use-admission /build/pkgs/data-use-admission
 # Front-door seam 9 (FD-13): the vendor declarations the Vendor screen declares into.
 COPY packages/integration/vendor-dependency /build/pkgs/vendor-dependency
+# Clearance export (CE-5, CE-6): the contracts-only export package the studio
+# reaches through its one SD-1 entry, and the evaluator package whose frozen
+# receipt type it imports. action-clearance is installed because the export
+# package depends on it; the studio's own source never imports it.
+COPY packages/integration/clearance-export /build/pkgs/clearance-export
+COPY packages/capabilities/action-clearance /build/pkgs/action-clearance
 COPY deployment/governance-studio /build/deployment
 RUN pip install --no-cache-dir "pydantic>=2" "fastapi>=0.110" "uvicorn>=0.27" "starlette>=0.36" \
  && pip install --no-cache-dir /build/compiler /build/awc /build/agent-runtime \
@@ -57,6 +63,7 @@ RUN pip install --no-cache-dir "pydantic>=2" "fastapi>=0.110" "uvicorn>=0.27" "s
       /build/pkgs/agentic-proposer /build/pkgs/agent-constitution-policy /build/pkgs/agent-constitution-conformance \
       /build/pkgs/agent-constitution-activation /build/pkgs/ai-system-registry \
       /build/pkgs/data-use-admission /build/pkgs/vendor-dependency \
+      /build/pkgs/action-clearance /build/pkgs/clearance-export \
       /build/backend /build/deployment
 
 # ---- Stage 3: minimal runtime image -----------------------------------------

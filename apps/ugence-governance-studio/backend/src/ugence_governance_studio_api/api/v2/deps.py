@@ -47,6 +47,12 @@ def _absent_vendor() -> Any:
     return VendorDeclarationService(declarations=None)
 
 
+def _absent_clearance_export() -> Any:
+    from ...services.studio_v2 import ClearanceExportService
+
+    return ClearanceExportService(source=None)
+
+
 def _absent_ledger_observe() -> Any:
     from ...services.studio_v2 import LedgerObserveService
 
@@ -75,6 +81,7 @@ class V2Context:
         start_run: Any = None,
         data_use: Any = None,
         vendor: Any = None,
+        clearance_export: Any = None,
         ledger_observe: Any = None,
     ) -> None:
         self.constitution = constitution
@@ -98,6 +105,13 @@ class V2Context:
         # Front-door seam 9 (FD-13): the vendor-dependency intake. Absent, the vendor
         # routes report the gap.
         self.vendor = vendor if vendor is not None else _absent_vendor()
+        # Clearance export (CE-5 EXPORT_IS_A_READ): the one read that returns the
+        # portable form of a clearance the deployment already holds. Absent, the
+        # route reports the gap rather than answering as though the tenant simply
+        # held none.
+        self.clearance_export = (
+            clearance_export if clearance_export is not None
+            else _absent_clearance_export())
         # Front-door seam 7 (FD-11): Observe over the worker's ledger. Absent, the ledger
         # route reports the same review_service gap.
         self.ledger_observe = ledger_observe if ledger_observe is not None else _absent_ledger_observe()
