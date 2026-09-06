@@ -256,3 +256,30 @@ This ruling is documentation. No file outside this record changes under it.
   deployment attested about itself at startup. It says nothing about whether ActionGate
   or any other module is reachable now, and an implementation may not infer that from
   a seam being `configured`.
+
+## 13 — Implementation record, MA-5 (2026-09-06)
+
+Shipped as one test in
+`apps/ugence-governance-studio/backend/tests/test_v2_operation_ids.py`. What the
+ruling became, and where the claim is checked:
+
+| Ruling | What landed | Where it is checked |
+|---|---|---|
+| MA-5 `SCAN_SUMMARY_TOO` | `test_no_v2_summary_names_an_authority_act` scans every v2 operation's `summary` for the seven `PROHIBITED_VERBS`, in the same shape as the operation-id and path scans. The docstring's claim at `:6-7` is now true of the file. | the test itself, against the committed `contracts/openapi_v2.json` through `canonical_v2_openapi_bytes()` |
+| self-check | `test_the_prohibition_test_actually_catches_a_violation` now holds two fake routes: one that offends in all three scanned places, and one that offends in the summary alone. The second is the proof that the summary scan reads the summary and does not fall back to the operation id. | the same test, asserting the id, path and summary scans each catch exactly the routes they should |
+
+**Verified, not asserted.** The file passed at 10 tests before the change and 11
+after; the full studio backend suite passed at 351. A mutation check against the
+committed contract — one real summary rewritten in memory to read "Clear and export
+the receipt" — failed the new test with `GET /api/v2/exports/{receipt_id} ->
+'Clear and export the receipt' (clear)`, which is the message a future violation
+would produce.
+
+**What did not change.** No contract byte: `openapi_v2.json`, its amendment chain
+and both approved-operation manifests are untouched, and
+`test_v2_document_is_committed_and_free_of_drift` still passes against the same
+bytes. No route, client, allowlist entry, or `PROHIBITED_VERBS` member. No current
+summary needed rewording; the gap was latent, as §3 found, and is now closed rather
+than relied on.
+
+MA-2 and MA-4 remain unimplemented and separately scoped, as §12 requires.

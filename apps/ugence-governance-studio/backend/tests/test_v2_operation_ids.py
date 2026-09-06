@@ -62,25 +62,61 @@ def test_no_v2_path_names_an_authority_act(v2_schema):
     assert violations == [], "SD-2 violation in a route path:\n  " + "\n  ".join(violations)
 
 
+def test_no_v2_summary_names_an_authority_act(v2_schema):
+    """The summary is the third place the docstring names, and the one a reader of the
+    rendered contract sees first (ruling MA-5, ``SCAN_SUMMARY_TOO``)."""
+    violations = []
+    for path, method, op in _operations(v2_schema):
+        lowered = (op.get("summary") or "").lower()
+        for verb in PROHIBITED_VERBS:
+            if verb in lowered:
+                violations.append(f"{method.upper()} {path} -> {op.get('summary')!r} ({verb})")
+    assert violations == [], "SD-2 violation in a route summary:\n  " + "\n  ".join(violations)
+
+
 def test_the_prohibition_test_actually_catches_a_violation():
     """A guard that cannot fail is not a guard.
 
     Without this, a refactor that broke the matching would leave every assertion above
-    passing vacuously and the ruling unenforced.
+    passing vacuously and the ruling unenforced. One fake route offends in all three
+    scanned places; a second offends in the summary alone, so a summary scan that
+    silently fell back to the operation id would be caught here.
     """
     fake = {
         "paths": {
             "/api/v2/policy/issue": {
-                "post": {"operationId": "v2_policy_issue_release"}
-            }
+                "post": {
+                    "operationId": "v2_policy_issue_release",
+                    "summary": "Issue a policy release",
+                }
+            },
+            "/api/v2/policy/render": {
+                "post": {
+                    "operationId": "v2_policy_render",
+                    "summary": "Activate the rendered policy",
+                }
+            },
         }
     }
-    caught = [
+    caught_by_id = [
         op["operationId"]
         for _p, _m, op in _operations(fake)
         if any(v in op["operationId"].lower() for v in PROHIBITED_VERBS)
     ]
-    assert caught == ["v2_policy_issue_release"]
+    assert caught_by_id == ["v2_policy_issue_release"]
+
+    caught_by_path = [
+        p for p, _m, _op in _operations(fake)
+        if any(v in p.lower() for v in PROHIBITED_VERBS)
+    ]
+    assert caught_by_path == ["/api/v2/policy/issue"]
+
+    caught_by_summary = [
+        op["operationId"]
+        for _p, _m, op in _operations(fake)
+        if any(v in (op.get("summary") or "").lower() for v in PROHIBITED_VERBS)
+    ]
+    assert caught_by_summary == ["v2_policy_issue_release", "v2_policy_render"]
 
 
 def test_every_v2_operation_has_a_stable_operation_id(v2_schema):
