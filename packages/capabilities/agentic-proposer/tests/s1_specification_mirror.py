@@ -253,8 +253,18 @@ FIELD_CLASSIFICATION = {
         "terminal_outcome": CLOSED, "reason_codes": C5D,
         "advisory_digest": OTHER_PATTERN, "jcs_distribution_version": OTHER_PATTERN,
         "started_at": NON_STRING, "completed_at": NON_STRING,
+        # `RM-3` (0.5.0): the admitted reasoning-method advisory as typed input.
+        "reasoning_method_advisory_input": STRUCTURED,
     },
     "ProposerProcessStateTransition": {"state": CLOSED, "at": NON_STRING},
+    # `RM-3` (0.5.0): D8's third nested public shape. Input, never authority.
+    "ReasoningMethodAdvisoryInput": {
+        "reasoning_advisory_ref": C5A, "reasoning_advisory_digest": OTHER_PATTERN,
+        "admission_digest": OTHER_PATTERN, "rule_set_id": C5B, "rule_set_version": C5B,
+        "rule_set_digest": OTHER_PATTERN, "task_class_digest": OTHER_PATTERN,
+        "evidence_status": CLOSED, "usage_scope": CLOSED,
+        "qualifying_method_ids": C5B, "primary_method_id": C5B, "evidence_refs": OTHER_PATTERN,
+    },
 }
 
 #: The eight canonical top-level contracts (Part D).
@@ -265,7 +275,7 @@ TOP_LEVEL_CONTRACTS = (
 )
 #: The two subordinate nested public shapes. Exported for typing, never transported
 #: alone, and carrying no C2 common field.
-NESTED_PUBLIC_SHAPES = ("CandidateAdvisory", "ProposerProcessStateTransition")
+NESTED_PUBLIC_SHAPES = ("CandidateAdvisory", "ProposerProcessStateTransition", "ReasoningMethodAdvisoryInput")
 
 #: The stated cardinality of each contract, common fields included. Part D states these
 #: so the registry's completeness can be checked by exact membership rather than left
@@ -291,8 +301,11 @@ CONTRACT_CARDINALITY = {
     # constitution's identity and version, both identity-participating and
     # package-stamped from the injected constitution resolution.
     "ProposerAdvisory": 32,
-    "ProposerProcessRecord": 18,
+    # `RM-3` (0.5.0) took this 18 -> 19: one optional structured field carrying the
+    # admitted reasoning-method advisory as typed input, outside ``P_unsigned``.
+    "ProposerProcessRecord": 19,
     "ProposerProcessStateTransition": 2,
+    "ReasoningMethodAdvisoryInput": 12,
 }
 
 #: The C2 common fields every top-level contract carries and neither nested shape does.
@@ -368,6 +381,7 @@ def representative_shapes():
         "ProposerAdvisory": ap.ProposerAdvisory,
         "ProposerProcessRecord": ap.ProposerProcessRecord,
         "ProposerProcessStateTransition": ap.ProposerProcessStateTransition,
+        "ReasoningMethodAdvisoryInput": ap.ReasoningMethodAdvisoryInput,
     }
 
 

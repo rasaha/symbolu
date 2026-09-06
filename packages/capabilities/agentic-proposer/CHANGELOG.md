@@ -1,5 +1,34 @@
 # Changelog — ugence-agentic-proposer
 
+## 0.5.0 — `RM-3`: the admitted reasoning-method advisory as typed input
+
+Authorized by the three owner rulings recorded in
+[`ADR_UGENCE_REASONING_METHOD_PRODUCT_ENTRY.md`](../../../docs/architecture/ADR_UGENCE_REASONING_METHOD_PRODUCT_ENTRY.md).
+**One public name added — `ReasoningMethodAdvisoryInput` — taking the curated surface
+from fifty-one to fifty-two.** `P_unsigned` is untouched: no advisory digest moves.
+
+### Added
+
+- **`ReasoningMethodAdvisoryInput`**, D8's third nested public shape (twelve fields, no
+  C2 common field). The typed reference by which an *admitted* reasoning-method
+  advisory reaches the process record: advisory and admission digests, the rule set,
+  the task class, the qualifying method identifiers and the admitting fit assessments'
+  digests. **Input, never authority**: no disposition, no `declared_strategy`, no
+  `DEPENDENT_FIELDS` member, no reserved authority term. Its two vocabulary fields are
+  `Literal`s, so a research-only advisory cannot be constructed as input at all.
+- **`ProposerProcessRecord.reasoning_method_advisory_input`**, optional, default
+  `None` (18 -> 19). Outside `P_unsigned` (D9). Existing record constructions are
+  unchanged.
+- **`build_proposer_process_record(..., reasoning_method_advisory_input=None)`**, one
+  keyword-only parameter with a `None` default.
+
+### Unchanged
+
+- This package still imports nothing from the research packages; the advisor knows
+  this shape and produces the mapping, one way (`ugence_reasoning_method_advisor.
+  to_proposer_input`). The proposer records the reference; it does not re-derive the
+  admission.
+
 ## 0.4.0 — the `OD-C1=B` contract amendment: constitution binding
 
 The Agent Constitution contract-amendment change set, authorized by

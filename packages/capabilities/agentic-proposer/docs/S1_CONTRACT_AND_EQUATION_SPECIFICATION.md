@@ -91,7 +91,8 @@ it amended:
   identity-participating, which is `S2B-D6=B1`'s **proposal-bound** guarantee;
 * `ProposerProcessRecord` **stays 18**, its `declared_strategy` **retyped** to the
   ratified enum (`S2B-S1-Q3=A`, `S2B-R2-Q5=A`); `AdvisoryCandidateSet` stays 12 and
-  `CandidateAdvisory` stays 11;
+  `CandidateAdvisory` stays 11 (`RM-3` later takes `ProposerProcessRecord` to **19**,
+  see D8);
 * an injected `StrategyPolicyResolver` protocol this package **owns and does not
   implement**, with its two call shapes (`S2B-S1-Q9=A`);
 * three changed builder signatures (`S2B-S1-Q5=A`) and a ratified construction order
@@ -831,8 +832,9 @@ removed and replaced, and the declaration is unchanged.
 
 # Part D — Contracts
 
-Eight top-level contracts. `CandidateAdvisory` and `ProposerProcessStateTransition` are
-nested public shapes, exported for typing, never transported alone.
+Eight top-level contracts. `CandidateAdvisory`, `ProposerProcessStateTransition` and
+`ReasoningMethodAdvisoryInput` (`RM-3`, 0.5.0) are nested public shapes, exported for
+typing, never transported alone.
 
 For every field: name, type, requiredness, nullability, default, cardinality, closed
 vocabulary, validation, ownership, and whether it participates in the canonical
@@ -1252,9 +1254,13 @@ the run ended*.
 
 ## D8 — `ProposerProcessRecord`
 
-**Cardinality: 18 fields** — the fifteen below plus the three C2 common fields (`schema_version`, `tenant_id`, `created_at`). Stated in D1's form so that I5's pinned registry can be checked
+**Cardinality: 19 fields** — the sixteen below plus the three C2 common fields (`schema_version`, `tenant_id`, `created_at`). Stated in D1's form so that I5's pinned registry can be checked
 for completeness by exact membership. `[V]` **Unchanged by S2-B at eighteen**: rider `R1`
-**retains** `declared_strategy` and **retypes** it; it adds no field.
+**retains** `declared_strategy` and **retypes** it; it adds no field. `[V]` **Taken to
+nineteen by `RM-3`** (0.5.0, `ADR_UGENCE_REASONING_METHOD_PRODUCT_ENTRY.md`): one
+optional structured field, `reasoning_method_advisory_input`, carrying an admitted
+reasoning-method advisory as typed input. It sits on this record — outside `P_unsigned`
+(D9) — so it can never alter an advisory identity.
 
 A non-identity-bearing audit record. It is **not** referenced by `ProposerAdvisory` and
 is not reachable from `P_unsigned`, so nothing in it can alter an advisory identity.
@@ -1274,6 +1280,7 @@ is not reachable from `P_unsigned`, so nothing in it can alter an advisory ident
 | `reason_codes` | `list[str]` | yes | no | `[]` | 0..n | — | **C5d** — rejects any non-empty value | this package | no |
 | `advisory_digest` | `str` | yes | no | none | 1 | open | C6 | this package | no |
 | `jcs_distribution_version` | `str` | yes | no | none | 1 | open | `^[0-9]+\.[0-9]+\.[0-9]+$` | resolved from the installed distribution | no |
+| `reasoning_method_advisory_input` | `ReasoningMethodAdvisoryInput \| None` | no | yes | `None` | 0..1 | — | the nested shape's own validators (`RM-3`) | this package | no |
 | `started_at` | `datetime` | yes | no | none | 1 | — | C4 | this package | no |
 | `completed_at` | `datetime` | yes | no | none | 1 | — | C4; `completed_at >= started_at` | this package | no |
 
@@ -1507,6 +1514,43 @@ suite previously recorded the cardinality and comparison basis as an open questi
 document had to settle before a test could decide it. This paragraph is that settlement,
 recorded here as the amendment requires; it is not a description of code already written
 reconciled backward into the specification.
+
+### `ReasoningMethodAdvisoryInput` — nested public shape (`RM-3`, 0.5.0)
+
+**Cardinality: 12 fields** — the twelve below. It carries **no** C2 common field, for the
+reason C2 gives for `CandidateAdvisory`: it is a nested public shape, not a contract.
+Ratified by the three owner rulings in `ADR_UGENCE_REASONING_METHOD_PRODUCT_ENTRY.md`.
+
+**Input, never authority.** It is the typed reference by which an *admitted*
+reasoning-method advisory reaches `ProposerProcessRecord`. It names the advisory and its
+admission by digest, the rule set that produced it, the task class it was admitted for,
+the method identifiers the rule set found qualifying, and the fit assessments that
+admitted it, by digest. It carries no disposition, no `declared_strategy`, no
+`DEPENDENT_FIELDS` member and no reserved authority term. Its two vocabulary fields are
+`Literal`s fixed at the admitted values, so a research-only advisory
+(`COMPARISON_EVIDENCE_ABSENT` / `RESEARCH_ONLY`) **cannot be constructed as input at
+all**. Whether a recorded input was genuine is settled outside this package, by the
+advisor's own `validate_admission` over the cited digests; this package records the
+reference and does not re-derive it. The producing package knows this shape; this
+package imports nothing from the research packages (`test_boundaries.py`).
+
+| Field | Type | Required | Nullable | Default | Validation |
+| --- | --- | --- | --- | --- | --- |
+| `reasoning_advisory_ref` | `str` | yes | no | none | C5a |
+| `reasoning_advisory_digest` | `str` | yes | no | none | C6 |
+| `admission_digest` | `str` | yes | no | none | C6 |
+| `rule_set_id` | `str` | yes | no | none | C5b |
+| `rule_set_version` | `str` | yes | no | none | C5b |
+| `rule_set_digest` | `str` | yes | no | none | C6 |
+| `task_class_digest` | `str` | yes | no | none | C6 |
+| `evidence_status` | `Literal["COMPARISON_EVIDENCE_PRESENT"]` | yes | no | that literal | closed, fixed |
+| `usage_scope` | `Literal["ADVISORY_INPUT"]` | yes | no | that literal | closed, fixed |
+| `qualifying_method_ids` | `list[str]` | yes | no | none | C5b; non-empty, no duplicates |
+| `primary_method_id` | `str \| None` | no | yes | `None` | C5b; present iff exactly one method qualifies, and then equal to it |
+| `evidence_refs` | `list[str]` | yes | no | none | C6; non-empty, no duplicates |
+
+The digest fields carry the C6 grammar (an algorithm prefix), which the advisor's own
+bare-hex digests do not; the advisor's bridge translates, one way.
 
 ### What the forward-only record does not represent (R-3, OD-5)
 
@@ -2672,7 +2716,7 @@ against. A named, purpose-built exception class states plainly what actually fai
 The complete exported surface, as amended by OD-7. Recorded here as specification; **no
 `public_api.json` is created by this document**, and none could exist until S1 was
 implemented and separately authorised. `[V]` It exists now and covers every item below:
-**fifty-one names** — the thirty-nine `0.1.0` froze, plus OD-7's seven at `0.2.0`, plus
+**fifty-two names** (`RM-3` added one at `0.5.0`) — the thirty-nine `0.1.0` froze, plus OD-7's seven at `0.2.0`, plus
 S2-B's five at `0.3.0` — at `0.3.0`. `[V]` `S2B-S1-Q6=A` with `S2B-R2-Q4=A` authorizes
 **exactly five** additions and **no removals and no renames**: `ReasoningStrategy`,
 `StrategyPolicyResolver`, `StrategyPolicyRequest`, `StrategyPolicyResponse` and
@@ -2682,7 +2726,8 @@ S2-B's five at `0.3.0` — at `0.3.0`. `[V]` `S2B-S1-Q6=A` with `S2B-R2-Q4=A` au
 `BoundedContextEnvelope`, `ToolObservation`, `AdvisoryCandidateSet`, `ProposerAdvisory`,
 `ProposerProcessRecord`
 
-**Nested public models (2):** `CandidateAdvisory`, `ProposerProcessStateTransition`
+**Nested public models (3):** `CandidateAdvisory`, `ProposerProcessStateTransition`,
+`ReasoningMethodAdvisoryInput` (`RM-3`, 0.5.0)
 
 **Call-boundary shapes and the injected-evaluator protocol (3, OD-7 part 2):**
 `DomainEvaluationRequest`, `DomainEvaluationResponse`, `DomainEvaluationProvider`. None

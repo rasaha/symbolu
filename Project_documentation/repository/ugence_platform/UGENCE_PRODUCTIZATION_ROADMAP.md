@@ -355,7 +355,11 @@ inside `apps/ugence-governance-studio`.
 No live execution against real systems. No credentials — the Credential Broker
 (cloud-scaling Phase 5X) remains unbuilt `[V]` (Appendix B §B.6 ¶2) and nothing here
 substitutes for it. No generic LLM, prompt or API canvas nodes. No research-only
-package in the product. No hosted multi-tenancy. No claim of pilot validation or
+package in the product — except a reasoning-method advisory that carries a
+`ReasoningMethodAdvisoryAdmission` under
+`docs/architecture/ADR_UGENCE_REASONING_METHOD_PRODUCT_ENTRY.md` (rulings RM-1 to
+RM-3, 2026-09-06), which enters as typed input to the Agentic Proposer and as nothing
+else. No hosted multi-tenancy. No claim of pilot validation or
 production certification, on any item, at any exit above.
 
 ### 11.3 Owner decisions — ruled 2026-09-05

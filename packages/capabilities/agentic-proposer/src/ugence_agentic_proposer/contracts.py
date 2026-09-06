@@ -1190,6 +1190,63 @@ def _check_process_ordering(transitions: list[ProposerProcessStateTransition]) -
         raise ValueError("state_transitions' `at` values must be non-decreasing (R-3)")
 
 
+
+# --------------------------------------------------------------------------- #
+# RM-3 — the reasoning-method advisory as typed input (product-entry ADR)
+# --------------------------------------------------------------------------- #
+
+#: RM-3's two fixed vocabulary values, mirrored by literal so this package imports
+#: nothing from the research packages that emit them (``test_boundaries.py``).
+REASONING_METHOD_EVIDENCE_PRESENT = "COMPARISON_EVIDENCE_PRESENT"
+REASONING_METHOD_ADVISORY_INPUT = "ADVISORY_INPUT"
+
+
+class ReasoningMethodAdvisoryInput(BaseModel):
+    """D8's third nested public shape (`RM-3`). **Input, never authority.**
+
+    The typed reference by which an *admitted* reasoning-method advisory reaches
+    the process record: the advisory and its admission by digest, the rule set
+    that produced it, the task class it was admitted for, the method identifiers
+    it found qualifying, and the fit assessments that admitted it, by digest.
+    Both vocabulary fields are ``Literal`` — a research-only advisory
+    (``COMPARISON_EVIDENCE_ABSENT`` / ``RESEARCH_ONLY``) cannot be constructed
+    as input at all, which is the fail-closed half of `RM-2`.
+
+    `[R]` Nothing here selects, ranks, disposes or permits. It is carried on
+    ``ProposerProcessRecord`` — outside ``P_unsigned`` (D9) — so its presence,
+    absence or content can never alter an advisory identity; it sets no
+    ``declared_strategy`` and touches no ``DEPENDENT_FIELDS``. A reader who
+    wants to know whether the recorded input was genuine resolves the digests
+    against the advisor's own ``validate_admission``, outside this package.
+    Twelve fields, no C2 common field (C2).
+    """
+
+    model_config = _MODEL_CONFIG
+
+    reasoning_advisory_ref: Identifier
+    reasoning_advisory_digest: DigestShaped
+    admission_digest: DigestShaped
+    rule_set_id: Token
+    rule_set_version: Token
+    rule_set_digest: DigestShaped
+    task_class_digest: DigestShaped
+    evidence_status: Literal["COMPARISON_EVIDENCE_PRESENT"] = REASONING_METHOD_EVIDENCE_PRESENT
+    usage_scope: Literal["ADVISORY_INPUT"] = REASONING_METHOD_ADVISORY_INPUT
+    qualifying_method_ids: Annotated[list[Token], AfterValidator(_require_non_empty_no_duplicates)]
+    primary_method_id: Optional[Token] = None
+    evidence_refs: Annotated[list[DigestShaped], AfterValidator(_require_non_empty_no_duplicates)]
+
+    @model_validator(mode="after")
+    def _primary_is_a_sole_qualifier_or_absent(self):
+        """The advisor's own no-forced-winner rule, restated at the boundary: a
+        primary exists only when exactly one method qualifies, and is that method."""
+        if self.primary_method_id is None:
+            if len(self.qualifying_method_ids) == 1:
+                raise ValueError("exactly one method qualifies but no primary is named")
+        elif self.qualifying_method_ids != [self.primary_method_id]:
+            raise ValueError("primary_method_id must be the sole qualifying method")
+        return self
+
 class ProposerProcessRecord(BaseModel):
     """D8. A non-identity-bearing audit record: not referenced by ``ProposerAdvisory``
     and not reachable from ``P_unsigned``, so nothing here can alter an advisory
@@ -1227,6 +1284,9 @@ class ProposerProcessRecord(BaseModel):
     selected_candidate_id: Optional[Identifier] = None
     #: C5d — awaits a reference scheme for audit records (Part J).
     semantic_audit_refs: Reserved = []
+    #: `RM-3`. The admitted reasoning-method advisory this process consumed as typed
+    #: input, or ``None`` when none was. Structured, optional, outside ``P_unsigned``.
+    reasoning_method_advisory_input: Optional[ReasoningMethodAdvisoryInput] = None
     terminal_outcome: TerminalOutcome
     #: C5d — awaits a reason-code catalogue (Part J).
     reason_codes: Reserved = []

@@ -184,7 +184,13 @@ def test_r_f_benchmark_derived_is_not_a_label():
 def test_public_api_and_version_pin():
     for n in api.__all__:
         assert hasattr(api, n), n
-    assert {m.value for m in A} == {"PROFILE_CLASS_MISMATCH", "RULE_METHOD_UNKNOWN", "PRIMARY_WITHOUT_SOLE_QUALIFIER", "CLASSIFICATION_INCONSISTENT", "TRADE_OFF_CARDINALITY", "RULE_OUTCOME_VERSION_MISMATCH", "RULE_SET_UNSORTED", "RULE_DUPLICATE_ID", "CATALOG_METHOD_VERSION_AMBIGUOUS"}
+    assert {m.value for m in A} == {
+        # slice 2
+        "PROFILE_CLASS_MISMATCH", "RULE_METHOD_UNKNOWN", "PRIMARY_WITHOUT_SOLE_QUALIFIER", "CLASSIFICATION_INCONSISTENT",
+        "TRADE_OFF_CARDINALITY", "RULE_OUTCOME_VERSION_MISMATCH", "RULE_SET_UNSORTED", "RULE_DUPLICATE_ID", "CATALOG_METHOD_VERSION_AMBIGUOUS",
+        # slice 3 (product entry)
+        "COMPARISON_EVIDENCE_UNBOUND", "COMPARISON_EVIDENCE_CONTRADICTED", "RESEARCH_ONLY_REFUSED_IN_PRODUCT",
+    }
     import pathlib
 
     text = (pathlib.Path(__file__).resolve().parents[1] / "pyproject.toml").read_text(encoding="utf-8")

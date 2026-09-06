@@ -31,6 +31,12 @@ strategy authorizes additional compute, tools, evidence access or consequential
 execution. A permission failure is **structural**: no artifact is constructed, replay
 returns ``False``, and **no disposition and no reserved authority term is emitted**.
 
+RM-3 adds one at ``0.5.0``, taking the curated surface to fifty-two: the nested
+``ReasoningMethodAdvisoryInput`` shape by which an *admitted* reasoning-method
+advisory reaches ``ProposerProcessRecord`` as **typed input, never authority**. It is
+carried outside ``P_unsigned``, so it can never alter an advisory identity, and a
+research-only advisory cannot be constructed as input at all.
+
 Proposal identity is computed only by a call into ``ugence_jcs``, inside the single
 authorised identity module (``identity.py``). This package contains no
 canonicalization code of any kind anywhere else — not in ``src``, not in ``tests``,
@@ -57,6 +63,7 @@ from .contracts import (
     ProposerAdvisory,
     ProposerProcessRecord,
     ProposerProcessStateTransition,
+    ReasoningMethodAdvisoryInput,
     StrategyPolicyRequest,
     StrategyPolicyResolver,
     StrategyPolicyResponse,
@@ -110,9 +117,10 @@ __all__ = [
     "AdvisoryCandidateSet",
     "ProposerAdvisory",
     "ProposerProcessRecord",
-    # Nested public models (2)
+    # Nested public models (3). ``ReasoningMethodAdvisoryInput`` is RM-3 (0.5.0).
     "CandidateAdvisory",
     "ProposerProcessStateTransition",
+    "ReasoningMethodAdvisoryInput",
     # OD-7 call-boundary shapes (2) and the injected-evaluator protocol (1). Not
     # contracts: no C2 common field, no identity role, never stored or transported.
     "DomainEvaluationRequest",

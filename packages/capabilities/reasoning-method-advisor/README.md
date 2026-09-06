@@ -17,16 +17,51 @@ one or many methods), every inclusion and exclusion reason, trade-offs between
 multiple qualifiers, and a primary **only when exactly one method qualifies**.
 Rule count, rule priority and traversal order never manufacture a winner.
 
-Every label is `RULE_DERIVED`, every advisory's evidence status is the explicit
-`COMPARISON_EVIDENCE_ABSENT`, and every advisory is `RESEARCH_ONLY`. A request
-without a governed task class is marked `UNCLASSIFIED_EXPLORATORY` and
-`INELIGIBLE_UNCLASSIFIED`: no benchmark comparison, no configuration binding, no
-production authority.
+Every label is `RULE_DERIVED`. A request without a governed task class is marked
+`UNCLASSIFIED_EXPLORATORY` and `INELIGIBLE_UNCLASSIFIED`: no benchmark comparison, no
+configuration binding, no production authority.
 
-Excluded by ruling: LLM-based selection, `BENCHMARK_DERIVED` claims,
-comparison-result ingestion, numeric predictions, scalar cost labels, approval,
-configuration mutation, Constitution binding, envelope issuance, and any change
-to Agentic Proposer, Agent Workforce Composer, Agent Runtime, readiness
-classification, ROI or the advisory composite. The rule set `rules.research.v0`
-ships as a **test fixture only**; it is a transcription of the experimental
-selector's mapping and is provenance, not evidence of correctness.
+## Slice 3 — product entry (0.2.0)
+
+Under `docs/architecture/ADR_UGENCE_REASONING_METHOD_PRODUCT_ENTRY.md` (rulings
+RM-1..RM-3, owner-ruled 2026-09-06) an advisory may enter the product **through a
+separate record**, never by changing shape:
+
+- The slice 2 request and advisory are **unchanged, field for field**. Every advisory
+  is still `COMPARISON_EVIDENCE_ABSENT` / `RESEARCH_ONLY`, and every historical
+  digest — including a preregistered pilot manifest that embeds one — still verifies.
+- `ComparisonEvidence` presents `ReasoningMethodFitAssessment`s for one task class over
+  one catalog. `admit(advisory, request, evidence, admitted_at=...)` returns a
+  `ReasoningMethodAdvisoryAdmission` — `COMPARISON_EVIDENCE_PRESENT` /
+  `ADVISORY_INPUT`, digest-bound to the advisory, restating its qualifying set and
+  primary, and citing the admitting assessments' digests as `evidence_refs` — **only
+  when every qualifying method** has a sufficient assessment
+  (`SUFFICIENT_PARETO_EFFICIENT` or `SUFFICIENT_RESOURCE_DOMINATED`) for exactly its
+  method reference. `validate_admission` replays that at any later time.
+
+Evidence never creates a qualifier: the rule set decides who qualifies; the evidence
+decides whether that result may leave research. Partial coverage, no qualifier, or
+only `COMPARISON_EVIDENCE_ABSENT` assessments — refused as
+`RESEARCH_ONLY_REFUSED_IN_PRODUCT`, which is how the `rules.research.v0` fixture is
+kept out of the product without naming it. An `INSUFFICIENT_QUALITY` assessment for a
+qualifying method — refused as `COMPARISON_EVIDENCE_CONTRADICTED`. Evidence for another
+task class, another catalog, or presented twice — `COMPARISON_EVIDENCE_UNBOUND`. An
+unclassified advisory is never admitted.
+
+`to_proposer_input(admission)` is the one-way bridge to the Agentic Proposer's typed
+`ReasoningMethodAdvisoryInput`: references, method identifiers and evidence digests —
+input, never authority — refused for a bare advisory. This package knows the proposer's
+input shape; the proposer imports nothing from here.
+
+**What no evidence exists for yet `[G]`.** The fit assessments in this package's tests
+are synthetic fixtures proving the mechanism. Real comparison evidence comes from a
+comparison study over `ugence-readiness-comparison`, which this package still never
+imports and whose results it never ingests: it is handed assessments, and it checks them.
+
+Still excluded by ruling: LLM-based selection, `BENCHMARK_DERIVED` claims, numeric
+predictions, scalar cost labels, approval, configuration mutation, Constitution
+binding, envelope issuance, and any change to Agent Workforce Composer, Agent Runtime,
+readiness classification, ROI or the advisory composite. The former exclusion of "any
+change to Agentic Proposer" is lifted by RM-1. The rule set `rules.research.v0` ships
+as a **test fixture only**; it is a transcription of the experimental selector's
+mapping and is provenance, not evidence of correctness.

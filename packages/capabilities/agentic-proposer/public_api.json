@@ -1,8 +1,8 @@
 {
+  "note": "Machine-readable snapshot of the curated public API (ugence_agentic_proposer.__all__). Generated from the installed package; tests/test_public_api.py asserts this file equals the actual package surface. Regenerate when the curated API changes, which for this package means a ratified amendment to docs/S1_CONTRACT_AND_EQUATION_SPECIFICATION.md.",
   "distribution": "ugence-agentic-proposer",
   "namespace": "ugence_agentic_proposer",
-  "package_version": "0.4.0",
-  "note": "Machine-readable snapshot of the curated public API (ugence_agentic_proposer.__all__). Generated from the installed package; tests/test_public_api.py asserts this file equals the actual package surface. Regenerate when the curated API changes, which for this package means a ratified amendment to docs/S1_CONTRACT_AND_EQUATION_SPECIFICATION.md.",
+  "package_version": "0.5.0",
   "symbols": {
     "ADVISORY_IDENTITY_NFC_PATHS": {
       "kind": "constant",
@@ -211,6 +211,7 @@
         "candidate_ids",
         "selected_candidate_id",
         "semantic_audit_refs",
+        "reasoning_method_advisory_input",
         "terminal_outcome",
         "reason_codes",
         "advisory_digest",
@@ -254,6 +255,23 @@
         "INDETERMINATE",
         "SUPPORTED",
         "UNSUPPORTED"
+      ]
+    },
+    "ReasoningMethodAdvisoryInput": {
+      "kind": "model",
+      "fields": [
+        "reasoning_advisory_ref",
+        "reasoning_advisory_digest",
+        "admission_digest",
+        "rule_set_id",
+        "rule_set_version",
+        "rule_set_digest",
+        "task_class_digest",
+        "evidence_status",
+        "usage_scope",
+        "qualifying_method_ids",
+        "primary_method_id",
+        "evidence_refs"
       ]
     },
     "ReasoningStrategy": {
@@ -363,7 +381,7 @@
     },
     "__version__": {
       "kind": "constant",
-      "value": "0.4.0"
+      "value": "0.5.0"
     },
     "build_advisory_candidate_set": {
       "kind": "function"

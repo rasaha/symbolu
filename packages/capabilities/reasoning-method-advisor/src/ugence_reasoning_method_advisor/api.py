@@ -1,5 +1,14 @@
-"""Curated public API of ugence-reasoning-method-advisor (slice 2)."""
+"""Curated public API of ugence-reasoning-method-advisor (slices 2 and 3)."""
 
+from .admission import (
+    ADMISSION_SCHEMA_VERSION,
+    ADMITTER_IDENTITY,
+    SUFFICIENT_FIT_OUTCOMES,
+    ComparisonEvidence,
+    ReasoningMethodAdvisoryAdmission,
+    admit,
+    validate_admission,
+)
 from .advisor import ADVISOR_IDENTITY, TraversalOrder, advise
 from .contracts import (
     ADVISORY_REQUEST_SCHEMA_VERSION,
@@ -32,12 +41,15 @@ from .contracts import (
     validate_against_rule_set,
 )
 from .errors import AdvisorError, AdvisorErrorCode
+from .proposer_bridge import PROPOSER_INPUT_MODEL, to_proposer_input
 from .version import __version__
 
 __all__ = [
     "__version__", "ADVISOR_IDENTITY", "TraversalOrder", "advise",
     "ADVISORY_REQUEST_SCHEMA_VERSION", "ADVISORY_SCHEMA_VERSION", "RULE_SET_SCHEMA_VERSION",
     "PRIMARY_BASIS_SOLE_QUALIFYING_METHOD", "EVIDENCE_STATUS_COMPARISON_EVIDENCE_ABSENT",
+    "ADMISSION_SCHEMA_VERSION", "ADMITTER_IDENTITY", "SUFFICIENT_FIT_OUTCOMES", "ComparisonEvidence",
+    "ReasoningMethodAdvisoryAdmission", "admit", "validate_admission", "PROPOSER_INPUT_MODEL", "to_proposer_input",
     "SYNTHETIC_INADMISSIBLE_IMPLEMENTATION_STATUS", "SYNTHETIC_NO_SUPPORTING_RULE", "SYNTHETIC_RULE_IDS",
     "FORBIDDEN_ADVISORY_FIELD_NAMES", "CATALOG_SIDE_PREDICATES",
     "RuleKind", "PredicateKind", "AdvisoryLabel", "NoPrimaryReason", "AdvisoryClassification", "AdvisoryEligibility",
