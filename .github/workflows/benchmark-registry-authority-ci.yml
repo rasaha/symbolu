@@ -242,10 +242,13 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-      - name: Install test tooling
+      - name: Install test tooling and the D-41 pair
+        # The freeze matrix imports this package's curated API to compare its
+        # canonicalization version against BR-1's, and at the candidate rung
+        # that import reaches the verifier module and the pair.
         run: |
           python -m pip install --upgrade pip
-          pip install pytest build
+          pip install pytest build "cryptography>=41.0.7,<47.0.0" "PyNaCl>=1.5.0,<2.0.0"
       - name: BR-1 suite, unmodified — 593 tests
         run: python -m pytest packages/benchmark-registry/tests -q
       - name: BR-1 probes, unmodified — 57 probes
