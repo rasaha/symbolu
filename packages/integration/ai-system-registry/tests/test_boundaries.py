@@ -75,8 +75,21 @@ def _identifiers(path: pathlib.Path) -> set[str]:
     return names
 
 
+#: Front-door FD-9.2 (2026-09-06): the one ruled local store. Every contracts-only
+#: assertion below scans the contract modules; ``durable.py`` is enumerated here and
+#: has its own boundary test in ``test_durable.py`` (sqlite and stdlib only, no clock).
+RULED_STORE_MODULES = {"durable"}
+CONTRACT_SOURCES = [src for src in SOURCES if src.stem not in RULED_STORE_MODULES]
+
+
+def test_exactly_one_store_module_is_ruled():
+    assert {src.stem for src in SOURCES} & {"durable"} == RULED_STORE_MODULES
+    assert not any(src.stem in ("memory", "sqlite", "store", "adapter", "connector", "client")
+                   for src in SOURCES)
+
+
 def test_source_imports_only_stdlib_and_governance_contracts():
-    for src in SOURCES:
+    for src in CONTRACT_SOURCES:
         roots = _roots(src)
         strays = roots - STDLIB - ALLOWED_FIRST_PARTY - {"__future__"}
         assert not strays, (src.name, strays)
@@ -92,7 +105,7 @@ def test_pyproject_declares_the_ratified_dependency_set():
                       "decision-authority", "risk-authority", "policy-authority",
                       "model-selection", "benchmark-registry", "pydantic", "sqlalchemy"):
         assert forbidden not in joined
-    assert pkg.__version__ == "0.1.0"
+    assert pkg.__version__ == "0.2.0"
 
 
 def test_no_clock_is_read_anywhere():
@@ -153,20 +166,24 @@ def test_no_surface_can_admit_gate_promote_or_attest():
     forbidden = {"admit", "register", "gate", "promote", "approve", "resolve", "attest",
                  "sign", "verify", "authorize", "authenticate", "revoke", "sync", "push",
                  "save", "store", "commit", "upsert", "delete"}
+    # FD-9.2: the one ruled store carries exactly one of these, ``register``; nothing else does
+    ruled = {"SqliteSystemRegistry": {"register"}}
     for name in pkg.__all__:
         value = getattr(pkg, name)
         if isinstance(value, type):
             methods = {n for n in dir(value) if not n.startswith("_")}
-            assert not methods & forbidden, (name, methods & forbidden)
+            assert methods & forbidden == ruled.get(name, set()), (name, methods & forbidden)
         assert name.lower() not in forbidden, name
-    assert pkg.ENFORCEMENT_ENABLED is False and pkg.MATURITY == "CONTRACTS_ONLY"
+    assert pkg.ENFORCEMENT_ENABLED is False
+    assert pkg.CONTRACT_MATURITY == "CONTRACTS_ONLY" and pkg.MATURITY == "CONTRACTS_PLUS_LOCAL_STORE"
 
 
 def test_no_store_adapter_or_connector_ships():
     """D-5 is held structurally: there is nothing here that could reach a system of record."""
 
     # Match whole word segments, so "supersession" is not read as "session".
-    segments = {seg for src in SOURCES for name in _identifiers(src)
+    segments = {seg for src in CONTRACT_SOURCES if src.stem != "__init__"
+                for name in _identifiers(src)
                 for seg in re.split(r"[^a-z0-9]+", re.sub(r"(?<!^)(?=[A-Z])", "_", name).lower())}
     for word in ("sqlite", "connect", "connection", "session", "http", "https", "url",
                  "endpoint", "client", "servicenow", "jira", "cmdb", "scim", "ldap"):
@@ -174,6 +191,12 @@ def test_no_store_adapter_or_connector_ships():
     module_names = {src.stem for src in SOURCES}
     for banned in ("memory", "sqlite", "store", "adapter", "connector", "client"):
         assert banned not in module_names, banned
+    # the ruled store is the only module allowed to name sqlite, and it names no network
+    durable = {seg for name in _identifiers(next(s for s in SOURCES if s.stem == "durable"))
+               for seg in re.split(r"[^a-z0-9]+", re.sub(r"(?<!^)(?=[A-Z])", "_", name).lower())}
+    for word in ("http", "https", "url", "endpoint", "client", "servicenow", "jira", "cmdb",
+                 "scim", "ldap", "socket"):
+        assert word not in durable, word
 
 
 def test_the_registration_cannot_be_mutated_after_construction():

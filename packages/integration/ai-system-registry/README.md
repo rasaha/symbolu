@@ -12,6 +12,14 @@ systems-of-record connectors stay post-v1.
 > registers into a system of record, promotes, approves, gates, resolves or attests.
 > A registration is a record, not a permission.
 
+## The one local store (0.2.0, front-door FD-9.2)
+
+`SqliteSystemRegistry` is the single implementation of `SystemRegistryPort`: a sqlite
+**file** a composing deployment owns (no server, driver, DSN or network), bound to one
+tenant, append-only, whose only write is `register`. It records; it never admits,
+gates, promotes, attests, edits or deletes. Every other module stays contracts only,
+and the operational registry and its systems-of-record connectors stay post-v1.
+
 ## What "contracts only" means here
 
 Record types, refusal reasons, pure selectors, and one read-only Protocol. **No
