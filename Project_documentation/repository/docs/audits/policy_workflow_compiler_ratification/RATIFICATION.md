@@ -190,14 +190,52 @@ compiler → Workflow IR → AWC / Agent Runtime / governance.
 
 ## Ratified implementation order
 
-1. **PA/PWC-X1** — establish the boundary and the source-linkage coordinate.
-2. **PWC-P3A** — diff-driven review requirements and approval binding.
-3. **`policy_pack.v2`** — source-declarable semantic fields.
-4. **PWC-P3B** — declarative capability/contract binding **validation**.
-5. **PWC-P3C** — deterministic offline simulation.
-6. **AI Hiring reference equivalence.**
-7. **Real pilot** against a named policy corpus.
-8. **`pilot_validated`** — only when every D4 item is evidenced.
+**Amended** after the X1 design established that source linkage cannot be
+digest-bound on `policy_pack.v1` without moving every frozen v1 digest. X1 is
+ratified first as an *architectural rule*; its carriage ships with `policy_pack.v2`.
+See `../policy_workflow_compiler_x1/DESIGN.md`.
+
+1. **PWC ratifications** — D1–D5 and the X1 architectural boundary (this document).
+2. **PWC-P3A** — diff-driven review requirements and approval binding. It expands no
+   source contract, so it ships against v1 without approaching a frozen digest.
+3. **`policy_pack.v2`** — source-declarable semantic fields; the first
+   source-contract expansion.
+4. **PA/PWC-X1 carriage and validation** — activated by v2.
+5. **PWC-P3B** — declarative capability/contract binding **validation**.
+6. **PWC-P3C** — deterministic offline simulation.
+7. **AI Hiring reference equivalence.**
+8. **Real pilot** against a named policy corpus.
+9. **`pilot_validated`** — only when every D4 item is evidenced.
+
+### X1-A — the sequencing ruling
+
+PA/PWC-X1 is ratified now as an architectural boundary. Its digest-bound
+`AuthoritativeSourceRef` carriage activates **only** for `policy_pack.v2`.
+`policy_pack.v1` remains structurally and digest-byte identical and gains no
+unconditional or defaulted authoritative-source field — a defaulted `None` on the v1
+logical payload is explicitly prohibited, because it moves every existing v1 digest.
+
+### X1-B — composition-root placement
+
+The component that turns a `RESOLVED` `PolicyResolution` into a compiled release
+lives in **neither** Policy Authority **nor** the compiler, and not in the Governance
+Studio (which is `NON_AUTHORITY_STUDIO` by its own audit). It belongs in the
+deployment/product integration layer, which may depend on both packages —
+`packages/integration/agent-constitution-activation` is the existing precedent. It
+owns no new authority: it cannot change Policy Authority's answer and cannot waive
+compiler validation.
+
+**Derivation prohibition.** Neither the compiler nor an untrusted caller may
+construct a production-trusted `AuthoritativeSourceRef` by assertion alone.
+Production authoritative-source linkage must originate from a successfully verified
+Policy Authority resolution through the designated composition root; on that path the
+reference is derived, never authored.
+
+**Attestation boundary.** The compiler attests **carriage, not authenticity**: it
+proves a release is immutably bound to the authoritative-source assertion supplied at
+compilation, and never that the policy was independently established as currently
+authoritative. Its diagnostics must not imply a signature, key-trust or revocation
+check it did not perform.
 
 The governing principle: the compiler becomes richer as a deterministic policy
 compiler and pre-execution analyzer. It does not gradually become a runtime

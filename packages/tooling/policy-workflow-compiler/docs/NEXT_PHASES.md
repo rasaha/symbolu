@@ -33,13 +33,17 @@ capabilities keep decision, approval, authorization, and execution authority.
 
 ## Ratified order
 
-1. **PA/PWC-X1** — the Policy Authority boundary and the source-linkage coordinate.
-2. **PWC-P3A** — diff-driven review requirements and approval binding.
-3. **`policy_pack.v2`** — source-declarable semantic fields.
+1. **PWC-P3A** — diff-driven review requirements and approval binding.
+2. **`policy_pack.v2`** — source-declarable semantic fields.
+3. **PA/PWC-X1 carriage and validation** — activated by v2.
 4. **PWC-P3B** — declarative capability/contract binding **validation**.
 5. **PWC-P3C** — deterministic offline simulation.
 6. **AI Hiring reference equivalence.**
 7. A real pilot against a named policy corpus, then `pilot_validated`.
+
+The PA/PWC-X1 **boundary** is ratified ahead of all of it; only its carriage waits
+for v2. P3A leads because it expands no source contract, so it ships against
+`policy_pack.v1` without approaching a frozen digest.
 
 ### PA/PWC-X1 — Policy Authority boundary and source linkage
 
@@ -48,16 +52,28 @@ supersession, revocation, and resolution. This package consumes an exact resolve
 authoritative artifact and transforms it deterministically. Compiled artifacts
 retain immutable linkage to the authoritative source policy coordinate and digest.
 
-This is new work. Today `models/provenance.py` carries **document**-level provenance
+This is new work on this side only — Policy Authority requires no change; it already
+issues the complete coordinate, issuance record, resolution and revocation records.
+Today `models/provenance.py` carries **document**-level provenance
 (`ProvenanceReference` with `source_id`, `title`, `version`, `content_digest`,
 `clause`, `authority_level`, plus `SourceDocument`), which identifies a document
-rather than an authoritative issuance. Nothing binds a compiled release to an issued
-policy version, its registration or signature reference, or its revocation state.
+rather than an authoritative issuance.
 
-The linkage must be carried as **data** in the pack and compiled release — an exact
-policy coordinate plus digest, validated structurally. It must not become an import
-of `packages/policy-authority`; resolution and revocation checking belong to the
-consumer or composition root.
+The linkage is carried as **data** — a PWC-owned `AuthoritativeSourceRef` of plain
+strings, never an import of `packages/policy-authority`. It is digest-bound through
+`policy_pack.v2` only: an unconditional or defaulted field on the v1 payload would
+move every existing v1 digest, so v1 stays byte-identical and carries no such field.
+
+The compiler attests **carriage, not authenticity**. It proves that a release is
+immutably bound to the authoritative-source assertion supplied at compilation; it
+never claims to have verified a signature, key trust, or revocation state. Those
+belong to Policy Authority and to a composition root in the integration layer, which
+derives the reference from a `RESOLVED` resolution rather than accepting one by
+assertion.
+
+The full field set, carriage rules, validation codes and composition-root
+requirements are in
+`Project_documentation/repository/docs/audits/policy_workflow_compiler_x1/DESIGN.md`.
 
 ### PWC-P3A — Governed diff-driven review and approval binding
 
