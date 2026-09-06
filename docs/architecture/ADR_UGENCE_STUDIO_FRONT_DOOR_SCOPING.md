@@ -1,7 +1,8 @@
 # ADR — Governed Agent Studio as the front door: scoping audit
 
 **Status:** scoping audit, 2026-09-05. Documentation only; no code, branch or PR.
-Owner decisions FD-1, FD-3, FD-4 and FD-5 in §6 are open; FD-2 was ruled on 2026-09-05. Labels: `[V]` verified, `[I]` inferred,
+Owner decisions FD-1 to FD-5 were all ruled on 2026-09-05 (§6). **The rulings authorize
+documentation only; no seam is activated by them.** Labels: `[V]` verified, `[I]` inferred,
 `[R]` requires ratification, `[G]` gap.
 
 ## 1 — The question
@@ -72,17 +73,35 @@ the accepted subset to Workflow IR through `compile_policy_pack`, refuse anythin
 unmapped, and record consequential transitions against execution-reservation. Nothing
 here is implemented.
 
-## 6 — Owner decisions `[R]`
+## 6 — Owner decisions (ruled 2026-09-05)
 
-| # | Decision | Options | Recommendation |
-|---|---|---|---|
-| FD-1 | Which seams the deployed studio hands `build_studio_context`, and in what order | `ALL_SEVEN_AT_ONCE` \| `ONE_SEAM_PER_STEP` (activation root; then policy registry and decision store; then hook and provider registry; then console) | `ONE_SEAM_PER_STEP`: each is a P3E amendment with its own freeze test, as CR-2 was |
-| FD-2 | The "govern an existing agent" path | **Ruled 2026-09-05: `ENTER_LANGFLOW_FIRST`.** The owner superseded GAS-5 on product judgement (`ENTER_LANGFLOW_IMPORT_FIRST`, roadmap §11.3); Langflow is the first and only import format; other platforms stay customer-gated; scoped in `ADR_UGENCE_LANGFLOW_IMPORT_SCOPING.md` | closed |
-| FD-3 | Lifecycle authority | `COMPOSITION_RECORD_IN_REGISTRY` \| `NEW_PACKAGE` | `COMPOSITION_RECORD_IN_REGISTRY`: a contracts-only lifecycle-state record over `SystemRegistration`, consistent with D-4 and D-5; OD-C4=A stays until a later ruling assigns the transition authority |
-| FD-4 | Use-case intake | `TYPED_INTAKE_ONLY` \| `PROSE_ASSIST` | `TYPED_INTAKE_ONLY` |
-| FD-5 | Which unbuilt screens enter the studio next | any subset of 1, 4, 5, 10 | 1 and 5 as registration forms over existing records; 4 waits on the research-only labels; 10 observe-only over the ledger |
+| # | Ruling |
+|---|---|
+| **FD-1** | **`ONE_SEAM_PER_STEP`.** One front-door seam is introduced and validated at a time. Each seam requires its own bounded implementation, failure tests, maturity statement and independently reviewable commit before the next seam begins. |
+| **FD-2** | **`ENTER_LANGFLOW_FIRST`** (ruled earlier the same day). GAS-5 superseded by `ENTER_LANGFLOW_IMPORT_FIRST`; Langflow is the first and only import format; other platforms stay customer-gated; scoped in `ADR_UGENCE_LANGFLOW_IMPORT_SCOPING.md`, where LI-1 to LI-5 are ruled and implementation is blocked on a fixture. |
+| **FD-3** | **`COMPOSITION_RECORD_IN_REGISTRY`.** The studio front-door composition is represented through an immutable, versioned registry record using existing registry ownership (`ai-system-registry`). No new package is created merely to hold composition metadata. |
+| **FD-4** | **`TYPED_INTAKE_ONLY`.** The first front door accepts only versioned, schema-validated typed input. It performs no prose-to-contract conversion, LLM interpretation, inferred defaults or silent repair. Prose assistance remains a later, separately ruled capability. |
+| **FD-5** | **`SCREEN_1_ONLY`.** Only screen 1 enters the next implementation step, as the activation root. Screens 4, 5 and 10 remain unchanged and are introduced only through later, separately validated seams. |
+
+**What the rulings authorize.** Documentation only. No seam is activated, no code is
+changed, and the P3E container still hands the studio context the review-service URL
+alone until the next implementation prompt is issued and its PR merges.
+
+**Reading of FD-5 `[I]`.** The ruling names the activation root as the seam. The
+activation root serves the studio's first screen in its own order, Constitution
+(§3 row 2: `build_studio_context(activation_root=...)`, consumed by
+`ConstitutionService.preflight`). The outline's screen 1, the use-case registration
+form over `ai-system-registry` (§3 row 1), is not entered by this ruling; if the owner
+intended it, a one-line correction re-rules FD-5. The next seam is therefore: the P3E
+profile hands the studio an activation root composed from the constitution
+authority's own deny-by-default signer and verifiers (no key material in the studio;
+`build_activation_root` accepts none) over a durable policy registry, so preflight
+reports its real result and issuance refuses.
 
 ## 7 — Next step
 
-Ruling on FD-1 to FD-5. No implementation prompt is issued while they are open; the
-first implementation after ruling is the next P3E seam under FD-1, in the CR-2 shape.
+The next P3E amendment under FD-1 and FD-5: one seam, the activation root, in the CR-2
+shape (one configuration value, one freeze-test amendment, its own failure tests and
+maturity statement, one PR), preserving `REFERENCE_GRADE_SHADOW_ONLY`, the frozen
+runtime configuration, existing v1 and v2 behaviour, and every credential and LIVE
+prohibition. Issued by its own implementation prompt.
