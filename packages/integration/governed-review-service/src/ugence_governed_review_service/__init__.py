@@ -12,7 +12,9 @@ round trip's receipt linkage to the control-plane audit ledger (HE-1) and expose
 run detail (HE-5); since 0.3.0 it defines the service-local ``ApproverIdentityPort``
 and the proof shape (AI-A, rulings ID-2 to ID-5), with a fixture adapter only; since
 0.5.0 it exposes the sixth route, a relayed start of the composition root's own shadow
-run through a ``ShadowRunStarter`` the root supplies (front-door ruling FD-10).
+run through a ``ShadowRunStarter`` the root supplies (front-door ruling FD-10); since
+0.6.0 the seventh, a raw read of the root's own tenant's audit-ledger rows by
+correlation id through an ``AuditLedgerReader`` the root supplies (FD-11).
 Maturity ``REFERENCE_GRADE_SHADOW_ONLY``: the approver on every decision is a presented
 reference, not a proven identity, because no real identity adapter exists (AI-C).
 """
@@ -20,7 +22,15 @@ reference, not a proven identity, because no real identity adapter exists (AI-C)
 from __future__ import annotations
 
 from .errors import ClockDisciplineError, ContractViolation, GovernedReviewServiceError
-from .http import ROUTES, START_BODY_KEYS, build_app, decision_view, queue_entry_view, start_view
+from .http import (
+    ROUTES,
+    START_BODY_KEYS,
+    audit_view,
+    build_app,
+    decision_view,
+    queue_entry_view,
+    start_view,
+)
 from .identity import (
     IDENTITY_PROOF_LABELS,
     IDP_AUTHENTICATED,
@@ -55,6 +65,9 @@ from .service import (
     SIGNAL_NAME,
     TENANT_SOURCE_CONFIGURED,
     TENANT_SOURCE_PROOF,
+    AuditLedgerReader,
+    AuditReadOutcome,
+    AuditReadResult,
     DecisionOutcome,
     DecisionResult,
     QueueEntry,
@@ -77,6 +90,7 @@ __all__ = [
     "ReviewService", "DecisionOutcome", "DecisionResult", "QueueEntry", "SIGNAL_NAME",
     "ShadowRunStarter", "StartOutcome", "StartResult", "SHADOW_RUN_MODE", "CORRELATION_ID_PATTERN",
     "START_BODY_KEYS", "start_view",
+    "AuditLedgerReader", "AuditReadOutcome", "AuditReadResult", "audit_view",
     "TENANT_SOURCE_PROOF", "TENANT_SOURCE_CONFIGURED", "instance_of",
     "ApproverIdentityPort", "ApproverIdentity", "VerifiedClaims", "ActorKind", "TenantMode",
     "RecordedAssurance", "StaticApproverIdentityAdapter", "IdentityUnavailable",

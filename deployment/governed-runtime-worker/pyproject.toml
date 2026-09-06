@@ -29,12 +29,12 @@ license = { text = "Proprietary" }
 authors = [{ name = "Rakesh Mohan" }]
 classifiers = ["Typing :: Typed"]
 dependencies = [
-  "ugence-governed-review-service[http]>=0.5.0",
+  "ugence-governed-review-service[http]>=0.6.0",
   "ugence-approver-identity-jwt>=0.1.0",
   "ugence-governed-review>=0.3.0",
   "ugence-approval-workflow>=0.2.0",
   "ugence-authority-directory>=0.1.0",
-  "ugence-control-plane-root>=0.1.0",
+  "ugence-control-plane-root>=0.2.0",
   "ugence-durable-execution>=0.1.0",
   "ugence-agent-runtime>=0.7.0",
   "ugence-agent-runtime-governance>=0.1.0",

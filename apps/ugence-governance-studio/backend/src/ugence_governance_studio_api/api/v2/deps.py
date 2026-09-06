@@ -35,6 +35,12 @@ def _absent_start_run() -> Any:
     return StartRunService(review=None)
 
 
+def _absent_ledger_observe() -> Any:
+    from ...services.studio_v2 import LedgerObserveService
+
+    return LedgerObserveService(review=None)
+
+
 class V2Context:
     """The six services, plus whatever optional dependencies were configured.
 
@@ -55,6 +61,7 @@ class V2Context:
         review: Any = None,
         registry: Any = None,
         start_run: Any = None,
+        ledger_observe: Any = None,
     ) -> None:
         self.constitution = constitution
         self.policy = policy
@@ -71,6 +78,9 @@ class V2Context:
         # Front-door seam 6 (FD-10): the worker shadow-run relay. Absent, the start route
         # reports the same review_service gap as the review screens.
         self.start_run = start_run if start_run is not None else _absent_start_run()
+        # Front-door seam 7 (FD-11): Observe over the worker's ledger. Absent, the ledger
+        # route reports the same review_service gap.
+        self.ledger_observe = ledger_observe if ledger_observe is not None else _absent_ledger_observe()
 
 
 def studio(request: Request) -> V2Context:

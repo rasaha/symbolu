@@ -244,8 +244,8 @@ def test_the_egress_record_names_six_routes_one_destination_and_the_frontend_man
     egress = cfg["external_network_egress"]
     (permitted,) = egress["permitted"]
     assert egress["default"] == "none" and permitted["scheme"] == "https"
-    assert len(permitted["routes"]) == 6
-    assert permitted["routes"][4:] == ["POST /review/decisions", "POST /review/runs"]
+    assert len(permitted["routes"]) == 7
+    assert permitted["routes"][4:6] == ["POST /review/decisions", "POST /review/runs"]
     assert permitted["start_relay"].startswith("POST /review/runs")
     assert "no workflow, task, provider, digest or credential crosses" in permitted["start_relay"]
     manifest = json.load(open(os.path.join(REPO, "apps", "ugence-governance-studio", "frontend", "security",
@@ -278,10 +278,13 @@ def test_the_second_contract_amendment_is_recorded_in_the_p3e_freeze():
                                          "openapi_v2.amendments.json"), encoding="utf-8"))
     with open(os.path.join(REPO, "apps", "ugence-governance-studio", "contracts", "openapi_v2.json"), "rb") as fh:
         current = hashlib.sha256(fh.read()).hexdigest()
-    a1, a2 = record["amendments"][-2:]
+    a1, a2 = record["amendments"][0:2]
     assert a1["amendment_id"] == "v2-A1" and a2["amendment_id"] == "v2-A2"
     assert a2["previous_sha256"] == a1["sha256"]
-    assert cfg["frozen"]["openapi_v2_sha256"] == current == a2["sha256"]
+    # the committed bytes and the freeze carry the latest amendment (v2-A3 since seam 7);
+    # the chain from A2 onward is verified in test_ledger_observe_profile
+    assert cfg["frozen"]["openapi_v2_sha256"] == current == record["amendments"][-1]["sha256"]
+    assert record["amendments"][-1]["previous_sha256"] == a2["sha256"] or record["amendments"][-1] is a2
     assert a2["operations_added"] == ["v2_review_start_shadow_run"] and a2["paths_added"] == ["/api/v2/review/runs"]
     assert "v2-A2" in cfg["frozen"]["openapi_v2_amendment"] and "v2-A1" in cfg["frozen"]["openapi_v2_amendment"]
     assert cfg["frozen"]["openapi_sha256"] == "dc309eab216e1a4c2f63f286887a4ef218a96ac34f8fa8614bff176db7c36656"

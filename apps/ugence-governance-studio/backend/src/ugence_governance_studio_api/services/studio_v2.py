@@ -56,6 +56,8 @@ __all__ = [
     "RegistryService",
     "StartRunService",
     "WORKER_RELAY_PATH",
+    "LedgerObserveService",
+    "WORKER_LEDGER_SOURCE",
     "OWNER_REF_STATUS",
     "DependencyUnavailable",
     "SIMULATION_MODES",
@@ -739,6 +741,58 @@ class StartRunService:
         except ReviewServiceUnavailable as exc:
             return _unavailable(self.CAPABILITY, str(exc))
         return {"available": True, "path": dict(WORKER_RELAY_PATH), "result": answer}
+
+
+# --------------------------------------------------------------------------- #
+# 7b · Observe over the worker's ledger (front-door seam 7, FD-11)
+# --------------------------------------------------------------------------- #
+#: FD-11.4: how the Observe screen labels this source, distinct from the console's
+#: stage chain. Stated by the backend so the label cannot drift from the service.
+WORKER_LEDGER_SOURCE: Dict[str, str] = {
+    "source": "worker_audit_ledger",
+    "record_type": "control-plane audit-ledger rows: receipts and references (kind, payload, "
+                   "digests), raw and uninterpreted; not stage narratives",
+    "executor": "the governed runtime worker's own ledger, read by the worker for its own "
+                "tenant; the studio names no tenant and re-derives nothing",
+    "durability": "durable, per-tenant, hash-chained, append-only by database trigger; "
+                  "tamper-evident, not tamper-proof",
+    "verification": "the worker's own verify_chain, shown as the worker reported it; a chain "
+                    "that does not verify withholds its entries",
+    "maturity": "REFERENCE_GRADE",
+}
+
+
+class LedgerObserveService:
+    """Relay-only: ask the worker for its own tenant's ledger rows by correlation id and
+    return the worker's answer unchanged (FD-11.3, FD-11.4).
+
+    A missing review-service URL is the typed gap ``review_service``; an older worker
+    without the route is a gap naming it; an unknown correlation id is the worker's
+    typed not-found; the worker's refusals (``REFUSED_INTEGRITY``, ``REFUSED_SCHEMA``,
+    ``REFUSED_UNCONFIGURED``) come back as the worker said them. Nothing here reads,
+    orders, joins or re-hashes an entry.
+    """
+
+    CAPABILITY = "review_service"
+
+    def __init__(self, review: Optional[Any] = None) -> None:
+        self._review = review
+
+    def chain(self, correlation_id: str) -> Dict[str, Any]:
+        from ..clients.review import ReviewNotFound, ReviewServiceUnavailable
+
+        if self._review is None:
+            return _unavailable(self.CAPABILITY,
+                                "no governed review service base URL is configured")
+        try:
+            answer = self._review.read_audit(correlation_id)
+        except ReviewNotFound as exc:
+            return {"available": True, "found": False, "result": None,
+                    "source": dict(WORKER_LEDGER_SOURCE), "reason": str(exc)}
+        except ReviewServiceUnavailable as exc:
+            return _unavailable(self.CAPABILITY, str(exc))
+        return {"available": True, "found": True, "source": dict(WORKER_LEDGER_SOURCE),
+                "result": answer}
 
 
 # --------------------------------------------------------------------------- #

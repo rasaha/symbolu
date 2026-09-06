@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.6.0 — 2026-09-06 — front-door seam 7 (FD-11)
+
+Contract `governed_review_service.v6`: the six routes plus one ledger read.
+
+- `GET /review/audit/{correlation_id}` (`review_read_audit`): the deployment's own
+  tenant's control-plane audit-ledger rows for one correlation id, in chain order,
+  each as the ledger stored it (seq, entry_ref, kind, recorded_at, recorded_by,
+  correlation_id, payload, prev_digest, record_digest), with the chain verification
+  as the typed field `chain_verified`. A chain that does not verify is the typed
+  `REFUSED_INTEGRITY` (409) with the entries withheld; a ledger at another schema
+  version is `REFUSED_SCHEMA`; no composed reader is `REFUSED_UNCONFIGURED`; an unknown
+  correlation id is 404; a malformed one is 422. There is no list-all route and no
+  write. Requires `ugence-control-plane-root` 0.2.0 (`read_entries`).
+- `ReviewService(ledger_reader=...)`, `read_audit`, `AuditLedgerReader`,
+  `AuditReadOutcome`, `AuditReadResult`, `audit_view`.
+
 ## 0.5.0 — 2026-09-06 — front-door seam 6 (FD-10)
 
 Contract `governed_review_service.v5`: the same five routes plus one start relay.

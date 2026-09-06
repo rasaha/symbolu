@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-__version__ = "0.5.0"
+__version__ = "0.6.0"
 
 #: The wire contract this release presents: the five routes of the screen/API audit
 #: plus, since v5, the one start relay,
@@ -13,8 +13,11 @@ __version__ = "0.5.0"
 #: the linkage (AI-D), so the approval view and the linkage view carry it; v5 since
 #: 0.5.0 adds the sixth route ``POST /review/runs`` (front-door ruling FD-10.2): a
 #: relayed start of the deployment's own shadow run, nothing supplied by the caller
-#: but a typed correlation id.
-CONTRACT_VERSION = "governed_review_service.v5"
+#: but a typed correlation id; v6 since 0.6.0 adds the seventh route ``GET
+#: /review/audit/{correlation_id}`` (front-door ruling FD-11.3): the deployment's own
+#: tenant's audit-ledger rows for one correlation id, in chain order, with the chain
+#: verification as a typed field.
+CONTRACT_VERSION = "governed_review_service.v6"
 
 #: Honest label. The service records decisions whose approver is a PRESENTED reference:
 #: no identity provider integration exists, so nothing here proves who decided. Every

@@ -177,9 +177,28 @@ paths (FD-10.5), the P3E egress record and its freeze test name six routes over 
 existing destination, CR-2 and HR-1 are amended in their ADRs, and §11.3's matrix is
 tests in the worker, the studio backend and the profile. No configuration value, image
 package, credential or second egress destination was added; the composition record
-supersedes the seam-5 record (`composition-record.seam-5.json`, unchanged). The next
-seam is audited in §12 (Observe over the worker's ledger recommended; the console and
-a durable Decision Authority store not next) and waits on ruling FD-11 under FD-1.
+supersedes the seam-5 record (`composition-record.seam-5.json`, unchanged). **Seam 7
+shipped** (`governance-studio-deployment` 0.8.0, FD-11, with `control-plane-root` 0.2.0,
+`governed-review-service` 0.6.0 and `governed-runtime-worker` 0.3.0): the ledger's one
+raw read, `read_entries`, returns a tenant's own rows for one correlation id in chain
+order, refusing a blank key, an in-memory store and a foreign schema version, and its
+ADR D-5 and README say a raw read is not reconstruction; the worker's seventh route
+`GET /review/audit/{correlation_id}` (`review_read_audit`) returns the worker's own
+tenant's rows with `chain_verified` as a typed field, a chain that does not verify is
+`REFUSED_INTEGRITY` with the entries withheld, another schema version `REFUSED_SCHEMA`,
+no reader `REFUSED_UNCONFIGURED`, unknown 404, malformed 422, no list-all route and no
+write; the studio's review client is seven routes (five reads, two relays),
+`LedgerObserveService` returns the worker's answer unchanged under a backend-stated
+source label, the v2 contract is amended a third time (v2-A3, `v2_observe_ledger_chain`)
+with its generated client and the frontend manifest, the Observe screen shows the
+worker ledger and the console's typed gap as two labelled sources (FD-11.4) and
+re-derives nothing, the P3E egress record and freeze test name seven routes over the
+one destination, CR-2 is amended again in its ADR, and §12.4 is tests in
+control-plane-root, the review service, the worker, the studio backend and the profile.
+No configuration value, image package, credential or second egress destination was
+added; the composition record supersedes the seam-6 record
+(`composition-record.seam-6.json`, unchanged). The next seam waits on its own ruling
+under FD-1.
 
 The shape every seam follows: the CR-2 shape (one configuration value, one freeze-test amendment, its own failure tests and
 maturity statement, one PR), preserving `REFERENCE_GRADE_SHADOW_ONLY`, the frozen
@@ -839,7 +858,8 @@ remaining before implementation: the five above, of which FD-11.2 carries the on
 
 **What the ruling authorizes.** Documentation only. No seam is activated, no route
 exists, no package is released, no contract byte moves and no code changes. Seam 7
-activates by its own implementation prompt, which will ship in one step: the read
+activates by its own implementation prompt (issued and shipped 2026-09-06; see §7),
+which ships in one step: the read
 port in `control-plane-root` 0.2.0 with tests and its ADR and README amended, the
 review service's seventh `ROUTES` entry and route with tests, the studio's review
 client and Observe relay service, the v2 amendment v2-A3 with the regenerated client,

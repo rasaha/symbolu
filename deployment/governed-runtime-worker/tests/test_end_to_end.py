@@ -312,3 +312,52 @@ def test_the_sixth_route_starts_the_workers_own_shadow_run_parks_it_and_replays(
     everything = started.text + again.text + decided.text
     for secret in (worker.config.app_database_url, worker.config.system_database_url, token):
         assert secret not in everything
+
+
+# --------------------------------------------------------------------------- #
+# front-door seam 7 (FD-11): the ledger read over the composed worker
+# --------------------------------------------------------------------------- #
+@requires_postgres
+def test_the_seventh_route_reads_the_relayed_runs_receipt_from_the_workers_own_ledger(worker, issuer):
+    """§12.4 rows 3, 7 and 9 over the composed worker: before any GRANT the correlation
+    id is a typed not-found; after the existing decision relay and the next quantum the
+    linkage the appender wrote is read back raw, chain verified, own tenant only."""
+
+    from fastapi.testclient import TestClient
+    from governed_runtime_worker import instance_id_for
+
+    _grant(worker)
+    client = TestClient(worker.app)
+    assert worker.service.ledger_reader_configured
+
+    started = client.post("/review/runs", json={"correlation_id": "c-ledger"})
+    assert started.status_code == 200 and started.json()["result"] == "STARTED"
+    instance = instance_id_for(ShadowWorkload.WORKFLOW_ID, "c-ledger")
+    assert client.get("/review/audit/c-ledger").status_code == 404, "nothing recorded yet"
+
+    (entry,) = client.get("/review/queue").json()["entries"]
+    token = issuer.mint(claims_for(issuer), kid="rsa-1")
+    worker.clock.advance(minutes=1)
+    decided = client.post("/review/decisions", json={
+        "approval_id": entry["approval_id"], "decision": "GRANT", "justification": "reviewed",
+        "presented_approver": {"approver_id": subject_ref("alice"), "approver_kind": "HUMAN",
+                               "role": ROLE, "authority_reference": f"directory://roles/{ROLE}"},
+    }, headers={PROOF_HEADER: token})
+    assert decided.status_code == 200
+    worker.adapter.advance(instance_id=instance, attempt_token="a-ledger")
+    run = client.get(f"/review/runs/{instance}").json()
+    assert run["linkages"][0]["state"] == "APPENDED"
+
+    read = client.get("/review/audit/c-ledger", headers={PROOF_HEADER: token})
+    assert read.status_code == 200, read.text
+    body = read.json()
+    assert body["result"] == "READ" and body["chain_verified"] is True
+    assert body["tenant_id"] == TENANT and body["entry_count"] == 1
+    (row,) = body["entries"]
+    assert row["kind"] == "governed_review.linkage.v2" and row["correlation_id"] == "c-ledger"
+    assert row["recorded_by"] == "governed-runtime-worker"
+    assert row["payload"]["instance_id"] == instance and row["payload"]["approval_id"] == entry["approval_id"]
+    assert row["record_digest"] == run["linkages"][0]["audit_reference"]["entry_digest"]
+    assert row["entry_ref"] == run["linkages"][0]["audit_reference"]["entry_ref"]
+    for secret in (worker.config.app_database_url, worker.config.system_database_url, token):
+        assert secret not in read.text

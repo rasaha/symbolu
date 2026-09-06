@@ -107,7 +107,8 @@ def test_approved_runtime_config_permits_exactly_one_egress_the_review_relay():
     (permitted,) = egress["permitted"]
     assert "UGENCE_STUDIO_REVIEW_SERVICE_URL" in permitted["destination"]
     assert permitted["scheme"] == "https"
-    assert len(permitted["routes"]) == 6 and permitted["routes"][4] == "POST /review/decisions"
+    assert len(permitted["routes"]) == 7 and permitted["routes"][4] == "POST /review/decisions"
+    assert permitted["routes"][6] == "GET /review/audit/{correlation_id}"
     assert permitted["routes"][5] == "POST /review/runs"
     assert permitted["forwarded_header"].startswith("X-Ugence-Approver-Proof")
     assert "unset" in egress["container_gate_note"]
@@ -117,7 +118,7 @@ def test_approved_runtime_config_permits_exactly_one_egress_the_review_relay():
                                                 "UGENCE_STUDIO_POLICY_IDENTITIES",
                                                 "UGENCE_STUDIO_SIMULATION_PROVIDER",
                                                 "UGENCE_STUDIO_SYSTEM_REGISTRY_PATH"]
-    assert cfg["deployment_version"] == "0.7.0"
+    assert cfg["deployment_version"] == "0.8.0"
 
 
 def test_approved_runtime_config_records_front_door_seam_3_exactly():

@@ -12,7 +12,24 @@ from ugence_governance_contracts.api import Validity
 
 from ugence_governed_review_service import ReviewService, StaticRunReader, StartOutcome, StartResult
 
-__all__ = ["F", "RecordingAdapter", "RecordingStarter", "parked_checkpoint", "request_for", "service"]
+__all__ = ["F", "RecordingAdapter", "RecordingStarter", "file_audit_ledger", "parked_checkpoint",
+           "request_for", "service"]
+
+
+def file_audit_ledger(tmp_path, *entries):
+    """A real file-backed control-plane audit ledger holding ``entries``; the seventh
+    route reads exactly this shape and nothing in memory."""
+
+    import os
+
+    from ugence_control_plane_root import AuditLedger, LedgerEntry
+    from ugence_governance_contracts.api import AuditReference
+
+    path = os.path.join(str(tmp_path), "audit-ledger.sqlite3")
+    ledger = AuditLedger(path)
+    for e in entries:
+        ledger.append(LedgerEntry(**e), reference_factory=AuditReference)
+    return path, ledger
 
 
 class RecordingStarter:
@@ -86,9 +103,9 @@ def request_for(ledger, clock: F.Clock, instance_id: str, task_id: str = "t1",
 
 
 def service(ledger, clock: F.Clock, *, adapter=None, reader=None, eligibility=None,
-            fault_injector=None, starter=None) -> ReviewService:
+            fault_injector=None, starter=None, ledger_reader=None) -> ReviewService:
     return ReviewService(
         ledger=ledger, adapter=adapter or RecordingAdapter(), reader=reader or StaticRunReader(),
         tenant_id=F.TENANT, clock=clock.datetime, eligibility=eligibility,
-        fault_injector=fault_injector, starter=starter,
+        fault_injector=fault_injector, starter=starter, ledger_reader=ledger_reader,
     )
