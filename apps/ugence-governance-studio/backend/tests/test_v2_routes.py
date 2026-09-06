@@ -235,7 +235,9 @@ def test_simulate_labels_a_permissive_hook():
 # 5 · Publish  /  6 · Observe
 # --------------------------------------------------------------------------- #
 def test_publish_reports_an_unconfigured_console(bare_client):
-    result = _result(bare_client.post("/api/v2/publish/shadow", json={"compiled_package": {}}))
+    # FD-8.2: a valid scenario_id, so the console gap (not the unmapped refusal) answers.
+    result = _result(bare_client.post("/api/v2/publish/shadow",
+                                      json={"compiled_package": {}, "scenario_id": "k8s_rollout_restart_clean"}))
     assert result["available"] is False
     assert result["capability"] == "console_api"
 
