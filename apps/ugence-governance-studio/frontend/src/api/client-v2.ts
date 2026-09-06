@@ -21,6 +21,7 @@ import {
   type PublishShadowBody,
   type DataUseDeclareBody,
   type RegistryRegisterBody,
+  type VendorDeclareBody,
   type ReviewDecisionBody,
   type ReviewStartShadowRunBody,
   type SimulateRunBody,
@@ -61,6 +62,10 @@ export const V2_OPERATIONS = [
   // declarations. Declare is the only write (FD-12.5) and it confers nothing.
   "v2_data_use_declare",
   "v2_data_use_list",
+  // Front-door seam 9 (FD-13.1 SCREEN_5_TYPED_VENDOR_DECLARATIONS): typed vendor
+  // declarations. Declare is the only write (FD-13.4) and it confers nothing.
+  "v2_vendor_declare",
+  "v2_vendor_list",
 ] as const;
 
 async function v2Request<T>(pathAndQuery: string, init?: RequestInit): Promise<T> {
@@ -247,4 +252,21 @@ export const declareDataUse = (body: DataUseDeclareBody) =>
 export const listDataUseDeclarations = (asOf = "") => {
   const query = asOf ? `?as_of=${enc(asOf)}` : "";
   return gap("/api/v2/data-use/declarations" + query);
+};
+
+// -- 10 · Vendor dependencies (front-door seam 9, FD-13) --------------------
+/**
+ * Record one typed vendor-dependency declaration for this deployment's tenant. The
+ * tenant and the derived declaration id are never sent from here; `declared_by` is
+ * recorded as presented and unproven; `vendor_ref` is an opaque reference and there is
+ * no field that could carry an address, endpoint or credential. The risk posture is
+ * recorded uninterpreted (FD-13.4) and `policy_ref` recorded and never resolved.
+ */
+export const declareVendorDependency = (body: VendorDeclareBody) =>
+  gap("/api/v2/vendor/declarations", postJson(body));
+
+/** The vendor declarations in force for this deployment's tenant at `asOf` (or now). */
+export const listVendorDeclarations = (asOf = "") => {
+  const query = asOf ? `?as_of=${enc(asOf)}` : "";
+  return gap("/api/v2/vendor/declarations" + query);
 };

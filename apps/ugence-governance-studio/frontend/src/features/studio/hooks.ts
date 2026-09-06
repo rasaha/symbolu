@@ -13,6 +13,7 @@ import type {
   PolicyPackBody,
   PublishShadowBody,
   DataUseDeclareBody,
+  VendorDeclareBody,
   RegistryRegisterBody,
   ReviewDecisionBody,
   ReviewStartShadowRunBody,
@@ -126,5 +127,16 @@ export const useDataUseDeclarations = (asOf = "") =>
   useQuery({
     queryKey: ["v2", "data-use", "declarations", asOf],
     queryFn: () => v2.listDataUseDeclarations(asOf),
+    retry: RETRY,
+  });
+
+// Front-door seam 9 (FD-13): typed vendor declarations. Declare is the only write.
+export const useDeclareVendorDependency = () =>
+  useMutation({ mutationFn: (b: VendorDeclareBody) => v2.declareVendorDependency(b) });
+
+export const useVendorDeclarations = (asOf = "") =>
+  useQuery({
+    queryKey: ["v2", "vendor", "declarations", asOf],
+    queryFn: () => v2.listVendorDeclarations(asOf),
     retry: RETRY,
   });

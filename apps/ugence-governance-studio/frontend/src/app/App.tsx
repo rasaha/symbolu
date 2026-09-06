@@ -20,6 +20,7 @@ import {
   AuthorityScreen,
   ConstitutionScreen,
   DataUseScreen,
+  VendorScreen,
   ObserveScreen,
   PolicyScreen,
   PublishScreen,
@@ -61,6 +62,8 @@ export function App() {
             <Route path="registration" element={<RegistrationScreen />} />
             {/* Front-door seam 8 (FD-12): typed data-use declarations; declare is the only write. */}
             <Route path="data-use" element={<DataUseScreen />} />
+            {/* Front-door seam 9 (FD-13): typed vendor declarations; declare is the only write. */}
+            <Route path="vendor" element={<VendorScreen />} />
             <Route path="constitution" element={<ConstitutionScreen />} />
             <Route
               path="policy"
