@@ -55,7 +55,9 @@ def _build_backend(config: DeploymentConfig):
     deployment's name and version as ``registered_by`` (seam 5, FD-9); and when a
     data-use declarations path is configured, the tenant-bound declarations file the
     Data use screen declares into, with this deployment's name and version as the
-    recording composition (seam 8, FD-12). No decision
+    recording composition (seam 8, FD-12); and when a vendor declarations path is
+    configured, the tenant-bound file the Vendor screen declares into on the same
+    terms (seam 9, FD-13). No decision
     store, governance hook (FD-7.3: the runtime's fail-closed default stays; FD-7.5:
     nothing permissive is ever handed) or console URL: those screens report their
     gaps rather than a stand-in.
@@ -110,6 +112,14 @@ def _build_backend(config: DeploymentConfig):
             config.data_use_declarations_path, tenant_id=config.tenant_id,
             production_mode=config.is_production)
         recorded_by = RECORDED_BY
+    vendor_declarations = None
+    if config.vendor_declarations_path:
+        from .vendor import VENDOR_RECORDED_BY, open_vendor_declarations
+
+        vendor_declarations = open_vendor_declarations(
+            config.vendor_declarations_path, tenant_id=config.tenant_id,
+            production_mode=config.is_production)
+        recorded_by = recorded_by or VENDOR_RECORDED_BY
     studio = build_studio_context(
         activation_root=activation_root,
         policy_registry=policy_registry,
@@ -120,6 +130,7 @@ def _build_backend(config: DeploymentConfig):
         registered_by=registered_by,
         data_use_declarations=data_use_declarations,
         recorded_by=recorded_by,
+        vendor_declarations=vendor_declarations,
     )
     from .simulation import refuse_permissive_hook
 

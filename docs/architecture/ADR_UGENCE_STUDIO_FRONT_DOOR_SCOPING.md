@@ -221,9 +221,27 @@ ruled; it did not close the row. `vendor-dependency` is the same shape again ins
 row 5 and, in FD-12.1's own words, "its own later seam under FD-1" — audited as seam 9
 in §14. (An earlier revision of this paragraph said the front door was at its ceiling
 with no further studio-alone seam remaining. That overstated FD-12.1 and is corrected
-here.) The console remains a packaging body of work, a durable Decision Authority
-store a package decision, and the mirror coordinates, Langflow fixture and enterprise
-issuer owner inputs.
+here.) **Seam 9 shipped** (`governance-studio-deployment` 0.10.0, FD-13, with
+`vendor-dependency` 0.2.0): the same durable-home posture again —
+`SqliteVendorDeclarations`, tenant-bound, append-only, `declare` its only write, the
+record digest re-verified on read and no clock — with the studio backend's
+`VendorDeclarationService` taking typed intake only and the v2 contract amended a
+fifth time (v2-A5, `v2_vendor_declare` and `v2_vendor_list`). What FD-13.4 required is
+what the seam is careful about: the risk posture is recorded verbatim and matched by
+exact text, ordered, compared, ranked and scored nowhere, and no vendor approval,
+onboarding status, tier or certification is expressible at the seam or displayed
+beside it, because no package in this repository computes one; `policy_ref` is
+recorded and never resolved; `vendor_ref` is opaque and no field could carry an
+address, endpoint, credential, contract term or price. The P3E profile adds one
+configuration value, `UGENCE_STUDIO_VENDOR_DECLARATIONS_PATH`, requiring
+`UGENCE_STUDIO_TENANT_ID`, one package in the image and one startup-integrity check;
+§14.4 is tests in the package, the studio backend, the frontend and the profile; and
+the composition record supersedes the seam-8 one (`composition-record.seam-8.json`,
+unchanged). **With seam 9 the front door under FD-1 is at its ceiling**, as FD-13.1
+ruled: no studio-alone seam remains. Row 5's third element, egress restrictions, has a
+ratified ADR and no package and stays a gap; the console remains a packaging body of
+work, a durable Decision Authority store a package decision, and the mirror
+coordinates, Langflow fixture and enterprise issuer owner inputs.
 
 The shape every seam follows: the CR-2 shape (one configuration value, one freeze-test amendment, its own failure tests and
 maturity statement, one PR), preserving `REFERENCE_GRADE_SHADOW_ONLY`, the frozen

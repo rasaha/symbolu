@@ -1,11 +1,11 @@
-"""Front-door seam 8 (ADR_UGENCE_STUDIO_FRONT_DOOR_SCOPING.md FD-1, FD-3, FD-4, FD-12).
+"""Front-door seam 9 (ADR_UGENCE_STUDIO_FRONT_DOOR_SCOPING.md FD-1, FD-3, FD-4, FD-13).
 
-The P3E profile hands the Data use screen a tenant-bound sqlite declarations file under
-the runtime volume. The failure matrix of ADR §13.4 as tests, row by row: the unset gap,
+The P3E profile hands the Vendor screen a tenant-bound sqlite declarations file under
+the runtime volume. The failure matrix of ADR §14.4 as tests, row by row: the unset gap,
 the missing tenant, blank and malformed input, a caller-supplied tenant, an inadmissible
-supersession, the cross-tenant refusal and the foreign file, the absent data, the absent
-mutating route, restart, and the absent egress restriction. The contract-byte amendment
-is recorded and the composition record supersedes the seam-7 one.
+supersession, the cross-tenant refusal and the foreign file, the vendor that cannot be
+reached, the absent mutating route, restart, and the posture nothing ranks. The
+contract-byte amendment is recorded and the composition record supersedes the seam-8 one.
 """
 from __future__ import annotations
 
@@ -17,13 +17,13 @@ import os
 import pytest
 from starlette.testclient import TestClient
 
-from ugence_data_use_admission import CrossTenantRefused, SqliteDataUseDeclarations
+from ugence_vendor_dependency import CrossTenantRefused, SqliteVendorDeclarations
 
 from governance_studio_deployment import DEPLOYMENT_NAME, DEPLOYMENT_VERSION, app as deployment_app
 from governance_studio_deployment.access_control import FailureTracker
 from governance_studio_deployment.app import build_app
 from governance_studio_deployment.config import DeploymentConfig, DeploymentConfigError
-from governance_studio_deployment.declarations import RECORDED_BY, open_data_use_declarations
+from governance_studio_deployment.vendor import VENDOR_RECORDED_BY, open_vendor_declarations
 from governance_studio_deployment.startup_integrity import IntegrityInputs, run_startup_integrity
 
 from conftest import basic_auth
@@ -33,8 +33,8 @@ HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 REPO = os.path.dirname(os.path.dirname(HERE))
 TENANT = "tenant-1"
 OTHER = "tenant-2"
-D = "d" * 64
-ROUTE = "/api/v2/data-use/declarations"
+D = "f" * 64
+ROUTE = "/api/v2/vendor/declarations"
 
 
 def _headers(**extra) -> dict:
@@ -74,9 +74,9 @@ def _declaration(**over):
                             "context_digest": D, "system_id": "hiring-screener",
                             "system_version": "1.0.0", "configuration_id": "cfg-1",
                             "configuration_digest": D},
-                "data_ref": "dataset://applicants/2026",
-                "classification_label": "candidate-personal-data",
-                "purpose_label": "shortlisting",
+                "vendor_ref": "vendor://acme-llm",
+                "risk_posture_label": "elevated",
+                "policy_ref": "policy://vendor-standard/v3",
                 "validity": {"issued_at": "2026-09-01T00:00:00+00:00",
                              "expires_at": "2027-09-01T00:00:00+00:00"},
                 "declared_by": "directory://people/declarer-1"}
@@ -93,17 +93,17 @@ def runtime_dir(tmp_path):
 
 @pytest.fixture()
 def declarations_path(runtime_dir):
-    return str(runtime_dir / "data-use-declarations.sqlite3")
+    return str(runtime_dir / "vendor-declarations.sqlite3")
 
 
 @pytest.fixture()
 def enabled(password_hash, runtime_dir, declarations_path) -> DeploymentConfig:
     return _config(password_hash, runtime_dir, tenant_id=TENANT,
-                   data_use_declarations_path=declarations_path)
+                   vendor_declarations_path=declarations_path)
 
 
 def _count(path: str) -> int:
-    store = SqliteDataUseDeclarations(path, tenant_id=TENANT)
+    store = SqliteVendorDeclarations(path, tenant_id=TENANT)
     try:
         return store.count()
     finally:
@@ -111,70 +111,70 @@ def _count(path: str) -> int:
 
 
 # --------------------------------------------------------------------------- #
-# §13.4 rows 1 and 2 — the typed gap, the path rules, the tenant rule
+# §14.4 rows 1 and 2 — the typed gap, the path rules, the tenant rule
 # --------------------------------------------------------------------------- #
 def test_unset_is_the_typed_gap_on_both_routes(config):
-    assert config.data_use_declarations_configured is False
+    assert config.vendor_declarations_configured is False
     with _client(config) as client:
         for response in (client.post(ROUTE, headers=_headers(), json=_declaration()),
                          client.get(ROUTE, headers=_headers())):
             r = _result(response)
-            assert r["available"] is False and r["capability"] == "data_use_declarations"
+            assert r["available"] is False and r["capability"] == "vendor_declarations"
             assert r["result"] is None
 
 
 def test_missing_tenant_fails_validation_and_startup_integrity_with_the_seam_code(
         password_hash, runtime_dir, declarations_path, tmp_path):
-    cfg = _config(password_hash, runtime_dir, data_use_declarations_path=declarations_path)
+    cfg = _config(password_hash, runtime_dir, vendor_declarations_path=declarations_path)
     errors = cfg.validate()
     assert any("requires UGENCE_STUDIO_TENANT_ID" in e for e in errors)
     result = _integrity(cfg, tmp_path)
-    assert result.ok is False and result.code == "GOVERNANCE_STUDIO_P3E_DATA_USE_SEAM_FAILED"
+    assert result.ok is False and result.code == "GOVERNANCE_STUDIO_P3E_VENDOR_SEAM_FAILED"
     good = _config(password_hash, runtime_dir, tenant_id=TENANT,
-                   data_use_declarations_path=declarations_path)
+                   vendor_declarations_path=declarations_path)
     assert good.validate() == []
     report = _integrity(good, tmp_path).report
-    assert report["data_use_declarations"] == "configured" and report["system_registry"] == "unset"
+    assert report["vendor_declarations"] == "configured" and report["system_registry"] == "unset"
 
 
 @pytest.mark.parametrize("path", [":memory:", "file::memory:?cache=shared", "relative.sqlite3",
-                                  "/elsewhere/d.sqlite3"])
+                                  "/elsewhere/v.sqlite3"])
 def test_a_path_outside_the_volume_or_in_memory_is_refused(password_hash, runtime_dir, path):
-    cfg = _config(password_hash, runtime_dir, tenant_id=TENANT, data_use_declarations_path=path)
-    assert any("UGENCE_STUDIO_DATA_USE_DECLARATIONS_PATH" in e for e in cfg.validate())
+    cfg = _config(password_hash, runtime_dir, tenant_id=TENANT, vendor_declarations_path=path)
+    assert any("UGENCE_STUDIO_VENDOR_DECLARATIONS_PATH" in e for e in cfg.validate())
 
 
 def test_an_unwritable_directory_fails_startup_integrity_before_bind(password_hash, runtime_dir,
                                                                      tmp_path):
     cfg = _config(password_hash, runtime_dir, tenant_id=TENANT,
-                  data_use_declarations_path=str(runtime_dir / "missing" / "d.sqlite3"))
+                  vendor_declarations_path=str(runtime_dir / "missing" / "v.sqlite3"))
     assert cfg.validate() == []
     result = _integrity(cfg, tmp_path)
-    assert result.ok is False and result.checks["data_use_declarations_writable"] is False
-    assert result.code == "GOVERNANCE_STUDIO_P3E_DATA_USE_SEAM_FAILED"
+    assert result.ok is False and result.checks["vendor_declarations_writable"] is False
+    assert result.code == "GOVERNANCE_STUDIO_P3E_VENDOR_SEAM_FAILED"
 
 
 # --------------------------------------------------------------------------- #
-# §13.4 rows 3, 4, 5 and 7 — the write, its refusals, and what never crosses
+# §14.4 rows 3, 4, 5 and 7 — the write, its refusals, and what never crosses
 # --------------------------------------------------------------------------- #
 def test_declare_records_with_the_deployment_as_recorder_and_the_declarer_unproven(
         enabled, declarations_path):
     with _client(enabled) as client:
         r = _result(client.post(ROUTE, headers=_headers(), json=_declaration()))
     assert r["declared"] is True and r["tenant_id"] == TENANT
-    assert r["recorded_by"] == RECORDED_BY == f"{DEPLOYMENT_NAME}/{DEPLOYMENT_VERSION}"
+    assert r["recorded_by"] == VENDOR_RECORDED_BY == f"{DEPLOYMENT_NAME}/{DEPLOYMENT_VERSION}"
     assert r["declared_by_status"] == "PRESENTED_UNPROVEN" and r["confers"].startswith("nothing")
-    assert r["store_kind"] == "SqliteDataUseDeclarations"
+    assert r["store_kind"] == "SqliteVendorDeclarations"
     assert r["record"]["declaration"]["declared_by"] == "directory://people/declarer-1"
     assert _count(declarations_path) == 1
 
 
 @pytest.mark.parametrize("over,code", [
-    ({"data_ref": ""}, "declaration_refused"),
-    ({"purpose_label": " "}, "declaration_refused"),
-    ({"classification_label": ""}, "declaration_refused"),
-    ({"validity": {"issued_at": "2026-09-01T00:00:00"}}, "declaration_refused"),
-    ({"supersedes": "dud_" + "0" * 32}, "supersession_refused"),
+    ({"vendor_ref": ""}, "vendor_declaration_refused"),
+    ({"risk_posture_label": " "}, "vendor_declaration_refused"),
+    ({"policy_ref": ""}, "vendor_declaration_refused"),
+    ({"validity": {"issued_at": "2026-09-01T00:00:00"}}, "vendor_declaration_refused"),
+    ({"supersedes": "vdd_" + "0" * 32}, "supersession_refused"),
 ])
 def test_blank_malformed_input_and_an_inadmissible_supersession_are_typed_refusals(
         enabled, declarations_path, over, code):
@@ -193,7 +193,7 @@ def test_a_caller_supplied_tenant_or_id_is_a_contract_refusal_and_no_field_carri
 
 
 # --------------------------------------------------------------------------- #
-# §13.4 rows 6 and 9 — the tenant boundary and restart
+# §14.4 rows 6 and 9 — the tenant boundary and restart
 # --------------------------------------------------------------------------- #
 def test_a_cross_tenant_read_is_refused_and_a_foreign_file_is_refused_before_bind(
         password_hash, runtime_dir, declarations_path, enabled):
@@ -203,7 +203,7 @@ def test_a_cross_tenant_read_is_refused_and_a_foreign_file_is_refused_before_bin
                                     params={"as_of": "2026-10-01T00:00:00+00:00"}))
         assert listed["tenant_id"] == TENANT and listed["count"] == 1
         assert all(rec["binding"]["tenant_id"] == TENANT for rec in listed["result"])
-    store = open_data_use_declarations(declarations_path, tenant_id=TENANT, production_mode=False)
+    store = open_vendor_declarations(declarations_path, tenant_id=TENANT, production_mode=False)
     try:
         with pytest.raises(CrossTenantRefused):
             store.declarations_for_tenant(
@@ -211,7 +211,7 @@ def test_a_cross_tenant_read_is_refused_and_a_foreign_file_is_refused_before_bin
     finally:
         store.close()
     foreign = _config(password_hash, runtime_dir, tenant_id=OTHER,
-                      data_use_declarations_path=declarations_path)
+                      vendor_declarations_path=declarations_path)
     with pytest.raises(DeploymentConfigError, match="another tenant"):
         deployment_app._build_backend(foreign)
 
@@ -225,11 +225,11 @@ def test_records_survive_a_restart_of_the_profile(enabled):
         assert [rec["declaration"]["declaration_id"] for rec in listed["result"]] == [
             first["declaration_id"]]
         dup = _result(client.post(ROUTE, headers=_headers(), json=_declaration()))
-        assert dup["refused"] is True and dup["code"] == "declaration_duplicate"
+        assert dup["refused"] is True and dup["code"] == "vendor_declaration_duplicate"
 
 
 # --------------------------------------------------------------------------- #
-# §13.4 rows 8 and 10 — declare is the only write; no egress restriction exists
+# §14.4 — declare is the only write; nothing ranks the posture
 # --------------------------------------------------------------------------- #
 def test_no_mutating_or_admitting_route_exists_on_the_composed_profile(enabled):
     with _client(enabled) as client:
@@ -242,30 +242,50 @@ def test_no_mutating_or_admitting_route_exists_on_the_composed_profile(enabled):
             assert response.status_code in (404, 405), (method, path, response.status_code)
 
 
-def test_the_answers_state_that_no_egress_restriction_is_expressible(enabled):
+def test_the_answers_state_that_the_posture_is_recorded_and_never_assessed(enabled):
     with _client(enabled) as client:
         declared = _result(client.post(ROUTE, headers=_headers(), json=_declaration()))
         listed = _result(client.get(ROUTE, headers=_headers()))
     for answer in (declared, listed):
-        assert answer["egress_restrictions"].startswith("not expressible")
-        assert "restricts nothing" in answer["egress_restrictions"]
+        assert answer["risk_posture"].startswith("uninterpreted")
+        assert "ranked and scored nowhere" in answer["risk_posture"]
+        assert "no package computes one" in answer["risk_posture"]
+
+
+def test_no_vendor_approval_or_onboarding_status_is_expressible_through_the_profile(enabled):
+    """§14.4: the posture is the only judgement-shaped field, and it is a record. A
+    caller cannot smuggle a verdict in beside it."""
+
+    with _client(enabled) as client:
+        for extra in ({"approved": True}, {"onboarding_status": "complete"},
+                      {"risk_score": 7}, {"tier": "critical"},
+                      {"certification": "iso-27001"},
+                      {"vendor_endpoint": "https://acme.example"},
+                      {"contract_terms": "net-30"}):
+            response = client.post(ROUTE, headers=_headers(), json=_declaration(**extra))
+            assert response.status_code == 422, (extra, response.text)
+        declared = _result(client.post(ROUTE, headers=_headers(), json=_declaration()))
+    text = json.dumps(declared["record"])
+    for forbidden in ("approved", "onboarding", "risk_score", "tier", "certification",
+                      "endpoint", "credential", "pricing"):
+        assert forbidden not in text, forbidden
 
 
 # --------------------------------------------------------------------------- #
 # the approved profile: the configuration value, the freeze, the composition record
 # --------------------------------------------------------------------------- #
-def test_the_approved_runtime_config_records_the_seam_and_its_amendment():
+def test_the_approved_runtime_config_records_the_seam_and_the_fifth_amendment():
     cfg = json.load(open(os.path.join(HERE, "approved-runtime-config.json"), encoding="utf-8"))
-    # the deployment version moves with each seam; this seam's own record is pinned below
-    assert cfg["deployment_version"] == DEPLOYMENT_VERSION
-    added = cfg["configuration_added"]["UGENCE_STUDIO_DATA_USE_DECLARATIONS_PATH"]
-    assert "requires UGENCE_STUDIO_TENANT_ID" in added and "front-door seam 8" in added
-    seam = cfg["data_use_declarations"]
-    assert "FD-12.5 DECLARE_IS_THE_ONLY_WRITE" in seam["ruling"]
+    assert cfg["deployment_version"] == DEPLOYMENT_VERSION == "0.10.0"
+    added = cfg["configuration_added"]["UGENCE_STUDIO_VENDOR_DECLARATIONS_PATH"]
+    assert "requires UGENCE_STUDIO_TENANT_ID" in added and "front-door seam 9" in added
+    seam = cfg["vendor_declarations"]
+    assert "FD-13.4 RISK_POSTURE_UNINTERPRETED" in seam["ruling"]
     assert "no server, no driver, no DSN" in seam["store"]
-    assert seam["egress_restrictions"].startswith("not expressible")
-    assert "packages/integration/data-use-admission" in cfg["first_party_packages_in_image"]
-    assert any(h.startswith("data_use_declarations (seam 8")
+    assert seam["risk_posture"].startswith("uninterpreted")
+    assert "no package computes one" in seam["risk_posture"]
+    assert "packages/integration/vendor-dependency" in cfg["first_party_packages_in_image"]
+    assert any(h.startswith("vendor_declarations (seam 9")
                for h in cfg["front_door_seams"]["handed_to_build_studio_context"])
     # the frozen v2 bytes and the amendment chain
     contract = os.path.join(REPO, "apps", "ugence-governance-studio", "contracts")
@@ -273,12 +293,10 @@ def test_the_approved_runtime_config_records_the_seam_and_its_amendment():
         committed = hashlib.sha256(fh.read()).hexdigest()
     assert cfg["frozen"]["openapi_v2_sha256"] == committed
     record = json.load(open(os.path.join(contract, "openapi_v2.amendments.json"), encoding="utf-8"))
-    # this seam's own amendment, found by id: a later seam appends after it and the
-    # freeze then carries that one's sha instead
-    (mine,) = [a for a in record["amendments"] if a["amendment_id"] == "v2-A4"]
-    assert set(mine["operations_added"]) == {"v2_data_use_declare", "v2_data_use_list"}
-    assert cfg["frozen"]["openapi_v2_sha256"] == committed == record["amendments"][-1]["sha256"]
-    assert "v2-A4 (FD-12.4" in cfg["frozen"]["openapi_v2_amendment"]
+    latest = record["amendments"][-1]
+    assert latest["amendment_id"] == "v2-A5" and latest["sha256"] == committed
+    assert set(latest["operations_added"]) == {"v2_vendor_declare", "v2_vendor_list"}
+    assert cfg["frozen"]["openapi_v2_amendment"].startswith("v2-A5 (FD-13.3")
     # FD-1: the ratified v1 bytes and the shadow-only ceiling are untouched
     assert cfg["frozen"]["api_contract"] == "governance_studio.api.v1"
     assert cfg["frozen"]["openapi_sha256"] == \
