@@ -116,7 +116,19 @@ expected answers held by someone other than the executor) and the whole of §5. 
 assessment in every suite in this repository is synthetic. Nothing in this plan changes
 Appendix B.5's zero pilot-validated capabilities.
 
-## 7 — The ruling needed to run it `[R]`
+## 7 — RM-4 given, and what stopped the run `[V]`
+
+RM-4 was given on 2026-09-07 with the owner's five values. The sample was preregistered
+before any case text was used: `experiments/workflow_fit_study/first_admission_study/
+preregistration_rm4.json` commits the seed, the 100 selected indexes and their digest,
+the benchmark content digest and the case-list digest; no case text or target is
+committed. Execution did not start, for three reasons recorded there: the environment
+holds no model credential or SDK; the ratified Phase 4C process requires a CALIBRATION
+run whose verdict custody needs a D5-approved adapter, and none exists; and the ruling
+names no calibration step, so the confirmatory manifest's provenance cannot be
+preregistered yet. None of the three endings in §4 has occurred `[G]`.
+
+## 7a — The ruling as originally needed `[R]`
 
 **RM-4 — run the first admission study**: authorize one execution of §4 over BBH
 logical-deduction-7 for the re-issued `study.hard` class, with the owner supplying, in
