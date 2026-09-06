@@ -117,7 +117,7 @@ unfed. **An honest first export is verifiable for integrity and unverifiable for
 authenticity, and must say so in the artifact itself** rather than leaving a consumer
 to infer it.
 
-## 7 — Proposed ruling CE-1 to CE-5 (five decisions, recommended option first)
+## 7 — Proposed ruling CE-1 to CE-5 (five decisions, recommended option first; ruled in §10)
 
 | # | Decision | Options |
 |---|---|---|
@@ -146,3 +146,28 @@ allowlist `[V]`. Whatever CE-2 and CE-5 rule, the export seam requires either th
 allowlist entry or a relay through a package that already has one. That is an
 implementation consequence of the ruling, not a sixth decision — but it is the reason
 this seam is not a small change, and it is named here so the estimate is honest.
+
+## 10 — Ruling CE-1 to CE-5 (owner, 2026-09-06)
+
+The recommended option is ratified in every case.
+
+| # | Ruling |
+|---|---|
+| **CE-1** | **`RECEIVED_CLEARANCE_ONLY`.** The exported artifact carries a `ClearanceReceiptBody` the deployment **received**, never one the studio minted and never a compile result. Exporting is not clearing: compilation establishes what was compiled, a clearance establishes whether a consequential action may proceed now and until when. The two semantics stay separate in the artifact and in the routes that produce them. |
+| **CE-2** | **`NEW_CONTRACTS_ONLY_PACKAGE`.** `packages/integration/clearance-export`, a record type plus a pure verifier function, on the shape seams 5, 8 and 9 proved: no store, no adapter, no connector, no clock, no network. `action-clearance` is not extended — its receipt body is the evaluator partition's projection and gains no serialization or transport concern. |
+| **CE-3** | **`ONE_MEMBER_NOW`.** `identity_assurance` is an enum with the single member `PRESENTED_UNPROVEN`, on the `SystemBindingAuthenticityStatus` precedent (`system_identity.py:217`, whose docstring records that an authority-verified member is deliberately absent until a ratified verifier exists). `VERIFIED` is admitted only by a further ruling, once an enterprise issuer exists (AI-E). No consumer is offered a value nothing in this repository can set, and no producer is tempted to set one. |
+| **CE-4** | **`INTEGRITY_ONLY_AND_SAY_SO`.** The artifact is content-addressed and self-describing about what a consumer can and cannot check. It carries an explicit `authenticity: UNSIGNED` and names the unfed prerequisite: a `TrustAnchorResolverPort` exists in `trusted-evidence-authority` and no signing key or trust root is configured. Content-addressing establishes integrity, never authenticity, and the artifact must not imply otherwise. |
+| **CE-5** | **`EXPORT_IS_A_READ`.** One v2 read operation returns the artifact for a clearance the deployment already holds. No write, no new egress destination, no credential, and no route that mints, signs, approves or clears. |
+
+**What the ruling authorizes.** Documentation only. No package is created, no route
+exists, no contract byte moves and no code changes. The export seam activates by its
+own implementation prompt, after the console packaging implementation CP-1 to CP-5
+authorized. `LIVE` stays absent from `SIMULATION_MODES`, `ENFORCEMENT_ENABLED` stays
+`False` in all eleven packages that declare it, no credential is introduced, and the
+frozen v1 and v2 contracts, every `FROM` line and ratified digest, SD-2, FD-8.1,
+FD-8.4 and `REFERENCE_GRADE_SHADOW_ONLY` are preserved.
+
+**The prerequisite this ruling does not remove.** §9 stands: `ugence_action_clearance`
+is not on the studio's SD-1 allowlist, so the implementation step must add that entry
+or relay through a package that has one. That is the reason this seam is larger than
+seams 8 and 9, and the ruling does not make it smaller.
