@@ -1,0 +1,51 @@
+# The Procurement policy-pack builder for the PA/PWC-X1 composition root.
+#
+# Ruling CR-2 places the mapping from a resolved policy artifact to a structured
+# policy_pack.v2 pack with the FAMILY, not with the composition root and not with
+# the compiler. This distribution is that mapping for Procurement, and nothing else.
+#
+# Placement (ruling CR-2a, recorded in the X1 composition-root design):
+#
+#   * not in the compiler — a family-to-pack mapping is not compiler behaviour, and
+#     the compiler must stay a leaf with no Policy Authority coupling;
+#   * not in packages/products/procurement — that would make the product depend on
+#     the compiler, inverting the direction the product boundary keeps;
+#   * here, in the integration layer, which is where components that depend on two
+#     capabilities already live.
+#
+# One first-party dependency, reached through its public api module only. No Policy
+# Authority dependency: the builder consumes a typed artifact, not a resolution.
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ugence-procurement-policy-compilation"
+dynamic = ["version"]
+description = "The Procurement family's deterministic mapping from a resolved policy artifact to a policy_pack.v2 pack, for the PA/PWC-X1 composition root."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "Proprietary" }
+authors = [{ name = "Rakesh Mohan" }]
+keywords = ["ugence", "procurement", "policy", "compiler", "governance"]
+dependencies = ["ugence-policy-workflow-compiler>=0.2.0"]
+
+[project.optional-dependencies]
+# The composition root is a TEST dependency only: the end-to-end chain exercises it,
+# but the builder must never depend on it at runtime — a family mapping that needed
+# the orchestrator would have the direction backwards.
+test = ["pytest>=7.0", "ugence-authoritative-policy-compilation>=0.1.0"]
+dev = ["pytest>=7.0", "build>=1.0"]
+
+[tool.setuptools.dynamic]
+version = { attr = "ugence_procurement_policy_compilation.version.__version__" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["ugence_procurement_policy_compilation*"]
+
+[tool.setuptools.package-data]
+ugence_procurement_policy_compilation = ["py.typed"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

@@ -1,0 +1,62 @@
+name: procurement-policy-compilation-ci
+
+# Scoped CI for the Procurement policy-pack builder (ruling CR-2): the mapping, the
+# strict parser, determinism, and the end-to-end chain from a hand-assembled
+# resolution through the composition root to a compiled release. Offline; no keys.
+
+on:
+  pull_request:
+    paths:
+      - "packages/integration/procurement-policy-compilation/**"
+      - ".github/workflows/procurement-policy-compilation-ci.yml"
+  push:
+    branches:
+      - "claude/setup-symbolu-monorepo-**"
+      - "claude/procurement-pack-builder-**"
+    paths:
+      - "packages/integration/procurement-policy-compilation/**"
+      - ".github/workflows/procurement-policy-compilation-ci.yml"
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  PKG: packages/integration/procurement-policy-compilation
+  ROOT: packages/integration/authoritative-policy-compilation
+
+jobs:
+  package-suite:
+    name: Builder, parser, determinism and the end-to-end chain
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.11" }
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest pydantic
+          pip install -e packages/governance-contracts --no-deps
+          pip install -e packages/uvi-policy-contracts --no-deps
+          pip install -e packages/policy-authority --no-deps
+          pip install -e packages/tooling/policy-workflow-compiler --no-deps
+      - env:
+          PYTHONPATH: "${{ env.PKG }}/src:${{ env.PKG }}/tests:${{ env.ROOT }}/src"
+        run: python -m pytest ${{ env.PKG }}/tests -q
+
+  boundary:
+    name: The builder depends on no authority package at runtime
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          python - <<'PY'
+          import pathlib, re, sys
+          src = pathlib.Path("packages/integration/procurement-policy-compilation/src")
+          banned = re.compile(r"ugence_policy_authority|ugence_authoritative_policy_compilation")
+          bad = [str(m) for m in src.rglob("*.py") if banned.search(m.read_text())]
+          if bad:
+              print("the builder reached an authority package:", bad); sys.exit(1)
+          print("boundary intact")
+          PY

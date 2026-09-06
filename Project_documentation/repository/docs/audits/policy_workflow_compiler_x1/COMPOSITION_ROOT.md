@@ -79,6 +79,32 @@ Each family supplies its own builder, tested against its own artifacts.
 compile anything until a family provides a builder. That is a real dependency, not a
 missing feature.
 
+### CR-2a — where a family builder lives
+
+**In the integration layer, as its own distribution.** The first one,
+`packages/integration/procurement-policy-compilation`, is delivered.
+
+Three placements were possible and two are wrong:
+
+- **Not in the compiler.** A family-to-pack mapping is not compiler behaviour, and
+  the compiler must stay a leaf — it gains no Policy Authority coupling, directly or
+  by association.
+- **Not in `packages/products/procurement`.** That would make the product depend on
+  the compiler, inverting the direction the product boundary keeps.
+- **In the integration layer**, where components depending on two capabilities
+  already live.
+
+`[V]` The builder depends only on the compiler's public `api`. It does **not**
+depend on Policy Authority — it maps a typed artifact, not a resolution — and it
+does not depend on the composition root either; the root is a *test* dependency
+only, for the end-to-end chain. A family mapping that needed the orchestrator would
+have the direction backwards.
+
+The parser is strict and total: an unknown key is refused rather than ignored,
+because the projection is the policy's own statement of itself and quietly dropping
+part of it would compile a workflow that governs less than the policy says. Where the
+artifact is silent, the pack is silent.
+
 ## The service flow
 
 `AuthoritativePolicyCompilationService.draft_from_coordinate(...)`, taking trust
