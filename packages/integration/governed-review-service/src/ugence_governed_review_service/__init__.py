@@ -10,7 +10,9 @@ GAS-7 step HR-C under owner rulings HR-1 to HR-5
 eligibility adapter and the DBOS adapter; since 0.2.0 it also appends each completed
 round trip's receipt linkage to the control-plane audit ledger (HE-1) and exposes it on
 run detail (HE-5); since 0.3.0 it defines the service-local ``ApproverIdentityPort``
-and the proof shape (AI-A, rulings ID-2 to ID-5), with a fixture adapter only.
+and the proof shape (AI-A, rulings ID-2 to ID-5), with a fixture adapter only; since
+0.5.0 it exposes the sixth route, a relayed start of the composition root's own shadow
+run through a ``ShadowRunStarter`` the root supplies (front-door ruling FD-10).
 Maturity ``REFERENCE_GRADE_SHADOW_ONLY``: the approver on every decision is a presented
 reference, not a proven identity, because no real identity adapter exists (AI-C).
 """
@@ -18,7 +20,7 @@ reference, not a proven identity, because no real identity adapter exists (AI-C)
 from __future__ import annotations
 
 from .errors import ClockDisciplineError, ContractViolation, GovernedReviewServiceError
-from .http import ROUTES, build_app, decision_view, queue_entry_view
+from .http import ROUTES, START_BODY_KEYS, build_app, decision_view, queue_entry_view, start_view
 from .identity import (
     IDENTITY_PROOF_LABELS,
     IDP_AUTHENTICATED,
@@ -48,6 +50,8 @@ from .linkage import (
 )
 from .reader import DbosRunReader, RunReader, StaticRunReader
 from .service import (
+    CORRELATION_ID_PATTERN,
+    SHADOW_RUN_MODE,
     SIGNAL_NAME,
     TENANT_SOURCE_CONFIGURED,
     TENANT_SOURCE_PROOF,
@@ -55,6 +59,9 @@ from .service import (
     DecisionResult,
     QueueEntry,
     ReviewService,
+    ShadowRunStarter,
+    StartOutcome,
+    StartResult,
     instance_of,
 )
 from .version import (
@@ -68,6 +75,8 @@ from .version import (
 __all__ = [
     "__version__", "CONTRACT_VERSION", "MATURITY", "IDENTITY_PROOF", "ENFORCEMENT_ENABLED",
     "ReviewService", "DecisionOutcome", "DecisionResult", "QueueEntry", "SIGNAL_NAME",
+    "ShadowRunStarter", "StartOutcome", "StartResult", "SHADOW_RUN_MODE", "CORRELATION_ID_PATTERN",
+    "START_BODY_KEYS", "start_view",
     "TENANT_SOURCE_PROOF", "TENANT_SOURCE_CONFIGURED", "instance_of",
     "ApproverIdentityPort", "ApproverIdentity", "VerifiedClaims", "ActorKind", "TenantMode",
     "RecordedAssurance", "StaticApproverIdentityAdapter", "IdentityUnavailable",
