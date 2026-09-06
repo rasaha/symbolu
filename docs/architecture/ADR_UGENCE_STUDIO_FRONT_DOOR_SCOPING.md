@@ -280,3 +280,99 @@ matrix rows 1 to 6 as tests, with rows 4 and 6 closing their `[G]`. FD-3, FD-4, 
 and v2 contracts, every FROM line and ratified digest, and every credential, egress
 and LIVE prohibition are preserved. `CONSOLE_BASE_URL` and the governed hook remain
 unruled future seams; neither is implemented.
+
+## 9 — Seam 4 audit: `CONSOLE_BASE_URL` (2026-09-06)
+
+**The question.** Can the P3E profile hand the Publish and Observe screens the
+console without a second deployment unit or a new egress? **No.** The console is a
+root-level prototype service with no authentication, no TLS, no packaging and a
+per-instance in-memory audit store, and the Publish screen's request body does not
+match the console's request model, so today the compiled-package path can only ever
+render a typed gap. Seam 4 is not enterable as it stands; what would have to be true
+first is a set of owner decisions (§9.4). Everything below is documentation; no seam
+is activated.
+
+### 9.1 What exists today `[V]`
+
+- **The seam.** `build_studio_context(console_base_url=)` builds one `ConsoleClient`
+  shared by `PublishService` and `ObserveService` (`app_v2.py:79-95`). The client is
+  standard-library `urllib`, sends no credential and no header beyond content type,
+  and refuses any route outside a closed set of four before opening a connection:
+  `POST /v1/governed-loop/shadow`, `POST /v1/governed-loop/scenario/{id}`,
+  `GET /v1/audit`, `GET /v1/audit/{id}` (`clients/console.py:35-45, 95-101`);
+  `/v1/actions/authorize`, `/v1/actions/clear` and a hypothetical `/live` are refused
+  (`test_v2_operation_ids.py:140-152`, SD-2). Unset, both screens answer the typed
+  gap `console_api`; unreachable and empty are distinguished (`studio_v2.py:522-570`).
+- **The console.** `ugence_console_api/` at the repository root, version 0.1.0: a
+  FastAPI prototype served by `uvicorn` on plain HTTP, `0.0.0.0:8090`, with no
+  authentication and CORS `*` (`app.py:42-56`, `__main__.py`). Its `AuditStore` is an
+  in-memory dict, documented as "deliberately a prototype seam" (`audit.py:8-11`).
+  Its capabilities import root legacy modules (`governance_providers`, `tap_provider`,
+  `actiongate_provider`, `ugence_context_minimization`) under fail-safe imports. It is
+  not a distribution under `packages/`, has no Dockerfile, no compose file and no
+  deployment unit, and is in neither the P3E nor the worker image. It makes no
+  outbound call of its own.
+- **The shadow loop.** `orchestrator.run` evaluates four stages (context minimization,
+  truth assurance, ActionGate, operational clearance), records the chain and returns
+  `would_execute`; it invokes no provider and changes nothing in any system in any mode
+  (`orchestrator.py:55-140`). `mode` is client-supplied (`SHADOW`, `RECOMMENDATION`,
+  `ENFORCEMENT`) and the shadow route does not pin it (`app.py:111-116`,
+  `models.py:21-24`).
+- **The Publish payload does not fit.** `PublishService.shadow` posts the
+  `CompiledReleasePackage` dict verbatim as the body of `/v1/governed-loop/shadow`
+  (`studio_v2.py:533-538`); the console's `GovernedLoopRequest` requires `assertion`,
+  `action` and `operational_signals` (`models.py:125-131`), none of which a compiled
+  package carries (`compiler/release.py:64-82`). The console answers 422, which the
+  client surfaces as `ConsoleUnavailable`, so the screen shows the gap `console_api`.
+  Only the `scenario_id` path, a frozen console scenario, can succeed. No test in the
+  studio exercises a real console `[V]` (the only console tests use an unreachable
+  host). A compiled package is not a governed-loop request; mapping one onto the
+  other would be the studio authoring governance content (v1 audit rule, FD-4).
+- **The profile.** P3E permits exactly one outbound destination, the review relay,
+  and the freeze test asserts exactly one (`test_container_artifacts.py:94-104`); the
+  review URL must be https and carry no credential. The console has no TLS.
+- **The alternative record.** The worker holds the control-plane-root `AuditLedger`,
+  durable and hash-chained, but it exposes `append`, `entry_count` and `verify_chain`
+  only, no read by reference (`ledger.py:147-238`), and the review service's five
+  routes carry linkages on run detail, not a ledger read (`http.py:33-39`). An
+  observe-only screen over that ledger (§3 row 10, §4) needs a read port first.
+
+### 9.2 Failure matrix (what the code does today)
+
+| # | Case | Result |
+|---|---|---|
+| 1 | URL unset | typed gap `console_api` on both screens `[V]` |
+| 2 | console unreachable | typed gap naming the failure, never an empty list `[V]` |
+| 3 | route outside the four | refused before a socket opens `[V]` |
+| 4 | compiled package to the shadow loop | console 422 → typed gap; the path cannot succeed `[V]`, a defect `[G]` |
+| 5 | unknown `scenario_id` / unknown correlation id | console 404 → typed gap `[V]`; not distinguished from unreachable `[G]` |
+| 6 | `mode` other than shadow inside the payload | not pinned by the studio; the console answers in that mode `[G]` |
+| 7 | cross-tenant | the console has no tenant dimension; audit ids are global to one instance `[V]`, `[G]` |
+| 8 | credential | none sent, none held, none required by the console: anyone on the segment may post `[V]` |
+| 9 | LIVE | no such console route; the allowlist refuses any `live` path `[V]` |
+| 10 | restart | the audit store is lost with the console process `[V]` |
+
+### 9.3 Prohibitions any admissible shape must preserve `[V]`
+
+No credential enters the studio; a second egress exists only by ruling, https only,
+to a private listener; SD-2 stands (the four routes, nothing that authorizes, clears
+or executes); shadow only, with the mode pinned by the studio and never by the
+payload; LIVE absent; `ENFORCEMENT_ENABLED` False; the frozen v1 and v2 bytes,
+every FROM line and ratified digest untouched; `REFERENCE_GRADE_SHADOW_ONLY`.
+
+### 9.4 Proposed ruling FD-8 `[R]` (five decisions, recommended option first)
+
+| # | Decision | Options |
+|---|---|---|
+| **FD-8.1** | Is seam 4 entered now? | **`ABSENT_UNTIL_PREREQUISITES`**: `console_base_url` stays absent by ruling; the Publish and Observe screens keep their typed gap; the prerequisites are FD-8.2 to FD-8.4 and each is its own step. `ENTER_WITH_CONSOLE_AS_THIRD_UNIT`: package and deploy the prototype behind TLS and a gate now. |
+| **FD-8.2** | The Publish request | **`PIN_SHADOW_AND_REFUSE_UNMAPPED`**: the studio pins `mode=shadow` in every governed-loop body it sends, and the compiled-package path answers a typed refusal (`publish_payload_unmapped`) rather than relaying a body the console cannot accept; only `scenario_id` reaches the console. `TYPED_ADAPTER`: a ruled, versioned mapping from `CompiledReleasePackage` to `GovernedLoopRequest` (none exists; it would author governance content). |
+| **FD-8.3** | The console as a deployable | **`PACKAGE_FIRST`**: before any deployment unit, `ugence_console_api` becomes a distribution under `packages/` with a private TLS listener, an access gate, a pinned scenario set and a stated maturity; the root prototype is never deployed as-is. `DEPLOY_PROTOTYPE`. |
+| **FD-8.4** | Egress | **`SECOND_DESTINATION_BY_RULING`**: when seam 4 is entered, the profile's permitted egress moves from one destination to two, https only, the four routes named, the freeze test amended; until then none. |
+| **FD-8.5** | Observe's record | **`LABELLED_SINGLE_INSTANCE`**: whenever a console is handed, the Observe screen states it shows one console instance's in-memory audit, lost on restart. `OBSERVE_OVER_WORKER_LEDGER`: a later seam of its own, needing a ledger read port in control-plane-root and a sixth relayed route (amends CR-2). |
+
+Under the recommended options no seam is activated by this ruling; the next
+implementation step is FD-8.2 alone (a studio-backend correction with tests, no
+deployment change), and seam 4 waits on FD-8.3.
+
+The ruling authorizes documentation only. No implementation prompt is issued while
+FD-8.1 to FD-8.5 remain open.
