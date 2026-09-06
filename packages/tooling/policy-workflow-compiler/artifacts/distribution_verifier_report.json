@@ -13,7 +13,7 @@
       "passed": true,
       "problems": [],
       "has_py_typed": true,
-      "member_count": 70
+      "member_count": 73
     },
     "clean_install": {
       "passed": true
@@ -91,7 +91,7 @@
     },
     "public_api_frozen": {
       "passed": true,
-      "count": 123
+      "count": 124
     },
     "offline_no_credentials": {
       "passed": true
@@ -99,18 +99,18 @@
     "installed_test_suite": {
       "passed": true,
       "tail": [
-        "38 passed in 0.39s"
+        "38 passed in 0.34s"
       ]
     }
   },
   "hashes": {
     "wheel": {
       "name": "ugence_policy_workflow_compiler-0.2.0-py3-none-any.whl",
-      "sha256": "06259cb48d43226f2138512c298ed778aaada6fc600c1000e37ecd6ce8cae80a"
+      "sha256": "778b3734d9da831e981e06f7462d859ecd2b152c26c4836a8d41c9f490ea4fe9"
     },
     "sdist": {
       "name": "ugence_policy_workflow_compiler-0.2.0.tar.gz",
-      "sha256": "57d5b7f3bc61994cebe6c9f7d9ab6e00aa0f5217b20382fe335de7c6e34d5a88"
+      "sha256": "d45ea0759728104ca9ca9d3f3de062c07fc7d5b9256e9149d186d568dd3d5017"
     }
   },
   "reproducibility": {

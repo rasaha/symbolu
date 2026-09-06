@@ -46,11 +46,13 @@ worded but "equivalent" descriptions as the same (see `STRUCTURAL_DIFF.md`).
 
 ## Equivalence limited to Procurement
 
-The reference-equivalence harness validates the compiler's interpretation against
-exactly one live product, `ugence-procurement`, across five modeled dimensions
-(see `PROCUREMENT_REFERENCE_VALIDATION.md`). No equivalence claim is made for any
-other domain or product. A second domain (AI Hiring) is owner-ratified as a
-precondition for `pilot_validated` (D3), and is not built.
+The reference-equivalence harnesses validate the compiler's interpretation against
+two live products: `ugence-procurement` across five modelled dimensions (see
+`PROCUREMENT_REFERENCE_VALIDATION.md`) and `ugence-ai-hiring` across five different
+ones chosen for its advisory-versus-binding shape (see
+`AI_HIRING_REFERENCE_VALIDATION.md`). Both report `EQUIVALENT`. No equivalence claim
+is made for any other domain or product, and equivalence is measured against a
+reference product's modelled behaviour — it certifies neither product.
 
 ## Maturity gates not yet met
 

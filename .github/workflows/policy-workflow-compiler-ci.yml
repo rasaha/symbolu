@@ -86,7 +86,8 @@ jobs:
                     "pilot_validated", "production_certified"):
               assert i[k] is False, (k, i[k])
           for k in ("structured_policy_pack_implemented", "deterministic_compilation_verified",
-                    "procurement_reference_equivalence_verified"):
+                    "procurement_reference_equivalence_verified",
+                    "ai_hiring_reference_equivalence_verified"):
               assert i[k] is True, (k, i[k])
           print("maturity honest")
           PY
@@ -115,6 +116,37 @@ jobs:
           res = run_equivalence()
           assert res.classification == EQUIVALENT, res.to_dict()
           print("procurement equivalence:", res.classification)
+          for d in res.dimensions:
+              print(" ", d.dimension, d.classification, d.checked)
+          PY
+
+  ai-hiring-equivalence:
+    name: AI Hiring reference equivalence (D3 second domain)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest pydantic
+          pip install -e packages/capabilities/decision-authority --no-deps
+          pip install -e packages/governance-contracts --no-deps
+          pip install -e packages/governance-provider-framework --no-deps
+          pip install -e packages/products/ai-hiring --no-deps
+      - name: Compiler AI Hiring interpretation == reference behaviour
+        env:
+          PYTHONPATH: packages/tooling/policy-workflow-compiler/src
+        run: |
+          python -m pytest packages/tooling/policy-workflow-compiler/tests/test_ai_hiring_equivalence.py -q
+          python - <<'PY'
+          from ugence_policy_workflow_compiler.reference.ai_hiring_equivalence import (
+              run_equivalence, EQUIVALENT)
+          res = run_equivalence()
+          assert res.classification == EQUIVALENT, res.to_dict()
+          print("ai hiring equivalence:", res.classification)
           for d in res.dimensions:
               print(" ", d.dimension, d.classification, d.checked)
           PY

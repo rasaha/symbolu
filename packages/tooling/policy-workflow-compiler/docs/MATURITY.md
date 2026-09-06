@@ -11,6 +11,7 @@ as importantly — what is not.
 | `structured_policy_pack_implemented` | `true` | The structured policy-pack object model exists and is usable. |
 | `deterministic_compilation_verified` | `true` | Deterministic compilation is verified: identical approved input + compiler version yields an identical logical digest. |
 | `procurement_reference_equivalence_verified` | `true` | The compiler's Procurement interpretation is verified `EQUIVALENT` to the live product across the modeled dimensions. |
+| `ai_hiring_reference_equivalence_verified` | `true` | The compiler's AI Hiring interpretation is verified `EQUIVALENT` to the live product across five dimensions chosen for its advisory-versus-binding shape (decision D3's second domain). See `AI_HIRING_REFERENCE_VALIDATION.md`. |
 | `document_extraction_implemented` | `false` | No document ingestion / extraction. |
 | `runtime_deployment_implemented` | `false` | No runtime execution or deployment. |
 | `pilot_validated` | `false` | Not validated in a pilot. |
@@ -40,6 +41,7 @@ as importantly — what is not.
 | `policy_pack_v2_supported` | `true` | The additive `policy_pack.v2` schema is accepted: source-declared data classification, permission intent, required tools and typed contract versions are carried in a sidecar collection, together with the authoritative-source coordinate. `policy_pack.v1` packs and digests are byte-identical under it. See `POLICY_PACK_SCHEMA.md`. |
 | `source_declared_semantics_implemented` | `true` | `workflow_ir.v2` enrichment reads declared data classification, permission intent, required tools and contract versions into node semantics, each with `EXPLICIT` per-value provenance. An undeclared value stays unresolved and is never defaulted. |
 | `authoritative_source_carriage_implemented` | `true` | A `policy_pack.v2` pack may carry the exact Policy Authority issuance it was compiled from; the reference is digest-bound, structurally validated and denormalized into the release manifest. See `AUTHORITATIVE_SOURCE.md`. |
+| `binding_conformance_validation_implemented` | `true` | Every capability binding `workflow_ir.v2` emits is validated against the capability registry — unknown capabilities, advisory-on-authoritative misuse, optionality conflicts, contract-target disagreement and unresolved required bindings all refuse. Validation only: no provider is imported and nothing is emitted. See `BINDING_CONFORMANCE.md`. |
 
 ## Explicit non-goals
 
@@ -89,7 +91,7 @@ Summarized, with what this build already satisfies:
 | Pilot evidence | Status |
 | --- | --- |
 | Procurement reference equivalence | satisfied — `EQUIVALENT`, 5 dimensions, 28 checks |
-| AI Hiring reference equivalence | not built |
+| AI Hiring reference equivalence | satisfied — `EQUIVALENT`, 5 dimensions, 22 checks |
 | One named real pilot policy corpus | not done |
 | Source policy passed legitimate human approval | mechanism exists; not demonstrated on a pilot corpus |
 | Exact source artifact and digest retained | requires the PA/PWC-X1 source-linkage coordinate |

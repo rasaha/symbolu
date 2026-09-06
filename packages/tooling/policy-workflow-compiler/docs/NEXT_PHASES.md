@@ -37,7 +37,8 @@ capabilities keep decision, approval, authorization, and execution authority.
    **Delivered** — see "Already delivered" below and `DIFF_DRIVEN_REVIEW.md`.
 2. **`policy_pack.v2`** — source-declarable semantic fields (next).
 3. **PA/PWC-X1 carriage and validation** — activated by v2.
-4. **PWC-P3B** — declarative capability/contract binding **validation**.
+4. ~~**PWC-P3B** — declarative capability/contract binding **validation**.~~
+   **Delivered** — see `BINDING_CONFORMANCE.md`.
 5. **PWC-P3C** — deterministic offline simulation.
 6. **AI Hiring reference equivalence.**
 7. A real pilot against a named policy corpus, then `pilot_validated`.
