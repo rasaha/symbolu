@@ -40,7 +40,7 @@ each belongs to a different component.
 
 | Gate | Value | Meaning |
 | --- | --- | --- |
-| `awc_adapter_updated` | `false` | The compiler does not update or own the Agent Workforce Composer adapter. The value is unchanged, but its cross-package meaning is now contested — see "`awc_adapter_updated` is pending owner ratification" below. |
+| `awc_adapter_updated` | `false` | The compiler does not update or own the Agent Workforce Composer adapter. **Deprecated by ratification** — held `false` for compatibility, removed at the next compatibility-controlled version. See "`awc_adapter_updated` is deprecated" below. |
 | `agent_eligibility_implemented` | `false` | Eligibility is an AWC concern, not a compiler concern. |
 | `agent_ranking_implemented` | `false` | Ranking is an AWC concern. |
 | `team_composition_implemented` | `false` | Team composition is an AWC concern. |
@@ -48,7 +48,7 @@ each belongs to a different component.
 | `action_authorization_implemented` | `false` | Authorization is held by canonical capabilities, never the compiler. |
 | `enterprise_policy_evaluation_implemented` | `false` | Enterprise deployment-policy overlay evaluation stays outside the portable compiled workflow. |
 
-### `awc_adapter_updated` is pending owner ratification
+### `awc_adapter_updated` is deprecated
 
 This gate was introduced when the AWC adapter had not been updated, and at that
 time it read the same way under either interpretation. That is no longer true.
@@ -56,22 +56,48 @@ AWC P2.1 is delivered: the Agent Workforce Composer does consume `workflow_ir.v2
 and its own `compiler_v2_adapter_implemented` gate reports so. This package's gate
 still reports `false`.
 
-The two readings now diverge:
+The owner has ruled (decision D5): the gate is **deprecated as a cross-package
+maturity flag and must not be used to represent platform state**. It remains
+`false` through the current 0.2.x line for compatibility, and is removed only at
+the next compatibility-controlled version — removing a key from
+`version_info().to_dict()` is a contract change, and spending a version bump to
+delete one field is not warranted while this deprecation carries the same
+information.
 
-- **Scoped to this package** (the reading the code comment takes): "the compiler
-  does not update the AWC adapter" — still true, and true permanently, since the
-  adapter is AWC-owned.
-- **Read as platform state** by a downstream consumer gating its own usage: "the
-  AWC adapter has not been updated for v2" — **false as of AWC P2.1**.
+Until then: read the gate as scoped to this package's own responsibility, which
+remains true and permanent — the adapter is AWC-owned and this package will never
+update it. For AWC's actual state, read the AWC gates.
 
-Which reading is authoritative — and therefore whether the gate should be
-retired, renamed to something unambiguous, or kept with its scope documented — is
-an **owner decision that has not been ratified**. Pending that decision the value
-is deliberately left unchanged: this maintenance pass documents the ambiguity
-rather than resolving it, because flipping or removing a published maturity
-boolean is a contract change, not a doc fix. Consumers reading this gate today
-should treat it as scoped to this package and consult the AWC gates for AWC
-state.
+## Earning the pilot and production gates
+
+`pilot_validated` and `production_certified` are `false` and are earned by recorded
+evidence, never flipped administratively. The owner-ratified evidence list (decision
+D4) is in
+`Project_documentation/repository/docs/audits/policy_workflow_compiler_ratification/RATIFICATION.md`.
+Summarized, with what this build already satisfies:
+
+| Pilot evidence | Status |
+| --- | --- |
+| Procurement reference equivalence | satisfied — `EQUIVALENT`, 5 dimensions, 28 checks |
+| AI Hiring reference equivalence | not built |
+| One named real pilot policy corpus | not done |
+| Source policy passed legitimate human approval | mechanism exists; not demonstrated on a pilot corpus |
+| Exact source artifact and digest retained | requires the PA/PWC-X1 source-linkage coordinate |
+| Deterministic compilation | satisfied — verified, with pinned v1 and v2 digests |
+| Diff-driven re-review demonstrated | signal exists; the governed workflow is PWC-P3A |
+| Approval bound to the exact changed pack | implemented; demonstration outstanding |
+| No critical unresolved semantics in the corpus | assessable only against a real corpus |
+| Assurance package generated | satisfied — fail-closed coverage invariant |
+| Replay evidence retained | satisfied — `deterministic_replay_verified` |
+
+`production_certified` additionally requires distribution integrity, upgrade
+compatibility, a security review, an authority-boundary review, demonstrated
+fail-closed behavior, release provenance, operational recovery and replay, supported
+contract migration, and a formal certification record. Each still needs its own
+acceptance threshold defined; the ratification names the set, not the thresholds.
+
+The package remains tooling throughout. It does not need to become a runtime package
+to earn either gate.
 
 ## Version and contract identity
 
@@ -103,5 +129,7 @@ else: enrichment describes, it does not bind, decide, authorize or execute.
 
 Honesty about maturity is itself a product feature: the false gates are surfaced
 by `version_info()` so downstream consumers can gate their own usage. See
-`KNOWN_LIMITATIONS.md` for the scope boundaries these gates reflect and
-`NEXT_PHASES.md` for what later phases would address.
+`KNOWN_LIMITATIONS.md` for the scope boundaries these gates reflect,
+`NEXT_PHASES.md` for the owner-ratified phases that would address them, and
+`Project_documentation/repository/docs/audits/policy_workflow_compiler_ratification/RATIFICATION.md`
+for the binding decision record behind both.
