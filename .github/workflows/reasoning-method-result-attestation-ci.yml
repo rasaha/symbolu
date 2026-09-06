@@ -23,6 +23,10 @@ on:
       - "packages/trusted-evidence-authority/**"
       - "packages/capabilities/reasoning-method-governance/**"
       - "packages/capabilities/reasoning-method-advisor/**"
+      - "experiments/workflow_fit_study/signed_admission.py"
+      - "experiments/workflow_fit_study/publish_research_trust_anchor_set.py"
+      - "experiments/workflow_fit_study/research_trust_anchor_set_v1.json"
+      - "tests/experiments/workflow_fit_study/test_signed_admission.py"
       - "docs/architecture/ADR_UGENCE_SIGNED_COMPARISON_RESULT_SCOPING.md"
       - ".github/workflows/reasoning-method-result-attestation-ci.yml"
   push:
@@ -98,6 +102,7 @@ jobs:
             -e packages/capabilities/reasoning-method-advisor \
             -e packages/capabilities/readiness-comparison \
             -e packages/capabilities/agentic-proposer \
+            -e packages/capabilities/workflow-fit-pilot \
             -e packages/integration/risk-authority-effect-attestation \
             -e packages/integration/reasoning-method-result-attestation
       - name: Trusted Evidence Authority (lent one comparison-result capability; third consumer named)
@@ -108,6 +113,10 @@ jobs:
         run: python -m pytest packages/capabilities/reasoning-method-governance -q -p no:cacheprovider
       - name: Reasoning-method advisor (consumes the typed VerifiedResultSignature)
         run: python -m pytest packages/capabilities/reasoning-method-advisor -q -p no:cacheprovider
+      - name: Signed workflow-fit admission composition root (SR-0 to SR-5; research evidence only)
+        run: |
+          python experiments/workflow_fit_study/publish_research_trust_anchor_set.py --check
+          python -m pytest tests/experiments/workflow_fit_study/test_signed_admission.py -q -p no:cacheprovider
       - name: Repository import boundaries and package-CI coverage
         run: |
           python -m pytest tests/boundaries/test_package_import_boundaries.py tests/boundaries/test_package_ci_coverage.py -q -p no:cacheprovider

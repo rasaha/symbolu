@@ -169,3 +169,32 @@ The contracts-only slice of §3 is built; nothing in §4 has changed.
   trust-anchor set naming the engine, no harness composition root. The first
   admission study still runs unsigned, and `require_signature=True` refuses every
   result today.
+
+## 7 — The first signed study: rulings SR-0 to SR-5, ratified and implemented `[V]`
+
+Given 2026-09-06 after the composition-root design; enacted in
+`experiments/workflow_fit_study/signed_admission.py`.
+
+| # | Ruling | Enacted by |
+|---|---|---|
+| SR-0 | **ENGINE_KEY_CUSTODY = RESEARCH_REFERENCE_ONLY.** The experiment operator controls both keys; they are two distinct seeds; no production key, KMS, HSM, vault, cloud signer, Credential Broker or network signer. | `RESEARCH_ENGINE_SEED` in `signed_admission.py`; `RESEARCH_PUBLICATION_SEED` only in `publish_research_trust_anchor_set.py`; a test asserts the seeds, public keys, coordinates and capabilities differ |
+| SR-1 | **COMPOSITION_ROOT = HARNESS_MODULE.** | `experiments/workflow_fit_study/signed_admission.py`; no signer or attestation composition in the pilot package, no new package. Step 1 runs the pilot through `run_phase_4c_pilot`, not the bare `run_pilot` the ruling named: the pilot's ratified tripwire (revision 20/26, `test_the_phase_4c_study_never_calls_the_ungated_runner`) forbids the ungated runner from this harness, and the gate delegates to `run_pilot` after F3 and F4. A signed study therefore needs a v2 manifest with a committed role `[V]` |
+| SR-2 | **SIGNER_BACKEND = REFERENCE_SIGNER_ONLY.** | `research_engine_signer()` is `ReferenceEd25519ComparisonResultSigner`; signing never sets `production_mode`; the verifier does, so the reference *resolver* is refused |
+| SR-3 | **SNAPSHOT_CUSTODY = COMMITTED_RESEARCH_SNAPSHOT.** | `research_trust_anchor_set_v1.json`, rendered deterministically by the publisher script and checked equal by a test; `research_resolver()` takes the document bytes, the pinned root (public key by literal), `max_snapshot_age=30 days` and `last_accepted_set_version=0` explicitly |
+| SR-4 | **ENGINE_KEY_ID = VERSIONED_RESEARCH_KEY.** | `workflow-fit-research-engine/1`; anchor window 2026-09-01 to 2026-09-26 (25 days), inside the set's 30-day window; a later generation issues new seeds under `/2` |
+| SR-5 | **EVIDENCE_STATUS = RESEARCH_ONLY.** | `SignedAdmissionEnvelope.evidence_classification` is fixed at `RESEARCH_EVIDENCE / CRYPTOGRAPHICALLY_VERIFIABLE_SELF_ATTESTATION` and unconstructible otherwise; `render_envelope` opens and closes with it and carries the same-party note |
+
+**What the run proves `[V]`** (`tests/experiments/workflow_fit_study/test_signed_admission.py`,
+one genuine pilot run through the boundary process): a valid signed admission citing
+the verification record; refusals for a mutated result, a different key under the
+engine's identity, an unpublished key id, a snapshot without the engine anchor, a
+forged or engine-signed publication signature, a stale set, a rollback, an expired
+engine key, a signer for another identity, and an unsigned result under
+`require_signature=True`; the two keys are distinct; and the classification survives
+success. The receipt digest is the attestation package's `verification_result_digest`
+with the repository's one `sha256:` prefix translation; no second representation.
+
+**What it does not change `[V]`.** §4 stands except that a research trust chain now
+exists: no production key, no production trust anchor, no revocation, no
+independent-verifier role. The study's admission is research evidence.
+

@@ -100,12 +100,14 @@ three attestations below it. Trust therefore rests on four things upstream:
 |---|---|---|---|
 | A1 | Assessments come from an engine-produced `ReadinessComparisonResult`, not a hand | result contract refuses a foreign assessor `[V]` (`governance/contracts/ports.py:170`); the admission cites the **result digest** and refuses any engine but the comparison engine `[V]` | closed structurally; a forged result still needs A3 |
 | A2 | Execution records attested by a party that is neither producer nor requester, and resolved as an authority | engine refuses self-attestation `[V]` (`engine.py:244`); resolution is requester-asserted `[V]` (`engine.py:218`) | `[G]` no authority resolution exists |
-| A3 | Attestations verified by the Trusted Evidence Authority; the result itself signed by the engine under a lent TEA capability | `VerificationEnvelope` must reference an attestation of the same record `[V]` (`engine.py:251-258`); TEV-2 verifier exists; result signing **built as contracts** under `ADR_UGENCE_SIGNED_COMPARISON_RESULT_SCOPING.md` SCR-1 `[V]` (`reasoning-method-result-attestation`; `admit(..., require_signature=True)`) | closed structurally; `[G]` no engine key, no signing composition root, so the study runs unsigned |
+| A3 | Attestations verified by the Trusted Evidence Authority; the result itself signed by the engine under a lent TEA capability | `VerificationEnvelope` must reference an attestation of the same record `[V]` (`engine.py:251-258`); TEV-2 verifier exists; result signing **built as contracts** under `ADR_UGENCE_SIGNED_COMPARISON_RESULT_SCOPING.md` SCR-1 `[V]` (`reasoning-method-result-attestation`; `admit(..., require_signature=True)`) | closed for the research posture: `experiments/workflow_fit_study/signed_admission.py` signs with a research reference key and verifies through a committed research snapshot (SR-0 to SR-5, ADR §7); `[G]` no production key, so a signed admission is cryptographically verifiable self-attestation, not independent verification |
 | A4 | Quality claims independent of self-reported quality; scorer custody independent of the executor | engine refuses claims naming `self_reported_quality` `[V]` (`engine.py:306`); scorer custody keyed by case digest `[V]` | `[G]` evaluator independence is `DECLARED_UNVERIFIED` |
 
-Until A3 is closed, an admission is only as trustworthy as whoever ran the engine.
-That is acceptable for the first study, whose purpose is to exercise the path, and not
-acceptable for any product claim `[R]`.
+Under SR-5 a signed admission is exactly as trustworthy as whoever ran the engine,
+because the operator, requester and signer are the same party: the signature makes
+that attribution cryptographically verifiable and nothing more. That is acceptable for
+the first study, whose purpose is to exercise the path, and not acceptable for any
+product claim `[R]`.
 
 ## 6 — What today lacks a real dataset `[G]`
 
