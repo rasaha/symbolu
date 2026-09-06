@@ -20,8 +20,10 @@ requires-python = ">=3.10"
 license = { text = "Proprietary" }
 authors = [{ name = "Rakesh Mohan" }]
 keywords = ["governance", "roi", "value", "authorization", "actiongate", "ugence"]
-# A leaf: no third-party runtime dependency and no other Ugence package.
-dependencies = []
+# One Ugence dependency, no third-party runtime dependency: the shared contract
+# layer that defines MetricObservation (GV-DEP). 0.2.0 is the release that first
+# defines it. The leaf posture ended deliberately; see the observation-ingress ADR.
+dependencies = ["ugence-governance-contracts>=0.2.0"]
 
 [project.optional-dependencies]
 test = ["pytest>=7.0"]

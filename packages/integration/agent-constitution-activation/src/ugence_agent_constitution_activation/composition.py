@@ -50,7 +50,7 @@ from ugence_policy_authority.api import (
 from .errors import ActivationCompositionError, ActivationRequestError
 from .preflight import PreflightReport, preflight_issuance
 from .receipts import ActivationReceipt, IssuanceReceipt
-from .reference_map import populate_reference_map
+from .reference_map import DerivedReferenceMap, populate_reference_map
 
 __all__ = ["ActivationRoot", "build_activation_root"]
 
@@ -202,13 +202,27 @@ class ActivationRoot:
     def constitution_resolver(
         self,
         *,
-        reference_map: Mapping[Tuple[str, str], PolicyCoordinate],
+        reference_map: DerivedReferenceMap,
     ) -> PolicyAuthorityConstitutionResolver:
-        """A resolver over this root's trust and the given mapping.
+        """A resolver over this root's trust and a **derived** mapping.
+
+        ``ACC-COUPLING``: the orchestrated path accepts only the exact
+        :class:`DerivedReferenceMap` :meth:`activate_constitution` returns, so a
+        map that was typed rather than derived from an issued record cannot
+        reach a resolver through this root. The conformance package's own
+        ``build_constitution_resolver`` still accepts any mapping — that
+        injected-trust posture is ratified and untouched — so a deployment that
+        composes conformance directly still carries the original disclosed gap.
 
         Delegates to ``build_constitution_resolver``, so the `ACC-S1-Q3` guard
         runs again on this path too.
         """
+
+        if type(reference_map) is not DerivedReferenceMap:
+            raise ActivationRequestError(
+                "reference_map must be exactly the DerivedReferenceMap returned "
+                "by activate_constitution; this root composes derived maps only"
+            )
 
         return build_constitution_resolver(
             reference_map=reference_map,

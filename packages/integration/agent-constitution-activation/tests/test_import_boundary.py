@@ -43,6 +43,10 @@ ALL_TEXT = sorted(
 #: The only top-level modules the shipped source may import.
 ALLOWED_IMPORT_ROOTS = {
     "__future__",
+    # ``collections.abc.Mapping``, which ``DerivedReferenceMap`` implements so a
+    # derived map is accepted everywhere a mapping is (ACC-COUPLING). A pure
+    # stdlib ABC: no clock, socket, store or plugin host arrives with it.
+    "collections",
     "dataclasses",
     "datetime",
     "types",

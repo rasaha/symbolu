@@ -27,9 +27,25 @@ already exist, never by defining new authority.
   `governed_role_refs`, mapped to the record's exact coordinate under its own
   tenant component. Free-form entries are unrepresentable; a conflicting
   existing entry fails closed; every derived entry is listed on the
-  `ActivationReceipt`.
+  `ActivationReceipt`. The result is a `DerivedReferenceMap`, a read-only
+  mapping only that function can construct, carrying `derived_from` — the
+  coordinates of the records every entry came from.
 * **Resolver assembly** (`ActivationRoot.constitution_resolver`): a
-  fail-closed conformance resolver over this root's trust and a given mapping.
+  fail-closed conformance resolver over this root's trust and a **derived**
+  mapping. `ACC-COUPLING`: this path accepts only the exact
+  `DerivedReferenceMap` `activate_constitution` returns, so a map that was
+  typed rather than derived from an issued record cannot reach a resolver
+  through this root. Disclosed plainly: the conformance package's own
+  `build_constitution_resolver` still accepts any mapping — that injected-trust
+  posture is ratified and untouched — so a deployment composing conformance
+  directly still carries the original disclosed gap. The gap is narrowed to one
+  path, not eliminated.
+
+Removing an entry and re-pointing one stay outside this package (`ACC-RECONFIG`):
+an operator needing a different map derives one from the records it intends.
+Omission is how an entry leaves, and a conflicting entry still fails closed
+rather than being overwritten — a removal seam taking effect on a live
+deployment would be lifecycle authority under another name (`OD-C4=A`).
 
 ## What it is not
 

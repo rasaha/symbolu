@@ -7,11 +7,12 @@ engines/phases and are not exposed here.
 
 from __future__ import annotations
 
-from typing import Optional
+from typing import Iterable, Optional
 
 from ..domain.case import AgentValueCase
 from ..domain.events import GovernedValueEvent
 from ..observability.events import EventBus
+from ..services.ingress import admit_observations
 from ..services.scorer import GovernedValueResult, score_case
 
 __all__ = ["GovernedValueApplication"]
@@ -25,8 +26,19 @@ class GovernedValueApplication:
     def events(self) -> EventBus:
         return self._events
 
-    def score(self, case: AgentValueCase) -> GovernedValueResult:
-        result = score_case(case)
+    def score(
+        self,
+        case: AgentValueCase,
+        observations: Iterable[object] = (),
+    ) -> GovernedValueResult:
+        """Score one case, optionally binding typed observations to it.
+
+        Observations are admitted first and refused as a set: a mis-bound one
+        raises before any figure is produced. Admitting them changes no money
+        and no classification — the result is still ``REPORTED``/``UNVERIFIED``.
+        """
+
+        result = score_case(case, observed_metrics=admit_observations(case, observations))
         self._events.publish(
             GovernedValueEvent(
                 event_type="governed_value.scored",

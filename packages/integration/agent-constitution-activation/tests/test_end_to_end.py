@@ -16,6 +16,8 @@ under ``packages/`` outside that capability, and this file must satisfy it.
 
 from __future__ import annotations
 
+from types import MappingProxyType
+
 import pytest
 import s1_specification_mirror as spec
 import ugence_agentic_proposer as ap
@@ -37,6 +39,7 @@ from ugence_agent_constitution_conformance import (
     UnknownConstitutionReferenceError,
     role_facts_conform,
 )
+from ugence_agent_constitution_activation import ActivationRequestError
 from ugence_policy_authority.api import PolicyApprovalError
 
 #: Looked up rather than written. See this module's docstring.
@@ -268,16 +271,34 @@ def test_missing_trust_refuses_resolution_with_a_typed_reason():
     assert excinfo.value.reason is not None
 
 
-def test_missing_mapping_refuses_resolution():
+def test_a_reference_the_derived_map_does_not_carry_refuses_resolution():
+    """A derived map answers for the roles it derived, and for no others."""
+
     world = make_world()
-    world.issue_first_constitution()
-    resolver = world.root.constitution_resolver(reference_map={})
+    _, receipt = world.issue_first_constitution()
+    reference_map, _ = world.root.activate_constitution(
+        coordinate=receipt.coordinate, activated_at=T_ACTIVATE
+    )
+    resolver = world.root.constitution_resolver(reference_map=reference_map)
     with pytest.raises(UnknownConstitutionReferenceError):
         resolver.resolve(
             tenant_id=GLOBAL_TENANT,
-            role_contract_ref=GOVERNED_ROLE_REF,
+            role_contract_ref="role.never.governed.v1",
             as_of=T_RESOLVE,
         )
+
+
+def test_a_hand_built_mapping_never_reaches_a_resolver_through_this_root():
+    """ACC-COUPLING: the orchestrated path composes derived maps only."""
+
+    world = make_world()
+    _, receipt = world.issue_first_constitution()
+    reference_map, _ = world.root.activate_constitution(
+        coordinate=receipt.coordinate, activated_at=T_ACTIVATE
+    )
+    for typed in ({}, dict(reference_map), MappingProxyType(dict(reference_map))):
+        with pytest.raises(ActivationRequestError, match="DerivedReferenceMap"):
+            world.root.constitution_resolver(reference_map=typed)
 
 
 def test_a_revoked_constitution_refuses_resolution_with_a_typed_reason():

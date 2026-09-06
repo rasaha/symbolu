@@ -9,6 +9,7 @@ conflicting or malformed prior map fails closed before anything merges.
 from __future__ import annotations
 
 import dataclasses
+from collections.abc import Mapping
 
 import pytest
 from _activation_fixtures import (
@@ -21,6 +22,7 @@ from _activation_fixtures import (
 )
 from ugence_agent_constitution_activation import (
     ActivationRequestError,
+    DerivedReferenceMap,
     ReferenceMapConflictError,
     ReferenceMapDerivationError,
     populate_reference_map,
@@ -173,3 +175,39 @@ def test_the_derived_map_feeds_the_resolver_without_translation(issued):
     assert dict(resolver.reference_map) == dict(mapping)
     assert type(record.coordinate) is PolicyCoordinate
     assert coordinate_of(policy) == record.coordinate
+
+# --------------------------------------------------------------------------- #
+# ACC-COUPLING: a derived map proves how it was built.
+# --------------------------------------------------------------------------- #
+def test_a_derived_map_cannot_be_constructed_by_hand():
+    """Provenance by construction: a caller who could build one could type the
+    entries it claims to have derived, which is the whole gap this closes."""
+
+    with pytest.raises(ActivationRequestError, match="populate_reference_map"):
+        DerivedReferenceMap(object(), {}, ())
+
+
+def test_a_derived_map_is_a_read_only_mapping_and_names_its_records(issued):
+    world, _, record = issued
+    derived = populate_reference_map(record=record, adapters=world.root._adapters)
+
+    assert isinstance(derived, Mapping)
+    assert dict(derived) == {
+        (record.coordinate.tenant_id, ref): record.coordinate
+        for ref in record.policy.governed_role_refs
+    }
+    assert derived.derived_from == (record.coordinate,)
+    with pytest.raises(TypeError):
+        derived[("t", "r")] = record.coordinate  # type: ignore[index]
+    with pytest.raises(AttributeError):
+        derived._entries = {}  # type: ignore[attr-defined]
+
+
+def test_merging_carries_every_record_the_map_derived_from(issued):
+    world, _, record = issued
+    adapters = world.root._adapters
+    first = populate_reference_map(record=record, adapters=adapters)
+    second = populate_reference_map(record=record, adapters=adapters, existing=first)
+
+    assert dict(second) == dict(first)
+    assert second.derived_from == (record.coordinate, record.coordinate)

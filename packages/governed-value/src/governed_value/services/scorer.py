@@ -44,6 +44,7 @@ from ..domain.enums import (
     Scorability,
 )
 from ..domain.money import Money
+from ..domain.observation import ObservedMetric
 
 __all__ = ["GovernedValueResult", "score_case"]
 
@@ -92,6 +93,12 @@ class GovernedValueResult:
     payback_periods: Optional[Decimal]
     reasons: tuple[str, ...] = field(default_factory=tuple)
     advisories: tuple[str, ...] = field(default_factory=tuple)
+    # -- bound observations (GV-2) — carried, never scored --------------------
+    #: What the ingress admitted, recorded outside every monetary term and
+    #: outside the scorability verdict. Present observations do **not** lift
+    #: ``evidence_status`` or ``authority_status``; see the observation-ingress
+    #: ADR for why a bound observation is still ``REPORTED``.
+    observed_metrics: tuple[ObservedMetric, ...] = field(default_factory=tuple)
 
     @property
     def is_scorable(self) -> bool:
@@ -102,8 +109,16 @@ def _measurement_method(outcome: OutcomeClass) -> MeasurementMethod:
     return OUTCOME_MEASUREMENT[outcome]
 
 
-def score_case(case: AgentValueCase) -> GovernedValueResult:
-    """Score one agent for one reported window. Pure and deterministic."""
+def score_case(
+    case: AgentValueCase,
+    *,
+    observed_metrics: tuple[ObservedMetric, ...] = (),
+) -> GovernedValueResult:
+    """Score one agent for one reported window. Pure and deterministic.
+
+    ``observed_metrics`` is carried onto the result untouched. It is read by no
+    monetary term, guard, reason, advisory or classification below.
+    """
 
     currency = case.currency
     attribution = case.attribution
@@ -214,4 +229,5 @@ def score_case(case: AgentValueCase) -> GovernedValueResult:
         payback_periods=payback,
         reasons=tuple(reasons),
         advisories=tuple(advisories),
+        observed_metrics=tuple(observed_metrics),
     )

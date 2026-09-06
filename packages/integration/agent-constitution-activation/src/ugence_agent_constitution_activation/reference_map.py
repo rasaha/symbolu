@@ -18,13 +18,25 @@ coordinate does not equal its carried artifact's derived coordinate is refused.
 What remains outside this module, deliberately: removing an entry, re-pointing
 an entry, and choosing *which* previously derived entries compose into one
 deployment's map. Those are operator reconfigurations of injected trust, and a
-population call performs none of them — a conflicting entry fails closed.
+population call performs none of them — a conflicting entry fails closed. Under
+``ACC-RECONFIG`` they stay outside the repository: an operator who needs a
+different map derives one from the records it intends, rather than editing a map
+this module produced.
+
+The derived map is returned as a :class:`DerivedReferenceMap`, a read-only
+mapping this module alone can construct (``ACC-COUPLING``). It is what
+``ActivationRoot.constitution_resolver`` requires, so the orchestrated path
+cannot be handed a map that was typed rather than derived. The conformance
+package's own ``build_constitution_resolver`` still accepts any mapping — the
+injected-trust posture there is ratified and untouched — so a deployment that
+composes conformance directly still carries the original disclosed gap.
 """
 
 from __future__ import annotations
 
+from collections.abc import Mapping as _MappingABC
 from types import MappingProxyType
-from typing import Mapping, Optional, Tuple
+from typing import Iterator, Mapping, Optional, Tuple
 
 from ugence_agent_constitution_policy import AgentConstitutionPolicy
 from ugence_policy_authority.api import (
@@ -39,7 +51,59 @@ from .errors import (
     ReferenceMapDerivationError,
 )
 
-__all__ = ["populate_reference_map"]
+__all__ = ["DerivedReferenceMap", "populate_reference_map"]
+
+#: Construction token. A ``DerivedReferenceMap`` proves its own provenance by
+#: being unconstructible outside this module: a caller who could build one could
+#: type the entries it claims to have derived, which is the whole gap this
+#: closes.
+_DERIVED = object()
+
+
+class DerivedReferenceMap(_MappingABC):
+    """A reference map derived from issued records, and never entered by hand.
+
+    A read-only ``Mapping`` of ``(tenant_id, role_contract_ref)`` to
+    ``PolicyCoordinate``, plus the coordinates of the records it derived from.
+    It behaves as a mapping everywhere one is accepted; what it adds is that its
+    existence is evidence of how it was built.
+    """
+
+    __slots__ = ("_entries", "_derived_from")
+
+    def __init__(self, token: object, entries, derived_from) -> None:
+        if token is not _DERIVED:
+            raise ActivationRequestError(
+                "a DerivedReferenceMap is constructed by populate_reference_map "
+                "alone; entries derive from an issued record, never from a "
+                "caller-built mapping"
+            )
+        object.__setattr__(self, "_entries", MappingProxyType(dict(entries)))
+        object.__setattr__(self, "_derived_from", tuple(derived_from))
+
+    def __setattr__(self, name: str, value: object) -> None:
+        raise AttributeError(f"DerivedReferenceMap is immutable; cannot set {name!r}")
+
+    def __delattr__(self, name: str) -> None:
+        raise AttributeError(f"DerivedReferenceMap is immutable; cannot delete {name!r}")
+
+    def __getitem__(self, key):
+        return self._entries[key]
+
+    def __iter__(self) -> Iterator:
+        return iter(self._entries)
+
+    def __len__(self) -> int:
+        return len(self._entries)
+
+    def __repr__(self) -> str:
+        return f"DerivedReferenceMap({dict(self._entries)!r})"
+
+    @property
+    def derived_from(self) -> Tuple[PolicyCoordinate, ...]:
+        """The coordinates of the issued records every entry came from."""
+
+        return self._derived_from
 
 
 def populate_reference_map(
@@ -47,10 +111,11 @@ def populate_reference_map(
     record: IssuedPolicyRecord,
     adapters: AdapterRegistry,
     existing: Optional[Mapping[Tuple[str, str], PolicyCoordinate]] = None,
-) -> Mapping[Tuple[str, str], PolicyCoordinate]:
+) -> DerivedReferenceMap:
     """Derive reference-map entries from one issued record; return the merged map.
 
-    Returns a **new, read-only** mapping: ``existing`` (validated, unchanged)
+    Returns a **new, read-only** :class:`DerivedReferenceMap`: ``existing``
+    (validated, unchanged)
     plus one entry per reference in the record's artifact's
     ``governed_role_refs``. An existing entry already binding one of those keys
     to a *different* coordinate raises ``ReferenceMapConflictError`` and nothing
@@ -99,7 +164,10 @@ def populate_reference_map(
                 "are never overwritten"
             )
         merged[key] = coordinate
-    return MappingProxyType(merged)
+    prior = getattr(existing, "derived_from", ())
+    return DerivedReferenceMap(
+        _DERIVED, merged, tuple(prior) + (record.coordinate,)
+    )
 
 
 def _validated_existing(

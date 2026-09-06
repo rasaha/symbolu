@@ -25,7 +25,9 @@ from ..domain.expected_loss import ExpectedLoss, ExpectedLossItem
 from ..domain.investment import TotalInvestment
 from ..domain.modifiers import DomainProfile, GeographyProfile
 from ..domain.money import Money
+from ..domain.observation import ObservationBindingError, ObservedMetric
 from ..domain.value import ReportedValue
+from ..services.ingress import admit_observations
 from ..services.scorer import GovernedValueResult
 from .facade import GovernedValueApplication
 
@@ -48,7 +50,10 @@ __all__ = [
     "DomainProfile",
     "GeographyProfile",
     "Money",
+    "ObservationBindingError",
+    "ObservedMetric",
     "ReportedValue",
+    "admit_observations",
     "GovernedValueResult",
     "GovernedValueApplication",
 ]
