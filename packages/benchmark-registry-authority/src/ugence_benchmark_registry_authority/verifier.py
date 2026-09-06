@@ -3,12 +3,15 @@
 Status
 ------
 This is the ``0.3.0rc1`` candidate head, engineered under the owner's ruling
-that BR-2C candidate engineering and testing may begin before the D-38
-independent external cryptographic reviewer is individually named or the review
-commissioned. It is a **candidate only**: it conveys no audit, no independent
-review and no production-release claim, and ``0.3.0`` — BR-2C's closure — is
-not taken until that review has been commissioned and completed (D-32(4),
-D-38(i)). No artifact of this distribution may describe this module otherwise.
+that BR-2C candidate engineering and testing may begin before the D-38(i)
+review is completed. It is a **candidate only**: it conveys no audit, no review
+and no production-release claim, and ``0.3.0`` — BR-2C's closure — is not
+taken until two separate preconditions are recorded: the D-38(i) review, by a
+reviewer distinct from the author of the commit under review who may be
+owner-affiliated (D-38 as amended by D-44), and D-32(4)'s external
+cryptographic audit, which is unamended and outstanding. A review under D-38
+as amended is owner-reviewed, never independently reviewed. No artifact of
+this distribution may describe this module otherwise.
 
 What is here, and under which rulings
 --------------------------------------
@@ -453,6 +456,18 @@ class BenchmarkEd25519Verifier:
             raise _Refused(refused)
         anchor = resolution.anchor
         if type(anchor) is not BenchmarkTrustAnchorRecord:
+            raise _Refused(BenchmarkRegistryRefusalReason.INDETERMINATE)
+        # D-44 review finding F-1: the resolution's constructor checks that the
+        # anchor answers the asked triple, but a record substituted into a
+        # genuine resolution after construction bypasses the constructor. The
+        # anchor is re-checked here against the triple this seam asked, so an
+        # approver's record can never be handed to the publisher seam, whatever
+        # the resolution around it claims.
+        if (
+            anchor.role is not role
+            or anchor.identity != identity
+            or anchor.key_id != key_id
+        ):
             raise _Refused(BenchmarkRegistryRefusalReason.INDETERMINATE)
         return anchor
 

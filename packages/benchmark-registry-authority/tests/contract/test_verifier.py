@@ -16,8 +16,9 @@ signatures; role separation across the three namespaces; the directory-failure
 mappings; the exact deny-all default; and that no answer is ever memoized.
 
 **Candidate only.** Passing these proves the engineering the owner authorized;
-it is not, and does not stand in for, the independent external cryptographic
-review D-38 requires before ``0.3.0``.
+it is not, and does not stand in for, the D-38(i) review (a reviewer distinct
+from the commit author, who may be owner-affiliated) or D-32(4)'s separate
+external cryptographic audit, both required before ``0.3.0``.
 """
 
 from __future__ import annotations
@@ -697,6 +698,110 @@ def test_a_failing_directory_refuses_and_never_falls_back(directory, expected):
     assert result.anchor_record_digest is None
 
 
+class _SwapsTheAnchorAfterConstruction:
+    """D-44 review finding F-1: a genuine resolution for the asked triple whose
+    ``anchor`` is replaced, after construction, by a record from another role
+    namespace carrying the same public key. The resolution's own constructor
+    never sees the swap; the seam must re-check the record itself."""
+
+    def __init__(self, replacement: BenchmarkTrustAnchorRecord) -> None:
+        self.replacement = replacement
+
+    def resolve_anchor(self, role, identity, key_id):
+        genuine = BenchmarkTrustAnchorResolution(
+            role=role, identity=identity, key_id=key_id,
+            anchor=publisher_anchor(), refusal_reason=None,
+        )
+        object.__setattr__(genuine, "anchor", self.replacement)
+        return genuine
+
+
+@pytest.mark.parametrize(
+    "replacement",
+    [
+        lambda: approver_anchor(public_key_material=_hex_pub(PUBLISHER_SK)),
+        lambda: publisher_anchor(identity="publisher-omega"),
+        lambda: publisher_anchor(key_id="publisher-key-9"),
+    ],
+    ids=["other-role", "other-identity", "other-key-id"],
+)
+def test_an_anchor_swapped_into_a_genuine_resolution_after_construction_refuses(replacement):
+    """The swapped record would verify the publisher's genuine signature if the
+    seam trusted the resolution's triple instead of the record's own."""
+
+    envelope = signed_publisher()
+    result = BenchmarkEd25519Verifier(
+        _SwapsTheAnchorAfterConstruction(replacement())
+    ).verify_publisher_submission(envelope, fx.TRUSTED_INSTANT)
+    assert result.outcome is OUT.REFUSED
+    assert result.refusal_reason is R.INDETERMINATE
+    assert result.anchor_record_digest is None
+
+
+class _DuckTypedResolution:
+    """Every attribute a resolution has, none of its identity. Wraps a genuine
+    anchor, so nothing downstream would refuse it if the seam trusted shape."""
+
+    def __init__(self, role, identity, key_id) -> None:
+        self.role, self.identity, self.key_id = role, identity, key_id
+        self.anchor = publisher_anchor()
+        self.refusal_reason = None
+
+
+class _DuckTypedAnchor:
+    """Every attribute a record has — including a *chosen* revision digest —
+    and none of its identity. Swapped into a genuine resolution after
+    construction, exactly as F-1's swap was."""
+
+    def __init__(self) -> None:
+        real = publisher_anchor()
+        for name in ("role", "identity", "key_id", "signature_profile",
+                     "public_key_material", "validity_from", "validity_to",
+                     "status", "revoked_at", "revocation_reason"):
+            setattr(self, name, getattr(real, name))
+        self.anchor_record_digest = fx.OTHER_DIGEST  # a forged revision
+
+
+class _ReturnsDuckTypedResolution:
+    def resolve_anchor(self, role, identity, key_id):
+        return _DuckTypedResolution(role, identity, key_id)
+
+
+class _SwapsInADuckTypedAnchor:
+    def resolve_anchor(self, role, identity, key_id):
+        genuine = BenchmarkTrustAnchorResolution(
+            role=role, identity=identity, key_id=key_id,
+            anchor=publisher_anchor(), refusal_reason=None,
+        )
+        object.__setattr__(genuine, "anchor", _DuckTypedAnchor())
+        return genuine
+
+
+def test_a_duck_typed_resolution_carrying_a_genuine_anchor_is_refused():
+    """Contract identity is load-bearing (§26): a lookalike with the right
+    attributes is not a resolution, whatever it wraps."""
+
+    result = BenchmarkEd25519Verifier(
+        _ReturnsDuckTypedResolution()
+    ).verify_publisher_submission(signed_publisher(), fx.TRUSTED_INSTANT)
+    assert result.outcome is OUT.REFUSED
+    assert result.refusal_reason is R.INDETERMINATE
+    assert result.anchor_record_digest is None
+
+
+def test_a_duck_typed_anchor_with_a_forged_revision_is_refused_not_bound():
+    """Without the anchor exact-type check the lookalike's chosen digest would
+    be bound into a VERIFIED result as the anchor revision."""
+
+    result = BenchmarkEd25519Verifier(
+        _SwapsInADuckTypedAnchor()
+    ).verify_publisher_submission(signed_publisher(), fx.TRUSTED_INSTANT)
+    assert result.outcome is OUT.REFUSED
+    assert result.refusal_reason is R.INDETERMINATE
+    assert result.anchor_record_digest is None
+    assert result.anchor_record_digest != fx.OTHER_DIGEST
+
+
 def test_a_reason_the_result_may_not_carry_is_never_leaked_through_the_seam():
     """D-42(d): an unclassified condition is INDETERMINATE, never a bare raise."""
 
@@ -717,13 +822,24 @@ def test_a_reason_the_result_may_not_carry_is_never_leaked_through_the_seam():
 # The seam's contract-side preconditions raise (D-42(a))
 # --------------------------------------------------------------------------- #
 @pytest.mark.parametrize("seam", SEAMS, ids=SEAM_IDS)
-def test_a_naive_trusted_instant_is_a_contract_violation_not_a_refusal(seam):
+def test_a_naive_trusted_instant_is_refused_before_the_directory_is_consulted(seam):
+    """D-44 review finding F-3: the raise alone was shadowed by the result
+    type's own ``evaluated_at`` validator, which fires after resolution and
+    verification. The seam's precondition is proved by what it prevents — the
+    directory is never asked — not by which validator eventually raised."""
+
     _, method, sign, anchor_of, _, _ = seam
-    for candidate in (verifier(anchor_of()), BenchmarkDenyAllVerifier()):
+    directory = ExactTripleDirectory(anchor_of())
+    candidate = BenchmarkEd25519Verifier(directory)
+    for bad_instant in (datetime(2026, 4, 1), "2026-04-01T00:00:00Z", None):
         with pytest.raises(BenchmarkRegistryContractError):
-            getattr(candidate, method)(sign(), datetime(2026, 4, 1))
+            getattr(candidate, method)(sign(), bad_instant)  # type: ignore[arg-type]
         with pytest.raises(BenchmarkRegistryContractError):
-            getattr(candidate, method)(sign(), "2026-04-01T00:00:00Z")  # type: ignore[arg-type]
+            getattr(BenchmarkDenyAllVerifier(), method)(sign(), bad_instant)  # type: ignore[arg-type]
+    assert directory.asked == []
+    # And the aware instant is what unlocks the directory: exactly one question.
+    getattr(candidate, method)(sign(), fx.TRUSTED_INSTANT)
+    assert len(directory.asked) == 1
 
 
 def test_an_envelope_of_the_wrong_exact_type_is_refused_before_evaluation():
