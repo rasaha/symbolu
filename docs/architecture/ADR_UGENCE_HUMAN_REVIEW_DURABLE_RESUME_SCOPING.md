@@ -112,7 +112,7 @@ row. A row is green only against a real PostgreSQL and a real SQLite ledger.
 
 | # | Ruling |
 |---|---|
-| **HR-1** | **`DISPLAY_AND_TRANSMIT`.** The studio renders the queue and run detail and relays a verbatim human decision to a separate review service that authenticates the approver and owns the ledger. The studio holds no approver identity, computes no eligibility, consumes nothing, signals nothing and resumes nothing; the relay route's operation id and path carry none of the SD-2 verbs, and the verb in the body is the human's. |
+| **HR-1** | **`DISPLAY_AND_TRANSMIT`.** The studio renders the queue and run detail and relays a verbatim human decision to a separate review service that authenticates the approver and owns the ledger. The studio holds no approver identity, computes no eligibility, consumes nothing, signals nothing and resumes nothing; the relay route's operation id and path carry none of the SD-2 verbs, and the verb in the body is the human's. **Amended 2026-09-06 under `ADR_UGENCE_STUDIO_FRONT_DOOR_SCOPING.md` FD-10.1 and FD-10.4:** the studio may also ask the review service to start the worker's own shadow run (`POST /review/runs`), supplying at most a typed correlation id; it still holds no identity, computes no eligibility, consumes nothing, signals nothing and resumes nothing, and no operation id or path names an SD-2 verb. |
 | **HR-2** | **`NEW_PACKAGE_GOVERNED_REVIEW`.** `packages/integration/governed-review` owns the production `GovernanceInputSource` over the approval ledger and the directory, the consume-then-advance order, and the review service. It imports approval-workflow, authority-directory and durable-execution and nothing under `capabilities/`. The console API is not the home: its audit store is an in-memory prototype (`ugence_console_api/audit.py:8-10`) and the studio may not import it. |
 | **HR-3** | **`RATIFY_FINGERPRINT_BINDING`.** `subject_kind="agent_runtime_proposal"`, `subject_digest=<proposal fingerprint>`, `consumer_ref=<instance_id>:<task_id>`; consume in the SQLite ledger first, then advance in Postgres; `ALREADY_CONSUMED` whose holder is this instance and task is satisfied. No second ledger in Postgres. |
 | **HR-4** | **`BARE_RUNTIME_BOUNDED_ADAPTER`.** `resume_workflow` keeps its signature and is never exposed to a human; the DBOS adapter moves to `continue_workflow`, one bounded quantum per durable step; consumption is the only trigger. The adapter change re-runs the full §8 matrix of the DBOS ADR; GAS-R5 is untouched. |
@@ -179,8 +179,8 @@ implementation prompt, ships behind its own tests and is labelled honestly at ex
    the screen and API audit. **Implemented**: five v2 relay routes
    (`v2_review_list_queue`, `v2_review_read_run`, `v2_review_read_run_events`,
    `v2_review_read_approval`, `v2_review_submit_decision`) over a standard-library
-   review-service client whose five-route allowlist is enforced before a socket
-   opens; the decision body is relayed verbatim and the studio adds no identity; an
+   review-service client whose five-route allowlist (six since front-door seam 6,
+   FD-10.4: the start relay added) is enforced before a socket opens; the decision body is relayed verbatim and the studio adds no identity; an
    unreachable review service renders as a gap, never an empty queue; a HOLD is
    filtered and counted on both sides of the wire (HR-5); fingerprints and
    `valid_until` are rendered as history. The SD-2 prohibition, console allowlist,

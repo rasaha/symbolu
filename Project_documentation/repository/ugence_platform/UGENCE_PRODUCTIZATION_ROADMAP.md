@@ -422,7 +422,7 @@ merged; GAS-5 is deferred; GAS-6 remains gated; GAS-7 is ruled and not entered.
 | FD-10.2 | **`SIXTH_ROUTE_START_SHADOW_RUN`** — seam 6 is `POST /review/runs` on the worker: an optional typed correlation id, a worker-minted instance id, idempotent by the DBOS adapter's rule; read back through the four existing reads, resumed only through the existing decision relay | same, §11 |
 | FD-10.3 | **`NO_DEFINITION_CROSSES`** — no workflow, task, provider, mode or digest is sent; the worker's `definition_digest` binds every instance and the adapter's refusal of any other digest is the property that makes the seam safe | same, §11 |
 | FD-10.4 | **`ONE_STEP_AMENDMENT`** — CR-2 (six routes), HR-1's wording, the P3E egress record and freeze test, the frontend manifest and the v2 contract (v2-A2, one operation) with its generated client are amended together with tests; no configuration value, image package, credential or second egress destination | same, §11 |
-| FD-10.5 | **`TWO_LABELLED_PATHS`** — the Simulate screen shows the seam-3 in-process fixture run and the worker relay as distinct paths, each labelled with its executor, hook and maturity, never merged. Documentation only; seam 6 activates by its own implementation prompt | same, §11 |
+| FD-10.5 | **`TWO_LABELLED_PATHS`** — the Simulate screen shows the seam-3 in-process fixture run and the worker relay as distinct paths, each labelled with its executor, hook and maturity, never merged. Seam 6 shipped 2026-09-06 (`governed-review-service` 0.5.0, `governed-runtime-worker` 0.2.0, `governance-studio-deployment` 0.7.0; ADR §7) | same, §11 |
 
 
 ---

@@ -97,8 +97,9 @@ def test_approved_runtime_config_declares_boundaries():
 
 def test_approved_runtime_config_permits_exactly_one_egress_the_review_relay():
     """CR-2 amended the egress claim from none to one named destination. The record
-    stays exact: default none, one permitted destination, https, the five review
-    routes, the one forwarded header, and gate evidence recorded as unset."""
+    stays exact: default none, one permitted destination, https, the six review
+    routes (five since CR-2, the start relay since FD-10.4), the one forwarded header,
+    and gate evidence recorded as unset."""
     import json
     cfg = json.load(open(os.path.join(HERE, "approved-runtime-config.json"), encoding="utf-8"))
     egress = cfg["external_network_egress"]
@@ -106,7 +107,8 @@ def test_approved_runtime_config_permits_exactly_one_egress_the_review_relay():
     (permitted,) = egress["permitted"]
     assert "UGENCE_STUDIO_REVIEW_SERVICE_URL" in permitted["destination"]
     assert permitted["scheme"] == "https"
-    assert len(permitted["routes"]) == 5 and permitted["routes"][-1] == "POST /review/decisions"
+    assert len(permitted["routes"]) == 6 and permitted["routes"][4] == "POST /review/decisions"
+    assert permitted["routes"][5] == "POST /review/runs"
     assert permitted["forwarded_header"].startswith("X-Ugence-Approver-Proof")
     assert "unset" in egress["container_gate_note"]
     assert list(cfg["configuration_added"]) == ["UGENCE_STUDIO_REVIEW_SERVICE_URL",
@@ -115,7 +117,7 @@ def test_approved_runtime_config_permits_exactly_one_egress_the_review_relay():
                                                 "UGENCE_STUDIO_POLICY_IDENTITIES",
                                                 "UGENCE_STUDIO_SIMULATION_PROVIDER",
                                                 "UGENCE_STUDIO_SYSTEM_REGISTRY_PATH"]
-    assert cfg["deployment_version"] == "0.6.0"
+    assert cfg["deployment_version"] == "0.7.0"
 
 
 def test_approved_runtime_config_records_front_door_seam_3_exactly():
