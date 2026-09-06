@@ -186,8 +186,9 @@ def _sha256(path: str) -> str:
 
 def test_approved_runtime_config_records_front_door_seam_5_exactly():
     """FD-9: the tenant-bound system registry file is handed; register is the only
-    write; the registrant is presented and unproven; the v2 amendment is recorded; one
-    package added to the image (ai-system-registry) and nothing else."""
+    write; the registrant is presented and unproven; the v2 amendment is recorded; the
+    package it added to the image (ai-system-registry) is there, with seam 8's beside
+    it and nothing else."""
     import json
     cfg = json.load(open(os.path.join(HERE, "approved-runtime-config.json"), encoding="utf-8"))
     seam = cfg["system_registry"]
@@ -202,5 +203,6 @@ def test_approved_runtime_config_records_front_door_seam_5_exactly():
     assert "persistent_database" in cfg["prohibited"] and "prohibited persistent_database" in seam["durability"]
     assert cfg["first_party_packages_in_image"][-2] == "packages/integration/ai-system-registry"
     assert cfg["first_party_packages_in_image"][-1] == "packages/integration/data-use-admission"
-    assert "COPY packages/integration/ai-system-registry /build/" in _read("Dockerfile")
+    for package in cfg["first_party_packages_in_image"][-2:]:
+        assert f"COPY {package} /build/" in _read("Dockerfile"), package
     assert "openapi_v2_amendment" in cfg["frozen"] and "v2-A1" in cfg["frozen"]["openapi_v2_amendment"]
