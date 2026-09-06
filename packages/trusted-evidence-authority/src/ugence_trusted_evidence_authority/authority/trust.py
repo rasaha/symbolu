@@ -184,6 +184,24 @@ class TrustAnchorCapability(str, Enum):
     #: each such grant is an explicit, independently configured record; nothing
     #: derives one from another.
     CLOUD_SCALING_RECOMMENDATION_ATTESTATION = "CLOUD_SCALING_RECOMMENDATION_ATTESTATION"
+    #: The anchor's key signs an **external-effect attestation as the executing
+    #: provider** — the party that carried out an authorized action and reports
+    #: the effect it observed. Lent to ``ugence-risk-authority-effect-attestation``
+    #: under the wave 5 ruling SE-4 (ADR_UGENCE_SIGNED_EFFECT_ATTESTATION_SCOPING).
+    #: A verified signature under this capability proves **which provider
+    #: reported** the effect; it does not independently prove the effect
+    #: occurred. Deliberately distinct from the independent-observer capability
+    #: below: an anchor holding one never satisfies a coordinate naming the
+    #: other, and neither confers evidence production, receipt issuance or
+    #: Cloud Scaling attestation.
+    EFFECT_ATTESTATION_EXECUTING_PROVIDER = "EFFECT_ATTESTATION_EXECUTING_PROVIDER"
+    #: The anchor's key signs an **external-effect attestation as an independent
+    #: observer** — a party other than the executing provider that observed the
+    #: effect. Lent under the same ruling. A verified signature under this
+    #: capability proves the identity and authorized role of the observer, not
+    #: the truth of its observation. This package defines both effect
+    #: coordinates and **verifies nothing** under either.
+    EFFECT_ATTESTATION_INDEPENDENT_OBSERVER = "EFFECT_ATTESTATION_INDEPENDENT_OBSERVER"
 
 
 @dataclass(frozen=True)

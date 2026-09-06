@@ -273,16 +273,24 @@ def test_the_catch_all_is_the_load_bearing_capability_separation():
     # And the converse: the catch-all refuses values nothing above it names, which is why
     # removing *it* would open the attack rather than merely blur a diagnostic.
     #
-    # TEV declares exactly three capabilities today, and the two explicit branches name both
-    # non-dedicated members, so the value the catch-all uniquely refuses right now is one
-    # that is not a member at all — the drift GI-4b scores. Pinning the roster means adding
-    # a fourth member forces this property, and the wording it backs, to be revisited.
+    # TEV declares five capabilities: the two evidence roles the explicit branches name,
+    # the dedicated one, and — since TEV 0.4.0 — two effect-attestation capabilities lent
+    # to the Risk Authority effect-attestation consumer. Those two are refused here by the
+    # catch-all ALONE: no explicit branch names them, which is exactly the case this
+    # property exists to keep visible. The roster is pinned member by member, so a sixth
+    # member forces this property, and the wording it backs, to be revisited again.
     named = {borrowed for borrowed, _label, _phrase in CAPABILITY_SEPARATIONS}
-    assert set(TrustAnchorCapability) == named | {dedicated}, (
-        "TEV's capability roster changed; a member outside the dedicated one and the two "
-        "named borrowed ones is refused by the catch-all alone, so the guard inventory's "
-        "scored-vs-load-bearing reading must be re-checked against the new member"
+    catch_all_only = {
+        TrustAnchorCapability.EFFECT_ATTESTATION_EXECUTING_PROVIDER,
+        TrustAnchorCapability.EFFECT_ATTESTATION_INDEPENDENT_OBSERVER,
+    }
+    assert set(TrustAnchorCapability) == named | {dedicated} | catch_all_only, (
+        "TEV's capability roster changed; a member outside the dedicated one, the two "
+        "named borrowed ones and the two effect-attestation ones is refused by the "
+        "catch-all alone, so the guard inventory's scored-vs-load-bearing reading must be "
+        "re-checked against the new member"
     )
+    assert catch_all_only.isdisjoint(named) and dedicated not in catch_all_only
 
     class _UnratifiedCapability:
         name = "SOME_FUTURE_CAPABILITY"

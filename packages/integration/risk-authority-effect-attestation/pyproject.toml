@@ -1,0 +1,62 @@
+# Ugence Risk Authority Effect Attestation — signed external-effect verification,
+# contracts first (gap-sequencing ADR wave 5, row "Signed external-effect
+# verification": RA-8 successor milestone; Trusted Evidence Authority DD-10b custody).
+#
+# Scoped and ratified by docs/architecture/ADR_UGENCE_SIGNED_EFFECT_ATTESTATION_SCOPING.md
+# (SE-1 this new package, SE-2 two non-interchangeable attester roles, SE-3 an immutable
+# wrapper over an unmodified ExecutionObservation, SE-4 TEA's resolver and anchors under
+# two lent effect capabilities, SE-5 the D-41 pair with strict point validation).
+#
+#   THIS PACKAGE VERIFIES WHO SIGNED AN OBSERVATION AND THAT THE BYTES ARE INTACT.
+#   IT NEVER PRODUCES, FETCHES, RECONCILES OR ADMITS AN OBSERVATION, AND A VERIFIED
+#   SIGNATURE NEVER MEANS THE EFFECT IS TRUE.
+#
+# Dependency direction (one-way):
+#     ugence-governance-contracts (leaf)          <- ExecutionObservation, wrapped unchanged
+#     ugence-trusted-evidence-authority (>=0.4.0)  <- trust-anchor contracts, resolver port,
+#         ▲                                          Ed25519 key/codec types (exact grant)
+#     ugence-risk-authority-effect-attestation (this package)
+#
+# Never imported: RA-8 (execution assurance), Decision Authority, Agent Runtime, any Risk
+# Authority runtime, Policy Authority, Benchmark Registry, cryptography or nacl directly.
+#
+# Maturity: REFERENCE-GRADE / NOT PRODUCTION-READY. No production signer, key loading,
+# key generation, network, filesystem, environment-variable, credential or discovery code.
+#
+# Build:   python -m build packages/integration/risk-authority-effect-attestation
+# Verify:  python packages/integration/risk-authority-effect-attestation/scripts/verify_isolated_install.py
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ugence-risk-authority-effect-attestation"
+dynamic = ["version"]
+description = "Ugence Risk Authority Effect Attestation — signed external-effect verification, contracts first: an immutable attestation wrapping one unmodified ExecutionObservation, two non-interchangeable attester roles (executing provider, independent observer) resolved under the Trusted Evidence Authority's anchors, and one verifier on the D-41 pair with strict point validation. A verified signature proves provenance and integrity, never that the effect is true. Reference-grade, not production-ready; not wired into RA-8."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "Proprietary" }
+authors = [{ name = "Rakesh Mohan" }]
+keywords = ["governance", "risk-authority", "effect", "attestation", "ed25519", "contracts", "ugence"]
+classifiers = ["Typing :: Typed"]
+dependencies = [
+    "ugence-governance-contracts>=0.8.0",
+    "ugence-trusted-evidence-authority>=0.4.0",
+]
+
+[project.optional-dependencies]
+test = ["pytest>=7.0"]
+
+[tool.setuptools.dynamic]
+version = { attr = "ugence_risk_authority_effect_attestation.version.__version__" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["ugence_risk_authority_effect_attestation*"]
+
+[tool.setuptools.package-data]
+ugence_risk_authority_effect_attestation = ["py.typed"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"

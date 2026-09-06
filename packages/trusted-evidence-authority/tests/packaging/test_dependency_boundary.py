@@ -432,7 +432,18 @@ AUTHORIZED_MODULE_BINDING_TEST_MODULES = frozenset(
     }
 )
 
-AUTHORIZED_CONSUMERS = ("packages/integration/cloud-scaling-producer-attestation",)
+#: ``packages/integration/risk-authority-effect-attestation`` — **wave 5, signed
+#: external-effect verification.** Authorized by the owner's ruling SE-4
+#: (``docs/architecture/ADR_UGENCE_SIGNED_EFFECT_ATTESTATION_SCOPING.md``): reuse this
+#: package's ``TrustAnchorResolverPort`` and anchor representation under two lent
+#: effect-attestation capabilities, with no second trust store and no package-owned
+#: directory. The same exact symbol grant applies; it is a second named exception, not
+#: a generic one, and the two lent effect capabilities grant nothing here (see
+#: ``tests/authority/test_lent_capability_disjointness.py``).
+AUTHORIZED_CONSUMERS = (
+    "packages/integration/cloud-scaling-producer-attestation",
+    "packages/integration/risk-authority-effect-attestation",
+)
 
 
 def _authorized_prefixes(repo):
@@ -613,6 +624,7 @@ def test_the_consumer_allowlist_is_exactly_the_ratified_set():
 
     assert AUTHORIZED_CONSUMERS == (
         "packages/integration/cloud-scaling-producer-attestation",
+        "packages/integration/risk-authority-effect-attestation",
     )
 
 

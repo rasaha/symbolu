@@ -45,6 +45,9 @@ from _authority_builders import (
 )
 
 CS = TrustAnchorCapability.CLOUD_SCALING_RECOMMENDATION_ATTESTATION
+EP = TrustAnchorCapability.EFFECT_ATTESTATION_EXECUTING_PROVIDER
+IO = TrustAnchorCapability.EFFECT_ATTESTATION_INDEPENDENT_OBSERVER
+LENT = (CS, EP, IO)
 PKG_ROOT = pathlib.Path(ugence_trusted_evidence_authority.__file__).resolve().parent
 
 
@@ -61,7 +64,9 @@ def test_the_pre_existing_members_keep_their_spelling_and_declaration_order():
     assert [m.value for m in members[:2]] == ["EVIDENCE_PRODUCTION", "RECEIPT_ISSUANCE"]
     assert members[2] is CS
     assert CS.value == "CLOUD_SCALING_RECOMMENDATION_ATTESTATION"
-    assert len(members) == 3
+    assert members[3] is EP and EP.value == "EFFECT_ATTESTATION_EXECUTING_PROVIDER"
+    assert members[4] is IO and IO.value == "EFFECT_ATTESTATION_INDEPENDENT_OBSERVER"
+    assert len(members) == 5
 
 
 def test_the_new_member_is_distinct_from_both_existing_ones():
@@ -71,7 +76,13 @@ def test_the_new_member_is_distinct_from_both_existing_ones():
     assert CS is not TrustAnchorCapability.RECEIPT_ISSUANCE
     assert CS != TrustAnchorCapability.EVIDENCE_PRODUCTION
     assert CS != TrustAnchorCapability.RECEIPT_ISSUANCE
-    assert len({m.value for m in TrustAnchorCapability}) == 3
+    assert len({m.value for m in TrustAnchorCapability}) == 5
+    # The two effect capabilities are distinct from each other and from every
+    # earlier member: a provider anchor never answers an observer coordinate.
+    assert EP is not IO and EP != IO
+    for lent in (EP, IO):
+        assert lent not in (TrustAnchorCapability.EVIDENCE_PRODUCTION,
+                            TrustAnchorCapability.RECEIPT_ISSUANCE, CS)
 
 
 # --------------------------------------------------------------------------------- #
@@ -150,8 +161,8 @@ def test_the_lent_capability_is_never_substitutable_for_either_existing_one():
         capability: TrustAnchorCoordinate(**base, capability=capability)
         for capability in TrustAnchorCapability
     }
-    assert len(set(coordinates.values())) == 3
-    assert len({c.canonical_digest() for c in coordinates.values()}) == 3
+    assert len(set(coordinates.values())) == 5
+    assert len({c.canonical_digest() for c in coordinates.values()}) == 5
 
 
 # --------------------------------------------------------------------------------- #
@@ -167,12 +178,51 @@ def test_this_package_defines_the_lent_capability_and_verifies_nothing_under_it(
     canonicalize and cannot reconcile. That is the failure this test exists to catch.
     """
 
-    referencing = []
+    for spelling in ("CLOUD_SCALING_RECOMMENDATION_ATTESTATION",
+                     "EFFECT_ATTESTATION_EXECUTING_PROVIDER",
+                     "EFFECT_ATTESTATION_INDEPENDENT_OBSERVER"):
+        referencing = []
+        for path in sorted(PKG_ROOT.rglob("*.py")):
+            text = path.read_text(encoding="utf-8")
+            if spelling in text:
+                referencing.append(path.relative_to(PKG_ROOT).as_posix())
+        assert referencing == ["authority/trust.py"], (spelling, referencing)
+
+
+@pytest.mark.parametrize("lent", [EP, IO], ids=["executing-provider", "independent-observer"])
+def test_an_effect_attestation_anchor_can_neither_produce_evidence_nor_issue_a_receipt(lent):
+    """The two effect capabilities grant nothing here, exactly as the Cloud Scaling one."""
+
+    from _authority_builders import envelope
+
+    anchors = directory(producer_anchor(capability=lent), authority_anchor())
+    determination = authority(trust_anchors=anchors).verify(
+        submission(), request(), verified_at=VERIFIED_AT, verifier_key_id=VERIFIER_KEY_ID,
+    )
+    assert determination.outcome is EvidenceAdmissionOutcome.REFUSED
+    assert R.TRUSTED_EVIDENCE_TRUST_ANCHOR_MISSING in determination.refusal_reasons
+    anchors = directory(producer_anchor(), authority_anchor(capability=lent))
+    result = reverifier(trust_anchors=anchors).verify_signature(envelope(), evaluated_at=VERIFIED_AT)
+    assert result.outcome.name == "REFUSED"
+    assert result.refusal_reason is R.TRUSTED_EVIDENCE_TRUST_ANCHOR_MISSING
+
+
+def test_no_effect_attestation_module_is_imported_or_named_by_this_package():
+    """Lending two effect capabilities is not importing the effect domain either."""
+
+    offenders = []
     for path in sorted(PKG_ROOT.rglob("*.py")):
-        text = path.read_text(encoding="utf-8")
-        if "CLOUD_SCALING_RECOMMENDATION_ATTESTATION" in text:
-            referencing.append(path.relative_to(PKG_ROOT).as_posix())
-    assert referencing == ["authority/trust.py"], referencing
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        for node in ast.walk(tree):
+            modules = []
+            if isinstance(node, ast.Import):
+                modules = [a.name for a in node.names]
+            elif isinstance(node, ast.ImportFrom) and node.module:
+                modules = [node.module]
+            for module in modules:
+                if "effect_attestation" in module or "execution_assurance" in module:
+                    offenders.append(f"{path.name}: {module}")
+    assert offenders == [], offenders
 
 
 def test_no_cloud_scaling_contract_is_imported_or_named_by_this_package():

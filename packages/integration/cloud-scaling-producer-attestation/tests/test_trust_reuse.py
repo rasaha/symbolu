@@ -217,7 +217,14 @@ def test_the_producer_capability_is_the_dedicated_cloud_scaling_one():
     )
     assert PRODUCER_ATTESTATION_CAPABILITY is not TrustAnchorCapability.EVIDENCE_PRODUCTION
     assert PRODUCER_ATTESTATION_CAPABILITY is not TrustAnchorCapability.RECEIPT_ISSUANCE
-    assert len(list(TrustAnchorCapability)) == 3
+    # The vocabulary may grow by lending (0.4.0 lent two effect-attestation
+    # capabilities to a different consumer); what this package relies on is that
+    # its own capability stays dedicated and disjoint from every other member.
+    assert len(list(TrustAnchorCapability)) >= 3
+    assert all(
+        member is PRODUCER_ATTESTATION_CAPABILITY or member != PRODUCER_ATTESTATION_CAPABILITY
+        for member in TrustAnchorCapability
+    )
 
 
 # --------------------------------------------------------------------------------------- #

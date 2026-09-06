@@ -1,5 +1,39 @@
 # Changelog — ugence-trusted-evidence-authority
 
+## [0.4.0] — a second named consumer exception, and two lent effect-attestation capabilities
+
+Additive and backward-compatible over 0.3.0. **Every 0.3.0 symbol remains exported
+unchanged**, every pinned digest is byte-identical, the three existing
+`TrustAnchorCapability` members keep their names, serialized spellings and
+declaration order, and every evidence and receipt behaviour is unchanged. The
+curated export count is unchanged at 87.
+
+### The second consumer exception
+
+`packages/integration/risk-authority-effect-attestation` — wave 5, signed
+external-effect verification — is authorized to import this package's **public
+trust-anchor contracts and resolver port**, under the **same exact symbol grant**
+the Cloud Scaling producer-attestation consumer holds, and nothing else. The
+authorization is the owner's ruling SE-4 in
+`docs/architecture/ADR_UGENCE_SIGNED_EFFECT_ATTESTATION_SCOPING.md`: reuse this
+resolver and anchor representation, add purpose-specific effect roles under it,
+create no second trust store and no package-owned directory. It is a second
+**named** exception and not a generic one; `AUTHORIZED_CONSUMERS` in
+`tests/packaging/test_dependency_boundary.py` is still a closed two-entry list.
+
+### The two lent capabilities
+
+Adds `TrustAnchorCapability.EFFECT_ATTESTATION_EXECUTING_PROVIDER` and
+`TrustAnchorCapability.EFFECT_ATTESTATION_INDEPENDENT_OBSERVER`, appended after
+the Cloud Scaling member. They are distinct from each other and from every
+earlier member: an anchor holding one never satisfies a coordinate naming the
+other, and neither confers evidence production, receipt issuance or Cloud
+Scaling attestation. This package verifies nothing under either, and
+`tests/authority/test_lent_capability_disjointness.py` proves it for both: an
+evidence submission whose producer holds only an effect capability is REFUSED, a
+receipt cannot be verified under one, both spellings are referenced in exactly
+one file, and no effect-attestation or execution-assurance module is imported.
+
 ## [0.3.0] — one reviewed consumer exception, and a dedicated lent capability
 
 Additive and backward-compatible over 0.2.0. **Every 0.2.0 symbol remains exported

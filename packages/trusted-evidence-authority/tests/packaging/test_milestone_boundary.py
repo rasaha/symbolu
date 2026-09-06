@@ -25,7 +25,16 @@ def _sources():
 
 
 def test_the_package_version_is_the_expected_additive_minor_bump():
-    """0.2.0 -> 0.3.0: additive, backward-compatible.
+    """0.3.0 -> 0.4.0: additive, backward-compatible.
+
+    The same rule as 0.2.0 -> 0.3.0, applied a third time: two further
+    :class:`TrustAnchorCapability` members, ``EFFECT_ATTESTATION_EXECUTING_PROVIDER``
+    and ``EFFECT_ATTESTATION_INDEPENDENT_OBSERVER``, lent to the Risk Authority
+    effect-attestation consumer under wave 5 ruling SE-4, plus a second named
+    consumer exception. This package verifies nothing under either member.
+
+    The 0.3.0 rationale, kept for the record:
+    0.2.0 -> 0.3.0: additive, backward-compatible.
 
     Same rule as 0.1.0 -> 0.2.0, applied again. A minor bump, not a major one,
     because every existing symbol remains present with the same shape, the same
@@ -41,8 +50,8 @@ def test_the_package_version_is_the_expected_additive_minor_bump():
     path admits it (see the disjointness tests below).
     """
 
-    assert ugence_trusted_evidence_authority.__version__ == "0.3.0"
-    assert api.__version__ == "0.3.0"
+    assert ugence_trusted_evidence_authority.__version__ == "0.4.0"
+    assert api.__version__ == "0.4.0"
 
 
 def test_no_separate_contract_version_constant_is_minted():
