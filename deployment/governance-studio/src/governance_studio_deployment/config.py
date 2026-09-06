@@ -82,6 +82,10 @@ class DeploymentConfig:
     #: build_studio_context(provider_registry=...); unset leaves the Simulate screen on
     #: its typed gap; any other value is refused. No provider list is read (FD-4).
     simulation_provider: str = ""
+    #: Front-door seam 5 (FD-9): ``UGENCE_STUDIO_SYSTEM_REGISTRY_PATH``, the sqlite file
+    #: of the tenant-bound system registry under the writable runtime volume; requires
+    #: UGENCE_STUDIO_TENANT_ID. Read here and handed to build_studio_context only.
+    system_registry_path: str = ""
     _errors: List[str] = field(default_factory=list, compare=False)
 
     @property
@@ -107,6 +111,10 @@ class DeploymentConfig:
     @property
     def simulation_provider_enabled(self) -> bool:
         return self.simulation_provider == SIMULATION_PROVIDER_ENABLED
+
+    @property
+    def system_registry_configured(self) -> bool:
+        return bool(self.system_registry_path)
 
     @classmethod
     def from_env(cls, **overrides) -> "DeploymentConfig":
@@ -137,6 +145,8 @@ class DeploymentConfig:
             simulation_provider=(overrides.get("simulation_provider")
                                  if overrides.get("simulation_provider") is not None
                                  else (_env("UGENCE_STUDIO_SIMULATION_PROVIDER") or "")),
+            system_registry_path=(overrides.get("system_registry_path")
+                                  or _env("UGENCE_STUDIO_SYSTEM_REGISTRY_PATH") or "").strip(),
         )
         return cfg
 
@@ -187,10 +197,21 @@ class DeploymentConfig:
         if self.constitution_registry_path:
             errors.extend(_registry_path_errors(self.constitution_registry_path, self.runtime_dir))
 
-        # authority reads (front-door seam 2): typed identities, one tenant, registry required
-        if self.policy_identities or self.tenant_id:
+        # authority reads (front-door seam 2): typed identities, one tenant, registry required.
+        # Since seam 5 the tenant may also stand alone for the system registry.
+        if self.policy_identities or (self.tenant_id and not self.system_registry_path):
             errors.extend(_authority_errors(self.policy_identities, self.tenant_id,
                                             bool(self.constitution_registry_path)))
+        elif self.tenant_id:
+            errors.extend(_tenant_errors(self.tenant_id))
+
+        # system registry (front-door seam 5): a file under the volume, tenant-bound
+        if self.system_registry_path:
+            errors.extend(_path_errors("UGENCE_STUDIO_SYSTEM_REGISTRY_PATH",
+                                       self.system_registry_path, self.runtime_dir))
+            if not self.tenant_id:
+                errors.append("UGENCE_STUDIO_SYSTEM_REGISTRY_PATH requires UGENCE_STUDIO_TENANT_ID; "
+                              "the registry is bound to one tenant")
 
         # simulation provider (front-door seam 3): one boolean, typed; "1" or unset
         if self.simulation_provider not in ("", SIMULATION_PROVIDER_ENABLED):
@@ -222,10 +243,7 @@ def _authority_errors(identities: Tuple[str, ...], tenant_id: str, registry_conf
                       "UGENCE_STUDIO_CONSTITUTION_REGISTRY_PATH; there is no registry to read")
     if identities and not tenant_id:
         errors.append("UGENCE_STUDIO_TENANT_ID is required with UGENCE_STUDIO_POLICY_IDENTITIES")
-    if tenant_id and not _is_typed_token(tenant_id):
-        errors.append("UGENCE_STUDIO_TENANT_ID must be non-empty, NFC and without whitespace")
-    if tenant_id and "|" in tenant_id:
-        errors.append("UGENCE_STUDIO_TENANT_ID must not contain '|'")
+    errors.extend(_tenant_errors(tenant_id))
     seen = set()
     for entry in identities:
         if not _is_typed_token(entry) or entry.count("|") != 2 or any(part == "" for part in entry.split("|")):
@@ -238,25 +256,38 @@ def _authority_errors(identities: Tuple[str, ...], tenant_id: str, registry_conf
     return errors
 
 
-def _registry_path_errors(path: str, runtime_dir: str) -> List[str]:
-    """Why ``UGENCE_STUDIO_CONSTITUTION_REGISTRY_PATH`` must not be used, or nothing.
+def _tenant_errors(tenant_id: str) -> List[str]:
+    errors: List[str] = []
+    if tenant_id and not _is_typed_token(tenant_id):
+        errors.append("UGENCE_STUDIO_TENANT_ID must be non-empty, NFC and without whitespace")
+    if tenant_id and "|" in tenant_id:
+        errors.append("UGENCE_STUDIO_TENANT_ID must not contain '|'")
+    return errors
 
-    The registry is a sqlite file (Posture B) and lives only under the writable
-    runtime volume: an absolute path below ``runtime_dir``, never in memory, never a
+
+def _registry_path_errors(path: str, runtime_dir: str) -> List[str]:
+    """Why ``UGENCE_STUDIO_CONSTITUTION_REGISTRY_PATH`` must not be used, or nothing."""
+    return _path_errors("UGENCE_STUDIO_CONSTITUTION_REGISTRY_PATH", path, runtime_dir)
+
+
+def _path_errors(variable: str, path: str, runtime_dir: str) -> List[str]:
+    """Why a registry-file variable must not be used, or nothing.
+
+    A registry is a sqlite file (Posture B) and lives only under the writable runtime
+    volume: an absolute path below ``runtime_dir``, never in memory, never a
     directory. Whether it is writable is the startup-integrity gate's question.
     """
     if path in (":memory:",) or path.startswith("file:"):
-        return ["UGENCE_STUDIO_CONSTITUTION_REGISTRY_PATH must be a file path; an in-memory "
-                "registry is not durable and is refused"]
+        return [f"{variable} must be a file path; an in-memory registry is not durable and is refused"]
     if not os.path.isabs(path):
-        return ["UGENCE_STUDIO_CONSTITUTION_REGISTRY_PATH must be an absolute path"]
+        return [f"{variable} must be an absolute path"]
     root = os.path.realpath(runtime_dir) if runtime_dir else ""
     candidate = os.path.realpath(path)
     if not root or not (candidate == root or candidate.startswith(root + os.sep)) or candidate == root:
-        return ["UGENCE_STUDIO_CONSTITUTION_REGISTRY_PATH must lie under the writable runtime "
-                "volume (UGENCE_STUDIO_RUNTIME_DIR); no other path is writable"]
+        return [f"{variable} must lie under the writable runtime volume (UGENCE_STUDIO_RUNTIME_DIR); "
+                "no other path is writable"]
     if os.path.isdir(candidate):
-        return ["UGENCE_STUDIO_CONSTITUTION_REGISTRY_PATH names a directory, not a file"]
+        return [f"{variable} names a directory, not a file"]
     return []
 
 

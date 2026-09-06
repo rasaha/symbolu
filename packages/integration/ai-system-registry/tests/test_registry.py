@@ -186,5 +186,6 @@ def test_no_implementation_of_the_port_ships():
         and not getattr(getattr(pkg, name), "_is_protocol", False)
         and hasattr(getattr(pkg, name), "registrations_for_tenant")
     ]
-    assert implementations == []
+    # FD-9.2 (2026-09-06): exactly one implementation ships, the ruled local store
+    assert implementations == ["SqliteSystemRegistry"]
     assert isinstance(SystemRegistryPort, type) and SystemRegistryPort._is_protocol

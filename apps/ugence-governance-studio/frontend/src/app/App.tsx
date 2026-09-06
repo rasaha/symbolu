@@ -22,6 +22,7 @@ import {
   ObserveScreen,
   PolicyScreen,
   PublishScreen,
+  RegistrationScreen,
   ReviewQueueScreen,
   RunDetailScreen,
   SimulateScreen,
@@ -55,6 +56,8 @@ export function App() {
           </Route>
           <Route path="/studio" element={<StudioLayout />}>
             <Route index element={<Navigate to="constitution" replace />} />
+            {/* Front-door seam 5 (FD-9): typed registration intake; register is the only write. */}
+            <Route path="registration" element={<RegistrationScreen />} />
             <Route path="constitution" element={<ConstitutionScreen />} />
             <Route
               path="policy"

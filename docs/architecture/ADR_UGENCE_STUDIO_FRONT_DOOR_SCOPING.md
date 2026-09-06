@@ -148,9 +148,19 @@ it; the root refuses any hook handed to the Simulate service before bind and the
 startup integrity gate fails if the package's source could construct a permissive
 one; the profile's `agent_execution` prohibition carries its FD-7.1 definition; the
 composition record supersedes the seam-2 record (`composition-record.seam-2.json`,
-unchanged). Matrix rows 1 to 6 of §8.2 are tests, rows 4 and 6 no longer gaps. The
-next seam (`CONSOLE_BASE_URL`, or the governed hook once ESCALATE has a sink) waits
-on its own ruling under FD-1.
+unchanged). Matrix rows 1 to 6 of §8.2 are tests, rows 4 and 6 no longer gaps.
+**Seam 4 absent by ruling** (FD-8.1; FD-8.2 shipped in the studio backend, §9.5).
+**Seam 5 shipped** (`governance-studio-deployment` 0.6.0, FD-9):
+`UGENCE_STUDIO_SYSTEM_REGISTRY_PATH` hands the Registration screen a tenant-bound
+`SqliteSystemRegistry` (`ai-system-registry` 0.2.0, the one ruled local store) under
+the runtime volume, with `registered_by` this deployment's name and version and every
+owner reference recorded as `PRESENTED_UNPROVEN`; the frozen v2 contract is amended
+once (v2-A1, `openapi_v2.amendments.json`) by `v2_registry_register` and
+`v2_registry_list`, the generated client regenerated, the P3E freeze carrying the
+new digest; `register` is the only write; the composition record supersedes the
+seam-3 record (`composition-record.seam-3.json`, unchanged); §10.4's failure matrix
+is tests. The next seam (the governed hook in the worker-relay shape, or the console
+once FD-8.3 is complete) waits on its own ruling under FD-1.
 
 The shape every seam follows: the CR-2 shape (one configuration value, one freeze-test amendment, its own failure tests and
 maturity statement, one PR), preserving `REFERENCE_GRADE_SHADOW_ONLY`, the frozen

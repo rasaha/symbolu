@@ -92,6 +92,12 @@ _PUBLIC_ENTRY_ALLOWLIST = {
         "import ugence_agent_runtime.api",
         "from ugence_agent_runtime.api import ",
     ),
+    # Front-door seam 5 (FD-9): the registration intake over the package's curated
+    # public surface only; its `durable` store is reached through that surface.
+    "ugence_ai_system_registry": (
+        "from ugence_ai_system_registry import ",
+        "import ugence_ai_system_registry",
+    ),
 }
 
 # SD-2 — permanently outside the allowlist. These are authority acts, and the

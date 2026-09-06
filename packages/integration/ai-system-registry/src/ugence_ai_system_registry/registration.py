@@ -46,6 +46,7 @@ __all__ = [
     "SystemRegistration", "REGISTRATION_ID_PREFIX", "registration_id_for",
     "supersession_refusals", "require_admissible_supersession",
     "validity_to_dict", "validity_from_dict",
+    "binding_to_dict", "binding_from_dict", "registration_record", "registration_from_record",
 ]
 
 REGISTRATION_ID_PREFIX = "reg_"
@@ -63,6 +64,84 @@ def validity_from_dict(d: Optional[dict]) -> Optional[Validity]:
     return Validity(issued_at=from_iso(d["issued_at"]),
                     expires_at=from_iso(d["expires_at"]) if d.get("expires_at") else None,
                     stale_after=from_iso(d["stale_after"]) if d.get("stale_after") else None)
+
+
+_BINDING_TEXT_FIELDS = (
+    "binding_id", "tenant_id", "subject_id", "context_id", "context_digest", "system_id",
+    "system_version", "configuration_id", "configuration_digest",
+    "canonical_subject_context_ref", "system_manifest_ref", "system_manifest_digest",
+    "deployment_environment_ref",
+)
+_BINDING_INSTANT_FIELDS = ("effective_from", "effective_to")
+
+
+def binding_to_dict(binding: AssessedSystemBinding) -> dict:
+    """The binding's own fields, instants as ISO-8601 UTC text or ``""``."""
+    if not isinstance(binding, AssessedSystemBinding):
+        raise ContractViolation("binding_to_dict takes a governance-contracts AssessedSystemBinding")
+    out = {name: getattr(binding, name) for name in _BINDING_TEXT_FIELDS}
+    for name in _BINDING_INSTANT_FIELDS:
+        value = getattr(binding, name)
+        out[name] = iso(value, f"AssessedSystemBinding.{name}") if value is not None else ""
+    return out
+
+
+def binding_from_dict(d: dict) -> AssessedSystemBinding:
+    """Rebuild a binding from :func:`binding_to_dict`; any contract failure is a
+    :class:`ContractViolation` of this package, never a raw neighbour error."""
+    if not isinstance(d, dict):
+        raise ContractViolation("binding_from_dict takes a mapping")
+    unknown = set(d) - set(_BINDING_TEXT_FIELDS) - set(_BINDING_INSTANT_FIELDS)
+    if unknown:
+        raise ContractViolation(f"binding has unknown fields: {sorted(unknown)}")
+    kwargs: dict = {}
+    for name in _BINDING_TEXT_FIELDS:
+        if name in d:
+            kwargs[name] = d[name]
+    for name in _BINDING_INSTANT_FIELDS:
+        raw = d.get(name, "")
+        if raw not in ("", None):
+            if not isinstance(raw, str):
+                raise ContractViolation(f"binding.{name} must be ISO-8601 text or empty")
+            try:
+                kwargs[name] = from_iso(raw)
+            except Exception as exc:  # noqa: BLE001 - a malformed instant is a refusal
+                raise ContractViolation(f"binding.{name} is not an ISO-8601 instant: {exc}") from exc
+    try:
+        return AssessedSystemBinding(**kwargs)
+    except (TypeError, ValueError) as exc:
+        raise ContractViolation(f"binding refused: {exc}") from exc
+
+
+def registration_record(registration: "SystemRegistration") -> dict:
+    """The complete, reconstructible record: the registration's own fields plus the
+    binding's, under two keys so neither can be mistaken for the other."""
+    return {"registration": registration.to_dict(),
+            "binding": binding_to_dict(registration.binding)}
+
+
+def registration_from_record(record: dict) -> "SystemRegistration":
+    """Rebuild a registration from :func:`registration_record`. The derived id is
+    re-verified at construction, so a tampered record cannot reconstruct."""
+    if not isinstance(record, dict) or "registration" not in record or "binding" not in record:
+        raise ContractViolation("a registration record carries 'registration' and 'binding'")
+    reg = record["registration"]
+    if not isinstance(reg, dict):
+        raise ContractViolation("registration must be a mapping")
+    binding = binding_from_dict(record["binding"])
+    validity = validity_from_dict(reg.get("validity"))
+    if validity is None:
+        raise ContractViolation("registration.validity is required")
+    try:
+        return SystemRegistration(
+            registration_id=reg.get("registration_id", ""), binding=binding,
+            owner_ref=reg.get("owner_ref", ""), classification_label=reg.get("classification_label", ""),
+            validity=validity, supersedes=reg.get("supersedes", ""),
+            registered_by=reg.get("registered_by", ""), notes=reg.get("notes", ""))
+    except ContractViolation:
+        raise
+    except (TypeError, ValueError) as exc:
+        raise ContractViolation(f"registration refused: {exc}") from exc
 
 
 def registration_id_for(binding: AssessedSystemBinding, owner_ref: str,

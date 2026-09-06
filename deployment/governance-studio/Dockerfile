@@ -44,12 +44,14 @@ COPY packages/capabilities/agentic-proposer /build/pkgs/agentic-proposer
 COPY packages/integration/agent-constitution-policy /build/pkgs/agent-constitution-policy
 COPY packages/integration/agent-constitution-conformance /build/pkgs/agent-constitution-conformance
 COPY packages/integration/agent-constitution-activation /build/pkgs/agent-constitution-activation
+# Front-door seam 5 (FD-9): the system registry the Registration screen records into.
+COPY packages/integration/ai-system-registry /build/pkgs/ai-system-registry
 COPY deployment/governance-studio /build/deployment
 RUN pip install --no-cache-dir "pydantic>=2" "fastapi>=0.110" "uvicorn>=0.27" "starlette>=0.36" \
  && pip install --no-cache-dir /build/compiler /build/awc /build/agent-runtime \
       /build/pkgs/governance-contracts /build/pkgs/jcs /build/pkgs/uvi-policy-contracts /build/pkgs/policy-authority \
       /build/pkgs/agentic-proposer /build/pkgs/agent-constitution-policy /build/pkgs/agent-constitution-conformance \
-      /build/pkgs/agent-constitution-activation /build/backend /build/deployment
+      /build/pkgs/agent-constitution-activation /build/pkgs/ai-system-registry /build/backend /build/deployment
 
 # ---- Stage 3: minimal runtime image -----------------------------------------
 FROM python:3.11-slim-bookworm@sha256:b18992999dbe963a45a8a4da40ac2b1975be1a776d939d098c647482bcad5cba AS runtime

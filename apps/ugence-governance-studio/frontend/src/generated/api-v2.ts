@@ -1,6 +1,6 @@
 // AUTO-GENERATED from apps/ugence-governance-studio/contracts/openapi_v2.json
 // DO NOT EDIT BY HAND. Regenerate with: npm run generate:api-v2
-// source_openapi_sha256: dd63180dc91ba7842dc1dc2b6efb3dbc155ea3bd47200f40de7bac85d373f39a
+// source_openapi_sha256: 1dbc612681b37b4b82a244a3c30631000856accfd8869f74a3c7a0b69e63cf97
 // api_contract_version: governance_studio.api.v2
 
 export interface paths {
@@ -236,6 +236,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v2/registry/registrations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Registrations
+         * @description The registrations in force for this deployment's tenant at ``as_of``.
+         *
+         *     ``as_of`` is an ISO-8601 instant with a timezone; absent, the request's own instant
+         *     is used and reported back. A registration outside its window is absent from the
+         *     answer, never flagged.
+         */
+        get: operations["v2_registry_list"];
+        put?: never;
+        /**
+         * Register System
+         * @description Record one typed system registration for this deployment's tenant.
+         *
+         *     Every field is validated by ai-system-registry's own refusal reasons; the
+         *     classification label is recorded uninterpreted; a superseding registration is
+         *     admitted only by the package's supersession rule. A refusal is typed, never a 500.
+         */
+        post: operations["v2_registry_register"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v2/review/approvals/{approval_id}": {
         parameters: {
             query?: never;
@@ -449,6 +481,91 @@ export interface components {
             };
             /** Scenario Id */
             scenario_id?: string | null;
+        };
+        /**
+         * RegistryBindingInput
+         * @description The exact system and configuration a registration is about, as typed fields.
+         *
+         *     No ``tenant_id``: the tenant is the deployment's and is never caller-supplied.
+         *     The two required digests are lowercase sha-256 hex the administrator asserts; the
+         *     studio computes none of them.
+         */
+        RegistryBindingInput: {
+            /** Binding Id */
+            binding_id: string;
+            /**
+             * Canonical Subject Context Ref
+             * @default
+             */
+            canonical_subject_context_ref: string;
+            /** Configuration Digest */
+            configuration_digest: string;
+            /** Configuration Id */
+            configuration_id: string;
+            /** Context Digest */
+            context_digest: string;
+            /** Context Id */
+            context_id: string;
+            /**
+             * Deployment Environment Ref
+             * @default
+             */
+            deployment_environment_ref: string;
+            /** Subject Id */
+            subject_id: string;
+            /** System Id */
+            system_id: string;
+            /**
+             * System Manifest Digest
+             * @default
+             */
+            system_manifest_digest: string;
+            /**
+             * System Manifest Ref
+             * @default
+             */
+            system_manifest_ref: string;
+            /** System Version */
+            system_version: string;
+        };
+        /**
+         * RegistryRegisterRequest
+         * @description Register one system for this deployment's tenant (typed intake only, FD-4).
+         *
+         *     No ``registration_id`` (derived by the package, never chosen), no ``tenant_id``
+         *     (the deployment's), no ``registered_by`` (the deployment's name and version). The
+         *     ``owner_ref`` is an opaque handle recorded as presented and unproven (FD-9.3); the
+         *     ``classification_label`` is recorded uninterpreted (registry ADR D-2).
+         */
+        RegistryRegisterRequest: {
+            binding: components["schemas"]["RegistryBindingInput"];
+            /** Classification Label */
+            classification_label: string;
+            /**
+             * Notes
+             * @default
+             */
+            notes: string;
+            /** Owner Ref */
+            owner_ref: string;
+            /**
+             * Supersedes
+             * @default
+             */
+            supersedes: string;
+            validity: components["schemas"]["RegistryValidityInput"];
+        };
+        /**
+         * RegistryValidityInput
+         * @description The registration window, as ISO-8601 instants with a timezone.
+         */
+        RegistryValidityInput: {
+            /** Expires At */
+            expires_at?: string | null;
+            /** Issued At */
+            issued_at: string;
+            /** Stale After */
+            stale_after?: string | null;
         };
         /**
          * ReviewDecisionRequest
@@ -830,6 +947,70 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["PublishShadowRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    v2_registry_list: {
+        parameters: {
+            query?: {
+                as_of?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    v2_registry_register: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RegistryRegisterRequest"];
             };
         };
         responses: {

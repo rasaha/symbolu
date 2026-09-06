@@ -113,8 +113,9 @@ def test_approved_runtime_config_permits_exactly_one_egress_the_review_relay():
                                                 "UGENCE_STUDIO_CONSTITUTION_REGISTRY_PATH",
                                                 "UGENCE_STUDIO_TENANT_ID",
                                                 "UGENCE_STUDIO_POLICY_IDENTITIES",
-                                                "UGENCE_STUDIO_SIMULATION_PROVIDER"]
-    assert cfg["deployment_version"] == "0.5.0"
+                                                "UGENCE_STUDIO_SIMULATION_PROVIDER",
+                                                "UGENCE_STUDIO_SYSTEM_REGISTRY_PATH"]
+    assert cfg["deployment_version"] == "0.6.0"
 
 
 def test_approved_runtime_config_records_front_door_seam_3_exactly():
@@ -126,7 +127,7 @@ def test_approved_runtime_config_records_front_door_seam_3_exactly():
     seams = cfg["front_door_seams"]
     assert [s.split(" ")[0] for s in seams["handed_to_build_studio_context"]] == [
         "review_service_base_url", "activation_root", "policy_registry", "policy_identities",
-        "provider_registry"]
+        "provider_registry", "system_registry"]
     assert [s.split(" ")[0] for s in seams["absent_by_ruling"]] == [
         "decision_store", "governance_hook", "console_base_url"]
     assert "RUNTIME_DEFAULT_BLOCK" in seams["absent_by_ruling"][1]
@@ -151,7 +152,7 @@ def test_approved_runtime_config_records_front_door_seam_3_exactly():
     assert cfg["prohibited_definitions"]["agent_execution"].startswith(
         "agent execution against any non-fixture provider")
     assert "external_tool_calls" in cfg["prohibited"] and "external_model_calls" in cfg["prohibited"]
-    assert len(cfg["first_party_packages_in_image"]) == 12
+    assert len(cfg["first_party_packages_in_image"]) == 13
 
 
 def test_approved_runtime_config_records_the_constitution_registry_seam_exactly():
@@ -170,10 +171,31 @@ def test_approved_runtime_config_records_the_constitution_registry_seam_exactly(
     df = _read("Dockerfile")
     for distribution in cfg["first_party_packages_in_image"]:
         assert f"COPY {distribution} /build/" in df, distribution
-    assert len(cfg["first_party_packages_in_image"]) == 12
+    assert len(cfg["first_party_packages_in_image"]) == 13
 
 
 def _sha256(path: str) -> str:
     import hashlib
     with open(path, "rb") as fh:
         return hashlib.sha256(fh.read()).hexdigest()
+
+
+def test_approved_runtime_config_records_front_door_seam_5_exactly():
+    """FD-9: the tenant-bound system registry file is handed; register is the only
+    write; the registrant is presented and unproven; the v2 amendment is recorded; one
+    package added to the image (ai-system-registry) and nothing else."""
+    import json
+    cfg = json.load(open(os.path.join(HERE, "approved-runtime-config.json"), encoding="utf-8"))
+    seam = cfg["system_registry"]
+    assert "SqliteSystemRegistry" in seam["store"] and "/var/run/ugence-studio" in seam["store"]
+    assert "no server, no driver, no DSN" in seam["store"]
+    assert "never re-bound" in seam["tenant_binding"] and "typed refusal" in seam["tenant_binding"]
+    assert "PRESENTED_UNPROVEN" in seam["registrant"]
+    assert seam["reachable_acts"].startswith("register (the only write")
+    assert "no edit, revocation, gate, admission, promotion or attestation" in seam["reachable_acts"]
+    assert "v2_registry_register" in seam["contract"]
+    assert seam["composition_record"].startswith("composition-record.json")
+    assert "persistent_database" in cfg["prohibited"] and "prohibited persistent_database" in seam["durability"]
+    assert cfg["first_party_packages_in_image"][-1] == "packages/integration/ai-system-registry"
+    assert "COPY packages/integration/ai-system-registry /build/" in _read("Dockerfile")
+    assert "openapi_v2_amendment" in cfg["frozen"] and "v2-A1" in cfg["frozen"]["openapi_v2_amendment"]

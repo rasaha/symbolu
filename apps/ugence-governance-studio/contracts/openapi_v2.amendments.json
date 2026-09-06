@@ -1,0 +1,24 @@
+{
+  "contract": "governance_studio.api.v2",
+  "note": "Every amendment to the frozen v2 contract, in order. previous_sha256 chains from original_sha256 to the committed openapi_v2.json bytes; the generated client (frontend/src/generated/api-v2.ts) and its hash file are regenerated with the repository's own tooling (npm run generate:api-v2) in the same step, and the P3E freeze (deployment/governance-studio/approved-runtime-config.json frozen.openapi_v2_sha256) carries the same sha256.",
+  "original_sha256": "dd63180dc91ba7842dc1dc2b6efb3dbc155ea3bd47200f40de7bac85d373f39a",
+  "original_frozen_by": "GAS-4 (v2 freeze); CR-2 served it behind v1",
+  "amendments": [
+    {
+      "amendment_id": "v2-A1",
+      "date": "2026-09-06",
+      "ruling": "ADR_UGENCE_STUDIO_FRONT_DOOR_SCOPING.md FD-9.4 V2_AMENDMENT_TWO_OPERATIONS",
+      "previous_sha256": "dd63180dc91ba7842dc1dc2b6efb3dbc155ea3bd47200f40de7bac85d373f39a",
+      "sha256": "1dbc612681b37b4b82a244a3c30631000856accfd8869f74a3c7a0b69e63cf97",
+      "operations_added": [
+        "v2_registry_register",
+        "v2_registry_list"
+      ],
+      "operations_removed": [],
+      "paths_added": [
+        "/api/v2/registry/registrations"
+      ],
+      "note": "Front-door seam 5: typed registration intake over ai-system-registry 0.2.0. The write records what an administrator asserted and confers nothing (registry ADR D-5); no other operation changed."
+    }
+  ]
+}

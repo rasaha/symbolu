@@ -33,7 +33,7 @@ env:
   # Source roots for every package on the SD-1 public-entry-point allowlist. The
   # first three are v1's; the rest are what the GAS-4 v2 surface reaches.
   PYTHONPATH: >-
-    apps/ugence-governance-studio/backend/src:packages/capabilities/agent-workforce-composer/src:packages/tooling/policy-workflow-compiler/src:packages/integration/agent-constitution-activation/src:packages/integration/agent-constitution-policy/src:packages/integration/agent-constitution-conformance/src:packages/capabilities/agentic-proposer/src:packages/policy-authority/src:packages/capabilities/decision-authority/src:packages/runtime/agent-runtime/src:packages/uvi-policy-contracts/src:packages/governance-contracts/src:packages/jcs/src
+    apps/ugence-governance-studio/backend/src:packages/capabilities/agent-workforce-composer/src:packages/tooling/policy-workflow-compiler/src:packages/integration/agent-constitution-activation/src:packages/integration/agent-constitution-policy/src:packages/integration/agent-constitution-conformance/src:packages/capabilities/agentic-proposer/src:packages/policy-authority/src:packages/capabilities/decision-authority/src:packages/runtime/agent-runtime/src:packages/uvi-policy-contracts/src:packages/governance-contracts/src:packages/jcs/src:packages/integration/ai-system-registry/src
   BACKEND: apps/ugence-governance-studio/backend
 
 jobs:

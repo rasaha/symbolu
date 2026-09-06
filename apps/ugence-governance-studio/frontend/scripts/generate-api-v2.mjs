@@ -40,6 +40,9 @@ export const REQUIRED_V2_OPERATIONS = [
   "v2_review_read_run_events",
   "v2_review_read_approval",
   "v2_review_submit_decision",
+  // Front-door seam 5 (FD-9): the Registration screen (typed intake; register is the only write).
+  "v2_registry_register",
+  "v2_registry_list",
 ];
 
 // SD-2, enforced at generation time as well as in the backend suite. If a route

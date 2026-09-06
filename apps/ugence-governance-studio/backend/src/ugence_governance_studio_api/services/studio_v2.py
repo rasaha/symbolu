@@ -24,11 +24,24 @@ presents the answer as though the real thing had run.
 from __future__ import annotations
 
 import re
-
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Tuple
 
 import ugence_agent_runtime.api as art
 import ugence_policy_workflow_compiler.api as compiler
+
+from ugence_ai_system_registry import (
+    ContractViolation as RegistryContractViolation,
+    CrossTenantRefused,
+    DuplicateRegistrationError,
+    RegistrationSupersessionError,
+    RegistryStorageError,
+    SystemRegistration,
+    binding_from_dict,
+    registration_id_for,
+    registration_record,
+    validity_from_dict,
+)
 
 from ..clients.console import ConsoleClient, ConsoleUnavailable
 from ..serialization.canonical import canonical_digest, to_jsonable
@@ -40,6 +53,8 @@ __all__ = [
     "SimulateService",
     "PublishService",
     "ObserveService",
+    "RegistryService",
+    "OWNER_REF_STATUS",
     "DependencyUnavailable",
     "SIMULATION_MODES",
     "EXECUTION_MODE_ARGUMENT",
@@ -671,3 +686,143 @@ class ReviewRelayService:
         through to the client unread and kept in no attribute of this service.
         """
         return self._guard(lambda: self._review.submit_decision(body, proof=proof))
+
+
+# --------------------------------------------------------------------------- #
+# 8 · Registration (front-door seam 5, FD-9)
+# --------------------------------------------------------------------------- #
+#: FD-9.3: the registrant is a typed opaque handle the form supplied. No identity is
+#: claimed; every answer says so.
+OWNER_REF_STATUS = "PRESENTED_UNPROVEN"
+REGISTRATION_CONFERS = "nothing: a registration is a record, not a permission (registry ADR D-5)"
+
+
+def _instant(text: str) -> Optional[datetime]:
+    """A timezone-aware ISO-8601 instant, or ``None``. Naive text is not an instant."""
+    try:
+        parsed = datetime.fromisoformat(text.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    return parsed if parsed.tzinfo is not None else None
+
+
+class RegistryService:
+    """Typed intake over the deployment's ``SqliteSystemRegistry`` (FD-9).
+
+    The tenant is the registry's, never the caller's. The registration id is derived
+    by the package, never chosen. Every field is validated by ai-system-registry's own
+    refusal reasons; the classification label is recorded uninterpreted; a superseding
+    registration is admitted only by the package's supersession rule. The only write is
+    ``register`` (FD-9.5); there is no edit, revocation, gate, admission or attestation.
+    """
+
+    CAPABILITY = "system_registry"
+
+    def __init__(self, registry: Any = None, registered_by: str = "") -> None:
+        self._registry = registry
+        self._registered_by = registered_by
+
+    def _gap(self) -> Dict[str, Any]:
+        return _unavailable(
+            self.CAPABILITY,
+            "no system registry is configured: this deployment holds no registration file, "
+            "so nothing can be recorded or listed",
+        )
+
+    @staticmethod
+    def _refused(code: str, message: str) -> Dict[str, Any]:
+        return {"available": True, "refused": True, "code": code, "reason": message, "result": None}
+
+    def register(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+        if self._registry is None:
+            return self._gap()
+        tenant_id = self._registry.tenant_id
+        try:
+            binding_input = dict(payload.get("binding") or {})
+            if "tenant_id" in binding_input:
+                return self._refused("registration_refused",
+                                     "tenant_id is the deployment's and is never caller-supplied")
+            binding = binding_from_dict({**binding_input, "tenant_id": tenant_id})
+            validity_input = dict(payload.get("validity") or {})
+            for name in ("issued_at", "expires_at", "stale_after"):
+                raw = validity_input.get(name)
+                if raw in (None, ""):
+                    continue
+                if not isinstance(raw, str) or _instant(raw) is None:
+                    return self._refused(
+                        "registration_refused",
+                        f"validity.{name} must be an ISO-8601 instant with a timezone")
+            validity = validity_from_dict(validity_input)
+            if validity is None:
+                return self._refused("registration_refused", "validity is required")
+            owner_ref = payload.get("owner_ref", "")
+            registration = SystemRegistration(
+                registration_id=registration_id_for(binding, owner_ref, validity),
+                binding=binding,
+                owner_ref=owner_ref,
+                classification_label=payload.get("classification_label", ""),
+                validity=validity,
+                supersedes=payload.get("supersedes", "") or "",
+                registered_by=self._registered_by,
+                notes=payload.get("notes", "") or "",
+            )
+        except RegistryContractViolation as exc:
+            return self._refused("registration_refused", str(exc))
+        except (TypeError, ValueError) as exc:
+            return self._refused("registration_refused", f"typed input refused: {exc}")
+        try:
+            self._registry.register(registration)
+        except DuplicateRegistrationError as exc:
+            return self._refused("registration_duplicate", str(exc))
+        except RegistrationSupersessionError as exc:
+            return self._refused("supersession_refused", str(exc))
+        except CrossTenantRefused as exc:
+            return self._refused("registration_refused", str(exc))
+        except RegistryStorageError as exc:
+            return _unavailable(self.CAPABILITY, f"the registry could not be written: {exc}")
+        return {
+            "available": True,
+            "registered": True,
+            "tenant_id": tenant_id,
+            "registry_kind": type(self._registry).__name__,
+            "record": registration_record(registration),
+            "record_digest": registration.record_digest(),
+            "registration_id": registration.registration_id,
+            "owner_ref_status": OWNER_REF_STATUS,
+            "registered_by": self._registered_by,
+            "confers": REGISTRATION_CONFERS,
+            "result": registration_record(registration),
+        }
+
+    def list(self, *, as_of: Optional[str]) -> Dict[str, Any]:
+        if self._registry is None:
+            return self._gap()
+        tenant_id = self._registry.tenant_id
+        if as_of is None:
+            instant = datetime.now(timezone.utc)
+            source = "request"
+        else:
+            parsed = _instant(as_of) if isinstance(as_of, str) else None
+            if parsed is None:
+                return self._refused("as_of_untyped",
+                                     "as_of must be an ISO-8601 instant with a timezone")
+            instant = parsed
+            source = "caller"
+        try:
+            registrations = self._registry.registrations_for_tenant(tenant_id=tenant_id, as_of=instant)
+        except CrossTenantRefused as exc:
+            return self._refused("registration_refused", str(exc))
+        except (RegistryStorageError, RegistryContractViolation) as exc:
+            return _unavailable(self.CAPABILITY, f"the registry could not be read: {exc}")
+        records = [registration_record(r) for r in registrations]
+        return {
+            "available": True,
+            "tenant_id": tenant_id,
+            "registry_kind": type(self._registry).__name__,
+            "as_of": instant.isoformat(),
+            "as_of_source": source,
+            "count": len(records),
+            "owner_ref_status": OWNER_REF_STATUS,
+            "confers": REGISTRATION_CONFERS,
+            "result": records,
+        }

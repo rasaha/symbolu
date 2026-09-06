@@ -8,6 +8,7 @@ import { NavLink, Outlet } from "react-router-dom";
 import type { CompiledRelease, StudioReleaseContext } from "./release";
 
 const SCREENS = [
+  { to: "registration", label: "Registration" },
   { to: "constitution", label: "Constitution" },
   { to: "policy", label: "Policy" },
   { to: "authority", label: "Authority" },

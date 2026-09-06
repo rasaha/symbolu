@@ -57,11 +57,12 @@ describe("SD-2 — no screen can reach an authority act", () => {
     expect(detectAuthorityActs(poisoned, manifest.prohibited_verbs).length).toBeGreaterThan(0);
   });
 
-  it("the v2 client consumes exactly the seventeen approved operations", () => {
+  it("the v2 client consumes exactly the nineteen approved operations", () => {
+    // seventeen since GAS-7 HR-D, plus the two registry operations of front-door seam 5 (FD-9.4)
     const { consumed, unmatched } = detectV2Consumption(clientText, spec);
     expect(unmatched).toEqual([]);
     expect([...consumed].sort()).toEqual([...manifest.approved_operation_ids].sort());
-    expect(consumed.size).toBe(17);
+    expect(consumed.size).toBe(19);
     expect([...V2_OPERATIONS].sort()).toEqual([...manifest.approved_operation_ids].sort());
   });
 

@@ -50,9 +50,12 @@ def _build_backend(config: DeploymentConfig):
     1 (FD-5); and when policy identities are configured too, the Authority screen's
     read-only, tenant-bound registry view and those identities (seam 2, FD-6); and
     when the simulation provider is enabled, a registry holding the one pinned
-    in-image provider (seam 3, FD-7). No decision store, governance hook (FD-7.3: the
-    runtime's fail-closed default stays; FD-7.5: nothing permissive is ever handed) or
-    console URL: those screens report their gaps rather than a stand-in.
+    in-image provider (seam 3, FD-7); and when a system registry path is configured,
+    the tenant-bound system registry the Registration screen records into, with this
+    deployment's name and version as ``registered_by`` (seam 5, FD-9). No decision
+    store, governance hook (FD-7.3: the runtime's fail-closed default stays; FD-7.5:
+    nothing permissive is ever handed) or console URL: those screens report their
+    gaps rather than a stand-in.
     """
     from ugence_governance_studio_api.app_v2 import build_studio_context, create_combined_app
     from ugence_governance_studio_api.settings import ApiSettings
@@ -87,12 +90,22 @@ def _build_backend(config: DeploymentConfig):
         from .simulation import build_simulation_registry
 
         provider_registry = build_simulation_registry()
+    system_registry = None
+    registered_by = ""
+    if config.system_registry_path:
+        from .registration import REGISTERED_BY, open_system_registry
+
+        system_registry = open_system_registry(config.system_registry_path, tenant_id=config.tenant_id,
+                                               production_mode=config.is_production)
+        registered_by = REGISTERED_BY
     studio = build_studio_context(
         activation_root=activation_root,
         policy_registry=policy_registry,
         policy_identities=policy_identities,
         provider_registry=provider_registry,
         review_service_base_url=config.review_service_url or None,
+        system_registry=system_registry,
+        registered_by=registered_by,
     )
     from .simulation import refuse_permissive_hook
 
