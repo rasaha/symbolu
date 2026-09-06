@@ -38,7 +38,7 @@ must not be built as screens. The import path is already ruled.
 | 2 | Agent role builder | Agent Constitution and owner | `agent-constitution-policy` (family), `-activation` (preflight, issuance receipts), `-conformance`; owner is an opaque external fact (OD-C4=A) | Constitution screen; `activation_root` not handed in P3E | `[V]` |
 | 3 | Workflow canvas | typed proposal and workflow contracts | `policy-workflow-compiler` (`compile_policy_pack` to Workflow IR), `agent-workforce-composer` (role adaptation, eligibility); the React Flow canvas is the ratified authoring surface (GAS-R3) | Policy screen (validate, synthesize, compile) | `[V]` |
 | 4 | Model and reasoning selector | model-selection and reasoning-governance records | `model-selection` (policy-bounded selection, owns no routing), `reasoning-method-governance` and `-advisor` (research-only slice 1), `agentic-proposer-strategy-permission-*` (signable strategy permission) | no screen | `[V]` packages (research-only labels), `[G]` screen |
-| 5 | Data and tool connections | data permissions, tool scopes, egress restrictions | `data-use-admission` (declared data use), `vendor-dependency`; egress: `ADR_UGENCE_DATA_EGRESS_AUTHORITY_SCOPING.md` ratified, no package; tool scopes live in the governed-execution restrictions the hook already carries | no screen | `[V]` records, `[G]` egress package and screen |
+| 5 | Data and tool connections | data permissions, tool scopes, egress restrictions | `data-use-admission` (declared data use), `vendor-dependency`; egress: `ADR_UGENCE_DATA_EGRESS_AUTHORITY_SCOPING.md` is **discharged** — it authorized `data-use-admission`, which shipped as seam 8; what it deferred is *result* egress (DE-1), a seam no document has declared; tool scopes live in the governed-execution restrictions the hook already carries | screens shipped (seams 8, 9) | `[V]` records and screens, `[G]` result egress, undeclared |
 | 6 | Policy builder | machine-enforceable policy bindings | `policy-authority` registry, `policy-workflow-compiler`, `decision-authority`; `agentic-proposer` S1 contracts (proposes, decides nothing) | Policy and Authority screens; `policy_registry`, `decision_store` not handed in P3E | `[V]` |
 | 7 | Simulation laboratory | evidence, failures, readiness | `agent-runtime` over fixture providers, `agent-runtime-governance` hook; readiness: `agent-value-readiness`; `agent-assurance-evidence` records what an exercise found | Simulate screen; `governance_hook`, `provider_registry` not handed in P3E, so it BLOCKs by design | `[V]` |
 | 8 | Authority designer | authority graph and approval workflow | `authority-directory` (grants, delegation, committees), `approval-workflow`, `governed-review`, `governed-review-service`, `approver-identity-jwt` | Review queue and run detail, wired end to end (steps 2 and 3) | `[V]` |
@@ -937,7 +937,9 @@ owner input, or a non-goal. Everything below is documentation; no seam is activa
   says the package "records what a declarer asserted" and never inspects, verifies,
   scores, persists or decides. That is exactly `ai-system-registry`'s state before
   FD-9, and seam 5 is the proven shape for it. The row's third element, egress
-  restrictions, has a ratified ADR and no package (§3), and stays `[G]`.
+  restrictions, was described here as having a ratified ADR and no package. That was
+  wrong from seam 8 onward and is corrected in that ADR's §7: it is discharged, and
+  what stays `[G]` is *result* egress (DE-1), a seam no document has declared.
 - **Row 4, model and reasoning selector.** `model-selection` and
   `reasoning-method-governance` are 0.1.0 research-only slices (§3); roadmap §11.2 rules
   "no research-only package in the product". Not enterable as a screen `[V]`.
@@ -1088,7 +1090,7 @@ operation amendment, the same P3E configuration value.
 | Item | Kind | State |
 |---|---|---|
 | `vendor-dependency` declarations (row 5) | **seam a ruling can open** | enterable now; needs FD-13 |
-| Egress restrictions (row 5) | seam blocked on an absent package | ratified ADR, no package `[G]` |
+| Result egress (row 5) | seam not yet declared | its ADR is discharged; DE-1's deferred seam has no document `[G]` |
 | Console in the profile (seam 4) | packaging body of work | FD-8.1 holds until FD-8.3 completes |
 | Durable Decision Authority store | package decision | no producer; store empty by construction |
 | Mirror coordinates | owner input | `registry_host`, `repository_prefix`, `secret_name` all `null`; `PENDING_OUTSIDE_REPOSITORY` |
@@ -1196,7 +1198,7 @@ The three seam packages that gained a durable home — `ai-system-registry`,
 
 | Item | Kind | The one input | Who supplies it |
 |---|---|---|---|
-| Egress restrictions (row 5's third element) | seam with no package | an egress-authority package; `ADR_UGENCE_DATA_EGRESS_AUTHORITY_SCOPING.md` is ratified and no package exists `[G]` | a body of work, then a ruling |
+| Result egress (row 5's third element) | seam not yet declared | a document declaring where model output crosses a boundary worth governing; the named ADR is discharged, not unimplemented (its §7) `[G]` | a body of work, then an owner ratification |
 | Console in the profile (seam 4) | packaging body of work | FD-8.3 completion: the root prototype at `apps/console/` becomes a bounded, installable, tested distribution with an authentication boundary and a stated maturity | a body of work |
 | Durable Decision Authority store | package decision | a producer of decisions; the store would be empty by construction until one exists | a body of work |
 | Mirror coordinates | owner input | `registry_host`, `repository_prefix`, `secret_name` — all three `null`, `provisioning.status: PENDING_OUTSIDE_REPOSITORY` | the owner |
@@ -1219,9 +1221,12 @@ store — which is why no seam has fixed it: no seam hands one.
 
 A front-door seam under FD-1 needs a package with a public surface the studio can type
 against and a composition root that can hand it over. Every outline row that had one
-now has a screen. A tenth seam therefore requires a *new package* first — the egress
-authority being the named candidate — and that package is itself a body of work under
-its own ADR, not a ruling this document can make. Until such a package exists, or the
+now has a screen. A tenth seam therefore requires a *new package* first. Result egress was audited as
+the candidate on 2026-09-06 and is not one yet: its seam has never been declared, no
+producer of model output is reachable (`LIVE` is absent), and `ENFORCEMENT_ENABLED` is
+`False` everywhere, so a package written now would answer no question. The prerequisite
+is a document declaring the seam, then a scoping ADR of its own — a body of work and an
+owner ratification, not a ruling this document can make. Until such a package exists, or the
 console is packaged under FD-8.3, or an owner input arrives, there is nothing for a
 ruling to decide.
 

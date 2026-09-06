@@ -79,3 +79,65 @@ into without a further ruling:
 
 Implement `packages/integration/data-use-admission` 0.1.0 under the decisions
 above, after `DataClassificationLabel` lands in governance-contracts.
+
+## 7 — Post-implementation audit (2026-09-06): this record is discharged
+
+**The question asked.** Should an egress-authority package be scoped now, as the
+named candidate for a tenth front-door seam under FD-1?
+
+**The answer, which is first a correction.** The question rests on a false premise
+that this repository's own documents have carried since the front-door outline was
+written. **This record is not an unimplemented ADR. It is discharged.** §6 named one
+next step — implement `packages/integration/data-use-admission` 0.1.0 — and that
+package exists at 0.2.0 with a durable store, a studio screen and a composed
+deployment seam (front-door seam 8, FD-12) `[V]`.
+
+The claim "`ADR_UGENCE_DATA_EGRESS_AUTHORITY_SCOPING.md` ratified, no package"
+appears in `ADR_UGENCE_STUDIO_FRONT_DOOR_SCOPING.md` §2's outline table (row 5) and
+was propagated from there into its §13.1, §14.3 and §15.2 `[V]`. It was true when
+first written and became false the moment seam 8 shipped. The front-door ADR is
+corrected alongside this section.
+
+### 7.1 What genuinely has no package `[V]`
+
+Not "the egress package". Two things this record deferred **in terms**, in §5:
+
+- **Result egress (DE-1).** "Result and output egress is a second, undeclared seam
+  after model output; it remains explicitly deferred." No noun for it exists anywhere
+  in the repository: a search for `result_egress`, `output_egress`, `ResultEgress` or
+  `OutputEgress` across all Python and Markdown returns nothing `[V]`.
+- **Residency consolidation (DE-2).** Prohibited without a further ruling, and
+  nothing has changed: ActionGate keeps `allowed_region`, Model Selection keeps
+  `data_residency_allowed`, and `data-use-admission` records `residency_label` and
+  evaluates it nowhere `[V]`.
+
+### 7.2 Why result egress is not scopable now `[V]`
+
+An egress *authority*, unlike the record this ADR authorized, would have to decide —
+and there is nowhere for a decision to land:
+
+| Prerequisite | State |
+|---|---|
+| A producer of model output to govern | none reachable: `SIMULATION_MODES` is `("DRY_RUN", "SIMULATION", "SHADOW")` and `LIVE` is deliberately absent (`studio_v2.py:100-102`) `[V]` |
+| An enforcement point | none: `ENFORCEMENT_ENABLED = False` in all eleven packages that declare it `[V]` |
+| A ruled seam to sit at | none: DE-1 calls result egress "a second, **undeclared** seam" — undeclared here means not yet described by any ADR, this one included `[V]` |
+
+A package written now would record declarations about output that nothing produces,
+for enforcement that cannot happen, at a seam no document has drawn. That is not a
+contracts-only slice awaiting an engine; it is a slice with no question to answer.
+The admission seam had one — `context-minimization/README.md:14` named it and nothing
+sat upstream `[V]`. Result egress has no equivalent citation, and inventing one would
+be authoring governance content rather than recording it.
+
+### 7.3 What would have to come first `[I]`
+
+In order: a declared result-egress seam — a document that names where model output
+crosses a boundary worth governing, as §1 did for admission — then a scoping ADR of
+its own with its own ratified decisions, then a contracts-only slice. The first is a
+body of work and the second an owner ratification; neither is a ruling this record can
+make, and the third cannot begin before them.
+
+**No ruling is proposed, and none is needed.** The front door under FD-1 remains at
+the ceiling FD-13.1 named. Row 5's third element stays `[G]` — not because a ratified
+ADR awaits implementation, but because the seam it would serve has never been
+declared.
