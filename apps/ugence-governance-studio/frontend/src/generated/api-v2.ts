@@ -1,6 +1,6 @@
 // AUTO-GENERATED from apps/ugence-governance-studio/contracts/openapi_v2.json
 // DO NOT EDIT BY HAND. Regenerate with: npm run generate:api-v2
-// source_openapi_sha256: 956c8289e77c31afa304a58a2cf94023b057a44f78c9159c83496338202b3b51
+// source_openapi_sha256: 907f360f2ba2127d005c140d6146ab441056794ba2b1f1a35580cf4148956e73
 // api_contract_version: governance_studio.api.v2
 
 export interface paths {
@@ -485,6 +485,39 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v2/vendor/declarations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Vendor Declarations
+         * @description The vendor declarations in force for this deployment's tenant at ``as_of``.
+         *
+         *     ``as_of`` is an ISO-8601 instant with a timezone; absent, the request's own instant
+         *     is used and reported back. A declaration outside its window is absent from the
+         *     answer, never flagged. The answer is never ordered by posture: nothing ranks one.
+         */
+        get: operations["v2_vendor_list"];
+        put?: never;
+        /**
+         * Declare Vendor Dependency
+         * @description Record one typed vendor-dependency declaration for this deployment's tenant.
+         *
+         *     Every field is validated by vendor-dependency's own refusal reasons; a superseding
+         *     declaration is admitted only by ``supersession_refusals``. ``vendor_ref`` is an
+         *     opaque handle and the record carries no way to reach the vendor. A refusal is
+         *     typed, never a 500.
+         */
+        post: operations["v2_vendor_declare"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -816,6 +849,92 @@ export interface components {
             msg: string;
             /** Error Type */
             type: string;
+        };
+        /**
+         * VendorBindingInput
+         * @description The exact system and configuration a vendor declaration is about.
+         *
+         *     No ``tenant_id``: the tenant is the deployment's and is never caller-supplied.
+         *     The two required digests are lowercase sha-256 hex the declarer asserts; the
+         *     studio computes none of them.
+         */
+        VendorBindingInput: {
+            /** Binding Id */
+            binding_id: string;
+            /** Configuration Digest */
+            configuration_digest: string;
+            /** Configuration Id */
+            configuration_id: string;
+            /** Context Digest */
+            context_digest: string;
+            /** Context Id */
+            context_id: string;
+            /**
+             * Deployment Environment Ref
+             * @default
+             */
+            deployment_environment_ref: string;
+            /** Subject Id */
+            subject_id: string;
+            /** System Id */
+            system_id: string;
+            /** System Version */
+            system_version: string;
+        };
+        /**
+         * VendorDeclareRequest
+         * @description Declare one vendor dependency for this deployment's tenant (typed intake, FD-4).
+         *
+         *     No ``declaration_id`` (derived by the package, never chosen) and no ``tenant_id``
+         *     (the deployment's). ``vendor_ref`` is an opaque, non-secret reference — never an
+         *     address, endpoint or credential, and there is no field that could carry one.
+         *     ``risk_posture_label`` is recorded uninterpreted (VR-3, FD-13.4): nothing orders,
+         *     compares, ranks or scores it, and there is no field for an approval, onboarding
+         *     status, tier or certification because no package computes one. ``policy_ref`` is
+         *     recorded and never resolved (VR-4), and ``declared_by`` is an opaque handle
+         *     recorded as presented and unproven (FD-12.3, carried forward by FD-13.2).
+         */
+        VendorDeclareRequest: {
+            binding: components["schemas"]["VendorBindingInput"];
+            /**
+             * Correlation Id
+             * @default
+             */
+            correlation_id: string;
+            /**
+             * Declared By
+             * @default
+             */
+            declared_by: string;
+            /**
+             * Notes
+             * @default
+             */
+            notes: string;
+            /** Policy Ref */
+            policy_ref: string;
+            /** Risk Posture Label */
+            risk_posture_label: string;
+            /**
+             * Supersedes
+             * @default
+             */
+            supersedes: string;
+            validity: components["schemas"]["VendorValidityInput"];
+            /** Vendor Ref */
+            vendor_ref: string;
+        };
+        /**
+         * VendorValidityInput
+         * @description The declaration window, as ISO-8601 instants with a timezone.
+         */
+        VendorValidityInput: {
+            /** Expires At */
+            expires_at?: string | null;
+            /** Issued At */
+            issued_at: string;
+            /** Stale After */
+            stale_after?: string | null;
         };
     };
     responses: never;
@@ -1516,6 +1635,70 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["SimulateRunRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    v2_vendor_list: {
+        parameters: {
+            query?: {
+                as_of?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    v2_vendor_declare: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VendorDeclareRequest"];
             };
         };
         responses: {

@@ -104,6 +104,12 @@ _PUBLIC_ENTRY_ALLOWLIST = {
         "from ugence_data_use_admission import ",
         "import ugence_data_use_admission",
     ),
+    # Front-door seam 9 (FD-13): the vendor-dependency intake over the package's
+    # curated public surface only; its `durable` store is reached through that surface.
+    "ugence_vendor_dependency": (
+        "from ugence_vendor_dependency import ",
+        "import ugence_vendor_dependency",
+    ),
 }
 
 # SD-2 — permanently outside the allowlist. These are authority acts, and the

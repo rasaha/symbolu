@@ -30,6 +30,19 @@ from typing import Any, Dict, List, Optional, Tuple
 import ugence_agent_runtime.api as art
 import ugence_policy_workflow_compiler.api as compiler
 
+from ugence_vendor_dependency import (
+    ContractViolation as VendorContractViolation,
+    CrossTenantRefused as VendorCrossTenantRefused,
+    DeclarationStorageError as VendorStorageError,
+    DeclarationSupersessionError as VendorSupersessionError,
+    DuplicateDeclarationError as DuplicateVendorDeclarationError,
+    VendorDependencyDeclaration,
+    VendorRiskLabel,
+    binding_from_dict as vendor_binding_from_dict,
+    declaration_id_for as vendor_declaration_id_for,
+    declaration_record as vendor_declaration_record,
+    validity_from_dict as vendor_validity_from_dict,
+)
 from ugence_data_use_admission import (
     ContractViolation as DeclarationContractViolation,
     DataClassificationLabel,
@@ -68,6 +81,9 @@ __all__ = [
     "ObserveService",
     "RegistryService",
     "DeclarationService",
+    "VendorDeclarationService",
+    "VENDOR_RISK_POSTURE_NOTE",
+    "VENDOR_DECLARATION_CONFERS",
     "DECLARED_BY_STATUS",
     "DECLARATION_CONFERS",
     "EGRESS_RESTRICTIONS_NOTE",
@@ -1105,5 +1121,161 @@ class DeclarationService:
             "recorded_by": self._recorded_by,
             "confers": DECLARATION_CONFERS,
             "egress_restrictions": EGRESS_RESTRICTIONS_NOTE,
+            "result": records,
+        }
+
+
+# --------------------------------------------------------------------------- #
+# Screen 5b · Vendor dependencies (front-door seam 9, FD-13)
+# --------------------------------------------------------------------------- #
+#: FD-13.4: the posture is what the declarer called it. Nothing here or anywhere in
+#: this repository orders, compares, ranks or scores it, and no approval or
+#: onboarding status exists to show beside it.
+VENDOR_RISK_POSTURE_NOTE = (
+    "uninterpreted: the posture is recorded exactly as the declarer typed it and is "
+    "ordered, compared, ranked and scored nowhere; no vendor approval, onboarding "
+    "status, tier or certification is implied, because no package computes one"
+)
+VENDOR_DECLARATION_CONFERS = (
+    "nothing: a vendor declaration is a record of what a declarer asserted, not an "
+    "approval, an onboarding decision or a permission (vendor-risk ADR VR-1, FD-13.4)"
+)
+
+
+class VendorDeclarationService:
+    """Typed intake over the deployment's ``SqliteVendorDeclarations`` (FD-13).
+
+    The tenant is the store's, never the caller's. The declaration id is derived by
+    the package, never chosen. Every field is validated by vendor-dependency's own
+    refusal reasons; the risk posture is recorded uninterpreted (VR-3, FD-13.4) and
+    the ``policy_ref`` recorded and never resolved (VR-4); a superseding declaration
+    is admitted only by ``supersession_refusals``. The only write is ``declare``
+    (FD-13.4): there is no edit, revocation, approval, onboarding, verification,
+    scoring or enforcement, and the record carries an opaque ``vendor_ref`` and never
+    a way to reach the vendor.
+    """
+
+    CAPABILITY = "vendor_declarations"
+
+    def __init__(self, declarations: Any = None, recorded_by: str = "") -> None:
+        self._declarations = declarations
+        self._recorded_by = recorded_by
+
+    def _gap(self) -> Dict[str, Any]:
+        return _unavailable(
+            self.CAPABILITY,
+            "no vendor declarations file is configured: this deployment holds no "
+            "vendor declarations file, so nothing can be recorded or listed",
+        )
+
+    @staticmethod
+    def _refused(code: str, message: str) -> Dict[str, Any]:
+        return {"available": True, "refused": True, "code": code, "reason": message, "result": None}
+
+    def declare(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+        if self._declarations is None:
+            return self._gap()
+        tenant_id = self._declarations.tenant_id
+        try:
+            binding_input = dict(payload.get("binding") or {})
+            if "tenant_id" in binding_input:
+                return self._refused("vendor_declaration_refused",
+                                     "tenant_id is the deployment's and is never caller-supplied")
+            binding = vendor_binding_from_dict({**binding_input, "tenant_id": tenant_id})
+            validity_input = dict(payload.get("validity") or {})
+            for name in ("issued_at", "expires_at", "stale_after"):
+                raw = validity_input.get(name)
+                if raw in (None, ""):
+                    continue
+                if not isinstance(raw, str) or _instant(raw) is None:
+                    return self._refused(
+                        "vendor_declaration_refused",
+                        f"validity.{name} must be an ISO-8601 instant with a timezone")
+            validity = vendor_validity_from_dict(validity_input)
+            if validity is None:
+                return self._refused("vendor_declaration_refused", "validity is required")
+            posture = VendorRiskLabel(payload.get("risk_posture_label", ""))
+            vendor_ref = payload.get("vendor_ref", "")
+            policy_ref = payload.get("policy_ref", "")
+            declaration = VendorDependencyDeclaration(
+                declaration_id=vendor_declaration_id_for(binding, vendor_ref, posture,
+                                                         policy_ref, validity),
+                tenant_id=tenant_id,
+                binding=binding,
+                vendor_ref=vendor_ref,
+                risk_posture=posture,
+                policy_ref=policy_ref,
+                validity=validity,
+                supersedes=payload.get("supersedes", "") or "",
+                declared_by=payload.get("declared_by", "") or "",
+                correlation_id=payload.get("correlation_id", "") or "",
+                notes=payload.get("notes", "") or "",
+            )
+        except VendorContractViolation as exc:
+            return self._refused("vendor_declaration_refused", str(exc))
+        except (TypeError, ValueError) as exc:
+            return self._refused("vendor_declaration_refused", f"typed input refused: {exc}")
+        try:
+            self._declarations.declare(declaration)
+        except DuplicateVendorDeclarationError as exc:
+            return self._refused("vendor_declaration_duplicate", str(exc))
+        except VendorSupersessionError as exc:
+            return self._refused("supersession_refused", str(exc))
+        except VendorCrossTenantRefused as exc:
+            return self._refused("vendor_declaration_refused", str(exc))
+        except VendorStorageError as exc:
+            return _unavailable(self.CAPABILITY,
+                                f"the vendor declarations file could not be written: {exc}")
+        record = vendor_declaration_record(declaration)
+        return {
+            "available": True,
+            "declared": True,
+            "tenant_id": tenant_id,
+            "store_kind": type(self._declarations).__name__,
+            "record": record,
+            "record_digest": declaration.record_digest(),
+            "declaration_id": declaration.declaration_id,
+            "declared_by": declaration.declared_by,
+            "declared_by_status": DECLARED_BY_STATUS,
+            "recorded_by": self._recorded_by,
+            "risk_posture": VENDOR_RISK_POSTURE_NOTE,
+            "confers": VENDOR_DECLARATION_CONFERS,
+            "result": record,
+        }
+
+    def list(self, *, as_of: Optional[str]) -> Dict[str, Any]:
+        if self._declarations is None:
+            return self._gap()
+        tenant_id = self._declarations.tenant_id
+        if as_of is None:
+            instant = datetime.now(timezone.utc)
+            source = "request"
+        else:
+            parsed = _instant(as_of) if isinstance(as_of, str) else None
+            if parsed is None:
+                return self._refused("as_of_untyped",
+                                     "as_of must be an ISO-8601 instant with a timezone")
+            instant = parsed
+            source = "caller"
+        try:
+            declarations = self._declarations.declarations_for_tenant(
+                tenant_id=tenant_id, as_of=instant)
+        except VendorCrossTenantRefused as exc:
+            return self._refused("vendor_declaration_refused", str(exc))
+        except (VendorStorageError, VendorContractViolation) as exc:
+            return _unavailable(self.CAPABILITY,
+                                f"the vendor declarations file could not be read: {exc}")
+        records = [vendor_declaration_record(d) for d in declarations]
+        return {
+            "available": True,
+            "tenant_id": tenant_id,
+            "store_kind": type(self._declarations).__name__,
+            "as_of": instant.isoformat(),
+            "as_of_source": source,
+            "count": len(records),
+            "declared_by_status": DECLARED_BY_STATUS,
+            "recorded_by": self._recorded_by,
+            "risk_posture": VENDOR_RISK_POSTURE_NOTE,
+            "confers": VENDOR_DECLARATION_CONFERS,
             "result": records,
         }

@@ -224,3 +224,57 @@ class DataUseDeclareRequest(StrictModel):
     declared_by: str = ""
     correlation_id: str = ""
     notes: str = ""
+
+
+# --------------------------------------------------------------------------- #
+# Vendor dependencies (front-door seam 9, FD-13)
+# --------------------------------------------------------------------------- #
+class VendorBindingInput(StrictModel):
+    """The exact system and configuration a vendor declaration is about.
+
+    No ``tenant_id``: the tenant is the deployment's and is never caller-supplied.
+    The two required digests are lowercase sha-256 hex the declarer asserts; the
+    studio computes none of them.
+    """
+
+    binding_id: str
+    subject_id: str
+    context_id: str
+    context_digest: str
+    system_id: str
+    system_version: str
+    configuration_id: str
+    configuration_digest: str
+    deployment_environment_ref: str = ""
+
+
+class VendorValidityInput(StrictModel):
+    """The declaration window, as ISO-8601 instants with a timezone."""
+
+    issued_at: str
+    expires_at: Optional[str] = None
+    stale_after: Optional[str] = None
+
+
+class VendorDeclareRequest(StrictModel):
+    """Declare one vendor dependency for this deployment's tenant (typed intake, FD-4).
+
+    No ``declaration_id`` (derived by the package, never chosen) and no ``tenant_id``
+    (the deployment's). ``vendor_ref`` is an opaque, non-secret reference — never an
+    address, endpoint or credential, and there is no field that could carry one.
+    ``risk_posture_label`` is recorded uninterpreted (VR-3, FD-13.4): nothing orders,
+    compares, ranks or scores it, and there is no field for an approval, onboarding
+    status, tier or certification because no package computes one. ``policy_ref`` is
+    recorded and never resolved (VR-4), and ``declared_by`` is an opaque handle
+    recorded as presented and unproven (FD-12.3, carried forward by FD-13.2).
+    """
+
+    binding: VendorBindingInput
+    vendor_ref: str
+    risk_posture_label: str
+    policy_ref: str
+    validity: VendorValidityInput
+    supersedes: str = ""
+    declared_by: str = ""
+    correlation_id: str = ""
+    notes: str = ""
