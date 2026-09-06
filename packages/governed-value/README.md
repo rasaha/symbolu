@@ -3,8 +3,9 @@
 > **Scope (read first).** This package is an **experimental, downstream
 > reported-value _calculation kernel_**. It computes a post-deployment
 > governed-value figure from **caller-reported, unverified inputs**. It is **not**
-> an ROI governance system: it has no evidence, attribution, or authority binding
-> yet, so it can never claim a figure is observed, attributed, or verified —
+> an ROI governance system: it can **carry** typed observations (GV-2) but has no
+> attribution or authority binding, so it can never claim a figure is observed,
+> attributed, or verified —
 > naming an input "realized" does not make it so. Every ``reported_*`` figure is a
 > caller assertion about the supplied accounting period, not a determination by
 > this kernel. It is one stage (the
@@ -56,9 +57,34 @@ Every result carries all four; they are independent, not one enum:
 | `AuthorityStatus` | `UNVERIFIED` · `ATTESTED` · `VERIFIED` | **`UNVERIFIED`** only |
 | `Scorability` | `SCORABLE` · `DEGRADED` · `NOT_SCORABLE` | computed |
 
-Rising above `REPORTED`/`UNVERIFIED` requires the evidence (GV-2) and authority
-(GV-4) layers, which do not exist. The classification is invariant across
-`SCORABLE`/`DEGRADED`/`NOT_SCORABLE`.
+Rising above `REPORTED`/`UNVERIFIED` requires the authority layer (GV-4), which
+does not exist. The classification is invariant across
+`SCORABLE`/`DEGRADED`/`NOT_SCORABLE` **and across bound observations** — see
+"Observations" below.
+
+## Observations (GV-2)
+
+`score(case, observations)` accepts already-constructed `MetricObservation`
+values from `ugence-governance-contracts` and binds each to the case: exact
+type, matching `tenant_id`, `governed_unit` equal to the case's `natural_unit`,
+and no repeated `observation_id`. Any violation raises `ObservationBindingError`
+and **no result is produced** — the whole set refuses, because a figure scored
+beside a mis-bound observation is worse than one scored beside none.
+
+What is admitted is recorded on the result as `observed_metrics`, a tuple of
+`ObservedMetric`: observation id, metric id, governed unit, window bounds,
+evidence-reference count and content digest. It is carried **outside every
+monetary term and outside the scorability verdict**.
+
+**A bound observation does not make the figure observed.** The caller who
+supplies the case also supplies the observation, so emitting
+`EvidenceStatus.OBSERVED` on that basis would be exactly the caller-elevated
+evidence the platform's anti-gaming invariants forbid: elevation needs
+provenance *and* method *and* authority, and a producer may never attest its own
+output. This kernel constructs no observation and attests none. The seam exists
+so that when an attesting authority arrives there is somewhere for its output to
+land; until then `evidence_status` stays `REPORTED` and `authority_status` stays
+`UNVERIFIED`, pinned by test.
 
 ## Design invariants (enforced + tested)
 
@@ -83,8 +109,8 @@ Rising above `REPORTED`/`UNVERIFIED` requires the evidence (GV-2) and authority
 
 ```
 src/governed_value/
-  domain/         money · value · expected_loss · cost · investment · modifiers · attribution · case · enums
-  services/       scorer (reported NGV + risk-adjusted view + guards + classification)
+  domain/         money · value · expected_loss · cost · investment · modifiers · attribution · case · enums · observation
+  services/       ingress (observation binding) · scorer (reported NGV + risk-adjusted view + guards + classification)
   observability/  governance-event bus
   api/            application facade + public surface
 tests/            unit · contract · adversarial (+ reusable scenario builder)
@@ -132,16 +158,19 @@ No binary drift reaches a reported number.
 python packages/governed-value/verify_governed_value_distribution.py
 ```
 
-Builds the single wheel, installs it into a clean `--no-index` venv (zero
-third-party packages), and proves the reported calculation, the honest
-classification, the fail-closed suppression, and the additive-catastrophic-loss
-behaviour.
+Builds this wheel and the one it depends on into a local wheelhouse, installs
+from it into a clean `--no-index` venv (zero third-party packages), and proves
+the reported calculation, the honest classification, the fail-closed
+suppression, the additive-catastrophic-loss behaviour, and that a bound
+observation is carried without lifting either quality axis.
 
 ## Not in this package (separate, reviewed phases)
 
 Pre-ROI readiness scoring (Intelligence / Capabilities / Adoption), forecast
 modelling, geography/domain/outcome as **versioned policy context**, evidence &
 attribution binding, authority adapters, FX / valuation basis / discounting,
-per-unit normalization (`NormalizationBasis`), and portfolio comparison. This
-kernel deliberately stops at a deterministic reported-value calculation over
-caller-reported inputs.
+per-unit normalization (`NormalizationBasis`), and portfolio comparison. **The
+producer of observations is a deployment concern**, and the authority adapter
+(GV-4) waits on an attesting authority. This kernel deliberately stops at a
+deterministic reported-value calculation over caller-reported inputs, with typed
+observations carried beside it.

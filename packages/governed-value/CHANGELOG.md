@@ -1,5 +1,67 @@
 # Changelog — ugence-governed-value
 
+## [0.3.0] — GV-2 observation ingress (GV-DEP, GV-PRODUCER, GV-ORDER)
+
+Ratified by `docs/architecture/ADR_UGENCE_GOVERNED_VALUE_OBSERVATION_INGRESS.md`.
+Additive over 0.2.0: **no money rule, guard, reason, advisory or classification
+changes.** The kernel stays EXPERIMENTAL over caller-reported, unverified inputs
+and still emits exactly `POST_DEPLOYMENT_VALUE / REPORTED / UNVERIFIED`.
+
+### Added
+
+- `GovernedValueApplication.score(case, observations=())` and
+  `admit_observations(case, observations)` (GV-PRODUCER): bind
+  `MetricObservation` values built elsewhere to the case — exact type, matching
+  `tenant_id`, `governed_unit` equal to the case's `natural_unit`, no repeated
+  `observation_id`. Any violation raises `ObservationBindingError` and **no
+  result is produced**: the set refuses as a whole. The kernel constructs no
+  observation and attests none.
+- `ObservedMetric` and `GovernedValueResult.observed_metrics` (GV-ORDER): what
+  the seam checked — observation id, metric id, governed unit, window bounds,
+  evidence-reference count, content digest — carried outside every monetary term
+  and outside the scorability verdict, and read by nothing.
+- `ObservationBindingError`, a `GovernedValueError`.
+
+### Changed
+
+- **The zero-dependency leaf posture ends, deliberately** (GV-DEP):
+  `dependencies = ["ugence-governance-contracts>=0.2.0"]`, the release that first
+  defines `MetricObservation`. No third-party dependency is added. Copying the
+  shapes instead — the BR-2 precedent — is closed: that precedent copies from a
+  package BR-2 is forbidden to import, whereas this is the shared contract layer,
+  and a second copy of the evidence vocabulary is the fork that layer exists to
+  prevent.
+- `verify_governed_value_distribution.py` builds a two-wheel local wheelhouse and
+  installs from it, still `--no-index`, so an undeclared dependency fails to
+  resolve rather than being fetched. It now also proves a bound observation is
+  carried without lifting either quality axis, and that a foreign-tenant
+  observation refuses.
+- `conftest.py` puts `governance-contracts/src` on `sys.path`, matching the other
+  governance capabilities.
+
+### Unchanged, and stated because it is the point
+
+**A bound observation does not make a figure observed.** The caller who supplies
+the case also supplies the observation, so emitting `EvidenceStatus.OBSERVED` on
+that basis is the caller-elevated evidence the platform's anti-gaming invariants
+forbid — elevation needs provenance *and* method *and* authority, and a producer
+may never attest its own output. `evidence_status` stays `REPORTED` and
+`authority_status` stays `UNVERIFIED` with observations present, pinned by test.
+The authority adapter (GV-4) remains absent and blocked on an attesting
+authority.
+
+Every GV-0 and GV-1 rule is untouched: additive unbounded expected loss, no
+re-discounting of reported benefit, investment distinct from cost-to-serve,
+historical loss distinct from forward expected loss, exact minor-unit money,
+`None` unequal to explicit zero, determinism, fail-closed headline suppression,
+geography and domain touching no money, and `reported_confidence` out of the
+arithmetic.
+
+### Measured
+
+Suite **53 passed, 0 failed**; distribution verifier **verified** offline from
+the two-wheel wheelhouse. Figures are re-run, never edited.
+
 ## [0.2.0] — GV-0 classification + GV-1 corrected money model
 
 ### Audit polish (RF-1..RF-4 + honest naming)
