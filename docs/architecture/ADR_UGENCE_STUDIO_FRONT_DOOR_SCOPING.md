@@ -360,7 +360,7 @@ or executes); shadow only, with the mode pinned by the studio and never by the
 payload; LIVE absent; `ENFORCEMENT_ENABLED` False; the frozen v1 and v2 bytes,
 every FROM line and ratified digest untouched; `REFERENCE_GRADE_SHADOW_ONLY`.
 
-### 9.4 Proposed ruling FD-8 `[R]` (five decisions, recommended option first)
+### 9.4 Proposed ruling FD-8 (five decisions, recommended option first; ruled in §9.5)
 
 | # | Decision | Options |
 |---|---|---|
@@ -374,5 +374,33 @@ Under the recommended options no seam is activated by this ruling; the next
 implementation step is FD-8.2 alone (a studio-backend correction with tests, no
 deployment change), and seam 4 waits on FD-8.3.
 
-The ruling authorizes documentation only. No implementation prompt is issued while
-FD-8.1 to FD-8.5 remain open.
+### 9.5 Ruling FD-8 (owner, 2026-09-06)
+
+| # | Ruling |
+|---|---|
+| **FD-8.1** | **`ABSENT_UNTIL_PREREQUISITES`.** The console does not enter the P3E deployment profile until its prerequisites are separately completed and ratified. Its current root-level prototype, unauthenticated HTTP listener, in-memory audit store and absence from both container images are not an acceptable deployable boundary. |
+| **FD-8.2** | **`PIN_SHADOW_AND_REFUSE_UNMAPPED`.** `PublishService` must construct every governed-loop request with mode fixed to shadow. Caller-supplied or compiled-package mode values cannot select enforcement or any other mode. A `compiled_package` lacking a valid `scenario_id` is not translatable to the console's frozen-scenario request shape and must return the typed refusal `publish_payload_unmapped` before any outbound request. It must not invent an assertion, action, signal, scenario or default. For an accepted frozen-scenario request, relay only the validated `scenario_id` using the console's existing request contract. Do not forward arbitrary compiled-package fields. |
+| **FD-8.3** | **`PACKAGE_FIRST`.** Before the console may enter deployment, it must become a bounded, installable and tested package or deployment unit with explicit public API, configuration, persistence boundary, authentication boundary, maturity label and import restrictions. Packaging is a separately scoped future body of work; it does not begin here. |
+| **FD-8.4** | **`SECOND_DESTINATION_BY_RULING`.** If seam 4 is later admitted, the console is a second explicitly ruled outbound destination. It must use HTTPS, receive an independently frozen allowlist/configuration entry and satisfy the P3E egress and secret constraints. The existing one-destination freeze must not be silently widened in this step. |
+| **FD-8.5** | **`LABELLED_SINGLE_INSTANCE`.** Until durable multi-instance storage exists, Observe output may describe only the records held by the identified console instance. Every response and screen must disclose that limitation and must not imply durable, complete, distributed or restart-safe audit coverage. |
+
+**What the ruling authorizes.** FD-8.2 alone enters implementation, in the studio
+backend only: no deployment variable, no second egress, no image package, no console
+deployment, no console change, the console destination allowlist exactly preserved,
+the v2 contract and generated client and the v1 API and its frontend byte-identical.
+Seam 4 stays absent by ruling (FD-8.1) until FD-8.3 is completed and ratified as its
+own body of work; FD-8.4 and FD-8.5 bind any later admission. `REFERENCE_GRADE_SHADOW_ONLY`
+and every credential and LIVE-execution prohibition are preserved.
+
+**FD-8.2 shipped** (studio backend, same PR as this record): `PublishService` validates
+`scenario_id` as a typed token before anything else and answers the typed refusal
+`publish_payload_unmapped` for a missing, empty, malformed or wrong-type value with
+zero outbound calls; it relays only the validated id through the console client's
+scenario route, whose body is the constant `{"mode": "shadow"}`; the client's shadow
+route, no longer called by the service, also overrides any `mode` it is handed. No
+field of `compiled_package` is read. The console allowlist, the frozen runtime
+configuration, the v1 and v2 contract bytes and the generated client are unchanged.
+The Publish screen, which sends no `scenario_id`, now renders the typed refusal
+rather than a console gap; offering a scenario selector is a frontend change for a
+later step. Maturity: **Core implemented** for the pin and the refusal; the console
+itself remains a prototype (FD-8.1, FD-8.3).
