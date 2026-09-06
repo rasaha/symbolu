@@ -42,3 +42,46 @@ Enrichment is a pure function of the v1 graph. Identical inputs produce identica
 fingerprints across processes; the enrichment output is canonically ordered so it
 adds no ordering sensitivity of its own. `upgrade-v1` of a v1 IR reproduces the exact
 fingerprint of `compile --contract workflow_ir.v2`.
+
+
+## Source-declared semantics (`policy_pack.v2`)
+
+Where the source pack is `policy_pack.v2`, enrichment reads its declarations into
+node semantics instead of leaving the slots empty.
+
+A declaration reaches a node when the node was built from the object the
+declaration names — that is, when `subject_object_id` is one of the node's
+`input_object_ids`, the same linkage `source_policy_refs` already reports. Values
+from several declarations on one node are unioned, de-duplicated and sorted, so the
+result is a function of what was declared, never of declaration order.
+
+| Field | Filled from |
+| --- | --- |
+| `data_classification_refs` | `SemanticDeclaration.data_classification_refs` |
+| `permission_intent_refs` | `SemanticDeclaration.permission_intent_refs` |
+| `required_tool_refs` | `SemanticDeclaration.required_tool_refs` |
+| `DataContractRef.contract_data_version` | a declared contract ref matching that contract id |
+
+### Declared, never inferred
+
+A declared value carries `DerivationClass.EXPLICIT`. A contract version the policy
+declares is marked `EXPLICIT` under the rule `source_declared_contract_version`;
+one it does not declare stays empty under `DERIVED_FROM_CONTRACT`, never guessed. A
+field the policy leaves unstated stays empty with no provenance entry at all —
+there is no explicit provenance for a value nobody declared.
+
+Note the scope: a declaration is attached to its subject's node. A node's *input*
+contract belongs to its producer, so a version declared about one object does not
+silently version another object's contract.
+
+### `declared_value_provenance`
+
+Per-value provenance lives in a top-level `declared_value_provenance` collection
+rather than on `WorkflowNodeSemantics`. A new per-node field would appear in every
+node's canonical bytes and move the fingerprint of every graph, including those
+enriched from a v1 pack that declares nothing. The collection is empty for a
+v1-sourced graph, and the logical digest **omits the key entirely** when it is
+empty — so `workflow_ir.v2` fingerprints predating this addition are unchanged.
+
+A v2 pack that declares content produces a different fingerprint. That is new
+content, not a moved fingerprint.

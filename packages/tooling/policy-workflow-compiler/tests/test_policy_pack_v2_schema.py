@@ -256,7 +256,8 @@ def test_a_changed_declaration_routes_to_review():
 def test_maturity_reports_v2_honestly():
     info = api.version_info().to_dict()
     assert info["policy_pack_v2_supported"] is True
-    # Enrichment does not read declarations yet; the gate says so.
-    assert info["source_declared_semantics_implemented"] is False
+    # Enrichment now reads declarations into node semantics; see
+    # tests/test_v2_declared_semantics.py for what that consumption guarantees.
+    assert info["source_declared_semantics_implemented"] is True
     for gate in ("runtime_execution_implemented", "pilot_validated", "production_certified"):
         assert info[gate] is False, gate

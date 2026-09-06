@@ -116,6 +116,7 @@ from .verification import (
 
 # -- P2: workflow_ir.v2 semantic enrichment (additive) -------------------------
 from .semantics import (
+    DeclaredValueProvenance,
     CapabilityRequirement,
     CapabilityRequirementSource,
     DataContractRef,
@@ -236,6 +237,7 @@ __all__ = [
     "SCHEMA_VERSION_V2",
     "SemanticDeclaration",
     "DeclaredContractRef",
+    "DeclaredValueProvenance",
     "AuthoritativeSourceRef",
     # governed diff-driven review (P3A)
     "APPROVAL_SENSITIVE_OBJECT_TYPES",

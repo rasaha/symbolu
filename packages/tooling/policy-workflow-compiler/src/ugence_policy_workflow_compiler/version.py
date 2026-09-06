@@ -247,10 +247,10 @@ def version_info() -> VersionInfo:
         diff_driven_review_implemented=True,
         # policy_pack.v2: the schema, the sidecar carriage and the fail-closed gate.
         policy_pack_v2_supported=True,
-        # Declared values are carried and validated; workflow_ir.v2 enrichment does
-        # not yet READ them into node semantics. That is the next step, and this gate
-        # stays false until it lands.
-        source_declared_semantics_implemented=False,
+        # workflow_ir.v2 enrichment reads declared values into node semantics and
+        # records EXPLICIT per-value provenance. Declared, never inferred: an
+        # undeclared value stays unresolved.
+        source_declared_semantics_implemented=True,
         # explicit non-goals — never claimed by this package.
         awc_adapter_updated=False,
         agent_eligibility_implemented=False,

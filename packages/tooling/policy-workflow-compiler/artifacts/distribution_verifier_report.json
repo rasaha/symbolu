@@ -91,7 +91,7 @@
     },
     "public_api_frozen": {
       "passed": true,
-      "count": 120
+      "count": 121
     },
     "offline_no_credentials": {
       "passed": true
@@ -106,11 +106,11 @@
   "hashes": {
     "wheel": {
       "name": "ugence_policy_workflow_compiler-0.2.0-py3-none-any.whl",
-      "sha256": "05248fa56a5cd7ea8961e46e9981bef1120f9584ab3c5028d0af8afee6e5b603"
+      "sha256": "11d7a44c97b514574ab84a742052beff5c10c88cddd020400a13b8bdb8c3da6a"
     },
     "sdist": {
       "name": "ugence_policy_workflow_compiler-0.2.0.tar.gz",
-      "sha256": "817017dfd4a54517220d0ca32c964e83da3c78270b6624809cf65532fd50063b"
+      "sha256": "111dda0d374e4f333498b963ac4582ac9eeb1914d64b629a98b3e1f0e2364e48"
     }
   },
   "reproducibility": {

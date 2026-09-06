@@ -4,6 +4,25 @@ All notable changes to `ugence-policy-workflow-compiler` are documented here.
 This project adheres to semantic-ish versioning for its distribution wheel; the
 product version tracks capability maturity separately.
 
+## Unreleased — `workflow_ir.v2` consumption of source-declared semantics
+
+Completes decision D2. `workflow_ir.v2` enrichment now reads `policy_pack.v2`
+declarations; v1-sourced graphs are byte-identical.
+
+### Added
+- Node semantics fill `data_classification_refs`, `permission_intent_refs`,
+  `required_tool_refs` and `DataContractRef.contract_data_version` from the
+  declarations attached to a node's source objects, unioned and canonically ordered.
+- `DeclaredValueProvenance`: per-value provenance with `DerivationClass.EXPLICIT`
+  under the rules `source_declared_semantics` and `source_declared_contract_version`,
+  carried in a top-level collection whose digest key is **omitted when empty** — a
+  per-node field would have moved every existing v2 fingerprint.
+- `source_declared_semantics_implemented=true`; public API 120 → 121.
+
+### Unchanged
+An undeclared value stays unresolved and is never defaulted. A v1-sourced graph
+enriches to the same `sha256:2e031c78…` fingerprint as before.
+
 ## Unreleased — `policy_pack.v2`: source-declarable semantics
 
 Additive schema. `policy_pack.v1` packs, digests and approvals are byte-identical.

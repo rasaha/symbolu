@@ -38,7 +38,7 @@ as importantly — what is not.
 | --- | --- | --- |
 | `diff_driven_review_implemented` | `true` | Review requirements are derived deterministically from a structural diff and the pack's own declared approval path, and a fail-closed review gate verifies a ledger against one. Routing and recording only — the compiler never performs, grants or waives an approval. See `DIFF_DRIVEN_REVIEW.md`. |
 | `policy_pack_v2_supported` | `true` | The additive `policy_pack.v2` schema is accepted: source-declared data classification, permission intent, required tools and typed contract versions are carried in a sidecar collection, together with the authoritative-source coordinate. `policy_pack.v1` packs and digests are byte-identical under it. See `POLICY_PACK_SCHEMA.md`. |
-| `source_declared_semantics_implemented` | `false` | Declared values are carried, digest-bound and validated, but `workflow_ir.v2` enrichment does not yet read them into node semantics. |
+| `source_declared_semantics_implemented` | `true` | `workflow_ir.v2` enrichment reads declared data classification, permission intent, required tools and contract versions into node semantics, each with `EXPLICIT` per-value provenance. An undeclared value stays unresolved and is never defaulted. |
 
 ## Explicit non-goals
 

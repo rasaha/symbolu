@@ -176,6 +176,29 @@ class SemanticDiagnostic(CompilerModel):
     fingerprint: str = ""
 
 
+class DeclaredValueProvenance(CompilerModel):
+    """Provenance for one semantic value a `policy_pack.v2` source policy declared.
+
+    Declared values live on the node semantics like any other, but their origin is
+    categorically different — a policy stated them, the compiler did not derive
+    them. This records that distinction per value, with ``DerivationClass.EXPLICIT``.
+
+    It is a top-level collection rather than a field on
+    :class:`WorkflowNodeSemantics` because a new per-node field would appear in
+    every node's canonical bytes and move the fingerprint of every graph, including
+    those enriched from a v1 pack that declares nothing. Empty here means "nothing
+    was declared", and the enclosing digest omits the key entirely in that case.
+    """
+
+    contract_version: str = WORKFLOW_IR_V2
+    node_id: str
+    #: The `WorkflowNodeSemantics` field this provenance describes.
+    field_name: str
+    #: The exact values the source policy declared, in canonical order.
+    declared_values: Tuple[str, ...] = ()
+    provenance: PolicyProvenanceRef
+
+
 class WorkflowIRv2(CompilerModel):
     """The enriched workflow contract.
 
@@ -198,6 +221,10 @@ class WorkflowIRv2(CompilerModel):
     capability_reference_manifest: Tuple[str, ...] = ()
     contract_reference_manifest: Tuple[str, ...] = ()
     provenance_manifest: Tuple[str, ...] = ()
+    #: Per-value provenance for `policy_pack.v2` source-declared semantics. Empty
+    #: for a v1-sourced graph, and omitted from the digest when empty, so every
+    #: existing v2 fingerprint is unchanged.
+    declared_value_provenance: Tuple[DeclaredValueProvenance, ...] = ()
     diagnostics: Tuple[SemanticDiagnostic, ...] = ()
     compiler_version: str = ""
     workflow_fingerprint: str = ""
@@ -205,8 +232,7 @@ class WorkflowIRv2(CompilerModel):
     def logical_digest(self) -> str:
         """Content digest over the base graph digest plus all enriched fields
         (excluding the stored ``workflow_fingerprint`` slot)."""
-        return hashing.digest(
-            {
+        payload = {
                 "ir_version": self.ir_version,
                 "policy_pack_id": self.policy_pack_id,
                 "policy_pack_version": self.policy_pack_version,
@@ -218,11 +244,17 @@ class WorkflowIRv2(CompilerModel):
                 "contract_reference_manifest": list(self.contract_reference_manifest),
                 "provenance_manifest": list(self.provenance_manifest),
                 "diagnostics": list(self.diagnostics),
-            }
-        )
+        }
+        # Included only when a source policy declared something. Adding the key
+        # unconditionally would move every existing v2 fingerprint, including those
+        # of graphs enriched from a v1 pack that declares nothing.
+        if self.declared_value_provenance:
+            payload["declared_value_provenance"] = list(self.declared_value_provenance)
+        return hashing.digest(payload)
 
 
 __all__ = [
+    "DeclaredValueProvenance",
     "stamp",
     "PolicyProvenanceRef",
     "CapabilityRequirement",
