@@ -24,6 +24,8 @@ on:
       - "packages/capabilities/decision-authority/**"
       - "packages/governance-contracts/**"
       - "packages/risk_authority/**"
+      - "packages/integration/risk-authority-effect-attestation/**"
+      - "packages/trusted-evidence-authority/**"
       - ".github/workflows/risk-authority-execution-assurance-ci.yml"
   push:
     branches:
@@ -31,6 +33,7 @@ on:
       - "claude/setup-symbolu-monorepo-**"
     paths:
       - "packages/integration/risk-authority-execution-assurance/**"
+      - "packages/integration/risk-authority-effect-attestation/**"
       - ".github/workflows/risk-authority-execution-assurance-ci.yml"
 
 defaults:
@@ -51,8 +54,12 @@ jobs:
       - name: Install tooling + first-party packages (editable)
         run: |
           python -m pip install --upgrade pip
-          pip install pytest pydantic
+          pip install pytest pydantic "cryptography>=41.0.7,<47.0.0" "PyNaCl>=1.5.0,<2.0.0"
           pip install -e packages/governance-contracts
+          # Signed effect attestation (RI-1 to RI-5) and the Trusted Evidence Authority
+          # it is built on. RA-8 imports only the former; TEA is its declared dependency.
+          pip install -e packages/trusted-evidence-authority
+          pip install -e packages/integration/risk-authority-effect-attestation
           pip install -e packages/risk_authority
           pip install -e packages/integration/risk-authority-status-runtime
           pip install -e packages/capabilities/decision-authority
@@ -83,8 +90,12 @@ jobs:
       - name: Install tooling
         run: |
           python -m pip install --upgrade pip
-          pip install pytest pydantic
+          pip install pytest pydantic "cryptography>=41.0.7,<47.0.0" "PyNaCl>=1.5.0,<2.0.0"
           pip install -e packages/governance-contracts
+          # Signed effect attestation (RI-1 to RI-5) and the Trusted Evidence Authority
+          # it is built on. RA-8 imports only the former; TEA is its declared dependency.
+          pip install -e packages/trusted-evidence-authority
+          pip install -e packages/integration/risk-authority-effect-attestation
           pip install -e packages/risk_authority
           pip install -e packages/runtime/agent-runtime
           pip install -e packages/integration/risk-authority-status-runtime

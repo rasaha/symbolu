@@ -213,7 +213,8 @@ jobs:
             -e packages/integration/risk-authority-status-runtime \
             -e packages/providers/actiongate \
             -e packages/capabilities/cloud-scaling-operations \
-            -e packages/integration/cloud-scaling-producer-attestation
+            -e packages/integration/cloud-scaling-producer-attestation \
+            -e packages/integration/risk-authority-effect-attestation
       - name: 1 · Risk Authority conformance suite
         run: python -m pytest packages/risk_authority/tests
       - name: 2 · Policy Authority suite
