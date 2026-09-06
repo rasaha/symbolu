@@ -9,9 +9,10 @@ from fifty-one to fifty-two.** `P_unsigned` is untouched: no advisory digest mov
 
 ### Added
 
-- **`ReasoningMethodAdvisoryInput`**, D8's third nested public shape (twelve fields, no
-  C2 common field). The typed reference by which an *admitted* reasoning-method
-  advisory reaches the process record: advisory and admission digests, the rule set,
+- **`ReasoningMethodAdvisoryInput`**, D8's third nested public shape (thirteen fields,
+  no C2 common field). The typed reference by which an *admitted* reasoning-method
+  advisory reaches the process record: advisory, admission and engine comparison-result
+  digests, the rule set,
   the task class, the qualifying method identifiers and the admitting fit assessments'
   digests. **Input, never authority**: no disposition, no `declared_strategy`, no
   `DEPENDENT_FIELDS` member, no reserved authority term. Its two vocabulary fields are

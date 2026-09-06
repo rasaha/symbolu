@@ -3,10 +3,12 @@
 from .admission import (
     ADMISSION_SCHEMA_VERSION,
     ADMITTER_IDENTITY,
+    COMPARISON_ENGINE_IDENTITY,
     SUFFICIENT_FIT_OUTCOMES,
     ComparisonEvidence,
     ReasoningMethodAdvisoryAdmission,
     admit,
+    evidence_from_result,
     validate_admission,
 )
 from .advisor import ADVISOR_IDENTITY, TraversalOrder, advise
@@ -48,8 +50,8 @@ __all__ = [
     "__version__", "ADVISOR_IDENTITY", "TraversalOrder", "advise",
     "ADVISORY_REQUEST_SCHEMA_VERSION", "ADVISORY_SCHEMA_VERSION", "RULE_SET_SCHEMA_VERSION",
     "PRIMARY_BASIS_SOLE_QUALIFYING_METHOD", "EVIDENCE_STATUS_COMPARISON_EVIDENCE_ABSENT",
-    "ADMISSION_SCHEMA_VERSION", "ADMITTER_IDENTITY", "SUFFICIENT_FIT_OUTCOMES", "ComparisonEvidence",
-    "ReasoningMethodAdvisoryAdmission", "admit", "validate_admission", "PROPOSER_INPUT_MODEL", "to_proposer_input",
+    "ADMISSION_SCHEMA_VERSION", "ADMITTER_IDENTITY", "COMPARISON_ENGINE_IDENTITY", "SUFFICIENT_FIT_OUTCOMES",
+    "ComparisonEvidence", "ReasoningMethodAdvisoryAdmission", "admit", "evidence_from_result", "validate_admission", "PROPOSER_INPUT_MODEL", "to_proposer_input",
     "SYNTHETIC_INADMISSIBLE_IMPLEMENTATION_STATUS", "SYNTHETIC_NO_SUPPORTING_RULE", "SYNTHETIC_RULE_IDS",
     "FORBIDDEN_ADVISORY_FIELD_NAMES", "CATALOG_SIDE_PREDICATES",
     "RuleKind", "PredicateKind", "AdvisoryLabel", "NoPrimaryReason", "AdvisoryClassification", "AdvisoryEligibility",

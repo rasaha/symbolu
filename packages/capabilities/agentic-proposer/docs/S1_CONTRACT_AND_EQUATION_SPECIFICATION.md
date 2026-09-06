@@ -1517,13 +1517,14 @@ reconciled backward into the specification.
 
 ### `ReasoningMethodAdvisoryInput` — nested public shape (`RM-3`, 0.5.0)
 
-**Cardinality: 12 fields** — the twelve below. It carries **no** C2 common field, for the
-reason C2 gives for `CandidateAdvisory`: it is a nested public shape, not a contract.
+**Cardinality: 13 fields** — the thirteen below. It carries **no** C2 common field, for
+the reason C2 gives for `CandidateAdvisory`: it is a nested public shape, not a contract.
 Ratified by the three owner rulings in `ADR_UGENCE_REASONING_METHOD_PRODUCT_ENTRY.md`.
 
 **Input, never authority.** It is the typed reference by which an *admitted*
-reasoning-method advisory reaches `ProposerProcessRecord`. It names the advisory and its
-admission by digest, the rule set that produced it, the task class it was admitted for,
+reasoning-method advisory reaches `ProposerProcessRecord`. It names the advisory, its
+admission and the engine comparison result it was admitted on, each by digest, the rule
+set that produced it, the task class it was admitted for,
 the method identifiers the rule set found qualifying, and the fit assessments that
 admitted it, by digest. It carries no disposition, no `declared_strategy`, no
 `DEPENDENT_FIELDS` member and no reserved authority term. Its two vocabulary fields are
@@ -1539,6 +1540,7 @@ package imports nothing from the research packages (`test_boundaries.py`).
 | `reasoning_advisory_ref` | `str` | yes | no | none | C5a |
 | `reasoning_advisory_digest` | `str` | yes | no | none | C6 |
 | `admission_digest` | `str` | yes | no | none | C6 |
+| `comparison_result_digest` | `str` | yes | no | none | C6 |
 | `rule_set_id` | `str` | yes | no | none | C5b |
 | `rule_set_version` | `str` | yes | no | none | C5b |
 | `rule_set_digest` | `str` | yes | no | none | C6 |

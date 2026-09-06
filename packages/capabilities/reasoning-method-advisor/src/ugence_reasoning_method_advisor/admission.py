@@ -3,10 +3,20 @@
 The slice 2 request and advisory are **unchanged, field for field**: every
 historical digest — including a preregistered pilot manifest that embeds an
 advisory — still verifies. Product entry is a new record,
-``ReasoningMethodAdvisoryAdmission``, that cites the advisory by digest and
+``ReasoningMethodAdvisoryAdmission``, that cites the advisory by digest, the
+engine-produced ``ReadinessComparisonResult`` it was granted on by digest, and
 the fit assessments that admit it by theirs. The advisory stays
 ``COMPARISON_EVIDENCE_ABSENT`` / ``RESEARCH_ONLY``; the admission is what is
 ``COMPARISON_EVIDENCE_PRESENT`` / ``ADVISORY_INPUT``.
+
+``admit`` takes the **result**, never a bare bundle of assessments. The result
+contract binds every assessment to one engine identity and one request digest
+(``ASSESSOR_ENGINE_MISMATCH``), and ``admit`` refuses a result that names any
+engine but the comparison engine. A hand-assembled tuple of assessments cannot
+be admitted at all. That closes provenance *structurally*: what it does not
+close is a forged result, which needs a signed result — Trusted Evidence
+Authority verification — that does not exist yet. ``ComparisonEvidence`` stays
+as the internal shape the coverage rule reads.
 
 Evidence never creates a qualifier. ``admit`` reads the advisory's qualifying
 set as the rule set produced it and asks one question per method: is there a
@@ -24,11 +34,13 @@ from datetime import datetime
 from typing import FrozenSet, List, Optional, Tuple
 
 from ugence_reasoning_method_governance.api import (
+    COMPARISON_RESULT_SCHEMA_VERSION,
     EVIDENCE_STATUS_COMPARISON_EVIDENCE_PRESENT,
     USAGE_SCOPE_ADVISORY_INPUT,
     ContractError,
     ContractErrorCode,
     FitOutcome,
+    ReadinessComparisonResult,
     ReasoningMethodCatalogRef,
     ReasoningMethodFitAssessment,
     ReasoningMethodRef,
@@ -45,8 +57,13 @@ from .contracts import (
 from .errors import AdvisorError, AdvisorErrorCode
 from .version import __version__
 
-ADMISSION_SCHEMA_VERSION = "reasoning_method.advisory_admission.v1"
+ADMISSION_SCHEMA_VERSION = "reasoning_method.advisory_admission.v2"
 ADMITTER_IDENTITY = "ugence-reasoning-method-advisor"
+#: The comparison engine's identity, mirrored by literal: this package never imports
+#: ``ugence_readiness_comparison`` (``tests/test_profiles.py::test_p8``), so it can
+#: neither run a comparison nor read one it was not handed. A result naming any other
+#: engine is refused as unbound.
+COMPARISON_ENGINE_IDENTITY = "ugence-readiness-comparison"
 
 #: The fit outcomes that count as comparison evidence *for* a method.
 #: INSUFFICIENT_QUALITY is evidence against it; COMPARISON_EVIDENCE_ABSENT is none.
@@ -104,6 +121,8 @@ class ReasoningMethodAdvisoryAdmission(_NoScalarLabels):
     advisory_id: str
     advisory_digest: str
     request_digest: str
+    #: The engine-produced ``ReadinessComparisonResult`` this admission was granted on.
+    comparison_result_digest: str
     task_class_digest: str
     catalog: ReasoningMethodCatalogRef
     rule_set: RuleSetRef
@@ -122,6 +141,7 @@ class ReasoningMethodAdvisoryAdmission(_NoScalarLabels):
         require_nonblank(self.advisory_id, "ReasoningMethodAdvisoryAdmission.advisory_id")
         require_digest(self.advisory_digest, "ReasoningMethodAdvisoryAdmission.advisory_digest")
         require_digest(self.request_digest, "ReasoningMethodAdvisoryAdmission.request_digest")
+        require_digest(self.comparison_result_digest, "ReasoningMethodAdvisoryAdmission.comparison_result_digest")
         require_digest(self.task_class_digest, "ReasoningMethodAdvisoryAdmission.task_class_digest")
         if not isinstance(self.catalog, ReasoningMethodCatalogRef):
             raise ContractError(ContractErrorCode.REF_BLANK_FIELD, "catalog must be a ReasoningMethodCatalogRef")
@@ -181,39 +201,55 @@ def _covering_refs(advisory: ReasoningMethodAdvisory, evidence: ComparisonEviden
     return tuple(sorted(set(refs)))
 
 
+def evidence_from_result(result: ReadinessComparisonResult, advisory: ReasoningMethodAdvisory) -> ComparisonEvidence:
+    """The internal evidence bundle an engine result carries for this advisory.
+
+    Refuses (``COMPARISON_EVIDENCE_UNBOUND``) a result naming any engine but the
+    comparison engine, a result of another schema version, an empty result, and —
+    through ``ComparisonEvidence`` — any assessment for another task class or catalog.
+    """
+    if not isinstance(result, ReadinessComparisonResult):
+        raise TypeError("admit() takes a ReadinessComparisonResult, never a bare bundle of assessments")
+    if advisory.task_class_digest is None:
+        raise AdvisorError(AdvisorErrorCode.CLASSIFICATION_INCONSISTENT, "an unclassified advisory can never be admitted")
+    if result.engine_identity != COMPARISON_ENGINE_IDENTITY:
+        raise AdvisorError(AdvisorErrorCode.COMPARISON_EVIDENCE_UNBOUND, f"result names engine {result.engine_identity!r}, not the comparison engine")
+    if result.schema_version != COMPARISON_RESULT_SCHEMA_VERSION:
+        raise AdvisorError(AdvisorErrorCode.COMPARISON_EVIDENCE_UNBOUND, f"result schema {result.schema_version!r} is not admitted")
+    if not result.assessments:
+        raise AdvisorError(AdvisorErrorCode.RESEARCH_ONLY_REFUSED_IN_PRODUCT, "the result carries no assessment; there is nothing to admit on")
+    return ComparisonEvidence(advisory.task_class_digest, advisory.catalog, tuple(result.assessments))
+
+
 def admit(
     advisory: ReasoningMethodAdvisory,
     request: ReasoningMethodAdvisoryRequest,
-    evidence: ComparisonEvidence,
+    result: ReadinessComparisonResult,
     *,
     admitted_at: datetime,
 ) -> ReasoningMethodAdvisoryAdmission:
-    """Admit ``advisory`` to the product on ``evidence``, or refuse.
+    """Admit ``advisory`` to the product on an engine ``result``, or refuse.
 
     Binds the advisory to its request first (``validate_against_request``), so an
     advisory cannot be admitted against a request it did not answer. The request
     must be governed: an unclassified advisory is never admitted
-    (``CLASSIFICATION_INCONSISTENT``). The evidence must be for the advisory's own
-    task class and catalog (``COMPARISON_EVIDENCE_UNBOUND``). This is the product
-    gate: the ``rules.research.v0`` fixture, or any rule set, passes only with
-    sufficient evidence for everything it made qualify — never by name.
+    (``CLASSIFICATION_INCONSISTENT``). The result must be the comparison engine's
+    and every assessment in it must be for the advisory's own task class and
+    catalog (``COMPARISON_EVIDENCE_UNBOUND``). This is the product gate: the
+    ``rules.research.v0`` fixture, or any rule set, passes only with sufficient
+    evidence for everything it made qualify — never by name — and only evidence
+    the engine produced.
     """
-    if not isinstance(evidence, ComparisonEvidence):
-        raise TypeError("admit() takes a ComparisonEvidence")
     require_tzaware(admitted_at, "admitted_at")
     validate_against_request(advisory, request)
-    if advisory.task_class_digest is None:
-        raise AdvisorError(AdvisorErrorCode.CLASSIFICATION_INCONSISTENT, "an unclassified advisory can never be admitted")
-    if evidence.task_class_digest != advisory.task_class_digest:
-        raise AdvisorError(AdvisorErrorCode.COMPARISON_EVIDENCE_UNBOUND, "evidence is for another task class")
-    if evidence.catalog != advisory.catalog:
-        raise AdvisorError(AdvisorErrorCode.COMPARISON_EVIDENCE_UNBOUND, "evidence is over another catalog")
+    evidence = evidence_from_result(result, advisory)
     refs = _covering_refs(advisory, evidence)
     return ReasoningMethodAdvisoryAdmission(
         schema_version=ADMISSION_SCHEMA_VERSION,
         advisory_id=advisory.advisory_id,
         advisory_digest=advisory.advisory_digest,
         request_digest=advisory.request_digest,
+        comparison_result_digest=result.result_digest,
         task_class_digest=advisory.task_class_digest,
         catalog=advisory.catalog,
         rule_set=advisory.rule_set,
@@ -228,18 +264,22 @@ def admit(
     )
 
 
-def validate_admission(admission: ReasoningMethodAdvisoryAdmission, advisory: ReasoningMethodAdvisory, evidence: ComparisonEvidence) -> None:
-    """Replay: the admission must describe exactly this advisory and cite only this evidence.
+def validate_admission(admission: ReasoningMethodAdvisoryAdmission, advisory: ReasoningMethodAdvisory, result: ReadinessComparisonResult) -> None:
+    """Replay: the admission must describe exactly this advisory and this result.
 
-    ``DIGEST_MALFORMED`` when the advisory or request digests differ or a cited
-    assessment was not presented; ``CLASSIFICATION_INCONSISTENT`` when the
-    restated qualifying set or primary is not the advisory's. Coverage is then
-    recomputed, so an admission cannot outlive the evidence it was granted on.
+    ``DIGEST_MALFORMED`` when the advisory, request or result digests differ or a
+    cited assessment is not in the result; ``CLASSIFICATION_INCONSISTENT`` when
+    the restated qualifying set or primary is not the advisory's;
+    ``COMPARISON_EVIDENCE_UNBOUND`` when the result is not the engine's. Coverage
+    is then recomputed, so an admission cannot outlive the result it was granted on.
     """
     if not isinstance(admission, ReasoningMethodAdvisoryAdmission):
-        raise TypeError("validate_admission(admission, advisory, evidence)")
+        raise TypeError("validate_admission(admission, advisory, result)")
     if admission.advisory_digest != advisory.advisory_digest or admission.request_digest != advisory.request_digest:
         raise ContractError(ContractErrorCode.DIGEST_MALFORMED, "admission does not describe this advisory")
+    evidence = evidence_from_result(result, advisory)
+    if admission.comparison_result_digest != result.result_digest:
+        raise ContractError(ContractErrorCode.DIGEST_MALFORMED, "admission was not granted on this comparison result")
     if admission.qualifying != tuple(q.method for q in advisory.qualifying) or admission.primary != advisory.primary:
         raise AdvisorError(AdvisorErrorCode.CLASSIFICATION_INCONSISTENT, "admission restates a qualifying set or primary the advisory does not carry")
     unknown = sorted(set(admission.evidence_refs) - evidence.digests())
@@ -252,9 +292,11 @@ def validate_admission(admission: ReasoningMethodAdvisoryAdmission, advisory: Re
 __all__ = [
     "ADMISSION_SCHEMA_VERSION",
     "ADMITTER_IDENTITY",
+    "COMPARISON_ENGINE_IDENTITY",
     "SUFFICIENT_FIT_OUTCOMES",
     "ComparisonEvidence",
     "ReasoningMethodAdvisoryAdmission",
+    "evidence_from_result",
     "admit",
     "validate_admission",
 ]

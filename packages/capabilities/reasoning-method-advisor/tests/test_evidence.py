@@ -13,6 +13,7 @@ import pytest
 import matrix_fixtures as fx
 import rule_fixtures as rf
 from ugence_reasoning_method_advisor.api import (
+    COMPARISON_ENGINE_IDENTITY,
     AdvisorError,
     AdvisorErrorCode as A,
     ComparisonEvidence,
@@ -23,30 +24,41 @@ from ugence_reasoning_method_advisor.api import (
     validate_admission,
 )
 from ugence_reasoning_method_governance.api import (
+    AUTHORITY_RESOLUTION_BASIS_V1,
+    COMPARISON_RESULT_SCHEMA_VERSION,
     EVIDENCE_STATUS_SOURCE_V1,
     FIT_SCHEMA_VERSION,
     USAGE_SCOPE_RESEARCH_ONLY,
     ContractError,
     ContractErrorCode as C,
     FitOutcome,
+    ReadinessComparisonResult,
     ReasoningMethodFitAssessment,
     ReasoningMethodRef,
     ResourceDimension,
 )
 
+ENGINE_VERSION = "0.1.0"
+
 ONE = ("comparison_request",)                      # sole qualifier: map_reduce
 TWO = ("comparison_request", "causal_reasoning")   # map_reduce and linear_chain
 
 
-def assessment(method_id, request, *, outcome=FitOutcome.SUFFICIENT_PARETO_EFFICIENT, assessment_id="a.1", class_digest=None, catalog_ref=None):
+def assessment(method_id, request, *, outcome=FitOutcome.SUFFICIENT_PARETO_EFFICIENT, assessment_id="a.1", class_digest=None, catalog_ref=None, engine=COMPARISON_ENGINE_IDENTITY):
     cref = catalog_ref or request.catalog.ref()
     tc = request.task_class or rf.governed_class(ONE)
     return ReasoningMethodFitAssessment(
         FIT_SCHEMA_VERSION, assessment_id, tc.task_class_id, class_digest or tc.task_class_digest, fx.HEX_D, "",
         ReasoningMethodRef(cref, method_id, "1"), ReasoningMethodRef(cref, "linear_chain", "1"),
         outcome, None, None, (), (), (ResourceDimension.LLM_CALLS,), "pol.cmp", "1", "",
-        (), EVIDENCE_STATUS_SOURCE_V1, USAGE_SCOPE_RESEARCH_ONLY, "study:synthetic", "0.1.0", fx.NOW, "synthetic fixture",
+        (), EVIDENCE_STATUS_SOURCE_V1, USAGE_SCOPE_RESEARCH_ONLY, engine, ENGINE_VERSION, fx.NOW, "synthetic fixture",
     )
+
+
+def result(*assessments, engine=COMPARISON_ENGINE_IDENTITY, schema=COMPARISON_RESULT_SCHEMA_VERSION):
+    """A hand-built engine result: the SHAPE the engine emits, with synthetic content."""
+    ordered = tuple(sorted(assessments, key=lambda a: a.method.sort_key))
+    return ReadinessComparisonResult(schema, "cmp.synthetic", fx.HEX_A, ordered, (), (), (), AUTHORITY_RESOLUTION_BASIS_V1, engine, ENGINE_VERSION, fx.NOW)
 
 
 def evidence(request, *assessments, class_digest=None, catalog_ref=None):
@@ -57,8 +69,8 @@ def evidence(request, *assessments, class_digest=None, catalog_ref=None):
 def world(tokens, *method_ids, governed=True, **kw):
     rq = rf.request(tokens, governed=governed)
     adv = advise(rq, advised_at=fx.NOW)
-    ev = evidence(rq, *[assessment(m, rq, assessment_id=f"a.{i}", **kw) for i, m in enumerate(method_ids, 1)]) if method_ids else None
-    return rq, adv, ev
+    res = result(*[assessment(m, rq, assessment_id=f"a.{i}", **kw) for i, m in enumerate(method_ids, 1)]) if method_ids else None
+    return rq, adv, res
 
 
 def refuses(code, thunk):
@@ -78,33 +90,34 @@ def test_the_slice_2_advisory_is_still_research_only_by_construction():
 # ------------------------------------------------------------------ admission
 
 def test_sufficient_evidence_for_the_sole_qualifier_admits():
-    rq, adv, ev = world(ONE, "map_reduce")
-    adm = admit(adv, rq, ev, admitted_at=fx.NOW)
+    rq, adv, res = world(ONE, "map_reduce")
+    adm = admit(adv, rq, res, admitted_at=fx.NOW)
     assert isinstance(adm, ReasoningMethodAdvisoryAdmission)
     assert adm.advisory_digest == adv.advisory_digest and adm.request_digest == adv.request_digest
     assert adm.primary is not None and adm.primary.method_id == "map_reduce"
     assert adm.evidence_status == "COMPARISON_EVIDENCE_PRESENT" and adm.usage_scope == "ADVISORY_INPUT"
-    assert adm.evidence_refs == (ev.assessments[0].assessment_digest,)
+    assert adm.evidence_refs == (res.assessments[0].assessment_digest,)
+    assert adm.comparison_result_digest == res.result_digest
     assert len(adm.admission_digest) == 64
-    validate_admission(adm, adv, ev)
+    validate_admission(adm, adv, res)
 
 
 def test_evidence_for_every_qualifier_admits_and_cites_each_assessment():
-    rq, adv, ev = world(TWO, "map_reduce", "linear_chain")
-    adm = admit(adv, rq, ev, admitted_at=fx.NOW)
+    rq, adv, res = world(TWO, "map_reduce", "linear_chain")
+    adm = admit(adv, rq, res, admitted_at=fx.NOW)
     assert [m.method_id for m in adm.qualifying] == ["linear_chain", "map_reduce"] and adm.primary is None
-    assert adm.evidence_refs == tuple(sorted(a.assessment_digest for a in ev.assessments))
+    assert adm.evidence_refs == tuple(sorted(a.assessment_digest for a in res.assessments))
 
 
 def test_resource_dominated_still_counts_as_sufficient():
-    rq, adv, ev = world(ONE, "map_reduce", outcome=FitOutcome.SUFFICIENT_RESOURCE_DOMINATED)
-    assert admit(adv, rq, ev, admitted_at=fx.NOW).evidence_refs
+    rq, adv, res = world(ONE, "map_reduce", outcome=FitOutcome.SUFFICIENT_RESOURCE_DOMINATED)
+    assert admit(adv, rq, res, admitted_at=fx.NOW).evidence_refs
 
 
 def test_admission_is_deterministic_and_time_sensitive():
-    rq, adv, ev = world(ONE, "map_reduce")
-    a, b = admit(adv, rq, ev, admitted_at=fx.NOW), admit(adv, rq, ev, admitted_at=fx.NOW)
-    later = admit(adv, rq, ev, admitted_at=fx.NOW.replace(hour=13))
+    rq, adv, res = world(ONE, "map_reduce")
+    a, b = admit(adv, rq, res, admitted_at=fx.NOW), admit(adv, rq, res, admitted_at=fx.NOW)
+    later = admit(adv, rq, res, admitted_at=fx.NOW.replace(hour=13))
     assert a == b and a.admission_digest != later.admission_digest
 
 
@@ -112,52 +125,51 @@ def test_admission_is_deterministic_and_time_sensitive():
 
 def test_the_fixture_without_evidence_cannot_be_admitted():
     rq, adv, _ = world(ONE)
-    refuses(A.RESEARCH_ONLY_REFUSED_IN_PRODUCT, lambda: admit(adv, rq, evidence(rq, assessment("tree_of_thought", rq)), admitted_at=fx.NOW))
+    refuses(A.RESEARCH_ONLY_REFUSED_IN_PRODUCT, lambda: admit(adv, rq, result(assessment("tree_of_thought", rq)), admitted_at=fx.NOW))
 
 
 def test_partial_coverage_is_refused_as_research_only():
-    rq, adv, ev = world(TWO, "map_reduce")
-    refuses(A.RESEARCH_ONLY_REFUSED_IN_PRODUCT, lambda: admit(adv, rq, ev, admitted_at=fx.NOW))
+    rq, adv, res = world(TWO, "map_reduce")
+    refuses(A.RESEARCH_ONLY_REFUSED_IN_PRODUCT, lambda: admit(adv, rq, res, admitted_at=fx.NOW))
 
 
 def test_evidence_absent_outcome_is_not_evidence():
-    rq, adv, ev = world(ONE, "map_reduce", outcome=FitOutcome.COMPARISON_EVIDENCE_ABSENT)
-    refuses(A.RESEARCH_ONLY_REFUSED_IN_PRODUCT, lambda: admit(adv, rq, ev, admitted_at=fx.NOW))
+    rq, adv, res = world(ONE, "map_reduce", outcome=FitOutcome.COMPARISON_EVIDENCE_ABSENT)
+    refuses(A.RESEARCH_ONLY_REFUSED_IN_PRODUCT, lambda: admit(adv, rq, res, admitted_at=fx.NOW))
 
 
 def test_nothing_qualifying_cannot_be_admitted():
     rq, adv, _ = world(())
     assert adv.qualifying == ()
-    refuses(A.RESEARCH_ONLY_REFUSED_IN_PRODUCT, lambda: admit(adv, rq, evidence(rq, assessment("map_reduce", rq)), admitted_at=fx.NOW))
+    refuses(A.RESEARCH_ONLY_REFUSED_IN_PRODUCT, lambda: admit(adv, rq, result(assessment("map_reduce", rq)), admitted_at=fx.NOW))
 
 
 def test_insufficient_quality_for_a_qualifier_contradicts_the_rule_set():
-    rq, adv, ev = world(ONE, "map_reduce", outcome=FitOutcome.INSUFFICIENT_QUALITY)
-    refuses(A.COMPARISON_EVIDENCE_CONTRADICTED, lambda: admit(adv, rq, ev, admitted_at=fx.NOW))
+    rq, adv, res = world(ONE, "map_reduce", outcome=FitOutcome.INSUFFICIENT_QUALITY)
+    refuses(A.COMPARISON_EVIDENCE_CONTRADICTED, lambda: admit(adv, rq, res, admitted_at=fx.NOW))
 
 
 def test_contradiction_beats_partial_coverage():
-    rq, adv, ev = world(TWO, "map_reduce", outcome=FitOutcome.INSUFFICIENT_QUALITY)
-    refuses(A.COMPARISON_EVIDENCE_CONTRADICTED, lambda: admit(adv, rq, ev, admitted_at=fx.NOW))
+    rq, adv, res = world(TWO, "map_reduce", outcome=FitOutcome.INSUFFICIENT_QUALITY)
+    refuses(A.COMPARISON_EVIDENCE_CONTRADICTED, lambda: admit(adv, rq, res, admitted_at=fx.NOW))
 
 
 def test_an_unclassified_advisory_is_never_admitted():
     rq, adv, _ = world(ONE, governed=False)
-    ev = evidence(rq, assessment("map_reduce", rq))
-    refuses(A.CLASSIFICATION_INCONSISTENT, lambda: admit(adv, rq, ev, admitted_at=fx.NOW))
+    res = result(assessment("map_reduce", rq))
+    refuses(A.CLASSIFICATION_INCONSISTENT, lambda: admit(adv, rq, res, admitted_at=fx.NOW))
 
 
 def test_evidence_for_another_task_class_is_unbound():
     rq, adv, _ = world(ONE)
-    ev = evidence(rq, assessment("map_reduce", rq, class_digest=fx.HEX_C), class_digest=fx.HEX_C)
-    refuses(A.COMPARISON_EVIDENCE_UNBOUND, lambda: admit(adv, rq, ev, admitted_at=fx.NOW))
+    res = result(assessment("map_reduce", rq, class_digest=fx.HEX_C))
+    refuses(A.COMPARISON_EVIDENCE_UNBOUND, lambda: admit(adv, rq, res, admitted_at=fx.NOW))
 
 
 def test_evidence_over_another_catalog_is_unbound():
     rq, adv, _ = world(ONE)
-    other = fx.c1_catalog_ref(fx.HEX_C)
-    ev = evidence(rq, assessment("map_reduce", rq, catalog_ref=other), catalog_ref=other)
-    refuses(A.COMPARISON_EVIDENCE_UNBOUND, lambda: admit(adv, rq, ev, admitted_at=fx.NOW))
+    res = result(assessment("map_reduce", rq, catalog_ref=fx.c1_catalog_ref(fx.HEX_C)))
+    refuses(A.COMPARISON_EVIDENCE_UNBOUND, lambda: admit(adv, rq, res, admitted_at=fx.NOW))
 
 
 def test_an_assessment_for_another_class_inside_the_bundle_is_unbound():
@@ -171,10 +183,43 @@ def test_an_assessment_presented_twice_is_unbound():
 
 
 def test_an_advisory_cannot_be_admitted_against_a_request_it_did_not_answer():
-    rq, adv, ev = world(ONE, "map_reduce")
+    rq, adv, res = world(ONE, "map_reduce")
     other = rf.request(ONE, request_id="req.other")
     with pytest.raises((AdvisorError, ContractError)):
-        admit(adv, other, ev, admitted_at=fx.NOW)
+        admit(adv, other, res, admitted_at=fx.NOW)
+
+
+# ------------------------------------------------------------------ provenance: the result, never a bundle
+
+def test_a_hand_built_bundle_of_assessments_can_no_longer_admit():
+    rq, adv, _ = world(ONE)
+    bundle = evidence(rq, assessment("map_reduce", rq))
+    with pytest.raises(TypeError):
+        admit(adv, rq, bundle, admitted_at=fx.NOW)
+    with pytest.raises(TypeError):
+        admit(adv, rq, (assessment("map_reduce", rq),), admitted_at=fx.NOW)
+
+
+def test_a_result_from_any_other_engine_is_unbound():
+    rq, adv, _ = world(ONE)
+    foreign = result(assessment("map_reduce", rq, engine="someone-else"), engine="someone-else")
+    refuses(A.COMPARISON_EVIDENCE_UNBOUND, lambda: admit(adv, rq, foreign, admitted_at=fx.NOW))
+
+
+def test_an_empty_result_admits_nothing():
+    rq, adv, _ = world(ONE)
+    refuses(A.RESEARCH_ONLY_REFUSED_IN_PRODUCT, lambda: admit(adv, rq, result(), admitted_at=fx.NOW))
+
+
+def test_the_admission_cites_the_result_and_replay_binds_to_it():
+    rq, adv, res = world(ONE, "map_reduce")
+    adm = admit(adv, rq, res, admitted_at=fx.NOW)
+    assert adm.comparison_result_digest == res.result_digest
+    other = result(assessment("map_reduce", rq, assessment_id="a.other"))
+    assert other.result_digest != res.result_digest
+    refuses(C.DIGEST_MALFORMED, lambda: validate_admission(adm, adv, other))
+    swapped = _rebuild(adm, comparison_result_digest=fx.HEX_A)
+    refuses(C.DIGEST_MALFORMED, lambda: validate_admission(swapped, adv, res))
 
 
 # ------------------------------------------------------------------ the record's own invariants
@@ -186,8 +231,8 @@ def _rebuild(adm, **over):
 
 
 def test_an_admission_exists_only_in_the_admitted_state():
-    rq, adv, ev = world(ONE, "map_reduce")
-    adm = admit(adv, rq, ev, admitted_at=fx.NOW)
+    rq, adv, res = world(ONE, "map_reduce")
+    adm = admit(adv, rq, res, admitted_at=fx.NOW)
     refuses(C.REF_BLANK_FIELD, lambda: _rebuild(adm, evidence_status="COMPARISON_EVIDENCE_ABSENT"))
     refuses(C.REF_BLANK_FIELD, lambda: _rebuild(adm, usage_scope="RESEARCH_ONLY"))
     refuses(C.REF_BLANK_FIELD, lambda: _rebuild(adm, evidence_refs=()))
@@ -195,13 +240,13 @@ def test_an_admission_exists_only_in_the_admitted_state():
 
 
 def test_replay_refuses_a_tampered_admission():
-    rq, adv, ev = world(TWO, "map_reduce", "linear_chain")
-    adm = admit(adv, rq, ev, admitted_at=fx.NOW)
+    rq, adv, res = world(TWO, "map_reduce", "linear_chain")
+    adm = admit(adv, rq, res, admitted_at=fx.NOW)
     narrowed = _rebuild(adm, qualifying=adm.qualifying[:1], primary=adm.qualifying[0])
-    refuses(A.CLASSIFICATION_INCONSISTENT, lambda: validate_admission(narrowed, adv, ev))
+    refuses(A.CLASSIFICATION_INCONSISTENT, lambda: validate_admission(narrowed, adv, res))
     foreign = _rebuild(adm, evidence_refs=(fx.HEX_A,))
-    refuses(C.DIGEST_MALFORMED, lambda: validate_admission(foreign, adv, ev))
-    thinner = evidence(rq, ev.assessments[0])
+    refuses(C.DIGEST_MALFORMED, lambda: validate_admission(foreign, adv, res))
+    thinner = result(res.assessments[0])
     refuses(C.DIGEST_MALFORMED, lambda: validate_admission(adm, adv, thinner))
 
 
@@ -219,8 +264,8 @@ def test_the_bridge_refuses_a_research_only_advisory():
 
 
 def test_the_bridge_carries_references_and_no_authority_term():
-    rq, adv, ev = world(ONE, "map_reduce")
-    adm = admit(adv, rq, ev, admitted_at=fx.NOW)
+    rq, adv, res = world(ONE, "map_reduce")
+    adm = admit(adv, rq, res, admitted_at=fx.NOW)
     mapping = to_proposer_input(adm)
     assert mapping["reasoning_advisory_digest"] == "sha256:" + adv.advisory_digest and mapping["admission_digest"] == "sha256:" + adm.admission_digest
     assert mapping["qualifying_method_ids"] == ["map_reduce"] and mapping["primary_method_id"] == "map_reduce"
@@ -235,6 +280,6 @@ def test_the_bridge_mapping_validates_as_the_proposer_input():
     ap = pytest.importorskip("ugence_agentic_proposer")
     if not hasattr(ap, "ReasoningMethodAdvisoryInput"):
         pytest.skip("installed proposer predates the typed input")
-    rq, adv, ev = world(TWO, "map_reduce", "linear_chain")
-    model = ap.ReasoningMethodAdvisoryInput.model_validate(to_proposer_input(admit(adv, rq, ev, admitted_at=fx.NOW)))
+    rq, adv, res = world(TWO, "map_reduce", "linear_chain")
+    model = ap.ReasoningMethodAdvisoryInput.model_validate(to_proposer_input(admit(adv, rq, res, admitted_at=fx.NOW)))
     assert model.primary_method_id is None and sorted(model.qualifying_method_ids) == ["linear_chain", "map_reduce"]

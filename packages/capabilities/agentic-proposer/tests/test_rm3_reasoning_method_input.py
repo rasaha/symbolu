@@ -21,6 +21,7 @@ INPUT = {
     "reasoning_advisory_ref": "req.pilot:advisory",
     "reasoning_advisory_digest": P + "a" * 64,
     "admission_digest": P + "b" * 64,
+    "comparison_result_digest": P + "f" * 64,
     "rule_set_id": "rules.evidence",
     "rule_set_version": "1",
     "rule_set_digest": P + "c" * 64,

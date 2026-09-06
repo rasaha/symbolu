@@ -78,8 +78,8 @@ repository** `[G]`. Both are supplied at run time and named in the preregistrati
    when the mean fails `>= 0.9` `[V]` (`engine.py:382`); otherwise
    `SUFFICIENT_RESOURCE_DOMINATED` if another sufficient method dominates it on
    `LLM_CALLS`, else `SUFFICIENT_PARETO_EFFICIENT` `[V]` (`engine.py:416`).
-7. **Admit.** Bundle the three qualifiers' assessments as `ComparisonEvidence` and call
-   `admit(advisory, request, evidence, admitted_at=...)`. It refuses if any qualifier is
+7. **Admit.** Hand the engine's result to
+   `admit(advisory, request, result, admitted_at=...)`. It refuses if any qualifier is
    `INSUFFICIENT_QUALITY` (`admission.py:166-171`) or lacks a sufficient assessment
    (`admission.py:176-180`); both sufficient outcomes count (`admission.py:53`) `[V]`.
 
@@ -90,19 +90,20 @@ which is what the study exists to find out.
 
 ## 5 — What must be attested before `admit` is trusted
 
-`admit` checks shape, binding and coverage. It does **not** establish where an
-assessment came from: a hand-built `ReasoningMethodFitAssessment` with the right
-digests admits today `[V]` (`admission.py:184-228` checks binding and coverage, never provenance). Trust
-therefore rests on four things upstream, each expressible now and none produced yet:
+`admit` checks shape, binding, coverage and — since the amendment of 2026-09-06 —
+that the evidence arrived as an engine `ReadinessComparisonResult`, which it cites by
+`comparison_result_digest` `[V]` (`admission.py`, `evidence_from_result`). A hand-built
+tuple of assessments no longer admits. What remains open is a *forged result*, and the
+three attestations below it. Trust therefore rests on four things upstream:
 
 | # | Requirement | Mechanism | Status |
 |---|---|---|---|
-| A1 | Assessments come from an engine-produced `ReadinessComparisonResult`, not a hand | result contract refuses a foreign assessor `[V]` (`governance/contracts/ports.py:170`); the admission should cite the **result digest**, not only assessment digests | `[G]` admission cites assessments only |
+| A1 | Assessments come from an engine-produced `ReadinessComparisonResult`, not a hand | result contract refuses a foreign assessor `[V]` (`governance/contracts/ports.py:170`); the admission cites the **result digest** and refuses any engine but the comparison engine `[V]` | closed structurally; a forged result still needs A3 |
 | A2 | Execution records attested by a party that is neither producer nor requester, and resolved as an authority | engine refuses self-attestation `[V]` (`engine.py:244`); resolution is requester-asserted `[V]` (`engine.py:218`) | `[G]` no authority resolution exists |
 | A3 | Attestations verified by the Trusted Evidence Authority | `VerificationEnvelope` must reference an attestation of the same record `[V]` (`engine.py:251-258`); TEV-2 verifier exists | `[G]` not wired to the pilot |
 | A4 | Quality claims independent of self-reported quality; scorer custody independent of the executor | engine refuses claims naming `self_reported_quality` `[V]` (`engine.py:306`); scorer custody keyed by case digest `[V]` | `[G]` evaluator independence is `DECLARED_UNVERIFIED` |
 
-Until A1 is closed, an admission is only as trustworthy as whoever assembled the bundle.
+Until A3 is closed, an admission is only as trustworthy as whoever ran the engine.
 That is acceptable for the first study, whose purpose is to exercise the path, and not
 acceptable for any product claim `[R]`.
 

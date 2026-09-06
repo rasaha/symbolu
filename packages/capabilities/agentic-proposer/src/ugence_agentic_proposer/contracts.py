@@ -1205,9 +1205,10 @@ class ReasoningMethodAdvisoryInput(BaseModel):
     """D8's third nested public shape (`RM-3`). **Input, never authority.**
 
     The typed reference by which an *admitted* reasoning-method advisory reaches
-    the process record: the advisory and its admission by digest, the rule set
-    that produced it, the task class it was admitted for, the method identifiers
-    it found qualifying, and the fit assessments that admitted it, by digest.
+    the process record: the advisory, its admission and the engine comparison
+    result it was admitted on, each by digest; the rule set that produced it; the
+    task class it was admitted for; the method identifiers it found qualifying;
+    and the fit assessments that admitted it, by digest.
     Both vocabulary fields are ``Literal`` — a research-only advisory
     (``COMPARISON_EVIDENCE_ABSENT`` / ``RESEARCH_ONLY``) cannot be constructed
     as input at all, which is the fail-closed half of `RM-2`.
@@ -1218,7 +1219,7 @@ class ReasoningMethodAdvisoryInput(BaseModel):
     ``declared_strategy`` and touches no ``DEPENDENT_FIELDS``. A reader who
     wants to know whether the recorded input was genuine resolves the digests
     against the advisor's own ``validate_admission``, outside this package.
-    Twelve fields, no C2 common field (C2).
+    Thirteen fields, no C2 common field (C2).
     """
 
     model_config = _MODEL_CONFIG
@@ -1226,6 +1227,7 @@ class ReasoningMethodAdvisoryInput(BaseModel):
     reasoning_advisory_ref: Identifier
     reasoning_advisory_digest: DigestShaped
     admission_digest: DigestShaped
+    comparison_result_digest: DigestShaped
     rule_set_id: Token
     rule_set_version: Token
     rule_set_digest: DigestShaped

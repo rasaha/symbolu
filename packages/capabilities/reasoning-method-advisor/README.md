@@ -30,14 +30,18 @@ separate record**, never by changing shape:
 - The slice 2 request and advisory are **unchanged, field for field**. Every advisory
   is still `COMPARISON_EVIDENCE_ABSENT` / `RESEARCH_ONLY`, and every historical
   digest — including a preregistered pilot manifest that embeds one — still verifies.
-- `ComparisonEvidence` presents `ReasoningMethodFitAssessment`s for one task class over
-  one catalog. `admit(advisory, request, evidence, admitted_at=...)` returns a
-  `ReasoningMethodAdvisoryAdmission` — `COMPARISON_EVIDENCE_PRESENT` /
-  `ADVISORY_INPUT`, digest-bound to the advisory, restating its qualifying set and
-  primary, and citing the admitting assessments' digests as `evidence_refs` — **only
-  when every qualifying method** has a sufficient assessment
-  (`SUFFICIENT_PARETO_EFFICIENT` or `SUFFICIENT_RESOURCE_DOMINATED`) for exactly its
-  method reference. `validate_admission` replays that at any later time.
+- `admit(advisory, request, result, admitted_at=...)` takes the comparison engine's
+  `ReadinessComparisonResult` — never a bare bundle of assessments — and returns a
+  `ReasoningMethodAdvisoryAdmission`: `COMPARISON_EVIDENCE_PRESENT` / `ADVISORY_INPUT`,
+  digest-bound to the advisory **and to the result** (`comparison_result_digest`),
+  restating the qualifying set and primary, and citing the admitting assessments'
+  digests as `evidence_refs` — **only when every qualifying method** has a sufficient
+  assessment (`SUFFICIENT_PARETO_EFFICIENT` or `SUFFICIENT_RESOURCE_DOMINATED`) for
+  exactly its method reference. A result naming any engine but
+  `ugence-readiness-comparison` (mirrored as `COMPARISON_ENGINE_IDENTITY`; this package
+  still imports nothing from the engine) is unbound. `ComparisonEvidence` is the
+  internal shape the coverage rule reads. `validate_admission(admission, advisory,
+  result)` replays all of it at any later time.
 
 Evidence never creates a qualifier: the rule set decides who qualifies; the evidence
 decides whether that result may leave research. Partial coverage, no qualifier, or
@@ -52,6 +56,11 @@ unclassified advisory is never admitted.
 `ReasoningMethodAdvisoryInput`: references, method identifiers and evidence digests —
 input, never authority — refused for a bare advisory. This package knows the proposer's
 input shape; the proposer imports nothing from here.
+
+**What citing the result does and does not establish.** A hand-assembled tuple of
+assessments can no longer be admitted, and the result contract binds every assessment
+to one engine identity and one request digest. A *forged result* remains possible
+until results are signed and verified by the Trusted Evidence Authority `[G]`.
 
 **What no evidence exists for yet `[G]`.** The fit assessments in this package's tests
 are synthetic fixtures proving the mechanism. Real comparison evidence comes from a

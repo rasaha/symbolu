@@ -260,7 +260,8 @@ FIELD_CLASSIFICATION = {
     # `RM-3` (0.5.0): D8's third nested public shape. Input, never authority.
     "ReasoningMethodAdvisoryInput": {
         "reasoning_advisory_ref": C5A, "reasoning_advisory_digest": OTHER_PATTERN,
-        "admission_digest": OTHER_PATTERN, "rule_set_id": C5B, "rule_set_version": C5B,
+        "admission_digest": OTHER_PATTERN, "comparison_result_digest": OTHER_PATTERN,
+        "rule_set_id": C5B, "rule_set_version": C5B,
         "rule_set_digest": OTHER_PATTERN, "task_class_digest": OTHER_PATTERN,
         "evidence_status": CLOSED, "usage_scope": CLOSED,
         "qualifying_method_ids": C5B, "primary_method_id": C5B, "evidence_refs": OTHER_PATTERN,
@@ -305,7 +306,7 @@ CONTRACT_CARDINALITY = {
     # admitted reasoning-method advisory as typed input, outside ``P_unsigned``.
     "ProposerProcessRecord": 19,
     "ProposerProcessStateTransition": 2,
-    "ReasoningMethodAdvisoryInput": 12,
+    "ReasoningMethodAdvisoryInput": 13,
 }
 
 #: The C2 common fields every top-level contract carries and neither nested shape does.

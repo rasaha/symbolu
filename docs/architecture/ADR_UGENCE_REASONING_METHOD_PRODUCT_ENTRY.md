@@ -38,22 +38,27 @@ additions beside them:
 - `ComparisonEvidence(task_class_digest, catalog, assessments)` — a bundle of
   `ReasoningMethodFitAssessment`s for one task class over one catalog; another class,
   another catalog or a duplicated assessment is `COMPARISON_EVIDENCE_UNBOUND`.
-- `admit(advisory, request, evidence, admitted_at=...)` →
-  `ReasoningMethodAdvisoryAdmission`: binds the advisory to its request first, refuses
-  an unclassified advisory, then asks one question per qualifying method — is there a
+- `admit(advisory, request, result, admitted_at=...)` →
+  `ReasoningMethodAdvisoryAdmission`: takes the engine's `ReadinessComparisonResult`
+  (never a bare bundle; a result naming another engine is unbound), binds the advisory
+  to its request first, refuses an unclassified advisory, then asks one question per
+  qualifying method — is there a
   `SUFFICIENT_PARETO_EFFICIENT` or `SUFFICIENT_RESOURCE_DOMINATED` assessment for
   exactly its method reference? All covered: admitted, citing the admitting digests as
   `evidence_refs` inside the admission digest. An `INSUFFICIENT_QUALITY` assessment for
   a qualifying method: `COMPARISON_EVIDENCE_CONTRADICTED`. Partial coverage, no
   qualifier, or only `COMPARISON_EVIDENCE_ABSENT` assessments:
-  `RESEARCH_ONLY_REFUSED_IN_PRODUCT`. The admission exists only in the admitted state;
-  `validate_admission` replays coverage at any later time.
+  `RESEARCH_ONLY_REFUSED_IN_PRODUCT`. The admission exists only in the admitted state
+  and cites the result by `comparison_result_digest`; `validate_admission` replays
+  coverage against that result at any later time. (Amended 2026-09-06: the first
+  version took a bare `ComparisonEvidence` bundle, so a hand-built assessment could
+  admit; study-plan requirement A1 closed that structurally.)
 - `to_proposer_input(admission)` — the one-way bridge. Refuses a bare advisory. Adds
   the proposer's C6 `sha256:` prefix to every digest; the advisor's own digests stay
   bare hex.
 
-**Proposer 0.5.0.** One public name, `ReasoningMethodAdvisoryInput` (twelve fields, no
-C2 common field), and one optional field on `ProposerProcessRecord` (18 → 19). Both
+**Proposer 0.5.0.** One public name, `ReasoningMethodAdvisoryInput` (thirteen fields,
+no C2 common field, including `comparison_result_digest`), and one optional field on `ProposerProcessRecord` (18 → 19). Both
 vocabulary fields are `Literal`s, so a research-only advisory cannot be constructed as
 input at all. The record sits outside `P_unsigned` (D9), so no advisory digest moves
 `[V]` (`tests/test_rm3_reasoning_method_input.py::test_the_input_is_outside_p_unsigned`).
