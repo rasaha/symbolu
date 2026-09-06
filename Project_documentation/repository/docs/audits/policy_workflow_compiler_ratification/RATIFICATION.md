@@ -259,7 +259,7 @@ an unsatisfied review. Design: `../policy_workflow_compiler_p3a/DESIGN.md`.
 | Ruling | Decision |
 | --- | --- |
 | **V2-A** | The shared canonical-pack-view extraction is **its own prior commit**, with digests pinned, so a refactor that could silently invalidate every approval is reviewable apart from the schema change. **Delivered**: `models/pack_view.py::canonical_pack_view`, with both the release payload and the approval digest delegating to it. |
-| **V2-B** | *Open.* Whether `SemanticDeclaration` becomes a `PolicyObject` in `APPROVAL_SENSITIVE_OBJECT_TYPES`. Recommendation: yes — a changed data classification should route to P3A review. |
+| **V2-B** | `SemanticDeclaration` **is** a `PolicyObject` with a new `ObjectType.SEMANTIC_DECLARATION`, and that type joins `APPROVAL_SENSITIVE_OBJECT_TYPES` — a changed data classification routes to P3A review. **Delivered** with the schema gate. |
 
 Design: `../policy_workflow_compiler_pack_v2/DESIGN.md`.
 

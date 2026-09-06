@@ -27,6 +27,7 @@ class PolicyPackValidator:
         diagnostics: List[ValidationDiagnostic] = []
         # Schema first: an unsupported schema is fatal and short-circuits the rest.
         schema = _prov.check_schema_version(pack)
+        schema = schema + _prov.check_schema_declarations(pack) if not schema else schema
         diagnostics.extend(schema)
         if any(d.severity is Severity.FATAL for d in schema):
             return ValidationReport(

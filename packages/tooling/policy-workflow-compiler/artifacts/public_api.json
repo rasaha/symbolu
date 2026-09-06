@@ -1,5 +1,5 @@
 {
-  "count": 116,
+  "count": 120,
   "fingerprints": {
     "APPROVAL_SENSITIVE_OBJECT_TYPES": {
       "kind": "object",
@@ -228,6 +228,39 @@
       ]
     },
     "AuditSchema": {
+      "kind": "class",
+      "members": [
+        "construct",
+        "copy",
+        "dict",
+        "from_orm",
+        "json",
+        "model_computed_fields",
+        "model_config",
+        "model_construct",
+        "model_copy",
+        "model_dump",
+        "model_dump_json",
+        "model_extra",
+        "model_fields",
+        "model_fields_set",
+        "model_json_schema",
+        "model_parametrized_name",
+        "model_post_init",
+        "model_rebuild",
+        "model_validate",
+        "model_validate_json",
+        "model_validate_strings",
+        "parse_file",
+        "parse_obj",
+        "parse_raw",
+        "schema",
+        "schema_json",
+        "update_forward_refs",
+        "validate"
+      ]
+    },
+    "AuthoritativeSourceRef": {
       "kind": "class",
       "members": [
         "construct",
@@ -758,6 +791,39 @@
         "validate"
       ]
     },
+    "DeclaredContractRef": {
+      "kind": "class",
+      "members": [
+        "construct",
+        "copy",
+        "dict",
+        "from_orm",
+        "json",
+        "model_computed_fields",
+        "model_config",
+        "model_construct",
+        "model_copy",
+        "model_dump",
+        "model_dump_json",
+        "model_extra",
+        "model_fields",
+        "model_fields_set",
+        "model_json_schema",
+        "model_parametrized_name",
+        "model_post_init",
+        "model_rebuild",
+        "model_validate",
+        "model_validate_json",
+        "model_validate_strings",
+        "parse_file",
+        "parse_obj",
+        "parse_raw",
+        "schema",
+        "schema_json",
+        "update_forward_refs",
+        "validate"
+      ]
+    },
     "DependencyKind": {
       "kind": "enum",
       "members": [
@@ -1205,6 +1271,7 @@
         "PROVENANCE_REFERENCE",
         "REPLAY_CASE",
         "REQUIRED_EVIDENCE",
+        "SEMANTIC_DECLARATION",
         "SEQUENCE_RISK_PATTERN",
         "SOURCE_DOCUMENT",
         "TEST_SCENARIO"
@@ -1227,6 +1294,7 @@
         "PROVENANCE_REFERENCE",
         "REPLAY_CASE",
         "REQUIRED_EVIDENCE",
+        "SEMANTIC_DECLARATION",
         "SEQUENCE_RISK_PATTERN",
         "SOURCE_DOCUMENT",
         "TEST_SCENARIO"
@@ -2026,9 +2094,47 @@
         "UNSUPPORTED"
       ]
     },
+    "SCHEMA_VERSION_V2": {
+      "kind": "constant",
+      "type": "str"
+    },
     "SUPPORTED_WORKFLOW_IR_VERSIONS": {
       "kind": "object",
       "type": "tuple"
+    },
+    "SemanticDeclaration": {
+      "kind": "class",
+      "members": [
+        "construct",
+        "copy",
+        "dict",
+        "from_orm",
+        "json",
+        "model_computed_fields",
+        "model_config",
+        "model_construct",
+        "model_copy",
+        "model_dump",
+        "model_dump_json",
+        "model_extra",
+        "model_fields",
+        "model_fields_set",
+        "model_json_schema",
+        "model_parametrized_name",
+        "model_post_init",
+        "model_rebuild",
+        "model_validate",
+        "model_validate_json",
+        "model_validate_strings",
+        "parse_file",
+        "parse_obj",
+        "parse_raw",
+        "provenance_status",
+        "schema",
+        "schema_json",
+        "update_forward_refs",
+        "validate"
+      ]
     },
     "SemanticDiagnostic": {
       "kind": "class",
@@ -2398,10 +2504,12 @@
         "diff_driven_review_implemented",
         "enterprise_policy_evaluation_implemented",
         "human_review_semantics_implemented",
+        "policy_pack_v2_supported",
         "policy_provenance_implemented",
         "release_validation_implemented",
         "runtime_execution_implemented",
         "semantic_node_enrichment_implemented",
+        "source_declared_semantics_implemented",
         "supported_workflow_ir_versions",
         "team_composition_implemented",
         "to_dict",
@@ -2766,6 +2874,7 @@
     "AuditFieldDefinition",
     "AuditRequirement",
     "AuditSchema",
+    "AuthoritativeSourceRef",
     "AuthorityDisposition",
     "AuthorityRequirement",
     "AuthorityType",
@@ -2787,6 +2896,7 @@
     "CoverageMatrix",
     "DataContractRef",
     "DecisionRule",
+    "DeclaredContractRef",
     "DependencyKind",
     "DerivationClass",
     "EdgeKind",
@@ -2832,7 +2942,9 @@
     "ReviewRequirement",
     "ReviewStepRequirement",
     "RoleRelevance",
+    "SCHEMA_VERSION_V2",
     "SUPPORTED_WORKFLOW_IR_VERSIONS",
+    "SemanticDeclaration",
     "SemanticDiagnostic",
     "SemanticFeature",
     "SemanticFeatureName",

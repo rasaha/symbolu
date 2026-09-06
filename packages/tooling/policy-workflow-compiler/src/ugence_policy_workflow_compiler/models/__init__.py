@@ -25,8 +25,14 @@ from .audit import (
     AuditSchema,
 )
 from .authority import ApprovalPath, ApprovalStep, AuthorityRequirement
+from .declarations import (
+    AuthoritativeSourceRef,
+    DeclaredContractRef,
+    SemanticDeclaration,
+)
 from .common import (
     SCHEMA_VERSION,
+    SCHEMA_VERSION_V2,
     SUPPORTED_SCHEMA_VERSIONS,
     AuthorityDisposition,
     AuthorityType,
@@ -54,6 +60,10 @@ from .rules import Comparator, DecisionRule, Predicate, ProhibitedCondition
 __all__ = [
     "SCHEMA_VERSION",
     "SUPPORTED_SCHEMA_VERSIONS",
+    "SCHEMA_VERSION_V2",
+    "AuthoritativeSourceRef",
+    "DeclaredContractRef",
+    "SemanticDeclaration",
     "AuthorityDisposition",
     "AuthorityType",
     "BlockBehavior",

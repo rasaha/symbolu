@@ -1,8 +1,9 @@
 # `policy_pack.v2` — Source-Declarable Semantics: Design
 
-**Status:** design. **V2-A is ruled and delivered** (the shared canonical-view
-extraction); **V2-B remains open**. No further source change is authorized by this
-document.
+**Status:** design. **V2-A and V2-B are both ruled and delivered** — the shared
+canonical-view extraction, and the schema gate with the `SemanticDeclaration`
+sidecar. Enrichment consumption of declared values (`workflow_ir.v2` reading them)
+is the remaining step and is not delivered here.
 **Scope:** `packages/tooling/policy-workflow-compiler`. Ratified as decision **D2**
 (`../policy_workflow_compiler_ratification/RATIFICATION.md`) and required by the X1
 carriage design (`../policy_workflow_compiler_x1/DESIGN.md`), which cannot bind an
@@ -149,7 +150,7 @@ un-portable across enterprises.
 | Existing approvals | unchanged — the canonical view is identical for v1 packs |
 | `policy_pack.v2` artifacts | new by construction; none exist yet |
 
-## Open rulings — required before implementation `[R]`
+## Rulings
 
 **V2-A — sequencing of the canonical-view extraction. RULED: its own prior
 commit — and delivered.** `models/pack_view.py::canonical_pack_view` is now the one
@@ -159,10 +160,11 @@ that no other module reconstructs the view. No schema gate is present yet: the
 refactor moved no digest, so it is reviewable in isolation from the schema change
 that follows. Step two adds the `schema_version` gate to that single function.
 
-**V2-B — is `SemanticDeclaration` approval-sensitive?** Whether it becomes a
-`PolicyObject` with a new `ObjectType.SEMANTIC_DECLARATION` and joins
-`APPROVAL_SENSITIVE_OBJECT_TYPES`. Recommendation: **yes**. As a `PolicyObject` it
-gains provenance refs, appears in `all_objects()`, and becomes diffable; as an
-approval-sensitive type, changing a data classification routes to P3A review, which
-is the correct handling for "this now touches PII". The change costs nothing for v1
-packs, which contain no such objects.
+**V2-B — is `SemanticDeclaration` approval-sensitive? RULED: yes.**
+`SemanticDeclaration` is a `PolicyObject` with a new
+`ObjectType.SEMANTIC_DECLARATION`, and that type joins
+`APPROVAL_SENSITIVE_OBJECT_TYPES`. As a `PolicyObject` it carries its own provenance
+refs, appears in `all_objects()`, and is diffable; as an approval-sensitive type,
+changing a data classification routes to P3A review — the correct handling for "this
+now touches PII". The change costs nothing for `policy_pack.v1` packs, which contain
+no such objects.

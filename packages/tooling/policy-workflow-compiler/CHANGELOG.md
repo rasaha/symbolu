@@ -4,6 +4,29 @@ All notable changes to `ugence-policy-workflow-compiler` are documented here.
 This project adheres to semantic-ish versioning for its distribution wheel; the
 product version tracks capability maturity separately.
 
+## Unreleased — `policy_pack.v2`: source-declarable semantics
+
+Additive schema. `policy_pack.v1` packs, digests and approvals are byte-identical.
+
+### Added
+- **`policy_pack.v2`** in `SUPPORTED_SCHEMA_VERSIONS`, with `SemanticDeclaration`
+  (a `PolicyObject` under the new `ObjectType.SEMANTIC_DECLARATION`),
+  `DeclaredContractRef`, and `AuthoritativeSourceRef` for the PA/PWC-X1 coordinate.
+- A sidecar `semantic_declarations` collection and an `authoritative_source` slot on
+  the pack, both included in the canonical view **only** for a v2 pack.
+- The schema gate inside the single `canonical_pack_view` extracted in step one, so
+  the release digest and the approval digest can never diverge on it.
+- Fail-closed checks: `V2_FIELD_IN_V1_PACK` (FATAL), `DANGLING_DECLARATION_SUBJECT`,
+  `DUPLICATE_DECLARATION_SUBJECT`, `MALFORMED_CONTRACT_VERSION_REF`.
+- Ruling **V2-B**: `SEMANTIC_DECLARATION` joins `APPROVAL_SENSITIVE_OBJECT_TYPES`, so
+  a changed data classification routes to P3A review.
+- Public API 116 → 120 names; maturity gates `policy_pack_v2_supported=true` and
+  `source_declared_semantics_implemented=false`.
+
+### Not implemented
+`workflow_ir.v2` enrichment does not yet read declared values into node semantics.
+Declarations are carried, digest-bound and validated; they are not yet consumed.
+
 ## Unreleased — Phase 3A: Governed Diff-Driven Review
 
 Additive and contracts-only. No policy-pack, workflow-IR, compiler, assurance or

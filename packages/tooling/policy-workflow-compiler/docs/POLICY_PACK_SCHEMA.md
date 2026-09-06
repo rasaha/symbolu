@@ -69,3 +69,55 @@ Every substantive object must cite provenance. An object with no provenance is
 until a reviewer explicitly approves the gap. The compiler never fabricates
 provenance. See `AUDIT_SCHEMA.md` and `VALIDATION_MODEL.md` for how missing
 provenance surfaces as a diagnostic.
+
+
+## `policy_pack.v2` — source-declarable semantics
+
+`policy_pack.v2` is additive. It adds two pack-level fields and one object type; a
+`policy_pack.v1` pack is unchanged, and so is every v1 digest and every approval
+bound to one.
+
+| Addition | Purpose |
+| --- | --- |
+| `semantic_declarations` | A sidecar collection of `SemanticDeclaration` objects, each naming its `subject_object_id` and declaring data classification refs, permission *intent* refs, required tool refs, and typed input/output contract refs with versions. |
+| `authoritative_source` | The exact Policy Authority issuance the pack was compiled from (PA/PWC-X1): the six-field coordinate, the issuance attestation, and the resolution context. |
+| `ObjectType.SEMANTIC_DECLARATION` | Declarations are addressable `PolicyObject`s — they carry provenance refs, appear in `all_objects()`, and are diffable. |
+
+### Why a sidecar
+
+A declaration names its subject rather than living on it. That keeps the twenty v1
+object models untouched, and it means the schema gate is a single reviewable rule
+rather than a per-model concern.
+
+### The schema gate
+
+`models/pack_view.py::canonical_pack_view` is the one definition of a pack's logical
+content, used by both the compiled release and the approval digest. It includes the
+v2 fields **only** for a v2 pack, so `policy_pack.v1` canonical bytes are identical
+by construction.
+
+A **v1 pack that declares v2 content is refused** (`V2_FIELD_IN_V1_PACK`, `FATAL`),
+never quietly pruned: a field that is present, reviewed, approved and then silently
+excluded from the digest is worse than one either accepted or rejected.
+
+### Fail-closed checks
+
+| Code | Raised when |
+| --- | --- |
+| `V2_FIELD_IN_V1_PACK` | A `policy_pack.v1` pack carries v2 content |
+| `DANGLING_DECLARATION_SUBJECT` | `subject_object_id` resolves to no object in the pack |
+| `DUPLICATE_DECLARATION_SUBJECT` | Two declarations claim one subject — which governs is not a question the compiler may answer |
+| `MALFORMED_CONTRACT_VERSION_REF` | A typed contract reference carries no contract id |
+| `UNSUPPORTED_SCHEMA_VERSION` | The pack declares a schema this build cannot compile |
+
+### Declared, never inferred
+
+A declaration is preserved exactly as the source policy states it. Where the policy
+declares nothing, the value stays unresolved — never defaulted. `workflow_ir.v2`
+enrichment reading these values into node semantics is the next step and is not
+implemented (`source_declared_semantics_implemented=false`).
+
+### Ruling V2-B
+
+`SEMANTIC_DECLARATION` is in `APPROVAL_SENSITIVE_OBJECT_TYPES`: changing a data
+classification is governance-material and routes to P3A review.

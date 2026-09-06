@@ -24,6 +24,9 @@ APPROVAL_SENSITIVE_OBJECT_TYPES = frozenset(
         ObjectType.OVERRIDE_RULE,
         ObjectType.EXCEPTION_RULE,
         ObjectType.APPROVAL_PATH,
+        # Ruling V2-B: a changed source-declared semantic — "this now touches PII" —
+        # is governance-material and routes to review like any other.
+        ObjectType.SEMANTIC_DECLARATION,
     }
 )
 

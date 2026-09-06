@@ -15,6 +15,7 @@ from __future__ import annotations
 # -- object model --------------------------------------------------------------
 from .models import (
     ActionConstraint,
+    AuthoritativeSourceRef,
     ApprovalDecision,
     ApprovalPath,
     ApprovalStep,
@@ -30,6 +31,7 @@ from .models import (
     Comparator,
     ConnectorMapping,
     ConstraintKind,
+    DeclaredContractRef,
     CoverageMatrix,
     DecisionRule,
     EvidenceKind,
@@ -38,6 +40,8 @@ from .models import (
     HumanApprovalRecord,
     LegitimateCounterexample,
     ObjectType,
+    SCHEMA_VERSION_V2,
+    SemanticDeclaration,
     OverrideRule,
     PolicyObject,
     PolicyPack,
@@ -228,6 +232,11 @@ __all__ = [
     "ImpactSummary",
     "ChangeType",
     "diff_policy_packs",
+    # policy_pack.v2 source-declared semantics
+    "SCHEMA_VERSION_V2",
+    "SemanticDeclaration",
+    "DeclaredContractRef",
+    "AuthoritativeSourceRef",
     # governed diff-driven review (P3A)
     "APPROVAL_SENSITIVE_OBJECT_TYPES",
     "REVIEW_ENFORCEMENT",

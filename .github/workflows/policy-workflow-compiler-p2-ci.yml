@@ -66,9 +66,10 @@ jobs:
                     "dependency_semantics_implemented","authority_semantics_implemented",
                     "human_review_semantics_implemented","policy_provenance_implemented",
                     "release_validation_implemented","deterministic_replay_verified",
-                    "diff_driven_review_implemented"):
+                    "diff_driven_review_implemented","policy_pack_v2_supported"):
               assert i[k] is True, k
-          for k in ("awc_adapter_updated","agent_eligibility_implemented","agent_ranking_implemented",
+          for k in ("awc_adapter_updated","source_declared_semantics_implemented",
+                    "agent_eligibility_implemented","agent_ranking_implemented",
                     "team_composition_implemented","runtime_execution_implemented",
                     "action_authorization_implemented","enterprise_policy_evaluation_implemented",
                     "pilot_validated","production_certified"):
@@ -210,6 +211,19 @@ jobs:
       - run: python -m pip install --upgrade pip && pip install pytest pydantic
       - env: { PYTHONPATH: "${{ env.SRC }}" }
         run: python -m pytest ${{ env.PKG }}/tests/test_p3a_review.py -q
+
+  pack-v2-suite:
+    name: policy_pack.v2 schema gate and sidecar carriage
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.11" }
+      - run: python -m pip install --upgrade pip && pip install pytest pydantic
+      - env: { PYTHONPATH: "${{ env.SRC }}" }
+        run: |
+          python -m pytest ${{ env.PKG }}/tests/test_policy_pack_v2_schema.py \
+            ${{ env.PKG }}/tests/test_canonical_pack_view.py -q
 
   verifier-report-freshness:
     name: Committed verifier report is not stale
