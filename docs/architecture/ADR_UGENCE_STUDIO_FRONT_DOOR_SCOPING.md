@@ -1199,7 +1199,7 @@ The three seam packages that gained a durable home — `ai-system-registry`,
 | Item | Kind | The one input | Who supplies it |
 |---|---|---|---|
 | Result egress (row 5's third element) | seam not yet declared | a document declaring where model output crosses a boundary worth governing; the named ADR is discharged, not unimplemented (its §7) `[G]` | a body of work, then an owner ratification |
-| Console in the profile (seam 4) | packaging body of work | FD-8.3 completion: the root prototype at `apps/console/` becomes a bounded, installable, tested distribution with an authentication boundary and a stated maturity | a body of work |
+| Console in the profile (seam 4) | packaging body of work | FD-8.3 completion: the root prototype `ugence_console_api/` (not `apps/console/`, which is its separate frontend) becomes a bounded, installable, tested distribution with an authentication boundary and a stated maturity; scoped in `ADR_UGENCE_CONSOLE_PACKAGING_SCOPING.md`, which proposes CP-1 to CP-5 | a body of work, after an owner ruling |
 | Durable Decision Authority store | package decision | a producer of decisions; the store would be empty by construction until one exists | a body of work |
 | Mirror coordinates | owner input | `registry_host`, `repository_prefix`, `secret_name` — all three `null`, `provisioning.status: PENDING_OUTSIDE_REPOSITORY` | the owner |
 | Langflow export fixture | owner input | one genuine secret-free export; only `ADR_UGENCE_LANGFLOW_IMPORT_SCOPING.md` exists, no fixture | the owner |
