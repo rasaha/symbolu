@@ -11,6 +11,7 @@ as importantly — what is not.
 | `structured_policy_pack_implemented` | `true` | The structured policy-pack object model exists and is usable. |
 | `deterministic_compilation_verified` | `true` | Deterministic compilation is verified: identical approved input + compiler version yields an identical logical digest. |
 | `procurement_reference_equivalence_verified` | `true` | The compiler's Procurement interpretation is verified `EQUIVALENT` to the live product across the modeled dimensions. |
+| `ai_hiring_reference_equivalence_verified` | `true` | The compiler's AI Hiring interpretation is verified `EQUIVALENT` to the live product across five dimensions chosen for its advisory-versus-binding shape (decision D3's second domain). See `AI_HIRING_REFERENCE_VALIDATION.md`. |
 | `document_extraction_implemented` | `false` | No document ingestion / extraction. |
 | `runtime_deployment_implemented` | `false` | No runtime execution or deployment. |
 | `pilot_validated` | `false` | Not validated in a pilot. |
@@ -89,7 +90,7 @@ Summarized, with what this build already satisfies:
 | Pilot evidence | Status |
 | --- | --- |
 | Procurement reference equivalence | satisfied — `EQUIVALENT`, 5 dimensions, 28 checks |
-| AI Hiring reference equivalence | not built |
+| AI Hiring reference equivalence | satisfied — `EQUIVALENT`, 5 dimensions, 22 checks |
 | One named real pilot policy corpus | not done |
 | Source policy passed legitimate human approval | mechanism exists; not demonstrated on a pilot corpus |
 | Exact source artifact and digest retained | requires the PA/PWC-X1 source-linkage coordinate |

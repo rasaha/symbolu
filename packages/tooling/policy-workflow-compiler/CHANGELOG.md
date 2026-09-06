@@ -4,6 +4,30 @@ All notable changes to `ugence-policy-workflow-compiler` are documented here.
 This project adheres to semantic-ish versioning for its distribution wheel; the
 product version tracks capability maturity separately.
 
+## Unreleased — AI Hiring reference equivalence (decision D3)
+
+The second equivalence domain, required before `pilot_validated` can be earned.
+
+### Added
+- `reference/ai_hiring.py` — a reference pack modelling non-compensatory eligibility
+  over mandatory gates, advisory-versus-binding separation, transparent advisory
+  floors and fail-closed evidence admissibility.
+- `reference/ai_hiring_equivalence.py` — a harness with dimensions chosen for this
+  domain's shape rather than Procurement's: `eligibility_derivation`,
+  `advisory_disposition`, `advisory_binding_separation`,
+  `compatibility_not_eligibility`, `deterministic_threshold_translation`.
+  **Result: EQUIVALENT across all five, 22 checks.**
+- Optional `ai-hiring-reference` extra, an `ai_hiring_reference_equivalence_verified`
+  maturity gate, and `AI_HIRING_REFERENCE_VALIDATION.md`.
+
+### Noted
+The live product states its advisory floors as floats; the compiler refuses a float
+in policy logic, so the reference states them in integer units and a dedicated
+dimension checks that the translation stays exact.
+
+### Unchanged
+Procurement equivalence, and every `workflow_ir.v1` / `workflow_ir.v2` digest.
+
 ## Unreleased — PA/PWC-X1: authoritative source carriage
 
 A `policy_pack.v2` pack may carry the exact Policy Authority issuance it was

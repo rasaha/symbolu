@@ -51,6 +51,7 @@ dependencies = [
 # live ugence-procurement reference workflow. It is the ONLY optional integration,
 # and it is never required for core compilation or the offline demo.
 procurement-reference = ["ugence-procurement>=0.1.0"]
+ai-hiring-reference = ["ugence-ai-hiring>=0.1.1"]
 dev = ["pytest>=7.0", "build>=1.0"]
 
 [project.scripts]

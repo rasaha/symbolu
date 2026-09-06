@@ -81,6 +81,7 @@ def digest_compiler_version_for(contract_version: str) -> str:
 #: targets from metadata alone. version_info() reports availability only.
 _OPTIONAL_INTEGRATIONS = {
     "procurement-reference": "ugence_procurement",
+    "ai-hiring-reference": "ugence_ai_hiring",
 }
 
 _TRACKED_DEPENDENCIES = ("pydantic",)
@@ -115,6 +116,7 @@ class VersionInfo:
     structured_policy_pack_implemented: bool
     deterministic_compilation_verified: bool
     procurement_reference_equivalence_verified: bool
+    ai_hiring_reference_equivalence_verified: bool
     document_extraction_implemented: bool
     runtime_deployment_implemented: bool
     pilot_validated: bool
@@ -168,6 +170,9 @@ class VersionInfo:
             "deterministic_compilation_verified": self.deterministic_compilation_verified,
             "procurement_reference_equivalence_verified": (
                 self.procurement_reference_equivalence_verified
+            ),
+            "ai_hiring_reference_equivalence_verified": (
+                self.ai_hiring_reference_equivalence_verified
             ),
             "document_extraction_implemented": self.document_extraction_implemented,
             "runtime_deployment_implemented": self.runtime_deployment_implemented,
@@ -237,6 +242,9 @@ def version_info() -> VersionInfo:
         structured_policy_pack_implemented=True,
         deterministic_compilation_verified=True,
         procurement_reference_equivalence_verified=True,
+        # Decision D3's second domain: EQUIVALENT across five dimensions chosen for
+        # AI Hiring's advisory-versus-binding shape, not Procurement's.
+        ai_hiring_reference_equivalence_verified=True,
         document_extraction_implemented=False,
         runtime_deployment_implemented=False,
         pilot_validated=False,
