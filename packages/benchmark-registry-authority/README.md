@@ -335,9 +335,9 @@ red.** The only place any check parses a document directly is BR-1's own
 
 | Check | Result |
 | --- | --- |
-| Package suite | **2261 tests passed**, 1 pre-existing failure (`test_no_package_in_the_monorepo_imports_this_one`: another package's boundary test names this package by string; red on the default branch too) |
+| Package suite | **2263 tests passed**, 0 failed — the reverse-import gate now reads import statements over the AST, so a neighbour naming this package in its own ban list is no longer read as importing it, and a planted-import test proves the gate still catches every import spelling |
 | Independent adversarial probes | **93 passed** (also inside the installed wheel) |
-| Distinct properties | **561 adversarial : 41 happy = 13.68 : 1** (required ≥ 2:1) |
+| Distinct properties | **562 adversarial : 41 happy = 13.71 : 1** (required ≥ 2:1) |
 | Gate inventory | **84 gates** (72 contract gates plus 12 verifier gates added under D-44 finding F-2) |
 | Mutation sweep | **84 gates; 78 KILLED, 6 SURVIVED, 0 errored — the five survivors carried from `0.2.3` plus G-79 (the in-package `S < L` check, shadowed by the signature backend, which enforces RFC 8032 §5.1.7 itself); every survivor classified in `gate_inventory.json`, none designed away** |
 | Distribution | wheel + sdist built; `--no-index` install from a local wheelhouse holding BR-1 and the D-41 pair verified |

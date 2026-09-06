@@ -172,6 +172,21 @@ digest domain, pinned vector or `package_version`; `__version__` stays
 `0.3.0rc1` on `BR-2C-RC`; no capability was added beyond the F-1 cross-check;
 the ADR is not amended by this entry.
 
+### Fixed — the reverse-import gate measures imports, not mentions (owner ruling, option (a))
+
+`test_no_package_in_the_monorepo_imports_this_one` had been red since before
+this branch: it searched every other package's source for the string
+`ugence_benchmark_registry_authority`, and `ai-system-registry`'s own boundary
+test names this package inside *its* forbidden-import list — the opposite of an
+import. The gate now walks the AST and reports a file only on `import`, `from …
+import`, or a string literal handed to `importlib.import_module` or
+`__import__`; a name in a string, comment or docstring is a mention. Its
+BR-2A terminal-state meaning is unchanged. A new test plants all six import
+spellings plus a mention-only module in a scratch tree and requires exactly
+the six to be reported. The neighbour's file is untouched, nothing is
+suppressed, and the suite is green for the first time on this branch: **2263
+passed, 0 failed**; properties **562 adversarial : 41 happy = 13.71 : 1**.
+
 Re-measured after the fixes: suite **2261 passed**, 1 pre-existing failure
 (unchanged); probes **93 passed**; properties **561 adversarial : 41 happy = 13.68 : 1**; distribution
 verifier **verified, 8 of 8 negative controls caught**; mutation sweep

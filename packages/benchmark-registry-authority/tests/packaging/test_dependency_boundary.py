@@ -162,6 +162,60 @@ def test_the_only_non_stdlib_imports_are_br1_and_the_pair_in_the_verifier_module
     assert offenders == [], offenders
 
 
+NAMESPACE = "ugence_benchmark_registry_authority"
+
+
+def _imports_this_package(path: pathlib.Path) -> bool:
+    """Whether a Python file **imports** this package — by ``import``,
+    ``from … import``, or a string literal handed to ``importlib.import_module``
+    or ``__import__``.
+
+    An import statement, not a mention. The previous form searched for the
+    package name as a substring, which also matched a neighbour naming this
+    package inside its *own* forbidden-import list — the opposite of an import.
+    Reading the AST measures the claim the gate makes: that no other package
+    depends on this one. Dynamic imports through a literal string are caught
+    because they are the cheapest way to hide one; a name computed at runtime
+    is outside what a static gate can see, and is not claimed.
+    """
+
+    try:
+        tree = ast.parse(path.read_text(), filename=str(path))
+    except (SyntaxError, ValueError):
+        return False
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            if any(alias.name.split(".")[0] == NAMESPACE for alias in node.names):
+                return True
+        elif isinstance(node, ast.ImportFrom):
+            if node.level == 0 and node.module and node.module.split(".")[0] == NAMESPACE:
+                return True
+        elif isinstance(node, ast.Call):
+            func = node.func
+            name = func.attr if isinstance(func, ast.Attribute) else getattr(func, "id", "")
+            if name in ("import_module", "__import__") and node.args:
+                first = node.args[0]
+                if isinstance(first, ast.Constant) and isinstance(first.value, str):
+                    if first.value.split(".")[0] == NAMESPACE:
+                        return True
+    return False
+
+
+def _reverse_importers(packages_root: pathlib.Path, exclude: pathlib.Path):
+    offenders = []
+    for path in sorted(packages_root.rglob("*.py")):
+        if exclude in path.parents:
+            continue
+        if "__pycache__" in str(path) or "/build/" in str(path):
+            continue
+        try:
+            if _imports_this_package(path):
+                offenders.append(str(path.relative_to(packages_root.parent)))
+        except (UnicodeDecodeError, OSError):  # pragma: no cover
+            continue
+    return offenders
+
+
 @_DETACHED
 def test_no_package_in_the_monorepo_imports_this_one():
     """The BR-2A **terminal state**, not a permanent invariant.
@@ -170,21 +224,46 @@ def test_no_package_in_the_monorepo_imports_this_one():
     ratification. What this asserts is that *at BR-2A delivery* nothing does —
     so this milestone changes no other package's behaviour, and the freeze
     matrix for every neighbour is a statement about an untouched tree.
+
+    Measured on import statements (see :func:`_imports_this_package`), so a
+    neighbour that bans this package by name in its own boundary test is not
+    read as depending on it.
     """
 
-    offenders = []
-    for path in (REPO / "packages").rglob("*.py"):
-        if PKG in path.parents:
-            continue
-        if "__pycache__" in str(path) or "/build/" in str(path):
-            continue
-        try:
-            text = path.read_text()
-        except (UnicodeDecodeError, OSError):  # pragma: no cover
-            continue
-        if "ugence_benchmark_registry_authority" in text:
-            offenders.append(str(path.relative_to(REPO)))
-    assert offenders == [], offenders
+    assert _reverse_importers(REPO / "packages", PKG) == []
+
+
+def test_the_reverse_import_gate_catches_a_real_import_and_ignores_a_mention(tmp_path):
+    """The gate must still fail on an actual reverse import, in every spelling a
+    contributor would write, and must stay silent on a name in a string."""
+
+    packages = tmp_path / "packages"
+    this = packages / "benchmark-registry-authority"
+    this.mkdir(parents=True)
+    (this / "own.py").write_text("import ugence_benchmark_registry_authority\n")
+    neighbour = packages / "integration" / "neighbour"
+    neighbour.mkdir(parents=True)
+    spellings = {
+        "plain.py": "import ugence_benchmark_registry_authority\n",
+        "dotted.py": "import ugence_benchmark_registry_authority.api as x\n",
+        "from_form.py": "from ugence_benchmark_registry_authority import api\n",
+        "from_sub.py": "from ugence_benchmark_registry_authority.contracts import trust\n",
+        "dynamic.py": "import importlib\nm = importlib.import_module('ugence_benchmark_registry_authority')\n",
+        "dunder.py": "m = __import__('ugence_benchmark_registry_authority.api')\n",
+    }
+    for name, text in spellings.items():
+        (neighbour / name).write_text(text)
+    (neighbour / "mention.py").write_text(
+        'FORBIDDEN = {"ugence_benchmark_registry_authority", "other"}\n'
+        '# ugence_benchmark_registry_authority is never imported here\n'
+        'doc = """ugence_benchmark_registry_authority"""\n'
+    )
+    (neighbour / "relative.py").write_text("from . import mention\n")
+    caught = _reverse_importers(packages, this)
+    assert sorted(caught) == sorted(
+        f"packages/integration/neighbour/{name}" for name in spellings
+    )
+    assert not any(path.endswith(("mention.py", "relative.py", "own.py")) for path in caught)
 
 
 @_DETACHED
