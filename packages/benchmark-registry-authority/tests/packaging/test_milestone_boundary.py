@@ -270,8 +270,16 @@ def test_every_unlock_phase_named_is_a_real_subphase():
 def test_no_capability_beyond_br2c_is_scheduled_to_unlock_at_or_before_this_version():
     """An unlock in the past would be a ban this release already lifted.
 
-    The only unlocks at or below the candidate rung are the eight BR-2C tokens
-    the transition names, and theirs is exactly **at** the rung, never below.
+    The only unlocks at or below the reached rung are the eight BR-2C tokens the
+    transition names. D-45 rules that their unlock phase **stays** ``BR-2C-RC``
+    rather than moving with the version, so at the candidate rung theirs is *at*
+    the rung and at ``BR-2C`` it is one rung below: ``<=``, never ``>``. The
+    relaxation is scoped to those eight and drops one of the two facts ``==``
+    pinned — that no unlock sits below the reached rung. The other, that they
+    unlock at a **named** rung, is not lost:
+    :func:`test_the_effective_ban_set_is_exactly_what_the_transition_leaves`
+    pins ``unlock == "BR-2C-RC"`` by set equality in both directions, so a token
+    whose unlock drifted to any other rung fails there.
     """
 
     reached = SUBPHASE_LADDER.index(VERSION_SUBPHASE[api.__version__])
@@ -279,7 +287,7 @@ def test_no_capability_beyond_br2c_is_scheduled_to_unlock_at_or_before_this_vers
         if unlock is None:
             continue
         if token in BR2C_CAPABILITY_TOKENS:
-            assert SUBPHASE_LADDER.index(unlock) == reached, token
+            assert SUBPHASE_LADDER.index(unlock) <= reached, token
         else:
             assert SUBPHASE_LADDER.index(unlock) > reached, token
 
