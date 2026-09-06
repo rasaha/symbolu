@@ -55,6 +55,15 @@ export const useAuditChain = (correlationId: string | null) =>
     retry: RETRY,
   });
 
+// -- 6b · Observe over the worker's ledger (front-door seam 7, FD-11) --------
+export const useLedgerChain = (correlationId: string | null) =>
+  useQuery({
+    queryKey: ["v2", "observe", "ledger", correlationId],
+    queryFn: () => v2.readLedgerChain(correlationId as string),
+    enabled: correlationId !== null && correlationId !== "",
+    retry: RETRY,
+  });
+
 // -- 7 · Review (GAS-7 HR-D) ------------------------------------------------
 export const useReviewQueue = (requiredRole = "") =>
   useQuery({

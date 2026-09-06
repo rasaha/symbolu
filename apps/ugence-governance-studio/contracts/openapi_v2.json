@@ -672,6 +672,47 @@
         ]
       }
     },
+    "/api/v2/observe/ledger/{correlation_id}": {
+      "get": {
+        "description": "The worker's own tenant's audit-ledger rows for one correlation id, as the\nworker read them, with the worker's chain verification (FD-11.3, FD-11.4).\n\nThe studio names no tenant and re-derives, re-orders and re-hashes nothing: what\nis returned is the worker's answer, including its typed refusal when the chain\ndoes not verify.",
+        "operationId": "v2_observe_ledger_chain",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "correlation_id",
+            "required": true,
+            "schema": {
+              "title": "Correlation Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Ledger Chain",
+        "tags": [
+          "observe"
+        ]
+      }
+    },
     "/api/v2/policy/compile": {
       "post": {
         "description": "Compile a reviewed pack into a release.\n\n``approval`` is required by the request model and ``require_approval`` is left at\nthe compiler's default of True. The studio has no path that compiles without one.",

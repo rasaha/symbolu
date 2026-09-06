@@ -53,6 +53,9 @@ export const V2_OPERATIONS = [
   // Front-door seam 6 (FD-10.1 START_IS_A_RELAY): ask the governed runtime worker to
   // start the worker's own shadow run. Nothing of the studio's crosses (FD-10.3).
   "v2_review_start_shadow_run",
+  // Front-door seam 7 (FD-11.1 OBSERVE_OVER_WORKER_LEDGER): the worker's own tenant's
+  // audit-ledger rows by correlation id, as the worker read them (FD-11.3).
+  "v2_observe_ledger_chain",
 ] as const;
 
 async function v2Request<T>(pathAndQuery: string, init?: RequestInit): Promise<T> {
@@ -152,6 +155,14 @@ export const listAuditCorrelationIds = () => gap("/api/v2/observe/audit");
 
 export const readAuditChain = (correlationId: string) =>
   gap(`/api/v2/observe/audit/${enc(correlationId)}`);
+
+/**
+ * Front-door seam 7 (FD-11): the worker's own tenant's audit-ledger rows for one
+ * correlation id, with the worker's chain verification, returned as the worker read
+ * them. No tenant, filter or proof is sent; nothing is re-derived here (FD-11.4).
+ */
+export const readLedgerChain = (correlationId: string) =>
+  gap(`/api/v2/observe/ledger/${enc(correlationId)}`);
 
 // -- 7 · Review (GAS-7 HR-D; owner ruling HR-1: display and transmit) -------
 export const listReviewQueue = (requiredRole = "") => {

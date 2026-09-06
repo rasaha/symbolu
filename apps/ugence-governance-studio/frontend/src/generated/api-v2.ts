@@ -1,6 +1,6 @@
 // AUTO-GENERATED from apps/ugence-governance-studio/contracts/openapi_v2.json
 // DO NOT EDIT BY HAND. Regenerate with: npm run generate:api-v2
-// source_openapi_sha256: 9d958f9c70ca133509aa7cff02657f7f39c5f98068f9dc6fd12bfb9c2a665cdb
+// source_openapi_sha256: 6346f2b7cd10430874f2f077ac69c12ce74be138a9462b0c4ccdcb503c624d7b
 // api_contract_version: governance_studio.api.v2
 
 export interface paths {
@@ -142,6 +142,31 @@ export interface paths {
          *     the record, and a studio-side reconstruction would be a second unverified account.
          */
         get: operations["v2_observe_audit_chain"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v2/observe/ledger/{correlation_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Ledger Chain
+         * @description The worker's own tenant's audit-ledger rows for one correlation id, as the
+         *     worker read them, with the worker's chain verification (FD-11.3, FD-11.4).
+         *
+         *     The studio names no tenant and re-derives, re-orders and re-hashes nothing: what
+         *     is returned is the worker's answer, including its typed refusal when the chain
+         *     does not verify.
+         */
+        get: operations["v2_observe_ledger_chain"];
         put?: never;
         post?: never;
         delete?: never;
@@ -848,6 +873,37 @@ export interface operations {
         };
     };
     v2_observe_audit_chain: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                correlation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    v2_observe_ledger_chain: {
         parameters: {
             query?: never;
             header?: never;
