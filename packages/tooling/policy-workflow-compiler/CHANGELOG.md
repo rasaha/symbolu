@@ -4,6 +4,31 @@ All notable changes to `ugence-policy-workflow-compiler` are documented here.
 This project adheres to semantic-ish versioning for its distribution wheel; the
 product version tracks capability maturity separately.
 
+## Unreleased — PWC-P3C step one: one predicate evaluator
+
+Prerequisite for the offline simulator, delivered on its own so a change to how
+every policy predicate is interpreted is reviewable in isolation. It also fixes a
+live defect.
+
+### Fixed
+The predicate interpretation lived privately inside
+`reference/procurement_equivalence.py` and handled **eight of twelve** comparators:
+`IN`, `NOT_IN`, `NON_EMPTY` and `IS_EMPTY` fell through to `False`, so a policy
+using any of them read as *unsatisfied* rather than raising — a silent wrong answer
+inside a harness whose job is to prove two interpretations agree.
+
+### Added
+- `evaluation/predicates.py` — the single interpreter of the policy language, total
+  over all twelve comparators, with its rules stated: an unevaluable predicate is
+  unsatisfied; absence is emptiness; ordering requires comparable operands and never
+  orders a `bool` against a threshold; an unknown comparator **raises**.
+- `_eval_predicate` is now a thin alias delegating to it.
+- 41 tests covering every comparator, both unevaluable cases, and the delegation.
+
+### Unchanged
+Both equivalence harnesses still report `EQUIVALENT` at 28 and 22 checks; the
+evaluator stays internal, so the public API remains 124 names; every digest holds.
+
 ## Unreleased — PWC-P3B: binding conformance validation
 
 Validation only. No emission path changes, no provider import, and every digest is

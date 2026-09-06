@@ -26,6 +26,7 @@ from types import SimpleNamespace
 from typing import Dict, List, Optional, Tuple
 
 from ..models.actions import ConstraintKind
+from ..evaluation import evaluate_predicate
 from ..models.policy_pack import PolicyPack
 from .procurement import APPROVAL_THRESHOLD, HARD_LIMIT, build_procurement_policy_pack
 
@@ -249,27 +250,15 @@ def _pack_rejects(pack: PolicyPack, rs: RejectionScenario) -> bool:
 
 
 def _eval_predicate(pred, facts) -> bool:
-    from ..models.rules import Comparator
+    """Delegate to the one evaluator for the policy language.
 
-    val = facts.get(pred.fact_key)
-    c = pred.comparator
-    if c is Comparator.IS_TRUE:
-        return val is True
-    if c is Comparator.IS_FALSE:
-        return val is False
-    if c is Comparator.LTE:
-        return val is not None and val <= pred.value
-    if c is Comparator.LT:
-        return val is not None and val < pred.value
-    if c is Comparator.GTE:
-        return val is not None and val >= pred.value
-    if c is Comparator.GT:
-        return val is not None and val > pred.value
-    if c is Comparator.EQ:
-        return val == pred.value
-    if c is Comparator.NE:
-        return val != pred.value
-    return False
+    This function previously interpreted predicates itself, handling eight of the
+    twelve comparators and returning ``False`` for ``IN``, ``NOT_IN``, ``NON_EMPTY``
+    and ``IS_EMPTY`` — a silent wrong answer inside a harness whose job is to prove
+    two interpretations agree. It is kept as a thin alias so existing call sites and
+    tests continue to read naturally.
+    """
+    return evaluate_predicate(pred, facts)
 
 
 def _reference_mappings() -> Dict[str, Dict[str, str]]:
