@@ -128,7 +128,18 @@ not exist; a bare-string approval reference where an `ApprovalEvidenceRef` is
 required) and made `decode_dataclass` public in policy-authority 0.3.1. The frozen v2
 request still carries the approval reference as one string, read as a typed
 three-part encoding; a structured field is a v2 contract amendment for a later,
-separately ruled step. Seam 2 is ruled (FD-6) and waits on its own implementation prompt.
+separately ruled step. **Seam 2 shipped** (`governance-studio-deployment` 0.4.0): `UGENCE_STUDIO_TENANT_ID` and
+`UGENCE_STUDIO_POLICY_IDENTITIES` (typed, `<policy_family>|<policy_id>|<scope>`) hand
+the Authority screen `ReadOnlyTenantBoundRegistry`, a four-read view of the seam-1
+registry instance bound to one tenant, plus the identities; `decision_store` stays
+absent. The studio's `AuthorityService` was corrected alongside: it addressed the
+registry by record id and by an untyped identity where the port takes an exact
+coordinate and four keyword parts, so it now resolves a record id through the
+configured identities' records, parses the typed identity, displays every record by
+its canonical references without the signature bytes or the policy body, and maps a
+registry refusal to a typed refusal. The composition record now supersedes the seam-1
+record (`composition-record.seam-1.json`, unchanged). The next seam waits on its own
+ruling under FD-1.
 
 The shape every seam follows: the CR-2 shape (one configuration value, one freeze-test amendment, its own failure tests and
 maturity statement, one PR), preserving `REFERENCE_GRADE_SHADOW_ONLY`, the frozen
