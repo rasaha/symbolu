@@ -99,6 +99,14 @@ def run_startup_integrity(inputs: IntegrityInputs) -> IntegrityResult:
         check("constitution_registry_writable", writable,
               "the registry directory does not exist or is not writable")
 
+    # simulation provider (front-door seam 3): FD-7.5, nothing in this package can
+    # construct or hand a permissive governance hook, whether or not the seam is enabled
+    from .simulation import permissive_hook_source_findings
+
+    package_dir = os.path.dirname(os.path.abspath(__file__))
+    permissive = permissive_hook_source_findings(package_dir)
+    check("simulation_no_permissive_hook", not permissive, "; ".join(permissive))
+
     # frontend build
     index_ok = bool(cfg.frontend_dir) and os.path.isfile(os.path.join(cfg.frontend_dir, "index.html"))
     check("frontend_build_exists", index_ok)
@@ -184,6 +192,7 @@ def run_startup_integrity(inputs: IntegrityInputs) -> IntegrityResult:
         "synthetic_bundle_hash": _bundle_hash_of(cfg),
         "constitution_registry": registry_state,
         "authority_reads": "configured" if cfg.policy_identities else "unset",
+        "simulation_provider": "configured" if cfg.simulation_provider_enabled else "unset",
         "checks": checks,
         "result": "PASS" if ok else "FAIL",
         "failure_code": code,
@@ -208,6 +217,8 @@ def _classify(failures: List[str]) -> str:
         return "GOVERNANCE_STUDIO_P3E_HTTPS_FAILED"
     if "POLICY_IDENTITIES" in joined or "TENANT_ID" in joined:
         return "GOVERNANCE_STUDIO_P3E_AUTHORITY_SEAM_FAILED"
+    if "SIMULATION_PROVIDER" in joined or "simulation_no_permissive_hook" in joined:
+        return "GOVERNANCE_STUDIO_P3E_SIMULATION_SEAM_FAILED"
     if "credential" in joined or "config:" in joined or "allowed_hosts" in joined:
         return "GOVERNANCE_STUDIO_P3E_ACCESS_CONTROL_FAILED"
     if "openapi" in joined:

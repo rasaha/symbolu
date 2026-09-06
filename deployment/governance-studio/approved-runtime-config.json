@@ -1,7 +1,7 @@
 {
   "schema_version": "1",
   "deployment": "governance-studio-private-hosted",
-  "deployment_version": "0.4.0",
+  "deployment_version": "0.5.0",
   "single_process": true,
   "exposed_ports": [
     "8443/tcp"
@@ -70,7 +70,8 @@
     "UGENCE_STUDIO_REVIEW_SERVICE_URL": "optional; read by DeploymentConfig and handed to build_studio_context(review_service_base_url=...) and nowhere else",
     "UGENCE_STUDIO_CONSTITUTION_REGISTRY_PATH": "optional; read by DeploymentConfig and handed to build_studio_context(activation_root=...) and nowhere else; an absolute sqlite file path under the writable runtime volume (front-door seam 1, FD-5)",
     "UGENCE_STUDIO_TENANT_ID": "optional; the one tenant the Authority screen displays; required with UGENCE_STUDIO_POLICY_IDENTITIES; typed (NFC, no whitespace); read by DeploymentConfig only (front-door seam 2, FD-6)",
-    "UGENCE_STUDIO_POLICY_IDENTITIES": "optional; comma-separated typed policy identities '<policy_family>|<policy_id>|<scope>' (each NFC, no whitespace, no duplicates; no discovery, no default); requires UGENCE_STUDIO_CONSTITUTION_REGISTRY_PATH and UGENCE_STUDIO_TENANT_ID; handed to build_studio_context(policy_registry=..., policy_identities=...) and nowhere else (front-door seam 2, FD-6)"
+    "UGENCE_STUDIO_POLICY_IDENTITIES": "optional; comma-separated typed policy identities '<policy_family>|<policy_id>|<scope>' (each NFC, no whitespace, no duplicates; no discovery, no default); requires UGENCE_STUDIO_CONSTITUTION_REGISTRY_PATH and UGENCE_STUDIO_TENANT_ID; handed to build_studio_context(policy_registry=..., policy_identities=...) and nowhere else (front-door seam 2, FD-6)",
+    "UGENCE_STUDIO_SIMULATION_PROVIDER": "optional; exactly '1' enables the one pinned in-image simulation provider handed to build_studio_context(provider_registry=...) and nowhere else; unset leaves the Simulate screen on its typed gap simulation_providers; any other value is refused before bind (front-door seam 3, FD-7)"
   },
   "constitution_registry": {
     "ruling": "ADR_UGENCE_STUDIO_FRONT_DOOR_SCOPING.md FD-1 ONE_SEAM_PER_STEP, FD-5 SCREEN_1_ONLY (activation root)",
@@ -96,20 +97,44 @@
     "packages/integration/agent-constitution-activation"
   ],
   "front_door_seams": {
-    "ruling": "ADR_UGENCE_STUDIO_FRONT_DOOR_SCOPING.md FD-1 ONE_SEAM_PER_STEP; FD-5 seam 1; FD-6 seam 2",
+    "ruling": "ADR_UGENCE_STUDIO_FRONT_DOOR_SCOPING.md FD-1 ONE_SEAM_PER_STEP; FD-5 seam 1; FD-6 seam 2; FD-7 seam 3",
     "handed_to_build_studio_context": [
       "review_service_base_url (CR-2)",
       "activation_root (seam 1)",
       "policy_registry (seam 2: read-only, tenant-bound view of the seam-1 registry)",
-      "policy_identities (seam 2: typed, '<policy_family>|<policy_id>|<scope>|<tenant_id>')"
+      "policy_identities (seam 2: typed, '<policy_family>|<policy_id>|<scope>|<tenant_id>')",
+      "provider_registry (seam 3: the one pinned in-image no-I/O simulation provider, only while UGENCE_STUDIO_SIMULATION_PROVIDER=1)"
     ],
     "absent_by_ruling": [
       "decision_store (no durable Decision Authority record store exists; the decision read keeps its typed gap decision_authority_store)",
-      "governance_hook",
-      "provider_registry",
+      "governance_hook (seam 3, FD-7.3 RUNTIME_DEFAULT_BLOCK: the runtime's fail-closed default applies; FD-7.5: a permissive hook is prohibited and refused before bind)",
       "console_base_url"
     ],
     "tenant_binding": "records of any tenant other than UGENCE_STUDIO_TENANT_ID are refused with a typed refusal and never displayed",
     "persistent_database": "prohibition stands: the registry is the seam-1 sqlite file under the runtime volume; no server, no driver, no DSN"
+  },
+  "prohibited_definitions": {
+    "agent_execution": "agent execution against any non-fixture provider (FD-7.1 FIXTURE_RUN_ADMISSIBLE, ruled 2026-09-06): a run whose every provider is the in-image no-I/O simulation provider, under DRY_RUN, SIMULATION or SHADOW, is a demonstration and not agent execution; LIVE is absent from the mode list and refused by the studio; external_model_calls and external_tool_calls stand unchanged"
+  },
+  "simulation": {
+    "ruling": "ADR_UGENCE_STUDIO_FRONT_DOOR_SCOPING.md FD-7.1 FIXTURE_RUN_ADMISSIBLE, FD-7.2 P3E_IN_PROCESS, FD-7.3 RUNTIME_DEFAULT_BLOCK, FD-7.4 ONE_PINNED_FIXTURE_PROVIDER, FD-7.5 PROHIBITED_IN_PROFILE",
+    "provider": {
+      "provider_id": "fixture",
+      "version": "0.1.0",
+      "maturity": "DEMONSTRATION_ONLY",
+      "implementation": "governance_studio_deployment.simulation.StudioSimulationProvider",
+      "behaviour": "records each invocation in memory and returns success; opens no socket, reads no file, spawns nothing, holds no credential"
+    },
+    "registry": "ProviderRegistry holding exactly that one provider, built in-process by build_simulation_registry(); no provider list is read from the environment (FD-4: no discovery, no default)",
+    "governance_hook": "absent by ruling (FD-7.3): the runtime's own UnconfiguredGovernanceHook applies, so every consequential task BLOCKs with GOVERNANCE_NOT_CONFIGURED and the trace shows it; governance_hook_configured is false in every answer",
+    "permissive_hook": "prohibited (FD-7.5): the composition root refuses any hook handed to the Simulate service before bind (refuse_permissive_hook) and startup integrity fails if this package's source could construct one (simulation_no_permissive_hook); governance_hook_permissive is false in every answer",
+    "modes": [
+      "DRY_RUN",
+      "SIMULATION",
+      "SHADOW"
+    ],
+    "live": "absent from the mode list and refused by the studio with a typed 422",
+    "unset": "the Simulate screen reports the typed gap simulation_providers (available false)",
+    "composition_record": "composition-record.json (an ai-system-registry SystemRegistration, FD-3), superseding the seam-2 record kept byte-for-byte as composition-record.seam-2.json"
   }
 }

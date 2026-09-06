@@ -24,6 +24,8 @@ FAILURE_COOLDOWN_SECONDS = 30.0
 FAILED_AUTH_DELAY_SECONDS = 0.5
 REQUEST_TIMEOUT_SECONDS = 30
 IDLE_TIMEOUT_SECONDS = 60
+#: The only value that enables front-door seam 3 (FD-7.4: one boolean, no list).
+SIMULATION_PROVIDER_ENABLED = "1"
 
 
 class DeploymentConfigError(Exception):
@@ -75,6 +77,11 @@ class DeploymentConfig:
     #: the registry path. Read here and handed to build_studio_context only.
     tenant_id: str = ""
     policy_identities: Tuple[str, ...] = ()
+    #: Front-door seam 3 (FD-7): the raw value of ``UGENCE_STUDIO_SIMULATION_PROVIDER``.
+    #: Exactly ``"1"`` enables the one pinned in-package simulation provider handed to
+    #: build_studio_context(provider_registry=...); unset leaves the Simulate screen on
+    #: its typed gap; any other value is refused. No provider list is read (FD-4).
+    simulation_provider: str = ""
     _errors: List[str] = field(default_factory=list, compare=False)
 
     @property
@@ -96,6 +103,10 @@ class DeploymentConfig:
     @property
     def authority_reads_configured(self) -> bool:
         return bool(self.policy_identities)
+
+    @property
+    def simulation_provider_enabled(self) -> bool:
+        return self.simulation_provider == SIMULATION_PROVIDER_ENABLED
 
     @classmethod
     def from_env(cls, **overrides) -> "DeploymentConfig":
@@ -123,6 +134,9 @@ class DeploymentConfig:
             tenant_id=(overrides.get("tenant_id") or _env("UGENCE_STUDIO_TENANT_ID") or ""),
             policy_identities=tuple(overrides["policy_identities"]) if overrides.get("policy_identities") is not None
             else _split_identities(_env("UGENCE_STUDIO_POLICY_IDENTITIES")),
+            simulation_provider=(overrides.get("simulation_provider")
+                                 if overrides.get("simulation_provider") is not None
+                                 else (_env("UGENCE_STUDIO_SIMULATION_PROVIDER") or "")),
         )
         return cfg
 
@@ -177,6 +191,11 @@ class DeploymentConfig:
         if self.policy_identities or self.tenant_id:
             errors.extend(_authority_errors(self.policy_identities, self.tenant_id,
                                             bool(self.constitution_registry_path)))
+
+        # simulation provider (front-door seam 3): one boolean, typed; "1" or unset
+        if self.simulation_provider not in ("", SIMULATION_PROVIDER_ENABLED):
+            errors.append("UGENCE_STUDIO_SIMULATION_PROVIDER must be '1' to enable the simulation "
+                          "provider or unset; no other value is accepted")
 
         return errors
 

@@ -4,14 +4,14 @@ A single-process, HTTPS-only, authenticated wrapper that packages the FROZEN
 Governance Studio frontend build and the FROZEN P3B backend (``create_app``) into
 one privately hosted, synthetic-data-only demonstration deployment. It changes no
 governance decision semantics, grants no permissions, authorizes no business
-actions, and executes no agents.
+actions, and executes no agent against any non-fixture provider (FD-7.1).
 
 Deployment bundle identity is distinct from the component versions it packages.
 """
 from __future__ import annotations
 
 DEPLOYMENT_NAME = "governance-studio-private-hosted"
-DEPLOYMENT_VERSION = "0.4.0"
+DEPLOYMENT_VERSION = "0.5.0"
 
 # Frozen component identities this deployment packages (never relabelled).
 FRONTEND_VERSION = "0.2.0"

@@ -287,24 +287,37 @@ def test_the_composition_record_is_an_immutable_versioned_registry_record():
         assert binding.configuration_digest == hashlib.sha256(fh.read()).hexdigest()
     assert reg["classification_label"] == "REFERENCE_GRADE_SHADOW_ONLY"
     assert "never edited" in reg["notes"]
-    # FD-3: the chain. The current record supersedes the seam-1 record, which is kept
-    # byte-for-byte and still reconstructs; the supersession is admissible.
+    # FD-3: the chain. The current record supersedes the seam-2 record, which supersedes
+    # the seam-1 record; both prior records are kept byte-for-byte and still
+    # reconstruct, and each supersession is admissible.
     from ugence_ai_system_registry import supersession_refusals
 
-    prior = json.load(open(os.path.join(HERE, "composition-record.seam-1.json"), encoding="utf-8"))
-    pb = AssessedSystemBinding(**prior["binding"])
-    pr = prior["registration"]
-    prior_reg = SystemRegistration(
-        registration_id=pr["registration_id"], binding=pb, owner_ref=pr["owner_ref"],
-        classification_label=pr["classification_label"],
-        validity=Validity(issued_at=datetime.fromisoformat(pr["validity"]["issued_at"].replace("Z", "+00:00")),
-                          expires_at=datetime.fromisoformat(pr["validity"]["expires_at"].replace("Z", "+00:00"))),
-        supersedes=pr["supersedes"], registered_by=pr["registered_by"], notes=pr["notes"])
-    assert prior_reg.record_digest() == prior["record_digest"] == \
-        "6416a5984823f7e2" + prior["record_digest"][16:]
-    assert prior_reg.registration_id == "reg_ae7d03070a79245ca5a31eb83c2fffb8"
-    assert pr["supersedes"] == "" and pb.system_version == "0.3.0"
-    assert reg["supersedes"] == prior_reg.registration_id
-    assert supersession_refusals(rebuilt, prior_reg) == ()
+    def _load(name: str):
+        prior = json.load(open(os.path.join(HERE, name), encoding="utf-8"))
+        pb = AssessedSystemBinding(**prior["binding"])
+        pr = prior["registration"]
+        return prior, SystemRegistration(
+            registration_id=pr["registration_id"], binding=pb, owner_ref=pr["owner_ref"],
+            classification_label=pr["classification_label"],
+            validity=Validity(issued_at=datetime.fromisoformat(pr["validity"]["issued_at"].replace("Z", "+00:00")),
+                              expires_at=datetime.fromisoformat(pr["validity"]["expires_at"].replace("Z", "+00:00"))),
+            supersedes=pr["supersedes"], registered_by=pr["registered_by"], notes=pr["notes"])
+
+    seam1, seam1_reg = _load("composition-record.seam-1.json")
+    assert seam1_reg.record_digest() == seam1["record_digest"] == \
+        "6416a5984823f7e2" + seam1["record_digest"][16:]
+    assert seam1_reg.registration_id == "reg_ae7d03070a79245ca5a31eb83c2fffb8"
+    assert seam1["registration"]["supersedes"] == "" and seam1_reg.system_version == "0.3.0"
+    seam2, seam2_reg = _load("composition-record.seam-2.json")
+    assert seam2_reg.record_digest() == seam2["record_digest"] == \
+        "993107dfa315b039" + seam2["record_digest"][16:]
+    assert seam2_reg.registration_id == "reg_b6eba57c58f066386115abce13816958"
+    assert seam2["registration"]["supersedes"] == seam1_reg.registration_id
+    assert seam2_reg.system_version == "0.4.0"
+    assert supersession_refusals(seam2_reg, seam1_reg) == ()
+    assert reg["supersedes"] == seam2_reg.registration_id
+    assert supersession_refusals(rebuilt, seam2_reg) == ()
+    assert record["supersedes_record"] == "composition-record.seam-2.json"
     assert record["seams_handed_to_build_studio_context"] == [
-        "review_service_base_url", "activation_root", "policy_registry", "policy_identities"]
+        "review_service_base_url", "activation_root", "policy_registry", "policy_identities",
+        "provider_registry"]

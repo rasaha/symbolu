@@ -35,6 +35,9 @@ services:
       # Authority screen may list; read-only; unset = typed gap.
       UGENCE_STUDIO_TENANT_ID: ${UGENCE_STUDIO_TENANT_ID:-}
       UGENCE_STUDIO_POLICY_IDENTITIES: ${UGENCE_STUDIO_POLICY_IDENTITIES:-}
+      # Front-door seam 3: '1' hands the Simulate screen the one pinned in-image no-I/O
+      # provider; the governance hook stays the runtime's fail-closed default; unset = typed gap.
+      UGENCE_STUDIO_SIMULATION_PROVIDER: ${UGENCE_STUDIO_SIMULATION_PROVIDER:-}
     volumes:
       # certificate material is mounted READ-ONLY; the private key is never baked in
       - type: bind

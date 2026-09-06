@@ -112,23 +112,45 @@ def test_approved_runtime_config_permits_exactly_one_egress_the_review_relay():
     assert list(cfg["configuration_added"]) == ["UGENCE_STUDIO_REVIEW_SERVICE_URL",
                                                 "UGENCE_STUDIO_CONSTITUTION_REGISTRY_PATH",
                                                 "UGENCE_STUDIO_TENANT_ID",
-                                                "UGENCE_STUDIO_POLICY_IDENTITIES"]
-    assert cfg["deployment_version"] == "0.4.0"
+                                                "UGENCE_STUDIO_POLICY_IDENTITIES",
+                                                "UGENCE_STUDIO_SIMULATION_PROVIDER"]
+    assert cfg["deployment_version"] == "0.5.0"
 
 
-def test_approved_runtime_config_records_front_door_seam_2_exactly():
-    """FD-6: read-only, tenant-bound authority reads over the seam-1 registry; the
-    decision store, hook, provider registry and console stay absent; packages unchanged."""
+def test_approved_runtime_config_records_front_door_seam_3_exactly():
+    """FD-7: the provider registry is handed (one pinned in-image provider); the hook
+    stays the runtime default and a permissive one is prohibited; the decision store
+    and console stay absent; seam 2 unchanged; packages unchanged (no new package)."""
     import json
     cfg = json.load(open(os.path.join(HERE, "approved-runtime-config.json"), encoding="utf-8"))
     seams = cfg["front_door_seams"]
     assert [s.split(" ")[0] for s in seams["handed_to_build_studio_context"]] == [
-        "review_service_base_url", "activation_root", "policy_registry", "policy_identities"]
+        "review_service_base_url", "activation_root", "policy_registry", "policy_identities",
+        "provider_registry"]
     assert [s.split(" ")[0] for s in seams["absent_by_ruling"]] == [
-        "decision_store", "governance_hook", "provider_registry", "console_base_url"]
+        "decision_store", "governance_hook", "console_base_url"]
+    assert "RUNTIME_DEFAULT_BLOCK" in seams["absent_by_ruling"][1]
     assert "refused" in seams["tenant_binding"] and "never displayed" in seams["tenant_binding"]
     assert "prohibition stands" in seams["persistent_database"]
     assert "read-only, tenant-bound" in cfg["constitution_registry"]["reachable_acts"]
+    sim = cfg["simulation"]
+    from governance_studio_deployment.simulation import (
+        SIMULATION_PROVIDER_ID, SIMULATION_PROVIDER_MATURITY, SIMULATION_PROVIDER_VERSION,
+        StudioSimulationProvider,
+    )
+    assert sim["provider"]["provider_id"] == SIMULATION_PROVIDER_ID == StudioSimulationProvider.provider_id
+    assert sim["provider"]["version"] == SIMULATION_PROVIDER_VERSION == StudioSimulationProvider.version
+    assert sim["provider"]["maturity"] == SIMULATION_PROVIDER_MATURITY
+    assert sim["provider"]["implementation"].endswith("simulation.StudioSimulationProvider")
+    assert sim["modes"] == ["DRY_RUN", "SIMULATION", "SHADOW"] and "LIVE" not in sim["modes"]
+    assert "GOVERNANCE_NOT_CONFIGURED" in sim["governance_hook"]
+    assert "prohibited" in sim["permissive_hook"] and "refuse_permissive_hook" in sim["permissive_hook"]
+    assert sim["composition_record"].startswith("composition-record.json")
+    # FD-7.1: the prohibition keeps its identifier and carries its ruled definition
+    assert "agent_execution" in cfg["prohibited"]
+    assert cfg["prohibited_definitions"]["agent_execution"].startswith(
+        "agent execution against any non-fixture provider")
+    assert "external_tool_calls" in cfg["prohibited"] and "external_model_calls" in cfg["prohibited"]
     assert len(cfg["first_party_packages_in_image"]) == 12
 
 
