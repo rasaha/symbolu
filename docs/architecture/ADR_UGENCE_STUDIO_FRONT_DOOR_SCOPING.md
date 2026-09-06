@@ -215,11 +215,15 @@ score, enforce, revoke, edit or delete control; the P3E profile adds one configu
 value, `UGENCE_STUDIO_DATA_USE_DECLARATIONS_PATH`, requiring `UGENCE_STUDIO_TENANT_ID`,
 one package in the image and one startup-integrity check; and §13.4 is tests in the
 package, the studio backend, the frontend and the profile. The composition record
-supersedes the seam-7 record (`composition-record.seam-7.json`, unchanged). With that
-the front door under FD-1 is at its ceiling: no further studio-alone seam remains,
-the console is a packaging body of work, a durable Decision Authority store a package
-decision, and the mirror coordinates, Langflow fixture and enterprise issuer are owner
-inputs.
+supersedes the seam-7 record (`composition-record.seam-7.json`, unchanged). Seam 8
+closed the **last outline row** a studio-alone seam can reach, which is what FD-12.1
+ruled; it did not close the row. `vendor-dependency` is the same shape again inside
+row 5 and, in FD-12.1's own words, "its own later seam under FD-1" — audited as seam 9
+in §14. (An earlier revision of this paragraph said the front door was at its ceiling
+with no further studio-alone seam remaining. That overstated FD-12.1 and is corrected
+here.) The console remains a packaging body of work, a durable Decision Authority
+store a package decision, and the mirror coordinates, Langflow fixture and enterprise
+issuer owner inputs.
 
 The shape every seam follows: the CR-2 shape (one configuration value, one freeze-test amendment, its own failure tests and
 maturity statement, one PR), preserving `REFERENCE_GRADE_SHADOW_ONLY`, the frozen
@@ -1029,3 +1033,87 @@ FD-3, FD-4, FD-8.1, FD-8.3, SD-2, the `persistent_database` prohibition, the
 `REFERENCE_GRADE_SHADOW_ONLY` ceiling, `ENFORCEMENT_ENABLED = False`, the frozen v1
 contract, every FROM line and ratified digest, and every credential, egress and LIVE
 prohibition are preserved.
+
+## 14 — Remaining front-door audit under FD-1 (2026-09-06, after seam 8)
+
+**The question.** With seams 1, 2, 3, 5, 6, 7 and 8 shipped and seam 4 absent by
+ruling, is the front door at its ceiling? **No. One studio-alone seam remains:
+`vendor-dependency`, the second element of outline row 5, in the same shape seam 8
+just proved.** FD-12.1 said so in terms — "`vendor-dependency` is the same shape again
+and its own later seam under FD-1" — and §7's earlier claim that no further seam
+remained overstated it. That sentence is corrected in §7; this section is the audit
+behind the correction. Everything else remains a package decision, a separately
+scoped body of work, an owner input, or a non-goal.
+
+### 14.1 The correction `[V]`
+
+Seam 8 closed the last outline **row** a studio-alone seam can reach, not the row
+itself. Row 5, "data and tool connections", has three elements: data-use declarations
+(seam 8, shipped), vendor and tool dependencies (`vendor-dependency`, open), and
+egress restrictions (no package, §3) `[G]`. Reading "last row" as "last seam" is the
+error; the ruling's own final sentence contradicts it.
+
+### 14.2 Seam 9: `vendor-dependency`, and why it is enterable `[V]`
+
+`vendor-dependency` 0.1.0 stands exactly where `data-use-admission` 0.1.0 stood before
+FD-12: `MATURITY = "CONTRACTS_ONLY"` (`version.py:16`), one typed record, a
+deterministic `declaration_id_for`, `supersession_refusals`, and one read-only
+`VendorDependencyPort` whose docstring states "**No implementation ships in 0.1.0**"
+(`selectors.py:135-144`). Its five reads mirror the data-use port's, `vendor_ref` and
+`risk_posture_label` standing where `data_ref` and `classification_label` stand. Seam
+8 is therefore not merely a precedent but a template: the same durable-home posture,
+the same one-write boundary, the same presented-unproven declarer, the same two-
+operation amendment, the same P3E configuration value.
+
+### 14.3 What remains, by kind `[V]`
+
+| Item | Kind | State |
+|---|---|---|
+| `vendor-dependency` declarations (row 5) | **seam a ruling can open** | enterable now; needs FD-13 |
+| Egress restrictions (row 5) | seam blocked on an absent package | ratified ADR, no package `[G]` |
+| Console in the profile (seam 4) | packaging body of work | FD-8.1 holds until FD-8.3 completes |
+| Durable Decision Authority store | package decision | no producer; store empty by construction |
+| Mirror coordinates | owner input | `registry_host`, `repository_prefix`, `secret_name` all `null`; `PENDING_OUTSIDE_REPOSITORY` |
+| Langflow export fixture | owner input | a genuine secret-free export is required as evidence before implementation |
+| Enterprise issuer (AI-E) | owner input | no issuer exists; every declarer stays `PRESENTED_UNPROVEN` |
+| Rows 4, 7-evidence, 9-beyond-shadow, 10 | non-goal or not-yet | research-only packages, no producer, or ruled out |
+| `decision_store.get` vs `get_decision` | defect, not a seam | `studio_v2.py:430` calls `.get`; the repository offers `get_decision` `[G]` |
+
+The last row is unchanged since §13.1 recorded it and still belongs to the step that
+first hands a decision store, not to a seam.
+
+### 14.4 Failure matrix for seam 9 (by construction, on the seam-8 precedent)
+
+Identical in shape to §13.4, with `vendor_ref` for `data_ref` and `risk_posture_label`
+for `classification_label`: an unset path is the typed gap `vendor_declarations`; a
+tenant unset with the path set is refused before bind; blank `vendor_ref` or malformed
+validity is the package's typed refusal; a caller-supplied `tenant_id` is a contract
+refusal; an inadmissible supersession is `supersession_refusals` as the package states
+it; a cross-tenant read is a typed refusal, never an empty answer; a vendor's contract
+terms, pricing or contact data are not expressible, because no field carries them; no
+write but `declare` has a route; records survive restart; and no vendor approval,
+onboarding status or risk verdict is invented, because no package computes one `[G]`.
+
+### 14.5 Recommendation and proposed ruling FD-13 (four decisions, recommended first)
+
+Seam 9 is the only remaining item whose prerequisite is a ruling rather than an owner
+input, a packaging body of work or a package decision. Because seam 8 settled the
+durable-home, declarer and mutation-boundary questions for this exact shape, the
+decisions left are fewer than FD-12's.
+
+| # | Decision | Options |
+|---|---|---|
+| **FD-13.1** | Next seam | **`SCREEN_5_TYPED_VENDOR_DECLARATIONS`**: seam 9 is a typed vendor-dependency form in the seam-8 shape, completing row 5 but for egress. `FRONT_DOOR_CEILING_REACHED`: decline the seam and treat row 5 as done. |
+| **FD-13.2** | Durable home | **`LOCAL_SQLITE_UNDER_RUNTIME_VOLUME`**: `vendor-dependency` 0.2.0 adds one sqlite `VendorDependencyPort` implementation plus a single `declare`, tenant-bound, named by one configuration value — the seam-8 posture unchanged. `COMPOSITION_ROOT_MEMORY`. |
+| **FD-13.3** | Contract | **`V2_AMENDMENT_TWO_OPERATIONS`**: `v2_vendor_declare` and `v2_vendor_list`, re-frozen as amendment v2-A5 with the regenerated client in the same step. |
+| **FD-13.4** | Risk posture | **`RISK_POSTURE_UNINTERPRETED`**: `risk_posture_label` is recorded exactly as typed and ordered, compared, scored and evaluated nowhere; the screen says so, and no vendor approval or onboarding status is invented. `RATIFY_A_VOCABULARY`: an owner-fixed posture taxonomy (none exists). |
+
+Under the recommended options seam 9 ships in one step on the seam-8 template: the
+`vendor-dependency` 0.2.0 release with its store and tests, the studio backend's
+service and two operations with amendment v2-A5 and the regenerated client, the
+screen, the P3E composition with a superseding composition record, and §14.4 as tests.
+Owner decisions remaining before implementation: the four above. If FD-13.1 is
+declined, the front door is at its ceiling and the correction in §7 should say so.
+
+**What this section authorizes.** Documentation only. No seam is activated, no route
+exists, no package is released, no contract byte moves and no code changes.
