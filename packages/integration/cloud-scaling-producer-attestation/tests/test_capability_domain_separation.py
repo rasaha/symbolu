@@ -160,7 +160,7 @@ def test_changing_only_the_capability_moves_the_trust_anchor_coordinate_digest()
         )
         for capability in TrustAnchorCapability
     }
-    assert len(set(digests.values())) == 3
+    assert len(set(digests.values())) == len(TrustAnchorCapability) >= 3
     assert digests[CS] == anchor_coordinate_digest(
         producer_anchor_coordinate(issuer=ISSUER_ID, producer_key_id=PRODUCER_KEY_ID)
     )
