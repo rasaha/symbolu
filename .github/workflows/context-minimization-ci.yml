@@ -2,7 +2,8 @@ name: context-minimization-ci
 
 # Scoped CI for the independent ugence-context-minimization leaf package. Runs the
 # package suite (structural + oracle-verified safety, protection, budgets/determinism,
-# public-API agreement, import-boundary), the migrated Console structural parity, the
+# public-API agreement, import-boundary), the migrated Console structural parity (the console
+# now ships as packages/integration/console-api under ruling CP-2), the
 # wheel + sdist build with isolated clean-venv install and a product-neutral demo, and
 # platform-freeze verification. Triggered only by changes to the package, its migrated
 # consumer, or this workflow.
@@ -11,7 +12,7 @@ on:
   pull_request:
     paths:
       - "packages/capabilities/context-minimization/**"
-      - "ugence_console_api/capabilities/context_gateway.py"
+      - "packages/integration/console-api/src/ugence_console_api/capabilities/context_gateway.py"
       - "conftest.py"
       - ".github/workflows/context-minimization-ci.yml"
   push:
@@ -23,7 +24,7 @@ on:
       - "claude/context-minimization-**"
     paths:
       - "packages/capabilities/context-minimization/**"
-      - "ugence_console_api/capabilities/context_gateway.py"
+      - "packages/integration/console-api/src/ugence_console_api/capabilities/context_gateway.py"
       - "conftest.py"
       - ".github/workflows/context-minimization-ci.yml"
 
@@ -61,15 +62,21 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-      - name: Install dependencies (console needs pydantic)
+      - name: Install dependencies (the console is a FastAPI service)
         run: |
           python -m pip install --upgrade pip
-          pip install pytest pydantic
+          pip install pytest pydantic fastapi httpx
       - name: Console context-gateway parity + governed-loop
+        # The parity test imports ugence_console_api, which since ruling CP-2 lives
+        # under packages/integration/console-api/src. Named explicitly rather than
+        # left to a root conftest: an importorskip that silently skips would report
+        # green for a parity check that never ran.
         run: |
+          PYTHONPATH="$PWD/packages/integration/console-api/src:$PYTHONPATH" \
+            python -m pytest \
+              packages/capabilities/context-minimization/tests/compatibility -q
           python -m pytest \
-            packages/capabilities/context-minimization/tests/compatibility -q
-          python -m pytest ugence_console_api/tests/test_governed_loop.py -q
+            packages/integration/console-api/tests/test_governed_loop.py -q
 
   isolated-install:
     name: Wheel + sdist build + isolated installation + demo

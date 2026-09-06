@@ -14,6 +14,17 @@ from typing import Dict, List, Optional
 
 from pydantic import BaseModel, Field
 
+# --------------------------------------------------------------------------- #
+# CP-4 — the audit ceiling, declared once and carried on every answer.
+# --------------------------------------------------------------------------- #
+#: The exact words that accompany every answer this service serves: a field on the
+#: two bodies that carry a decision trail, and the ``X-Ugence-Audit-Ceiling`` header
+#: on all five routes. Stated the same way in both places so they cannot drift.
+AUDIT_CEILING = (
+    "IN_MEMORY_SINGLE_PROCESS: this audit is one process's view of its own runs and "
+    "is lost on restart. It is not a durable, tamper-evident or shared record."
+)
+
 
 # --------------------------------------------------------------------------- #
 # Deployment mode — one product, three modes (First Look §2).
@@ -151,6 +162,9 @@ class GovernedLoopResult(BaseModel):
     would_execute: bool = Field(
         description="What enforcement mode WOULD do with this decision (computed even in shadow).")
     recorded: bool
+    audit_ceiling: str = Field(
+        default=AUDIT_CEILING,
+        description="CP-4: what ``recorded`` does and does not mean. Never omitted.")
 
 
 # --------------------------------------------------------------------------- #
@@ -180,3 +194,6 @@ class AuditChain(BaseModel):
     mode: str
     final_disposition: str
     entries: List[AuditEntry]
+    audit_ceiling: str = Field(
+        default=AUDIT_CEILING,
+        description="CP-4: the reconstruction ceiling this chain was read at. Never omitted.")

@@ -26,7 +26,7 @@ branches from that exact HEAD.
   real-model harness and frozen `results/`).
 - **VC brief:** `CONTEXT_MINIMIZATION_VC_BRIEF.md` (claims cross-checked in §8).
 - **Two runtime code consumers**, both via fragile `sys.path.insert`:
-  - `ugence_console_api/capabilities/context_gateway.py` — **structural dedup only**,
+  - `packages/integration/console-api/src/ugence_console_api/capabilities/context_gateway.py` — **structural dedup only**,
     no oracle.
   - `robotics_reliability_bench/acp_control_plane/context_pipeline.py` — **full**
     `compress(...)` with the signed **ActionGate policy** as the oracle.

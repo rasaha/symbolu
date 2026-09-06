@@ -4,7 +4,7 @@
 
 | Consumer | Path | What it uses | Outcome |
 | --- | --- | --- | --- |
-| **Console Agent Gateway** | `ugence_console_api/capabilities/context_gateway.py` | structural dedup only (`structural_compress`), no oracle | **A — migrated now** |
+| **Console Agent Gateway** | `packages/integration/console-api/src/ugence_console_api/capabilities/context_gateway.py` | structural dedup only (`structural_compress`), no oracle | **A — migrated now** |
 | **Robotics reliability bench** | `robotics_reliability_bench/acp_control_plane/context_pipeline.py` | full `compress(...)` with the signed **ActionGate policy** as oracle | **C — intentional coexistence** (frozen benchmark) |
 | CER v0.1 / v0.2 / v0.3 control planes | `cer_v0_*/control_plane.py` | a string status field only (`"APPLIED"` / `"SKIPPED_NO_ACTIONGATE_CONTEXT"`) | **Not a code consumer** — no migration |
 

@@ -78,6 +78,7 @@ jobs:
           - packages/integration/cloud-scaling-bounded-execution
           - packages/integration/cloud-scaling-credential-broker
           - packages/integration/cloud-scaling-envelope-issuance
+          - packages/integration/console-api
           - packages/integration/control-plane-root
           - packages/integration/data-use-admission
           - packages/integration/execution-reservation
@@ -105,10 +106,13 @@ jobs:
         # would be reporting green for tests that never ran. cffi is PyNaCl's
         # native binding, without which the import dies in an unreadable pyo3
         # panic. pydantic is needed by governance-provider-framework's optional
-        # adapter.
+        # adapter. fastapi and httpx are real for console-api: it IS a FastAPI
+        # service, and its CP-3 route surface and CP-4 per-answer disclosure are
+        # asserted against the running application through TestClient, which needs
+        # httpx. Without them those two rulings would be checked by nothing.
         run: |
           python -m pip install --upgrade pip
-          pip install pytest numpy cffi cryptography pydantic pynacl
+          pip install pytest numpy cffi cryptography pydantic pynacl fastapi httpx
       - name: Suite
         # From the package's own directory: several need their conftest.py to put
         # src/ and their first-party dependencies on sys.path, and cannot be
@@ -116,3 +120,25 @@ jobs:
         run: |
           cd "${{ matrix.package }}"
           python -m pytest -q
+
+  console-api-distribution:
+    name: ugence-console-api built artifact (CP-2, CP-3, CP-4, CP-5)
+    runs-on: ubuntu-latest
+    # The console's suite runs against the source tree, where the repository root
+    # conftest puts every platform package on sys.path. That is exactly the comfort
+    # ruling CP-5 exists to remove: an undeclared dependency still imports there. So
+    # the four rulings are also proved against the wheel — built, installed into a
+    # clean --no-index venv, and interrogated as an installed package. The negative
+    # proof (install refuses when a governance dependency is withheld) cannot be run
+    # from source at all.
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install build tooling
+        run: |
+          python -m pip install --upgrade pip
+          pip install build
+      - name: Build, install into a clean venv, and interrogate the installed package
+        run: python packages/integration/console-api/scripts/verify_console_api_distribution.py

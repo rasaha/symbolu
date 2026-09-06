@@ -58,9 +58,12 @@ def test_console_structural_path_parity():
 def test_console_gateway_uses_canonical_package_not_syspath_hack():
     """After migration the gateway imports the canonical distribution and does not
     inject the experiments/ directory onto sys.path."""
-    gw = REPO_ROOT / "ugence_console_api" / "capabilities" / "context_gateway.py"
-    if not gw.is_file():
-        pytest.skip("console gateway source not present")
+    gw = (REPO_ROOT / "packages" / "integration" / "console-api" / "src"
+          / "ugence_console_api" / "capabilities" / "context_gateway.py")
+    assert gw.is_file(), (
+        "the console gateway moved (ruling CP-2 put it under "
+        "packages/integration/console-api/src); update this path rather than "
+        "letting the check skip itself into a permanent green")
     src = gw.read_text()
     assert "ugence_context_minimization" in src
     assert "sys.path.insert" not in src

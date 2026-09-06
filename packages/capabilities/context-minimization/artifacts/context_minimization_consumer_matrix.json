@@ -9,13 +9,13 @@
   "consumers": [
     {
       "name": "Console Agent Gateway",
-      "path": "ugence_console_api/capabilities/context_gateway.py",
+      "path": "packages/integration/console-api/src/ugence_console_api/capabilities/context_gateway.py",
       "uses": "structural dedup only (structural_compress), no oracle",
       "before": "sys.path.insert(experiments/actiongate_context_ablation) then import actiongate_context_ablation.compressor",
       "outcome": "A",
       "action": "Now imports ugence_context_minimization.api.structural_minimize; sys.path hack removed.",
       "behavior_change": "Hardening: a protected unit is never removed even when a duplicate remains (old structural_compress ignored protected_ids).",
-      "parity_evidence": "tests/compatibility/test_compatibility.py::test_console_structural_path_parity; ugence_console_api/tests/test_governed_loop.py (4 passed, unchanged)."
+      "parity_evidence": "tests/compatibility/test_compatibility.py::test_console_structural_path_parity; packages/integration/console-api/tests/test_governed_loop.py (4 passed, unchanged)."
     },
     {
       "name": "Robotics reliability bench (ACP control plane)",

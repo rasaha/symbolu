@@ -9,8 +9,8 @@ Scoped and ratified by ``docs/architecture/ADR_UGENCE_CONTROL_PLANE_ROOT_SCOPING
 It is a **composition root**, not a capability (D-2): it wires packages that
 already exist and adds nothing to the platform's capability count. It is
 deliberately **not** the AI Control Plane — that noun names a product with its own
-documentation tree and a shipped console (``ugence_console_api/``). This is a root
-*under* it.
+documentation tree and a shipped console (``packages/integration/console-api``). This
+is a root *under* it.
 
 Why the ledger and not another roadmap §3 service: it is the only one both unowned
 and composable from ``packages/``. Seven audit stores exist and none of them is the

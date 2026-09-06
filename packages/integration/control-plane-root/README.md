@@ -18,7 +18,7 @@ already exist and adds nothing to the platform's capability count.
 
 It is **not the AI Control Plane**. That noun names a product with its own
 documentation tree (`Project_documentation/control_plane/`) and a shipped console
-(`ugence_console_api/`, classified `CANONICAL_IMPLEMENTATION`). This is a root
+(`packages/integration/console-api`, classified `CANONICAL_IMPLEMENTATION`). This is a root
 *under* that product, never the thing itself — and three shipped packages
 (`governance-provider-framework`, `decision-authority`, `model-selection`) each
 disclaim the noun as belonging elsewhere.
