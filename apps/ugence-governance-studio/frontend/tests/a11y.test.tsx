@@ -60,7 +60,7 @@ const STUDIO_SCREENS: { route: string; name: string; ready: () => Promise<unknow
   {
     route: "/studio/observe",
     name: "Observe",
-    ready: () => screen.findByLabelText(/correlation id/i),
+    ready: () => screen.findByLabelText(/correlation id/i, { selector: "#correlation-id" }),
   },
   // GAS-7 HR-D
   {
