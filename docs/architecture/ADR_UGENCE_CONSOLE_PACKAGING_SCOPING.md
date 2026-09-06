@@ -138,3 +138,39 @@ clearance-export audit and ruling → packaging implementation → export implem
 CP-3 is the principle the export audit inherits: exporting a clearance is a **new
 external capability** and must be separately authorized rather than appearing because
 a compiler or a receipt type already exists.
+
+## 9 — Implementation record (2026-09-06)
+
+Shipped as `ugence-console-api` 0.2.0 at `packages/integration/console-api`. What each
+ruling became, and where the claim is checked:
+
+| # | Implementation | Checked by |
+|---|---|---|
+| CP-1 | The service alone moved. `apps/console/` is untouched and ships in no distribution. | `tests/test_packaging.py::test_the_react_app_is_not_part_of_this_distribution`; proof 1 of the distribution script |
+| CP-2 | `packages/integration/console-api/src/ugence_console_api/`, distribution `ugence-console-api`. The namespace did not move, so all fourteen boundary tests that forbid `ugence_console_api` forbid the same name and none was edited. | `tests/test_packaging.py` (CP-2 group); `tests/boundaries/test_package_import_boundaries.py` |
+| CP-3 | `create_app()` registers five routes. `app.SERVED_ROUTES` and `app.WITHHELD_ROUTES` name both sets; the four capability functions remain and the loop still runs all four in order. | `tests/test_served_surface.py`; proof 4 of the distribution script, which asserts each withheld route answers 404 from the *installed* application |
+| CP-4 | `models.AUDIT_CEILING` — one constant — rides on every answer as the `X-Ugence-Audit-Ceiling` header (errors included) and inside `/health`, `GovernedLoopResult` and `AuditChain`. `control-plane-root` is deliberately not a dependency. | `tests/test_audit_ceiling.py`; proof 4 of the distribution script |
+| CP-5 | Four platform distributions declared as required dependencies, none parked in an extra. | `tests/test_packaging.py` (CP-5 group); proof 2 of the distribution script |
+
+**One forced consequence of CP-5, recorded because it changed source.** The adapters
+imported the legacy root namespaces `governance_providers`, `actiongate_provider` and
+`tap_provider`. Those are logic-free compatibility surfaces that ship in **no**
+distribution, so a dependency declared on them could never be installed and the
+fail-safe guards would have degraded every isolated install to "unavailable" — exactly
+the runtime degradation CP-5 forbids. The adapters now import the canonical
+distributions the shims alias (`ugence_actiongate_provider`, `ugence_tap_provider`,
+`ugence_governance_provider_framework`). The shims preserve object identity by
+construction, so behaviour, serialization and fingerprints are unchanged; this is the
+only way to make CP-5's declaration true, not a reinterpretation of it.
+
+**Known consequence for `apps/console/`.** The React app calls `/v1/modules` and
+`/v1/scenarios`, two of the six routes CP-3 withheld. Under CP-1 that app is a separate
+unit and is out of this slice; what it should show instead is a product decision, not a
+packaging one, and it is not made here.
+
+**Verified against the built artifact, not the source tree.**
+`scripts/verify_console_api_distribution.py` builds the wheel, installs it into a clean
+`--no-index` virtual environment, and interrogates the installed package — including the
+one proof no source-tree test can make: that withholding `ugence-actiongate-provider`
+makes the install **fail** rather than succeed and serve. 22 checks, all passing, run in
+CI by the `console-api-distribution` job.

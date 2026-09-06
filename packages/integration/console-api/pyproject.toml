@@ -1,0 +1,84 @@
+# Ugence Console API — the packaged control-plane governed-loop service.
+#
+# Scoped and ratified by docs/architecture/ADR_UGENCE_CONSOLE_PACKAGING_SCOPING.md
+# §8 (CP-1 SERVICE_ONLY, CP-2 PACKAGES_INTEGRATION, CP-3 ALLOWLIST_THE_FOUR,
+# CP-4 DECLARE_THE_CEILING, CP-5 DECLARE_AND_FAIL_AT_INSTALL).
+#
+#   THIS PACKAGE SERVES THE FOUR ROUTES THE STUDIO'S FROZEN ALLOWLIST NAMES,
+#   PLUS /health. NOTHING ELSE. A capability does not become public API because
+#   the underlying function exists (CP-3).
+#
+# CP-1: the service alone. ``apps/console/`` remains a separately deployable
+# React app and is not part of this distribution.
+#
+# CP-2: the import namespace is unchanged — ``ugence_console_api`` — so no import
+# anywhere in the tree moves, and every boundary test that forbids the namespace
+# keeps forbidding the same name.
+#
+# CP-4: the audit store is in-memory. Every answer discloses that ceiling; see
+# ``audit.AUDIT_CEILING``. ``ugence-control-plane-root`` 0.2.0 remains the durable
+# alternative for a later ruling and is deliberately NOT a dependency here.
+#
+# CP-5: every platform package the adapters import is declared below, so a missing
+# governance dependency is an install-time failure and never a runtime degradation
+# that serves while the governance it advertises is absent. The adapters import the
+# canonical distributions directly; the legacy root namespaces
+# (``governance_providers``, ``actiongate_provider``, ``tap_provider``) are
+# logic-free compatibility surfaces that ship in no distribution and therefore
+# cannot satisfy a declared dependency.
+#
+# Dependency direction (one-way):
+#     ugence-context-minimization            <- structural_minimize
+#     ugence-governance-provider-framework   <- the two neutral request types
+#     ugence-actiongate-provider             <- build_actiongate_provider
+#     ugence-tap-provider                    <- build_tap_provider
+#         ▲
+#     ugence-console-api (this package)
+#
+# Build:   python -m build packages/integration/console-api
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ugence-console-api"
+dynamic = ["version"]
+description = "Ugence Console API — the packaged control-plane governed-loop service: two shadow-only governed-loop writes, two audit reads and /health. Records one process's decision trail and says so; never grants, authorizes, clears or executes on any surface it serves."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "Proprietary" }
+authors = [{ name = "Rakesh Mohan" }]
+keywords = ["governance", "console", "governed-loop", "audit", "shadow", "ugence"]
+classifiers = ["Typing :: Typed"]
+dependencies = [
+    # The HTTP surface and its contracts.
+    "fastapi>=0.100.0",
+    "pydantic>=2.0.0",
+    # CP-5: the platform packages the capability adapters import. Each is required
+    # at install time; none may be optional, because the loop this service serves is
+    # the governance it advertises.
+    "ugence-context-minimization>=0.1.0",
+    "ugence-governance-provider-framework>=0.1.0",
+    "ugence-actiongate-provider>=0.1.0",
+    "ugence-tap-provider>=0.1.0",
+]
+
+[project.optional-dependencies]
+# The ASGI server is a deployment choice, not part of the library contract:
+# ``python -m ugence_console_api`` needs it, importing the app factory does not.
+serve = ["uvicorn>=0.20.0"]
+test = ["pytest>=7.0", "httpx>=0.24.0"]
+
+[tool.setuptools.dynamic]
+version = { attr = "ugence_console_api.__version__" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["ugence_console_api*"]
+
+[tool.setuptools.package-data]
+ugence_console_api = ["py.typed"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"

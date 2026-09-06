@@ -1,7 +1,14 @@
 """Action Control adapter — ActionGate ("may THIS exact action execute?").
 
-Wraps the real ActionGate engine (``build_actiongate_provider``) through the
-frozen ``actiongate_provider.api`` / ``governance_providers.api`` surfaces.
+Wraps the real ActionGate engine (``build_actiongate_provider``) through the frozen
+public surfaces of the canonical distributions ``ugence-actiongate-provider`` and
+``ugence-governance-provider-framework``.
+
+CP-5: the import names the canonical package, not the legacy root ``actiongate_provider``
+/ ``governance_providers`` namespaces. Those are logic-free compatibility surfaces that
+ship in no distribution, so a dependency declared on them could never be installed and
+the guard below would degrade this adapter to "unavailable" in every isolated install.
+The canonical modules are the same objects the shims alias, so behaviour is unchanged.
 
 Every action is reduced to a canonical envelope and hashed into a stable
 identity — the Canonical Execution Request (CER) id — which is the join key that
@@ -22,8 +29,8 @@ from ..models import ActionRequest, ActionVerdict
 _available = True
 _reason = ""
 try:  # fail-safe import
-    from actiongate_provider.configuration import build_actiongate_provider
-    from governance_providers.api import ActionGovernanceRequest
+    from ugence_actiongate_provider.configuration import build_actiongate_provider
+    from ugence_governance_provider_framework.api import ActionGovernanceRequest
     _provider = build_actiongate_provider()
 except Exception as exc:  # noqa: BLE001
     _available = False

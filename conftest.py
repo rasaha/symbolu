@@ -43,6 +43,12 @@ for _src in (project_root / "packages" / "jcs" / "src",
              # Reasoning Method Advisor slice 2 (research-only).
              project_root / "packages" / "capabilities" / "reasoning-method-advisor" / "src",
              # Trusted Workflow-Fit Pilot, Phase 4A (research-only).
-             project_root / "packages" / "capabilities" / "workflow-fit-pilot" / "src"):
+             project_root / "packages" / "capabilities" / "workflow-fit-pilot" / "src",
+             # Console API. Ruling CP-2 moved it out of the repository root into
+             # packages/integration/console-api; before that move it resolved because
+             # the root itself is on the path above. Listed here so a source checkout
+             # resolves it exactly as it did, and the cross-package parity tests that
+             # import it keep running instead of silently skipping.
+             project_root / "packages" / "integration" / "console-api" / "src"):
     if _src.is_dir() and str(_src) not in sys.path:
         sys.path.insert(0, str(_src))
