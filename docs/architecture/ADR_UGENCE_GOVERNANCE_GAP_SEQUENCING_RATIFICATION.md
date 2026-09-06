@@ -19,11 +19,11 @@ Of the assessment's twenty items (thirteen new packages, seven extensions):
 | Disposition | Items | Count |
 |---|---|---|
 | New capability package | approval workflow, authority directory, portfolio registry (contracts-only), incident orchestrator, privacy and egress, vendor risk, adversarial assurance | 7 |
-| Partly new | lifecycle authority: only the promotion state machine is new; Model Selection's `ExecutableRegistry` and the Agent Constitution lifecycle already hold the registries | 1 |
+| Partly new, deferred to wave 5 (LP-1) | lifecycle: Model Selection's `ExecutableRegistry` tracks executability evidence and the Agent Constitution packages carry a lifecycle *label* under `OD-C4=A`; neither owns a promotion, so the row is larger than "only the state machine" and is scoped again in wave 5 | 1 |
 | Folded into an existing milestone | credential broker, execution lease, control plane, audit ledger, integration hub, benchmark authority, Policy Authority persistence, live attestation, signed effects, value attribution, agent-runtime pilot, regulatory obligation mapping | 12 |
 
-Capability count moves from 45 to 52, or 53 if the lifecycle state machine ships
-separately. Physical package count may rise by up to three more without adding a
+Capability count moves from 45 to 52 in waves 1 to 4, or 53 if the deferred
+lifecycle row ships as its own package in wave 5. Physical package count may rise by up to three more without adding a
 capability, because the cloud-scaling ladder ships one integration package per phase
 (5A, 5B-0A and 5B-0B each did `[V]`): a Phase 5X package, the execution ledger that
 `NEXT_PHASES.md` names as owner of phase G with no package behind it, and the
@@ -58,7 +58,7 @@ Evidence labels: `[V]` verified against the cited file, `[I]` inferred.
 | Incident and remediation orchestrator | **new package** | extends RA-6 revoke; kill-switch shape from `products/code-governance` pilot_operator; compensation is a new proposal, never automatic rollback `[V]` | 3 |
 | Enterprise integration hub | roadmap | roadmap §3 connector framework `[V]` | 3 |
 | Data privacy and egress authority | **new package** | contracts first; evaluates data use independently of action authorization | 4 |
-| Model, prompt and agent lifecycle authority | existing plus new | Model Selection `ExecutableRegistry` and Agent Constitution lifecycle already cover parts; new package only for the promotion state machine `[I]` | 4 |
+| Model, prompt and agent lifecycle | deferred | premise corrected 2026-09-05: `ExecutableRegistry` is an executability ladder (`model-selection/.../registry.py:19-24`) and the Agent Constitution packages disclaim lifecycle authority (`OD-C4=A`); no package owns a promote, approve-for-environment or rollback transition; scoped in `ADR_UGENCE_LIFECYCLE_PROMOTION_SCOPING.md`, ruled `DEFER_TO_WAVE_5` `[V]` | 5 |
 | Third-party AI and vendor risk | **new package** | contracts first, linked to Policy Authority | 4 |
 | Agent security and adversarial assurance | **new package** | evidence provider to TAP and Risk Authority; never a decision authority | 4 |
 | Benchmark Registry Authority operational | existing | BR-2C, BR-2D under D-22, BR-2E `[V]` | 5 |
@@ -80,7 +80,7 @@ Evidence labels: `[V]` verified against the cited file, `[I]` inferred.
    consumed atomically.
 3. **Wave 3** composes; it mints no authority of its own.
 4. **Wave 4** ships contracts before engines, matching the repository's own pattern.
-5. **Wave 5** hardens existing packages and never blocks waves 1 to 3.
+5. **Wave 5** hardens existing packages and never blocks waves 1 to 3; it also carries the one deferred wave 4 row (lifecycle, LP-1) as a scoping item to re-rule before any package, not as a hardening item.
 
 One prohibition: no new package may be created for a noun that an existing README or
 NEXT_PHASES already reserves.
@@ -89,3 +89,12 @@ NEXT_PHASES already reserves.
 
 Implement gap G7 and G8 as additive contracts in governance-contracts. It is the
 smallest unblocked item on the critical path and the execution ledger depends on it.
+
+## Amendment 2026-09-05 (LP-1)
+
+Under ruling LP-1 of `ADR_UGENCE_LIFECYCLE_PROMOTION_SCOPING.md`, the lifecycle
+row's premise was found half wrong: `ExecStatus` is an executability-evidence
+ladder, not a promotion, and all three Agent Constitution packages declare
+`OD-C4=A`, no lifecycle authority. The row (line 61), the count row (line 22) and
+wave logic item 5 (line 83) were corrected in place, preserving every line number
+the wave 2 to 4 records cite. No other ruling is reopened.

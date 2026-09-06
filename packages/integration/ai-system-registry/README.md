@@ -110,8 +110,8 @@ to in-force registrations first, always.
   A test forbids `portfolio`, `priority`, `fairness`, `quantum`, `budget` and
   `schedul` from appearing in the code at all.
 - **Not a second system identity.** See above.
-- **Not a lifecycle authority.** The promotion state machine is wave 4
-  (`ADR_UGENCE_GOVERNANCE_GAP_SEQUENCING_RATIFICATION.md:61`).
+- **Not a lifecycle authority.** The promotion state machine is deferred to wave 5
+  (`ADR_UGENCE_GOVERNANCE_GAP_SEQUENCING_RATIFICATION.md:61`, ruling LP-1).
 - **Not a resolver.** It answers no "is this system allowed" question, because it
   ships nothing that can answer anything.
 
