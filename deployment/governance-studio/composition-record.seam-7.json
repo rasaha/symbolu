@@ -1,0 +1,44 @@
+{
+  "schema": "governance-studio.composition-record.v1",
+  "ruling": "ADR_UGENCE_STUDIO_FRONT_DOOR_SCOPING.md FD-3 COMPOSITION_RECORD_IN_REGISTRY: an ai-system-registry SystemRegistration; immutable and versioned by system_version; supersedes composition-record.seam-6.json; no new package for composition metadata",
+  "binding": {
+    "binding_id": "governance-studio-private-hosted/front-door/seam-7",
+    "tenant_id": "ugence-platform",
+    "subject_id": "governance-studio",
+    "context_id": "p3e-private-hosted",
+    "context_digest": "a1e929210098fc48320201b7bf5e07e4c5e34fbe3a42c5af8dd3e81ec93a655d",
+    "system_id": "governance-studio-private-hosted",
+    "system_version": "0.8.0",
+    "configuration_id": "approved-runtime-config.json",
+    "configuration_digest": "870f216f2c95f8d3559831cb07e9d2136b7f6e010d49be3f19907ec8aa5bd24e",
+    "deployment_environment_ref": "private-hosted"
+  },
+  "registration": {
+    "registration_id": "reg_36a76ca07c81cfa0e1e360f296b77e7f",
+    "binding_digest": "40cd1aaf8c703e391fb52a64861043e103c156bec52022ee5763de9a68b7df88",
+    "tenant_id": "ugence-platform",
+    "system_id": "governance-studio-private-hosted",
+    "system_version": "0.8.0",
+    "owner_ref": "rasaha",
+    "classification_label": "REFERENCE_GRADE_SHADOW_ONLY",
+    "validity": {
+      "issued_at": "2026-09-06T00:00:00.000000+00:00",
+      "expires_at": "2027-09-06T00:00:00.000000+00:00",
+      "stale_after": ""
+    },
+    "supersedes": "reg_4042e1b0e7af45eebb5a627fd5a59b33",
+    "registered_by": "governance-studio-deployment/0.8.0",
+    "notes": "Front-door composition, seam 7 (FD-1 ONE_SEAM_PER_STEP, FD-11 as ruled: OBSERVE_OVER_WORKER_LEDGER, READ_PORT_IN_CONTROL_PLANE_ROOT, SEVENTH_ROUTE_LEDGER_READ, TWO_LABELLED_SOURCES, READ_ONLY_ONE_STEP_AMENDMENT): build_studio_context receives the same seams as seam 6; the review-service destination now carries seven routes, the seventh a raw read of the worker's own tenant's audit-ledger rows by correlation id (control-plane-root 0.2.0 read_entries, governed-review-service 0.6.0, governed-runtime-worker 0.3.0); the frozen v2 contract is amended a third time (v2-A3) by one read operation; no configuration value, image package, credential or second egress destination is added; decision_store, governance_hook and console_base_url stay absent. Supersedes the seam-6 registration, which is never edited; a later seam registers a new record superseding this one."
+  },
+  "record_digest": "9967538f9814acea779d9f7d9bf68f1308c58f0103b458aafa22b33756f7d068",
+  "supersedes_record": "composition-record.seam-6.json",
+  "seams_handed_to_build_studio_context": [
+    "review_service_base_url",
+    "activation_root",
+    "policy_registry",
+    "policy_identities",
+    "provider_registry",
+    "system_registry"
+  ],
+  "configuration_digest_of": "deployment/governance-studio/approved-runtime-config.json (sha-256 of the file bytes)"
+}

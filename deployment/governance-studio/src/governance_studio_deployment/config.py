@@ -86,6 +86,10 @@ class DeploymentConfig:
     #: of the tenant-bound system registry under the writable runtime volume; requires
     #: UGENCE_STUDIO_TENANT_ID. Read here and handed to build_studio_context only.
     system_registry_path: str = ""
+    #: Front-door seam 8 (FD-12): ``UGENCE_STUDIO_DATA_USE_DECLARATIONS_PATH``, the sqlite
+    #: file of the tenant-bound data-use declarations under the writable runtime volume;
+    #: requires UGENCE_STUDIO_TENANT_ID. Read here and handed to build_studio_context only.
+    data_use_declarations_path: str = ""
     _errors: List[str] = field(default_factory=list, compare=False)
 
     @property
@@ -115,6 +119,10 @@ class DeploymentConfig:
     @property
     def system_registry_configured(self) -> bool:
         return bool(self.system_registry_path)
+
+    @property
+    def data_use_declarations_configured(self) -> bool:
+        return bool(self.data_use_declarations_path)
 
     @classmethod
     def from_env(cls, **overrides) -> "DeploymentConfig":
@@ -147,6 +155,9 @@ class DeploymentConfig:
                                  else (_env("UGENCE_STUDIO_SIMULATION_PROVIDER") or "")),
             system_registry_path=(overrides.get("system_registry_path")
                                   or _env("UGENCE_STUDIO_SYSTEM_REGISTRY_PATH") or "").strip(),
+            data_use_declarations_path=(overrides.get("data_use_declarations_path")
+                                        or _env("UGENCE_STUDIO_DATA_USE_DECLARATIONS_PATH")
+                                        or "").strip(),
         )
         return cfg
 
@@ -198,8 +209,10 @@ class DeploymentConfig:
             errors.extend(_registry_path_errors(self.constitution_registry_path, self.runtime_dir))
 
         # authority reads (front-door seam 2): typed identities, one tenant, registry required.
-        # Since seam 5 the tenant may also stand alone for the system registry.
-        if self.policy_identities or (self.tenant_id and not self.system_registry_path):
+        # Since seam 5 the tenant may also stand alone for the system registry, and since
+        # seam 8 for the data-use declarations file.
+        if self.policy_identities or (self.tenant_id and not self.system_registry_path
+                                      and not self.data_use_declarations_path):
             errors.extend(_authority_errors(self.policy_identities, self.tenant_id,
                                             bool(self.constitution_registry_path)))
         elif self.tenant_id:
@@ -212,6 +225,15 @@ class DeploymentConfig:
             if not self.tenant_id:
                 errors.append("UGENCE_STUDIO_SYSTEM_REGISTRY_PATH requires UGENCE_STUDIO_TENANT_ID; "
                               "the registry is bound to one tenant")
+
+        # data-use declarations (front-door seam 8): a file under the volume, tenant-bound
+        if self.data_use_declarations_path:
+            errors.extend(_path_errors("UGENCE_STUDIO_DATA_USE_DECLARATIONS_PATH",
+                                       self.data_use_declarations_path, self.runtime_dir))
+            if not self.tenant_id:
+                errors.append("UGENCE_STUDIO_DATA_USE_DECLARATIONS_PATH requires "
+                              "UGENCE_STUDIO_TENANT_ID; the declarations file is bound to "
+                              "one tenant")
 
         # simulation provider (front-door seam 3): one boolean, typed; "1" or unset
         if self.simulation_provider not in ("", SIMULATION_PROVIDER_ENABLED):

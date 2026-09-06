@@ -52,7 +52,10 @@ def _build_backend(config: DeploymentConfig):
     when the simulation provider is enabled, a registry holding the one pinned
     in-image provider (seam 3, FD-7); and when a system registry path is configured,
     the tenant-bound system registry the Registration screen records into, with this
-    deployment's name and version as ``registered_by`` (seam 5, FD-9). No decision
+    deployment's name and version as ``registered_by`` (seam 5, FD-9); and when a
+    data-use declarations path is configured, the tenant-bound declarations file the
+    Data use screen declares into, with this deployment's name and version as the
+    recording composition (seam 8, FD-12). No decision
     store, governance hook (FD-7.3: the runtime's fail-closed default stays; FD-7.5:
     nothing permissive is ever handed) or console URL: those screens report their
     gaps rather than a stand-in.
@@ -98,6 +101,15 @@ def _build_backend(config: DeploymentConfig):
         system_registry = open_system_registry(config.system_registry_path, tenant_id=config.tenant_id,
                                                production_mode=config.is_production)
         registered_by = REGISTERED_BY
+    data_use_declarations = None
+    recorded_by = ""
+    if config.data_use_declarations_path:
+        from .declarations import RECORDED_BY, open_data_use_declarations
+
+        data_use_declarations = open_data_use_declarations(
+            config.data_use_declarations_path, tenant_id=config.tenant_id,
+            production_mode=config.is_production)
+        recorded_by = RECORDED_BY
     studio = build_studio_context(
         activation_root=activation_root,
         policy_registry=policy_registry,
@@ -106,6 +118,8 @@ def _build_backend(config: DeploymentConfig):
         review_service_base_url=config.review_service_url or None,
         system_registry=system_registry,
         registered_by=registered_by,
+        data_use_declarations=data_use_declarations,
+        recorded_by=recorded_by,
     )
     from .simulation import refuse_permissive_hook
 

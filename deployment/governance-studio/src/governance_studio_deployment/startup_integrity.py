@@ -112,6 +112,18 @@ def run_startup_integrity(inputs: IntegrityInputs) -> IntegrityResult:
         check("system_registry_writable", writable,
               "the system registry directory does not exist or is not writable")
 
+    # data-use declarations (front-door seam 8): the same rule, before anything binds
+    data_use_state = "unset"
+    if cfg.data_use_declarations_path:
+        parent = os.path.dirname(cfg.data_use_declarations_path)
+        writable = os.path.isdir(parent) and os.access(parent, os.W_OK) and (
+            not os.path.exists(cfg.data_use_declarations_path)
+            or (os.path.isfile(cfg.data_use_declarations_path)
+                and os.access(cfg.data_use_declarations_path, os.W_OK)))
+        data_use_state = "configured" if writable else "unwritable"
+        check("data_use_declarations_writable", writable,
+              "the data-use declarations directory does not exist or is not writable")
+
     # simulation provider (front-door seam 3): FD-7.5, nothing in this package can
     # construct or hand a permissive governance hook, whether or not the seam is enabled
     from .simulation import permissive_hook_source_findings
@@ -207,6 +219,7 @@ def run_startup_integrity(inputs: IntegrityInputs) -> IntegrityResult:
         "authority_reads": "configured" if cfg.policy_identities else "unset",
         "simulation_provider": "configured" if cfg.simulation_provider_enabled else "unset",
         "system_registry": system_registry_state,
+        "data_use_declarations": data_use_state,
         "checks": checks,
         "result": "PASS" if ok else "FAIL",
         "failure_code": code,
@@ -229,6 +242,8 @@ def _classify(failures: List[str]) -> str:
         return "SYNTHETIC_DATA_BOUNDARY_FAILED"
     if "tls" in joined.lower() or "certificate" in joined.lower():
         return "GOVERNANCE_STUDIO_P3E_HTTPS_FAILED"
+    if "DATA_USE_DECLARATIONS" in joined or "data_use_declarations" in joined:
+        return "GOVERNANCE_STUDIO_P3E_DATA_USE_SEAM_FAILED"
     if "SYSTEM_REGISTRY" in joined or "system_registry" in joined:
         return "GOVERNANCE_STUDIO_P3E_REGISTRATION_SEAM_FAILED"
     if "POLICY_IDENTITIES" in joined or "TENANT_ID" in joined:
