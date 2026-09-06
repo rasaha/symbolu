@@ -274,3 +274,62 @@ excluded. `LIVE` stays absent from `SIMULATION_MODES`, `ENFORCEMENT_ENABLED` sta
 egress destination appears, no authenticity is claimed, and the frozen v1 and v2
 contracts, every `FROM` line and ratified digest, SD-2, FD-8.1, FD-8.4 and
 `REFERENCE_GRADE_SHADOW_ONLY` are preserved.
+
+## 13 — Ruling CE-6 and CE-7 (owner, 2026-09-06)
+
+The recommended option is ratified in both cases.
+
+| # | Ruling |
+|---|---|
+| **CE-6** | **`ONE_ENTRY_EXPORT_PACKAGE`.** The SD-1 public-entry-point allowlist gains exactly one entry: `ugence_clearance_export`, the contracts-only package CE-2 creates, reached through its curated public surface and nothing behind it — the shape FD-12 and FD-13 already ratified for `ugence_data_use_admission` and `ugence_vendor_dependency`. The studio imports neither `ugence_action_clearance` nor `ugence_execution_reservation`, so neither a clearance evaluator nor a receipt store becomes reachable from the studio process. `TWO_ENTRIES` and `ENTRY_FOR_ACTION_CLEARANCE` are refused. |
+| **CE-7** | **`SYNTHETIC_SEEDED_RECEIPTS`.** The deployment seeds a receipt store from pinned fixtures under the existing `SYNTHETIC_DEMONSTRATION_ONLY` manifest discipline, which fails closed unless fixtures match a pinned hash (`synthetic.py:135`). No route writes; CE-5's read stays a read. `RULED_INTAKE` is refused because it contradicts CE-5 as ruled; `NO_SEAM_YET` is refused because it leaves the export path unexercised, which is the failure this programme has repeatedly paid for. |
+
+### 13.1 — What a seeded receipt is evidence of, and what it is not
+
+A seeded receipt exercises the **export path and the verifier**. It is evidence about
+serialization and integrity, and about nothing else. No authority granted it, it
+confers no approval, it satisfies no obligation, and it says nothing about whether the
+platform can produce a real clearance — which, per §11.2, it currently cannot.
+
+The artifact must therefore carry **`SYNTHETIC_DEMONSTRATION_ONLY`** as a field of the
+exported record, alongside the `authenticity: UNSIGNED` CE-4 requires and the
+`PRESENTED_UNPROVEN` identity assurance CE-3 makes travel. Three separate honesty
+claims, none of which may be inferred from the absence of another, and none of which
+an implementation may omit because a consumer "would know". A synthetic export that
+reached an external runtime unlabelled would be the precise failure CE-4 exists to
+prevent, in a different coat.
+
+### 13.2 — What this ruling authorizes
+
+The implementation prompt for CE-1 to CE-7 may now proceed. Specifically:
+
+- `packages/integration/clearance-export`, contracts-only: the artifact record type,
+  the `identity_assurance` enum with its single member, the `authenticity` and
+  synthetic-classification fields, one read-only Protocol, refusal reasons, and a pure
+  verifier function. No store, no adapter, no connector, no clock, no network.
+- **One** new line in the SD-1 allowlist
+  (`apps/ugence-governance-studio/backend/tests/test_architecture.py`), for
+  `ugence_clearance_export` and no other package.
+- One v2 read operation, as CE-5 ruled, and the contract amendment that admits it.
+- Deployment seeding of a receipt store from pinned synthetic fixtures, inside the
+  existing manifest discipline rather than beside it.
+
+### 13.3 — What this ruling does not authorize
+
+Everything §8 excludes stays excluded, and nothing here reopens CE-1 to CE-5. `LIVE`
+stays absent from `SIMULATION_MODES`; `ENFORCEMENT_ENABLED` stays `False` in all eleven
+packages that declare it; no credential is introduced; no clearance is minted in the
+studio; no second egress destination appears; no authenticity is claimed; and the
+frozen v1 and v2 contracts, every `FROM` line and ratified digest, SD-2, FD-8.1, FD-8.4
+and `REFERENCE_GRADE_SHADOW_ONLY` are all preserved.
+
+Three further exclusions follow from CE-6 and CE-7 specifically:
+
+- **No second SD-1 entry.** Admitting `ugence_execution_reservation` or
+  `ugence_action_clearance` later is a new owner decision, not a follow-on from this
+  one. An implementation that finds it needs one stops and reports.
+- **No write on the export path.** CE-5's read stays a read; seeding is deployment
+  composition, not a route, and no operation may accept a receipt.
+- **No promotion of a synthetic receipt.** Nothing may strip, default, or condition
+  away the `SYNTHETIC_DEMONSTRATION_ONLY` label, and no later ruling is implied by its
+  presence.
