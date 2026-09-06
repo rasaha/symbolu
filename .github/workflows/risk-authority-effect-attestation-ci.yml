@@ -21,7 +21,9 @@ on:
       - "packages/integration/risk-authority-effect-attestation/**"
       - "packages/trusted-evidence-authority/**"
       - "packages/governance-contracts/**"
+      - "packages/integration/risk-authority-execution-assurance/**"
       - "docs/architecture/ADR_UGENCE_SIGNED_EFFECT_ATTESTATION_SCOPING.md"
+      - "docs/architecture/ADR_UGENCE_RA8_EFFECT_ATTESTATION_INTEGRATION.md"
       - ".github/workflows/risk-authority-effect-attestation-ci.yml"
   push:
     branches:
@@ -105,7 +107,7 @@ jobs:
         run: python -m pytest packages/trusted-evidence-authority -q -p no:cacheprovider
       - name: Cloud Scaling 5B-0A producer attestation (the other TEA consumer)
         run: python -m pytest packages/integration/cloud-scaling-producer-attestation -q -p no:cacheprovider
-      - name: RA-8 execution assurance (future integration target; untouched)
+      - name: RA-8 execution assurance (attested ingress, RI-1 to RI-5)
         run: python -m pytest packages/integration/risk-authority-execution-assurance -q -p no:cacheprovider
       - name: Repository import boundaries and package-CI coverage
         run: |

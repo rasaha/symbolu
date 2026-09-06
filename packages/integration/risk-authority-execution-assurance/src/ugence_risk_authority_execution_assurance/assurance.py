@@ -34,7 +34,14 @@ from .contracts import (
 )
 from .correlation import ExecutionCorrelator, GovernedAuthorityContext
 from .handoff import EffectAssuranceSignalEmitter, HandoffResult
-from .ingress import IngressDecision, ReferenceEffectSourceAuthenticator, TrustedEffectIngress
+from .ingress import (
+    AttestedEffectInput,
+    IngressDecision,
+    IngressDisposition,
+    ReferenceEffectSourceAuthenticator,
+    TrustedEffectIngress,
+)
+from .provenance import production_matched_gate
 from .reconciler import (
     DecisionAuthorityReconciler,
     ExpectedEffect,
@@ -142,6 +149,8 @@ class EffectAssuranceService:
         effect_source_available: bool = True,
         produced_at: Optional[datetime] = None,
         emit: bool = True,
+        attested: Sequence[AttestedEffectInput] = (),
+        verification_instant: Optional[datetime] = None,
     ) -> EffectAssuranceOutcome:
         """Run one full RA-8 assessment over a governed execution.
 
@@ -150,6 +159,14 @@ class EffectAssuranceService:
         :func:`~.ingress.normalize_execution_observation`). Every one passes the
         trusted ingress before it can influence the verdict; a rejected observation
         can never become a reconciliation record (spec §18, §19, §27).
+
+        ``attested`` are signed observations admitted through
+        :meth:`TrustedEffectIngress.admit_attested` at the explicitly injected
+        ``verification_instant`` (RI-5). ``produced_at`` is never used as that
+        instant: it is the assessment timestamp, and an attestation's own
+        ``attested_at`` is the attester's claim. In production the unsigned path
+        rejects every observation (RI-2) and a ``MATCHED`` verdict requires verified
+        independent-observer provenance (RI-3).
         """
 
         now = produced_at if isinstance(produced_at, datetime) else datetime.now(timezone.utc)
@@ -170,6 +187,25 @@ class EffectAssuranceService:
             decisions.append(decision)
             if decision.admitted and decision.observation is not None:
                 admitted.append(decision.observation)
+        for item in attested:
+            if type(item) is not AttestedEffectInput:
+                decisions.append(IngressDecision(
+                    IngressDisposition.REJECTED, reasons=("not an AttestedEffectInput",)
+                ))
+                continue
+            decision = self._ingress.admit_attested(
+                item.attestation,
+                correlation=correlation,
+                as_of=verification_instant,  # type: ignore[arg-type] - the ingress rejects a bad instant
+                observation_id=item.observation_id,
+                external_effect_id=item.external_effect_id,
+                source=item.source,
+                source_version=item.source_version,
+            )
+            decisions.append(decision)
+            if decision.admitted and decision.observation is not None:
+                admitted.append(decision.observation)
+        supplied = bool(observations) or bool(attested)
 
         # 2. Effect-source availability / trusted-evidence gates (never MATCHED).
         if effect_source_available is not True:
@@ -184,7 +220,7 @@ class EffectAssuranceService:
                 finality=EffectFinality.PENDING,
                 emit=emit,
             )
-        if observations and not admitted:
+        if supplied and not admitted:
             return self._finish(
                 correlation,
                 ReconciliationEvidence(error="no trusted effect observation admitted"),
@@ -196,7 +232,7 @@ class EffectAssuranceService:
                 finality=EffectFinality.PENDING,
                 emit=emit,
             )
-        if not observations:
+        if not supplied:
             return self._finish(
                 correlation,
                 ReconciliationEvidence(),
@@ -234,6 +270,25 @@ class EffectAssuranceService:
         aggregate = safe_aggregate(
             evidence.records, expected_parameters=expected.authorized_parameters
         )
+        # 4b. RI-3: in production, MATCHED requires verified independent-observer
+        #     provenance on an admitted, favorable, final observation. Every other
+        #     verdict passes through untouched, so adverse evidence is never masked.
+        gate = production_matched_gate(
+            aggregate.outcome, admitted, production_mode=self._production_mode
+        )
+        if gate is not None:
+            withheld_outcome, withheld_code, withheld_reason = gate
+            return self._finish(
+                correlation,
+                evidence,
+                decisions,
+                now,
+                outcome=withheld_outcome,
+                reason_code=withheld_code,
+                reason=withheld_reason,
+                finality=aggregate.finality,
+                emit=emit,
+            )
         assessment = EffectAssuranceAssessment(
             assessment_id=self._assessment_id(correlation, aggregate.outcome, now),
             tenant_id=correlation.tenant_id,

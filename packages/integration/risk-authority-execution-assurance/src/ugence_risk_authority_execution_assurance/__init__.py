@@ -64,6 +64,7 @@ from .contracts import (
     EffectReconciliationOutcome,
     ExecutionCorrelation,
     effect_finality_of,
+    EffectAttestationProvenance,
 )
 from .correlation import ExecutionCorrelator, GovernedAuthorityContext
 from .event_adapter import RuntimeAttemptEvidence, RuntimeEventAdapter
@@ -74,6 +75,11 @@ from .handoff import (
     HandoffResult,
     assessment_to_signal,
 )
+from .provenance import (
+    INDEPENDENT_OBSERVER_REQUIRED_REASON,
+    independent_observer_supports,
+    production_matched_gate,
+)
 from .ingress import (
     GOVERNANCE_OUTCOME_TO_BUSINESS_OUTCOME,
     EffectSourceAuthenticator,
@@ -83,6 +89,13 @@ from .ingress import (
     ReferenceEffectSourceAuthenticator,
     TrustedEffectIngress,
     normalize_execution_observation,
+    AttestationVerifierRejectedError,
+    AttestedEffectInput,
+    UNATTESTED_REFUSED_IN_PRODUCTION,
+    INVALID_VERIFICATION_INSTANT,
+    ATTESTATION_REFUSED,
+    ATTESTATION_VERIFIER_FAULT,
+    NO_ATTESTATION_VERIFIER,
 )
 from .reconciler import (
     DecisionAuthorityReconciler,
@@ -103,6 +116,7 @@ __all__ = [
     "EffectReasonCode",
     "ExecutionCorrelation",
     "EffectObservation",
+    "EffectAttestationProvenance",
     "EffectAssuranceAssessment",
     "effect_finality_of",
     "DA_STATUS_TO_OUTCOME",
@@ -121,6 +135,18 @@ __all__ = [
     "IngressDisposition",
     "normalize_execution_observation",
     "GOVERNANCE_OUTCOME_TO_BUSINESS_OUTCOME",
+    # attested ingress (RI-1 to RI-5)
+    "AttestationVerifierRejectedError",
+    "AttestedEffectInput",
+    "UNATTESTED_REFUSED_IN_PRODUCTION",
+    "INVALID_VERIFICATION_INSTANT",
+    "ATTESTATION_REFUSED",
+    "ATTESTATION_VERIFIER_FAULT",
+    "NO_ATTESTATION_VERIFIER",
+    # provenance gate (RI-3)
+    "production_matched_gate",
+    "independent_observer_supports",
+    "INDEPENDENT_OBSERVER_REQUIRED_REASON",
     # aggregation
     "safe_aggregate",
     "AggregateAssessment",

@@ -71,22 +71,61 @@ No failure, malformed input, wrong binding, replay, or conflict ever becomes
 `MATCHED`. A false RA-8 mismatch can cost availability but can never widen
 authority (RA-6's worst consequence is restriction, never a grant).
 
+## Attested ingress (RI-1 to RI-5) — 0.2.0
+
+Ratified by `docs/architecture/ADR_UGENCE_RA8_EFFECT_ATTESTATION_INTEGRATION.md`,
+built on `ugence-risk-authority-effect-attestation`.
+
+```
+EffectAttestation (signed wrapper over an unmodified ExecutionObservation)
+    → TrustedEffectIngress.admit_attested(attestation, correlation=, as_of=, observation_id=)
+        1. as_of must be an aware datetime, injected — else reject, resolver never asked (RI-5)
+        2. exact types: EffectAttestation, ExecutionCorrelation; a verifier must be configured
+        3. verifier: exact wrapped observation, tenant from the governed correlation,
+           attester's declared role and anchor → VERIFIED, and only VERIFIED, passes (RI-1)
+        4. normalize from the governed correlation; stamp typed EffectAttestationProvenance
+        5. the unchanged checks: binding, domain, producer authentication
+    → assess(..., attested=[AttestedEffectInput(...)], verification_instant=as_of)
+        production: MATCHED requires verified INDEPENDENT_OBSERVER provenance on an admitted,
+        favorable, final observation; otherwise UNVERIFIABLE / INDEPENDENT_OBSERVER_REQUIRED (RI-3)
+```
+
+- **RI-2** In production the unsigned path `admit` rejects every observation.
+  Unsigned evidence is admissible only under the labelled reference-grade posture.
+- **RI-3** An executing-provider attestation is provider provenance only. It can
+  surface `MISMATCH` and every other adverse verdict; it can never make a
+  production `MATCHED` reachable. Roles and anchors are non-interchangeable.
+- **RI-4** Production wiring is **blocked**: a production ingress requires a
+  verifier in production posture, which refuses TEA's `StaticTrustAnchorDirectory`;
+  the only admissible resolver in this repository, `DenyAllTrustAnchorDirectory`,
+  refuses every anchor. No production resolver, anchor publication, signer, key
+  custody or KMS/HSM is provided here. No production `MATCHED` flow exists.
+- **RI-5** `produced_at` is the assessment timestamp and an attestation's
+  `attested_at` is the attester's claim; neither is the verification instant.
+- A verified attestation proves provenance and integrity, never that the effect
+  occurred. `effect_digest` remains a content digest; the role travels only in the
+  typed provenance, never in `source`, `source_version` or reason text.
+
 ## Maturity (no overclaim)
 
-Reference-grade post-effect reconciliation. Effect-source trust is
-**authenticated / delegated ingress + content-hash integrity** (integrity ≠
-authenticity; a hash is not a signature). Persistence is **delegated to Decision
-Authority**. The reference effect authenticator and the reference DA reconciler are
-**refused in production** (the RA-5/6/7 F-1 pattern). This is **NOT** a production
-Third-Party Gateway, signed external receipts / attestations, globally-distributed
-effect observation, cryptographically-attested physical-world truth, zero-window
-correction, ACP, or GRC.
+Reference-grade post-effect reconciliation. **NOT PRODUCTION-READY.** Effect-source
+trust is **authenticated / delegated ingress + content-hash integrity** on the
+unsigned reference path (integrity ≠ authenticity; a hash is not a signature), and
+**signed effect attestation** on the attested path, which establishes provenance
+and integrity only. Persistence is **delegated to Decision Authority**. The
+reference effect authenticator, the reference DA reconciler and the reference
+trust-anchor directory are **refused in production** (the RA-5/6/7 F-1 pattern).
+Production effect-attestation wiring is blocked on the Trusted Evidence Authority's
+production resolver milestone (RI-4). This is **NOT** a production Third-Party
+Gateway, globally-distributed effect observation, cryptographically-attested
+physical-world truth, zero-window correction, ACP, or GRC.
 
 ## Develop / test / verify
 
 ```bash
-# Source tests (needs pydantic for the reused Decision Authority kernel):
-pip install pytest pydantic
+# Source tests (needs pydantic for the reused Decision Authority kernel, and the
+# Trusted Evidence Authority's Ed25519 backends for the attested path):
+pip install pytest pydantic "cryptography>=41.0.7,<47.0.0" "PyNaCl>=1.5.0,<2.0.0"
 python -m pytest packages/integration/risk-authority-execution-assurance/tests -q
 
 # Build + isolated-install proof (first-party wheels; index only for pydantic):

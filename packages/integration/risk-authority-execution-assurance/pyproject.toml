@@ -51,7 +51,12 @@ dependencies = [
     "ugence-risk-authority>=0.1.0",
     "ugence-risk-authority-status-runtime>=0.1.0",
     "ugence-decision-authority>=1.0.0",
-    "ugence-governance-contracts>=0.1.0",
+    # 0.8.0 is the floor the effect-attestation package requires (RI-1).
+    "ugence-governance-contracts>=0.8.0",
+    # Signed effect-attestation contracts and verifier (RI-1 to RI-5). RA-8 does
+    # not import the Trusted Evidence Authority directly; anchors, resolver port
+    # and key types reach it only through this package's curated surface.
+    "ugence-risk-authority-effect-attestation>=0.1.0",
 ]
 
 [project.optional-dependencies]

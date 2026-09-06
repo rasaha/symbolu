@@ -35,6 +35,7 @@ from ugence_decision_authority.execution.status import (
     Finality,
     ReconciliationStatus,
 )
+from ugence_risk_authority_effect_attestation import EffectAttesterRole
 
 __all__ = [
     "EXECUTION_ASSURANCE_SCHEMA_VERSION",
@@ -43,6 +44,7 @@ __all__ = [
     "EffectReconciliationOutcome",
     "EffectReasonCode",
     "ExecutionCorrelation",
+    "EffectAttestationProvenance",
     "EffectObservation",
     "EffectAssuranceAssessment",
     "effect_finality_of",
@@ -141,6 +143,10 @@ class EffectReasonCode(str, Enum):
     EFFECT_SOURCE_UNAVAILABLE = "EFFECT_SOURCE_UNAVAILABLE"
     NO_OBSERVATION = "NO_OBSERVATION"
     RECONCILIATION_ERROR = "RECONCILIATION_ERROR"
+    #: RI-3: a production ``MATCHED`` was withheld because no admitted observation
+    #: carried verified independent-observer provenance with a favorable final
+    #: outcome. Provider self-attestation is provenance only.
+    INDEPENDENT_OBSERVER_REQUIRED = "INDEPENDENT_OBSERVER_REQUIRED"
 
 
 def effect_finality_of(business_outcome: BusinessOutcome, finality: Finality) -> EffectFinality:
@@ -243,6 +249,57 @@ class ExecutionCorrelation:
 
 
 @dataclass(frozen=True)
+class EffectAttestationProvenance:
+    """Typed provenance of one admitted, attestation-verified observation (RI-3).
+
+    Carried on :class:`EffectObservation` so the attester **role** survives
+    normalization as a typed value — never packed into ``source``,
+    ``source_version`` or reason text. It records who signed, under which key and
+    role, which bytes were verified and against which anchor revision, at the
+    injected instant the ingress verified it (RI-5). It establishes provenance and
+    integrity only: a verified attestation never says the effect occurred.
+    """
+
+    attester_role: EffectAttesterRole
+    attester_identity: str
+    attester_key_id: str
+    observation_digest: str
+    signing_payload_digest: str
+    anchor_record_digest: str
+    verified_at: datetime
+
+    def __post_init__(self) -> None:
+        if type(self.attester_role) is not EffectAttesterRole:
+            raise TypeError("attester_role must be exactly an EffectAttesterRole")
+        for name in (
+            "attester_identity",
+            "attester_key_id",
+            "observation_digest",
+            "signing_payload_digest",
+            "anchor_record_digest",
+        ):
+            value = getattr(self, name)
+            if type(value) is not str or not value.strip():
+                raise TypeError(f"{name} must be a non-empty str")
+        if type(self.verified_at) is not datetime or self.verified_at.utcoffset() is None:
+            raise TypeError("verified_at must be a timezone-aware datetime")
+
+    @property
+    def establishes(self) -> str:
+        return "PROVENANCE_AND_INTEGRITY_ONLY"
+
+    @property
+    def is_independent_observer(self) -> bool:
+        return self.attester_role is EffectAttesterRole.INDEPENDENT_OBSERVER
+
+    @property
+    def factual_correctness_established(self) -> bool:
+        """Always ``False``: provenance is not truth (SE-2, SE-3)."""
+
+        return False
+
+
+@dataclass(frozen=True)
 class EffectObservation:
     """One normalized, admitted external-effect fact (spec §12).
 
@@ -270,6 +327,10 @@ class EffectObservation:
     source: str = ""
     source_version: str = ""
     effect_digest: str = ""
+    #: RI-3 typed provenance, set only by ``TrustedEffectIngress.admit_attested``.
+    #: ``None`` for an unattested (reference-grade) observation. Deliberately
+    #: outside ``effect_digest``: that digest stays a content digest.
+    provenance: Optional[EffectAttestationProvenance] = None
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "observed_parameters", dict(self.observed_parameters or {}))
@@ -320,6 +381,8 @@ class EffectObservation:
             reasons.append("business_outcome is not a BusinessOutcome")
         if not isinstance(self.finality, Finality):
             reasons.append("finality is not a Finality")
+        if self.provenance is not None and type(self.provenance) is not EffectAttestationProvenance:
+            reasons.append("provenance is not an EffectAttestationProvenance")
         return tuple(reasons)
 
 

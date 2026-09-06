@@ -45,6 +45,11 @@ FIRST_PARTY = [
     REPO / "packages" / "risk_authority",
     REPO / "packages" / "integration" / "risk-authority-status-runtime",
     REPO / "packages" / "capabilities" / "decision-authority",
+    # Attested ingress (RI-1 to RI-5): the effect-attestation contracts and the
+    # Trusted Evidence Authority they resolve anchors through. cryptography and
+    # PyNaCl are TEA's declared third-party dependencies and come from the index.
+    REPO / "packages" / "trusted-evidence-authority",
+    REPO / "packages" / "integration" / "risk-authority-effect-attestation",
     PKG,
 ]
 
@@ -56,6 +61,28 @@ from datetime import datetime, timezone
 import ugence_risk_authority_execution_assurance as ra8
 loc = pathlib.Path(ra8.__file__).resolve()
 assert "site-packages" in loc.parts, f"not installed from site-packages: {loc}"
+
+# 1b. The attested path resolves through the installed effect-attestation package
+#     and refuses the reference trust-anchor directory in production (RI-4).
+import ugence_risk_authority_effect_attestation as ea
+assert "site-packages" in pathlib.Path(ea.__file__).resolve().parts
+_signer = ea.ReferenceEd25519EffectAttestationSigner(
+    b"\x02" * 32, attester_identity="observer-omega", attester_key_id="ok-1",
+    attester_role=ea.EffectAttesterRole.INDEPENDENT_OBSERVER)
+_anchor = _signer.trust_anchor(trust_anchor_set_id="effect-anchors", trust_anchor_set_version="1")
+_static = ea.StaticTrustAnchorDirectory([_anchor], trust_anchor_set_id="effect-anchors",
+                                        trust_anchor_set_version="1")
+try:
+    ea.Ed25519EffectAttestationVerifier(trust_anchor_resolver=_static, production_mode=True)
+    raise SystemExit("static trust-anchor directory admitted in production")
+except ea.EffectAttestationConfigurationError:
+    pass
+_ref_verifier = ea.Ed25519EffectAttestationVerifier(trust_anchor_resolver=_static)
+_ingress = ra8.TrustedEffectIngress(ra8.ReferenceEffectSourceAuthenticator(),
+                                    attestation_verifier=_ref_verifier)
+assert _ingress.attestation_verifier is _ref_verifier
+_bad = _ingress.admit_attested(None, correlation=None, as_of=None, observation_id="x")
+assert not _bad.admitted and _bad.reasons[0] == ra8.INVALID_VERIFICATION_INSTANT
 
 from ugence_risk_authority_execution_assurance import (
     EffectAssuranceService, EffectAssuranceSignalEmitter, EffectObservation,

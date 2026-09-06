@@ -19,11 +19,24 @@ An admission does four things, fail-closed and never authority-widening:
 A rejected observation yields ``REJECTED`` and can never become a reconciliation
 record, touch another authority domain, or mint/widen authority. An absent effect
 source yields ``UNVERIFIABLE`` at the assessment layer — never ``MATCHED`` (§27).
+
+Attested admission (RI-1 to RI-5, ``ADR_UGENCE_RA8_EFFECT_ATTESTATION_INTEGRATION``)
+adds :meth:`TrustedEffectIngress.admit_attested`: it receives the signed
+``EffectAttestation`` while the raw ``ExecutionObservation`` is still available,
+verifies that exact wrapped observation under the attester's declared role and
+anchor at an **injected** instant, binds the tenant from the governed
+correlation, normalizes only after ``VERIFIED``, records typed provenance, and then
+runs the three checks above unchanged. In production the unsigned path
+:meth:`TrustedEffectIngress.admit` rejects every observation (RI-2). A verified
+attestation establishes provenance and integrity only — never that the effect
+occurred.
 """
 
 from __future__ import annotations
 
+import dataclasses
 from dataclasses import dataclass
+from datetime import datetime
 from enum import Enum
 from typing import Optional, Protocol, Tuple, runtime_checkable
 
@@ -32,10 +45,21 @@ from ugence_governance_contracts.contracts.execution import (
     ExecutionBusinessOutcome,
     ExecutionObservation,
 )
+from ugence_risk_authority_effect_attestation import (
+    EffectAttestation,
+    EffectAttestationVerificationOutcome,
+    EffectAttestationVerificationResult,
+    EffectAttestationVerifierPort,
+    EffectAttesterRole,
+)
 
-from .contracts import EXECUTION_ASSURANCE_SCHEMA_VERSION, EffectObservation
+from .contracts import (
+    EXECUTION_ASSURANCE_SCHEMA_VERSION,
+    EffectAttestationProvenance,
+    EffectObservation,
+    ExecutionCorrelation,
+)
 from .correlation import ExecutionCorrelator
-from .contracts import ExecutionCorrelation
 
 __all__ = [
     "IngressDisposition",
@@ -43,14 +67,37 @@ __all__ = [
     "EffectSourceAuthenticator",
     "ReferenceEffectSourceAuthenticator",
     "ReferenceEffectIngressRejectedError",
+    "AttestationVerifierRejectedError",
+    "AttestedEffectInput",
     "TrustedEffectIngress",
     "normalize_execution_observation",
     "GOVERNANCE_OUTCOME_TO_BUSINESS_OUTCOME",
+    "UNATTESTED_REFUSED_IN_PRODUCTION",
+    "INVALID_VERIFICATION_INSTANT",
+    "ATTESTATION_REFUSED",
+    "ATTESTATION_VERIFIER_FAULT",
+    "NO_ATTESTATION_VERIFIER",
 ]
 
 
 class ReferenceEffectIngressRejectedError(RuntimeError):
     """Raised when a reference effect authenticator is wired into production (F-1)."""
+
+
+class AttestationVerifierRejectedError(RuntimeError):
+    """Raised when a production ingress is given an attestation verifier that is not
+    itself in production posture (RI-4): the verifier's own ``production_mode`` must
+    be exactly ``True``, which is what refuses the reference trust-anchor directory."""
+
+
+#: Typed ingress reasons for the attested path. Strings, because
+#: ``IngressDecision.reasons`` is a tuple of strings; each is a fixed constant so a
+#: caller can match on identity rather than parse text.
+UNATTESTED_REFUSED_IN_PRODUCTION = "unattested observation refused in production (RI-2)"
+INVALID_VERIFICATION_INSTANT = "invalid verification instant (RI-5)"
+ATTESTATION_REFUSED = "attestation refused"
+ATTESTATION_VERIFIER_FAULT = "attestation verifier fault"
+NO_ATTESTATION_VERIFIER = "no attestation verifier configured"
 
 
 class IngressDisposition(str, Enum):
@@ -65,10 +112,32 @@ class IngressDecision:
     disposition: IngressDisposition
     reasons: Tuple[str, ...] = ()
     observation: Optional[EffectObservation] = None
+    #: The verifier's typed result when the decision came through ``admit_attested``
+    #: and the verifier answered; ``None`` on the unsigned path and when the
+    #: attested path rejected before or instead of consulting the verifier.
+    attestation: Optional[EffectAttestationVerificationResult] = None
 
     @property
     def admitted(self) -> bool:
         return self.disposition is IngressDisposition.ADMITTED
+
+
+@dataclass(frozen=True)
+class AttestedEffectInput:
+    """One signed observation handed to the composition for attested admission.
+
+    ``observation_id`` is the deployment's identifier for this observation record;
+    the effect identity itself comes from the wrapped observation's
+    ``provider_trace_id`` unless ``external_effect_id`` overrides it. ``source`` and
+    ``source_version`` describe the transport, never the attester: identity, key and
+    role travel in the typed provenance the ingress attaches after verification.
+    """
+
+    observation_id: str
+    attestation: EffectAttestation
+    external_effect_id: str = ""
+    source: str = ""
+    source_version: str = ""
 
 
 @runtime_checkable
@@ -177,6 +246,7 @@ class TrustedEffectIngress:
         *,
         production_mode: bool = False,
         correlator: Optional[ExecutionCorrelator] = None,
+        attestation_verifier: Optional[EffectAttestationVerifierPort] = None,
     ) -> None:
         if authenticator is None:
             raise ValueError(
@@ -190,13 +260,33 @@ class TrustedEffectIngress:
                 "(spec §4/D-A, §19, RA-5/RA-6/RA-7 F-1 symmetry): inject a real "
                 "deployment-authenticated effect ingress"
             )
+        if attestation_verifier is not None:
+            if not isinstance(attestation_verifier, EffectAttestationVerifierPort):
+                raise ValueError(
+                    "attestation_verifier must implement EffectAttestationVerifierPort"
+                )
+            # RI-4: a production ingress may only carry a verifier that is itself in
+            # production posture. The verifier's own constructor is what refuses
+            # StaticTrustAnchorDirectory; an exact-True check here means a reference
+            # verifier can never sit behind a production ingress by omission.
+            if production_mode and getattr(attestation_verifier, "production_mode", False) is not True:
+                raise AttestationVerifierRejectedError(
+                    "production_mode=True requires an attestation verifier constructed "
+                    "with production_mode=True (RI-4); a reference-posture verifier, or "
+                    "one that does not state its posture, is refused"
+                )
         self._authenticator = authenticator
         self._production_mode = production_mode
         self._correlator = correlator or ExecutionCorrelator()
+        self._attestation_verifier = attestation_verifier
 
     @property
     def production_mode(self) -> bool:
         return self._production_mode
+
+    @property
+    def attestation_verifier(self) -> Optional[EffectAttestationVerifierPort]:
+        return self._attestation_verifier
 
     def admit(
         self,
@@ -204,7 +294,149 @@ class TrustedEffectIngress:
         *,
         correlation: ExecutionCorrelation,
     ) -> IngressDecision:
-        """Admit or reject one effect observation against a governed correlation."""
+        """Admit or reject one **unattested** effect observation (the reference-grade path).
+
+        RI-2: under ``production_mode=True`` this path rejects every observation
+        before any other check — no flag, default or fallback admits unsigned
+        evidence in production. Attested evidence enters through
+        :meth:`admit_attested`. At reference grade the behaviour is unchanged.
+        """
+
+        decision = self._admit_normalized(obs, correlation=correlation)
+        if self._production_mode is False:
+            return decision
+        # Production (or any non-False posture): the unchanged checks above still
+        # run and still reject for their own reasons, but an observation they would
+        # have admitted is refused here because it is unattested. There is no branch
+        # that admits.
+        if not decision.admitted:
+            return decision
+        return IngressDecision(
+            IngressDisposition.REJECTED, reasons=(UNATTESTED_REFUSED_IN_PRODUCTION,)
+        )
+
+    def admit_attested(
+        self,
+        attestation: EffectAttestation,
+        *,
+        correlation: ExecutionCorrelation,
+        as_of: datetime,
+        observation_id: str,
+        external_effect_id: str = "",
+        source: str = "",
+        source_version: str = "",
+        expected_role: Optional[EffectAttesterRole] = None,
+    ) -> IngressDecision:
+        """Verify a signed observation, then normalize and admit it (RI-1).
+
+        Order, fail-closed at every step:
+
+        1. ``as_of`` must be exactly an aware ``datetime`` (RI-5); anything else
+           rejects before the verifier or its resolver is touched;
+        2. exact-type admission of the attestation and the correlation;
+        3. a configured verifier is required;
+        4. the verifier checks the **exact wrapped observation**, the tenant from
+           the governed correlation, and the attester's declared role and anchor;
+           a verifier fault, a malformed result or any non-``VERIFIED`` outcome
+           rejects with the verifier's typed reason;
+        5. only then is the observation normalized from the governed correlation
+           and stamped with typed provenance;
+        6. the unchanged binding, domain and authentication checks run last.
+        """
+
+        if (
+            type(as_of) is not datetime
+            or as_of.tzinfo is None
+            or as_of.utcoffset() is None
+        ):
+            return IngressDecision(
+                IngressDisposition.REJECTED,
+                reasons=(INVALID_VERIFICATION_INSTANT, f"got {type(as_of).__name__}"),
+            )
+        if type(attestation) is not EffectAttestation:
+            return IngressDecision(
+                IngressDisposition.REJECTED,
+                reasons=(ATTESTATION_REFUSED, "not an EffectAttestation"),
+            )
+        if not isinstance(correlation, ExecutionCorrelation):
+            return IngressDecision(
+                IngressDisposition.REJECTED, reasons=("not an ExecutionCorrelation",)
+            )
+        verifier = self._attestation_verifier
+        if verifier is None:
+            return IngressDecision(
+                IngressDisposition.REJECTED, reasons=(NO_ATTESTATION_VERIFIER,)
+            )
+        role = attestation.attester_role if expected_role is None else expected_role
+        if type(role) is not EffectAttesterRole:
+            return IngressDecision(
+                IngressDisposition.REJECTED,
+                reasons=(ATTESTATION_REFUSED, "expected_role is not an EffectAttesterRole"),
+            )
+        try:
+            result = verifier.verify(
+                attestation=attestation,
+                expected_role=role,
+                expected_tenant_id=correlation.tenant_id,
+                expected_observation=attestation.observation,
+                as_of=as_of,
+            )
+        except Exception as exc:  # noqa: BLE001 - a verifier fault fails closed
+            return IngressDecision(
+                IngressDisposition.REJECTED,
+                reasons=(ATTESTATION_VERIFIER_FAULT, repr(exc)),
+            )
+        if type(result) is not EffectAttestationVerificationResult:
+            return IngressDecision(
+                IngressDisposition.REJECTED,
+                reasons=(ATTESTATION_VERIFIER_FAULT, "malformed verifier result"),
+            )
+        # VERIFIED, and only VERIFIED, passes this stage (RI-1).
+        if (
+            result.outcome is not EffectAttestationVerificationOutcome.VERIFIED
+            or result.refusal_reason is not None
+        ):
+            reason = result.refusal_reason.value if result.refusal_reason is not None else "unknown"
+            return IngressDecision(
+                IngressDisposition.REJECTED,
+                reasons=(ATTESTATION_REFUSED, reason),
+                attestation=result,
+            )
+        try:
+            normalized = normalize_execution_observation(
+                attestation.observation,
+                correlation,
+                observation_id=observation_id,
+                external_effect_id=external_effect_id,
+                source=source,
+                source_version=source_version,
+            )
+            provenance = EffectAttestationProvenance(
+                attester_role=result.attester_role,
+                attester_identity=result.attester_identity,
+                attester_key_id=result.attester_key_id,
+                observation_digest=result.observation_digest,
+                signing_payload_digest=result.signing_payload_digest or "",
+                anchor_record_digest=result.anchor_record_digest or "",
+                verified_at=as_of,
+            )
+            stamped = dataclasses.replace(normalized, provenance=provenance)
+        except Exception as exc:  # noqa: BLE001 - normalization must never admit by accident
+            return IngressDecision(
+                IngressDisposition.REJECTED,
+                reasons=("normalization failed", repr(exc)),
+                attestation=result,
+            )
+        decision = self._admit_normalized(stamped, correlation=correlation)
+        return dataclasses.replace(decision, attestation=result)
+
+    def _admit_normalized(
+        self,
+        obs: EffectObservation,
+        *,
+        correlation: ExecutionCorrelation,
+    ) -> IngressDecision:
+        """The three unchanged checks: exact type and binding, domain, authentication."""
 
         # 0. A non-observation (defensive against a malformed producer) is rejected.
         if not isinstance(obs, EffectObservation):
