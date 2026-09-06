@@ -1,5 +1,6 @@
 export { StudioLayout } from "./StudioLayout";
 export { RegistrationScreen } from "./RegistrationScreen";
+export { DataUseScreen } from "./DataUseScreen";
 export { ConstitutionScreen } from "./ConstitutionScreen";
 export { PolicyScreen } from "./PolicyScreen";
 export { AuthorityScreen } from "./AuthorityScreen";

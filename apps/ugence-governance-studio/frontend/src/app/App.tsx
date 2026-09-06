@@ -19,6 +19,7 @@ import { WhatIfScreen } from "@/features/whatif/WhatIfScreen";
 import {
   AuthorityScreen,
   ConstitutionScreen,
+  DataUseScreen,
   ObserveScreen,
   PolicyScreen,
   PublishScreen,
@@ -58,6 +59,8 @@ export function App() {
             <Route index element={<Navigate to="constitution" replace />} />
             {/* Front-door seam 5 (FD-9): typed registration intake; register is the only write. */}
             <Route path="registration" element={<RegistrationScreen />} />
+            {/* Front-door seam 8 (FD-12): typed data-use declarations; declare is the only write. */}
+            <Route path="data-use" element={<DataUseScreen />} />
             <Route path="constitution" element={<ConstitutionScreen />} />
             <Route
               path="policy"
