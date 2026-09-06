@@ -11,8 +11,10 @@ Nowhere in this repository. Two supported places:
    https://code.claude.com/docs/en/claude-code-on-the-web. The variable is present in the
    session's process environment and nothing in the repository reads it except the
    provider factory inside the boundary process.
-2. **A local run:** a `.env` file outside the repository, or copied from `.env.example`
-   and kept untracked (`.env` is git-ignored at the root).
+2. **A local run:** a file named `.env`, or any name ending in `.env` such as
+   `Ugence_research_keys1.env`, at the repository root or outside it, copied from
+   `.env.example` and kept untracked (`.env` and `*.env` are git-ignored at the root;
+   `.env.example` templates are not, so a template must never hold a value).
 
 The prepared bundle's credential scan refuses any bundle that carries a credential-shaped
 value, and the provider configuration accepts only a dotted factory path, never a key.
