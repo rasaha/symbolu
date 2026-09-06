@@ -25,7 +25,15 @@ def _sources():
 
 
 def test_the_package_version_is_the_expected_additive_minor_bump():
-    """0.4.0 -> 0.5.0: additive, backward-compatible.
+    """0.5.0 -> 0.6.0: additive, backward-compatible.
+
+    One further :class:`TrustAnchorCapability` member, ``COMPARISON_RESULT_ATTESTATION``,
+    lent to the reasoning-method result-attestation consumer under ruling SCR-1
+    (ADR_UGENCE_SIGNED_COMPARISON_RESULT_SCOPING), plus a third named consumer
+    exception. This package verifies nothing under the member. Nothing existing moved.
+
+    The 0.5.0 rationale, kept for the record:
+    0.4.0 -> 0.5.0: additive, backward-compatible.
 
     One further :class:`TrustAnchorCapability` member, ``TRUST_ANCHOR_SET_PUBLICATION``,
     three appended refusal reasons, the keyword-only ``as_of`` on the resolver port
@@ -58,8 +66,8 @@ def test_the_package_version_is_the_expected_additive_minor_bump():
     path admits it (see the disjointness tests below).
     """
 
-    assert ugence_trusted_evidence_authority.__version__ == "0.5.0"
-    assert api.__version__ == "0.5.0"
+    assert ugence_trusted_evidence_authority.__version__ == "0.6.0"
+    assert api.__version__ == "0.6.0"
 
 
 def test_no_separate_contract_version_constant_is_minted():

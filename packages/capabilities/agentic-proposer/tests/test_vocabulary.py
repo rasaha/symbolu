@@ -103,15 +103,16 @@ def test_public_api_exports_only_the_vocabulary_and_version():
     """I6. The S0 export pin, updated to the full H3 surface in the same change that
     introduced the first contract, and again to H3 **as amended by OD-7** in the same
     change set that implements it (docs/S1_CONTRACT_AND_EQUATION_SPECIFICATION.md,
-    Part H3). Fifty-one names: the thirty-nine 0.1.0 froze, none removed, plus OD-7's
-    seven at 0.2.0 and S2-B's five at 0.3.0 (`S2B-S1-Q6=A`, `S2B-R2-Q4=A`)."""
+    Part H3). Fifty-two names: the thirty-nine 0.1.0 froze, none removed, plus OD-7's
+    seven at 0.2.0, S2-B's five at 0.3.0 (`S2B-S1-Q6=A`, `S2B-R2-Q4=A`) and RM-3's one
+    at 0.5.0."""
     assert set(ap.__all__) == {
         # Contracts (8)
         "AgentIdentityRef", "CognitiveRoleContract", "WorkMandate",
         "BoundedContextEnvelope", "ToolObservation", "AdvisoryCandidateSet",
         "ProposerAdvisory", "ProposerProcessRecord",
-        # Nested public models (2)
-        "CandidateAdvisory", "ProposerProcessStateTransition",
+        # Nested public models (3) — `RM-3` added ``ReasoningMethodAdvisoryInput`` at 0.5.0
+        "CandidateAdvisory", "ProposerProcessStateTransition", "ReasoningMethodAdvisoryInput",
         # OD-7 call-boundary shapes (2) and the injected-evaluator protocol (1)
         "DomainEvaluationRequest", "DomainEvaluationResponse",
         "DomainEvaluationProvider",

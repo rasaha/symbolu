@@ -30,6 +30,14 @@ FIT_SCHEMA_VERSION = "reasoning_method.fit_assessment.v1"
 EVIDENCE_STATUS_SOURCE_V1 = "RECORD_CONSTANTS_V1"
 USAGE_SCOPE_RESEARCH_ONLY = "RESEARCH_ONLY"
 
+# Product-entry vocabulary (ADR_UGENCE_REASONING_METHOD_PRODUCT_ENTRY.md, rulings
+# RM-1..RM-3). An *advisory* may carry these two values once every qualifying method
+# is covered by a sufficient fit assessment for the advisory's own task class. A fit
+# assessment, a comparison plan and a comparison result stay RESEARCH_ONLY: they are
+# the evidence, not the thing the evidence admits.
+EVIDENCE_STATUS_COMPARISON_EVIDENCE_PRESENT = "COMPARISON_EVIDENCE_PRESENT"
+USAGE_SCOPE_ADVISORY_INPUT = "ADVISORY_INPUT"
+
 
 class FitOutcome(str, Enum):
     INSUFFICIENT_QUALITY = "INSUFFICIENT_QUALITY"
@@ -186,6 +194,8 @@ __all__ = [
     "FIT_SCHEMA_VERSION",
     "EVIDENCE_STATUS_SOURCE_V1",
     "USAGE_SCOPE_RESEARCH_ONLY",
+    "EVIDENCE_STATUS_COMPARISON_EVIDENCE_PRESENT",
+    "USAGE_SCOPE_ADVISORY_INPUT",
     "FitOutcome",
     "QualityDirection",
     "QualityResult",

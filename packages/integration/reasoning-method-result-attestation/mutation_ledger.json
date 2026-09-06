@@ -1,0 +1,349 @@
+{
+  "gates_inventoried": 38,
+  "killed": 34,
+  "survived": 4,
+  "ledger": [
+    {
+      "gate": "G-01",
+      "category": "input-admission",
+      "module": "verification.py",
+      "description": "absent signed result refuses",
+      "status": "KILLED",
+      "first_failure": "FAILED tests/test_refusals.py::test_an_absent_signed_result_is_refused_not_defaulted",
+      "classification": null
+    },
+    {
+      "gate": "G-02",
+      "category": "input-admission",
+      "module": "verification.py",
+      "description": "exact signed-result type",
+      "status": "KILLED",
+      "first_failure": "FAILED tests/test_refusals.py::test_a_duck_typed_signed_result_is_refused_before_anything_is_read",
+      "classification": null
+    },
+    {
+      "gate": "G-03",
+      "category": "contract-admission",
+      "module": "verification.py",
+      "description": "schema version pinned",
+      "status": "KILLED",
+      "first_failure": "FAILED tests/test_refusals.py::test_an_unsupported_contract_identifier_is_refused_by_name[schema_version-reasoning_method.signed_comparison_result.v0-UNSUPPORTED_SCHEMA_VERSION]",
+      "classification": null
+    },
+    {
+      "gate": "G-04",
+      "category": "contract-admission",
+      "module": "verification.py",
+      "description": "signing domain pinned",
+      "status": "KILLED",
+      "first_failure": "FAILED tests/test_refusals.py::test_an_unsupported_contract_identifier_is_refused_by_name[signing_domain-ugence.other/comparison/v1-UNSUPPORTED_SIGNING_DOMAIN]",
+      "classification": null
+    },
+    {
+      "gate": "G-05",
+      "category": "contract-admission",
+      "module": "verification.py",
+      "description": "algorithm pinned",
+      "status": "KILLED",
+      "first_failure": "FAILED tests/test_refusals.py::test_an_unsupported_contract_identifier_is_refused_by_name[signature_algorithm-RSA-PSS-UNSUPPORTED_ALGORITHM]",
+      "classification": null
+    },
+    {
+      "gate": "G-06",
+      "category": "contract-admission",
+      "module": "verification.py",
+      "description": "profile pinned",
+      "status": "KILLED",
+      "first_failure": "FAILED tests/test_refusals.py::test_an_unsupported_contract_identifier_is_refused_by_name[signature_profile-ugence.other/signature/v1-UNSUPPORTED_PROFILE]",
+      "classification": null
+    },
+    {
+      "gate": "G-07",
+      "category": "contract-admission",
+      "module": "verification.py",
+      "description": "encoding pinned",
+      "status": "KILLED",
+      "first_failure": "FAILED tests/test_refusals.py::test_an_unsupported_contract_identifier_is_refused_by_name[signature_encoding-ugence.other/encoding/base64/v1-UNSUPPORTED_ENCODING]",
+      "classification": null
+    },
+    {
+      "gate": "G-08",
+      "category": "reconciliation",
+      "module": "verification.py",
+      "description": "role must match the caller's",
+      "status": "SURVIVED",
+      "first_failure": "",
+      "classification": "UNREACHABLE_IN_THIS_SLICE: ComparisonResultAttesterRole has exactly one member, and both the wrapper and the seam admit a role by exact type, so a signed result under a role other than the caller's cannot be constructed. The gate is kept so that the independent-verifier role the ADR defers (\u00a73) is refused at the seam the moment it is added, and the classification must be removed then, when the sweep will measure it."
+    },
+    {
+      "gate": "G-09",
+      "category": "reconciliation",
+      "module": "verification.py",
+      "description": "engine identity must match the caller's",
+      "status": "KILLED",
+      "first_failure": "FAILED tests/test_engine_identity.py::test_a_result_naming_another_engine_is_signed_only_by_that_engine",
+      "classification": null
+    },
+    {
+      "gate": "G-10",
+      "category": "reconciliation",
+      "module": "verification.py",
+      "description": "result projection must match the caller's",
+      "status": "KILLED",
+      "first_failure": "FAILED tests/test_engine_identity.py::test_a_wrapped_result_altered_in_place_after_signing_refuses",
+      "classification": null
+    },
+    {
+      "gate": "G-11",
+      "category": "anchor-resolution",
+      "module": "verification.py",
+      "description": "resolution exact type",
+      "status": "KILLED",
+      "first_failure": "FAILED tests/test_refusals.py::test_a_failing_or_substituted_directory_refuses_closed[wrong-type]",
+      "classification": null
+    },
+    {
+      "gate": "G-12",
+      "category": "anchor-resolution",
+      "module": "verification.py",
+      "description": "resolution answers the asked coordinate",
+      "status": "SURVIVED",
+      "first_failure": "",
+      "classification": "EQUIVALENT_DEFENSE_IN_DEPTH: TEA's TrustAnchorResolution refuses at construction any anchor whose coordinate differs from the resolution's, and G-14 re-checks the record against the asked coordinate; a resolution answering another coordinate therefore cannot carry a record that passes G-14. Kept as the package's own check."
+    },
+    {
+      "gate": "G-13",
+      "category": "anchor-resolution",
+      "module": "verification.py",
+      "description": "anchor exact type",
+      "status": "KILLED",
+      "first_failure": "FAILED tests/test_refusals.py::test_a_failing_or_substituted_directory_refuses_closed[duck-typed-anchor]",
+      "classification": null
+    },
+    {
+      "gate": "G-14",
+      "category": "anchor-resolution",
+      "module": "verification.py",
+      "description": "record cross-checked against the coordinate",
+      "status": "KILLED",
+      "first_failure": "FAILED tests/test_refusals.py::test_a_failing_or_substituted_directory_refuses_closed[post-construction-anchor-swap]",
+      "classification": null
+    },
+    {
+      "gate": "G-15",
+      "category": "role-separation",
+      "module": "verification.py",
+      "description": "capability must be the role's",
+      "status": "SURVIVED",
+      "first_failure": "",
+      "classification": "EQUIVALENT_DEFENSE_IN_DEPTH: the coordinate is built from capability_for_role(role) and G-14 requires anchor.capability is coordinate.capability, so the role-capability comparison is already decided one line earlier. Kept so SCR-1 is stated at the seam."
+    },
+    {
+      "gate": "G-16",
+      "category": "lifecycle",
+      "module": "verification.py",
+      "description": "lifecycle refusal is applied",
+      "status": "KILLED",
+      "first_failure": "FAILED tests/test_refusals.py::test_a_revoked_anchor_refuses_revoked_even_when_also_expired",
+      "classification": null
+    },
+    {
+      "gate": "G-17",
+      "category": "lifecycle",
+      "module": "verification.py",
+      "description": "expected anchor revision is compared",
+      "status": "KILLED",
+      "first_failure": "FAILED tests/test_refusals.py::test_a_wrong_expected_anchor_revision_refuses_and_names_the_real_one",
+      "classification": null
+    },
+    {
+      "gate": "G-18",
+      "category": "key-admission",
+      "module": "verification.py",
+      "description": "a key refused at admission is a refusal, not a pass-through",
+      "status": "KILLED",
+      "first_failure": "FAILED tests/test_malformed_points.py::test_a_record_forged_around_construction_is_refused_at_key_admission[all_ff]",
+      "classification": null
+    },
+    {
+      "gate": "G-19",
+      "category": "payload",
+      "module": "verification.py",
+      "description": "recomputed payload must equal the claimed bytes",
+      "status": "SURVIVED",
+      "first_failure": "",
+      "classification": "EQUIVALENT_DEFENSE_IN_DEPTH: G-10 has already required the caller's canonical projection to equal the wrapper's, the payload is recomputed from the same pinned fields, and canonicalization is deterministic; the recomputed frame can differ from signed_bytes() only under a SHA-256 collision, and G-20 still verifies over the recomputed frame, never the claimed one. Kept as the byte-for-byte statement of SCR-1."
+    },
+    {
+      "gate": "G-20",
+      "category": "signature",
+      "module": "verification.py",
+      "description": "the signature must verify",
+      "status": "KILLED",
+      "first_failure": "FAILED tests/test_malformed_points.py::test_a_genuine_key_passes_the_point_check_and_a_forgery_still_fails_under_it",
+      "classification": null
+    },
+    {
+      "gate": "G-21",
+      "category": "role-separation",
+      "module": "roles.py",
+      "description": "the engine role maps to the lent comparison-result capability",
+      "status": "KILLED",
+      "first_failure": "ERROR tests/packaging/test_packaging.py",
+      "classification": null
+    },
+    {
+      "gate": "G-22",
+      "category": "production-posture",
+      "module": "trust.py",
+      "description": "reference resolver refused in production",
+      "status": "KILLED",
+      "first_failure": "FAILED tests/test_production_posture.py::test_the_static_directory_is_refused_in_production_by_class",
+      "classification": null
+    },
+    {
+      "gate": "G-23",
+      "category": "production-posture",
+      "module": "signing.py",
+      "description": "reference signer refused in production",
+      "status": "KILLED",
+      "first_failure": "FAILED tests/test_signer_boundary.py::test_production_signing_refuses_the_reference_signer_and_every_subclass_of_it",
+      "classification": null
+    },
+    {
+      "gate": "G-24",
+      "category": "frame",
+      "module": "canonical.py",
+      "description": "the domain length prefix",
+      "status": "KILLED",
+      "first_failure": "FAILED tests/test_deterministic_digest.py::test_happy_the_pinned_vectors_reproduce_exactly",
+      "classification": null
+    },
+    {
+      "gate": "G-25",
+      "category": "frame",
+      "module": "canonical.py",
+      "description": "sorted keys in the canonical form",
+      "status": "KILLED",
+      "first_failure": "FAILED tests/test_deterministic_digest.py::test_mapping_insertion_order_never_moves_the_canonical_bytes",
+      "classification": null
+    },
+    {
+      "gate": "G-26",
+      "category": "canonical",
+      "module": "canonical.py",
+      "description": "non-NFC text refused",
+      "status": "KILLED",
+      "first_failure": "FAILED tests/test_deterministic_digest.py::test_non_nfc_text_and_str_subclasses_are_refused_not_normalized",
+      "classification": null
+    },
+    {
+      "gate": "G-27",
+      "category": "canonical",
+      "module": "canonical.py",
+      "description": "str subclasses refused",
+      "status": "KILLED",
+      "first_failure": "FAILED tests/test_deterministic_digest.py::test_str_subclasses_are_refused_at_every_identifier_seam_not_only_in_the_projection",
+      "classification": null
+    },
+    {
+      "gate": "G-28",
+      "category": "no-factual-claim",
+      "module": "verification.py",
+      "description": "factual correctness never established",
+      "status": "KILLED",
+      "first_failure": "FAILED tests/test_happy_path.py::test_happy_a_genuine_signed_result_verifies_under_the_engine_role_and_binds_every_fact",
+      "classification": null
+    },
+    {
+      "gate": "G-29",
+      "category": "input-admission",
+      "module": "verification.py",
+      "description": "aware instant required at the seam",
+      "status": "KILLED",
+      "first_failure": "FAILED tests/test_refusals.py::test_a_naive_as_of_is_a_caller_contract_violation_and_the_directory_is_never_asked",
+      "classification": null
+    },
+    {
+      "gate": "G-31",
+      "category": "trust-state",
+      "module": "verification.py",
+      "description": "the trust-anchor-set reasons keep their identity",
+      "status": "KILLED",
+      "first_failure": "FAILED tests/test_trust_state_refusals.py::test_stale_unavailable_unknown_and_resolver_fault_are_four_distinct_reasons",
+      "classification": null
+    },
+    {
+      "gate": "G-32",
+      "category": "trust-state",
+      "module": "trust.py",
+      "description": "stale and unavailable map to different reasons",
+      "status": "KILLED",
+      "first_failure": "FAILED tests/packaging/test_packaging.py::test_the_public_api_manifest_equals_the_live_package_surface",
+      "classification": null
+    },
+    {
+      "gate": "G-33",
+      "category": "production-posture",
+      "module": "verification.py",
+      "description": "a non-serving resolver is refused before consultation",
+      "status": "KILLED",
+      "first_failure": "FAILED tests/test_trust_state_refusals.py::test_a_resolver_whose_snapshot_failed_to_load_is_admitted_and_refuses_everything",
+      "classification": null
+    },
+    {
+      "gate": "G-34",
+      "category": "production-posture",
+      "module": "trust.py",
+      "description": "a resolver must declare the production contract",
+      "status": "KILLED",
+      "first_failure": "FAILED tests/test_production_posture.py::test_a_resolver_without_a_production_claim_is_refused_in_production",
+      "classification": null
+    },
+    {
+      "gate": "G-35",
+      "category": "production-posture",
+      "module": "trust.py",
+      "description": "the declaration must be an exact bool",
+      "status": "KILLED",
+      "first_failure": "FAILED tests/test_trust_state_refusals.py::test_a_resolver_declaring_no_posture_is_still_refused_at_composition",
+      "classification": null
+    },
+    {
+      "gate": "G-36",
+      "category": "production-posture",
+      "module": "trust.py",
+      "description": "serving requires exactly True",
+      "status": "KILLED",
+      "first_failure": "FAILED tests/test_trust_state_refusals.py::test_a_resolver_whose_snapshot_failed_to_load_is_admitted_and_refuses_everything",
+      "classification": null
+    },
+    {
+      "gate": "G-30",
+      "category": "result-shape",
+      "module": "verification.py",
+      "description": "VERIFIED must bind the anchor revision",
+      "status": "KILLED",
+      "first_failure": "FAILED tests/test_no_factual_claim.py::test_a_verified_result_cannot_be_constructed_without_the_anchor_revision_it_trusted",
+      "classification": null
+    },
+    {
+      "gate": "G-37",
+      "category": "wrapper",
+      "module": "attestation.py",
+      "description": "the wrapped result's self-digest is recomputed and compared",
+      "status": "KILLED",
+      "first_failure": "FAILED tests/test_engine_identity.py::test_a_wrapped_result_whose_self_digest_was_altered_is_refused_at_every_read",
+      "classification": null
+    },
+    {
+      "gate": "G-38",
+      "category": "wrapper",
+      "module": "attestation.py",
+      "description": "the engine role binds the signer identity to the result's engine",
+      "status": "KILLED",
+      "first_failure": "FAILED tests/test_engine_identity.py::test_a_signer_whose_identity_is_not_the_results_engine_cannot_sign_it_as_the_engine",
+      "classification": null
+    }
+  ]
+}

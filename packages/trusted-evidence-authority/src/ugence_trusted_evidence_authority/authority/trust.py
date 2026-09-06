@@ -210,6 +210,16 @@ class TrustAnchorCapability(str, Enum):
     #: Cloud Scaling or effect-attestation entitlement, and none of those
     #: capabilities may authenticate a set.
     TRUST_ANCHOR_SET_PUBLICATION = "TRUST_ANCHOR_SET_PUBLICATION"
+    #: The anchor's key signs a **reasoning-method comparison result as the
+    #: comparison engine** that produced it. Lent to
+    #: ``ugence-reasoning-method-result-attestation`` under ruling SCR-1
+    #: (ADR_UGENCE_SIGNED_COMPARISON_RESULT_SCOPING). A verified signature under
+    #: this capability proves **which engine produced** the result under which
+    #: key; it does not prove the comparison is correct. This package defines the
+    #: coordinate and **verifies nothing** under it, and holding it confers no
+    #: evidence production, receipt issuance, Cloud Scaling, effect-attestation
+    #: or set-publication entitlement.
+    COMPARISON_RESULT_ATTESTATION = "COMPARISON_RESULT_ATTESTATION"
 
 
 @dataclass(frozen=True)

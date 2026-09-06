@@ -769,14 +769,15 @@ def test_no_class_outside_the_pinned_set_is_used():
 
 
 def test_the_contract_set_is_pinned_exactly():
-    """Eight canonical contracts plus the two subordinate nested public shapes."""
+    """Eight canonical contracts plus the three subordinate nested public shapes
+    (`RM-3` added ``ReasoningMethodAdvisoryInput`` at 0.5.0)."""
     assert spec.TOP_LEVEL_CONTRACTS == (
         "AgentIdentityRef", "CognitiveRoleContract", "WorkMandate",
         "BoundedContextEnvelope", "ToolObservation", "AdvisoryCandidateSet",
         "ProposerAdvisory", "ProposerProcessRecord")
     assert len(spec.TOP_LEVEL_CONTRACTS) == 8
     assert spec.NESTED_PUBLIC_SHAPES == (
-        "CandidateAdvisory", "ProposerProcessStateTransition")
+        "CandidateAdvisory", "ProposerProcessStateTransition", "ReasoningMethodAdvisoryInput")
     assert set(FIELD_CLASSIFICATION) == set(
         spec.TOP_LEVEL_CONTRACTS) | set(spec.NESTED_PUBLIC_SHAPES)
 
@@ -1156,10 +1157,10 @@ def test_every_registered_category_is_covered_by_one_sweep_or_the_other():
     """The denominator, asserted. No registered class may fall between the two sweeps.
 
     For a patterned entry, the candidate reclassifications are the other eight registered
-    classes plus the unregistered sentinel — **nine**, and 61 x 9 = 549. Seven of the
+    classes plus the unregistered sentinel — **nine**, and 66 x 9 = 594. Seven of the
     eight registered ones are weakenings and, with the sentinel, make the sweep above's
-    61 x 8 = 488; the ninth candidate, the sibling patterned class, is a narrowing and
-    makes the sibling test's 61. 488 + 61 = 549, so nothing is unexplained.
+    66 x 8 = 528; the ninth candidate, the sibling patterned class, is a narrowing and
+    makes the sibling test's 66. 528 + 66 = 594, so nothing is unexplained.
 
     The entry count moved from 47 to 55 with OD-7 part 5's eight new C5b fields — four
     on ``AdvisoryCandidateSet`` and their four mirrors on ``ProposerAdvisory`` — and
@@ -1168,7 +1169,12 @@ def test_every_registered_category_is_covered_by_one_sweep_or_the_other():
     ``ProposerAdvisory.strategy_policy_id``/``_version`` (C5b, the stamped pair) — and
     from 58 to **61** with the `OD-C1=B` amendment's three (`ACC-AM-1`/`ACC-AM-2`):
     ``CognitiveRoleContract.constitution_ref`` (C5a, the constitution reference) and
-    ``ProposerAdvisory.constitution_policy_id``/``_version`` (C5b, the stamped pair). The
+    ``ProposerAdvisory.constitution_policy_id``/``_version`` (C5b, the stamped pair) — and
+    from 61 to **66** with `RM-3`'s five patterned fields on the nested
+    ``ReasoningMethodAdvisoryInput`` (0.5.0): ``reasoning_advisory_ref`` (C5a) and
+    ``rule_set_id``, ``rule_set_version``, ``qualifying_method_ids``,
+    ``primary_method_id`` (C5b). Its digest fields and its two ``Literal`` fields are
+    OTHER_PATTERN and CLOSED and add nothing here. The
     advisory's ``declared_strategy`` adds no entry here: it is CLOSED, so it is
     validated by membership and falls outside the patterned sweeps by construction.
     Self-reclassification is the tenth candidate and is not a mutation, so it stands
@@ -1183,7 +1189,7 @@ def test_every_registered_category_is_covered_by_one_sweep_or_the_other():
             f"{sorted(narrowings)}")
     entries = len(C5A_ENTRIES + C5B_ENTRIES)
     applicable = entries * len(WEAKENING_CATEGORIES)
-    assert applicable == 61 * 8 == 488, (
+    assert applicable == 66 * 8 == 528, (
         f"the weakening sweep's applicable count changed to {applicable}; if that is "
         "intended, update the count recorded in the enforcement documentation")
     # The denominator itself, so the two sweeps are shown to exhaust it rather than
@@ -1192,7 +1198,7 @@ def test_every_registered_category_is_covered_by_one_sweep_or_the_other():
     # not a mutation and is not among them.
     candidates_per_entry = (len(CLASSES) - 1) + 1
     narrowing_cases = entries * 1
-    assert applicable + narrowing_cases == entries * candidates_per_entry == 549, (
+    assert applicable + narrowing_cases == entries * candidates_per_entry == 594, (
         f"{applicable} weakening cases + {narrowing_cases} narrowing cases do not "
         f"exhaust the {entries} x {candidates_per_entry} candidate reclassifications")
 

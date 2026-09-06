@@ -105,7 +105,8 @@ def test_every_h3_category_is_present_in_the_snapshot():
     contracts = {"AgentIdentityRef", "CognitiveRoleContract", "WorkMandate",
                 "BoundedContextEnvelope", "ToolObservation", "AdvisoryCandidateSet",
                 "ProposerAdvisory", "ProposerProcessRecord"}
-    nested = {"CandidateAdvisory", "ProposerProcessStateTransition"}
+    nested = {"CandidateAdvisory", "ProposerProcessStateTransition",
+              "ReasoningMethodAdvisoryInput"}  # RM-3, 0.5.0
     # OD-7's two call-boundary shapes, and S2-B's two, are pydantic models and appear
     # as such; none is a contract, which is why they are named separately here rather
     # than folded in. Neither pair carries a C2 common field, has an identity role, or
@@ -132,8 +133,11 @@ def test_every_h3_category_is_present_in_the_snapshot():
                          "ADVISORY_IDENTITY_SET_PATHS", "ADVISORY_IDENTITY_NFC_PATHS"}
 
 
-def test_the_snapshot_carries_exactly_the_fifty_one_authorized_names():
-    """S2-B's public-API consequence, executed (`S2B-S1-Q6=A` with `S2B-R2-Q4=A`).
+def test_the_snapshot_carries_exactly_the_fifty_two_authorized_names():
+    """S2-B's public-API consequence, executed (`S2B-S1-Q6=A` with `S2B-R2-Q4=A`),
+    plus `RM-3`'s **one** name at ``0.5.0`` (``ReasoningMethodAdvisoryInput``), the
+    nested typed-input shape; no removals, no renames, so the residue below it is the
+    fifty-one that came before.
 
     Thirty-nine names were frozen at ``0.1.0``; OD-7 authorized seven more at
     ``0.2.0``; S2-B authorizes **exactly five** at ``0.3.0`` — the strategy vocabulary,
@@ -144,8 +148,11 @@ def test_the_snapshot_carries_exactly_the_fifty_one_authorized_names():
     fifty-one, and the amendment moves field lists only.
     """
     documented = json.loads(_PUBLIC_API_JSON.read_text())
-    assert documented["package_version"] == "0.4.0"
-    assert len(documented["symbols"]) == 51
+    assert documented["package_version"] == "0.6.0"
+    assert len(documented["symbols"]) == 52
+    rm3_added = {"ReasoningMethodAdvisoryInput"}
+    assert rm3_added <= set(documented["symbols"])
+    assert len(set(documented["symbols"]) - rm3_added) == 51
     od7_added = {"DomainEvaluationOutcome", "DomainEvaluationProvider",
                  "DomainEvaluationRequest", "DomainEvaluationResponse",
                  "DomainEvaluationProviderError", "verify_domain_evaluation",
@@ -156,8 +163,8 @@ def test_the_snapshot_carries_exactly_the_fifty_one_authorized_names():
     assert len(s2b_added) == 5, "S2-B authorizes exactly five names, and no more"
     assert od7_added <= set(documented["symbols"])
     assert s2b_added <= set(documented["symbols"])
-    assert len(set(documented["symbols"]) - s2b_added) == 46
-    assert len(set(documented["symbols"]) - s2b_added - od7_added) == 39
+    assert len(set(documented["symbols"]) - rm3_added - s2b_added) == 46
+    assert len(set(documented["symbols"]) - rm3_added - s2b_added - od7_added) == 39
 
 
 def test_the_recorded_version_symbol_agrees_with_the_package_version():

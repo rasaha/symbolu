@@ -51,7 +51,7 @@ import sys
 from datetime import datetime, timezone
 import ugence_agentic_proposer as ap
 
-assert ap.__version__ == "0.4.0", ap.__version__
+assert ap.__version__ == "0.6.0", ap.__version__
 assert "site-packages" in ap.__file__, ap.__file__
 assert not any("/symbolu" in p for p in sys.path), sys.path
 
@@ -73,16 +73,17 @@ assert "INDETERMINATE" in reserved
 assert ap.SemanticAuditorFindingStatus.INDETERMINATE.value == "INDETERMINATE"
 
 # The public surface is exactly the full H3 surface as amended by OD-7 and by S2-B
-# (I6, I8): 8 contracts, 2 nested public shapes, 4 call-boundary shapes, 2 injected
-# protocols, 12 enums, 5 builders, 2 equation functions, 2 identity functions,
-# 6 verifiers, 3 exceptions, 4 constants, __version__ = 51 names. The thirty-nine
-# 0.1.0 froze are all still here; neither 0.2.0 nor 0.3.0 removes any of them
-# (`S2B-S1-Q6=A`: no removals, no renames).
+# (I6, I8) and by RM-3: 8 contracts, 3 nested public shapes, 4 call-boundary shapes,
+# 2 injected protocols, 12 enums, 5 builders, 2 equation functions, 2 identity
+# functions, 6 verifiers, 3 exceptions, 4 constants, __version__ = 52 names. The
+# thirty-nine 0.1.0 froze are all still here; no release removes any of them
+# (`S2B-S1-Q6=A`: no removals, no renames; RM-3 adds exactly one at 0.5.0; SCR-1 adds
+# none at 0.6.0 — one optional field on the nested input shape only).
 EXPECTED_SURFACE = {
     "AgentIdentityRef", "CognitiveRoleContract", "WorkMandate",
     "BoundedContextEnvelope", "ToolObservation", "AdvisoryCandidateSet",
     "ProposerAdvisory", "ProposerProcessRecord",
-    "CandidateAdvisory", "ProposerProcessStateTransition",
+    "CandidateAdvisory", "ProposerProcessStateTransition", "ReasoningMethodAdvisoryInput",
     "DomainEvaluationRequest", "DomainEvaluationResponse", "DomainEvaluationProvider",
     "StrategyPolicyRequest", "StrategyPolicyResponse", "StrategyPolicyResolver",
     "TerminalOutcome", "CandidateDisposition", "SemanticAuditorFindingStatus",
@@ -104,7 +105,7 @@ EXPECTED_SURFACE = {
     "__version__",
 }
 assert set(ap.__all__) == EXPECTED_SURFACE, ap.__all__
-assert len(EXPECTED_SURFACE) == 51
+assert len(EXPECTED_SURFACE) == 52
 assert not any(n.startswith(("Proposal", "Recommendation")) for n in ap.__all__)
 
 # --- a complete advisory, built end to end through the installed ugence-jcs wheel ---

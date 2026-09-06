@@ -1,8 +1,10 @@
 """Curated public API of ugence-reasoning-method-governance (slice 1)."""
 
 from .contracts.assessment import (
+    EVIDENCE_STATUS_COMPARISON_EVIDENCE_PRESENT,
     EVIDENCE_STATUS_SOURCE_V1,
     FIT_SCHEMA_VERSION,
+    USAGE_SCOPE_ADVISORY_INPUT,
     USAGE_SCOPE_RESEARCH_ONLY,
     DominationRecord,
     FitOutcome,
@@ -102,7 +104,8 @@ __all__ = [
     "CountBasis", "UsageAvailabilityToken", "TokenUsageSnapshot", "ExecutionTelemetry", "BindingRef",
     "ReasoningMethodExecutionRecord",
     # assessment
-    "FIT_SCHEMA_VERSION", "EVIDENCE_STATUS_SOURCE_V1", "USAGE_SCOPE_RESEARCH_ONLY", "FitOutcome",
+    "FIT_SCHEMA_VERSION", "EVIDENCE_STATUS_SOURCE_V1", "USAGE_SCOPE_RESEARCH_ONLY",
+    "EVIDENCE_STATUS_COMPARISON_EVIDENCE_PRESENT", "USAGE_SCOPE_ADVISORY_INPUT", "FitOutcome",
     "QualityDirection", "QualityResult", "ResourceDelta", "DominationRecord", "ReasoningMethodFitAssessment",
     # envelopes
     "ATTESTATION_ENVELOPE_SCHEMA_VERSION", "VERIFICATION_ENVELOPE_SCHEMA_VERSION", "AttestationEnvelope",

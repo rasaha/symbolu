@@ -16,6 +16,7 @@ from .contracts import (
     DomainEvaluationProvider,
     ProposerAdvisory,
     ProposerProcessRecord,
+    ReasoningMethodAdvisoryInput,
 )
 from .equations import evaluate_eligibility
 from .verification import (
@@ -206,6 +207,7 @@ def build_proposer_process_record(
     terminal_outcome: TerminalOutcome,
     started_at,
     completed_at,
+    reasoning_method_advisory_input: "ReasoningMethodAdvisoryInput | None" = None,
 ) -> ProposerProcessRecord:
     """H1, as amended by S2-B rider `R1` (`S2B-S1-Q5=A`, `S2B-S1-Q10=A`). Enforces
     R-2, R-3 and R-4 through the model's own validators.
@@ -261,6 +263,8 @@ def build_proposer_process_record(
         "candidate_ids": list(candidate_ids),
         "selected_candidate_id": selected_candidate_id,
         "semantic_audit_refs": [],
+        # `RM-3`: an admitted reasoning-method advisory, as typed input, or none.
+        "reasoning_method_advisory_input": reasoning_method_advisory_input,
         "terminal_outcome": terminal_outcome,
         "reason_codes": [],
         # Rider `R1`: derived from the advisory this record is about. Still a foreign

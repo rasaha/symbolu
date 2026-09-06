@@ -45,6 +45,7 @@ env:
     packages/uvi-policy-contracts
     packages/capabilities/reasoning-method-governance
     packages/capabilities/reasoning-method-advisor
+    packages/capabilities/agentic-proposer
 
 jobs:
   reasoning-method-advisor:
