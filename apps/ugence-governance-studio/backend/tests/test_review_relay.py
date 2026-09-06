@@ -2,7 +2,7 @@
 
 What these assert is that the studio DISPLAYS and TRANSMITS and does nothing else: the
 decision body reaches the review service byte-for-byte as the studio received it, the
-studio's review client cannot reach anything but the five audited routes, an
+studio's review client cannot reach anything but the six audited routes, an
 unreachable review service is a gap and never an empty queue, and a HOLD is never
 presented as awaiting a human (HR-5). The review service is stood in for by a real
 local HTTP server, because the property under test is what goes over the wire.
@@ -215,9 +215,10 @@ def test_an_empty_queue_is_reported_as_reachable_and_empty(relay_client):
 # --------------------------------------------------------------------------- #
 # the outbound edge
 # --------------------------------------------------------------------------- #
-def test_the_review_client_reaches_exactly_the_five_audited_routes():
-    assert len(REVIEW_ALLOWED_ROUTES) == 5
-    assert [m for m, _p in REVIEW_ALLOWED_ROUTES].count("POST") == 1
+def test_the_review_client_reaches_exactly_the_six_audited_routes():
+    assert len(REVIEW_ALLOWED_ROUTES) == 6
+    assert [m for m, _p in REVIEW_ALLOWED_ROUTES].count("POST") == 2
+    assert REVIEW_ALLOWED_ROUTES[-1] == ("POST", "/review/runs")
     for _method, path in REVIEW_ALLOWED_ROUTES:
         assert not any(v in path.lower() for v in PROHIBITED), path
 

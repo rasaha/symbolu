@@ -31,7 +31,8 @@ In one process, in this order (`composition.py`):
 | runtime host and adapter | `DbosRuntimeHost`, `DbosExecutionAdapter` | the workload's definitions and providers |
 | reads and linkage | `DbosRunReader`, `LinkageAppender` | the above |
 | identity | `JwtApproverIdentityAdapter` from issuer, audience, JWKS URL and claim names | configuration (AI-C) |
-| the service | `ReviewService(..., tenant_mode=SINGLE_TENANT, production=<mode>)` and `build_app` | the above |
+| the start relay | `ShadowRunStarter` over the adapter, `wf-shadow`, `UGENCE_REVIEW_DEFINITION_DIGEST` (front-door seam 6, FD-10) | the above |
+| the service | `ReviewService(..., tenant_mode=SINGLE_TENANT, production=<mode>, starter=<the starter>)` and `build_app` | the above |
 
 One injected clock (`WorkerClock`: `epoch()` for the engine, `datetime()` for every store
 and the service) is shared by everything. `Worker.close()` unwinds it in reverse.

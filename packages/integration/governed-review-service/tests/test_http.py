@@ -1,4 +1,4 @@
-"""The five routes, through Starlette's test client, over the service core."""
+"""The six routes, through Starlette's test client, over the service core."""
 
 from __future__ import annotations
 
@@ -139,3 +139,52 @@ def test_the_queue_view_renders_a_directory_projection_that_is_not_an_approver_r
         "approver_id": Projection.approver_id, "approver_kind": "HUMAN",
         "role": S.F.ROLE, "authority_reference": Projection.authority_reference}]
     assert queue_entry_view(replace(entry, eligible_approvers=()))["eligible_approvers"] == []
+
+
+# --------------------------------------------------------------------------- #
+# the sixth route (front-door seam 6, FD-10)
+# --------------------------------------------------------------------------- #
+def test_the_start_route_without_a_composed_starter_is_the_typed_unconfigured_refusal(client):
+    c, _aid, adapter = client
+    r = c.post("/review/runs", json={})
+    assert r.status_code == 409
+    body = r.json()
+    assert body["result"] == "REFUSED_UNCONFIGURED" and body["started"] is False
+    assert body["mode"] == "shadow" and body["instance_id"] == ""
+    assert body["maturity"] == "REFERENCE_GRADE_SHADOW_ONLY"
+    assert adapter.signals == [] and adapter.resumes == []
+
+
+def test_the_start_route_refuses_any_mode_but_shadow_before_the_starter(tmp_path):
+    clock, ledger = F.Clock(), F.sqlite_ledger(tmp_path)
+    starter = S.RecordingStarter()
+    svc = S.service(ledger, clock, starter=starter)
+    with TestClient(build_app(svc)) as c:
+        for mode in ("live", "LIVE", "dry_run", "simulation", ""):
+            r = c.post("/review/runs", json={"mode": mode})
+            assert r.status_code == 409 and r.json()["result"] == "REFUSED_MODE", mode
+        assert starter.calls == [], "nothing reached the starter"
+        ok = c.post("/review/runs", json={"mode": "shadow", "correlation_id": "c-1"})
+        assert ok.status_code == 200 and ok.json()["result"] == "STARTED"
+        same = c.post("/review/runs", json={"correlation_id": "c-1"})
+        assert same.json()["result"] == "REPLAYED" and same.json()["instance_id"] == ok.json()["instance_id"]
+        assert starter.calls == ["c-1", "c-1"]
+
+
+def test_the_start_route_takes_no_definition_provider_mode_word_or_digest(tmp_path):
+    clock, ledger = F.Clock(), F.sqlite_ledger(tmp_path)
+    starter = S.RecordingStarter()
+    svc = S.service(ledger, clock, starter=starter)
+    with TestClient(build_app(svc)) as c:
+        for extra in ({"workflow": {}}, {"workflow_id": "wf"}, {"tasks": []}, {"provider_id": "p"},
+                      {"definition_digest": "d"}, {"execution_mode": "LIVE"}, {"inputs": {}},
+                      {"instance_id": "chosen"}, {"tenant_id": "other"}):
+            r = c.post("/review/runs", json={"correlation_id": "c", **extra})
+            assert r.status_code == 422, extra
+            assert "FD-10.3" in r.json()["detail"]
+        assert c.post("/review/runs", json={"correlation_id": "has space"}).status_code == 422
+        assert c.post("/review/runs", json={"correlation_id": 7}).status_code == 422
+        assert c.post("/review/runs", json=[1]).status_code == 422
+        assert c.post("/review/runs", content=b"not json",
+                      headers={"Content-Type": "application/json"}).status_code == 422
+        assert starter.calls == []

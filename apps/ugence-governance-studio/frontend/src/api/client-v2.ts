@@ -21,6 +21,7 @@ import {
   type PublishShadowBody,
   type RegistryRegisterBody,
   type ReviewDecisionBody,
+  type ReviewStartShadowRunBody,
   type SimulateRunBody,
   type V2Envelope,
 } from "./types-v2";
@@ -49,6 +50,9 @@ export const V2_OPERATIONS = [
   // only write, and it records what an administrator asserted, conferring nothing.
   "v2_registry_register",
   "v2_registry_list",
+  // Front-door seam 6 (FD-10.1 START_IS_A_RELAY): ask the governed runtime worker to
+  // start the worker's own shadow run. Nothing of the studio's crosses (FD-10.3).
+  "v2_review_start_shadow_run",
 ] as const;
 
 async function v2Request<T>(pathAndQuery: string, init?: RequestInit): Promise<T> {
@@ -186,6 +190,17 @@ export const submitReviewDecision = (body: ReviewDecisionBody, proof = "") => {
   }
   return gap("/api/v2/review/decisions", init);
 };
+
+/**
+ * Front-door seam 6 (FD-10): ask the worker to start the worker's own shadow run.
+ *
+ * The body is the operator's correlation id or nothing. There is no parameter for a
+ * workflow, task, provider, mode or digest: the worker holds the definition, the backend
+ * pins the mode word `shadow`, and the worker refuses any other (FD-10.3). No proof
+ * header travels here (ID-1). The answer is the worker's typed outcome, unchanged.
+ */
+export const startWorkerShadowRun = (body: ReviewStartShadowRunBody) =>
+  gap("/api/v2/review/runs", postJson(body));
 
 // -- 8 · Registration (front-door seam 5, FD-9) ------------------------------
 /**

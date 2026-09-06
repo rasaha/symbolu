@@ -57,12 +57,13 @@ describe("SD-2 — no screen can reach an authority act", () => {
     expect(detectAuthorityActs(poisoned, manifest.prohibited_verbs).length).toBeGreaterThan(0);
   });
 
-  it("the v2 client consumes exactly the nineteen approved operations", () => {
-    // seventeen since GAS-7 HR-D, plus the two registry operations of front-door seam 5 (FD-9.4)
+  it("the v2 client consumes exactly the twenty approved operations", () => {
+    // seventeen since GAS-7 HR-D, plus the two registry operations of front-door seam 5
+    // (FD-9.4), plus the one worker shadow-run relay of seam 6 (FD-10.4)
     const { consumed, unmatched } = detectV2Consumption(clientText, spec);
     expect(unmatched).toEqual([]);
     expect([...consumed].sort()).toEqual([...manifest.approved_operation_ids].sort());
-    expect(consumed.size).toBe(19);
+    expect(consumed.size).toBe(20);
     expect([...V2_OPERATIONS].sort()).toEqual([...manifest.approved_operation_ids].sort());
   });
 
@@ -79,10 +80,10 @@ describe("SD-2 — no screen can reach an authority act", () => {
     }
   });
 
-  it("the review-service routes the studio can reach are four reads and one relay (HR-1)", () => {
+  it("the review-service routes the studio can reach are four reads and two relays (HR-1, FD-10)", () => {
     const routes: string[] = manifest.review_service_routes_reachable_from_the_studio;
-    expect(routes).toHaveLength(5);
-    expect(routes.filter((r) => r.startsWith("POST "))).toEqual(["POST /review/decisions"]);
+    expect(routes).toHaveLength(6);
+    expect(routes.filter((r) => r.startsWith("POST "))).toEqual(["POST /review/decisions", "POST /review/runs"]);
     for (const route of routes) {
       for (const verb of [...CONSOLE_PROHIBITED, "resume", "signal", "release", "continue"]) {
         expect(route.toLowerCase()).not.toContain(verb);

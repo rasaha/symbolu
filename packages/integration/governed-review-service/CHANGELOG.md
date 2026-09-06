@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.5.0 — 2026-09-06 — front-door seam 6 (FD-10)
+
+Contract `governed_review_service.v5`: the same five routes plus one start relay.
+
+- `POST /review/runs` (`review_start_shadow_run`): asks the composition root's
+  `ShadowRunStarter` for the deployment's own shadow run. The body carries at most a
+  typed `correlation_id` and the word `mode: "shadow"`; any other key is 422, so no
+  workflow, task, provider, mode or digest crosses (FD-10.3). Any other mode is the
+  typed `REFUSED_MODE`; no composed starter is `REFUSED_UNCONFIGURED`; the starter
+  reports `STARTED`, `REPLAYED` (the adapter's idempotency rule), `REFUSED_DEFINITION`
+  or `REFUSED_CONFLICT`. Refusals answer 409 with the typed outcome.
+- `ReviewService(starter=...)`, `start_shadow_run`, `StartOutcome`, `StartResult`,
+  `ShadowRunStarter`, `start_view`. The service still holds no definition, provider or
+  adapter `start` of its own: signal and resume remain the only adapter calls here.
+
 ## 0.4.0 — 2026-09-05 — AI-D (approver-identity ruling ID-2)
 
 Contract `governed_review_service.v4`: the same five routes; the approval view and the

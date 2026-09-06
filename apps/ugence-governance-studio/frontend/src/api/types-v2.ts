@@ -49,6 +49,7 @@ export type PolicyCompileBody = Body<"v2_policy_compile">;
 export type SimulateRunBody = Body<"v2_simulate_run">;
 export type PublishShadowBody = Body<"v2_publish_shadow">;
 export type ReviewDecisionBody = Body<"v2_review_submit_decision">;
+export type ReviewStartShadowRunBody = Body<"v2_review_start_shadow_run">;
 export type RegistryRegisterBody = Body<"v2_registry_register">;
 
 // -- the gap contract -------------------------------------------------------

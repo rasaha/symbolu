@@ -159,8 +159,27 @@ once (v2-A1, `openapi_v2.amendments.json`) by `v2_registry_register` and
 `v2_registry_list`, the generated client regenerated, the P3E freeze carrying the
 new digest; `register` is the only write; the composition record supersedes the
 seam-3 record (`composition-record.seam-3.json`, unchanged); §10.4's failure matrix
-is tests. The next seam (the governed hook in the worker-relay shape, or the console
-once FD-8.3 is complete) waits on its own ruling under FD-1.
+is tests. **Seam 6 shipped** (`governance-studio-deployment` 0.7.0, FD-10, with
+`governed-review-service` 0.5.0 and `governed-runtime-worker` 0.2.0): the worker's
+sixth route `POST /review/runs` (`review_start_shadow_run`) asks a `ShadowRunStarter`
+the worker composes to start the worker's own `wf-shadow` under the worker's own
+definition digest, minting the instance id from the caller's typed correlation id and
+running the first bounded quantum so the run parks on ESCALATE in the existing queue;
+the adapter's `DefinitionVersionMismatch` and `InstanceIdentityError` are the typed
+`REFUSED_DEFINITION` and `REFUSED_CONFLICT`, a retried start is `REPLAYED`, any mode
+word but `shadow` is `REFUSED_MODE`, and any other body key is refused with 422 so no
+workflow, task, provider, mode or digest crosses (FD-10.3). The studio's review client
+is six routes (four reads, two relays), `StartRunService` relays the typed request and
+returns the worker's answer unchanged, the v2 contract is amended once more (v2-A2,
+`v2_review_start_shadow_run`) with its generated client and the frontend manifest, the
+Simulate screen shows the seam-3 in-process run and the worker relay as two labelled
+paths (FD-10.5), the P3E egress record and its freeze test name six routes over the one
+existing destination, CR-2 and HR-1 are amended in their ADRs, and §11.3's matrix is
+tests in the worker, the studio backend and the profile. No configuration value, image
+package, credential or second egress destination was added; the composition record
+supersedes the seam-5 record (`composition-record.seam-5.json`, unchanged). The next
+seam (the console once FD-8.3 is complete, or a durable Decision Authority store as a
+package decision) waits on its own ruling under FD-1.
 
 The shape every seam follows: the CR-2 shape (one configuration value, one freeze-test amendment, its own failure tests and
 maturity statement, one PR), preserving `REFERENCE_GRADE_SHADOW_ONLY`, the frozen
@@ -638,7 +657,7 @@ worker image's own gate set unchanged.
 
 **What the ruling authorizes.** Documentation only. No seam is activated, no route
 exists, no contract byte moves and no code changes. Seam 6 activates by its own
-implementation prompt, which will ship in one step: the worker route and its
+implementation prompt (issued and shipped 2026-09-06; see §7), which ships in one step: the worker route and its
 `adapter.start` call with tests, the review service's sixth `ROUTES` entry, the
 studio's review client and relay service, the v2 amendment v2-A2 with the regenerated
 client, the frontend manifest and the Simulate screen's second labelled path, the P3E
