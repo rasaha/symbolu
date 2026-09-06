@@ -52,20 +52,22 @@ def test_phase_5a_is_at_the_version_5b1_moved_it_to():
 
 
 @pytest.mark.invariant
-def test_the_policy_authority_stays_at_0_3_0():
-    """``0.3.0`` since ADR §15.7 closed under decision D-3 of the governance-gap
-    sequencing brief: the durable single-node ``SqlitePolicyRegistry``, the
-    ``PolicyArtifactCodec`` port and the typed consistency descriptor. Purely
-    additive — no ``PolicyResolutionReason`` member moved, so this package's
-    total, injective reason mapping stays complete — and it surfaced here, in a
-    consumer, before the authority's change could merge, which is exactly what
-    this file exists to do.
+def test_the_policy_authority_stays_at_0_3_1():
+    """``0.3.1`` since ``decode_dataclass`` became part of Policy Authority's public
+    surface (P3E front-door seam 1 needed it and SD-1 forbids ``.core`` imports).
+    Purely additive — one exported name, no ``PolicyResolutionReason`` member
+    moved, so this package's total, injective reason mapping stays complete — and
+    it surfaced here, in a consumer, after the authority's change merged, which is
+    exactly what this file exists to do.
 
-    ``0.2.0`` was the `ACC-LC` round (structured supersession, two new reasons).
-    The pin **moves**; it is never deleted or loosened (`ACC-LC-IA-BASE-A1`)."""
+    ``0.3.0`` closed ADR §15.7 under decision D-3 (durable single-node
+    ``SqlitePolicyRegistry``, ``PolicyArtifactCodec`` port, typed consistency
+    descriptor); ``0.2.0`` was the `ACC-LC` round (structured supersession, two
+    new reasons). The pin **moves**; it is never deleted or loosened
+    (`ACC-LC-IA-BASE-A1`)."""
 
     init = (REPO / "packages" / "policy-authority" / "src" / "ugence_policy_authority" / "__init__.py").read_text()
-    assert '__version__ = "0.3.0"' in init
+    assert '__version__ = "0.3.1"' in init
 
 
 @pytest.mark.invariant
