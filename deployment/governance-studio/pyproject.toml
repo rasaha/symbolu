@@ -36,6 +36,7 @@ pythonpath = [
   "../../packages/governance-contracts/src",
   "../../packages/jcs/src",
   "../../packages/integration/ai-system-registry/src",
+  "../../packages/integration/data-use-admission/src",
   "../../packages/integration/agent-constitution-policy/tests",
   "../../packages/integration/agent-constitution-activation/tests",
   "../../packages/policy-authority/tests",
