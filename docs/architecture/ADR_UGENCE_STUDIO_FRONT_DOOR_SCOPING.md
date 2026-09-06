@@ -1094,7 +1094,7 @@ terms, pricing or contact data are not expressible, because no field carries the
 write but `declare` has a route; records survive restart; and no vendor approval,
 onboarding status or risk verdict is invented, because no package computes one `[G]`.
 
-### 14.5 Recommendation and proposed ruling FD-13 (four decisions, recommended first)
+### 14.5 Recommendation and proposed ruling FD-13 (four decisions, recommended first; ruled in §14.6)
 
 Seam 9 is the only remaining item whose prerequisite is a ruling rather than an owner
 input, a packaging body of work or a package decision. Because seam 8 settled the
@@ -1117,3 +1117,25 @@ declined, the front door is at its ceiling and the correction in §7 should say 
 
 **What this section authorizes.** Documentation only. No seam is activated, no route
 exists, no package is released, no contract byte moves and no code changes.
+
+### 14.6 Ruling FD-13 (owner, 2026-09-06)
+
+| # | Ruling |
+|---|---|
+| **FD-13.1** | **`SCREEN_5_TYPED_VENDOR_DECLARATIONS`.** Seam 9 is a typed vendor-dependency form over `vendor-dependency`, composed through the P3E root and tenant-bound to `UGENCE_STUDIO_TENANT_ID`, in the shape seam 8 proved. It completes outline row 5 but for egress restrictions, which have a ratified ADR and no package and stay a gap until one exists. With seam 9 shipped the front door under FD-1 reaches its ceiling: the console stays a packaging body of work under FD-8.3, a durable Decision Authority store a package decision, and the mirror coordinates, Langflow fixture and enterprise issuer owner inputs. |
+| **FD-13.2** | **`LOCAL_SQLITE_UNDER_RUNTIME_VOLUME`.** `vendor-dependency` 0.2.0 adds one sqlite implementation of `VendorDependencyPort` plus a single append, `declare`, in the seam-5 and seam-8 posture: a file under the writable runtime volume named by one configuration value, no server, no driver, no DSN, the `persistent_database` prohibition standing. The file is bound to the deployment's tenant at first open and never re-bound; a read or write naming another tenant is a typed refusal, never an empty answer. `declared_by` is a typed opaque handle recorded as presented and unproven, the recording composition this deployment's name and version, exactly as FD-12.3 ruled for seam 8; no identity is claimed until an enterprise issuer exists (AI-E). |
+| **FD-13.3** | **`V2_AMENDMENT_TWO_OPERATIONS`.** `v2_vendor_declare` and `v2_vendor_list`, validated by the package's own refusal reasons and `supersession_refusals`; `openapi_v2.json` and the generated client are re-frozen by amendment v2-A5 in the same step, the fifth since the v2 freeze. |
+| **FD-13.4** | **`RISK_POSTURE_UNINTERPRETED`.** `risk_posture_label` is what the declarer called the vendor's posture and nothing more: recorded stripped and verbatim, and ordered, compared, scored, ranked and evaluated nowhere. No vendor approval, onboarding status, tier, certification or risk verdict is invented or displayed, because no package in this repository computes one. `declare` is the only write — no edit, revocation, admission, verification, scoring, approval or enforcement has a route — a changed declaration is a new one superseding the old, and the record confers no approval, admission, authority or permission. The record carries an opaque `vendor_ref` and never a vendor's contract terms, pricing or contact data, because no field could hold them. SD-2 and every credential and LIVE prohibition are unchanged. |
+
+**What the ruling authorizes.** Documentation only. No seam is activated, no route
+exists, no package is released, no contract byte moves and no code changes. Seam 9
+activates by its own implementation prompt, which will ship in one step: the
+`vendor-dependency` 0.2.0 release with its sqlite store and tests, the studio
+backend's declaration service and the two v2 operations with amendment v2-A5 and the
+regenerated client, the frontend manifest and the vendor screen, the P3E composition
+(one configuration value, one file under the runtime volume, tenant-bound) with a
+superseding composition record, and the failure matrix of §14.4 as tests. FD-1, FD-3,
+FD-4, FD-8.1, FD-8.3, FD-12, SD-2, the `persistent_database` prohibition, the
+`REFERENCE_GRADE_SHADOW_ONLY` ceiling, `ENFORCEMENT_ENABLED = False`, the frozen v1
+contract, every FROM line and ratified digest, and every credential, egress and LIVE
+prohibition are preserved.
