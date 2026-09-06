@@ -183,6 +183,7 @@ def run_startup_integrity(inputs: IntegrityInputs) -> IntegrityResult:
         "openapi_sha256": openapi_hash,
         "synthetic_bundle_hash": _bundle_hash_of(cfg),
         "constitution_registry": registry_state,
+        "authority_reads": "configured" if cfg.policy_identities else "unset",
         "checks": checks,
         "result": "PASS" if ok else "FAIL",
         "failure_code": code,
@@ -205,6 +206,8 @@ def _classify(failures: List[str]) -> str:
         return "SYNTHETIC_DATA_BOUNDARY_FAILED"
     if "tls" in joined.lower() or "certificate" in joined.lower():
         return "GOVERNANCE_STUDIO_P3E_HTTPS_FAILED"
+    if "POLICY_IDENTITIES" in joined or "TENANT_ID" in joined:
+        return "GOVERNANCE_STUDIO_P3E_AUTHORITY_SEAM_FAILED"
     if "credential" in joined or "config:" in joined or "allowed_hosts" in joined:
         return "GOVERNANCE_STUDIO_P3E_ACCESS_CONTROL_FAILED"
     if "openapi" in joined:

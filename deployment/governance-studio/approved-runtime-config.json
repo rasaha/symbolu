@@ -1,7 +1,7 @@
 {
   "schema_version": "1",
   "deployment": "governance-studio-private-hosted",
-  "deployment_version": "0.3.0",
+  "deployment_version": "0.4.0",
   "single_process": true,
   "exposed_ports": [
     "8443/tcp"
@@ -68,14 +68,16 @@
   ],
   "configuration_added": {
     "UGENCE_STUDIO_REVIEW_SERVICE_URL": "optional; read by DeploymentConfig and handed to build_studio_context(review_service_base_url=...) and nowhere else",
-    "UGENCE_STUDIO_CONSTITUTION_REGISTRY_PATH": "optional; read by DeploymentConfig and handed to build_studio_context(activation_root=...) and nowhere else; an absolute sqlite file path under the writable runtime volume (front-door seam 1, FD-5)"
+    "UGENCE_STUDIO_CONSTITUTION_REGISTRY_PATH": "optional; read by DeploymentConfig and handed to build_studio_context(activation_root=...) and nowhere else; an absolute sqlite file path under the writable runtime volume (front-door seam 1, FD-5)",
+    "UGENCE_STUDIO_TENANT_ID": "optional; the one tenant the Authority screen displays; required with UGENCE_STUDIO_POLICY_IDENTITIES; typed (NFC, no whitespace); read by DeploymentConfig only (front-door seam 2, FD-6)",
+    "UGENCE_STUDIO_POLICY_IDENTITIES": "optional; comma-separated typed policy identities '<policy_family>|<policy_id>|<scope>' (each NFC, no whitespace, no duplicates; no discovery, no default); requires UGENCE_STUDIO_CONSTITUTION_REGISTRY_PATH and UGENCE_STUDIO_TENANT_ID; handed to build_studio_context(policy_registry=..., policy_identities=...) and nowhere else (front-door seam 2, FD-6)"
   },
   "constitution_registry": {
     "ruling": "ADR_UGENCE_STUDIO_FRONT_DOOR_SCOPING.md FD-1 ONE_SEAM_PER_STEP, FD-5 SCREEN_1_ONLY (activation root)",
     "store": "SqlitePolicyRegistry (policy-authority Posture B) at UGENCE_STUDIO_CONSTITUTION_REGISTRY_PATH, a file under the writable runtime volume /var/run/ugence-studio",
     "durability": "that of the runtime volume's mount; the prohibited persistent_database (an external database server, driver or DSN) stands: no server, no driver, no DSN",
     "trust": "the constitution authority's DenyAllSignatureVerifier and DenyAllApprovalVerifier and a signer that refuses every act; no key material, no trust anchor, no credential in the image or the container",
-    "reachable_acts": "preflight only (mutation-free); issuance and activation have no route and refuse if invoked",
+    "reachable_acts": "preflight only (mutation-free) through the activation root; read-only, tenant-bound authority reads (issued records for configured identities, one record by id, its revocations and supersessions) through ReadOnlyTenantBoundRegistry over the same registry instance; issuance, revocation, supersession and activation have no route and refuse if invoked",
     "unset": "the Constitution screen reports the typed gap constitution_preflight (available false)",
     "composition_record": "composition-record.json (an ai-system-registry SystemRegistration, FD-3)"
   },
@@ -92,5 +94,22 @@
     "packages/integration/agent-constitution-policy",
     "packages/integration/agent-constitution-conformance",
     "packages/integration/agent-constitution-activation"
-  ]
+  ],
+  "front_door_seams": {
+    "ruling": "ADR_UGENCE_STUDIO_FRONT_DOOR_SCOPING.md FD-1 ONE_SEAM_PER_STEP; FD-5 seam 1; FD-6 seam 2",
+    "handed_to_build_studio_context": [
+      "review_service_base_url (CR-2)",
+      "activation_root (seam 1)",
+      "policy_registry (seam 2: read-only, tenant-bound view of the seam-1 registry)",
+      "policy_identities (seam 2: typed, '<policy_family>|<policy_id>|<scope>|<tenant_id>')"
+    ],
+    "absent_by_ruling": [
+      "decision_store (no durable Decision Authority record store exists; the decision read keeps its typed gap decision_authority_store)",
+      "governance_hook",
+      "provider_registry",
+      "console_base_url"
+    ],
+    "tenant_binding": "records of any tenant other than UGENCE_STUDIO_TENANT_ID are refused with a typed refusal and never displayed",
+    "persistent_database": "prohibition stands: the registry is the seam-1 sqlite file under the runtime volume; no server, no driver, no DSN"
+  }
 }

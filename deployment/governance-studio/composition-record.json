@@ -1,0 +1,42 @@
+{
+  "schema": "governance-studio.composition-record.v1",
+  "ruling": "ADR_UGENCE_STUDIO_FRONT_DOOR_SCOPING.md FD-3 COMPOSITION_RECORD_IN_REGISTRY: an ai-system-registry SystemRegistration; immutable and versioned by system_version; supersedes composition-record.seam-1.json; no new package",
+  "binding": {
+    "binding_id": "governance-studio-private-hosted/front-door/seam-2",
+    "tenant_id": "ugence-platform",
+    "subject_id": "governance-studio",
+    "context_id": "p3e-private-hosted",
+    "context_digest": "ccb6643530555f6825b86235d82a5d00af63ee435d713648b97adea4f4e8ff55",
+    "system_id": "governance-studio-private-hosted",
+    "system_version": "0.4.0",
+    "configuration_id": "approved-runtime-config.json",
+    "configuration_digest": "e5f44ff0feb661fcb0ea4f30d53b6b93f63d4ea931befa9f7f0805f2b1917733",
+    "deployment_environment_ref": "private-hosted"
+  },
+  "registration": {
+    "registration_id": "reg_b6eba57c58f066386115abce13816958",
+    "binding_digest": "24169ec221dc1ce0d51c3e95ec2a1c2771e835570197438cb348409d42fdb1d3",
+    "tenant_id": "ugence-platform",
+    "system_id": "governance-studio-private-hosted",
+    "system_version": "0.4.0",
+    "owner_ref": "rasaha",
+    "classification_label": "REFERENCE_GRADE_SHADOW_ONLY",
+    "validity": {
+      "issued_at": "2026-09-06T00:00:00.000000+00:00",
+      "expires_at": "2027-09-06T00:00:00.000000+00:00",
+      "stale_after": ""
+    },
+    "supersedes": "reg_ae7d03070a79245ca5a31eb83c2fffb8",
+    "registered_by": "governance-studio-deployment/0.4.0",
+    "notes": "Front-door composition, seam 2 (FD-1 ONE_SEAM_PER_STEP, FD-6 POLICY_REGISTRY_AND_DECISION_STORE): build_studio_context receives review_service_base_url (CR-2), activation_root (seam 1) and, when UGENCE_STUDIO_POLICY_IDENTITIES is set, policy_registry as a read-only tenant-bound view of the same registry instance with the typed identities; decision_store stays absent (no durable store exists). Supersedes the seam-1 registration, which is never edited; a later seam registers a new record superseding this one."
+  },
+  "record_digest": "993107dfa315b0393790f26b5185b543947d18812b7769a41e60c25d5d198691",
+  "supersedes_record": "composition-record.seam-1.json",
+  "seams_handed_to_build_studio_context": [
+    "review_service_base_url",
+    "activation_root",
+    "policy_registry",
+    "policy_identities"
+  ],
+  "configuration_digest_of": "deployment/governance-studio/approved-runtime-config.json (sha-256 of the file bytes)"
+}

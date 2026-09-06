@@ -7,8 +7,9 @@ or allowed hosts are absent. Secrets are never logged. The only two runtime mode
 from __future__ import annotations
 
 import os
+import unicodedata
 from dataclasses import dataclass, field
-from typing import List, Optional
+from typing import List, Optional, Tuple
 from urllib.parse import urlsplit
 
 from . import DEPLOYMENT_NAME
@@ -68,6 +69,12 @@ class DeploymentConfig:
     #: its typed gap. Read here, handed to build_studio_context(activation_root=...)
     #: and nowhere else. Must lie under the writable runtime volume.
     constitution_registry_path: str = ""
+    #: Front-door seam 2 (FD-6): the one tenant this deployment displays, and the typed
+    #: policy identities the Authority screen may enumerate, each
+    #: ``<policy_family>|<policy_id>|<scope>``. No discovery, no default; both require
+    #: the registry path. Read here and handed to build_studio_context only.
+    tenant_id: str = ""
+    policy_identities: Tuple[str, ...] = ()
     _errors: List[str] = field(default_factory=list, compare=False)
 
     @property
@@ -85,6 +92,10 @@ class DeploymentConfig:
     @property
     def constitution_registry_configured(self) -> bool:
         return bool(self.constitution_registry_path)
+
+    @property
+    def authority_reads_configured(self) -> bool:
+        return bool(self.policy_identities)
 
     @classmethod
     def from_env(cls, **overrides) -> "DeploymentConfig":
@@ -109,6 +120,9 @@ class DeploymentConfig:
                                 or _env("UGENCE_STUDIO_REVIEW_SERVICE_URL") or "").strip().rstrip("/"),
             constitution_registry_path=(overrides.get("constitution_registry_path")
                                         or _env("UGENCE_STUDIO_CONSTITUTION_REGISTRY_PATH") or "").strip(),
+            tenant_id=(overrides.get("tenant_id") or _env("UGENCE_STUDIO_TENANT_ID") or ""),
+            policy_identities=tuple(overrides["policy_identities"]) if overrides.get("policy_identities") is not None
+            else _split_identities(_env("UGENCE_STUDIO_POLICY_IDENTITIES")),
         )
         return cfg
 
@@ -159,7 +173,50 @@ class DeploymentConfig:
         if self.constitution_registry_path:
             errors.extend(_registry_path_errors(self.constitution_registry_path, self.runtime_dir))
 
+        # authority reads (front-door seam 2): typed identities, one tenant, registry required
+        if self.policy_identities or self.tenant_id:
+            errors.extend(_authority_errors(self.policy_identities, self.tenant_id,
+                                            bool(self.constitution_registry_path)))
+
         return errors
+
+
+def _split_identities(raw: Optional[str]) -> Tuple[str, ...]:
+    """The raw comma-separated value, split only; validation is ``validate``'s."""
+    return tuple(part for part in (raw or "").split(",") if part != "") if raw else ()
+
+
+def _is_typed_token(value: str) -> bool:
+    return (isinstance(value, str) and value != "" and value == value.strip()
+            and not any(ch.isspace() for ch in value)
+            and unicodedata.is_normalized("NFC", value))
+
+
+def _authority_errors(identities: Tuple[str, ...], tenant_id: str, registry_configured: bool) -> List[str]:
+    """Why ``UGENCE_STUDIO_POLICY_IDENTITIES`` and ``UGENCE_STUDIO_TENANT_ID`` must not be
+    used, or nothing. Every identity is exactly ``<policy_family>|<policy_id>|<scope>``,
+    each part non-empty, NFC, without whitespace; no duplicates; the tenant likewise;
+    neither is admissible without the registry path (nothing to read)."""
+    errors: List[str] = []
+    if not registry_configured:
+        errors.append("UGENCE_STUDIO_POLICY_IDENTITIES and UGENCE_STUDIO_TENANT_ID require "
+                      "UGENCE_STUDIO_CONSTITUTION_REGISTRY_PATH; there is no registry to read")
+    if identities and not tenant_id:
+        errors.append("UGENCE_STUDIO_TENANT_ID is required with UGENCE_STUDIO_POLICY_IDENTITIES")
+    if tenant_id and not _is_typed_token(tenant_id):
+        errors.append("UGENCE_STUDIO_TENANT_ID must be non-empty, NFC and without whitespace")
+    if tenant_id and "|" in tenant_id:
+        errors.append("UGENCE_STUDIO_TENANT_ID must not contain '|'")
+    seen = set()
+    for entry in identities:
+        if not _is_typed_token(entry) or entry.count("|") != 2 or any(part == "" for part in entry.split("|")):
+            errors.append("UGENCE_STUDIO_POLICY_IDENTITIES entry must be '<policy_family>|<policy_id>|<scope>', "
+                          "each part non-empty, NFC and without whitespace")
+            continue
+        if entry in seen:
+            errors.append("UGENCE_STUDIO_POLICY_IDENTITIES has a duplicate entry")
+        seen.add(entry)
+    return errors
 
 
 def _registry_path_errors(path: str, runtime_dir: str) -> List[str]:
