@@ -15,7 +15,7 @@ consumers import from `api` and rely on nothing outside it.
 
 ## Frozen surface
 
-The public surface comprises **71 names**, frozen in
+The public surface comprises **105 names**, frozen in
 `artifacts/public_api.json`. The frozen artifact is the source of truth for what
 the package promises to external callers. Because it is checked in, any change to
 the public surface is visible as a change to that artifact — an accidental

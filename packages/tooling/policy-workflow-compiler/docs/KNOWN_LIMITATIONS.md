@@ -66,4 +66,7 @@ of maturity booleans and what each asserts.
 - v2 enrichment is a pure function of the compiled v1 graph. It cannot recover source
   semantics that the v1 IR does not carry; such values are marked unresolved, never
   fabricated.
-- The AWC adapter is **not** updated to consume v2 in this phase.
+- The AWC adapter is not this package's to update. AWC consumes `workflow_ir.v2`
+  through its own P2.1 adapter; this package's `awc_adapter_updated` gate stays
+  `false` because the compiler owns the contract, not the consumer (see
+  `MATURITY.md`).

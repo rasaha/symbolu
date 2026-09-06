@@ -24,7 +24,7 @@ fingerprint byte-identical. `workflow_ir.v1` is otherwise unchanged.
   `INVALID` / `UNSUPPORTED_VERSION` / `INTEGRITY_FAILURE` and structural / semantic /
   authority / contract / dependency / provenance / digest integrity checks. Authority
   and digest failures are never downgraded to warnings.
-- Public API additions (surface 71 → 101), CLI additions (`compile --contract`,
+- Public API additions (surface 71 → 105), CLI additions (`compile --contract`,
   `validate-release`, `inspect-semantics`, `inspect-dependencies`,
   `inspect-provenance`, `compare-contracts`, `upgrade-v1`), honest P2 maturity flags,
   and an extended isolated-distribution verifier + scoped CI.

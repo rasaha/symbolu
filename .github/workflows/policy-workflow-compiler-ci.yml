@@ -73,8 +73,15 @@ jobs:
           python -m ugence_policy_workflow_compiler version
           python - <<'PY'
           import ugence_policy_workflow_compiler as u
-          assert u.__version__ == "0.1.0"
+          from ugence_policy_workflow_compiler.version import (
+              DISTRIBUTION_VERSION, WORKFLOW_IR_V1, digest_compiler_version_for,
+          )
+          # The package version is free to move; what must never move is the FROZEN
+          # semantic identity the workflow_ir.v1 logical digest commits to.
+          assert u.__version__ == DISTRIBUTION_VERSION, u.__version__
+          assert digest_compiler_version_for(WORKFLOW_IR_V1) == "0.1.0"
           i = u.version_info().to_dict()
+          assert i["workflow_ir_v1_digest_compiler_version"] == "0.1.0"
           for k in ("document_extraction_implemented", "runtime_deployment_implemented",
                     "pilot_validated", "production_certified"):
               assert i[k] is False, (k, i[k])

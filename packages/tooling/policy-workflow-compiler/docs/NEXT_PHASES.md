@@ -1,9 +1,10 @@
 # Next Phases
 
 This document **describes** — it does not implement — work that would follow the
-current Phase 1 tooling product. Nothing here is present in version 0.1.0; the
-current maturity gates (see `MATURITY.md`) remain the authoritative statement of
-what exists today.
+current tooling product. Nothing described here as future work is present in the
+shipped build; the maturity gates reported by `version_info()` (see `MATURITY.md`)
+remain the authoritative statement of what exists today. Where a section records
+work as delivered, it says so explicitly and names the evidence.
 
 ## Phase 2 (proposed): Canonical Runtime Binding and Human Review Interface
 
@@ -59,12 +60,34 @@ The `workflow_ir.v2` semantic-enrichment contract described as future work is
 in `version_info()`). It enriches the workflow description only; it does not bind a
 runtime or execute anything.
 
-### The exact next phase: AWC P2.1
+### AWC P2.1 — delivered (in the AWC package)
 
 **AWC P2.1 — Policy Workflow Compiler v2 Compatibility Adapter, Overlay Reduction and
-P1/P2 Fingerprint-Preserving Migration.** Update the Agent Workforce Composer to
-consume the enriched `workflow_ir.v2` contract, reduce only the temporary overlay
-fields the compiler now emits (`role_name`, `role_description`,
+P1/P2 Fingerprint-Preserving Migration** was the named next phase for the v2 contract:
+update the Agent Workforce Composer to consume enriched `workflow_ir.v2`, reduce only
+the temporary overlay fields the compiler now emits (`role_name`, `role_description`,
 `human_review_requirement`, the functional base capability, typed contracts), and
-preserve every enterprise-policy overlay that remains correctly external. That work
-belongs in the AWC package, not here.
+preserve every enterprise-policy overlay that remains correctly external.
+
+That work is **delivered**, and it landed where it belongs — in the AWC package, not
+here. Its evidence is AWC-side: `ugence_agent_workforce_composer.adapter_v2`, the
+`COMPILER_V2_ADAPTER.md` contract document, the scoped
+`agent-workforce-composer-p2-1-ci.yml` workflow, and the AWC maturity gates
+`compiler_v2_adapter_implemented`, `overlay_reduction_implemented` and
+`v1_v2_equivalence_harness_implemented`.
+
+This package emitted no new contract for it and changed no digest. Its own
+`awc_adapter_updated` gate stays `false` by design: the compiler does not own that
+adapter (see `MATURITY.md`, "Where AWC v2 consumption lives").
+
+### The next compiler phase is not yet ratified
+
+With AWC P2.1 delivered, there is no owner-ratified next phase for **this** package.
+The three Phase 2 strands described above — canonical capability-adapter binding,
+governed diff-driven review workflows, and deterministic offline simulation — remain
+descriptions, not commitments; none is scheduled, and `version_info()` reports none
+of them as implemented. The scope of the next phase, whether the three `DEFERRED` v2
+fields become source-declarable, whether reference equivalence must extend beyond
+Procurement, and what evidence would flip `pilot_validated` and
+`production_certified`, are all open owner decisions. Until they are ratified, this
+document describes options rather than a plan.
