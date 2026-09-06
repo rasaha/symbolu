@@ -3,7 +3,7 @@
   "distribution": "ugence-data-use-admission",
   "namespace": "ugence_data_use_admission",
   "note": "Machine-readable snapshot of the curated public API (ugence_data_use_admission.__all__). tests/packaging/test_packaging.py asserts this file equals the live package surface. Regenerate with scripts/generate_public_api.py when the curated API changes deliberately.",
-  "package_version": "0.1.0",
+  "package_version": "0.2.0",
   "symbols": {
     "AssessedSystemBinding": {
       "fields": [
@@ -25,11 +25,22 @@
       ],
       "kind": "dataclass"
     },
+    "CONTRACT_MATURITY": {
+      "kind": "constant",
+      "value": "CONTRACTS_ONLY"
+    },
     "CONTRACT_VERSION": {
       "kind": "constant",
       "value": "data_use_admission.v1"
     },
     "ContractViolation": {
+      "kind": "class",
+      "methods": [
+        "add_note",
+        "with_traceback"
+      ]
+    },
+    "CrossTenantRefused": {
       "kind": "class",
       "methods": [
         "add_note",
@@ -80,7 +91,28 @@
         "get_declaration"
       ]
     },
+    "DeclarationProductionModeError": {
+      "kind": "class",
+      "methods": [
+        "add_note",
+        "with_traceback"
+      ]
+    },
+    "DeclarationStorageError": {
+      "kind": "class",
+      "methods": [
+        "add_note",
+        "with_traceback"
+      ]
+    },
     "DeclarationSupersessionError": {
+      "kind": "class",
+      "methods": [
+        "add_note",
+        "with_traceback"
+      ]
+    },
+    "DuplicateDeclarationError": {
       "kind": "class",
       "methods": [
         "add_note",
@@ -93,7 +125,25 @@
     },
     "MATURITY": {
       "kind": "constant",
-      "value": "CONTRACTS_ONLY"
+      "value": "CONTRACTS_PLUS_LOCAL_STORE"
+    },
+    "SCHEMA_VERSION": {
+      "kind": "constant",
+      "value": "data_use_admission.sqlite.v1"
+    },
+    "SqliteDataUseDeclarations": {
+      "kind": "class",
+      "methods": [
+        "all_declared_at",
+        "close",
+        "count",
+        "declarations_by_classification",
+        "declarations_for_data",
+        "declarations_for_system",
+        "declarations_for_tenant",
+        "declare",
+        "get_declaration"
+      ]
     },
     "SystemBindingAuthenticityStatus": {
       "kind": "enum",
@@ -103,7 +153,25 @@
     },
     "__version__": {
       "kind": "constant",
-      "value": "0.1.0"
+      "value": "0.2.0"
+    },
+    "binding_from_dict": {
+      "kind": "function",
+      "parameters": [
+        "d"
+      ]
+    },
+    "binding_to_dict": {
+      "kind": "function",
+      "parameters": [
+        "binding"
+      ]
+    },
+    "declaration_from_record": {
+      "kind": "function",
+      "parameters": [
+        "record"
+      ]
     },
     "declaration_id_for": {
       "kind": "function",
@@ -113,6 +181,12 @@
         "classification",
         "purpose_label",
         "validity"
+      ]
+    },
+    "declaration_record": {
+      "kind": "function",
+      "parameters": [
+        "declaration"
       ]
     },
     "declared_at": {

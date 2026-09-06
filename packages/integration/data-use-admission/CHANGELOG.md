@@ -1,5 +1,32 @@
 # Changelog — ugence-data-use-admission
 
+## 0.2.0 — the one ruled local home (front-door seam 8, ruling FD-12.2)
+
+The record shape is unchanged and still contracts-only (`CONTRACT_MATURITY`); what is
+new is where a declaration lives. `MATURITY` becomes `CONTRACTS_PLUS_LOCAL_STORE`.
+
+- `SqliteDataUseDeclarations(path, tenant_id=..., production_mode=False)`: one
+  tenant-bound, append-only sqlite file implementing the read-only
+  `DataUseDeclarationPort` plus the single append `declare` (FD-12.5). A plain file
+  path under a writable volume: no server, no driver, no DSN, no network.
+- Bound to one tenant at first open and **never re-bound**: a file bound to another
+  tenant is `CrossTenantRefused` before any read, and a read or write naming another
+  tenant is a typed refusal, never an empty answer.
+- Append-only: a duplicate derived id is `DuplicateDeclarationError`, a supersession is
+  admitted only by `supersession_refusals`, and there is no edit, delete, admit,
+  authorize, classify or enforce method. A record altered outside the package fails its
+  digest check on read (`ContractViolation`).
+- `production_mode=True` refuses an in-memory or URI location
+  (`DeclarationProductionModeError`); storage faults are `DeclarationStorageError`.
+- `declaration_record` / `declaration_from_record` and `binding_to_dict` /
+  `binding_from_dict`: the complete, reconstructible record, with the derived id
+  re-verified on the way back in.
+- Every semantic prohibition still holds, mechanically: the store keeps the reference
+  and never the data, leaves the classification and residency labels uninterpreted
+  (DE-2, DE-3), reads no clock, and names no network. `tests/test_durable.py` pins all
+  of it, and the contracts-only boundary scans now enumerate `durable.py` as the one
+  ruled store rather than being relaxed.
+
 ## 0.1.0 — wave 4, initial release
 
 Scoped and ratified by `docs/architecture/ADR_UGENCE_DATA_EGRESS_AUTHORITY_SCOPING.md`

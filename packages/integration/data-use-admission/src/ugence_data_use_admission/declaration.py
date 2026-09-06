@@ -60,7 +60,16 @@ __all__ = [
     "DataUseDeclaration", "DECLARATION_ID_PREFIX", "declaration_id_for",
     "supersession_refusals", "require_admissible_supersession",
     "validity_to_dict", "validity_from_dict",
+    "binding_to_dict", "binding_from_dict",
+    "declaration_record", "declaration_from_record",
 ]
+
+#: The binding's own fields, split by shape so a record round-trips exactly.
+_BINDING_TEXT_FIELDS = ("binding_id", "tenant_id", "subject_id", "context_id",
+                        "context_digest", "system_id", "system_version",
+                        "configuration_id", "configuration_digest",
+                        "deployment_environment_ref")
+_BINDING_INSTANT_FIELDS = ("bound_at",)
 
 DECLARATION_ID_PREFIX = "dud_"
 
@@ -243,6 +252,89 @@ class DataUseDeclaration:
 
     def record_digest(self) -> str:
         return domain_digest("declaration", self.to_dict())
+
+
+def binding_to_dict(binding: AssessedSystemBinding) -> dict:
+    """The binding's own fields, instants as ISO-8601 UTC text or ``""``."""
+
+    if not isinstance(binding, AssessedSystemBinding):
+        raise ContractViolation(
+            "binding_to_dict takes a governance-contracts AssessedSystemBinding")
+    out = {name: getattr(binding, name) for name in _BINDING_TEXT_FIELDS
+           if hasattr(binding, name)}
+    for name in _BINDING_INSTANT_FIELDS:
+        if not hasattr(binding, name):
+            continue
+        value = getattr(binding, name)
+        out[name] = iso(value, f"AssessedSystemBinding.{name}") if value is not None else ""
+    return out
+
+
+def binding_from_dict(d: dict) -> AssessedSystemBinding:
+    """Rebuild a binding from :func:`binding_to_dict`. Any contract failure is this
+    package's :class:`ContractViolation`, never a raw neighbour error."""
+
+    if not isinstance(d, dict):
+        raise ContractViolation("binding_from_dict takes a mapping")
+    unknown = set(d) - set(_BINDING_TEXT_FIELDS) - set(_BINDING_INSTANT_FIELDS)
+    if unknown:
+        raise ContractViolation(f"binding has unknown fields: {sorted(unknown)}")
+    kwargs: dict = {name: d[name] for name in _BINDING_TEXT_FIELDS if name in d}
+    for name in _BINDING_INSTANT_FIELDS:
+        raw = d.get(name, "")
+        if raw in ("", None):
+            continue
+        if not isinstance(raw, str):
+            raise ContractViolation(f"binding.{name} must be ISO-8601 text or empty")
+        try:
+            kwargs[name] = from_iso(raw)
+        except Exception as exc:  # noqa: BLE001 - a malformed instant is a refusal
+            raise ContractViolation(
+                f"binding.{name} is not an ISO-8601 instant: {exc}") from exc
+    try:
+        return AssessedSystemBinding(**kwargs)
+    except ContractViolation:
+        raise
+    except (TypeError, ValueError) as exc:
+        raise ContractViolation(f"binding refused: {exc}") from exc
+
+
+def declaration_record(declaration: DataUseDeclaration) -> dict:
+    """The complete, reconstructible record: the declaration's own fields plus the
+    binding's, under two keys so neither can be mistaken for the other."""
+
+    return {"declaration": declaration.to_dict(),
+            "binding": binding_to_dict(declaration.binding)}
+
+
+def declaration_from_record(record: dict) -> DataUseDeclaration:
+    """Rebuild a declaration from :func:`declaration_record`. The derived id is
+    re-verified at construction, so an altered record cannot reconstruct."""
+
+    if not isinstance(record, dict) or "declaration" not in record or "binding" not in record:
+        raise ContractViolation("a declaration record carries 'declaration' and 'binding'")
+    declared = record["declaration"]
+    if not isinstance(declared, dict):
+        raise ContractViolation("declaration must be a mapping")
+    bound = binding_from_dict(record["binding"])
+    validity = validity_from_dict(declared.get("validity"))
+    if validity is None:
+        raise ContractViolation("declaration.validity is required")
+    try:
+        return DataUseDeclaration(
+            declaration_id=declared.get("declaration_id", ""),
+            tenant_id=declared.get("tenant_id", ""), binding=bound,
+            data_ref=declared.get("data_ref", ""),
+            classification=DataClassificationLabel(declared.get("classification_label", "")),
+            purpose_label=declared.get("purpose_label", ""), validity=validity,
+            residency_label=declared.get("residency_label", ""),
+            supersedes=declared.get("supersedes", ""),
+            declared_by=declared.get("declared_by", ""),
+            correlation_id=declared.get("correlation_id", ""), notes=declared.get("notes", ""))
+    except ContractViolation:
+        raise
+    except (TypeError, ValueError) as exc:
+        raise ContractViolation(f"declaration refused: {exc}") from exc
 
 
 def supersession_refusals(declaration: DataUseDeclaration,
