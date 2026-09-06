@@ -17,7 +17,7 @@ PUBLIC_API = PROJECT / "public_api.json"
 def test_the_distribution_is_named_and_versioned_exactly():
     text = PYPROJECT.read_text(encoding="utf-8")
     assert 'name = "ugence-vendor-dependency"' in text
-    assert PKG_DIR.name == "ugence_vendor_dependency" and pkg.__version__ == "0.1.0"
+    assert PKG_DIR.name == "ugence_vendor_dependency" and pkg.__version__ == "0.2.0"
     assert pkg.CONTRACT_VERSION == "vendor_dependency.v1"
 
 
@@ -54,7 +54,9 @@ def test_no_test_material_lives_inside_the_package_tree():
 def test_the_readme_and_changelog_state_the_posture():
     readme = (PROJECT / "README.md").read_text(encoding="utf-8").lower()
     assert (PROJECT / "CHANGELOG.md").exists() and (PROJECT / "LICENSE").exists()
-    assert "never" in readme and "contracts only" in readme
+    # 0.2.0 amends the posture: contracts plus the one ruled local file (FD-13.2)
+    assert "never" in readme and "contracts plus one ruled local file" in readme
+    assert "declare" in readme and "append-only" in readme
     assert "absent from every answer" in readme
     assert "assessedsystembinding" in readme and "vendorrisklabel" in readme
     for ruling in ("binding_only", "separate_opaque_risk_label", "policy_ref_string"):

@@ -40,6 +40,7 @@ from .services.studio_v2 import (
     PublishService,
     RegistryService,
     DeclarationService,
+    VendorDeclarationService,
     ReviewRelayService,
     StartRunService,
     LedgerObserveService,
@@ -74,6 +75,7 @@ def build_studio_context(
     registered_by: str = "",
     data_use_declarations: Any = None,
     recorded_by: str = "",
+    vendor_declarations: Any = None,
 ) -> V2Context:
     """Wire the six services from whatever this deployment actually has.
 
@@ -103,6 +105,8 @@ def build_studio_context(
         registry=RegistryService(registry=system_registry, registered_by=registered_by),
         data_use=DeclarationService(declarations=data_use_declarations,
                                     recorded_by=recorded_by),
+        vendor=VendorDeclarationService(declarations=vendor_declarations,
+                                        recorded_by=recorded_by),
         start_run=StartRunService(review=review),
         ledger_observe=LedgerObserveService(review=review),
     )

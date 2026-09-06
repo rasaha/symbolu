@@ -35,6 +35,7 @@ for _p in (
     os.path.join(_REPO, "packages", "jcs", "src"),
     os.path.join(_REPO, "packages", "integration", "ai-system-registry", "src"),
     os.path.join(_REPO, "packages", "integration", "data-use-admission", "src"),
+    os.path.join(_REPO, "packages", "integration", "vendor-dependency", "src"),
 ):
     if os.path.isdir(_p) and _p not in sys.path:
         sys.path.insert(0, _p)

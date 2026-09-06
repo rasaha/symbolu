@@ -19,6 +19,12 @@ import ugence_vendor_dependency as pkg
 PKG_DIR = pathlib.Path(pkg.__file__).resolve().parent
 DIST = PKG_DIR.parents[1]
 SOURCES = sorted(PKG_DIR.rglob("*.py"))
+#: FD-13.2 ruled exactly one module that may persist. Everything else in the package
+#: stays contracts-only, and the scans below hold that line module by module.
+RULED_STORE_MODULES = {"durable"}
+#: The contracts-only surface: every module but the ruled store. ``__init__`` is
+#: excluded from the identifier scans because it re-exports the store's own names.
+CONTRACT_SOURCES = [s for s in SOURCES if s.stem not in RULED_STORE_MODULES]
 STDLIB = set(sys.stdlib_module_names)
 ALLOWED_FIRST_PARTY = {"ugence_vendor_dependency", "ugence_governance_contracts"}
 FORBIDDEN = {
@@ -80,11 +86,12 @@ def _identifiers(path: pathlib.Path) -> set[str]:
     return names
 
 
-def _segments() -> set[str]:
+def _contract_segments() -> set[str]:
     """Whole word segments of every code identifier, so "supersession" is not read
     as "session" and "resolved" in prose is not read as "resolve" in code."""
 
-    return {seg for src in SOURCES for name in _identifiers(src)
+    return {seg for src in CONTRACT_SOURCES if src.stem != "__init__"
+            for name in _identifiers(src)
             for seg in re.split(r"[^a-z0-9]+", re.sub(r"(?<!^)(?=[A-Z])", "_", name).lower())}
 
 
@@ -96,7 +103,20 @@ def test_source_imports_only_stdlib_and_governance_contracts():
         roots = _roots(src)
         strays = roots - STDLIB - ALLOWED_FIRST_PARTY - {"__future__"}
         assert not strays, (src.name, strays)
-        assert not (roots & FORBIDDEN), (src.name, roots & FORBIDDEN)
+        forbidden = FORBIDDEN - ({"sqlite3"} if src.stem in RULED_STORE_MODULES else set())
+        assert not (roots & forbidden), (src.name, roots & forbidden)
+
+
+def test_the_ruled_store_is_the_only_persisting_module():
+    """FD-13.2 named one durable home. No other module may reach sqlite3, and the
+    store may reach nothing else the package forbids."""
+
+    for src in CONTRACT_SOURCES:
+        assert "sqlite3" not in _roots(src), src.name
+    store = PKG_DIR / "durable.py"
+    assert store.is_file(), "the ruled store module is missing"
+    assert _roots(store) <= {"__future__", "json", "sqlite3", "threading", "datetime",
+                             "typing", "ugence_vendor_dependency"}, _roots(store)
 
 
 def test_pyproject_declares_the_ratified_dependency_set():
@@ -110,7 +130,7 @@ def test_pyproject_declares_the_ratified_dependency_set():
                       "decision-authority", "model-selection", "benchmark-registry",
                       "pydantic", "sqlalchemy", "requests", "httpx"):
         assert forbidden not in joined, forbidden
-    assert pkg.__version__ == "0.1.0"
+    assert pkg.__version__ == "0.2.0"
 
 
 def test_no_clock_is_read_anywhere():
@@ -173,7 +193,11 @@ def test_no_surface_can_resolve_verify_score_grade_or_decide():
             methods = {n for n in dir(value) if not n.startswith("_")}
             assert not methods & forbidden, (name, methods & forbidden)
         assert name.lower() not in forbidden, name
-    assert pkg.ENFORCEMENT_ENABLED is False and pkg.MATURITY == "CONTRACTS_ONLY"
+    assert pkg.ENFORCEMENT_ENABLED is False
+    # 0.2.0 adds the one ruled local file and nothing else: the contract surface is
+    # still exactly what 0.1.0 shipped, and the package still decides nothing.
+    assert pkg.MATURITY == "CONTRACTS_PLUS_LOCAL_STORE"
+    assert pkg.CONTRACT_MATURITY == "CONTRACTS_ONLY"
 
 
 def test_the_code_names_none_of_the_things_it_refuses_to_do():
@@ -183,7 +207,7 @@ def test_the_code_names_none_of_the_things_it_refuses_to_do():
     code may not, because a function that could do it would have to name it.
     """
 
-    segments = _segments()
+    segments = _contract_segments()
     for word in (
         # persistence, transport, connectors, gateways
         "sqlite", "connect", "connection", "session", "http", "https", "url", "endpoint",
@@ -199,10 +223,38 @@ def test_the_code_names_none_of_the_things_it_refuses_to_do():
         "supplier", "purchase", "invoice", "procurement",
     ):
         assert word not in segments, word
-    module_names = {src.stem for src in SOURCES}
+    module_names = {src.stem for src in CONTRACT_SOURCES}
     for banned in ("memory", "sqlite", "store", "adapter", "connector", "client", "gateway",
                    "scorer", "engine", "questionnaire", "resolver", "verifier"):
         assert banned not in module_names, banned
+
+
+def test_the_ruled_store_refuses_everything_the_contracts_refuse():
+    """Persistence is all FD-13.2 bought. The store may name sqlite; it may not name
+    a scorer, a gateway, an approval or a vendor's own vocabulary."""
+
+    store = PKG_DIR / "durable.py"
+    segments = {seg for name in _identifiers(store)
+                for seg in re.split(r"[^a-z0-9]+",
+                                    re.sub(r"(?<!^)(?=[A-Z])", "_", name).lower())}
+    for word in (
+        # transport and reachability: the store is a file, not a client
+        "http", "https", "url", "endpoint", "socket", "gateway", "proxy", "webhook",
+        "smtp", "email", "request", "response",
+        # policy resolution and verification (VR-4)
+        "resolve", "resolver", "verifier", "fetch", "lookup", "signature",
+        # scoring, grading, ranking, approval (VR-3, FD-13.4)
+        "score", "grade", "rating", "severity", "tier", "rank", "weight", "eligible",
+        "eligibility", "approve", "approved", "reject", "sanction", "dominates",
+        "onboard", "onboarding", "certify", "certification",
+        # the registry (VR-2) and a counterparty's vocabulary
+        "registry", "registration", "registered", "supplier", "purchase", "invoice",
+        # ("contract" is deliberately absent: ContractViolation is this package's own
+        # refusal type. That no field could carry a vendor's contract terms is pinned
+        # by the field-set test below, not by a word ban.)
+        "procurement", "pricing", "price",
+    ):
+        assert word not in segments, word
 
 
 def test_no_field_could_carry_an_address_or_a_credential():

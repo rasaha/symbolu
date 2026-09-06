@@ -1,5 +1,40 @@
 # Changelog — ugence-vendor-dependency
 
+## 0.2.0 — the one ruled durable home (front-door ruling FD-13.2)
+
+Authorized by `ADR_UGENCE_STUDIO_FRONT_DOOR_SCOPING.md` §14.6 (FD-13.2
+`LOCAL_SQLITE_UNDER_RUNTIME_VOLUME`, FD-13.4 `RISK_POSTURE_UNINTERPRETED`), on the
+shape seam 8 proved for `data-use-admission` 0.2.0. **The contract surface is
+unchanged**: `CONTRACT_VERSION` stays `vendor_dependency.v1`, and the new
+`CONTRACT_MATURITY` records that the records, refusals, selectors and port are
+exactly what 0.1.0 shipped.
+
+- `SqliteVendorDeclarations`: one tenant-bound, append-only sqlite file implementing
+  `VendorDependencyPort`, plus the single append `declare` — its only write. A plain
+  file path under a writable volume: no server, no driver, no DSN, no network.
+- The file is bound to one tenant at first open and **never re-bound**; a read or
+  write naming another tenant is a typed refusal, never an empty answer.
+- Append-only: a duplicate derived id is refused, an inadmissible supersession is
+  refused by `supersession_refusals`, and nothing is ever edited or deleted.
+- The record digest is re-verified on the way out, so a row altered outside the
+  package cannot reconstruct.
+- No clock: every `as_of` remains the caller's instant, so a lapsed declaration is
+  absent from an answer without a sweeper.
+- `declaration_record` / `declaration_from_record` and `binding_to_dict` /
+  `binding_from_dict` make a declaration round-trip exactly, with the derived id
+  re-verified on the way back in.
+- New refusals: `DeclarationStorageError`, `DeclarationProductionModeError`,
+  `DuplicateDeclarationError`, `CrossTenantRefused`.
+- `MATURITY` becomes `CONTRACTS_PLUS_LOCAL_STORE`; `ENFORCEMENT_ENABLED` stays
+  `False`.
+
+**What did not change.** The posture is still uninterpreted (VR-3, FD-13.4): stored
+verbatim, matched by exact text, and ordered, compared, ranked and scored nowhere. No
+vendor approval, onboarding status, tier or certification exists to record, because
+no package computes one. `vendor_ref` is still opaque, and `policy_ref` still
+recorded and never resolved (VR-4). A declaration is still a record, not a
+permission.
+
 ## 0.1.0 — wave 4, initial release
 
 Scoped and ratified by `docs/architecture/ADR_UGENCE_VENDOR_RISK_SCOPING.md`

@@ -51,6 +51,10 @@ export const REQUIRED_V2_OPERATIONS = [
   // is the only write, FD-12.5).
   "v2_data_use_declare",
   "v2_data_use_list",
+  // Front-door seam 9 (FD-13): the Vendor-dependency screen (typed intake; declare is
+  // the only write, FD-13.4).
+  "v2_vendor_declare",
+  "v2_vendor_list",
 ];
 
 // SD-2, enforced at generation time as well as in the backend suite. If a route

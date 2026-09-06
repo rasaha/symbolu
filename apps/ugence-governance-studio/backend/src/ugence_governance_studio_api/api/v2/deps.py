@@ -41,6 +41,12 @@ def _absent_data_use() -> Any:
     return DeclarationService(declarations=None)
 
 
+def _absent_vendor() -> Any:
+    from ...services.studio_v2 import VendorDeclarationService
+
+    return VendorDeclarationService(declarations=None)
+
+
 def _absent_ledger_observe() -> Any:
     from ...services.studio_v2 import LedgerObserveService
 
@@ -68,6 +74,7 @@ class V2Context:
         registry: Any = None,
         start_run: Any = None,
         data_use: Any = None,
+        vendor: Any = None,
         ledger_observe: Any = None,
     ) -> None:
         self.constitution = constitution
@@ -88,6 +95,9 @@ class V2Context:
         # Front-door seam 8 (FD-12): the data-use declaration intake. Absent, the
         # data-use routes report the gap.
         self.data_use = data_use if data_use is not None else _absent_data_use()
+        # Front-door seam 9 (FD-13): the vendor-dependency intake. Absent, the vendor
+        # routes report the gap.
+        self.vendor = vendor if vendor is not None else _absent_vendor()
         # Front-door seam 7 (FD-11): Observe over the worker's ledger. Absent, the ledger
         # route reports the same review_service gap.
         self.ledger_observe = ledger_observe if ledger_observe is not None else _absent_ledger_observe()

@@ -206,7 +206,10 @@ def test_the_port_declares_only_read_methods():
         assert forbidden not in surface
 
 
-def test_no_implementation_of_the_port_ships():
+def test_exactly_one_ruled_implementation_of_the_port_ships():
+    """Since 0.2.0 the package ships the one durable home FD-13.2 ruled, and only it.
+    A second implementation would be a second answer to a settled question."""
+
     import ugence_vendor_dependency as pkg
 
     implementations = [
@@ -215,5 +218,5 @@ def test_no_implementation_of_the_port_ships():
         and not getattr(getattr(pkg, name), "_is_protocol", False)
         and hasattr(getattr(pkg, name), "declarations_for_tenant")
     ]
-    assert implementations == []
+    assert implementations == ["SqliteVendorDeclarations"]
     assert isinstance(VendorDependencyPort, type) and VendorDependencyPort._is_protocol

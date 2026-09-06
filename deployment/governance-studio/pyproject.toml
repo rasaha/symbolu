@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "governance-studio-deployment"
-version = "0.9.0"
+version = "0.10.0"
 description = "Private hosted, HTTPS-only, synthetic-data-only deployment wrapper for the frozen Governance Studio frontend and P3B backend. No permission granting, no agent execution, no business-action authorization."
 requires-python = ">=3.11"
 dependencies = [
@@ -37,6 +37,7 @@ pythonpath = [
   "../../packages/jcs/src",
   "../../packages/integration/ai-system-registry/src",
   "../../packages/integration/data-use-admission/src",
+  "../../packages/integration/vendor-dependency/src",
   "../../packages/integration/agent-constitution-policy/tests",
   "../../packages/integration/agent-constitution-activation/tests",
   "../../packages/policy-authority/tests",

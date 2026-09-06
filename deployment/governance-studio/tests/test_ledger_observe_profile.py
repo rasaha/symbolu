@@ -217,11 +217,13 @@ def test_the_egress_record_names_seven_routes_one_destination_and_the_manifest_a
                                                    "UGENCE_STUDIO_POLICY_IDENTITIES",
                                                    "UGENCE_STUDIO_SIMULATION_PROVIDER",
                                                    "UGENCE_STUDIO_SYSTEM_REGISTRY_PATH"], "seam 7 added no value (FD-11.5)"
-    assert list(cfg["configuration_added"])[6:] == ["UGENCE_STUDIO_DATA_USE_DECLARATIONS_PATH"], \
-        "the only later value is seam 8's declarations file (FD-12.2)"
+    assert list(cfg["configuration_added"])[6:] == [
+        "UGENCE_STUDIO_DATA_USE_DECLARATIONS_PATH",
+        "UGENCE_STUDIO_VENDOR_DECLARATIONS_PATH"], "later values belong to seams 8 and 9"
     assert cfg["first_party_packages_in_image"][:13][-1] == "packages/integration/ai-system-registry"
-    assert cfg["first_party_packages_in_image"][13:] == ["packages/integration/data-use-admission"], \
-        "the only later package is seam 8's (FD-12.2)"
+    assert cfg["first_party_packages_in_image"][13:] == [
+        "packages/integration/data-use-admission",
+        "packages/integration/vendor-dependency"], "later packages belong to seams 8 and 9"
 
 
 def test_the_third_contract_amendment_is_recorded_in_the_p3e_freeze():

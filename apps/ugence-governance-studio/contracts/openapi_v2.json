@@ -568,6 +568,151 @@
         ],
         "title": "ValidationError",
         "type": "object"
+      },
+      "VendorBindingInput": {
+        "additionalProperties": false,
+        "description": "The exact system and configuration a vendor declaration is about.\n\nNo ``tenant_id``: the tenant is the deployment's and is never caller-supplied.\nThe two required digests are lowercase sha-256 hex the declarer asserts; the\nstudio computes none of them.",
+        "properties": {
+          "binding_id": {
+            "title": "Binding Id",
+            "type": "string"
+          },
+          "configuration_digest": {
+            "title": "Configuration Digest",
+            "type": "string"
+          },
+          "configuration_id": {
+            "title": "Configuration Id",
+            "type": "string"
+          },
+          "context_digest": {
+            "title": "Context Digest",
+            "type": "string"
+          },
+          "context_id": {
+            "title": "Context Id",
+            "type": "string"
+          },
+          "deployment_environment_ref": {
+            "default": "",
+            "title": "Deployment Environment Ref",
+            "type": "string"
+          },
+          "subject_id": {
+            "title": "Subject Id",
+            "type": "string"
+          },
+          "system_id": {
+            "title": "System Id",
+            "type": "string"
+          },
+          "system_version": {
+            "title": "System Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "binding_id",
+          "subject_id",
+          "context_id",
+          "context_digest",
+          "system_id",
+          "system_version",
+          "configuration_id",
+          "configuration_digest"
+        ],
+        "title": "VendorBindingInput",
+        "type": "object"
+      },
+      "VendorDeclareRequest": {
+        "additionalProperties": false,
+        "description": "Declare one vendor dependency for this deployment's tenant (typed intake, FD-4).\n\nNo ``declaration_id`` (derived by the package, never chosen) and no ``tenant_id``\n(the deployment's). ``vendor_ref`` is an opaque, non-secret reference — never an\naddress, endpoint or credential, and there is no field that could carry one.\n``risk_posture_label`` is recorded uninterpreted (VR-3, FD-13.4): nothing orders,\ncompares, ranks or scores it, and there is no field for an approval, onboarding\nstatus, tier or certification because no package computes one. ``policy_ref`` is\nrecorded and never resolved (VR-4), and ``declared_by`` is an opaque handle\nrecorded as presented and unproven (FD-12.3, carried forward by FD-13.2).",
+        "properties": {
+          "binding": {
+            "$ref": "#/components/schemas/VendorBindingInput"
+          },
+          "correlation_id": {
+            "default": "",
+            "title": "Correlation Id",
+            "type": "string"
+          },
+          "declared_by": {
+            "default": "",
+            "title": "Declared By",
+            "type": "string"
+          },
+          "notes": {
+            "default": "",
+            "title": "Notes",
+            "type": "string"
+          },
+          "policy_ref": {
+            "title": "Policy Ref",
+            "type": "string"
+          },
+          "risk_posture_label": {
+            "title": "Risk Posture Label",
+            "type": "string"
+          },
+          "supersedes": {
+            "default": "",
+            "title": "Supersedes",
+            "type": "string"
+          },
+          "validity": {
+            "$ref": "#/components/schemas/VendorValidityInput"
+          },
+          "vendor_ref": {
+            "title": "Vendor Ref",
+            "type": "string"
+          }
+        },
+        "required": [
+          "binding",
+          "vendor_ref",
+          "risk_posture_label",
+          "policy_ref",
+          "validity"
+        ],
+        "title": "VendorDeclareRequest",
+        "type": "object"
+      },
+      "VendorValidityInput": {
+        "additionalProperties": false,
+        "description": "The declaration window, as ISO-8601 instants with a timezone.",
+        "properties": {
+          "expires_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expires At"
+          },
+          "issued_at": {
+            "title": "Issued At",
+            "type": "string"
+          },
+          "stale_after": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stale After"
+          }
+        },
+        "required": [
+          "issued_at"
+        ],
+        "title": "VendorValidityInput",
+        "type": "object"
       }
     }
   },
@@ -1477,6 +1622,92 @@
         "summary": "Run Simulation",
         "tags": [
           "simulate"
+        ]
+      }
+    },
+    "/api/v2/vendor/declarations": {
+      "get": {
+        "description": "The vendor declarations in force for this deployment's tenant at ``as_of``.\n\n``as_of`` is an ISO-8601 instant with a timezone; absent, the request's own instant\nis used and reported back. A declaration outside its window is absent from the\nanswer, never flagged. The answer is never ordered by posture: nothing ranks one.",
+        "operationId": "v2_vendor_list",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "as_of",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "As Of"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Vendor Declarations",
+        "tags": [
+          "vendor"
+        ]
+      },
+      "post": {
+        "description": "Record one typed vendor-dependency declaration for this deployment's tenant.\n\nEvery field is validated by vendor-dependency's own refusal reasons; a superseding\ndeclaration is admitted only by ``supersession_refusals``. ``vendor_ref`` is an\nopaque handle and the record carries no way to reach the vendor. A refusal is\ntyped, never a 500.",
+        "operationId": "v2_vendor_declare",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VendorDeclareRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Declare Vendor Dependency",
+        "tags": [
+          "vendor"
         ]
       }
     }

@@ -90,6 +90,10 @@ class DeploymentConfig:
     #: file of the tenant-bound data-use declarations under the writable runtime volume;
     #: requires UGENCE_STUDIO_TENANT_ID. Read here and handed to build_studio_context only.
     data_use_declarations_path: str = ""
+    #: Front-door seam 9 (FD-13): ``UGENCE_STUDIO_VENDOR_DECLARATIONS_PATH``, the sqlite
+    #: file of the tenant-bound vendor declarations under the writable runtime volume;
+    #: requires UGENCE_STUDIO_TENANT_ID. Read here and handed to build_studio_context only.
+    vendor_declarations_path: str = ""
     _errors: List[str] = field(default_factory=list, compare=False)
 
     @property
@@ -123,6 +127,10 @@ class DeploymentConfig:
     @property
     def data_use_declarations_configured(self) -> bool:
         return bool(self.data_use_declarations_path)
+
+    @property
+    def vendor_declarations_configured(self) -> bool:
+        return bool(self.vendor_declarations_path)
 
     @classmethod
     def from_env(cls, **overrides) -> "DeploymentConfig":
@@ -158,6 +166,9 @@ class DeploymentConfig:
             data_use_declarations_path=(overrides.get("data_use_declarations_path")
                                         or _env("UGENCE_STUDIO_DATA_USE_DECLARATIONS_PATH")
                                         or "").strip(),
+            vendor_declarations_path=(overrides.get("vendor_declarations_path")
+                                      or _env("UGENCE_STUDIO_VENDOR_DECLARATIONS_PATH")
+                                      or "").strip(),
         )
         return cfg
 
@@ -212,7 +223,8 @@ class DeploymentConfig:
         # Since seam 5 the tenant may also stand alone for the system registry, and since
         # seam 8 for the data-use declarations file.
         if self.policy_identities or (self.tenant_id and not self.system_registry_path
-                                      and not self.data_use_declarations_path):
+                                      and not self.data_use_declarations_path
+                                      and not self.vendor_declarations_path):
             errors.extend(_authority_errors(self.policy_identities, self.tenant_id,
                                             bool(self.constitution_registry_path)))
         elif self.tenant_id:
@@ -232,6 +244,15 @@ class DeploymentConfig:
                                        self.data_use_declarations_path, self.runtime_dir))
             if not self.tenant_id:
                 errors.append("UGENCE_STUDIO_DATA_USE_DECLARATIONS_PATH requires "
+                              "UGENCE_STUDIO_TENANT_ID; the declarations file is bound to "
+                              "one tenant")
+
+        # vendor declarations (front-door seam 9): a file under the volume, tenant-bound
+        if self.vendor_declarations_path:
+            errors.extend(_path_errors("UGENCE_STUDIO_VENDOR_DECLARATIONS_PATH",
+                                       self.vendor_declarations_path, self.runtime_dir))
+            if not self.tenant_id:
+                errors.append("UGENCE_STUDIO_VENDOR_DECLARATIONS_PATH requires "
                               "UGENCE_STUDIO_TENANT_ID; the declarations file is bound to "
                               "one tenant")
 
