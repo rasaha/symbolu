@@ -1,7 +1,7 @@
 {
   "distribution": "ugence-trusted-evidence-authority",
   "namespace": "ugence_trusted_evidence_authority",
-  "package_version": "0.4.0",
+  "package_version": "0.5.0",
   "curated_api_module": "ugence_trusted_evidence_authority.api",
   "note": "Machine-readable snapshot of the curated public API (ugence_trusted_evidence_authority.api.__all__). Generated from the package surface; tests/packaging/test_public_api.py asserts this file equals the actual package surface, and verify_trusted_evidence_authority_distribution.py asserts the same for the built wheel and the isolated installed runtime. Regenerate when the curated API changes.",
   "symbols": {
@@ -423,6 +423,9 @@
     "SignedReceiptVerifier": {
       "kind": "class"
     },
+    "SignedSnapshotTrustAnchorResolver": {
+      "kind": "class"
+    },
     "StaticTrustAnchorDirectory": {
       "kind": "class"
     },
@@ -473,7 +476,10 @@
         "TRUSTED_EVIDENCE_SIGNATURE_PROFILE_UNSUPPORTED",
         "TRUSTED_EVIDENCE_TRUST_ANCHOR_AMBIGUOUS",
         "TRUSTED_EVIDENCE_TRUST_ANCHOR_MISSING",
-        "TRUSTED_EVIDENCE_TRUST_ANCHOR_NOT_CONFIGURED"
+        "TRUSTED_EVIDENCE_TRUST_ANCHOR_NOT_CONFIGURED",
+        "TRUSTED_EVIDENCE_TRUST_ANCHOR_SET_INSTANT_REQUIRED",
+        "TRUSTED_EVIDENCE_TRUST_ANCHOR_SET_STALE",
+        "TRUSTED_EVIDENCE_TRUST_ANCHOR_SET_UNAVAILABLE"
       ]
     },
     "TRUSTED_EVIDENCE_CANONICALIZATION_VERSION": {
@@ -532,6 +538,9 @@
         "TRUSTED_EVIDENCE_TRUST_ANCHOR_AMBIGUOUS",
         "TRUSTED_EVIDENCE_TRUST_ANCHOR_MISSING",
         "TRUSTED_EVIDENCE_TRUST_ANCHOR_NOT_CONFIGURED",
+        "TRUSTED_EVIDENCE_TRUST_ANCHOR_SET_INSTANT_REQUIRED",
+        "TRUSTED_EVIDENCE_TRUST_ANCHOR_SET_STALE",
+        "TRUSTED_EVIDENCE_TRUST_ANCHOR_SET_UNAVAILABLE",
         "TRUSTED_EVIDENCE_TYPE_UNSUPPORTED",
         "TRUSTED_EVIDENCE_VERIFICATION_NOT_PERFORMED",
         "TRUSTED_EVIDENCE_VERIFIER_UNAVAILABLE"
@@ -557,6 +566,22 @@
       "kind": "constant",
       "value": "ugence.trusted-evidence-authority/trust-anchor-record/v1"
     },
+    "TRUST_ANCHOR_SET_COLLECTION_DIGEST_DOMAIN": {
+      "kind": "constant",
+      "value": "ugence.trusted-evidence-authority/trust-anchor-set-collection/v1"
+    },
+    "TRUST_ANCHOR_SET_DOCUMENT_SCHEMA_V1": {
+      "kind": "constant",
+      "value": "ugence.trusted-evidence-authority/trust-anchor-set-document/v1"
+    },
+    "TRUST_ANCHOR_SET_MANIFEST_SCHEMA_V1": {
+      "kind": "constant",
+      "value": "ugence.trusted-evidence-authority/trust-anchor-set-manifest/v1"
+    },
+    "TRUST_ANCHOR_SET_PUBLICATION_SIGNING_DOMAIN": {
+      "kind": "constant",
+      "value": "ugence.trusted-evidence-authority/trust-anchor-set-publication/v1"
+    },
     "TrustAnchorCapability": {
       "kind": "enum",
       "values": [
@@ -564,7 +589,8 @@
         "RECEIPT_ISSUANCE",
         "CLOUD_SCALING_RECOMMENDATION_ATTESTATION",
         "EFFECT_ATTESTATION_EXECUTING_PROVIDER",
-        "EFFECT_ATTESTATION_INDEPENDENT_OBSERVER"
+        "EFFECT_ATTESTATION_INDEPENDENT_OBSERVER",
+        "TRUST_ANCHOR_SET_PUBLICATION"
       ]
     },
     "TrustAnchorCoordinate": {
@@ -602,6 +628,44 @@
     },
     "TrustAnchorResolverPort": {
       "kind": "class"
+    },
+    "TrustAnchorSetLoadFailure": {
+      "kind": "enum",
+      "values": [
+        "DOCUMENT_UNAVAILABLE",
+        "DOCUMENT_MALFORMED",
+        "PUBLICATION_ROOT_ABSENT",
+        "PUBLICATION_ROOT_WRONG_CAPABILITY",
+        "PUBLISHER_UNKNOWN",
+        "SELF_AUTHENTICATING",
+        "SIGNATURE_INVALID",
+        "VERSION_ROLLBACK"
+      ]
+    },
+    "TrustAnchorSetManifest": {
+      "kind": "dataclass",
+      "fields": [
+        "schema_version",
+        "trust_anchor_set_id",
+        "trust_anchor_set_version",
+        "publisher_authority_id",
+        "publisher_key_id",
+        "published_at",
+        "effective_from",
+        "effective_to",
+        "anchor_count",
+        "anchor_collection_digest",
+        "signature_profile",
+        "signature_encoding"
+      ]
+    },
+    "TrustAnchorSetSnapshot": {
+      "kind": "dataclass",
+      "fields": [
+        "manifest",
+        "anchors",
+        "signature"
+      ]
     },
     "TrustedEvidenceCanonicalizationError": {
       "kind": "exception"
@@ -654,7 +718,10 @@
         "TRUSTED_EVIDENCE_PROTOCOL_UNSUPPORTED",
         "TRUSTED_EVIDENCE_PROTOCOL_VERSION_MISMATCH",
         "TRUSTED_EVIDENCE_RECEIPT_NOT_YET_VALID",
-        "TRUSTED_EVIDENCE_RECEIPT_EXPIRED"
+        "TRUSTED_EVIDENCE_RECEIPT_EXPIRED",
+        "TRUSTED_EVIDENCE_TRUST_ANCHOR_SET_INSTANT_REQUIRED",
+        "TRUSTED_EVIDENCE_TRUST_ANCHOR_SET_UNAVAILABLE",
+        "TRUSTED_EVIDENCE_TRUST_ANCHOR_SET_STALE"
       ]
     },
     "TrustedEvidenceSigningKey": {
@@ -696,6 +763,12 @@
     "is_valid_lifecycle_transition": {
       "kind": "function"
     },
+    "parse_trust_anchor_set_document": {
+      "kind": "function"
+    },
+    "render_trust_anchor_set_document": {
+      "kind": "function"
+    },
     "require_valid_lifecycle_transition": {
       "kind": "function"
     },
@@ -703,6 +776,12 @@
       "kind": "function"
     },
     "signed_receipt_input_bytes": {
+      "kind": "function"
+    },
+    "trust_anchor_collection_digest": {
+      "kind": "function"
+    },
+    "trust_anchor_set_signing_bytes": {
       "kind": "function"
     }
   }

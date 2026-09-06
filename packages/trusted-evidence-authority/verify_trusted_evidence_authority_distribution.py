@@ -101,7 +101,7 @@ assert not any("/symbolu" in p for p in sys.path), sys.path
 assert not any(p in ("", ".") for p in sys.path[1:]), sys.path
 
 import ugence_trusted_evidence_authority as u
-assert u.__version__ == "0.4.0", u.__version__
+assert u.__version__ == "0.5.0", u.__version__
 assert "site-packages" in u.__file__, u.__file__
 assert not any("/symbolu" in p for p in sys.path), sys.path
 assert (pathlib.Path(u.__file__).resolve().parent / "py.typed").is_file(), "py.typed not installed"
@@ -336,12 +336,14 @@ for field, code in (("tenant_id", R.TRUSTED_EVIDENCE_TENANT_MISMATCH),
     assert code in req(evidence=replayed).structural_scope_mismatches(), field
 
 assert set(R) == set(TRUSTED_EVIDENCE_REFUSAL_REASONS)
-assert len(list(R)) == 40
+assert len(list(R)) == 43  # 19 TEV-1 + 21 TEV-2 + 3 TR-3 (0.5.0)
+assert list(R)[40] is R.TRUSTED_EVIDENCE_TRUST_ANCHOR_SET_INSTANT_REQUIRED
 assert R.TRUSTED_EVIDENCE_INDETERMINATE in TRUSTED_EVIDENCE_REFUSAL_REASONS
 # TEV-1's nineteen keep their exact ordinal positions; TEV-2 appended 21.
 assert list(R)[18] is R.TRUSTED_EVIDENCE_INDETERMINATE
 assert list(R)[19] is R.TRUSTED_EVIDENCE_ENVELOPE_MALFORMED
-assert list(R)[-1] is R.TRUSTED_EVIDENCE_RECEIPT_EXPIRED
+assert list(R)[39] is R.TRUSTED_EVIDENCE_RECEIPT_EXPIRED
+assert list(R)[-1] is R.TRUSTED_EVIDENCE_TRUST_ANCHOR_SET_STALE  # TR-3 block, appended (0.5.0)
 for name in api.__all__:
     low = name.lower().replace("_", "")
     # No *later* milestone leaked in. TEV-2's own verifier, signer, trust

@@ -125,6 +125,14 @@ jobs:
         run: |
           python -m pytest \
             packages/trusted-evidence-authority/tests/packaging/test_milestone_boundary.py -q
+      - name: Signed-snapshot resolver conformance (TR-1 to TR-3; production-shaped candidate)
+        run: |
+          python -m pytest \
+            packages/trusted-evidence-authority/tests/authority/test_signed_snapshot_resolver_conformance.py -q
+      - name: Resolver mutation sweep — every survivor classified or the job fails
+        run: python packages/trusted-evidence-authority/scripts/resolver_mutation_sweep.py
+      - name: The committed resolver mutation ledger equals the one just measured
+        run: git diff --exit-code -- packages/trusted-evidence-authority/resolver_mutation_ledger.json
 
   adversarial-probes:
     name: Independent adversarial probes (source)

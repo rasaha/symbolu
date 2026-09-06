@@ -1,5 +1,70 @@
 # Changelog — ugence-trusted-evidence-authority
 
+## [0.5.0] — the production-shaped trust-anchor resolver candidate (TR-1 to TR-5)
+
+Additive and backward-compatible over 0.4.0. **Every 0.4.0 symbol remains exported
+unchanged**, every pinned digest is byte-identical, the five existing
+`TrustAnchorCapability` members and the forty existing refusal reasons keep their
+names, spellings and declaration order, and every evidence and receipt behaviour
+is unchanged. The curated export count grows from 87 to 99.
+
+Ratified by `docs/architecture/ADR_UGENCE_TEA_PRODUCTION_TRUST_ANCHOR_RESOLVER.md`.
+**Maturity: a production-shaped resolver candidate.** It is not independently
+reviewed, not externally cryptographically audited and not production-ready;
+D-38 and D-32(4) remain applicable. No consumer is wired to it here.
+
+### The protocol amendment (TR-3-PROTOCOL)
+
+`TrustAnchorResolverPort.resolve(coordinate, *, as_of=None)`. The keyword is
+additive: callers that omit it stay source-compatible, and
+`StaticTrustAnchorDirectory` and `DenyAllTrustAnchorDirectory` accept and ignore
+it. A resolver declaring `is_production_authoritative = True` requires an explicit
+timezone-aware `as_of` on **every** resolution and refuses
+`TRUSTED_EVIDENCE_TRUST_ANCHOR_SET_INSTANT_REQUIRED` otherwise, so no production
+resolution can succeed at `as_of=None`. The four existing call sites
+(`verification.py`, `reverification.py`, the 5B-0A verifier and the
+effect-attestation verifier) forward the instant they already hold; that is
+contract migration, not production consumer wiring. A third-party resolver that
+lacks the keyword is not production-conformant under this release.
+
+### The signed snapshot and its resolver
+
+- `TrustAnchorCapability.TRUST_ANCHOR_SET_PUBLICATION`: held only by a pinned
+  bootstrap root provisioned at the composition boundary; a snapshot may never
+  carry an anchor under it.
+- `TrustAnchorSetManifest` (schema, set id, integer set version, publisher
+  coordinate, `published_at`, `effective_from`/`effective_to`, anchor count,
+  complete-collection digest, profile, encoding) and `TrustAnchorSetSnapshot`
+  (manifest, canonically ordered records, signature). Duplicate coordinates,
+  out-of-order records, count or digest mismatch, records naming another set or
+  version, and any publication-capability record refuse at the contract.
+- `trust_anchor_set_signing_bytes` (domain-separated frame over the canonical
+  manifest), `trust_anchor_collection_digest`, and the wire document
+  (`parse_trust_anchor_set_document` / `render_trust_anchor_set_document`), which
+  is admitted only in its one canonical rendering.
+- `SignedSnapshotTrustAnchorResolver.from_document(document, publication_root=,
+  max_snapshot_age=, last_accepted_set_version=)`: the composition root reads the
+  file and hands over the complete bytes (this package bans `open`, `os` and
+  `pathlib` structurally); the resolver admits nothing on any failure and keeps a
+  typed `TrustAnchorSetLoadFailure`. `is_production_authoritative` is `True` only
+  after full admission. Resolution order: instant, admission, publication-root
+  lifecycle and set window at `as_of`, freshness (the earlier of the signed
+  `effective_to` and `published_at` plus the maximum age, half-open), exact
+  coordinate, typed resolution. Nothing is cached across resolutions.
+- Three appended refusal reasons: `TRUSTED_EVIDENCE_TRUST_ANCHOR_SET_INSTANT_REQUIRED`,
+  `TRUSTED_EVIDENCE_TRUST_ANCHOR_SET_UNAVAILABLE`, `TRUSTED_EVIDENCE_TRUST_ANCHOR_SET_STALE`.
+  `TEV2_TRUSTED_EVIDENCE_REFUSAL_REASONS` remains "every member after TEV-1" and
+  therefore contains them.
+- `tests/authority/resolver_conformance.py`: the reusable conformance harness
+  any production resolver must pass; `scripts/resolver_mutation_sweep.py` and
+  `resolver_mutation_ledger.json`: the measured gate sweep.
+
+### Not in this release
+
+Anchor-publication tooling, KMS/HSM signing, remote retrieval, automated rotation
+or revocation, any signer, any credential, any clock, and any consumer wired to
+the resolver. The TR-4 custody roles bind deployments, not this package.
+
 ## [0.4.0] — a second named consumer exception, and two lent effect-attestation capabilities
 
 Additive and backward-compatible over 0.3.0. **Every 0.3.0 symbol remains exported

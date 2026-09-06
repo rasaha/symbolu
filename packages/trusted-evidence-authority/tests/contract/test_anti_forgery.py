@@ -194,9 +194,13 @@ def test_the_only_signature_field_is_opaque_material_never_a_trust_claim():
     from ugence_trusted_evidence_authority.api import (
         SignedEvidenceSubmission,
         SignedEvidenceVerificationReceipt,
+        TrustAnchorSetSnapshot,
     )
 
-    allowed = {SignedEvidenceSubmission, SignedEvidenceVerificationReceipt}
+    # 0.5.0 adds the third signed artifact: the manifest-signed trust-anchor-set
+    # snapshot (TR-2). Its ``signature`` is publication material over the
+    # manifest, held as canonical hex, and it verifies only under a pinned root.
+    allowed = {SignedEvidenceSubmission, SignedEvidenceVerificationReceipt, TrustAnchorSetSnapshot}
     for name in api.__all__:
         obj = getattr(api, name)
         if not (isinstance(obj, type) and dataclasses.is_dataclass(obj)):

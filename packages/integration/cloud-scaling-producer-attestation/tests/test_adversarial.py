@@ -147,7 +147,7 @@ def test_a_resolver_answering_with_a_wrong_capability_anchor_is_refused(candidat
     )
 
     class MisdirectingResolver:
-        def resolve(self, coordinate):
+        def resolve(self, coordinate, *, as_of=None):
             return TrustAnchorResolution.resolved(wrong.coordinate, wrong)
 
     verifier = build_verifier(directory=MisdirectingResolver())
@@ -162,7 +162,7 @@ def test_a_resolver_answering_for_another_authority_is_refused(candidate):
     other = build_anchor(seed=TRUSTED_PRODUCER_SEED, issuer=FOREIGN_ISSUER_ID)
 
     class MisdirectingResolver:
-        def resolve(self, coordinate):
+        def resolve(self, coordinate, *, as_of=None):
             return TrustAnchorResolution.resolved(other.coordinate, other)
 
     verifier = build_verifier(directory=MisdirectingResolver())
@@ -177,7 +177,7 @@ def test_a_resolver_answering_with_another_key_id_is_refused(candidate):
     other = build_anchor(seed=TRUSTED_PRODUCER_SEED, key_id="some-other-key")
 
     class MisdirectingResolver:
-        def resolve(self, coordinate):
+        def resolve(self, coordinate, *, as_of=None):
             return TrustAnchorResolution.resolved(other.coordinate, other)
 
     verifier = build_verifier(directory=MisdirectingResolver())
@@ -255,7 +255,7 @@ def test_an_unrecognised_lifecycle_refusal_falls_closed_to_not_in_window(candida
         pass
 
     class UninterpretableResolver:
-        def resolve(self, coordinate):
+        def resolve(self, coordinate, *, as_of=None):
             # A record whose lifecycle answer this package has no mapping for.
             patched = copy.copy(genuine)
             object.__setattr__(
@@ -417,7 +417,7 @@ def test_an_anchor_profile_disagreement_is_refused(candidate, monkeypatch):
     genuine = build_anchor()
 
     class ProfileDivergentResolver:
-        def resolve(self, coordinate):
+        def resolve(self, coordinate, *, as_of=None):
             patched = copy.copy(genuine)
             object.__setattr__(patched, "signature_profile", "some.other/profile/v1")
             return TrustAnchorResolution.resolved(genuine.coordinate, patched)
@@ -434,7 +434,7 @@ def test_an_anchor_encoding_disagreement_is_refused(candidate):
     genuine = build_anchor()
 
     class EncodingDivergentResolver:
-        def resolve(self, coordinate):
+        def resolve(self, coordinate, *, as_of=None):
             patched = copy.copy(genuine)
             object.__setattr__(patched, "signature_encoding", "some.other/encoding/v1")
             return TrustAnchorResolution.resolved(genuine.coordinate, patched)
@@ -757,7 +757,7 @@ def test_a_resolver_that_raises_is_unavailable_not_successful(candidate):
     """A-51: an exception is never converted into a success."""
 
     class ExplodingResolver:
-        def resolve(self, coordinate):
+        def resolve(self, coordinate, *, as_of=None):
             raise RuntimeError("key service unreachable")
 
     verifier = build_verifier(directory=ExplodingResolver())
@@ -805,7 +805,7 @@ def test_a_resolver_returning_a_wrong_typed_resolution_is_refused(candidate):
     """A-54: the resolver's answer is exact-typed too."""
 
     class WrongTypeResolver:
-        def resolve(self, coordinate):
+        def resolve(self, coordinate, *, as_of=None):
             return {"anchor": "trust me"}
 
     verifier = build_verifier(directory=WrongTypeResolver())

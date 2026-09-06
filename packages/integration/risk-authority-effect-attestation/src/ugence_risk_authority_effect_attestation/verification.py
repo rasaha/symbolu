@@ -312,7 +312,7 @@ class Ed25519EffectAttestationVerifier:
             attester_key_id=attestation.attester_key_id,
         )
         try:
-            resolution = self._resolver.resolve(coordinate)
+            resolution = self._resolver.resolve(coordinate, as_of=instant)
         except Exception as exc:  # noqa: BLE001 - a resolver that raises is unavailable
             return refuse(_Reason.ANCHOR_UNAVAILABLE,
                           f"the trust-anchor resolver raised {type(exc).__name__}")
