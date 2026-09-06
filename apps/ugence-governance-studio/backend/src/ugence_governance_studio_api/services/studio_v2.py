@@ -23,6 +23,8 @@ presents the answer as though the real thing had run.
 """
 from __future__ import annotations
 
+import re
+
 from typing import Any, Dict, List, Optional, Tuple
 
 import ugence_agent_runtime.api as art
@@ -517,8 +519,42 @@ class SimulateService:
 # --------------------------------------------------------------------------- #
 # 5 · Publish
 # --------------------------------------------------------------------------- #
+#: FD-8.2: a frozen console scenario id is a typed token. Anything else is not a
+#: scenario id and is refused before any outbound request; nothing is inferred.
+SCENARIO_ID_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")
+PUBLISH_PAYLOAD_UNMAPPED = "publish_payload_unmapped"
+
+
+def _refused(code: str, reason: str) -> Dict[str, Any]:
+    return {"available": True, "refused": True, "code": code, "reason": reason, "result": None}
+
+
+def scenario_id_refusal(scenario_id: Any) -> Optional[str]:
+    """Why ``scenario_id`` cannot name a frozen console scenario, or ``None``."""
+    if scenario_id is None:
+        return ("a compiled release package is not a governed-loop request: the console's "
+                "shadow loop needs an assertion, an action and operational signals that a "
+                "compiled package does not carry, and the studio invents none of them; "
+                "name a frozen console scenario_id instead")
+    if not isinstance(scenario_id, str):
+        return f"scenario_id must be a string, got {type(scenario_id).__name__}"
+    if scenario_id == "":
+        return "scenario_id is empty"
+    if not SCENARIO_ID_PATTERN.fullmatch(scenario_id):
+        return ("scenario_id is not a typed scenario token (letters, digits, '.', '_' and "
+                "'-', at most 64 characters, no whitespace, no path separator)")
+    return None
+
+
 class PublishService:
-    """Hand a compiled release package to the console's SHADOW governed loop."""
+    """Hand a frozen console scenario to the console's SHADOW governed loop (FD-8.2).
+
+    The mode is never the caller's to choose: the console client names ``shadow`` in
+    every governed-loop body it sends. A compiled release package is not a
+    governed-loop request, so without a valid ``scenario_id`` the answer is the typed
+    refusal ``publish_payload_unmapped``, decided before any outbound request. No field
+    of ``compiled_package`` is read, forwarded or used to infer anything.
+    """
 
     def __init__(self, console: Optional[ConsoleClient] = None) -> None:
         self._console = console
@@ -526,18 +562,19 @@ class PublishService:
     def shadow(
         self, *, compiled_package: Dict[str, Any], scenario_id: Optional[str]
     ) -> Dict[str, Any]:
+        del compiled_package  # never read (FD-8.2): nothing of it crosses the boundary
+        reason = scenario_id_refusal(scenario_id)
+        if reason is not None:
+            return _refused(PUBLISH_PAYLOAD_UNMAPPED, reason)
         if self._console is None:
             return _unavailable(
                 "console_api", "no ugence_console_api base URL is configured"
             )
         try:
-            if scenario_id is not None:
-                body = self._console.governed_loop_scenario(scenario_id)
-            else:
-                body = self._console.governed_loop_shadow(compiled_package)
+            body = self._console.governed_loop_scenario(scenario_id)
         except ConsoleUnavailable as exc:
             return _unavailable("console_api", str(exc))
-        return {"available": True, "mode": "SHADOW", "result": body}
+        return {"available": True, "mode": "SHADOW", "scenario_id": scenario_id, "result": body}
 
 
 # --------------------------------------------------------------------------- #

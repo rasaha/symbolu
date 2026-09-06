@@ -26,7 +26,12 @@ import urllib.parse
 import urllib.request
 from typing import Any, Dict, Optional, Tuple
 
-__all__ = ["ConsoleClient", "ConsoleUnavailable", "CONSOLE_ALLOWED_ROUTES"]
+__all__ = ["ConsoleClient", "ConsoleUnavailable", "CONSOLE_ALLOWED_ROUTES", "GOVERNED_LOOP_MODE"]
+
+#: FD-8.2: the only deployment mode this client ever names in a governed-loop body.
+#: A constant, not a parameter: no caller, payload or compiled package can select
+#: enforcement or any other mode through the studio.
+GOVERNED_LOOP_MODE = "shadow"
 
 #: The complete set of console routes the studio may reach. Two shadow-only writes and
 #: two reads. Nothing that grants, authorizes, clears or executes appears here, and
@@ -59,16 +64,27 @@ class ConsoleClient:
 
     # -- the four permitted operations ----------------------------------------
     def governed_loop_shadow(self, payload: Dict[str, Any]) -> Dict[str, Any]:
-        """``POST /v1/governed-loop/shadow`` — the console's SHADOW governed loop."""
-        return self._request("POST", "/v1/governed-loop/shadow", body=payload)
+        """``POST /v1/governed-loop/shadow`` — the console's SHADOW governed loop.
+
+        The body's ``mode`` is overridden with :data:`GOVERNED_LOOP_MODE` whatever the
+        payload carries (FD-8.2). ``PublishService`` no longer calls this route; it
+        stays in the allowlist unchanged and pinned for any caller that does.
+        """
+        body = dict(payload)
+        body["mode"] = GOVERNED_LOOP_MODE
+        return self._request("POST", "/v1/governed-loop/shadow", body=body)
 
     def governed_loop_scenario(self, scenario_id: str) -> Dict[str, Any]:
-        """``POST /v1/governed-loop/scenario/{scenario_id}`` — a frozen console scenario."""
+        """``POST /v1/governed-loop/scenario/{scenario_id}`` — a frozen console scenario.
+
+        The body is the constant ``{"mode": "shadow"}`` (FD-8.2): the scenario id is
+        the only caller-supplied value, and it travels in the path, quoted.
+        """
         return self._request(
             "POST",
             "/v1/governed-loop/scenario/{scenario_id}",
             path_params={"scenario_id": scenario_id},
-            body={},
+            body={"mode": GOVERNED_LOOP_MODE},
         )
 
     def audit_ids(self) -> Any:
