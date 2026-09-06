@@ -2,7 +2,7 @@
 
 P3E **is** single-tenant, synthetic-data-only, HTTPS-only, authenticated demonstration
 hosting. P3E **does not**: grant permissions; provision credentials; authorize business
-actions; execute agents; call external models/tools; integrate production systems; ingest
+actions; execute agents against any non-fixture provider (FD-7.1: a run over the one in-image no-I/O simulation provider under a non-LIVE mode is a demonstration); call external models/tools; integrate production systems; ingest
 real/customer/enterprise data; provide multitenancy, SSO/SCIM/RBAC product features, a
 persistent user or decision database, billing, analytics, or telemetry export. It is not
 an enterprise identity implementation and not a public-Internet SaaS deployment. The OCI
