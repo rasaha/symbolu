@@ -230,7 +230,7 @@ stays `False`; `REFERENCE_GRADE_SHADOW_ONLY` stands; the v1 and v2 contract byte
 untouched (the response fields already exist); no FROM line or ratified digest changes;
 the mirror blocker is unchanged.
 
-### 8.4 Proposed ruling FD-7 `[R]` (five decisions, recommended option first)
+### 8.4 Proposed ruling FD-7 (five decisions, recommended option first; ruled in §8.5)
 
 | # | Decision | Options |
 |---|---|---|
@@ -247,5 +247,25 @@ entry re-worded, and matrix rows 1 to 6 as tests. The governed hook then becomes
 later seam of its own (FD-1), entered only when a sink for ESCALATE exists in the studio
 or the worker relay is ruled.
 
-The ruling authorizes documentation only. No implementation prompt is issued while
-FD-7.1 to FD-7.5 remain open.
+### 8.5 Ruling FD-7 (owner, 2026-09-06)
+
+| # | Ruling |
+|---|---|
+| **FD-7.1** | **`FIXTURE_RUN_ADMISSIBLE`.** A run whose every provider is an in-image, no-I/O fixture and whose modes exclude LIVE is a demonstration, not agent execution. The profile's `prohibited` entry `agent_execution` is re-worded, when seam 3 ships, to "agent execution against any non-fixture provider"; `external_tool_calls` and `external_model_calls` stand unchanged. |
+| **FD-7.2** | **`P3E_IN_PROCESS`.** The Simulate screen runs the studio's own Agent Runtime, as `SimulateService` is written. No worker relay; CR-2's five-route allowlist is untouched. |
+| **FD-7.3** | **`RUNTIME_DEFAULT_BLOCK`.** Seam 3 hands `provider_registry` only. `governance_hook` stays the runtime's fail-closed default and is recorded as absent by ruling; every consequential task BLOCKs with `GOVERNANCE_NOT_CONFIGURED` and the trace shows it. No package is added to the image. The governed hook is a later seam of its own (FD-1), entered only when ESCALATE has a sink in the studio or a worker relay is ruled. |
+| **FD-7.4** | **`ONE_PINNED_FIXTURE_PROVIDER`.** One provider in `governance-studio-deployment`, its id and version recorded in `approved-runtime-config.json`; it records in memory, returns success, opens no socket and reads no file. It is enabled by one boolean configuration value whose name and error text avoid the word "fixture" (§8.1, startup-integrity classification). No provider list is read from the environment (FD-4: no discovery, no default). |
+| **FD-7.5** | **`PROHIBITED_IN_PROFILE`.** The P3E composition root never constructs `AllowAllGovernanceHook` or any permissive hook; startup integrity fails if `governance_hook_permissive` could be true; the composition record states the prohibition. |
+
+**What the ruling authorizes.** Documentation only. No seam is activated, no code is
+changed, and the P3E container still hands the studio context the review-service
+URL, the activation root and the seam-2 authority reads until seam 3's own
+implementation prompt is issued and its PR merges. That step, when entered, ships:
+one configuration value, one fixture provider, `provider_registry` handed and
+`governance_hook` absent by ruling, the re-worded `agent_execution` entry, a
+superseding composition record (FD-3, the seam-2 record kept byte-for-byte), and
+matrix rows 1 to 6 as tests, with rows 4 and 6 closing their `[G]`. FD-3, FD-4, the
+`REFERENCE_GRADE_SHADOW_ONLY` ceiling, `ENFORCEMENT_ENABLED = False`, the frozen v1
+and v2 contracts, every FROM line and ratified digest, and every credential, egress
+and LIVE prohibition are preserved. `CONSOLE_BASE_URL` and the governed hook remain
+unruled future seams; neither is implemented.
