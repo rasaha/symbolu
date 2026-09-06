@@ -27,12 +27,11 @@ admissible set is fixed at ratification rather than at call time.
 
 None of that verifies anything. Every envelope permanently derives
 ``signature_verified is False`` and ``admission_established is False`` on top of
-§09's five, and **BR-2A implements no signing, no verification and no key
-parsing**, and ships no cryptographic dependency. D-03 makes a verified
-publisher signature mandatory *before admission*; BR-2C injects the verifier,
-whose default is exact deny-all, and supplies the audited one. Until then
-nothing can be admitted, which is the intended state and not a limitation to be
-worked around.
+§09's five, and **the contracts implement no signing, no verification and no
+key parsing**. D-03 makes a verified publisher signature mandatory *before
+admission*; the candidate verifier in ``verifier.py`` verifies against these
+frames, the deny-all default refuses everything, and neither admits anything —
+admission arrives with the durable authority at BR-2D.
 
 The signing frame, specified now so BR-2C need not reinterpret it
 ------------------------------------------------------------------
@@ -106,7 +105,9 @@ from ._validation import (
     require_distinct_actors,
     require_enum_member,
     require_exact_type,
+    require_actor_identity,
     require_identifier,
+    require_key_identifier,
     require_pinned_constant,
 )
 from .canonical import (
@@ -308,7 +309,7 @@ class BenchmarkPublisherSubmissionEnvelope:
     signing_frame_version: str
 
     #: A detached signature, exactly 128 lowercase hex characters. Validated as
-    #: an encoding; verified by nothing.
+    #: an encoding here; verified only at the verifier seam.
     detached_signature: str
 
     def __post_init__(self) -> None:
@@ -317,8 +318,8 @@ class BenchmarkPublisherSubmissionEnvelope:
             self.benchmark_identity_digest, "benchmark_identity_digest"
         )
         require_digest(self.benchmark_content_digest, "benchmark_content_digest")
-        require_identifier(self.publisher_identity, "publisher_identity")
-        require_identifier(self.publisher_key_id, "publisher_key_id")
+        require_actor_identity(self.publisher_identity, "publisher_identity")
+        require_key_identifier(self.publisher_key_id, "publisher_key_id")
         require_enum_member(
             self.signature_profile,
             BenchmarkSignatureProfile,
@@ -406,10 +407,10 @@ class BenchmarkApprovalEnvelope:
             BenchmarkPublisherSubmissionEnvelope,
             "publisher_submission_envelope",
         )
-        require_identifier(
+        require_actor_identity(
             self.approval_authority_identity, "approval_authority_identity"
         )
-        require_identifier(
+        require_key_identifier(
             self.approval_authority_key_id, "approval_authority_key_id"
         )
         require_enum_member(
@@ -548,8 +549,8 @@ class BenchmarkRevocationEnvelope:
     def __post_init__(self) -> None:
         require_exact_type(self.coordinate, BenchmarkCoordinate, "coordinate")
         require_digest(self.admitted_digest, "admitted_digest")
-        require_identifier(self.revoker_identity, "revoker_identity")
-        require_identifier(self.revoker_key_id, "revoker_key_id")
+        require_actor_identity(self.revoker_identity, "revoker_identity")
+        require_key_identifier(self.revoker_key_id, "revoker_key_id")
         require_enum_member(
             self.signature_profile,
             BenchmarkSignatureProfile,

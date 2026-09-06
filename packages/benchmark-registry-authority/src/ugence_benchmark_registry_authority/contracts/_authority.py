@@ -83,9 +83,9 @@ BENCHMARK_RESERVED_AUTHORITY_ISSUED_TYPE_NAMES: tuple = (
 
 _AUTHORITY_DOC = {
     "authority_verified": (
-        "Permanently ``False``. No authority verified this object, because at "
-        "BR-2A no authority exists to verify anything: this package ships no "
-        "admission engine, no verifier, no trust store and no registry. "
+        "Permanently ``False``. No authority verified this object: this "
+        "package ships no admission engine, no trust store and no registry, "
+        "and a cryptographic verification is not an authority act. "
         "Derived with no constructor argument, no setter and no subclass hook."
     ),
     "publisher_authenticity_established": (

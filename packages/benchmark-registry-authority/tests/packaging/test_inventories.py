@@ -235,7 +235,27 @@ def test_every_other_public_symbol_is_marked_with_its_kind_and_not_canonicalizab
             "abstract_type_declaration",
             "pure_validation_function",
             "pinned_constant",
+            "candidate_verifier_implementation",
         }
+
+
+def test_exactly_the_two_candidate_verifiers_are_marked_as_implementations():
+    """The candidate rung's two port implementations, and no other symbol."""
+
+    kinds = {
+        row["symbol"]: row["kind"] for row in CONTRACTS["other_public_symbols"]
+    }
+    implementations = sorted(
+        symbol for symbol, kind in kinds.items()
+        if kind == "candidate_verifier_implementation"
+    )
+    assert implementations == ["BenchmarkDenyAllVerifier", "BenchmarkEd25519Verifier"]
+    manifest = json.loads((PKG / "public_api.json").read_text())
+    for symbol in implementations:
+        row = manifest["symbols"][symbol]
+        assert row["kind"] == "candidate_verifier_implementation"
+        assert row["port"] == "BenchmarkApprovalVerifierPort"
+        assert row["maturity"] == "CANDIDATE_NOT_REVIEWED"
 
 
 def test_the_two_inventories_and_the_api_manifest_agree_on_the_surface():

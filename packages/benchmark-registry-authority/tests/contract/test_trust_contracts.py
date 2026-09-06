@@ -416,13 +416,39 @@ def test_the_evaluation_time_is_a_declared_input_not_a_clock_read(name, builder)
 # --------------------------------------------------------------------------- #
 # The ports stay inert
 # --------------------------------------------------------------------------- #
-def test_no_verifier_or_resolver_ships_and_no_crypto_is_imported():
-    """The contracts describe a verifier. Nothing here is one."""
+def test_no_contract_module_imports_cryptography_and_no_contract_verifies():
+    """The contracts describe a verifier. None of them is one.
 
-    import sys
+    The candidate verifier lives in ``verifier.py`` and imports the D-41 pair
+    there (D-40 as applied to the candidate rung). The ``contracts`` subpackage
+    stays exactly as it was: no cryptographic import, no curve operation, no
+    port satisfied. Measured on the import graph rather than ``sys.modules``,
+    because the curated surface now legitimately imports the verifier.
+    """
 
-    for module in ("cryptography", "nacl", "ed25519", "Crypto", "OpenSSL"):
-        assert module not in sys.modules
+    import ast
+    import pathlib
+
+    contracts = pathlib.Path(__file__).resolve().parents[2] / "src" / (
+        "ugence_benchmark_registry_authority"
+    ) / "contracts"
+    for path in sorted(contracts.rglob("*.py")):
+        for node in ast.walk(ast.parse(path.read_text())):
+            if isinstance(node, ast.Import):
+                roots = {alias.name.split(".")[0] for alias in node.names}
+            elif isinstance(node, ast.ImportFrom) and node.level == 0 and node.module:
+                roots = {node.module.split(".")[0]}
+            else:
+                continue
+            assert not roots & {"cryptography", "nacl", "ed25519", "Crypto", "OpenSSL"}, (
+                path.name, roots
+            )
+    import ugence_benchmark_registry_authority.contracts as contracts_pkg
+
+    for name in dir(contracts_pkg):
+        value = getattr(contracts_pkg, name)
+        if isinstance(value, type) and not getattr(value, "_is_protocol", False):
+            assert not hasattr(value, "verify_publisher_submission"), name
 
 
 # --------------------------------------------------------------------------- #

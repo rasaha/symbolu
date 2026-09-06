@@ -2,12 +2,207 @@
 
 All notable changes to this distribution. The format follows Keep a Changelog;
 versioning is Semantic Versioning, and the version ladder is the ratified one:
-BR-2A `0.1.0`, BR-2B `0.2.0`, **BR-2C-0 `0.2.1`, `0.2.2` and `0.2.3`**, BR-2C
-`0.3.0`, BR-2D `0.4.0`, BR-2E `0.5.0` (ADR §35 D-01, amended 2026-08-20, and
-D-33 and D-36). Five of the six rungs are subphases; `BR-2C-0` is a **version
-rung**, carries three versions, and mints no closure audit.
+BR-2A `0.1.0`, BR-2B `0.2.0`, BR-2C-0 `0.2.1`, `0.2.2` and `0.2.3`,
+**BR-2C-RC `0.3.0rc1`**, BR-2C `0.3.0`, BR-2D `0.4.0`, BR-2E `0.5.0` (ADR §35
+D-01, amended 2026-08-20; D-33 and D-36; the owner's BR-2C candidate ruling).
+Five of the seven rungs are subphases; `BR-2C-0` and `BR-2C-RC` are **version
+rungs**, and neither mints a closure audit.
 
-## [Unreleased] — BR-2C-0 closure: shipped-text corrections, D-36, D-37 and D-38
+## [0.3.0rc1] — BR-2C candidate head: the verifier, engineered and tested, not reviewed
+
+**A candidate version, never `0.3.0`.** Ratified by the owner as a candidate
+version only: it conveys no audit, independent-review or production-release
+claim. Two separate preconditions stand between it and `0.3.0`: **D-38(i)**,
+a review by a reviewer distinct from the author of the commit under review who
+may be owner-affiliated (D-38 as amended by ADR §35.2 D-44), which must be
+completed and recorded; and **D-32(4)**, the external cryptographic audit,
+which is unamended and still outstanding. A review under D-38 as amended is
+*owner-reviewed*, never *independently reviewed*, and this candidate is not
+described as reviewed, audited or production-ready anywhere in this
+distribution. Candidate engineering and testing were authorized to begin before
+the review, and this entry is exactly that and no more.
+
+### Added — the candidate verifier, in one dedicated module
+
+- **`src/ugence_benchmark_registry_authority/verifier.py`** — the only module
+  that performs cryptography. `BenchmarkEd25519Verifier` implements the three
+  seams of `BenchmarkApprovalVerifierPort` (D-24, D-26) over an injected
+  `BenchmarkPublisherTrustDirectoryPort` (D-25, D-34): it reconstructs each
+  envelope's signing input by reading the pinned
+  `BENCHMARK_SIGNING_FRAME_SPECIFICATION` rather than restating it, resolves the
+  anchor by the exact `(role, identity, key_id)` triple the envelope declares,
+  evaluates the anchor on `BENCHMARK_TRUST_ANCHOR_EVALUATION_ORDER` at the
+  caller's explicit trusted instant (D-27, D-28; half-open interval; revocation
+  retroactive), admits the anchor's key only after libsodium's strict point
+  check, applies RFC 8032 §5.1.7's `S < L` before consulting the signature
+  backend, and verifies under the single ratified profile (D-29). Nothing is
+  memoized (D-21).
+- **`BenchmarkDenyAllVerifier`** — the exact deny-all default §35.1's BR-2C row
+  requires: every seam refuses `NO_TRUST_ANCHOR_CONFIGURED`, consults no
+  directory, admits no key, has no field to flip, and still binds the envelope
+  digest, the declared signer and the trusted instant.
+- **D-41's division of labour, exactly**: `cryptography` verifies; `PyNaCl`
+  validates the public-key point at anchor admission. Re-measured on this pair
+  (`cryptography` 41.0.7 and 46.0.7, `PyNaCl` 1.6.2): the signature backend
+  alone accepts a key-less forgery under the identity point, its non-canonical
+  encoding, the order-2 point, one order-4 point and a `y ≥ p` encoding; the
+  point check refuses all twelve corpus entries. The second backend is
+  load-bearing, and `tests/contract/test_verifier.py` asserts that rather than
+  citing it.
+- **D-39 and D-42 at the seam**: parsing is private and no parser API is
+  exported; a malformation of external trust state — a malformed key, a
+  malformed or non-verifying signature, a directory that raises, returns the
+  wrong type or answers a different triple — is **returned** as a `REFUSED`
+  result within D-35's twelve, never raised past the seam. A contract error
+  carrying a reason outside the twelve, or none, refuses `INDETERMINATE`
+  (D-42(d)). The seam's own inputs are contracts: a non-envelope or a naive
+  trusted instant raises before evaluation (D-42(a)), because there is no
+  digest to bind a refusal to.
+- **The D-42 key-identifier grammar and the D-43 actor-identity grammar**,
+  applied at construction through two separate validators,
+  `require_key_identifier` and `require_actor_identity`, at exactly the sites
+  the two rulings name. `applicable_policy_ref` and `declared_revocation_reason`
+  stay on the bare rule. Every malformation refuses `INDETERMINATE`. No pinned
+  vector moved: every fixture identity already conformed.
+- **Two exported symbols**, appended: `api.__all__` 108 → **110**,
+  `public_api.json` 107 → **109**; both manifests classify them as
+  `candidate_verifier_implementation` with `maturity: CANDIDATE_NOT_REVIEWED`.
+  No digest domain, pinned vector, refusal member or contract type moved; the
+  canonical-domain inventory stays at **22**.
+
+### Changed — the release transition, and only what it names
+
+The owner ratified the D-40 release transition for the candidate rung as:
+`cryptography` and `PyNaCl` may be imported **only inside the dedicated verifier
+module** and only for their D-41 roles; the bans on
+`ugence_trusted_evidence_authority`, Policy Authority Ed25519 code, Risk
+Authority Ed25519 code, reuse of any other Ugence Ed25519 implementation, and
+every capability token not expressly named for BR-2C remain in force; no other
+dependency-boundary or milestone prohibition moves. Each gate below moved by
+exactly that much:
+
+- **Dependencies.** `pyproject.toml` declares `cryptography>=41.0.7,<47.0.0`
+  and `PyNaCl>=1.5.0,<2.0.0` after the frozen BR-1 pin — the same bounded
+  style as the trusted-evidence layer, as a *selection*, never an import of
+  that layer's code. `test_dependency_boundary.py` pins the list to exactly
+  those three, pins the pair's imports to `verifier.py` alone, keeps
+  `FORBIDDEN_PACKAGES` intact, and bans any further cryptographic distribution.
+- **Milestone ladder.** `tests/_milestones.py` inserts rung `BR-2C-RC` between
+  `BR-2C-0` and `BR-2C` and maps `0.3.0rc1` to it. The twelve BR-2C capability
+  tokens — eight tree-wide, four on the exported surface — unlock at
+  `BR-2C-RC`; every BR-2D token and every permanent ban is unmoved, and both
+  unlock maps are pinned **in both directions** against BR-2A's frozen sets
+  minus exactly the twelve. `BR-2C-0` still bans everything BR-2A froze.
+- **No-cryptography gates.** "Nothing performs cryptography" became "nothing
+  *outside the verifier module* performs cryptography", plus three new gates:
+  the module imports exactly the D-41 pair; it calls exactly `verify` and
+  `crypto_core_ed25519_is_valid_point` and no signing, key-generation or
+  private-key primitive; and it names no other Ugence Ed25519 code. The
+  contracts subpackage is asserted to import no cryptographic module at all.
+- **Port-implementation gates.** "No concrete class satisfies any port" became
+  "exactly the two candidate verifiers satisfy the verifier port, and nothing
+  satisfies the store, directory or clock port". The `NotImplementedError` ban,
+  the placeholder-name ban and the port-instantiation ban are unchanged.
+- **CI.** The package workflow installs the pair at the declared bounds; the
+  distribution verifier fetches the pair into its local wheelhouse before the
+  `--no-index` install and asserts the isolated environment holds exactly the
+  package, BR-1, the pair and the pair's transitive wheels.
+
+### Measured at this head
+
+Every figure from a fresh run against this tree, never edited:
+
+| Check | Result |
+| --- | --- |
+| Package suite | **2256 passed**, 1 failed — `test_no_package_in_the_monorepo_imports_this_one`, pre-existing on the default branch (`ai-system-registry`'s boundary test names this package by string) |
+| Independent adversarial probes | **93 passed**, source and installed wheel |
+| Distinct properties | **558 adversarial : 41 happy = 13.61 : 1** |
+| Distribution verifier | wheel + sdist built; `--no-index` install verified; **8 negative controls, 8 caught** |
+| `check_package_ci_coverage.py` | all 65 packages named by a workflow |
+| Repository boundary tests | 38 passed; `test_core_observer_boundary.py` fails to collect on a missing `agentic.tools` module, pre-existing |
+| Mutation sweep | **72 gates; 67 KILLED, 5 SURVIVED, 0 errored** — the same five survivors as at `0.2.3`, each classified in `gate_inventory.json` |
+| pyflakes | clean |
+
+### Fixed — the four findings of the D-44 owner-affiliated review, all dispositioned FIX
+
+The review of commit `2753404f` under D-38 as amended (owner-reviewed, never
+independently reviewed; D-32(4)'s external audit still outstanding) returned
+four actionable findings. Each is fixed here, with the test or gate that would
+have caught it:
+
+- **F-1 — `_resolve` trusted the resolution's triple, not the record's.**
+  `BenchmarkTrustAnchorResolution`'s constructor checks that the anchor answers
+  the asked triple, but a record substituted into a genuine resolution after
+  construction (`object.__setattr__`) bypasses it, and an approver's record
+  carrying the publisher's key then verified a publisher envelope. The seam now
+  re-checks `anchor.role`, `anchor.identity` and `anchor.key_id` against the
+  triple it asked, refusing `INDETERMINATE` with no revision bound.
+  `test_an_anchor_swapped_into_a_genuine_resolution_after_construction_refuses`
+  plants the swap for the other role, another identity and another key id;
+  sweep gate **G-86** neutralizes the cross-check and must be killed.
+- **F-2 — the sweep inventoried 72 gates and none in `verifier.py`.** Twelve
+  gates added at the package root: the strict point check (G-78), `S < L`
+  (G-79), each of D-28's four lifecycle branches (G-80 to G-83), the
+  resolution exact-type check (G-84), the anchor exact-type check (G-85), the
+  F-1 cross-check (G-86), the frame length prefix (G-87), the frame element
+  order (G-88) and the aware-instant precondition (G-89). Results below are
+  from a fresh run; every survivor is classified, none designed away. G-79
+  survives and is classified **shadowed by the signature backend**, which
+  enforces `S < L` itself; the in-package check stays as defence in depth
+  against backend substitution.
+- **F-3 — the naive-instant test was shadowed.** Deleting
+  `require_aware_datetime` from `_admit_inputs` left it green, because the
+  result type's own `evaluated_at` validator raised later — after the
+  directory had been consulted and the lifecycle comparison attempted. The
+  test now asserts the directory was **never asked** for a naive, string or
+  `None` instant, and asked exactly once for an aware one; gate G-89 pins it.
+- **F-4 — shipped text conflated D-38(i) with D-32(4).** `pyproject.toml`,
+  `README.md`, this file, `api.py`, `__init__.py`, `version.py`,
+  `verifier.py`, `ports.py`, `tests/_milestones.py` and
+  `tests/contract/test_verifier.py` described the precondition as an
+  "independent external cryptographic review". Every site now states D-38(i)
+  as amended — a reviewer distinct from the author of the commit under
+  review, who may be owner-affiliated — and names D-32(4)'s external
+  cryptographic audit separately as still outstanding. The finding listed six
+  sites; the same misstatement stood at five more, and all eleven are
+  corrected.
+
+**Nothing else moved.** No capability token, unlock phase, refusal member,
+digest domain, pinned vector or `package_version`; `__version__` stays
+`0.3.0rc1` on `BR-2C-RC`; no capability was added beyond the F-1 cross-check;
+the ADR is not amended by this entry.
+
+### Fixed — the reverse-import gate measures imports, not mentions (owner ruling, option (a))
+
+`test_no_package_in_the_monorepo_imports_this_one` had been red since before
+this branch: it searched every other package's source for the string
+`ugence_benchmark_registry_authority`, and `ai-system-registry`'s own boundary
+test names this package inside *its* forbidden-import list — the opposite of an
+import. The gate now walks the AST and reports a file only on `import`, `from …
+import`, or a string literal handed to `importlib.import_module` or
+`__import__`; a name in a string, comment or docstring is a mention. Its
+BR-2A terminal-state meaning is unchanged. A new test plants all six import
+spellings plus a mention-only module in a scratch tree and requires exactly
+the six to be reported. The neighbour's file is untouched, nothing is
+suppressed, and the suite is green for the first time on this branch: **2263
+passed, 0 failed**; properties **562 adversarial : 41 happy = 13.71 : 1**.
+
+Re-measured after the fixes: suite **2261 passed**, 1 pre-existing failure
+(unchanged); probes **93 passed**; properties **561 adversarial : 41 happy = 13.68 : 1**; distribution
+verifier **verified, 8 of 8 negative controls caught**; mutation sweep
+**84 gates; 78 KILLED, 6 SURVIVED, 0 errored — the five survivors carried from `0.2.3` plus G-79 (the in-package `S < L` check, shadowed by the signature backend, which enforces RFC 8032 §5.1.7 itself); every survivor classified in `gate_inventory.json`, none designed away**. Two tests were added during the sweep pass, after G-84 and G-85 first survived: a duck-typed resolution and a duck-typed anchor with a forged revision digest, each swapped in after construction, must refuse `INDETERMINATE` — a stated §26 property that had no test, not a mutant-shaped patch; both gates are now killed by those tests.
+
+### Maturity, stated plainly
+
+**Candidate.** Engineered and tested by the package's author under the owner's
+early-engineering ruling. **Not** independently reviewed, **not** externally
+audited, **not** a production release, and **not** `0.3.0`. D-38(i) and
+D-32(4) are both outstanding. D-37's self-attested capability-ban vocabulary is
+now load-bearing rather than inert, which is exactly the condition D-38 named
+for requiring an independent authority to audit the release head before any
+capability-bearing release.
+
+## [Unreleased before 0.3.0rc1] — BR-2C-0 closure: shipped-text corrections, D-36, D-37 and D-38
 
 **No version bump.** `package_version` stays `0.2.3`. This entry moves no
 **pinned surface count**, no digest domain, no pinned canonical vector, no

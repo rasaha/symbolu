@@ -903,6 +903,139 @@ def is_byte_identical_resubmission(""",
         """    if refusal_reason not in BENCHMARK_VERIFICATION_REFUSAL_REASONS:""",
         """    if False:""",
     ),
+    # ---------------- BR-2C candidate verifier (D-44 review finding F-2) --- #
+    # The verifier module sits at the package root, not under contracts/.
+    Gate(
+        "G-78",
+        "verifier-anchor-admission",
+        "verifier.py",
+        "the strict point check at anchor admission — libsodium's "
+        "crypto_core_ed25519_is_valid_point on the decoded key; without it the "
+        "identity point and every small-order or non-canonical encoding reach "
+        "the signature backend, which accepts a key-less forgery under five of "
+        "them (D-41 Ground 1)",
+        "        if len(raw) != 32 or not crypto_core_ed25519_is_valid_point(raw):",
+        "        if False:",
+        at_package_root=True,
+    ),
+    Gate(
+        "G-79",
+        "verifier-signature-decoding",
+        "verifier.py",
+        "RFC 8032 §5.1.7's S < L check before the backend is consulted; without "
+        "it the malleable S + L form is left to whichever backend is installed",
+        '    if int.from_bytes(raw[32:], "little") >= _ED25519_GROUP_ORDER:',
+        "    if False:",
+        at_package_root=True,
+    ),
+    Gate(
+        "G-80",
+        "verifier-lifecycle",
+        "verifier.py",
+        "D-28's first term: a REVOKED anchor refuses TRUST_ANCHOR_REVOKED",
+        "    if anchor.status is BenchmarkTrustAnchorStatus.REVOKED:",
+        "    if False:",
+        at_package_root=True,
+    ),
+    Gate(
+        "G-81",
+        "verifier-lifecycle",
+        "verifier.py",
+        "D-28's second term: a DISABLED anchor refuses TRUST_ANCHOR_DISABLED",
+        "    if anchor.status is BenchmarkTrustAnchorStatus.DISABLED:",
+        "    if False:",
+        at_package_root=True,
+    ),
+    Gate(
+        "G-82",
+        "verifier-lifecycle",
+        "verifier.py",
+        "D-28's third term: an instant before validity_from refuses "
+        "TRUST_ANCHOR_NOT_YET_VALID",
+        "    if trusted_instant < anchor.validity_from:",
+        "    if False:",
+        at_package_root=True,
+    ),
+    Gate(
+        "G-83",
+        "verifier-lifecycle",
+        "verifier.py",
+        "D-28's fourth term: an instant at or after validity_to refuses "
+        "TRUST_ANCHOR_EXPIRED (half-open interval)",
+        "    if trusted_instant >= anchor.validity_to:",
+        "    if False:",
+        at_package_root=True,
+    ),
+    Gate(
+        "G-84",
+        "verifier-resolution",
+        "verifier.py",
+        "the exact-type check on what the directory returns; without it any "
+        "object with the right attributes stands in for a "
+        "BenchmarkTrustAnchorResolution",
+        "        if type(resolution) is not BenchmarkTrustAnchorResolution:",
+        "        if False:",
+        at_package_root=True,
+    ),
+    Gate(
+        "G-85",
+        "verifier-resolution",
+        "verifier.py",
+        "the exact-type check on the resolved anchor; without it any object "
+        "with the right attributes stands in for a BenchmarkTrustAnchorRecord",
+        "        if type(anchor) is not BenchmarkTrustAnchorRecord:",
+        "        if False:",
+        at_package_root=True,
+    ),
+    Gate(
+        "G-86",
+        "verifier-resolution",
+        "verifier.py",
+        "D-44 finding F-1's cross-check: the resolved record must itself answer "
+        "the asked (role, identity, key_id) triple, so a record swapped into a "
+        "genuine resolution after construction cannot verify under another role",
+        """        if (
+            anchor.role is not role
+            or anchor.identity != identity
+            or anchor.key_id != key_id
+        ):
+            raise _Refused(BenchmarkRegistryRefusalReason.INDETERMINATE)
+        return anchor""",
+        """        return anchor""",
+        at_package_root=True,
+    ),
+    Gate(
+        "G-87",
+        "verifier-frame",
+        "verifier.py",
+        "the uint32 length prefix on every frame element; without it two "
+        "different field tuples can concatenate to one signing input",
+        '    return len(encoded).to_bytes(_LENGTH_PREFIX_BYTES, "big") + encoded',
+        "    return encoded",
+        at_package_root=True,
+    ),
+    Gate(
+        "G-88",
+        "verifier-frame",
+        "verifier.py",
+        "the pinned element order of the signing frame; a verifier reading the "
+        "elements in any other order verifies a different message than the "
+        "one signed",
+        '    for element in frame["element_order"]:',
+        '    for element in sorted(frame["element_order"]):',
+        at_package_root=True,
+    ),
+    Gate(
+        "G-89",
+        "verifier-precondition",
+        "verifier.py",
+        "the aware-instant precondition at the seam (D-44 finding F-3); without "
+        "it a naive instant reaches the directory and the lifecycle comparison "
+        "before the result type's own validator refuses it",
+        '    instant = require_aware_datetime(trusted_instant, "trusted_instant")',
+        "    instant = trusted_instant",
+        at_package_root=True,
+    ),
     # ---- withdrawn by owner ruling, 2026-08-20 (ADR §35 D-20) ------------- #
     # G-57, G-58, G-60, G-61 and G-62 planted plan-consuming callables in
     # PRIVATE source and asserted this package could discover them: an
@@ -1111,6 +1244,18 @@ def _run_suite(working: pathlib.Path):
 #: list; where a survivor was moved to KILLED it was by adding a test for a
 #: requirement the ratification already states, never by editing the package.
 SURVIVOR_CLASSIFICATIONS: dict = {
+    "G-79": (
+        "SHADOWED by the signature backend. With the in-package S < L check "
+        "removed, the malleated S + L signature still refuses SIGNATURE_INVALID "
+        "because cryptography's Ed25519 verify (OpenSSL) enforces RFC 8032 "
+        "§5.1.7 itself — measured on cryptography 41.0.7 and 46.0.7, and "
+        "recorded in ADR §35.2 D-41 Ground 1, where the two backends agree on "
+        "this input. The check is retained as defence in depth against a "
+        "backend substitution that does not enforce it; no test can observe "
+        "which layer refused, and a test on the private helper alone would "
+        "kill the mutant without changing that fact. Classified, not designed "
+        "away (D-44 finding F-2)."
+    ),
     "G-12": (
         "SHADOWED by G-11. G-11 proves the two nested paths reach "
         "byte-identical publisher envelopes; identical bytes necessarily hash "
@@ -1153,7 +1298,7 @@ SURVIVOR_CLASSIFICATIONS: dict = {
 
 def main() -> int:
     print("=" * 78)
-    print("BR-2C-0 GATE INVENTORY AND MEASURED GATE-DELETION MUTATION SWEEP")
+    print("BR-2C-RC (0.3.0rc1 candidate) GATE INVENTORY AND MEASURED GATE-DELETION MUTATION SWEEP")
     print("=" * 78)
     by_category: dict = {}
     for gate in GATES:
@@ -1274,7 +1419,7 @@ def main() -> int:
         json.dumps(
             {
                 "distribution": "ugence-benchmark-registry-authority",
-                "milestone": "BR-2C-0",
+                "milestone": "BR-2C-RC",
                 "note": (
                     "Complete inventory of every load-bearing gate, and the "
                     "measured result of neutralizing each one in turn against "

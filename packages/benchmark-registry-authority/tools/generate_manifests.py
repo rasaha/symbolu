@@ -406,6 +406,14 @@ def build_contract_inventory():
     return rows
 
 
+def _satisfies_verifier_port(value) -> bool:
+    port = api.BenchmarkApprovalVerifierPort
+    required = {n for n in dir(port) if not n.startswith("_") and callable(getattr(port, n, None))}
+    return not getattr(value, "_is_protocol", False) and required <= {
+        n for n in dir(value) if not n.startswith("_")
+    }
+
+
 def classify_non_contract_symbols():
     rows = []
     contract_names = {
@@ -425,6 +433,10 @@ def classify_non_contract_symbols():
             kind = "protocol_port"
         elif isinstance(value, type) and dataclasses.is_dataclass(value):
             kind = "frozen_descriptor"
+        elif isinstance(value, type) and _satisfies_verifier_port(value):
+            # BR-2C candidate rung: an implementation of the approval-verifier
+            # port. Candidate only — not reviewed, not audited, not 0.3.0.
+            kind = "candidate_verifier_implementation"
         elif isinstance(value, type):
             kind = "abstract_type_declaration"
         elif typing.get_origin(value) is not None and typing.get_args(value):
@@ -442,7 +454,8 @@ def classify_non_contract_symbols():
             "symbol": symbol,
             "kind": kind,
             "caller_constructible": kind
-            in {"frozen_descriptor", "closed_vocabulary_enum", "typed_error"},
+            in {"frozen_descriptor", "closed_vocabulary_enum", "typed_error",
+                "candidate_verifier_implementation"},
             "canonicalizable": False,
         }
         if kind == "closed_type_alias":
@@ -462,7 +475,7 @@ def main() -> int:
         "distribution": DISTRIBUTION,
         "namespace": NAMESPACE,
         "package_version": api.__version__,
-        "milestone": "BR-2C-0",
+        "milestone": "BR-2C-RC",
         "note": (
             "Machine-readable public-contract inventory. "
             "'Every type is constructible and canonicalizable' applies to "
@@ -566,6 +579,12 @@ def main() -> int:
             return {
                 "kind": "contract",
                 "fields": [f.name for f in dataclasses.fields(value)],
+            }
+        if isinstance(value, type) and _satisfies_verifier_port(value):
+            return {
+                "kind": "candidate_verifier_implementation",
+                "port": "BenchmarkApprovalVerifierPort",
+                "maturity": "CANDIDATE_NOT_REVIEWED",
             }
         if isinstance(value, type):
             return {"kind": "type"}

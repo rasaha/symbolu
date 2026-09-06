@@ -116,7 +116,7 @@ from ._validation import (
     require_distinct_actors,
     require_enum_member,
     require_exact_type,
-    require_identifier,
+    require_actor_identity,
 )
 from .canonical import (
     BENCHMARK_ADMISSION_DECISION_PAYLOAD_DIGEST_DOMAIN,
@@ -211,7 +211,7 @@ class BenchmarkSubmissionRecordPayload:
             BenchmarkPublisherSubmissionEnvelope,
             "publisher_submission_envelope",
         )
-        require_identifier(
+        require_actor_identity(
             self.declared_registry_authority_identity,
             "declared_registry_authority_identity",
         )

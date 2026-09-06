@@ -53,10 +53,10 @@ PORTS = (
 #: stop it by name only, and they sit in the same self-attested one-file
 #: two-literal pattern ADR §35.2 D-37 and D-38 rule.
 EXPORTED_IMPLEMENTATION_UNLOCK = {
-    "denyall": "BR-2C",
-    "deny_all": "BR-2C",
-    "verifier": "BR-2C",
-    "trust_store": "BR-2C",
+    "denyall": "BR-2C-RC",
+    "deny_all": "BR-2C-RC",
+    "verifier": "BR-2C-RC",
+    "trust_store": "BR-2C-RC",
     "inmemory": "BR-2D",
     "in_memory": "BR-2D",
     "adapter": "BR-2D",
@@ -107,11 +107,29 @@ EXPORTED_IMPLEMENTATION_TOKENS = tuple(
 )
 
 
-def test_the_exported_implementation_ban_is_not_weaker_than_br2a_froze():
-    """Milestone-conditional, and at this version identical to BR-2A's set."""
+#: The four exported-surface tokens D-33 records as BR-2C's. The candidate
+#: rung's ratified release transition lifts exactly these at ``BR-2C-RC``.
+BR2C_EXPORT_TOKENS = frozenset({"denyall", "deny_all", "verifier", "trust_store"})
 
-    assert set(EXPORTED_IMPLEMENTATION_TOKENS) == BR2A_FROZEN_EXPORT_TOKENS
+
+def test_the_exported_implementation_ban_is_exactly_what_the_transition_leaves():
+    """Milestone-conditional; at the candidate rung BR-2A's set minus BR-2C's four.
+
+    Both directions: a BR-2D or permanent token that unlocked early is a missing
+    element, a BR-2C token still banned is an extra one.
+    """
+
+    assert set(EXPORTED_IMPLEMENTATION_TOKENS) == (
+        BR2A_FROZEN_EXPORT_TOKENS - BR2C_EXPORT_TOKENS
+    )
     assert set(EXPORTED_IMPLEMENTATION_UNLOCK) == BR2A_FROZEN_EXPORT_TOKENS
+    assert {
+        token for token, unlock in EXPORTED_IMPLEMENTATION_UNLOCK.items()
+        if unlock == "BR-2C-RC"
+    } == BR2C_EXPORT_TOKENS
+    assert banned_capability_tokens("BR-2C-0", EXPORTED_IMPLEMENTATION_UNLOCK) == (
+        BR2A_FROZEN_EXPORT_TOKENS
+    )
 
 
 def test_a_placeholder_implementation_name_is_banned_at_every_subphase():
@@ -208,19 +226,34 @@ def test_no_port_can_be_instantiated():
             port()
 
 
-def test_no_concrete_class_in_the_package_satisfies_any_port():
-    """Structurally, by method-name coverage, so nothing satisfies one by accident."""
+#: The two classes the candidate rung ships against the approval-verifier
+#: port, and the only two. Pinned by name so a third implementation — or one
+#: against any other port — is a reviewed change rather than a silent one.
+VERIFIER_IMPLEMENTATIONS = frozenset(
+    {"BenchmarkDenyAllVerifier", "BenchmarkEd25519Verifier"}
+)
+
+
+def test_exactly_the_two_candidate_verifiers_satisfy_the_verifier_port_and_nothing_else():
+    """Structurally, by method-name coverage, so nothing satisfies one by accident.
+
+    At the candidate rung exactly two exported classes satisfy
+    ``BenchmarkApprovalVerifierPort`` — the candidate verifier and the exact
+    deny-all default — and **no** class satisfies the store, trust-directory or
+    clock port: no store, no anchor directory and no clock ship here, and BR-2D
+    owns all three.
+    """
 
     import inspect
 
     import ugence_benchmark_registry_authority as pkg
 
-    concrete = [
-        value
+    concrete = {
+        name: value
         for name in pkg.__all__
         for value in [getattr(pkg, name)]
         if inspect.isclass(value) and not getattr(value, "_is_protocol", False)
-    ]
+    }
     assert concrete, "the scan found no classes at all"
     for port in PORTS:
         required = {
@@ -229,15 +262,26 @@ def test_no_concrete_class_in_the_package_satisfies_any_port():
             if not name.startswith("_") and callable(getattr(port, name, None))
         }
         assert required, port.__name__
-        for cls in concrete:
-            available = {n for n in dir(cls) if not n.startswith("_")}
-            assert not required <= available, (
-                f"{cls.__name__} structurally satisfies {port.__name__}"
-            )
+        satisfying = {
+            name
+            for name, cls in concrete.items()
+            if required <= {n for n in dir(cls) if not n.startswith("_")}
+        }
+        if port is pkg.BenchmarkApprovalVerifierPort:
+            assert satisfying == VERIFIER_IMPLEMENTATIONS, satisfying
+            for name in satisfying:
+                assert isinstance(concrete[name], type)
+                assert issubclass(concrete[name], object)
+        else:
+            assert satisfying == set(), (port.__name__, satisfying)
 
 
-def test_no_deny_all_or_placeholder_implementation_ships():
+def test_no_placeholder_or_later_milestone_implementation_ships():
     """The ban is on shipping an implementation, so it is checked on **callables**.
+
+    At the candidate rung ``denyall`` and ``verifier`` are lifted — the exact
+    deny-all default and the candidate verifier ship — and every BR-2D token
+    and every permanent placeholder token stays banned on the exported surface.
 
     §17 explicitly permits documentation to state the ratified identity-checked
     allow-list requirement, and forbids implementing or simulating it. A string
