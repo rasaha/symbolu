@@ -103,7 +103,7 @@ class SpyDirectory:
         self._inner = ea.StaticTrustAnchorDirectory(list(anchors), **SET)
         self.calls = []
 
-    def resolve(self, coordinate):
+    def resolve(self, coordinate, *, as_of=None):
         self.calls.append(coordinate)
         return self._inner.resolve(coordinate)
 

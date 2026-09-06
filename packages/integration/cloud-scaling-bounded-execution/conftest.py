@@ -50,6 +50,10 @@ if REPO is not None:
         INTEGRATION / "cloud-scaling-action-admission" / "src",
         INTEGRATION / "cloud-scaling-credential-broker" / "src",
         INTEGRATION / "risk-authority-execution-assurance" / "src",
+        # RA-8 0.2.0 imports the effect-attestation contracts, which resolve
+        # anchors through the Trusted Evidence Authority (transitive, in-place).
+        INTEGRATION / "risk-authority-effect-attestation" / "src",
+        PACKAGES / "trusted-evidence-authority" / "src",
         CAPABILITIES / "cloud-scaling-operations" / "src",
         CONTROLLER / "src",
         # Genuine builders (tests only).

@@ -123,12 +123,14 @@ jobs:
       - name: Install build tooling
         run: |
           python -m pip install --upgrade pip
-          pip install build wheel pytest pydantic
+          pip install build wheel pytest pydantic "cryptography>=41.0.7,<47.0.0" "PyNaCl>=1.5.0,<2.0.0"
       - name: Build first-party wheels, install from wheelhouse, run assess->signal->RA-6 revoke proof
         run: python packages/integration/risk-authority-execution-assurance/scripts/verify_isolated_install.py
       - name: Package boundary tests (declared deps, no reverse cycle, no second authority, no third ledger)
         run: |
           pip install -e packages/governance-contracts \
+                      -e packages/trusted-evidence-authority \
+                      -e packages/integration/risk-authority-effect-attestation \
                       -e packages/risk_authority \
                       -e packages/integration/risk-authority-status-runtime \
                       -e packages/capabilities/decision-authority \
