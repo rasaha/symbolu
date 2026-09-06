@@ -197,8 +197,11 @@ one destination, CR-2 is amended again in its ADR, and §12.4 is tests in
 control-plane-root, the review service, the worker, the studio backend and the profile.
 No configuration value, image package, credential or second egress destination was
 added; the composition record supersedes the seam-6 record
-(`composition-record.seam-6.json`, unchanged). The next seam waits on its own ruling
-under FD-1.
+(`composition-record.seam-6.json`, unchanged). What remains is audited in §13: one
+studio-alone seam (typed data-use declarations, outline screen 5) is still enterable
+and waits on ruling FD-12; the console is a packaging body of work, a durable Decision
+Authority store a package decision, and the mirror coordinates, Langflow fixture and
+enterprise issuer are owner inputs.
 
 The shape every seam follows: the CR-2 shape (one configuration value, one freeze-test amendment, its own failure tests and
 maturity statement, one PR), preserving `REFERENCE_GRADE_SHADOW_ONLY`, the frozen
@@ -870,3 +873,118 @@ FD-4, FD-8.1, FD-8.5, SD-2, CR-3, CR-4, CR-5, ID-1, the `REFERENCE_GRADE_SHADOW_
 ceiling, `ENFORCEMENT_ENABLED = False`, the frozen v1 contract, every FROM line and
 ratified digest, the worker image's gate set, and every credential, egress and LIVE
 prohibition are preserved.
+
+## 13 — Remaining front-door audit under FD-1 (2026-09-06, after seam 7)
+
+**The question.** With seams 1, 2, 3, 5, 6 and 7 shipped and seam 4 absent by ruling,
+is any front-door seam of the studio alone still enterable, or is what remains the
+console packaging body of work (FD-8.3), a durable Decision Authority store as a
+package decision, or the three owner-blocked inputs? **One studio-alone seam remains:
+outline screen 5, a typed declaration form over `data-use-admission` in the seam-5
+shape.** Everything else is a package decision, a separately scoped body of work, an
+owner input, or a non-goal. Everything below is documentation; no seam is activated.
+
+### 13.1 The outline rows still without a screen `[V]`
+
+- **Row 5, data and tool connections.** `data-use-admission` 0.1.0 and
+  `vendor-dependency` 0.1.0 are both `CONTRACTS_ONLY` (`version.py:16` in each): each
+  ships one typed record (`DataUseDeclaration`: binding, `data_ref`, an uninterpreted
+  classification label, `purpose_label`, validity, `residency_label`, `supersedes`,
+  `declared_by`; `VendorDependencyDeclaration` likewise with `vendor_ref` and a risk
+  posture label), a deterministic `declaration_id_for`, `supersession_refusals`, and
+  one read-only port (`DataUseDeclarationPort`, `VendorDependencyPort`;
+  `selectors.py:131` and `:135`) with no implementation and no store. Each README
+  says the package "records what a declarer asserted" and never inspects, verifies,
+  scores, persists or decides. That is exactly `ai-system-registry`'s state before
+  FD-9, and seam 5 is the proven shape for it. The row's third element, egress
+  restrictions, has a ratified ADR and no package (§3), and stays `[G]`.
+- **Row 4, model and reasoning selector.** `model-selection` and
+  `reasoning-method-governance` are 0.1.0 research-only slices (§3); roadmap §11.2 rules
+  "no research-only package in the product". Not enterable as a screen `[V]`.
+- **Row 7's evidence half.** `agent-assurance-evidence` is
+  `REFERENCE_GRADE_CONTRACT_ONLY` with a read-only `AssuranceFindingPort` and no
+  producer; a finding typed by an administrator would be the same shape as a
+  declaration, but the Simulate paths already produce the studio's evidence and no
+  ruling names a finding as front-door intake. Later, if at all `[I]`.
+- **Row 9 beyond shadow and row 10 interventions** are non-goals (§4, roadmap §11.2).
+- **The Publish scenario selector** left open by FD-8.2 (§9.5) is a frontend change
+  with no reachable console while FD-8.1 holds; not next `[V]`.
+- **The Authority decision read** still calls `decision_store.get` where the port
+  offers `get_decision` (`studio_v2.py:408-414`) `[G]`; a correction that belongs to
+  the step that first hands a decision store, not a seam.
+
+### 13.2 What is not a front-door seam `[V]`
+
+- **The console (FD-8.3).** Unchanged since §12.1: a root prototype, no package, no
+  deployment unit, an in-memory audit store. Packaging "does not begin here" (§9.5);
+  it needs its own scoping ADR, deployment unit and evidence, then FD-8.4. A body of
+  work, not a seam.
+- **A durable Decision Authority store.** Unchanged since §12.2: frozen 1.0.0,
+  in-memory repositories, no producing deployment; a store handed to P3E would be
+  empty. A package decision first.
+- **The owner-blocked inputs.** The mirror record is
+  `RATIFIED_PENDING_MIRROR_COORDINATES` with `registry_host`, `repository_prefix` and
+  `secret_name` all null and provisioning `PENDING_OUTSIDE_REPOSITORY`
+  (`docs/audits/ugence_governance_studio_p3e/BASE_IMAGE_MIRROR_DECISION.json`); every
+  container gate set halts on it, and no repository change may fill those fields. The
+  Langflow importer is ruled entered and blocked on a genuine secret-free export fixture
+  (LI-5, roadmap §11.3). Real approver identity waits on an enterprise issuer (AI-E).
+  None of the three is repository work; each unblocks work that is.
+
+### 13.3 The one remaining seam: typed data-use declarations `[V]`
+
+What it would amend, in the seam-5 shape: `data-use-admission` 0.2.0 adds one sqlite
+implementation of `DataUseDeclarationPort` plus a single append, `declare`, under the
+runtime volume (no server, driver or DSN); the studio backend adds a `DeclarationService`
+over it with two v2 operations (declare, list-for-tenant), validated by the package's
+own refusal reasons and `supersession_refusals`, the tenant the deployment's and never
+the caller's; the frontend adds one screen with typed fields and a single Declare
+control; P3E adds one configuration value naming the file, requires
+`UGENCE_STUDIO_TENANT_ID`, records the seam, and supersedes the composition record; the
+v2 contract is amended once more (v2-A4, two operations). **What it must preserve.**
+FD-4 (typed intake, no inference, no repair); the package's own prohibitions (the
+record carries no data, only a `data_ref`; the classification, purpose and residency
+labels are uninterpreted; nothing is inspected, verified, scored, admitted or
+enforced); the `persistent_database` prohibition; tenant binding; SD-2 (declare is
+not an authority act and confers nothing); no egress restriction is invented for the
+absent egress package; every credential and LIVE prohibition; the frozen v1 bytes,
+FROM lines and ratified digests; `REFERENCE_GRADE_SHADOW_ONLY` and
+`ENFORCEMENT_ENABLED = False`. `vendor-dependency` is the same shape again and, under
+FD-1, its own later seam.
+
+### 13.4 Failure matrix for seam 8 (by construction, on the seam-5 precedent)
+
+| # | Case | Result |
+|---|---|---|
+| 1 | file path unset | typed gap `data_use_declarations` on both routes `[G]` until built |
+| 2 | tenant unset with the path set | refused before bind, as seam 5 `[V]` shape |
+| 3 | blank `data_ref` or `purpose_label`, malformed validity | the package's typed refusal, nothing written `[V]` shape |
+| 4 | a caller-supplied `tenant_id` | contract refusal (unknown field); the tenant is the deployment's `[V]` shape |
+| 5 | inadmissible supersession | `supersession_refusals` as the package states it `[V]` |
+| 6 | cross-tenant read, a file bound to another tenant | typed refusal, never an empty answer; refused before bind `[V]` shape |
+| 7 | any payload, dataset or record content | not expressible: `data_ref` is an opaque handle and no field carries data `[V]` |
+| 8 | a write other than declare | no route: no edit, revocation, admission or enforcement `[V]` shape |
+| 9 | restart | records survive on the volume `[V]` shape |
+| 10 | egress restrictions | absent; the screen says the egress package does not exist and invents nothing `[G]` |
+
+### 13.5 Recommendation and proposed ruling FD-12 (five decisions, recommended first)
+
+Seam 8 is the only remaining item whose prerequisites are rulings rather than a
+package decision, a packaging body of work or an owner input, and it is the last
+outline row a studio-alone seam can reach. After it, the front door under FD-1 is at
+its ceiling until the owner inputs arrive or the console is packaged.
+
+| # | Decision | Options |
+|---|---|---|
+| **FD-12.1** | Next seam | **`SCREEN_5_TYPED_DATA_USE_DECLARATIONS`**: seam 8 is a typed declaration form over `data-use-admission`, composed through the P3E root and tenant-bound. `FRONT_DOOR_CEILING_REACHED`: no further studio-alone seam; the remaining work is the owner inputs and the console packaging body of work. `CONSOLE_PACKAGING_BODY_OF_WORK` (FD-8.3; its own ADR first). |
+| **FD-12.2** | Durable home | **`LOCAL_SQLITE_UNDER_RUNTIME_VOLUME`**: `data-use-admission` 0.2.0 adds one sqlite implementation of `DataUseDeclarationPort` plus a single append, `declare`, in the seam-5 posture; one configuration value names the file. `COMPOSITION_ROOT_MEMORY`. |
+| **FD-12.3** | Declarer | **`DECLARED_BY_PRESENTED_UNPROVEN`**: `declared_by` is a typed opaque handle the form supplies, recorded as presented and unproven, with the deployment's name and version as the recording composition; no identity is claimed until an issuer exists (AI-E). `REQUIRE_IDENTITY`. |
+| **FD-12.4** | Contract | **`V2_AMENDMENT_TWO_OPERATIONS`**: `v2_data_use_declare` and `v2_data_use_list`, validated by the package's own refusal reasons and `supersession_refusals`, with `openapi_v2.json` and the generated client re-frozen by amendment v2-A4 in the same step. |
+| **FD-12.5** | Mutation boundary | **`DECLARE_IS_THE_ONLY_WRITE`**: the seam writes declarations and nothing else; no edit, revocation, admission, verification, scoring or enforcement; a changed declaration is a new one superseding the old; the record carries no data and confers nothing; egress restrictions are not invented; `vendor-dependency` is a later seam of its own under FD-1. |
+
+Under the recommended options seam 8 ships in its own implementation step: the
+package release, the two operations with a re-frozen contract, the screen, the
+deployment composition (one declarations file under the runtime volume, tenant-bound),
+a superseding composition record, and §13.4 as tests. Owner decisions remaining before
+implementation: the five above; none carries an `[R]` beyond the choice itself, since
+seam 5 already settled the durable-home and registrant questions for this shape.
