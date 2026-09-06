@@ -16,6 +16,7 @@ from ..semantics.contracts import (
     SUPPORTED_WORKFLOW_IR_VERSIONS,
     WORKFLOW_IR_V2,
 )
+from .binding_conformance import check_binding_conformance
 from ..semantics.models import SemanticDiagnostic, WorkflowIRv2
 
 
@@ -37,6 +38,12 @@ class ReleaseValidationCode(str, Enum):
     MISSING_CAPABILITY_REQUIREMENT = "MISSING_CAPABILITY_REQUIREMENT"
     UNKNOWN_CAPABILITY_REF = "UNKNOWN_CAPABILITY_REF"
     DUPLICATE_CAPABILITY_REQUIREMENT = "DUPLICATE_CAPABILITY_REQUIREMENT"
+    # -- P3B: conformance of emitted bindings against the capability registry --
+    ADVISORY_CAPABILITY_ON_AUTHORITATIVE_NODE = "ADVISORY_CAPABILITY_ON_AUTHORITATIVE_NODE"
+    AUTHORITATIVE_CAPABILITY_MARKED_OPTIONAL = "AUTHORITATIVE_CAPABILITY_MARKED_OPTIONAL"
+    MANDATORY_CAPABILITY_MARKED_OPTIONAL = "MANDATORY_CAPABILITY_MARKED_OPTIONAL"
+    CAPABILITY_CONTRACT_TARGET_MISMATCH = "CAPABILITY_CONTRACT_TARGET_MISMATCH"
+    UNRESOLVED_CAPABILITY_BINDING = "UNRESOLVED_CAPABILITY_BINDING"
     MISSING_INPUT_CONTRACT = "MISSING_INPUT_CONTRACT"
     MISSING_OUTPUT_CONTRACT = "MISSING_OUTPUT_CONTRACT"
     UNRESOLVED_CONTRACT_REF = "UNRESOLVED_CONTRACT_REF"
@@ -67,6 +74,10 @@ _AUTHORITY_CODES = {
     ReleaseValidationCode.AI_ELIGIBLE_ON_AUTHORITATIVE_NODE.value,
     ReleaseValidationCode.CONFLICTING_AUTHORITY_DISPOSITION.value,
     ReleaseValidationCode.MISSING_AUTHORITY_DISPOSITION.value,
+    # P3B: a binding that lets advice decide, or makes an authority optional, is an
+    # authority-boundary failure and is never reduced to a warning.
+    ReleaseValidationCode.ADVISORY_CAPABILITY_ON_AUTHORITATIVE_NODE.value,
+    ReleaseValidationCode.AUTHORITATIVE_CAPABILITY_MARKED_OPTIONAL.value,
 }
 
 
@@ -78,6 +89,8 @@ class ReleaseValidationResult(CompilerModel):
     semantic_ok: bool = True
     authority_ok: bool = True
     contract_ok: bool = True
+    #: P3B: every emitted capability binding conforms to the registry's definition.
+    binding_ok: bool = True
     dependency_ok: bool = True
     provenance_ok: bool = True
     digest_ok: bool = True
@@ -172,6 +185,15 @@ class CompiledReleaseValidator:
                     "duplicate capability requirement", node_id=n.node_id)
                 semantic_ok = False
 
+        # -- P3B: binding conformance against the capability registry --
+        # v2 already emits declarative bindings; this checks them against what the
+        # registry says each capability is. Conformance only — nothing is emitted,
+        # changed or inferred here, and no provider is imported.
+        binding_ok = True
+        for code, severity, message, node_id in check_binding_conformance(ir_v2):
+            add(ReleaseValidationCode(code), severity, message, node_id=node_id)
+            binding_ok = False
+
         # -- contract integrity --
         contract_ok = True
         for sem in ir_v2.node_semantics:
@@ -235,7 +257,7 @@ class CompiledReleaseValidator:
         return ReleaseValidationResult(
             state=state, workflow_identity=wid, contract_version=ir_v2.contract_version,
             structural_ok=structural_ok, semantic_ok=semantic_ok, authority_ok=authority_ok,
-            contract_ok=contract_ok, dependency_ok=dependency_ok,
+            contract_ok=contract_ok, binding_ok=binding_ok, dependency_ok=dependency_ok,
             provenance_ok=provenance_ok, digest_ok=digest_ok, diagnostics=tuple(diags))
 
     @staticmethod

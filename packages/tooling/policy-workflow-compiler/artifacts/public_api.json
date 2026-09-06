@@ -1,5 +1,5 @@
 {
-  "count": 123,
+  "count": 124,
   "fingerprints": {
     "APPROVAL_SENSITIVE_OBJECT_TYPES": {
       "kind": "object",
@@ -1717,9 +1717,12 @@
     "ReleaseValidationCode": {
       "kind": "enum",
       "members": [
+        "ADVISORY_CAPABILITY_ON_AUTHORITATIVE_NODE",
         "AI_ELIGIBLE_ON_AUTHORITATIVE_NODE",
+        "AUTHORITATIVE_CAPABILITY_MARKED_OPTIONAL",
         "BASE_DIGEST_MISMATCH",
         "BROKEN_PROVENANCE",
+        "CAPABILITY_CONTRACT_TARGET_MISMATCH",
         "CONFLICTING_AUTHORITY_DISPOSITION",
         "CONFLICTING_POLICY_SOURCE",
         "CONTRACT_VERSION_MISMATCH",
@@ -1729,6 +1732,7 @@
         "DUPLICATE_NODE_ID",
         "INCOMPLETE_ROLE_SEMANTICS",
         "INVALID_DEPENDENCY",
+        "MANDATORY_CAPABILITY_MARKED_OPTIONAL",
         "MISSING_AUTHORITY_DISPOSITION",
         "MISSING_CAPABILITY_REQUIREMENT",
         "MISSING_INPUT_CONTRACT",
@@ -1736,6 +1740,7 @@
         "MISSING_OUTPUT_CONTRACT",
         "UNKNOWN_CAPABILITY_REF",
         "UNKNOWN_CONTRACT_VERSION",
+        "UNRESOLVED_CAPABILITY_BINDING",
         "UNRESOLVED_CONTRACT_REF",
         "UNSUPPORTED_CYCLE",
         "UNSUPPORTED_EDGE_KIND",
@@ -1743,9 +1748,12 @@
         "WORKFLOW_FINGERPRINT_MISMATCH"
       ],
       "values": [
+        "ADVISORY_CAPABILITY_ON_AUTHORITATIVE_NODE",
         "AI_ELIGIBLE_ON_AUTHORITATIVE_NODE",
+        "AUTHORITATIVE_CAPABILITY_MARKED_OPTIONAL",
         "BASE_DIGEST_MISMATCH",
         "BROKEN_PROVENANCE",
+        "CAPABILITY_CONTRACT_TARGET_MISMATCH",
         "CONFLICTING_AUTHORITY_DISPOSITION",
         "CONFLICTING_POLICY_SOURCE",
         "CONTRACT_VERSION_MISMATCH",
@@ -1755,6 +1763,7 @@
         "DUPLICATE_NODE_ID",
         "INCOMPLETE_ROLE_SEMANTICS",
         "INVALID_DEPENDENCY",
+        "MANDATORY_CAPABILITY_MARKED_OPTIONAL",
         "MISSING_AUTHORITY_DISPOSITION",
         "MISSING_CAPABILITY_REQUIREMENT",
         "MISSING_INPUT_CONTRACT",
@@ -1762,6 +1771,7 @@
         "MISSING_OUTPUT_CONTRACT",
         "UNKNOWN_CAPABILITY_REF",
         "UNKNOWN_CONTRACT_VERSION",
+        "UNRESOLVED_CAPABILITY_BINDING",
         "UNRESOLVED_CONTRACT_REF",
         "UNSUPPORTED_CYCLE",
         "UNSUPPORTED_EDGE_KIND",
@@ -2532,6 +2542,7 @@
         "authoritative_source_verification_implemented",
         "authority_semantics_implemented",
         "awc_adapter_updated",
+        "binding_conformance_validation_implemented",
         "build_commit",
         "capability_requirement_extraction_implemented",
         "dependency_semantics_implemented",
@@ -2797,6 +2808,13 @@
         "required"
       ]
     },
+    "check_binding_conformance": {
+      "kind": "function",
+      "parameters": [
+        "ir_v2",
+        "registry"
+      ]
+    },
     "check_release_source_agreement": {
       "kind": "function",
       "parameters": [
@@ -3021,6 +3039,7 @@
     "WorkflowNodeSemantics",
     "build_approval_record",
     "check_authoritative_source",
+    "check_binding_conformance",
     "check_release_source_agreement",
     "check_review",
     "classify_role_relevance",

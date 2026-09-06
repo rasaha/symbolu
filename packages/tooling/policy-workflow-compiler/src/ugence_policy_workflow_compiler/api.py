@@ -95,6 +95,7 @@ from .diff import ChangeType, ImpactSummary, ObjectChange, PolicyPackDiff, diff_
 # -- authoritative source linkage (PA/PWC-X1) ----------------------------------
 # Carriage checks only: presence, shape, completeness and internal agreement. This
 # package never verifies a signature, key trust or revocation state.
+from .validation.binding_conformance import check_binding_conformance
 from .validation.authoritative_source import (
     check_authoritative_source,
     check_release_source_agreement,
@@ -249,6 +250,7 @@ __all__ = [
     # authoritative source linkage (PA/PWC-X1)
     "AuthoritativeSourceRef",
     "check_authoritative_source",
+    "check_binding_conformance",
     "check_release_source_agreement",
     # governed diff-driven review (P3A)
     "APPROVAL_SENSITIVE_OBJECT_TYPES",

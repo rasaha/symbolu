@@ -41,6 +41,7 @@ as importantly — what is not.
 | `policy_pack_v2_supported` | `true` | The additive `policy_pack.v2` schema is accepted: source-declared data classification, permission intent, required tools and typed contract versions are carried in a sidecar collection, together with the authoritative-source coordinate. `policy_pack.v1` packs and digests are byte-identical under it. See `POLICY_PACK_SCHEMA.md`. |
 | `source_declared_semantics_implemented` | `true` | `workflow_ir.v2` enrichment reads declared data classification, permission intent, required tools and contract versions into node semantics, each with `EXPLICIT` per-value provenance. An undeclared value stays unresolved and is never defaulted. |
 | `authoritative_source_carriage_implemented` | `true` | A `policy_pack.v2` pack may carry the exact Policy Authority issuance it was compiled from; the reference is digest-bound, structurally validated and denormalized into the release manifest. See `AUTHORITATIVE_SOURCE.md`. |
+| `binding_conformance_validation_implemented` | `true` | Every capability binding `workflow_ir.v2` emits is validated against the capability registry — unknown capabilities, advisory-on-authoritative misuse, optionality conflicts, contract-target disagreement and unresolved required bindings all refuse. Validation only: no provider is imported and nothing is emitted. See `BINDING_CONFORMANCE.md`. |
 
 ## Explicit non-goals
 

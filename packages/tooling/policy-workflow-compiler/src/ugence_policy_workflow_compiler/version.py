@@ -141,6 +141,8 @@ class VersionInfo:
     #: X1: the authoritative-source coordinate is carried, digest-bound for a v2
     #: pack, and structurally validated. Authenticity is never asserted here.
     authoritative_source_carriage_implemented: bool = False
+    #: P3B: emitted capability bindings are validated against the registry.
+    binding_conformance_validation_implemented: bool = False
     #: Explicit non-goal: this package never verifies a Policy Authority signature,
     #: key trust or revocation state. Those belong to Policy Authority.
     authoritative_source_verification_implemented: bool = False
@@ -198,6 +200,9 @@ class VersionInfo:
             ),
             "authoritative_source_carriage_implemented": (
                 self.authoritative_source_carriage_implemented
+            ),
+            "binding_conformance_validation_implemented": (
+                self.binding_conformance_validation_implemented
             ),
             "authoritative_source_verification_implemented": (
                 self.authoritative_source_verification_implemented
@@ -272,6 +277,9 @@ def version_info() -> VersionInfo:
         # undeclared value stays unresolved.
         source_declared_semantics_implemented=True,
         authoritative_source_carriage_implemented=True,
+        # P3B: conformance validation of already-emitted bindings. Validation only —
+        # nothing is emitted or inferred here, and no provider is ever imported.
+        binding_conformance_validation_implemented=True,
         # Never claimed: the compiler attests carriage, not authenticity.
         authoritative_source_verification_implemented=False,
         # explicit non-goals — never claimed by this package.

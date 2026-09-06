@@ -4,6 +4,27 @@ All notable changes to `ugence-policy-workflow-compiler` are documented here.
 This project adheres to semantic-ish versioning for its distribution wheel; the
 product version tracks capability maturity separately.
 
+## Unreleased — PWC-P3B: binding conformance validation
+
+Validation only. No emission path changes, no provider import, and every digest is
+unchanged.
+
+### Added
+- `validation/binding_conformance.py` — checks each emitted `CapabilityRequirement`
+  against the capability registry, wired into `CompiledReleaseValidator` and
+  reported as `ReleaseValidationResult.binding_ok`.
+- Six refusals; the two authority ones (`ADVISORY_CAPABILITY_ON_AUTHORITATIVE_NODE`,
+  `AUTHORITATIVE_CAPABILITY_MARKED_OPTIONAL`) join the authority set and can never be
+  reduced to warnings.
+- `binding_conformance_validation_implemented=true`; public API 123 → 124;
+  `BINDING_CONFORMANCE.md`.
+
+### Noted
+Canonical governance capabilities are checked against the registry; **functional**
+capabilities (`EVIDENCE_REQUIREMENT -> evidence_extraction`) are not, because the
+registry describes authority and functional capabilities describe work. Checking
+them there would fail every valid artifact.
+
 ## Unreleased — AI Hiring reference equivalence (decision D3)
 
 The second equivalence domain, required before `pilot_validated` can be earned.
