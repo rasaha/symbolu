@@ -529,3 +529,103 @@ one configuration value), a superseding composition record (FD-3), and the failu
 matrix named in §10.4. FD-1, FD-3, FD-4, the `REFERENCE_GRADE_SHADOW_ONLY` ceiling,
 `ENFORCEMENT_ENABLED = False`, the frozen v1 contract, every FROM line and ratified
 digest, and every credential, egress and LIVE prohibition are preserved.
+
+## 11 — Audit: the governed hook in the worker-relay shape (2026-09-06)
+
+**The question.** With seams 1, 2, 3 and 5 shipped and seam 4 absent by ruling, can
+the governed hook reach the Simulate screen as a run executed by the worker and
+relayed like the review screens? **Yes, in exactly one shape:** the studio asks the
+worker to start the worker's own shadow workflow and reads it back through the routes
+that already exist; nothing the studio holds crosses the wire. Whether asking another
+unit to start its fixture run is the studio "executing" under SD-2 is the owner's
+call. Everything below is documentation; no seam is activated.
+
+### 11.1 What exists today `[V]`
+
+- **No route starts a run.** The review service exposes five routes (four reads, one
+  relayed decision; `http.py:33-39`); its only adapter calls are `status`, `signal`
+  and `resume` (`service.py:309, 530, 554`). The worker's own end-to-end test starts
+  its run in process, `worker.adapter.start(workflow_id=ShadowWorkload.WORKFLOW_ID, …)`
+  (`test_end_to_end.py:115`). The studio's review client is a closed set of the same
+  five routes with one proof route (`clients/review.py`), the P3E egress record names
+  the five (`approved-runtime-config.json`, `external_network_egress.permitted[0].routes`),
+  and the frontend manifest freezes them (`review_service_routes_reachable_from_the_studio`).
+- **The worker runs one definition.** `ShadowWorkload` defines `wf-shadow` only, one
+  consequential task on the `FIXTURE_ONLY` `ShadowProvider`, and its upstream source
+  parks every proposal on ESCALATE (`workload.py`). The DBOS adapter binds every
+  instance to the worker's `definition_digest` at composition and refuses a start under
+  any other (`DefinitionVersionMismatch`, `dbos_engine.py:222-236`), refuses a
+  conflicting duplicate start and returns the existing handle for an identical one
+  (`InstanceIdentityError`, idempotent on `instance_id`). A studio-supplied workflow
+  therefore cannot run on the worker at all; that is a property, not a choice.
+- **The sink exists.** ESCALATE from the governed hook lands in the approval ledger
+  and the review queue; the existing decision relay resumes the bounded quantum
+  (HR-A to HR-E). A relayed run needs no new sink.
+- **The worker's postures hold.** Private TLS listener, identity port mandatory in
+  production (CR-3), one deployment-mode switch (CR-4), JWKS as its only egress (CR-5),
+  `SINGLE_TENANT` with its own configured tenant.
+- **What the rulings say.** CR-2 names one configuration value and the five routes;
+  HR-1 says the studio "holds no approver identity, computes no eligibility, consumes
+  nothing, signals nothing and resumes nothing"; SD-2 says the studio never executes;
+  FD-7.1 admitted a fixture-only, non-LIVE run in P3E as a demonstration, not agent
+  execution; FD-7.3 kept the hook out of P3E because ESCALATE had no sink there.
+
+### 11.2 The one admissible shape `[I]`
+
+A sixth worker route, `POST /review/runs`, that starts the worker's own `wf-shadow`
+with a worker-minted instance id and an optional typed correlation id, idempotent by
+the adapter's own rule; the studio relays it through its client, then reads the run,
+its events and its approvals through the four routes it already has, and a human's
+decision travels through the one relay it already has. No workflow, task, provider,
+mode or digest is sent: the digest binding makes any other shape unrunnable, and FD-4
+forbids untyped intake. The Simulate screen would show two labelled paths: the seam-3
+in-process fixture run (hook absent, every consequential task BLOCKs) and the worker
+relay (the governed hook over the approval-bound source, ESCALATE parked in the
+review queue, resumed only by a recorded decision).
+
+What it amends: the worker (one route, one `adapter.start` call, tests); the review
+service (`ROUTES` gains one entry whose operation id passes the prohibition scan); the
+studio's review client (six routes, the proof route unchanged); CR-2 and the P3E
+egress record and its freeze test (six routes); the frontend manifest; the v2 contract
+(a second amendment, one operation) and its generated client; HR-1's wording (the
+studio may start the worker's own shadow run; it still signals and resumes nothing).
+It adds no configuration value, no package to the P3E image, no credential and no
+second egress destination.
+
+### 11.3 Failure matrix (what the code does today, or would by construction)
+
+| # | Case | Result |
+|---|---|---|
+| 1 | review URL unset | typed gap `review_service`, as the review screens `[V]` |
+| 2 | worker unreachable, or the route absent on an older worker | typed gap naming the failure, never an empty run `[V]` (HTTP 404 surfaces as unavailable) |
+| 3 | a studio-supplied workflow, provider, mode or digest | not expressible: the route takes none; a foreign digest is refused by the adapter `[V]` |
+| 4 | duplicate start | idempotent on the instance id; a conflicting one refused `[V]` |
+| 5 | ESCALATE | parked in the existing queue; visible on Review, resumed only by a recorded decision `[V]` |
+| 6 | decision without a proof | `PRESENTED_UNPROVEN`, as today; production requires the identity port (CR-3) `[V]` |
+| 7 | cross-tenant | the worker is `SINGLE_TENANT` with its own tenant; the studio names none `[V]` |
+| 8 | LIVE | the worker's providers are `FIXTURE_ONLY`; the route names no mode `[V]` |
+| 9 | credential | none crosses on the start; the proof header stays on the decision route only (ID-1) `[V]` |
+| 10 | the studio's in-process Simulate | unchanged; a second, labelled path, never merged `[G]` until built |
+
+### 11.4 Prohibitions any admissible shape must preserve `[V]`
+
+No credential in the studio; no second egress destination (the worker's listener is
+the one already permitted); the worker's only egress stays the JWKS host (CR-5); no
+studio-supplied definition, provider or mode; SD-2's seven verbs absent from every
+operation id and path; LIVE absent; `ENFORCEMENT_ENABLED` False; the frozen v1 bytes,
+every FROM line and ratified digest untouched; `REFERENCE_GRADE_SHADOW_ONLY`; the
+worker image's own gate set unchanged.
+
+### 11.5 Proposed ruling FD-10 `[R]` (five decisions, recommended first)
+
+| # | Decision | Options |
+|---|---|---|
+| **FD-10.1** | Is starting the worker's own shadow run the studio executing (SD-2)? | **`START_IS_A_RELAY`**: asking a separate unit to start the fixture workflow it already owns, over `FIXTURE_ONLY` providers, with nothing supplied by the studio, is display and transmit in FD-7.1's sense, not execution; SD-2's verbs stay absent from the route. `START_IS_EXECUTION`: the relay stays absent. |
+| **FD-10.2** | The route | **`SIXTH_ROUTE_START_SHADOW_RUN`**: `POST /review/runs` on the worker, body an optional typed correlation id, the worker mints the instance id, idempotent by the adapter's rule. `SEPARATE_SIMULATE_SERVICE` (a new unit; not next). |
+| **FD-10.3** | What crosses | **`NO_DEFINITION_CROSSES`**: no workflow, task, provider, mode or digest is sent; the worker's definition digest binds. `TYPED_DEFINITION_UPLOAD` (refused by the digest binding). |
+| **FD-10.4** | The amendment set | **`ONE_STEP_AMENDMENT`**: CR-2 (six routes), HR-1 (start of the worker's own shadow run added; signal and resume still absent), the P3E egress record and freeze test, the frontend manifest, the v2 contract (amendment v2-A2, one operation) and generated client, in one step with tests. |
+| **FD-10.5** | The Simulate screen | **`TWO_LABELLED_PATHS`**: the in-process fixture run and the worker relay are distinct, each labelled with its executor, hook and maturity; never merged into one "run". |
+
+Under the recommended options the seam ships in its own implementation step. The
+ruling authorizes documentation only. No implementation prompt is issued while
+FD-10.1 to FD-10.5 remain open.
