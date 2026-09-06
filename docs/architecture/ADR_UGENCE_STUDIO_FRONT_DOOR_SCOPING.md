@@ -1157,3 +1157,73 @@ FD-4, FD-8.1, FD-8.3, FD-12, SD-2, the `persistent_database` prohibition, the
 `REFERENCE_GRADE_SHADOW_ONLY` ceiling, `ENFORCEMENT_ENABLED = False`, the frozen v1
 contract, every FROM line and ratified digest, and every credential, egress and LIVE
 prohibition are preserved.
+
+## 15 — Closing audit: the front door at its ceiling (2026-09-06, after seam 9)
+
+**The question.** With seams 1, 2, 3, 5, 6, 7, 8 and 9 shipped and seam 4 absent by
+ruling, is the ceiling FD-13.1 named reached, and what would have to change for any
+further seam to open? **It is reached, and no ruling is needed to close it.** Every
+remaining item is blocked on something no ruling can supply: a package that does not
+exist, a body of work not yet begun, a producer that does not exist, or an input only
+the owner holds. This section records that state and proposes nothing.
+
+### 15.1 What the composed profile is, verified `[V]`
+
+`deployment/governance-studio/approved-runtime-config.json` at
+`governance-studio-deployment` 0.10.0 hands `build_studio_context` eight seams —
+`review_service_base_url`, `activation_root`, `policy_registry`, `policy_identities`,
+`provider_registry`, `system_registry`, `data_use_declarations`,
+`vendor_declarations` — behind eight configuration values, with fifteen first-party
+packages in the image. Three dependencies stay absent by ruling: `decision_store`,
+`governance_hook` (FD-7.3's fail-closed default stands) and `console_base_url`
+(FD-8.1). `data_classification` is `SYNTHETIC_DEMONSTRATION_ONLY` and the composition
+record's `classification_label` is `REFERENCE_GRADE_SHADOW_ONLY`.
+
+The v2 contract has been amended five times since its freeze, and the chain verifies
+end to end: v2-A1 (registry), v2-A2 (start relay), v2-A3 (ledger read), v2-A4
+(data-use), v2-A5 (vendor), each `previous_sha256` matching its predecessor's
+`sha256`, and the committed `openapi_v2.json` bytes matching the latest. The frozen v1
+contract is `dc309eab216e1a4c2f63f286887a4ef218a96ac34f8fa8614bff176db7c36656`,
+unchanged since GAS-4. The composition-record chain runs unbroken from seam 1 to seam
+9, each prior record kept byte-for-byte and still reconstructing.
+
+The three seam packages that gained a durable home — `ai-system-registry`,
+`data-use-admission`, `vendor-dependency` — are all 0.2.0,
+`CONTRACTS_PLUS_LOCAL_STORE`, `ENFORCEMENT_ENABLED = False`. `control-plane-root` is
+0.2.0 and `REFERENCE_GRADE`.
+
+### 15.2 What remains, and the one input that unblocks each `[V]`
+
+| Item | Kind | The one input | Who supplies it |
+|---|---|---|---|
+| Egress restrictions (row 5's third element) | seam with no package | an egress-authority package; `ADR_UGENCE_DATA_EGRESS_AUTHORITY_SCOPING.md` is ratified and no package exists `[G]` | a body of work, then a ruling |
+| Console in the profile (seam 4) | packaging body of work | FD-8.3 completion: the root prototype at `apps/console/` becomes a bounded, installable, tested distribution with an authentication boundary and a stated maturity | a body of work |
+| Durable Decision Authority store | package decision | a producer of decisions; the store would be empty by construction until one exists | a body of work |
+| Mirror coordinates | owner input | `registry_host`, `repository_prefix`, `secret_name` — all three `null`, `provisioning.status: PENDING_OUTSIDE_REPOSITORY` | the owner |
+| Langflow export fixture | owner input | one genuine secret-free export; only `ADR_UGENCE_LANGFLOW_IMPORT_SCOPING.md` exists, no fixture | the owner |
+| Enterprise issuer (AI-E) | owner input | an issuer; until then every declarer across the seams stays `PRESENTED_UNPROVEN` | the owner |
+
+Three of the six are owner decisions in the strict sense — the owner holds the input
+and no work in this repository substitutes for it. The other three are bodies of work
+whose absence is structural, not a matter of choosing.
+
+### 15.3 The standing defect `[G]`
+
+`studio_v2.py:447` calls `self._decisions.get(decision_id)` where the Decision
+Authority repository offers `get_decision`
+(`repositories/decision_case_repository.py:43`). Unchanged since §13.1 recorded it. It
+is a defect, not a seam, and it belongs to whichever step first hands a real decision
+store — which is why no seam has fixed it: no seam hands one.
+
+### 15.4 What would have to change for a further seam to open `[I]`
+
+A front-door seam under FD-1 needs a package with a public surface the studio can type
+against and a composition root that can hand it over. Every outline row that had one
+now has a screen. A tenth seam therefore requires a *new package* first — the egress
+authority being the named candidate — and that package is itself a body of work under
+its own ADR, not a ruling this document can make. Until such a package exists, or the
+console is packaged under FD-8.3, or an owner input arrives, there is nothing for a
+ruling to decide.
+
+**No ruling is proposed.** The ceiling FD-13.1 named is reached, and this section
+closes the front-door sequence rather than opening another.
