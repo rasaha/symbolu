@@ -616,7 +616,7 @@ operation id and path; LIVE absent; `ENFORCEMENT_ENABLED` False; the frozen v1 b
 every FROM line and ratified digest untouched; `REFERENCE_GRADE_SHADOW_ONLY`; the
 worker image's own gate set unchanged.
 
-### 11.5 Proposed ruling FD-10 `[R]` (five decisions, recommended first)
+### 11.5 Proposed ruling FD-10 (five decisions, recommended first; ruled in §11.6)
 
 | # | Decision | Options |
 |---|---|---|
@@ -626,6 +626,24 @@ worker image's own gate set unchanged.
 | **FD-10.4** | The amendment set | **`ONE_STEP_AMENDMENT`**: CR-2 (six routes), HR-1 (start of the worker's own shadow run added; signal and resume still absent), the P3E egress record and freeze test, the frontend manifest, the v2 contract (amendment v2-A2, one operation) and generated client, in one step with tests. |
 | **FD-10.5** | The Simulate screen | **`TWO_LABELLED_PATHS`**: the in-process fixture run and the worker relay are distinct, each labelled with its executor, hook and maturity; never merged into one "run". |
 
-Under the recommended options the seam ships in its own implementation step. The
-ruling authorizes documentation only. No implementation prompt is issued while
-FD-10.1 to FD-10.5 remain open.
+### 11.6 Ruling FD-10 (owner, 2026-09-06)
+
+| # | Ruling |
+|---|---|
+| **FD-10.1** | **`START_IS_A_RELAY`.** Asking the separate governed runtime worker to start the fixture workflow it already owns, over `FIXTURE_ONLY` providers, with nothing supplied by the studio, is display and transmit in FD-7.1's sense, not execution. SD-2's seven verbs stay absent from every operation id and path; the studio still executes nothing. |
+| **FD-10.2** | **`SIXTH_ROUTE_START_SHADOW_RUN`.** Seam 6 is `POST /review/runs` on the worker: the body is an optional typed correlation id, the worker mints the instance id, the start is idempotent by the DBOS adapter's own rule, and the run is read back through the four existing reads and resumed only through the existing decision relay. |
+| **FD-10.3** | **`NO_DEFINITION_CROSSES`.** No workflow, task, provider, mode or digest is sent by the studio; the worker's `definition_digest` binds every instance to the definition it already runs, and the adapter's refusal of any other digest stands as the property that makes the seam safe. |
+| **FD-10.4** | **`ONE_STEP_AMENDMENT`.** CR-2 (six routes), HR-1's wording (the studio may start the worker's own shadow run; it still signals and resumes nothing), the P3E egress record and its freeze test, the frontend manifest, and the v2 contract (amendment v2-A2, one operation) with its generated client are amended together, in one step, with tests. No configuration value, image package, credential or second egress destination is added. |
+| **FD-10.5** | **`TWO_LABELLED_PATHS`.** The Simulate screen shows the seam-3 in-process fixture run and the worker relay as distinct paths, each labelled with its executor, its hook and its maturity; they are never merged into one "run". |
+
+**What the ruling authorizes.** Documentation only. No seam is activated, no route
+exists, no contract byte moves and no code changes. Seam 6 activates by its own
+implementation prompt, which will ship in one step: the worker route and its
+`adapter.start` call with tests, the review service's sixth `ROUTES` entry, the
+studio's review client and relay service, the v2 amendment v2-A2 with the regenerated
+client, the frontend manifest and the Simulate screen's second labelled path, the P3E
+egress record and freeze test, CR-2 and HR-1 amended in their ADRs, and the failure
+matrix of §11.3 as tests. FD-1, FD-3, FD-4, SD-2, CR-3, CR-4, CR-5, the
+`REFERENCE_GRADE_SHADOW_ONLY` ceiling, `ENFORCEMENT_ENABLED = False`, the frozen v1
+contract, every FROM line and ratified digest, the worker image's gate set, and every
+credential, egress and LIVE prohibition are preserved.
