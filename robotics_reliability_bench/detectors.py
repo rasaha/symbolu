@@ -27,6 +27,8 @@ from symbolu_robotics.bcvf_autonomous.core import (BCVFConfig, CostOrder,
 from robotics_reliability_bench.fault_corpus import FaultBundle
 from robotics_reliability_bench.predictor_trust_baseline import (
     DeterministicTrustBaseline, TrustState)
+from robotics_reliability_bench.llt_kalman_trust import (LLTKalmanConfig,
+                                                         LLTKalmanTrust)
 
 
 @dataclass
@@ -62,6 +64,36 @@ class BaselineDetector:
             signal=float(max_susp),
             metadata={"system_state": d.system_state.value,
                       "stale_excluded": stale, "reason": d.reason})
+
+
+# ---- LLT-Kalman variant adapter (cross-domain port) -----------------------
+
+class LLTKalmanDetector:
+    """Wraps ``LLTKalmanTrust``. Same detected / flagged / abstain semantics
+    as ``BaselineDetector`` so the frozen metric code scores it identically."""
+    name = "LLTKalman"
+
+    def __init__(self, cfg: Optional[LLTKalmanConfig] = None, name: Optional[str] = None):
+        self.det = LLTKalmanTrust(cfg)
+        if name:
+            self.name = name
+
+    def detect(self, b: FaultBundle) -> DetectorOutput:
+        d = self.det.evaluate(b.trajectories, b.valid_masks)
+        suspect = [r.index for r in d.per_predictor if r.state is TrustState.SUSPECT]
+        stale = [r.index for r in d.per_predictor
+                 if r.state is TrustState.ABSTAIN and any("stale" in x for x in r.reasons)]
+        abstained = d.system_state is TrustState.ABSTAIN
+        detected = bool(suspect or stale or abstained)
+        max_susp = max((r.suspicion for r in d.per_predictor), default=0.0)
+        return DetectorOutput(
+            self.name, detected=detected, flagged=d.flagged,
+            detection_tick=d.detection_tick, abstained=abstained,
+            signal=float(max_susp),
+            metadata={"system_state": d.system_state.value,
+                      "stale_excluded": stale, "reason": d.reason,
+                      "per_predictor": [(r.index, r.state.value, r.reasons)
+                                        for r in d.per_predictor]})
 
 
 # ---- Real BCVF kernel adapter --------------------------------------------
