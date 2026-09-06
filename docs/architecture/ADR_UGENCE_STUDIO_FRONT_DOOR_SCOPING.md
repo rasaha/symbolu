@@ -967,7 +967,7 @@ FD-1, its own later seam.
 | 9 | restart | records survive on the volume `[V]` shape |
 | 10 | egress restrictions | absent; the screen says the egress package does not exist and invents nothing `[G]` |
 
-### 13.5 Recommendation and proposed ruling FD-12 (five decisions, recommended first)
+### 13.5 Recommendation and proposed ruling FD-12 (five decisions, recommended first; ruled in §13.6)
 
 Seam 8 is the only remaining item whose prerequisites are rulings rather than a
 package decision, a packaging body of work or an owner input, and it is the last
@@ -988,3 +988,26 @@ deployment composition (one declarations file under the runtime volume, tenant-b
 a superseding composition record, and §13.4 as tests. Owner decisions remaining before
 implementation: the five above; none carries an `[R]` beyond the choice itself, since
 seam 5 already settled the durable-home and registrant questions for this shape.
+
+### 13.6 Ruling FD-12 (owner, 2026-09-06)
+
+| # | Ruling |
+|---|---|
+| **FD-12.1** | **`SCREEN_5_TYPED_DATA_USE_DECLARATIONS`.** Seam 8 is a typed declaration form over `data-use-admission`, composed through the P3E root and tenant-bound to `UGENCE_STUDIO_TENANT_ID`. It is the last outline row a studio-alone seam can reach: the console stays a packaging body of work under FD-8.3, a durable Decision Authority store a package decision, and the mirror coordinates, Langflow fixture and enterprise issuer owner inputs. `vendor-dependency` is the same shape again and its own later seam under FD-1. |
+| **FD-12.2** | **`LOCAL_SQLITE_UNDER_RUNTIME_VOLUME`.** `data-use-admission` 0.2.0 adds one sqlite implementation of `DataUseDeclarationPort` plus a single append, `declare`, in the seam-5 posture: a file under the writable runtime volume named by one configuration value, no server, no driver, no DSN, the `persistent_database` prohibition standing. The file is bound to the deployment's tenant at first open and never re-bound. |
+| **FD-12.3** | **`DECLARED_BY_PRESENTED_UNPROVEN`.** `declared_by` is a typed opaque handle the form supplies, recorded as presented and unproven; the recording composition is this deployment's name and version; no identity is claimed until an enterprise issuer exists (AI-E). |
+| **FD-12.4** | **`V2_AMENDMENT_TWO_OPERATIONS`.** `v2_data_use_declare` and `v2_data_use_list`, validated by the package's own refusal reasons and `supersession_refusals`; `openapi_v2.json` and the generated client are re-frozen by amendment v2-A4 in the same step, the fourth amendment since the v2 freeze. |
+| **FD-12.5** | **`DECLARE_IS_THE_ONLY_WRITE`.** The seam writes declarations and nothing else: no edit, revocation, admission, verification, scoring or enforcement has a route. A changed declaration is a new one superseding the old; the record carries no data, only an opaque `data_ref`, and its classification, purpose and residency labels stay uninterpreted; the record confers no approval, admission, authority or permission. Egress restrictions are not invented for the absent egress package. SD-2 and every credential and LIVE prohibition are unchanged. |
+
+**What the ruling authorizes.** Documentation only. No seam is activated, no route
+exists, no package is released, no contract byte moves and no code changes. Seam 8
+activates by its own implementation prompt, which will ship in one step: the
+`data-use-admission` 0.2.0 release with its sqlite store and tests, the studio
+backend's declaration service and the two v2 operations with amendment v2-A4 and the
+regenerated client, the frontend manifest and the declaration screen, the P3E
+composition (one configuration value, one file under the runtime volume, tenant-bound)
+with a superseding composition record, and the failure matrix of §13.4 as tests. FD-1,
+FD-3, FD-4, FD-8.1, FD-8.3, SD-2, the `persistent_database` prohibition, the
+`REFERENCE_GRADE_SHADOW_ONLY` ceiling, `ENFORCEMENT_ENABLED = False`, the frozen v1
+contract, every FROM line and ratified digest, and every credential, egress and LIVE
+prohibition are preserved.
