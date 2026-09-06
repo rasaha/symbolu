@@ -805,7 +805,7 @@ would still hold nothing. Everything below is documentation; no seam is activate
 | 9 | credential or proof on the read | none crosses; the proof route stays the decision relay (ID-1) `[V]` |
 | 10 | the console path | unchanged: the typed gap `console_api` beside the labelled worker source (FD-8.1, FD-8.5) `[G]` until built |
 
-### 12.5 Recommendation and proposed ruling FD-11 (five decisions, recommended first)
+### 12.5 Recommendation and proposed ruling FD-11 (five decisions, recommended first; ruled in §12.6)
 
 Observe over the worker's ledger is the only candidate whose prerequisites are rulings
 rather than packages, deployment units or producers, and it follows the seam-6 shape
@@ -826,3 +826,27 @@ the Observe screen's labelled worker source, the P3E egress record and freeze te
 CR-2 amended, a superseding composition record, and §12.4 as tests. Owner decisions
 remaining before implementation: the five above, of which FD-11.2 carries the one
 `[R]` (whether a raw read amends D-5 or falls outside it).
+
+### 12.6 Ruling FD-11 (owner, 2026-09-06)
+
+| # | Ruling |
+|---|---|
+| **FD-11.1** | **`OBSERVE_OVER_WORKER_LEDGER`.** Seam 7 is a read of the worker's control-plane audit ledger by correlation id, relayed through the review service as seam 6 relays the start. The console stays a packaging body of work under FD-8.3, and a durable Decision Authority store stays a package decision; neither is a front-door seam. |
+| **FD-11.2** | **`READ_PORT_IN_CONTROL_PLANE_ROOT`.** `control-plane-root` 0.2.0 adds one read-only, tenant-scoped read of a tenant's own rows by correlation id, returning stored entries in chain order with their digests, beside the existing `verify_chain`; its ADR's D-5 and its README's "no reconstruction API" are amended to say that a raw, uninterpreted read of a tenant's own rows is not reconstruction, and the ledger stays the one owner of its schema. The owner records `REVIEW_SERVICE_READ_INDEX` (a second read-only index on the `LedgerLinkageIndex` precedent, no package change) as the admissible alternative; seam 7's implementation prompt names which of the two it ships, and the control-plane-root amendment is the recommended one. |
+| **FD-11.3** | **`SEVENTH_ROUTE_LEDGER_READ`.** `GET /review/audit/{correlation_id}` on the worker returns its own tenant's entries for that correlation id in `tenant_seq` order (kind, `recorded_at`, `recorded_by`, payload, `entry_ref`, `record_digest`, `prev_digest`) and the chain verification result as a typed field. An integrity failure is a typed refusal, never a 500 and never the entries alone; an unknown correlation id is a typed not-found; there is no list-all route. |
+| **FD-11.4** | **`TWO_LABELLED_SOURCES`.** The Observe screen shows the worker ledger (durable, per-tenant, hash-chained, `REFERENCE_GRADE`, receipts rather than stage narratives) and the console (the typed gap `console_api` while FD-8.1 holds) as distinct sources, each labelled with its record type, executor and maturity, never merged. The screen re-derives, re-orders and re-hashes nothing and shows the worker's verification result as the worker's. |
+| **FD-11.5** | **`READ_ONLY_ONE_STEP_AMENDMENT`.** CR-2 (seven routes), the P3E egress record and its freeze test, the frontend manifest, the v2 contract (amendment v2-A3, one operation) with its generated client, and `control-plane-root` 0.2.0 are amended together, in one step, with tests. No append, edit or verification-trigger route exists from the studio; no configuration value, image package, credential or second egress destination is added. |
+
+**What the ruling authorizes.** Documentation only. No seam is activated, no route
+exists, no package is released, no contract byte moves and no code changes. Seam 7
+activates by its own implementation prompt, which will ship in one step: the read
+port in `control-plane-root` 0.2.0 with tests and its ADR and README amended, the
+review service's seventh `ROUTES` entry and route with tests, the studio's review
+client and Observe relay service, the v2 amendment v2-A3 with the regenerated client,
+the frontend manifest and the Observe screen's labelled worker source beside the
+console's gap, the P3E egress record and freeze test, CR-2 amended in its ADR, a
+superseding composition record, and the failure matrix of §12.4 as tests. FD-1, FD-3,
+FD-4, FD-8.1, FD-8.5, SD-2, CR-3, CR-4, CR-5, ID-1, the `REFERENCE_GRADE_SHADOW_ONLY`
+ceiling, `ENFORCEMENT_ENABLED = False`, the frozen v1 contract, every FROM line and
+ratified digest, the worker image's gate set, and every credential, egress and LIVE
+prohibition are preserved.
