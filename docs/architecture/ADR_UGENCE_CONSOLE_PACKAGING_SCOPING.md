@@ -89,7 +89,7 @@ it decides which of eleven routes a packaged console still exposes, and to whom.
 
 Test coverage today is one file, `tests/test_governed_loop.py` `[V]`.
 
-## 6 — Proposed ruling CP-1 to CP-5 (five decisions, recommended option first)
+## 6 — Proposed ruling CP-1 to CP-5 (five decisions, recommended option first; ruled in §8)
 
 | # | Decision | Options |
 |---|---|---|
@@ -115,3 +115,26 @@ this record does not enter it.
 - **`REFERENCE_GRADE_SHADOW_ONLY`, `ENFORCEMENT_ENABLED = False`, the frozen v1 and
   v2 contracts, every `FROM` line and ratified digest, and every credential and LIVE
   prohibition** — all preserved.
+
+## 8 — Ruling CP-1 to CP-5 (owner, 2026-09-06)
+
+The recommended option is ratified in every case.
+
+| # | Ruling |
+|---|---|
+| **CP-1** | **`SERVICE_ONLY`.** Package `ugence_console_api` alone. `apps/console/` stays an independently deployable React app, exactly as the studio's frontend and backend are separate units. |
+| **CP-2** | **`PACKAGES_INTEGRATION`.** The service becomes `packages/integration/console-api`, distribution `ugence-console-api`, with its namespace unchanged so no import in the tree moves. |
+| **CP-3** | **`ALLOWLIST_THE_FOUR`.** The packaged service exposes the four routes the studio's frozen allowlist already names, plus `/health`. The three governance verbs (`/v1/actions/authorize`, `/v1/actions/clear`, `/v1/assertions/evaluate`) and the three introspection routes are not served by the packaged unit until separately ruled. **A capability does not become public API because the underlying function exists**; each new external surface is separately authorized. |
+| **CP-4** | **`DECLARE_THE_CEILING`.** The in-memory audit store is retained for this reference-grade, shadow-only stage, and the package discloses on every answer that its audit is one process's view, lost on restart. `control-plane-root` 0.2.0 remains the durable alternative for a later ruling. |
+| **CP-5** | **`DECLARE_AND_FAIL_AT_INSTALL`.** Every platform package the adapters import becomes a declared distribution dependency. The fail-safe `try` guards may remain for development, but a missing governance dependency is an install-time failure, never a runtime degradation that serves while the governance it advertises is absent. |
+
+**What the ruling authorizes.** Documentation only. No package moves, no route
+changes, no dependency metadata and no code changes. **Packaging implementation does
+not begin yet:** by owner direction the clearance-export seam is audited first
+(`ADR_UGENCE_CLEARANCE_EXPORT_SCOPING.md`), so that the service is not packaged and
+then immediately reopened to widen its public API. The sequence is CP rulings →
+clearance-export audit and ruling → packaging implementation → export implementation.
+
+CP-3 is the principle the export audit inherits: exporting a clearance is a **new
+external capability** and must be separately authorized rather than appearing because
+a compiler or a receipt type already exists.
