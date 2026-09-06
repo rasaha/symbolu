@@ -12,6 +12,7 @@ import type {
   PolicyCompileBody,
   PolicyPackBody,
   PublishShadowBody,
+  RegistryRegisterBody,
   ReviewDecisionBody,
   SimulateRunBody,
 } from "@/api/types-v2";
@@ -89,4 +90,15 @@ export const useSubmitReviewDecision = () =>
   useMutation({
     mutationFn: ({ body, proof }: { body: ReviewDecisionBody; proof?: string }) =>
       v2.submitReviewDecision(body, proof ?? ""),
+  });
+
+// -- 8 · Registration (front-door seam 5, FD-9) ------------------------------
+export const useRegisterSystem = () =>
+  useMutation({ mutationFn: (b: RegistryRegisterBody) => v2.registerSystem(b) });
+
+export const useRegistrations = (asOf = "") =>
+  useQuery({
+    queryKey: ["v2", "registry", "registrations", asOf],
+    queryFn: () => v2.listRegistrations(asOf),
+    retry: RETRY,
   });
