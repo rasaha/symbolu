@@ -24,6 +24,12 @@ for _src in (
     ),
     os.path.join(_REPO, "packages", "capabilities", "decision-authority", "src"),
     os.path.join(_REPO, "packages", "governance-contracts", "src"),
+    # Signed effect attestation (RI-1 to RI-5) and the Trusted Evidence Authority it
+    # is built on; RA-8's own source imports only the former.
+    os.path.join(_REPO, "packages", "trusted-evidence-authority", "src"),
+    os.path.join(
+        _REPO, "packages", "integration", "risk-authority-effect-attestation", "src"
+    ),
     # RA-7 runtime-assurance is a baseline compatibility dependency for the RA-8
     # regression `test_35_ra7_unchanged` (it asserts RA-7's surface is undisturbed
     # and that RA-7 does NOT carry the RA-8 EXECUTION_EFFECT_MISMATCH reason). Adding
