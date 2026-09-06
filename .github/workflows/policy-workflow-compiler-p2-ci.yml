@@ -199,6 +199,21 @@ jobs:
           pip install -e packages/capabilities/agent-workforce-composer
       - run: python -m pytest packages/capabilities/agent-workforce-composer/tests -q
 
+  verifier-report-freshness:
+    name: Committed verifier report is not stale
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.11" }
+      - run: python -m pip install --upgrade pip && pip install pydantic
+      # Compares only stable fields (versions, filenames, API count, frozen v1
+      # identity, v1/v2 digests re-computed from source, required steps, verdict).
+      # Archive SHAs and timings are deliberately excluded — sdist archives are not
+      # bit-for-bit reproducible, so hash equality is not a gating invariant.
+      - env: { PYTHONPATH: "${{ env.SRC }}" }
+        run: python ${{ env.PKG }}/scripts/check_verifier_report_freshness.py
+
   isolated-distribution:
     name: Clean-install verifier (wheel/sdist, CLI v1+v2, cross-process determinism)
     runs-on: ubuntu-latest

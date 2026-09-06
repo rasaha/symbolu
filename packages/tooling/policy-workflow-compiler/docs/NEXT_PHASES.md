@@ -77,8 +77,11 @@ here. Its evidence is AWC-side: `ugence_agent_workforce_composer.adapter_v2`, th
 `v1_v2_equivalence_harness_implemented`.
 
 This package emitted no new contract for it and changed no digest. Its own
-`awc_adapter_updated` gate stays `false` by design: the compiler does not own that
-adapter (see `MATURITY.md`, "Where AWC v2 consumption lives").
+`awc_adapter_updated` gate still reports `false`, and that value is deliberately
+left unchanged here — whether the gate is scoped to this package's responsibility
+or reads as a (now false) claim about platform state is an unratified owner
+decision, recorded in `MATURITY.md` under "`awc_adapter_updated` is pending owner
+ratification".
 
 ### The next compiler phase is not yet ratified
 

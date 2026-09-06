@@ -27,7 +27,7 @@ responsibility:
   confirm reproducibility and packaging guarantees.
 
 The public API is a single curated module, `ugence_policy_workflow_compiler.api`
-(71 names), frozen in `artifacts/public_api.json`.
+(105 names), frozen in `artifacts/public_api.json`.
 
 ## The five-stage pipeline
 

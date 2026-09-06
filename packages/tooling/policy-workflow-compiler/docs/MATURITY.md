@@ -40,7 +40,7 @@ each belongs to a different component.
 
 | Gate | Value | Meaning |
 | --- | --- | --- |
-| `awc_adapter_updated` | `false` | The compiler does not update or own the Agent Workforce Composer adapter. That adapter is AWC-owned; see "Where AWC v2 consumption lives" below. |
+| `awc_adapter_updated` | `false` | The compiler does not update or own the Agent Workforce Composer adapter. The value is unchanged, but its cross-package meaning is now contested — see "`awc_adapter_updated` is pending owner ratification" below. |
 | `agent_eligibility_implemented` | `false` | Eligibility is an AWC concern, not a compiler concern. |
 | `agent_ranking_implemented` | `false` | Ranking is an AWC concern. |
 | `team_composition_implemented` | `false` | Team composition is an AWC concern. |
@@ -48,13 +48,30 @@ each belongs to a different component.
 | `action_authorization_implemented` | `false` | Authorization is held by canonical capabilities, never the compiler. |
 | `enterprise_policy_evaluation_implemented` | `false` | Enterprise deployment-policy overlay evaluation stays outside the portable compiled workflow. |
 
-### Where AWC v2 consumption lives
+### `awc_adapter_updated` is pending owner ratification
 
-`awc_adapter_updated=false` is a statement about *this package's* responsibility,
-not about the platform. The Agent Workforce Composer does consume
-`workflow_ir.v2` — its own `compiler_v2_adapter_implemented` gate reports that.
-The two gates are consistent: the consumer owns the adapter, the compiler owns
-the contract.
+This gate was introduced when the AWC adapter had not been updated, and at that
+time it read the same way under either interpretation. That is no longer true.
+AWC P2.1 is delivered: the Agent Workforce Composer does consume `workflow_ir.v2`,
+and its own `compiler_v2_adapter_implemented` gate reports so. This package's gate
+still reports `false`.
+
+The two readings now diverge:
+
+- **Scoped to this package** (the reading the code comment takes): "the compiler
+  does not update the AWC adapter" — still true, and true permanently, since the
+  adapter is AWC-owned.
+- **Read as platform state** by a downstream consumer gating its own usage: "the
+  AWC adapter has not been updated for v2" — **false as of AWC P2.1**.
+
+Which reading is authoritative — and therefore whether the gate should be
+retired, renamed to something unambiguous, or kept with its scope documented — is
+an **owner decision that has not been ratified**. Pending that decision the value
+is deliberately left unchanged: this maintenance pass documents the ambiguity
+rather than resolving it, because flipping or removing a published maturity
+boolean is a contract change, not a doc fix. Consumers reading this gate today
+should treat it as scoped to this package and consult the AWC gates for AWC
+state.
 
 ## Version and contract identity
 
