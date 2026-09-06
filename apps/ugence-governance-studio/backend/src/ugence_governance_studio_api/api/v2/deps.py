@@ -35,6 +35,12 @@ def _absent_start_run() -> Any:
     return StartRunService(review=None)
 
 
+def _absent_data_use() -> Any:
+    from ...services.studio_v2 import DeclarationService
+
+    return DeclarationService(declarations=None)
+
+
 def _absent_ledger_observe() -> Any:
     from ...services.studio_v2 import LedgerObserveService
 
@@ -61,6 +67,7 @@ class V2Context:
         review: Any = None,
         registry: Any = None,
         start_run: Any = None,
+        data_use: Any = None,
         ledger_observe: Any = None,
     ) -> None:
         self.constitution = constitution
@@ -78,6 +85,9 @@ class V2Context:
         # Front-door seam 6 (FD-10): the worker shadow-run relay. Absent, the start route
         # reports the same review_service gap as the review screens.
         self.start_run = start_run if start_run is not None else _absent_start_run()
+        # Front-door seam 8 (FD-12): the data-use declaration intake. Absent, the
+        # data-use routes report the gap.
+        self.data_use = data_use if data_use is not None else _absent_data_use()
         # Front-door seam 7 (FD-11): Observe over the worker's ledger. Absent, the ledger
         # route reports the same review_service gap.
         self.ledger_observe = ledger_observe if ledger_observe is not None else _absent_ledger_observe()

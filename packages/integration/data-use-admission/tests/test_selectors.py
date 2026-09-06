@@ -216,7 +216,10 @@ def test_the_port_declares_only_read_methods():
         assert forbidden not in surface
 
 
-def test_no_implementation_of_the_port_ships():
+def test_exactly_one_ruled_implementation_of_the_port_ships():
+    """FD-12.2 admits one local file and no more: a second implementation, an adapter
+    or a connector would need its own ruling."""
+
     import ugence_data_use_admission as pkg
 
     implementations = [
@@ -225,5 +228,5 @@ def test_no_implementation_of_the_port_ships():
         and not getattr(getattr(pkg, name), "_is_protocol", False)
         and hasattr(getattr(pkg, name), "declarations_for_tenant")
     ]
-    assert implementations == []
+    assert implementations == ["SqliteDataUseDeclarations"]
     assert isinstance(DataUseDeclarationPort, type) and DataUseDeclarationPort._is_protocol

@@ -211,13 +211,17 @@ def test_the_egress_record_names_seven_routes_one_destination_and_the_manifest_a
     assert seam["mutation_boundary"].startswith("read-only")
     assert seam["composition_record"].endswith("composition-record.seam-6.json")
     assert "FD-11 seam 7" in cfg["front_door_seams"]["ruling"]
-    assert list(cfg["configuration_added"]) == ["UGENCE_STUDIO_REVIEW_SERVICE_URL",
-                                                "UGENCE_STUDIO_CONSTITUTION_REGISTRY_PATH",
-                                                "UGENCE_STUDIO_TENANT_ID",
-                                                "UGENCE_STUDIO_POLICY_IDENTITIES",
-                                                "UGENCE_STUDIO_SIMULATION_PROVIDER",
-                                                "UGENCE_STUDIO_SYSTEM_REGISTRY_PATH"], "no value added (FD-11.5)"
-    assert len(cfg["first_party_packages_in_image"]) == 13, "no package added (FD-11.5)"
+    assert list(cfg["configuration_added"])[:6] == ["UGENCE_STUDIO_REVIEW_SERVICE_URL",
+                                                   "UGENCE_STUDIO_CONSTITUTION_REGISTRY_PATH",
+                                                   "UGENCE_STUDIO_TENANT_ID",
+                                                   "UGENCE_STUDIO_POLICY_IDENTITIES",
+                                                   "UGENCE_STUDIO_SIMULATION_PROVIDER",
+                                                   "UGENCE_STUDIO_SYSTEM_REGISTRY_PATH"], "seam 7 added no value (FD-11.5)"
+    assert list(cfg["configuration_added"])[6:] == ["UGENCE_STUDIO_DATA_USE_DECLARATIONS_PATH"], \
+        "the only later value is seam 8's declarations file (FD-12.2)"
+    assert cfg["first_party_packages_in_image"][:13][-1] == "packages/integration/ai-system-registry"
+    assert cfg["first_party_packages_in_image"][13:] == ["packages/integration/data-use-admission"], \
+        "the only later package is seam 8's (FD-12.2)"
 
 
 def test_the_third_contract_amendment_is_recorded_in_the_p3e_freeze():
@@ -228,10 +232,12 @@ def test_the_third_contract_amendment_is_recorded_in_the_p3e_freeze():
                                          "openapi_v2.amendments.json"), encoding="utf-8"))
     with open(os.path.join(REPO, "apps", "ugence-governance-studio", "contracts", "openapi_v2.json"), "rb") as fh:
         current = hashlib.sha256(fh.read()).hexdigest()
-    a2, a3 = record["amendments"][-2:]
+    a2, a3 = record["amendments"][1:3]
     assert a2["amendment_id"] == "v2-A2" and a3["amendment_id"] == "v2-A3"
     assert a3["previous_sha256"] == a2["sha256"]
-    assert cfg["frozen"]["openapi_v2_sha256"] == current == a3["sha256"]
+    # the committed bytes and the freeze carry the latest amendment (v2-A4 since seam 8),
+    # which chains from this one
+    assert cfg["frozen"]["openapi_v2_sha256"] == current == record["amendments"][-1]["sha256"]
     assert a3["operations_added"] == ["v2_observe_ledger_chain"]
     assert a3["paths_added"] == ["/api/v2/observe/ledger/{correlation_id}"]
     for tag in ("v2-A3", "v2-A2", "v2-A1"):

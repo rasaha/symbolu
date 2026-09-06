@@ -49,6 +49,22 @@
         "/api/v2/observe/ledger/{correlation_id}"
       ],
       "note": "Front-door seam 7: one read relaying the governed runtime worker's own tenant's audit-ledger rows for a correlation id, with the worker's chain verification, returned unchanged. The studio names no tenant and re-derives nothing. No other operation changed."
+    },
+    {
+      "amendment_id": "v2-A4",
+      "date": "2026-09-06",
+      "ruling": "ADR_UGENCE_STUDIO_FRONT_DOOR_SCOPING.md FD-12.4 V2_AMENDMENT_TWO_OPERATIONS (with FD-12.1 SCREEN_5_TYPED_DATA_USE_DECLARATIONS, FD-12.3 DECLARED_BY_PRESENTED_UNPROVEN, FD-12.5 DECLARE_IS_THE_ONLY_WRITE)",
+      "previous_sha256": "6346f2b7cd10430874f2f077ac69c12ce74be138a9462b0c4ccdcb503c624d7b",
+      "sha256": "956c8289e77c31afa304a58a2cf94023b057a44f78c9159c83496338202b3b51",
+      "operations_added": [
+        "v2_data_use_declare",
+        "v2_data_use_list"
+      ],
+      "operations_removed": [],
+      "paths_added": [
+        "/api/v2/data-use/declarations"
+      ],
+      "note": "Front-door seam 8: typed data-use declaration intake over data-use-admission 0.2.0. The write records what a declarer asserted and confers nothing (DE-1, FD-12.5); data_ref is an opaque handle and no field carries the data; the classification, purpose and residency labels stay uninterpreted; declared_by is presented and unproven. No egress restriction is expressible and none is invented. No other operation changed."
     }
   ]
 }

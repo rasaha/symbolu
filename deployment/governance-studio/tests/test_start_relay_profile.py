@@ -261,13 +261,17 @@ def test_the_egress_record_names_six_routes_one_destination_and_the_frontend_man
     assert seam["composition_record"].endswith("composition-record.seam-5.json")
     assert "START_IS_A_RELAY" in cfg["prohibited_definitions"]["agent_execution"]
     assert "FD-10 seam 6" in cfg["front_door_seams"]["ruling"]
-    assert list(cfg["configuration_added"]) == ["UGENCE_STUDIO_REVIEW_SERVICE_URL",
-                                                "UGENCE_STUDIO_CONSTITUTION_REGISTRY_PATH",
-                                                "UGENCE_STUDIO_TENANT_ID",
-                                                "UGENCE_STUDIO_POLICY_IDENTITIES",
-                                                "UGENCE_STUDIO_SIMULATION_PROVIDER",
-                                                "UGENCE_STUDIO_SYSTEM_REGISTRY_PATH"], "no value added (FD-10.4)"
-    assert len(cfg["first_party_packages_in_image"]) == 13, "no package added (FD-10.4)"
+    assert list(cfg["configuration_added"])[:6] == ["UGENCE_STUDIO_REVIEW_SERVICE_URL",
+                                                   "UGENCE_STUDIO_CONSTITUTION_REGISTRY_PATH",
+                                                   "UGENCE_STUDIO_TENANT_ID",
+                                                   "UGENCE_STUDIO_POLICY_IDENTITIES",
+                                                   "UGENCE_STUDIO_SIMULATION_PROVIDER",
+                                                   "UGENCE_STUDIO_SYSTEM_REGISTRY_PATH"], "seam 6 added no value (FD-10.4)"
+    assert list(cfg["configuration_added"])[6:] == ["UGENCE_STUDIO_DATA_USE_DECLARATIONS_PATH"], \
+        "the only later value is seam 8's declarations file (FD-12.2)"
+    assert cfg["first_party_packages_in_image"][:13][-1] == "packages/integration/ai-system-registry"
+    assert cfg["first_party_packages_in_image"][13:] == ["packages/integration/data-use-admission"], \
+        "the only later package is seam 8's (FD-12.2)"
 
 
 def test_the_second_contract_amendment_is_recorded_in_the_p3e_freeze():
@@ -281,10 +285,13 @@ def test_the_second_contract_amendment_is_recorded_in_the_p3e_freeze():
     a1, a2 = record["amendments"][0:2]
     assert a1["amendment_id"] == "v2-A1" and a2["amendment_id"] == "v2-A2"
     assert a2["previous_sha256"] == a1["sha256"]
-    # the committed bytes and the freeze carry the latest amendment (v2-A3 since seam 7);
-    # the chain from A2 onward is verified in test_ledger_observe_profile
+    # the committed bytes and the freeze carry the latest amendment (v2-A4 since seam 8);
+    # every link from the original freeze onward chains
     assert cfg["frozen"]["openapi_v2_sha256"] == current == record["amendments"][-1]["sha256"]
-    assert record["amendments"][-1]["previous_sha256"] == a2["sha256"] or record["amendments"][-1] is a2
+    previous = record["original_sha256"]
+    for amendment in record["amendments"]:
+        assert amendment["previous_sha256"] == previous
+        previous = amendment["sha256"]
     assert a2["operations_added"] == ["v2_review_start_shadow_run"] and a2["paths_added"] == ["/api/v2/review/runs"]
     assert "v2-A2" in cfg["frozen"]["openapi_v2_amendment"] and "v2-A1" in cfg["frozen"]["openapi_v2_amendment"]
     assert cfg["frozen"]["openapi_sha256"] == "dc309eab216e1a4c2f63f286887a4ef218a96ac34f8fa8614bff176db7c36656"

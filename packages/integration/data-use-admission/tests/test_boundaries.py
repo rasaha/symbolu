@@ -19,6 +19,17 @@ import ugence_data_use_admission as pkg
 PKG_DIR = pathlib.Path(pkg.__file__).resolve().parent
 DIST = PKG_DIR.parents[1]
 SOURCES = sorted(PKG_DIR.rglob("*.py"))
+
+#: Front-door ruling FD-12.2 admits exactly one module that persists: ``durable.py``.
+#: The contracts-only assertions below scan the contract modules; the ruled store is
+#: enumerated here and has its own boundary test in ``test_durable.py`` (sqlite and
+#: stdlib only, no clock, no network, and every semantic refusal still held).
+RULED_STORE_MODULES = {"durable"}
+CONTRACT_SOURCES = [src for src in SOURCES if src.stem not in RULED_STORE_MODULES]
+
+
+def test_the_ruled_store_is_the_only_persisting_module():
+    assert {src.stem for src in SOURCES} & {"durable"} == RULED_STORE_MODULES
 STDLIB = set(sys.stdlib_module_names)
 ALLOWED_FIRST_PARTY = {"ugence_data_use_admission", "ugence_governance_contracts"}
 FORBIDDEN = {
@@ -84,7 +95,10 @@ def _segments() -> set[str]:
     """Whole word segments of every code identifier, so "supersession" is not read
     as "session" and "admission" (the package's own name) is not read as "admit"."""
 
-    return {seg for src in SOURCES for name in _identifiers(src)
+    # ``__init__`` re-exports the ruled store by name; the contract modules are
+    # what this scan is about (FD-12.2).
+    return {seg for src in CONTRACT_SOURCES if src.stem != "__init__"
+            for name in _identifiers(src)
             for seg in re.split(r"[^a-z0-9]+", re.sub(r"(?<!^)(?=[A-Z])", "_", name).lower())}
 
 
@@ -92,7 +106,7 @@ def _segments() -> set[str]:
 # Import boundary and declared dependencies
 # --------------------------------------------------------------------------- #
 def test_source_imports_only_stdlib_and_governance_contracts():
-    for src in SOURCES:
+    for src in CONTRACT_SOURCES:
         roots = _roots(src)
         strays = roots - STDLIB - ALLOWED_FIRST_PARTY - {"__future__"}
         assert not strays, (src.name, strays)
@@ -110,13 +124,13 @@ def test_pyproject_declares_the_ratified_dependency_set():
                       "policy-authority", "benchmark-registry", "pydantic", "sqlalchemy",
                       "requests", "httpx"):
         assert forbidden not in joined, forbidden
-    assert pkg.__version__ == "0.1.0"
+    assert pkg.__version__ == "0.2.0"
 
 
 def test_no_clock_is_read_anywhere():
     """Every instant is a caller input, so a declaration lapses without a sweeper."""
 
-    for src in SOURCES:
+    for src in SOURCES:  # the ruled store reads no clock either
         for node in ast.walk(ast.parse(src.read_text())):
             if isinstance(node, ast.Call):
                 fn = node.func
@@ -135,7 +149,7 @@ def test_no_exported_type_is_an_authority():
     for name in pkg.__all__:
         assert not name.endswith("Authority"), name
         assert "Authority" not in name, name
-    for src in SOURCES:
+    for src in SOURCES:  # the ruled store is named no differently
         for node in ast.walk(ast.parse(src.read_text())):
             if isinstance(node, ast.ClassDef):
                 assert "Authority" not in node.name, (src.name, node.name)
@@ -145,7 +159,7 @@ def test_the_package_defines_no_system_identity_and_no_label_of_its_own():
     """It re-exports AssessedSystemBinding and DataClassificationLabel; it never
     redefines either."""
 
-    for src in SOURCES:
+    for src in SOURCES:  # the ruled store mints no identity either
         for node in ast.walk(ast.parse(src.read_text())):
             if isinstance(node, ast.ClassDef):
                 assert "SystemBinding" not in node.name, (src.name, node.name)
@@ -174,7 +188,9 @@ def test_no_surface_can_admit_authorize_classify_or_enforce():
             methods = {n for n in dir(value) if not n.startswith("_")}
             assert not methods & forbidden, (name, methods & forbidden)
         assert name.lower() not in forbidden, name
-    assert pkg.ENFORCEMENT_ENABLED is False and pkg.MATURITY == "CONTRACTS_ONLY"
+    assert pkg.ENFORCEMENT_ENABLED is False
+    assert pkg.MATURITY == "CONTRACTS_PLUS_LOCAL_STORE"
+    assert pkg.CONTRACT_MATURITY == "CONTRACTS_ONLY"
 
 
 def test_the_code_names_none_of_the_things_it_refuses_to_do():
@@ -206,6 +222,16 @@ def test_the_code_names_none_of_the_things_it_refuses_to_do():
     for banned in ("memory", "sqlite", "store", "adapter", "connector", "client", "proxy",
                    "redact", "redactor", "minimizer", "classifier", "engine", "egress"):
         assert banned not in module_names, banned
+    # FD-12.2: the ruled store is the only module that may name persistence, and it
+    # names no network, no payload inspection and nothing that admits or enforces.
+    ruled = {seg for name in _identifiers(next(s for s in SOURCES if s.stem == "durable"))
+             for seg in re.split(r"[^a-z0-9]+", re.sub(r"(?<!^)(?=[A-Z])", "_", name).lower())}
+    for word in ("http", "https", "url", "endpoint", "socket", "proxy",
+                 "payload", "content", "body", "redact", "minimize", "classify", "scan",
+                 "inspect", "pii", "regex", "admit", "authorize", "enforce", "gate",
+                 "allow", "deny", "permit", "model", "candidate", "eligib",
+                 "region", "jurisdiction", "egress"):
+        assert word not in ruled, word
 
 
 def test_no_field_could_carry_a_payload():

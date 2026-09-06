@@ -29,6 +29,8 @@ _PACKAGE_SRC = [
     os.path.join(_REPO, "packages", "jcs", "src"),
     # Front-door seam 5 (FD-9): the registration intake's package.
     os.path.join(_REPO, "packages", "integration", "ai-system-registry", "src"),
+    # Front-door seam 8 (FD-12): the data-use declaration intake's package.
+    os.path.join(_REPO, "packages", "integration", "data-use-admission", "src"),
 ]
 
 for p in [_SRC, *_PACKAGE_SRC]:

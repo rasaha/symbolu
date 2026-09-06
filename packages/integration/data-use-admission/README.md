@@ -1,6 +1,7 @@
 # ugence-data-use-admission
 
-**Contracts only. Not enforcement-ready, and not an admission engine.** The record
+**Contracts plus one ruled local file. Not enforcement-ready, and not an admission
+engine.** The record
 of declared data use at the admission seam: a bounded declaration over the neutral
 system identity and the neutral data-classification label governance-contracts
 already owns. Scoped and ratified by
@@ -8,13 +9,24 @@ already owns. Scoped and ratified by
 sequenced by `ADR_UGENCE_GOVERNANCE_GAP_SEQUENCING_RATIFICATION.md` (wave 4, line 60).
 
 > This package records what a declarer asserted about data. It **never** inspects,
-> classifies, redacts, minimizes, persists, admits, authorizes, selects, enforces
-> or governs egress. A declaration is a record, not a permission.
+> classifies, redacts, minimizes, admits, authorizes, selects, enforces or governs
+> egress. A declaration is a record, not a permission. Since 0.2.0 it keeps those
+> records in one tenant-bound local file (front-door ruling FD-12.2) — persistence of
+> the record and nothing more: the reference is stored, never the data, and the labels
+> stay exactly as uninterpreted as before.
 
-## What "contracts only" means here
+## What "contracts plus one local file" means here
 
-Record types, refusal reasons, pure selectors, and one read-only Protocol. **No
-store, no adapter, no connector, no proxy, no redactor, no clock.** The lines the
+Record types, refusal reasons, pure selectors, one read-only Protocol, and since 0.2.0
+`SqliteDataUseDeclarations` — the one implementation of that Protocol, ruled by FD-12.2,
+whose only write is `declare`. It is a file under a writable volume the composing
+deployment owns: no server, no driver, no DSN, no network, and no system of record.
+`tests/test_durable.py` holds that line mechanically.
+
+Everything else is as it was. **No adapter, no connector, no proxy, no redactor,
+no clock, no network.** The store is append-only: a declaration is never edited or
+deleted, a changed declaration is a new one that `supersedes` its predecessor, and a
+file bound to one tenant is never re-bound. The lines the
 rulings draw are held *structurally* rather than by discipline: there is nothing in
 the distribution that could reach data, a context, a model or a network, so "it
 does not admit" is not a promise this package could break. A boundary test asserts
@@ -134,8 +146,9 @@ never return another tenant's declaration.
 
 `ugence-governance-contracts>=0.6.0` and the Python standard library. Nothing else —
 no context-minimization, no ActionGate, no Model Selection, no Decision Authority,
-no Risk Authority, no Policy Authority, no agent-runtime, no `sqlite3`, no network
-client, no cloud SDK, no pydantic. Composition roots, products and applications may
+no Risk Authority, no Policy Authority, no agent-runtime, no network
+client, no cloud SDK, no pydantic. Since 0.2.0 `durable.py` alone uses the standard
+library's `sqlite3`; a boundary test pins it as the only module that may. Composition roots, products and applications may
 import it; no capability package may — enforced repository-wide by
 `scripts/check_package_import_boundaries.py` and
 `tests/boundaries/test_package_import_boundaries.py`.
@@ -144,7 +157,8 @@ import it; no capability package may — enforced repository-wide by
 
 - Nothing here proves that the referenced data exists, that the declared label is
   apt, or that the named system is the one that will use the data.
-- No store, so nothing persists; a composition root holds whatever it declares.
+- The store persists the record and nothing else. It confers no admission, proves
+  nothing about the data, and a composition root still holds every other decision.
 - No admission engine: the seam at `context-minimization/README.md:14` now has a
   record type, not a decision. Whether a context may be assembled is still nobody's
   answer.

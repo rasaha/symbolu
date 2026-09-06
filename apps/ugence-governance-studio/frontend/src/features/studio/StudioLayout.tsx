@@ -9,6 +9,7 @@ import type { CompiledRelease, StudioReleaseContext } from "./release";
 
 const SCREENS = [
   { to: "registration", label: "Registration" },
+  { to: "data-use", label: "Data use" },
   { to: "constitution", label: "Constitution" },
   { to: "policy", label: "Policy" },
   { to: "authority", label: "Authority" },

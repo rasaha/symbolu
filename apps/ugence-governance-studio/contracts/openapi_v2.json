@@ -60,6 +60,156 @@
         "title": "ConstitutionValidateRequest",
         "type": "object"
       },
+      "DataUseDeclareRequest": {
+        "additionalProperties": false,
+        "description": "Declare one data use for this deployment's tenant (typed intake only, FD-4).\n\nNo ``declaration_id`` (derived by the package, never chosen) and no ``tenant_id``\n(the deployment's). ``data_ref`` is an opaque, non-secret reference — never the\ndata, and there is no field that could carry it. ``classification_label``,\n``purpose_label`` and ``residency_label`` are recorded uninterpreted (DE-2, DE-3),\nand ``declared_by`` is an opaque handle recorded as presented and unproven\n(FD-12.3). Nothing here restricts egress: FD-12.5 invents no restriction for the\nabsent egress package.",
+        "properties": {
+          "binding": {
+            "$ref": "#/components/schemas/DeclarationBindingInput"
+          },
+          "classification_label": {
+            "title": "Classification Label",
+            "type": "string"
+          },
+          "correlation_id": {
+            "default": "",
+            "title": "Correlation Id",
+            "type": "string"
+          },
+          "data_ref": {
+            "title": "Data Ref",
+            "type": "string"
+          },
+          "declared_by": {
+            "default": "",
+            "title": "Declared By",
+            "type": "string"
+          },
+          "notes": {
+            "default": "",
+            "title": "Notes",
+            "type": "string"
+          },
+          "purpose_label": {
+            "title": "Purpose Label",
+            "type": "string"
+          },
+          "residency_label": {
+            "default": "",
+            "title": "Residency Label",
+            "type": "string"
+          },
+          "supersedes": {
+            "default": "",
+            "title": "Supersedes",
+            "type": "string"
+          },
+          "validity": {
+            "$ref": "#/components/schemas/DeclarationValidityInput"
+          }
+        },
+        "required": [
+          "binding",
+          "data_ref",
+          "classification_label",
+          "purpose_label",
+          "validity"
+        ],
+        "title": "DataUseDeclareRequest",
+        "type": "object"
+      },
+      "DeclarationBindingInput": {
+        "additionalProperties": false,
+        "description": "The exact system and configuration a declaration is about, as typed fields.\n\nNo ``tenant_id``: the tenant is the deployment's and is never caller-supplied.\nThe two required digests are lowercase sha-256 hex the declarer asserts; the\nstudio computes none of them.",
+        "properties": {
+          "binding_id": {
+            "title": "Binding Id",
+            "type": "string"
+          },
+          "configuration_digest": {
+            "title": "Configuration Digest",
+            "type": "string"
+          },
+          "configuration_id": {
+            "title": "Configuration Id",
+            "type": "string"
+          },
+          "context_digest": {
+            "title": "Context Digest",
+            "type": "string"
+          },
+          "context_id": {
+            "title": "Context Id",
+            "type": "string"
+          },
+          "deployment_environment_ref": {
+            "default": "",
+            "title": "Deployment Environment Ref",
+            "type": "string"
+          },
+          "subject_id": {
+            "title": "Subject Id",
+            "type": "string"
+          },
+          "system_id": {
+            "title": "System Id",
+            "type": "string"
+          },
+          "system_version": {
+            "title": "System Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "binding_id",
+          "subject_id",
+          "context_id",
+          "context_digest",
+          "system_id",
+          "system_version",
+          "configuration_id",
+          "configuration_digest"
+        ],
+        "title": "DeclarationBindingInput",
+        "type": "object"
+      },
+      "DeclarationValidityInput": {
+        "additionalProperties": false,
+        "description": "The declaration window, as ISO-8601 instants with a timezone.",
+        "properties": {
+          "expires_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expires At"
+          },
+          "issued_at": {
+            "title": "Issued At",
+            "type": "string"
+          },
+          "stale_after": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stale After"
+          }
+        },
+        "required": [
+          "issued_at"
+        ],
+        "title": "DeclarationValidityInput",
+        "type": "object"
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -608,6 +758,92 @@
         "summary": "Validate Constitution",
         "tags": [
           "constitution"
+        ]
+      }
+    },
+    "/api/v2/data-use/declarations": {
+      "get": {
+        "description": "The declarations in force for this deployment's tenant at ``as_of``.\n\n``as_of`` is an ISO-8601 instant with a timezone; absent, the request's own instant\nis used and reported back. A declaration outside its window is absent from the\nanswer, never flagged.",
+        "operationId": "v2_data_use_list",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "as_of",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "As Of"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Data Use Declarations",
+        "tags": [
+          "data-use"
+        ]
+      },
+      "post": {
+        "description": "Record one typed data-use declaration for this deployment's tenant.\n\nEvery field is validated by data-use-admission's own refusal reasons; a superseding\ndeclaration is admitted only by ``supersession_refusals``. ``data_ref`` is an opaque\nhandle and the record carries no data. A refusal is typed, never a 500.",
+        "operationId": "v2_data_use_declare",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DataUseDeclareRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Declare Data Use",
+        "tags": [
+          "data-use"
         ]
       }
     },

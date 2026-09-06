@@ -197,11 +197,29 @@ one destination, CR-2 is amended again in its ADR, and §12.4 is tests in
 control-plane-root, the review service, the worker, the studio backend and the profile.
 No configuration value, image package, credential or second egress destination was
 added; the composition record supersedes the seam-6 record
-(`composition-record.seam-6.json`, unchanged). What remains is audited in §13: one
-studio-alone seam (typed data-use declarations, outline screen 5) is still enterable
-and waits on ruling FD-12; the console is a packaging body of work, a durable Decision
-Authority store a package decision, and the mirror coordinates, Langflow fixture and
-enterprise issuer are owner inputs.
+(`composition-record.seam-6.json`, unchanged). **Seam 8 shipped**
+(`governance-studio-deployment` 0.9.0, FD-12, with `data-use-admission` 0.2.0): the
+package's one ruled durable home, `SqliteDataUseDeclarations`, is a tenant-bound,
+append-only sqlite file in the seam-5 posture whose only write is `declare` — a
+duplicate derived id refused, a supersession admitted only by `supersession_refusals`,
+a file bound to one tenant never re-bound, the record digest re-verified on the way
+out, and no clock read; the studio backend's `DeclarationService` takes typed intake
+only, the tenant the store's and the id derived, and its answers state that the
+declarer is presented and unproven, that a declaration confers nothing, and that no
+egress restriction is expressible because no egress-authority package exists; the v2
+contract is amended a fourth time (v2-A4, `v2_data_use_declare` and
+`v2_data_use_list`) with its generated client and the frontend manifest; the Data use
+screen carries typed fields, a single Declare control, hints saying the classification,
+purpose and residency labels are interpreted nowhere, and no admit, authorize, verify,
+score, enforce, revoke, edit or delete control; the P3E profile adds one configuration
+value, `UGENCE_STUDIO_DATA_USE_DECLARATIONS_PATH`, requiring `UGENCE_STUDIO_TENANT_ID`,
+one package in the image and one startup-integrity check; and §13.4 is tests in the
+package, the studio backend, the frontend and the profile. The composition record
+supersedes the seam-7 record (`composition-record.seam-7.json`, unchanged). With that
+the front door under FD-1 is at its ceiling: no further studio-alone seam remains,
+the console is a packaging body of work, a durable Decision Authority store a package
+decision, and the mirror coordinates, Langflow fixture and enterprise issuer are owner
+inputs.
 
 The shape every seam follows: the CR-2 shape (one configuration value, one freeze-test amendment, its own failure tests and
 maturity statement, one PR), preserving `REFERENCE_GRADE_SHADOW_ONLY`, the frozen

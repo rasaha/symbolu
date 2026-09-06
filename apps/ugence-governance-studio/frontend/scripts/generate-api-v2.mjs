@@ -47,6 +47,10 @@ export const REQUIRED_V2_OPERATIONS = [
   "v2_review_start_shadow_run",
   // Front-door seam 7 (FD-11): Observe over the worker's own audit ledger, relay only.
   "v2_observe_ledger_chain",
+  // Front-door seam 8 (FD-12): the Data-use declaration screen (typed intake; declare
+  // is the only write, FD-12.5).
+  "v2_data_use_declare",
+  "v2_data_use_list",
 ];
 
 // SD-2, enforced at generation time as well as in the backend suite. If a route

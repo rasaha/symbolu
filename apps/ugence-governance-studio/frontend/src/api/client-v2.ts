@@ -19,6 +19,7 @@ import {
   type PolicyCompileBody,
   type PolicyPackBody,
   type PublishShadowBody,
+  type DataUseDeclareBody,
   type RegistryRegisterBody,
   type ReviewDecisionBody,
   type ReviewStartShadowRunBody,
@@ -56,6 +57,10 @@ export const V2_OPERATIONS = [
   // Front-door seam 7 (FD-11.1 OBSERVE_OVER_WORKER_LEDGER): the worker's own tenant's
   // audit-ledger rows by correlation id, as the worker read them (FD-11.3).
   "v2_observe_ledger_chain",
+  // Front-door seam 8 (FD-12.1 SCREEN_5_TYPED_DATA_USE_DECLARATIONS): typed data-use
+  // declarations. Declare is the only write (FD-12.5) and it confers nothing.
+  "v2_data_use_declare",
+  "v2_data_use_list",
 ] as const;
 
 async function v2Request<T>(pathAndQuery: string, init?: RequestInit): Promise<T> {
@@ -226,4 +231,20 @@ export const registerSystem = (body: RegistryRegisterBody) =>
 export const listRegistrations = (asOf = "") => {
   const query = asOf ? `?as_of=${enc(asOf)}` : "";
   return gap("/api/v2/registry/registrations" + query);
+};
+
+// -- 9 · Data-use declarations (front-door seam 8, FD-12) --------------------
+/**
+ * Record one typed data-use declaration for this deployment's tenant. The tenant and
+ * the derived declaration id are never sent from here; `declared_by` is recorded as
+ * presented and unproven (FD-12.3); `data_ref` is an opaque reference and there is no
+ * field that could carry the data itself.
+ */
+export const declareDataUse = (body: DataUseDeclareBody) =>
+  gap("/api/v2/data-use/declarations", postJson(body));
+
+/** The declarations in force for this deployment's tenant at `asOf` (or now). */
+export const listDataUseDeclarations = (asOf = "") => {
+  const query = asOf ? `?as_of=${enc(asOf)}` : "";
+  return gap("/api/v2/data-use/declarations" + query);
 };

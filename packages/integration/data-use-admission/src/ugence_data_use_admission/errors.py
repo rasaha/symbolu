@@ -23,3 +23,19 @@ class DeclarationSupersessionError(DataUseAdmissionError, ValueError):
     re-declares exactly what the predecessor already declared — an unchanged
     declaration has nothing to supersede.
     """
+
+
+class DeclarationStorageError(DataUseAdmissionError, RuntimeError):
+    """The durable declarations file could not be opened, read or written (FD-12.2)."""
+
+
+class DeclarationProductionModeError(DeclarationStorageError):
+    """A non-durable location (in memory, a URI) was refused in production mode."""
+
+
+class DuplicateDeclarationError(DataUseAdmissionError, ValueError):
+    """A declaration with this derived id is already recorded; records are never edited."""
+
+
+class CrossTenantRefused(DataUseAdmissionError, ValueError):
+    """A read or write named a tenant other than the one this file is bound to."""

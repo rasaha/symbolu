@@ -12,6 +12,7 @@ import type {
   PolicyCompileBody,
   PolicyPackBody,
   PublishShadowBody,
+  DataUseDeclareBody,
   RegistryRegisterBody,
   ReviewDecisionBody,
   ReviewStartShadowRunBody,
@@ -114,5 +115,16 @@ export const useRegistrations = (asOf = "") =>
   useQuery({
     queryKey: ["v2", "registry", "registrations", asOf],
     queryFn: () => v2.listRegistrations(asOf),
+    retry: RETRY,
+  });
+
+// Front-door seam 8 (FD-12): typed data-use declarations. Declare is the only write.
+export const useDeclareDataUse = () =>
+  useMutation({ mutationFn: (b: DataUseDeclareBody) => v2.declareDataUse(b) });
+
+export const useDataUseDeclarations = (asOf = "") =>
+  useQuery({
+    queryKey: ["v2", "data-use", "declarations", asOf],
+    queryFn: () => v2.listDataUseDeclarations(asOf),
     retry: RETRY,
   });
