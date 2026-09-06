@@ -126,7 +126,7 @@ bundle. The same switch never enables LIVE execution: `ENFORCEMENT_ENABLED` stay
 | # | Ruling |
 |---|---|
 | **CR-1** | **`SEPARATE_WORKER_UNIT`.** A companion deployment unit, the governed runtime worker, hosts the DBOS engine, the runtime host, the three SQLite stores and the review service. The P3E container is not extended and the studio backend composes nothing. |
-| **CR-2** | **`AMEND_P3E_SERVE_V2`.** The P3E profile gains one configuration value, `UGENCE_STUDIO_REVIEW_SERVICE_URL`, and serves the combined v1 and v2 application under its existing gate; `approved-runtime-config` and its freeze test are amended to say so. **Amended 2026-09-06 under `ADR_UGENCE_STUDIO_FRONT_DOOR_SCOPING.md` FD-10.4 (`ONE_STEP_AMENDMENT`):** the permitted route set over that one destination is six, the five review routes plus `POST /review/runs`, the relayed start of the worker's own shadow run (FD-10.1 to FD-10.3); the egress record, its freeze test, the studio's review client and the frontend manifest name all six; no second configuration value, credential or destination. |
+| **CR-2** | **`AMEND_P3E_SERVE_V2`.** The P3E profile gains one configuration value, `UGENCE_STUDIO_REVIEW_SERVICE_URL`, and serves the combined v1 and v2 application under its existing gate; `approved-runtime-config` and its freeze test are amended to say so. **Amended 2026-09-06 under `ADR_UGENCE_STUDIO_FRONT_DOOR_SCOPING.md` FD-10.4 (`ONE_STEP_AMENDMENT`):** the permitted route set over that one destination is six, the five review routes plus `POST /review/runs`, the relayed start of the worker's own shadow run (FD-10.1 to FD-10.3); the egress record, its freeze test, the studio's review client and the frontend manifest name all six; no second configuration value, credential or destination. **Amended again 2026-09-06 under FD-11.5 (`READ_ONLY_ONE_STEP_AMENDMENT`):** seven routes, the seventh `GET /review/audit/{correlation_id}`, a raw read of the worker's own tenant's audit-ledger rows by correlation id with the worker's chain verification (FD-11.3); read-only, no write route; still one destination, no configuration value, credential or package. |
 | **CR-3** | **`PRIVATE_NETWORK_TLS_IDENTITY_MANDATORY`.** The worker's listener binds the private segment only, over TLS, and in production mode an identity port is mandatory. No second access gate and no second credential. |
 | **CR-4** | **`ONE_DEPLOYMENT_MODE_SWITCH`.** `UGENCE_REVIEW_DEPLOYMENT_MODE=production` sets every production switch together and refuses any fixture adapter, in-memory store or non-authoritative bundle at composition. It certifies nothing and enables no LIVE execution. |
 | **CR-5** | **`ALLOWLISTED_JWKS_HOST`.** The worker's only egress is the configured JWKS host over HTTPS, as platform configuration recorded as `EXTERNAL_DEPLOYMENT_EVIDENCE`; no discovery document, no docker.io, nothing else. |
@@ -196,7 +196,11 @@ review and the mirror.
 Steps 2 and 3 are shipped and step 4 is defined; the ceiling above is reached. Front-door
 seam 6 (2026-09-06) amended CR-2 to six routes: `governed-review-service` 0.5.0 exposes
 `POST /review/runs`, `governed-runtime-worker` 0.2.0 composes the `ShadowRunStarter`
-behind it, and the P3E record names the sixth route over the same destination. The
+behind it, and the P3E record names the sixth route over the same destination. Seam 7
+(2026-09-06) amended it to seven: `control-plane-root` 0.2.0 adds the raw read,
+`governed-review-service` 0.6.0 exposes `GET /review/audit/{correlation_id}` over it,
+`governed-runtime-worker` 0.3.0 hands its ledger as the reader, and the P3E record
+names the seventh route over the same destination. The
 worker gate set executes, and the mirror configuration may be recorded, only when the
 owner supplies the mirror host, repository prefix and secret name. Real approver
 identity waits on an enterprise issuer (AI-E).
