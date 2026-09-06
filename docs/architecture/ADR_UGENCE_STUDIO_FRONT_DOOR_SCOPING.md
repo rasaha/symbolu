@@ -138,8 +138,19 @@ coordinate and four keyword parts, so it now resolves a record id through the
 configured identities' records, parses the typed identity, displays every record by
 its canonical references without the signature bytes or the policy body, and maps a
 registry refusal to a typed refusal. The composition record now supersedes the seam-1
-record (`composition-record.seam-1.json`, unchanged). The next seam waits on its own
-ruling under FD-1.
+record (`composition-record.seam-1.json`, unchanged). **Seam 3 shipped**
+(`governance-studio-deployment` 0.5.0, FD-7): `UGENCE_STUDIO_SIMULATION_PROVIDER=1`
+hands the Simulate screen a `ProviderRegistry` holding the one pinned in-package
+provider (`fixture` 0.1.0, `DEMONSTRATION_ONLY`; records in memory, returns success,
+no socket, no file); `governance_hook` stays the runtime's fail-closed default, so
+every consequential task BLOCKs with `GOVERNANCE_NOT_CONFIGURED` and the trace shows
+it; the root refuses any hook handed to the Simulate service before bind and the
+startup integrity gate fails if the package's source could construct a permissive
+one; the profile's `agent_execution` prohibition carries its FD-7.1 definition; the
+composition record supersedes the seam-2 record (`composition-record.seam-2.json`,
+unchanged). Matrix rows 1 to 6 of §8.2 are tests, rows 4 and 6 no longer gaps. The
+next seam (`CONSOLE_BASE_URL`, or the governed hook once ESCALATE has a sink) waits
+on its own ruling under FD-1.
 
 The shape every seam follows: the CR-2 shape (one configuration value, one freeze-test amendment, its own failure tests and
 maturity statement, one PR), preserving `REFERENCE_GRADE_SHADOW_ONLY`, the frozen

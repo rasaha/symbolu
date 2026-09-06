@@ -48,9 +48,11 @@ def _build_backend(config: DeploymentConfig):
     The v2 studio context receives from this deployment: the review service base URL
     (CR-2); when a registry path is configured, the activation root of front-door seam
     1 (FD-5); and when policy identities are configured too, the Authority screen's
-    read-only, tenant-bound registry view and those identities (seam 2, FD-6). No
-    decision store, governance hook, provider registry or console URL: those screens
-    report their gaps rather than a fixture.
+    read-only, tenant-bound registry view and those identities (seam 2, FD-6); and
+    when the simulation provider is enabled, a registry holding the one pinned
+    in-image provider (seam 3, FD-7). No decision store, governance hook (FD-7.3: the
+    runtime's fail-closed default stays; FD-7.5: nothing permissive is ever handed) or
+    console URL: those screens report their gaps rather than a stand-in.
     """
     from ugence_governance_studio_api.app_v2 import build_studio_context, create_combined_app
     from ugence_governance_studio_api.settings import ApiSettings
@@ -80,12 +82,21 @@ def _build_backend(config: DeploymentConfig):
         if config.policy_identities:
             policy_registry = ReadOnlyTenantBoundRegistry(registry, tenant_id=config.tenant_id)
             policy_identities = tuple(f"{entry}|{config.tenant_id}" for entry in config.policy_identities)
+    provider_registry = None
+    if config.simulation_provider_enabled:
+        from .simulation import build_simulation_registry
+
+        provider_registry = build_simulation_registry()
     studio = build_studio_context(
         activation_root=activation_root,
         policy_registry=policy_registry,
         policy_identities=policy_identities,
+        provider_registry=provider_registry,
         review_service_base_url=config.review_service_url or None,
     )
+    from .simulation import refuse_permissive_hook
+
+    refuse_permissive_hook(studio)  # FD-7.5, before anything binds
     return create_combined_app(settings, studio=studio)
 
 
