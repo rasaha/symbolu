@@ -263,6 +263,15 @@ an unsatisfied review. Design: `../policy_workflow_compiler_p3a/DESIGN.md`.
 
 Design: `../policy_workflow_compiler_pack_v2/DESIGN.md`.
 
+## X1 composition-root rulings
+
+| Ruling | Decision |
+| --- | --- |
+| **CR-1** | The root compiles with `require_approval=False` and returns the constructed pack for approval; it never accepts or brokers an approval. A callback would place the orchestrator between a reviewer and the artifact they approve — the seam the no-self-approval rule protects. |
+| **CR-2** | Turning a resolved Policy Authority artifact into a `policy_pack.v2` is **family-specific and injected**. The root ships no builder and refuses to proceed without one (`NO_PACK_BUILDER`). A generic mapping would be exactly the inference this architecture refuses elsewhere. |
+
+Design and flow: `../policy_workflow_compiler_x1/COMPOSITION_ROOT.md`.
+
 ## What this ratification does not authorize
 
 - No change to `workflow_ir.v1` or `workflow_ir.v2` canonical output. `[V]` Pinned:

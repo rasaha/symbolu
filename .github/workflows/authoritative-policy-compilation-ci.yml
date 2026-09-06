@@ -1,0 +1,88 @@
+name: authoritative-policy-compilation-ci
+
+# Scoped CI for the PA/PWC-X1 composition root: the five fail-closed requirements,
+# the derived-reference prohibition proved by AST, the custody bound, and the
+# public-api-only import boundary to both neighbours. Offline; no network, no keys.
+
+on:
+  pull_request:
+    paths:
+      - "packages/integration/authoritative-policy-compilation/**"
+      - ".github/workflows/authoritative-policy-compilation-ci.yml"
+  push:
+    branches:
+      - "claude/setup-symbolu-monorepo-**"
+      - "claude/policy-workflow-compiler-**"
+    paths:
+      - "packages/integration/authoritative-policy-compilation/**"
+      - ".github/workflows/authoritative-policy-compilation-ci.yml"
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  PKG: packages/integration/authoritative-policy-compilation
+
+jobs:
+  package-suite:
+    name: Composition-root suite (requirements, derivation, boundaries)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.11" }
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest pydantic
+          pip install -e packages/governance-contracts --no-deps
+          pip install -e packages/uvi-policy-contracts --no-deps
+          pip install -e packages/policy-authority --no-deps
+          pip install -e packages/tooling/policy-workflow-compiler --no-deps
+      - env: { PYTHONPATH: "${{ env.PKG }}/src:${{ env.PKG }}/tests" }
+        run: python -m pytest ${{ env.PKG }}/tests -q
+
+  maturity:
+    name: Honest maturity (owns no authority, ships no builder)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.11" }
+      - run: |
+          python -m pip install --upgrade pip && pip install pydantic
+          pip install -e packages/governance-contracts --no-deps
+          pip install -e packages/uvi-policy-contracts --no-deps
+          pip install -e packages/policy-authority --no-deps
+          pip install -e packages/tooling/policy-workflow-compiler --no-deps
+      - env: { PYTHONPATH: "${{ env.PKG }}/src" }
+        run: |
+          python - <<'PY'
+          from ugence_authoritative_policy_compilation import version_info
+          i = version_info().to_dict()
+          for k in ("composition_root_implemented", "derived_source_reference_implemented",
+                    "body_digest_reverification_implemented"):
+              assert i[k] is True, k
+          for k in ("authored_source_reference_accepted", "issues_policy", "revokes_policy",
+                    "grants_approval", "holds_key_material", "policy_pack_builder_shipped",
+                    "runtime_execution_implemented", "pilot_validated", "production_certified"):
+              assert i[k] is False, k
+          print("maturity honest")
+          PY
+
+  compiler-unchanged:
+    name: The compiler gains no dependency on Policy Authority
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          python - <<'PY'
+          import pathlib, re, sys
+          root = pathlib.Path("packages/tooling/policy-workflow-compiler/src/ugence_policy_workflow_compiler")
+          bad = [str(m) for m in root.rglob("*.py")
+                 if re.search(r"ugence_policy_authority|policy-authority", m.read_text())]
+          if bad:
+              print("policy-authority leaked into the compiler:", bad); sys.exit(1)
+          print("boundary intact")
+          PY
