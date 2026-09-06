@@ -53,12 +53,15 @@ from .outcomes import EffectAttestationRefusalReason as _Reason
 from .outcomes import EffectAttestationVerificationOutcome as _Outcome
 from .roles import EFFECT_ATTESTER_ROLE_ESTABLISHES, EffectAttesterRole, capability_for_role
 from .trust import (
+    TRUST_ANCHOR_SET_REASONS,
     anchor_coordinate_digest,
     anchor_lifecycle_refusal,
     anchor_record_digest,
     anchor_verification_key,
+    declares_production_posture,
     effect_attester_coordinate,
     require_production_resolver,
+    resolver_serves_production,
 )
 
 __all__ = [
@@ -311,6 +314,19 @@ class Ed25519EffectAttestationVerifier:
             attester_identity=attestation.attester_identity,
             attester_key_id=attestation.attester_key_id,
         )
+        # TW-3: a resolver that declared the production contract but cannot serve
+        # right now — a snapshot that failed to load, most plainly — is refused
+        # here, **before it is consulted**, so admitting it at composition can
+        # never yield an anchor. A resolver that declares no posture at all is the
+        # ratified deny-all, which is admitted by exact type and left alone.
+        if (
+            self._production_mode
+            and declares_production_posture(self._resolver)
+            and not resolver_serves_production(self._resolver)
+        ):
+            return refuse(_Reason.ANCHOR_SET_UNAVAILABLE,
+                          "the resolver declares it cannot serve production trust state; "
+                          "no anchor is consulted while its posture is not True")
         try:
             resolution = self._resolver.resolve(coordinate, as_of=instant)
         except Exception as exc:  # noqa: BLE001 - a resolver that raises is unavailable
@@ -328,6 +344,16 @@ class Ed25519EffectAttestationVerifier:
                 TrustedEvidenceRefusalReason.TRUSTED_EVIDENCE_TRUST_ANCHOR_NOT_CONFIGURED,
             ):
                 return refuse(_Reason.ANCHOR_UNKNOWN, "no anchor is configured at the exact coordinate")
+            # TW-1: the trust-anchor **set** refusals keep their identity, so an
+            # operator can tell "publish a newer snapshot" from "the trust state
+            # cannot be consulted" from "the resolver misbehaved" (D-28).
+            set_reason = TRUST_ANCHOR_SET_REASONS.get(resolution.refusal_reason)
+            if set_reason is not None:
+                return refuse(set_reason,
+                              f"the trust-anchor set refused: {resolution.refusal_reason.value}")
+            # TW-2: everything else, TRUST_ANCHOR_SET_INSTANT_REQUIRED included, is a
+            # resolver that answered something this package never asks for, given that
+            # it always hands over a validated aware instant.
             return refuse(_Reason.ANCHOR_UNAVAILABLE,
                           f"the resolver refused: {resolution.refusal_reason.value}")
         anchor = resolution.anchor

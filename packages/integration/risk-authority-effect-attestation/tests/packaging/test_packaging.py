@@ -21,7 +21,7 @@ PUBLIC_API = PROJECT / "public_api.json"
 def test_the_distribution_is_named_and_versioned_exactly():
     text = PYPROJECT.read_text(encoding="utf-8")
     assert 'name = "ugence-risk-authority-effect-attestation"' in text
-    assert PKG_DIR.name == "ugence_risk_authority_effect_attestation" and pkg.__version__ == "0.1.0"
+    assert PKG_DIR.name == "ugence_risk_authority_effect_attestation" and pkg.__version__ == "0.2.0"
     assert pkg.MATURITY == "REFERENCE_GRADE_NOT_PRODUCTION_READY"
 
 

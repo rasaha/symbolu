@@ -81,10 +81,13 @@ from .trust import (
     TrustAnchorResolverPort,
     anchor_coordinate_digest,
     anchor_lifecycle_refusal,
+    TRUST_ANCHOR_SET_REASONS,
     anchor_record_digest,
     anchor_verification_key,
+    declares_production_posture,
     effect_attester_coordinate,
     require_production_resolver,
+    resolver_serves_production,
 )
 from .verification import (
     Ed25519EffectAttestationVerifier,
@@ -142,6 +145,9 @@ __all__ = [
     "anchor_lifecycle_refusal",
     "anchor_verification_key",
     "require_production_resolver",
+    "TRUST_ANCHOR_SET_REASONS",
+    "resolver_serves_production",
+    "declares_production_posture",
     # signing (reference only)
     "EffectAttestationSignerPort",
     "ReferenceEd25519EffectAttestationSigner",

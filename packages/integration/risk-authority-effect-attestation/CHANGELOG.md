@@ -1,5 +1,50 @@
 # Changelog — ugence-risk-authority-effect-attestation
 
+## 0.2.0 — 2026-09-06 — distinguishable trust state (TW-1 to TW-3)
+
+Ratified by `docs/architecture/ADR_UGENCE_TR5_EFFECT_ATTESTATION_RESOLVER_WIRING.md`.
+Additive over 0.1.0: every existing symbol, refusal, digest and pinned vector is
+unchanged, and the wrapper, roles, canonical form and D-41 pair are untouched.
+**REFERENCE-GRADE.** The signed-snapshot resolver this can now be wired to
+remains a production-shaped candidate only; no deployment is wired here.
+
+### Added
+
+- Two appended refusal reasons (TW-1), taking the vocabulary from 24 to 26:
+  `ANCHOR_SET_UNAVAILABLE` (the trust-anchor set could not be consulted at the
+  caller's instant) and `ANCHOR_SET_STALE` (it was admitted but is no longer
+  fresh). TEA's `TRUST_ANCHOR_SET_UNAVAILABLE` and `TRUST_ANCHOR_SET_STALE` map
+  one-to-one onto them through the exported `TRUST_ANCHOR_SET_REASONS`, so
+  D-28's ratified distinction survives instead of collapsing into
+  `ANCHOR_UNAVAILABLE`. `TRUST_ANCHOR_MISSING` and `TRUST_ANCHOR_NOT_CONFIGURED`
+  still map to `ANCHOR_UNKNOWN`; every other TEA reason still falls to
+  `ANCHOR_UNAVAILABLE`.
+- `resolver_serves_production` and `declares_production_posture` (TW-3): a
+  resolver **declares** the production contract by carrying
+  `is_production_authoritative` as an exact `bool`, and separately **is able to
+  serve** when that value is `True`.
+
+### Changed
+
+- `require_production_resolver` admits a resolver that declares the contract
+  either way, so a snapshot that failed to load is a typed refusal rather than a
+  crashed composition root (TW-3). Absent, non-`bool` and reference-grade
+  resolvers are refused exactly as before, and `DenyAllTrustAnchorDirectory` is
+  still admitted by exact type under E-8.
+- The verifier refuses `ANCHOR_SET_UNAVAILABLE` **before consulting** any
+  declaring resolver whose posture is not `True`, so admitting one can never
+  yield an anchor. The deny-all directory declares no posture and keeps its
+  ratified `ANCHOR_UNKNOWN`.
+- Dependency floor: `ugence-trusted-evidence-authority>=0.5.0`, the release that
+  first defines the two trust-anchor-set reasons.
+
+### Not changed
+
+`TRUST_ANCHOR_SET_INSTANT_REQUIRED` mints no member (TW-2): a bad `as_of` raises
+at the caller seam, and a resolver returning it despite being handed a valid
+instant is a resolver fault. No composition-root module reads a snapshot file
+(TW-4); the ban on `open`, `os` and `pathlib` stands.
+
 All measured figures below are re-run, never edited. Maturity is stated on
 every entry and never rises by wording.
 

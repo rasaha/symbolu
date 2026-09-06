@@ -105,6 +105,11 @@ EffectAttestation (signed wrapper over an unmodified ExecutionObservation)
 - A verified attestation proves provenance and integrity, never that the effect
   occurred. `effect_digest` remains a content digest; the role travels only in the
   typed provenance, never in `source`, `source_version` or reason text.
+- **TW-5** A rejected attestation carries the verifier's typed reason, and
+  `TRUST_STATE_REFUSALS` names the two that describe trust state rather than the
+  attestation: `ANCHOR_SET_STALE` (publish a newer trust-anchor snapshot) and
+  `ANCHOR_SET_UNAVAILABLE` (the trust state could not be consulted). Both reject
+  exactly as every other refusal does; the distinction is for the operator.
 
 ## Maturity (no overclaim)
 
