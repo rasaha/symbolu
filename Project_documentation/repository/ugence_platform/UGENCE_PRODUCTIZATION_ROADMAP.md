@@ -402,6 +402,10 @@ merged; GAS-5 is deferred; GAS-6 remains gated; GAS-7 is ruled and not entered.
 | LI-3 | **`REFUSE`** — any unknown or unmapped node type refuses the entire import with a typed error and zero evaluation; never a silent drop or degrade | same, §7 |
 | LI-4 | **`PLACEHOLDER_BOUND_BY_OPERATOR`** — an accepted external tool, provider or resource reference compiles only into an inert unresolved placeholder that an operator must bind to an already registered Ugence resource; non-executable, no credential, no authority, never LIVE | same, §7 |
 | LI-5 | **`PIN_ONE_VERIFIED_VERSION`** — exactly one explicitly identified Langflow export-schema version, verified against at least one genuine secret-free export fixture; other or missing versions refuse with a typed unsupported-version error; no best-effort parsing. **Implementation blocked until that fixture is supplied** | same, §7 and §8 |
+| FD-1 | **`ONE_SEAM_PER_STEP`** (2026-09-05) — one front-door seam of the deployed studio at a time, each with its own bounded implementation, failure tests, maturity statement and independently reviewable commit before the next begins; documentation only, activates no seam | `ADR_UGENCE_STUDIO_FRONT_DOOR_SCOPING.md` §6 |
+| FD-3 | **`COMPOSITION_RECORD_IN_REGISTRY`** — the front-door composition is an immutable, versioned registry record under existing registry ownership (`ai-system-registry`); no new package for composition metadata | same, §6 |
+| FD-4 | **`TYPED_INTAKE_ONLY`** — the first front door accepts only versioned, schema-validated typed input; no prose-to-contract conversion, LLM interpretation, inferred defaults or silent repair; prose assistance is a later, separately ruled capability | same, §6 |
+| FD-5 | **`SCREEN_1_ONLY`** — only screen 1 enters the next implementation step, as the activation root; screens 4, 5 and 10 unchanged until later, separately validated seams; the ruling authorizes documentation only and does not activate the seam | same, §6 and §7 |
 
 
 ---
