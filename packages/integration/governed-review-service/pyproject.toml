@@ -40,7 +40,7 @@ dependencies = [
     "ugence-authority-directory>=0.1.0",
     "ugence-durable-execution>=0.1.0",
     "ugence-governance-contracts>=0.4.0",
-    "ugence-control-plane-root>=0.1.0",
+    "ugence-control-plane-root>=0.2.0",
     "SQLAlchemy>=2.0",
 ]
 

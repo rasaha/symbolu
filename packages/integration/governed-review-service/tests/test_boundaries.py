@@ -95,7 +95,7 @@ def test_pyproject_declares_the_ratified_dependency_set():
                       "boto3", "kubernetes", "redis", "jwt", "authlib", "ldap"):
         assert forbidden not in joined, forbidden
     assert set(data["project"]["optional-dependencies"]["http"]) == {"fastapi>=0.110", "starlette>=0.36"}
-    assert pkg.__version__ == "0.5.0"
+    assert pkg.__version__ == "0.6.0"
 
 
 def test_no_clock_is_read_anywhere():
@@ -122,7 +122,8 @@ def test_routes_and_operation_ids_carry_no_prohibited_verb():
     assert [r[0] for r in pkg.ROUTES].count("POST") == 2, \
         "two relay routes: the decision, and the shadow-run start (FD-10.2)"
     assert pkg.ROUTES[5] == ("POST", "/review/runs", "review_start_shadow_run")
-    assert len(pkg.ROUTES) == 6
+    assert pkg.ROUTES[6] == ("GET", "/review/audit/{correlation_id}", "review_read_audit")
+    assert len(pkg.ROUTES) == 7
 
 
 def test_no_surface_could_approve_authenticate_clear_or_execute():

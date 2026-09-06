@@ -179,11 +179,14 @@ def route_client(tmp_path):
     directory.close()
 
 
-def test_the_sixth_route_is_in_the_table_and_names_no_prohibited_verb():
+def test_the_sixth_and_seventh_routes_are_in_the_table_and_name_no_prohibited_verb():
     assert ROUTES[5] == ("POST", "/review/runs", "review_start_shadow_run")
-    for verb in ("issue", "activate", "revoke", "grant", "authorize", "clear", "execute",
-                 "resume", "release", "continue", "signal", "retry"):
-        assert verb not in ROUTES[5][1] and verb not in ROUTES[5][2]
+    assert ROUTES[6] == ("GET", "/review/audit/{correlation_id}", "review_read_audit")
+    assert len(ROUTES) == 7 and [r[0] for r in ROUTES].count("POST") == 2
+    for route in (ROUTES[5], ROUTES[6]):
+        for verb in ("issue", "activate", "revoke", "grant", "authorize", "clear", "execute",
+                     "resume", "release", "continue", "signal", "retry"):
+            assert verb not in route[1] and verb not in route[2]
 
 
 def test_row_8_and_9_the_route_starts_shadow_only_and_carries_no_credential(route_client):

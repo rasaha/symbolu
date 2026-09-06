@@ -11,8 +11,11 @@ launches DBOS, builds the runtime host over the governed hook and the approval-b
 source, and hands the review service its four seams plus the linkage appender, the
 identity port and, since 0.2.0, the shadow-run starter of front-door seam 6 (FD-10):
 the sixth route starts the workload's own ``wf-shadow`` under this deployment's own
-definition digest, and nothing the caller sends can name another. The result carries
-no secret but the two DSNs already inside the datasource, and renders none.
+definition digest, and nothing the caller sends can name another. Since 0.3.0 the
+same audit ledger the linkage appender writes is handed to the service as its ledger
+reader (front-door seam 7, FD-11): the seventh route reads this deployment's own
+tenant's rows, raw, and nothing else. The result carries no secret but the two DSNs
+already inside the datasource, and renders none.
 """
 
 from __future__ import annotations
@@ -275,6 +278,8 @@ def compose(config: WorkerConfig, *, clock: WorkerClock, workload: Workload,
         clock=clock.datetime, eligibility=listing, linkage_appender=appender,
         identity_port=port, tenant_mode=TenantMode.SINGLE_TENANT, production=production,
         starter=starter,
+        # front-door seam 7 (FD-11.2): the one ledger, read raw by the seventh route
+        ledger_reader=audit,
     )
     app = build_app(service)
     app.add_api_route("/healthz", _healthz, methods=["GET"], include_in_schema=False)
