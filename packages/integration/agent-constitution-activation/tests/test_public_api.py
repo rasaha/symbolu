@@ -61,7 +61,7 @@ def test_documented_public_api_matches_actual():
     symbols, constants = actual_surface()
     assert documented["distribution"] == "ugence-agent-constitution-activation"
     assert documented["namespace"] == "ugence_agent_constitution_activation"
-    assert documented["package_version"] == activation.__version__ == "0.1.0"
+    assert documented["package_version"] == activation.__version__ == "0.2.0"
     assert documented["symbols"] == symbols
     assert documented["constants"] == constants
 
@@ -73,17 +73,19 @@ def test_curated_api_names_match_module_all():
 
 
 def test_the_surface_is_the_ratified_delta_and_nothing_more():
-    """`ACC-IA-1` with `ACC-IA-4`: the root and its builder, the two standalone
-    seams, their shapes, the two receipts and the error family — thirteen names
-    plus ``__version__``, no identity constant. Every identity value is the
-    family package's or the authority's, imported never restated."""
+    """`ACC-IA-1` with `ACC-IA-4`, and `ACC-COUPLING`: the root and its builder,
+    the two standalone seams, their shapes, the derived-map type, the two
+    receipts and the error family — fourteen names plus ``__version__``, no
+    identity constant. Every identity value is the family package's or the
+    authority's, imported never restated."""
 
     documented = _documented()
     assert documented["constants"] == {}
-    assert len(documented["symbols"]) == 13
+    assert len(documented["symbols"]) == 14
     assert documented["symbols"]["ActivationRoot"]["kind"] == "class"
     assert documented["symbols"]["build_activation_root"]["kind"] == "function"
     assert documented["symbols"]["populate_reference_map"]["kind"] == "function"
+    assert documented["symbols"]["DerivedReferenceMap"]["kind"] == "class"
     assert documented["symbols"]["preflight_issuance"]["kind"] == "function"
     for shape in ("PreflightCheck", "PreflightReport", "IssuanceReceipt",
                   "ActivationReceipt"):

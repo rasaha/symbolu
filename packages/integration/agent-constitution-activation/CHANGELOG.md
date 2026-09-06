@@ -1,5 +1,51 @@
 # Changelog — ugence-agent-constitution-activation
 
+## 0.2.0 — the derived reference map is the only one this root composes (ACC-COUPLING)
+
+Ratified by
+`docs/architecture/ADR_UGENCE_AGENT_CONSTITUTION_LIVE_ATTESTATION_SCOPING.md`
+(wave 5 row 3). Additive over 0.1.0 except for one deliberate narrowing of
+`ActivationRoot.constitution_resolver`. **No authority, lifecycle seam,
+disposition or attestation is added**, `OD-C3=B` and `OD-C4=A` hold, and no
+`ACC-FC-5` gate is closed here — gates 1 and 2 remain unadvanceable by any pull
+request.
+
+### Added
+
+- `DerivedReferenceMap`: the read-only mapping `populate_reference_map` now
+  returns. Only that module can construct one — a caller who could build one
+  could type the entries it claims to have derived, which is the whole gap this
+  closes — and it carries `derived_from`, the coordinates of the issued records
+  every entry came from. It is a `Mapping`, so it is accepted everywhere a
+  mapping is. Curated surface 13 → **14**.
+
+### Changed
+
+- `ActivationRoot.constitution_resolver` requires exactly a
+  `DerivedReferenceMap` and refuses anything else with `ActivationRequestError`.
+  A hand-built mapping — including `dict(derived_map)`, which has the same
+  entries and none of the provenance — no longer reaches a resolver through this
+  root.
+- The stdlib import allow-list gains `collections`, for the `Mapping` ABC the
+  new type implements. A pure ABC: no clock, socket, store or plugin host
+  arrives with it.
+
+### Unchanged, and stated because it bounds the claim
+
+The conformance package's `build_constitution_resolver` still accepts any
+mapping. Conformance must not depend on activation, and its injected-trust
+posture is ratified, so **the coupling is enforced on the orchestrated path
+only** and a deployment composing conformance directly still carries the
+original disclosed gap. Presented facts remain a caller assertion
+(`ACC-FACTS`); no role attestation contract is minted (`ACC-ATTESTER`); removal
+and re-pointing stay operator acts outside this repository (`ACC-RECONFIG`).
+
+### Measured
+
+Suite **195 passed, 0 failed**; offline pinned distribution verification **OK**,
+including the negative control for a missing first-party wheel. Figures are
+re-run, never edited.
+
 ## Repository act — the invoice-reconciler pilot (no release, no version move)
 
 The pilot change set authorized as `ACC-PR-IA-2` (see

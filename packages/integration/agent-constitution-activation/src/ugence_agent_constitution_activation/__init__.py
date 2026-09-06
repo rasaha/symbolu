@@ -52,7 +52,7 @@ from .errors import (
 )
 from .preflight import PreflightCheck, PreflightReport, preflight_issuance
 from .receipts import ActivationReceipt, IssuanceReceipt
-from .reference_map import populate_reference_map
+from .reference_map import DerivedReferenceMap, populate_reference_map
 from .version import __version__
 
 #: The curated public surface (`ACC-IA-1`): the root and its builder, the two
@@ -65,6 +65,7 @@ __all__ = [
     "build_activation_root",
     # Governed reference-map population
     "populate_reference_map",
+    "DerivedReferenceMap",
     # Preflight
     "preflight_issuance",
     "PreflightCheck",

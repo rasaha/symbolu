@@ -100,7 +100,7 @@ import ugence_agent_constitution_conformance as conformance
 import ugence_agent_constitution_policy as family
 import ugence_agentic_proposer as ap
 
-assert activation.__version__ == "0.1.0", activation.__version__
+assert activation.__version__ == "0.2.0", activation.__version__
 assert conformance.__version__ == "0.1.0", conformance.__version__
 assert family.__version__ == "0.2.0", family.__version__
 assert "site-packages" in activation.__file__, activation.__file__
@@ -391,11 +391,20 @@ refuses(lambda: t_resolver.resolve(
     tenant_id=GLOBAL_TENANT, role_contract_ref=GOVERNED_ROLE_REF, as_of=T_LATER),
     conformance.ConstitutionUnresolvedError)
 
-# 3. Missing mapping: an empty configured map -> typed refusal, mints nothing.
-empty_resolver = root.constitution_resolver(reference_map={})
-refuses(lambda: empty_resolver.resolve(
-    tenant_id=GLOBAL_TENANT, role_contract_ref=GOVERNED_ROLE_REF, as_of=T_LATER),
+# 3. Missing mapping: a reference the derived map does not carry -> typed
+#    refusal, mints nothing. And ACC-COUPLING: a hand-built mapping never
+#    reaches a resolver through this root, so "empty map" is no longer
+#    expressible here — the map a resolver gets came from an issued record.
+refuses(lambda: resolver.resolve(
+    tenant_id=GLOBAL_TENANT, role_contract_ref="ugence.roles/ugence/never/v1",
+    as_of=T_LATER),
     conformance.UnknownConstitutionReferenceError)
+refuses(lambda: root.constitution_resolver(reference_map={}),
+    activation.ActivationRequestError)
+refuses(lambda: root.constitution_resolver(reference_map=dict(reference_map)),
+    activation.ActivationRequestError)
+refuses(lambda: activation.DerivedReferenceMap(object(), {}, ()),
+    activation.ActivationRequestError)
 
 # 4. Revoked: the authority's own signed revocation -> resolve refuses after.
 revoke_policy(
