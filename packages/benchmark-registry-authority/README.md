@@ -8,9 +8,12 @@ layer [`ugence-benchmark-registry`](../benchmark-registry) and never inside it.
 > **Candidate, not release.** `0.3.0rc1` is a candidate version ratified by the
 > owner as a candidate only. The verifier it ships has been engineered and
 > tested; it has **not** been independently reviewed or externally audited, and
-> nothing here says otherwise. `0.3.0` — BR-2C's closure — waits on the D-38
-> independent external cryptographic reviewer being named and the review
-> commissioned and completed (D-32(4), D-38(i)).
+> nothing here says otherwise. `0.3.0` — BR-2C's closure — waits on two
+> separate preconditions: the D-38(i) review, by a reviewer distinct from the
+> author of the commit under review who may be owner-affiliated (D-38 as
+> amended by D-44; commissioned, outcome pending), and D-32(4)'s external
+> cryptographic audit, which is still outstanding. A review under D-38 as
+> amended is *owner-reviewed*, never *independently reviewed*.
 
 Internal platform infrastructure. Not a customer-facing module, not a product,
 and not a UVI engine. It computes nothing: no observation, no benchmark result,
@@ -62,7 +65,7 @@ stored BR-1 canonical artifact or its identity digest.
 | BR-2B | `0.2.0` | **Non-authoritative lifecycle kernel**: transition validation, predecessor checks, terminality, conflict and idempotency calculation over *caller-asserted* state. **No store, no verifier, no clock, no append path, no authority-issued result** — it cannot admit, register, revoke or resolve | shipped |
 | BR-2C-0 | `0.2.1`, `0.2.2`, `0.2.3` | **BR-2C's ratified contract surface, and no BR-2C capability.** A version rung, not a subphase (ADR §35.2 **D-33**, **D-36**): `api.__all__` 93 → 108 across the three versions | shipped |
 | **BR-2C-RC** | `0.3.0rc1` | **The BR-2C candidate head.** `BenchmarkEd25519Verifier` — the three verification seams on the D-41 pair inside one dedicated module — and `BenchmarkDenyAllVerifier`, the exact deny-all default; the D-42/D-43 identifier grammar at construction; `api.__all__` 108 → 110. A version rung, not a subphase; the twelve BR-2C capability tokens unlock here and nothing else moves | **this release — candidate only; not reviewed, not audited** |
-| BR-2C | `0.3.0` | BR-2C's closure: the same verifier after the D-38 independent external cryptographic review and D-32(4)'s external audit are commissioned, completed and recorded. The composition-root trust-resolver adapter and key entitlements stay with the composition root (D-04) | blocked on the D-38 reviewer being named and the review completed |
+| BR-2C | `0.3.0` | BR-2C's closure: the same verifier after (a) the D-38(i) review — a reviewer distinct from the commit author, who may be owner-affiliated (D-38 as amended by D-44) — and (b) D-32(4)'s separate external cryptographic audit are both completed and recorded. The composition-root trust-resolver adapter and key entitlements stay with the composition root (D-04) | blocked on the D-38 reviewer being named and the review completed |
 | BR-2D | `0.4.0` | Durable registry authority: persistence, the trusted clock, compare-and-set transitions, immutable event history, the process-local in-memory adapter, registry-event signing, and the **first authoritative** admission, registration, revocation and exact resolution. Closes with the identity-locked composition root | blocked on ADR DD-10 |
 | BR-2E | `0.5.0` | Production composition and operations: tenant authorization, service APIs, deployment controls, migrations, backup/recovery, observability, audit export | blocked on BR-2D |
 
@@ -332,11 +335,11 @@ red.** The only place any check parses a document directly is BR-1's own
 
 | Check | Result |
 | --- | --- |
-| Package suite | **2256 tests passed**, 1 pre-existing failure (`test_no_package_in_the_monorepo_imports_this_one`: another package's boundary test names this package by string; red on the default branch too) |
+| Package suite | **2261 tests passed**, 1 pre-existing failure (`test_no_package_in_the_monorepo_imports_this_one`: another package's boundary test names this package by string; red on the default branch too) |
 | Independent adversarial probes | **93 passed** (also inside the installed wheel) |
-| Distinct properties | **558 adversarial : 41 happy = 13.61 : 1** (required ≥ 2:1) |
-| Gate inventory | **72 gates** |
-| Mutation sweep | **67 KILLED, 5 SURVIVED, 0 errored** — every survivor classified; the same five as at `0.2.3` |
+| Distinct properties | **561 adversarial : 41 happy = 13.68 : 1** (required ≥ 2:1) |
+| Gate inventory | **84 gates** (72 contract gates plus 12 verifier gates added under D-44 finding F-2) |
+| Mutation sweep | **84 gates; 78 KILLED, 6 SURVIVED, 0 errored — the five survivors carried from `0.2.3` plus G-79 (the in-package `S < L` check, shadowed by the signature backend, which enforces RFC 8032 §5.1.7 itself); every survivor classified in `gate_inventory.json`, none designed away** |
 | Distribution | wheel + sdist built; `--no-index` install from a local wheelhouse holding BR-1 and the D-41 pair verified |
 | Negative controls | **8 run, 8 caught** |
 | pyflakes | clean |
@@ -385,9 +388,11 @@ does not.
 Ratified in
 [`docs/architecture/ADR_UGENCE_TRUSTED_EVIDENCE_AND_BENCHMARK_REGISTRY.md`](../../docs/architecture/ADR_UGENCE_TRUSTED_EVIDENCE_AND_BENCHMARK_REGISTRY.md),
 decisions **D-01 through D-43**, including their recorded modifications, and
-the owner's BR-2C candidate rulings: the D-38 reviewer authority is an
-independent external cryptographic reviewer, to be individually named with the
-review commissioned and completed before any final `0.3.0`; candidate
-engineering and testing may precede that naming; the D-40 release transition
+the owner's BR-2C candidate rulings: D-38(i)'s reviewer, as amended by D-44,
+is a reviewer distinct from the author of the commit under review who may be
+owner-affiliated, with the review completed and recorded before any final
+`0.3.0`, and D-32(4)'s external cryptographic audit remains a separate,
+unamended precondition; candidate engineering and testing may precede the
+review; the D-40 release transition
 for the candidate rung confines the D-41 pair to the dedicated verifier module
 and moves no other prohibition; and `0.3.0rc1` is a candidate version only.

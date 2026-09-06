@@ -55,9 +55,11 @@ The candidate verifier, and why this is ``0.3.0rc1`` and not ``0.3.0``
 D-23 classifies BR-2C as blocked on both unratified governance and audited
 cryptographic engineering. The governance half was cleared at ``BR-2C-0``
 (D-24 to D-26, D-32 to D-43). The owner then ruled that candidate engineering
-and testing may begin before the D-38 reviewer — an independent external
-cryptographic reviewer — is individually named or the review commissioned, and
-ratified ``0.3.0rc1`` as a **candidate version only**. This release is that
+and testing may begin before the D-38(i) review — by a reviewer distinct from
+the author of the commit under review, who may be owner-affiliated (D-38 as
+amended by D-44) — is completed, and ratified ``0.3.0rc1`` as a **candidate
+version only**. D-32(4)'s external cryptographic audit is a separate, still-
+outstanding precondition. This release is that
 candidate: engineered and tested, not reviewed, not audited, and never
 described as either. ``0.3.0`` — BR-2C's closure — is not taken until that
 review and D-32(4)'s external audit are commissioned, completed and recorded.

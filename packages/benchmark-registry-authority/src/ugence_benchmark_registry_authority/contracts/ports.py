@@ -233,9 +233,11 @@ class BenchmarkApprovalVerifierPort(Protocol):
     engineered and tested under the owner's early-engineering ruling; it has
     **not** been independently reviewed or externally audited. D-32 narrows
     "independently audited" to an *external cryptographic audit of the
-    verifier*, which remains a hard precondition to any production use, and
-    D-38 requires an independent external cryptographic reviewer to audit the
-    exact release head before any final ``0.3.0``.
+    verifier*, which remains a hard, separate precondition to any production
+    use; D-38(i), as amended by D-44, requires a reviewer distinct from the
+    author of the commit under review — who may be owner-affiliated — to review
+    the exact release head before any final ``0.3.0``. A review under D-38 as
+    amended is owner-reviewed, never independently reviewed.
 
     Three seams, not two
     ---------------------

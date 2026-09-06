@@ -52,9 +52,10 @@ SUBPHASE_LADDER = ("BR-2A", "BR-2B", "BR-2C-0", "BR-2C-RC", "BR-2C", "BR-2D", "B
 #: ``0.3.0rc1`` is the **BR-2C candidate rung**, ``BR-2C-RC``, ratified by the
 #: owner as a candidate version only. It sits between ``BR-2C-0`` and ``BR-2C``
 #: because it ships what neither neighbour does: BR-2C's capability — the
-#: candidate verifier — without BR-2C's closure, which D-32(4) and D-38(i)
-#: reserve for ``0.3.0`` after an independent external cryptographic review
-#: that has not occurred. The ratified release transition (D-40, as applied to
+#: candidate verifier — without BR-2C's closure, which D-38(i) (a reviewer
+#: distinct from the commit author, who may be owner-affiliated, per D-44) and
+#: D-32(4) (the separate external cryptographic audit, still outstanding)
+#: reserve for ``0.3.0``. The ratified release transition (D-40, as applied to
 #: this rung) lifts exactly the twelve capability tokens D-33 records as
 #: BR-2C's, and nothing else: every other prohibition, permanent or later,
 #: stands. It is a version rung, not a subphase, and it mints no closure audit.

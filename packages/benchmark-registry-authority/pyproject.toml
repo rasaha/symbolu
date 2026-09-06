@@ -23,9 +23,13 @@
 # pair inside one dedicated verifier module, and the exact deny-all default
 # (BenchmarkDenyAllVerifier). The D-42 key-identifier and D-43 actor-identity
 # grammar applied at construction. A CANDIDATE VERSION ONLY (owner ruling): it
-# conveys no audit, independent-review or production-release claim; 0.3.0 is
-# not taken until the D-38 independent external cryptographic reviewer is
-# named and the review commissioned and completed.
+# conveys no audit, review or production-release claim; 0.3.0 is not taken
+# until BOTH (a) the D-38(i) review — by a reviewer distinct from the author of
+# the commit under review, who may be owner-affiliated (D-38 as amended by
+# D-44) — is completed and recorded, and (b) D-32(4)'s external cryptographic
+# audit, a SEPARATE and still-outstanding precondition, is obtained and
+# recorded. A review under D-38 as amended is owner-reviewed, never
+# independently reviewed.
 #
 # BR-2C-0 (0.2.1, 0.2.2 and 0.2.3) —
 # BR-2C's ratified
@@ -42,10 +46,12 @@
 # further digest domains.
 #
 # NOT in this distribution:
-#   BR-2C (0.3.0) closure: the SAME verifier after the D-38 independent
-#                 external cryptographic review and D-32(4)'s external
-#                 cryptographic audit are commissioned, completed and recorded.
-#                 Neither has occurred. The composition-root trust-resolver
+#   BR-2C (0.3.0) closure: the SAME verifier after (a) the D-38(i) review by
+#                 a reviewer distinct from the commit author, who may be
+#                 owner-affiliated (D-38 as amended by D-44), and (b) D-32(4)'s
+#                 external cryptographic audit are both completed and recorded.
+#                 (a) is commissioned under D-44 with outcome pending; (b) has
+#                 not occurred. The composition-root trust-resolver
 #                 adapter and key entitlements remain with the composition root
 #                 (D-04) and are not here.
 #   BR-2D (0.4.0) durable registry authority: persistence, the trusted clock,
@@ -83,7 +89,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "ugence-benchmark-registry-authority"
 dynamic = ["version"]
-description = "Ugence Benchmark Registry Authority — BR-2C candidate head (0.3.0rc1): the candidate Ed25519 verifier (three verification seams on the cryptography + PyNaCl pair, inside one dedicated module) and the exact deny-all default, over BR-2C's contract surface, BR-2B's non-authoritative lifecycle kernel and BR-2A's registry and exact-resolution contracts: the administrative lifecycle and its closed transition relation, nested-binding record and event shapes, typed refusals, inert ports, transition planning over caller-asserted state, the role-scoped trust-anchor record, the three exact verified-result types, BenchmarkTrustAnchorResolution and BENCHMARK_VERIFICATION_REFUSAL_REASONS (internal platform infrastructure; no store, no clock, no append path, no authority-issued result; a CANDIDATE verifier only — engineered and tested, awaiting the D-38 independent external cryptographic review, and never described as reviewed or production-ready)."
+description = "Ugence Benchmark Registry Authority — BR-2C candidate head (0.3.0rc1): the candidate Ed25519 verifier (three verification seams on the cryptography + PyNaCl pair, inside one dedicated module) and the exact deny-all default, over BR-2C's contract surface, BR-2B's non-authoritative lifecycle kernel and BR-2A's registry and exact-resolution contracts: the administrative lifecycle and its closed transition relation, nested-binding record and event shapes, typed refusals, inert ports, transition planning over caller-asserted state, the role-scoped trust-anchor record, the three exact verified-result types, BenchmarkTrustAnchorResolution and BENCHMARK_VERIFICATION_REFUSAL_REASONS (internal platform infrastructure; no store, no clock, no append path, no authority-issued result; a CANDIDATE verifier only — engineered and tested; awaiting the D-38(i) review by a reviewer distinct from the commit author, who may be owner-affiliated, and separately D-32(4)'s still-outstanding external cryptographic audit; never described as independently reviewed, audited or production-ready)."
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "Proprietary" }

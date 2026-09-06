@@ -12,12 +12,15 @@ rungs**, and neither mints a closure audit.
 
 **A candidate version, never `0.3.0`.** Ratified by the owner as a candidate
 version only: it conveys no audit, independent-review or production-release
-claim. The D-38 reviewer authority is ratified as **an independent external
-cryptographic reviewer**; the individual reviewer must be named and the review
-commissioned and completed before any final `0.3.0` release, and this candidate
-is not described as audited or independently reviewed anywhere in this
+claim. Two separate preconditions stand between it and `0.3.0`: **D-38(i)**,
+a review by a reviewer distinct from the author of the commit under review who
+may be owner-affiliated (D-38 as amended by ADR §35.2 D-44), which must be
+completed and recorded; and **D-32(4)**, the external cryptographic audit,
+which is unamended and still outstanding. A review under D-38 as amended is
+*owner-reviewed*, never *independently reviewed*, and this candidate is not
+described as reviewed, audited or production-ready anywhere in this
 distribution. Candidate engineering and testing were authorized to begin before
-that naming, and this entry is exactly that and no more.
+the review, and this entry is exactly that and no more.
 
 ### Added — the candidate verifier, in one dedicated module
 
@@ -119,6 +122,60 @@ Every figure from a fresh run against this tree, never edited:
 | Repository boundary tests | 38 passed; `test_core_observer_boundary.py` fails to collect on a missing `agentic.tools` module, pre-existing |
 | Mutation sweep | **72 gates; 67 KILLED, 5 SURVIVED, 0 errored** — the same five survivors as at `0.2.3`, each classified in `gate_inventory.json` |
 | pyflakes | clean |
+
+### Fixed — the four findings of the D-44 owner-affiliated review, all dispositioned FIX
+
+The review of commit `2753404f` under D-38 as amended (owner-reviewed, never
+independently reviewed; D-32(4)'s external audit still outstanding) returned
+four actionable findings. Each is fixed here, with the test or gate that would
+have caught it:
+
+- **F-1 — `_resolve` trusted the resolution's triple, not the record's.**
+  `BenchmarkTrustAnchorResolution`'s constructor checks that the anchor answers
+  the asked triple, but a record substituted into a genuine resolution after
+  construction (`object.__setattr__`) bypasses it, and an approver's record
+  carrying the publisher's key then verified a publisher envelope. The seam now
+  re-checks `anchor.role`, `anchor.identity` and `anchor.key_id` against the
+  triple it asked, refusing `INDETERMINATE` with no revision bound.
+  `test_an_anchor_swapped_into_a_genuine_resolution_after_construction_refuses`
+  plants the swap for the other role, another identity and another key id;
+  sweep gate **G-86** neutralizes the cross-check and must be killed.
+- **F-2 — the sweep inventoried 72 gates and none in `verifier.py`.** Twelve
+  gates added at the package root: the strict point check (G-78), `S < L`
+  (G-79), each of D-28's four lifecycle branches (G-80 to G-83), the
+  resolution exact-type check (G-84), the anchor exact-type check (G-85), the
+  F-1 cross-check (G-86), the frame length prefix (G-87), the frame element
+  order (G-88) and the aware-instant precondition (G-89). Results below are
+  from a fresh run; every survivor is classified, none designed away. G-79
+  survives and is classified **shadowed by the signature backend**, which
+  enforces `S < L` itself; the in-package check stays as defence in depth
+  against backend substitution.
+- **F-3 — the naive-instant test was shadowed.** Deleting
+  `require_aware_datetime` from `_admit_inputs` left it green, because the
+  result type's own `evaluated_at` validator raised later — after the
+  directory had been consulted and the lifecycle comparison attempted. The
+  test now asserts the directory was **never asked** for a naive, string or
+  `None` instant, and asked exactly once for an aware one; gate G-89 pins it.
+- **F-4 — shipped text conflated D-38(i) with D-32(4).** `pyproject.toml`,
+  `README.md`, this file, `api.py`, `__init__.py`, `version.py`,
+  `verifier.py`, `ports.py`, `tests/_milestones.py` and
+  `tests/contract/test_verifier.py` described the precondition as an
+  "independent external cryptographic review". Every site now states D-38(i)
+  as amended — a reviewer distinct from the author of the commit under
+  review, who may be owner-affiliated — and names D-32(4)'s external
+  cryptographic audit separately as still outstanding. The finding listed six
+  sites; the same misstatement stood at five more, and all eleven are
+  corrected.
+
+**Nothing else moved.** No capability token, unlock phase, refusal member,
+digest domain, pinned vector or `package_version`; `__version__` stays
+`0.3.0rc1` on `BR-2C-RC`; no capability was added beyond the F-1 cross-check;
+the ADR is not amended by this entry.
+
+Re-measured after the fixes: suite **2261 passed**, 1 pre-existing failure
+(unchanged); probes **93 passed**; properties **561 adversarial : 41 happy = 13.68 : 1**; distribution
+verifier **verified, 8 of 8 negative controls caught**; mutation sweep
+**84 gates; 78 KILLED, 6 SURVIVED, 0 errored — the five survivors carried from `0.2.3` plus G-79 (the in-package `S < L` check, shadowed by the signature backend, which enforces RFC 8032 §5.1.7 itself); every survivor classified in `gate_inventory.json`, none designed away**. Two tests were added during the sweep pass, after G-84 and G-85 first survived: a duck-typed resolution and a duck-typed anchor with a forged revision digest, each swapped in after construction, must refuse `INDETERMINATE` — a stated §26 property that had no test, not a mutant-shaped patch; both gates are now killed by those tests.
 
 ### Maturity, stated plainly
 

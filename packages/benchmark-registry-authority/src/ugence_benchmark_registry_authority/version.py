@@ -18,10 +18,11 @@ this repository.
 **A candidate version, never ``0.3.0``.** The owner ratified ``0.3.0rc1`` as a
 candidate version only: it conveys no audit, independent-review or
 production-release claim. ``0.3.0`` — the version §35.1 and D-33 reserve for
-BR-2C's closure — is not taken until the D-38 reviewer, an independent external
-cryptographic reviewer, has been individually named and the review commissioned
-and completed, and until D-32(4)'s external cryptographic audit is obtained and
-recorded. Candidate engineering and testing may proceed before that (owner
+BR-2C's closure — is not taken until the D-38(i) review — by a reviewer
+distinct from the author of the commit under review, who may be
+owner-affiliated (D-38 as amended by D-44) — is completed and recorded, and
+until D-32(4)'s separate external cryptographic audit is obtained and recorded.
+A review under D-38 as amended is owner-reviewed, never independently reviewed. Candidate engineering and testing may proceed before that (owner
 ruling, 2026-09); a final ``0.3.0`` release may not. No artifact of this
 distribution describes the candidate as audited or independently reviewed.
 

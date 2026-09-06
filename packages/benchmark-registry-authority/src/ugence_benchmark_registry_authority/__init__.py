@@ -35,10 +35,11 @@ Milestone boundary
   revoke or resolve, holds no anchors and reads no clock — the directory and
   the trusted instant are both inputs. **Not reviewed, not audited, not
   0.3.0.**
-* **BR-2C (0.3.0)** — BR-2C's closure: the same verifier after the D-38
-  independent external cryptographic reviewer has been individually named and
-  the review commissioned and completed, and D-32(4)'s external cryptographic
-  audit obtained and recorded. Neither has occurred. The composition-root
+* **BR-2C (0.3.0)** — BR-2C's closure: the same verifier after (a) the D-38(i)
+  review — by a reviewer distinct from the author of the commit under review,
+  who may be owner-affiliated (D-38 as amended by D-44) — is completed and
+  recorded, and (b) D-32(4)'s separate external cryptographic audit is obtained
+  and recorded. (a) is commissioned with outcome pending; (b) has not occurred. The composition-root
   trust-resolver adapter and key entitlements stay with the composition root
   (D-04) and arrive with it.
 * **BR-2D (0.4.0)** — the durable registry authority: persistence, the trusted
