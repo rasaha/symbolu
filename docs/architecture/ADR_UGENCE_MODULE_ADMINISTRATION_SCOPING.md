@@ -283,3 +283,38 @@ summary needed rewording; the gap was latent, as §3 found, and is now closed ra
 than relied on.
 
 MA-2 and MA-4 remain unimplemented and separately scoped, as §12 requires.
+
+## 14 — Implementation record, MA-4 (2026-09-06)
+
+Shipped as a change to `apps/console/` only: the client, the two views that read
+the withheld routes, one new typed-gap component, and the README. What the ruling
+became, and where the claim is checked:
+
+| Ruling | What landed | Where it is checked |
+|---|---|---|
+| MA-4 `RETIRE_THE_TWO_CALLS` | `src/api.ts` no longer defines `modules()` or `scenarios()`, nor the `ModuleInfo` and `ScenarioSummary` types that existed only for them. The client's four remaining calls — `/health`, the scenario run, and the two audit reads — are each in `SERVED_ROUTES`; the fifth served route, the raw shadow write, was never called by this app and still is not. | a parse of every `get<…>(…)`/`post<…>(…)` path in `api.ts` against `SERVED_ROUTES` and `WITHHELD_ROUTES` in `app.py`: four calls, all served, none withheld |
+| typed gap, not empty result | `src/views/TypedGap.tsx`: a code (`CONSOLE_ROUTE_WITHHELD`), the source that is not served, and the two rulings, in the shape the studio's screens use for an unset seam. | rendered by both views below; `role="status"` |
+| Modules view | Reads `/health` only. Renders the service's availability probes under the keys it returns and its declared audit ceiling (CP-4), and the nine-row registry as a typed gap. No name, layer, maturity or wiring is hardcoded: that would be the withheld route re-implemented in the browser. | `src/views/Modules.tsx` |
+| Governed Loop view | Keeps the served run route. The scenario id is typed, the pattern the Audit view already uses for a correlation id; the catalogue is a typed gap, and an id the service does not hold is its own 404, shown verbatim. No scenario list is kept client-side, for the same reason. | `src/views/GovernedLoop.tsx` |
+| README | The Views section describes the two views as they now behave, and a new Served-surface section names the five routes and the two rulings. | `apps/console/README.md` |
+
+**Verified, not asserted.** The app defines two checks, `type-check` and `build`,
+and no lint or test. Both passed after the change: `tsc --noEmit` exit 0; `vite build`
+exit 0, 1365 modules transformed. The served-set proof above passed: every client call
+in `SERVED_ROUTES`, no client call in `WITHHELD_ROUTES`. The new `Health.audit_ceiling`
+field mirrors what `app.py:112` already returns; nothing was added to the service.
+
+**What did not change.** No route: `SERVED_ROUTES` and `WITHHELD_ROUTES` are as CP-3
+left them, and `test_served_surface.py` is untouched. No contract, no package, no
+dependency: `package.json` is unchanged, and the lockfile `npm install` generated
+during verification was removed rather than committed, since adding one is not this
+ruling's to make. The `dist/` build output is ignored and was not committed.
+
+**The one judgment call, recorded.** Typing the scenario id keeps the served run route
+usable; the alternative was to disable the run entirely once its picker lost its
+source. The typed form was chosen because it adds no data the service does not
+return and mirrors an existing view. If the owner would rather the run be disabled
+until a catalogue route is ruled, that is a one-line change and a new ruling is not
+needed for it.
+
+MA-2 remains unimplemented and separately scoped, as §12 requires.
