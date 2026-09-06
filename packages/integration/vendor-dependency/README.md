@@ -1,6 +1,7 @@
 # ugence-vendor-dependency
 
-**Contracts only. Not enforcement-ready, and not a vendor-risk engine.** The record
+**Contracts plus one ruled local file. Not enforcement-ready, and not a vendor-risk
+engine.** The record
 of declared vendor dependencies: a bounded declaration over the neutral system
 identity and the neutral vendor-risk label governance-contracts already owns,
 linked to a policy by reference. Scoped and ratified by
@@ -8,20 +9,34 @@ linked to a policy by reference. Scoped and ratified by
 `ADR_UGENCE_GOVERNANCE_GAP_SEQUENCING_RATIFICATION.md` (wave 4, line 62).
 
 > This package records what a declarer asserted about a vendor dependency. It
-> **never** resolves, verifies, scores, grades, contacts, persists or decides.
-> A declaration is a record, not a permission.
+> **never** resolves, verifies, scores, grades, ranks, approves, onboards, contacts
+> or decides. A declaration is a record, not a permission. Since 0.2.0 it keeps
+> those records in one tenant-bound local file (front-door ruling FD-13.2) —
+> persistence of the record and nothing more: an opaque `vendor_ref` is stored,
+> never a way to reach the vendor, and the posture stays exactly as uninterpreted
+> as before.
 
-## What "contracts only" means here
+## What "contracts plus one local file" means here
 
-Record types, refusal reasons, pure selectors, and one read-only Protocol. **No
-store, no connector, no gateway, no scorer, no questionnaire, no clock.** The lines
+Record types, refusal reasons, pure selectors, one read-only Protocol, and since
+0.2.0 `SqliteVendorDeclarations` — the one implementation of that Protocol, ruled by
+FD-13.2, whose only write is `declare`. It is a file under a writable volume the
+composing deployment owns: no server, no driver, no DSN, no network. The store is
+append-only: a declaration is never edited or deleted, a changed declaration is a new
+one that `supersedes` its predecessor, and a file bound to one tenant is never
+re-bound. `tests/test_durable.py` holds that line mechanically.
+
+Everything else is as it was. **No connector, no gateway, no scorer, no
+questionnaire, no clock, no network.** The lines
 the rulings draw are held *structurally* rather than by discipline: there is
-nothing in the distribution that could reach a vendor, a policy, a store or a
+nothing in the distribution that could reach a vendor, a policy or a
 network, so "it does not evaluate" is not a promise this package could break. A
-boundary test asserts it — no module named `store`, `adapter`, `connector`,
-`client`, `gateway`, `scorer` or `engine`, and no `connect`, `session`, `url`,
-`endpoint`, `socket`, `resolve`, `verify`, `fetch`, `score`, `grade`, `severity`,
-`eligible` or `approve` anywhere in the code.
+boundary test asserts it — outside the one ruled store module, no module named
+`store`, `adapter`, `connector`, `client`, `gateway`, `scorer` or `engine`, and no
+`connect`, `session`, `url`, `endpoint`, `socket`, `resolve`, `verify`, `fetch`,
+`score`, `grade`, `severity`, `eligible` or `approve` anywhere in the code — and the
+store itself is scanned for the same vocabulary, `rank`, `onboard` and `certify`
+included.
 
 The shape follows `packages/integration/data-use-admission` (wave 4), which
 follows `packages/integration/ai-system-registry` (wave 2).
@@ -130,15 +145,18 @@ and never return another tenant's declaration.
 
 `ugence-governance-contracts>=0.7.0` and the Python standard library. Nothing else —
 no Policy Authority, no Risk Authority, no AI System Registry, no Decision
-Authority, no agent-runtime, no `sqlite3`, no network client, no cloud SDK, no
-pydantic. Composition roots, products and applications may import it; no
+Authority, no agent-runtime, no network client, no cloud SDK, no
+pydantic. Since 0.2.0 `durable.py` alone uses the standard library's `sqlite3`; a
+boundary test pins it as the only module that may. Composition roots, products and applications may import it; no
 capability package may — enforced repository-wide by
 `scripts/check_package_import_boundaries.py` and
 `tests/boundaries/test_package_import_boundaries.py`.
 
 ## Maturity ceiling
 
-**Contracts only, with no operational vendor-risk evaluation.** Nothing here proves
+**Contracts plus one local file, with no operational vendor-risk evaluation.** The
+store persists the record and nothing else; it confers no approval and no onboarding
+status. Nothing here proves
 that a declared vendor exists, that the assigned posture is apt, that the policy
 reference resolves, or that the named system actually depends on the vendor. No
 scoring, no grading, no questionnaire, no due-diligence workflow, no contact with
@@ -147,7 +165,9 @@ authorizes an engine.
 
 ## Gaps that survive this release
 
-- No store, so nothing persists; a composition root holds whatever it declares.
+- The store persists the record and nothing else. It confers no approval, no
+  onboarding status, no tier and no certification, and a composition root still holds
+  every other decision.
 - The posture vocabulary is unratified, so the label stays uninterpreted until an
   owner fixes a taxonomy.
 - A `policy_ref` that names nothing is indistinguishable here from one that names a
