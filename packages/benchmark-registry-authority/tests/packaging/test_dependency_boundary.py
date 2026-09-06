@@ -177,12 +177,22 @@ def _imports_this_package(path: pathlib.Path) -> bool:
     depends on this one. Dynamic imports through a literal string are caught
     because they are the cheapest way to hide one; a name computed at runtime
     is outside what a static gate can see, and is not claimed.
+
+    **A file that will not parse is reported, not skipped**, when its text names
+    this package at all. Reading the AST bought accuracy about mentions and paid
+    for it with a case the substring scan could not miss: a file carrying a real
+    import and a syntax error parses to nothing and answered ``False``, so the
+    gate stayed silent on exactly the file it could not read. It now fails
+    closed on that file and says so; an unparseable file that never names this
+    package cannot import it under any spelling this gate claims to see, and is
+    left alone rather than reported as noise.
     """
 
+    text = path.read_text()
     try:
-        tree = ast.parse(path.read_text(), filename=str(path))
+        tree = ast.parse(text, filename=str(path))
     except (SyntaxError, ValueError):
-        return False
+        return NAMESPACE in text
     for node in ast.walk(tree):
         if isinstance(node, ast.Import):
             if any(alias.name.split(".")[0] == NAMESPACE for alias in node.names):
@@ -264,6 +274,37 @@ def test_the_reverse_import_gate_catches_a_real_import_and_ignores_a_mention(tmp
         f"packages/integration/neighbour/{name}" for name in spellings
     )
     assert not any(path.endswith(("mention.py", "relative.py", "own.py")) for path in caught)
+
+
+def test_a_file_the_gate_cannot_parse_is_reported_when_it_names_this_package(tmp_path):
+    """The AST rewrite must not go quiet on the file it cannot read.
+
+    A real import followed by a syntax error parses to nothing, so a gate that
+    skips unparseable files answers ``False`` on exactly the file whose imports
+    it could not determine — the one case the substring form could not miss.
+    It fails closed instead. An unparseable file that never names this package
+    is still left alone: it cannot import it under any spelling this gate
+    claims to see, and reporting it would be noise, not a finding.
+    """
+
+    packages = tmp_path / "packages"
+    this = packages / "benchmark-registry-authority"
+    this.mkdir(parents=True)
+    neighbour = packages / "integration" / "neighbour"
+    neighbour.mkdir(parents=True)
+    (neighbour / "broken_importer.py").write_text(
+        "import ugence_benchmark_registry_authority\ndef f(:\n"
+    )
+    (neighbour / "broken_mentioner.py").write_text(
+        'FORBIDDEN = {"ugence_benchmark_registry_authority"}\ndef f(:\n'
+    )
+    (neighbour / "broken_unrelated.py").write_text("import json\ndef f(:\n")
+
+    caught = _reverse_importers(packages, this)
+
+    assert "packages/integration/neighbour/broken_importer.py" in caught
+    assert "packages/integration/neighbour/broken_mentioner.py" in caught
+    assert "packages/integration/neighbour/broken_unrelated.py" not in caught
 
 
 @_DETACHED

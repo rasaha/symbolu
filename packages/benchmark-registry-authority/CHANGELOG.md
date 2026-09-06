@@ -187,6 +187,25 @@ the six to be reported. The neighbour's file is untouched, nothing is
 suppressed, and the suite is green for the first time on this branch: **2263
 passed, 0 failed**; properties **562 adversarial : 41 happy = 13.71 : 1**.
 
+### Fixed — the reverse-import gate fails closed on a file it cannot parse
+
+Reading the AST bought accuracy about mentions and paid for it with one case
+the substring form could not miss: a neighbour file carrying a real import
+**and** a syntax error parses to nothing, so the gate answered "does not
+import" about exactly the file whose imports it could not read. Measured
+against the previous form, which reported it. `_imports_this_package` now
+returns the substring answer when the file will not parse, so such a file is
+reported rather than skipped; an unparseable file that never names this package
+is still left alone, because it cannot import it under any spelling this gate
+claims to see. An unparseable file that only *mentions* the package is reported
+too — once a file will not parse, mention and import are indistinguishable,
+and that is the cost of failing closed rather than a regression to substring
+matching. A second planted-file test pins all three cases. No other gate, no
+capability and no shipped module moves: suite **2264 passed, 0 failed**;
+properties **563 adversarial : 41 happy = 13.73 : 1**; mutation sweep **84
+gates, 78 killed, 6 survived, 0 errored**, ledger unchanged; distribution
+verifier **verified, 8 of 8 negative controls caught**.
+
 Re-measured after the fixes: suite **2261 passed**, 1 pre-existing failure
 (unchanged); probes **93 passed**; properties **561 adversarial : 41 happy = 13.68 : 1**; distribution
 verifier **verified, 8 of 8 negative controls caught**; mutation sweep
