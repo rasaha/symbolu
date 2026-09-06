@@ -87,10 +87,24 @@ StoryGraph — verified by the import-boundary tests.
 Concrete Ugence governance adapters (which translate `ExecutionContext` into a TAP /
 Decision Authority / ActionGate / Action Clearance / StoryGraph evaluation and back to
 a `GovernanceEvaluation`) live **outside** this package — in the application layer or
-in an optional integration package (e.g. a future `ugence-agent-runtime-governance`).
-They are never required for the core to import. This packaging phase does **not**
-create such an adapter package, because a clean application-level adapter can already
-implement `GovernanceHook` directly.
+in an integration package. They are never required for the core to import, and this
+package still creates none: a clean application-level adapter can implement
+`GovernanceHook` directly.
+
+**That integration package now exists.** `ugence-agent-runtime-governance` 0.1.0 ships
+`GovernedExecutionHook`, which obtains a `GovernedExecutionDecision` from the ratified
+`RiskAuthorityCompositionEngine` and projects it onto `GovernanceEvaluation`, bound to
+the exact proposal. It is scoped as GAS-3 by
+`docs/architecture/ADR_DBOS_DURABLE_EXECUTION_INTEGRATION.md`. This document previously
+called it "a future" package; it is built, and the sentence is corrected rather than
+left to be read as an open item.
+
+It is **not** pilot-validated and **not** production-certified, and nothing about its
+existence moves this package's maturity. What blocks live execution is recorded in that
+ADR §10 and sits outside both packages: Risk Authority `production_mode` raises
+`ProductionContainmentError` (signed envelope issuance is Phase 5), no Credential Broker
+exists, and HOLD, DEFER and MANUAL_REVIEW have no sink — ESCALATE gained one under
+GAS-7 HR-A; the queue and decision surfaces are unbuilt.
 
 ## Default hook — fail closed (P0)
 
