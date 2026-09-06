@@ -1,6 +1,10 @@
 {
-  "count": 105,
+  "count": 116,
   "fingerprints": {
+    "APPROVAL_SENSITIVE_OBJECT_TYPES": {
+      "kind": "object",
+      "type": "frozenset"
+    },
     "ActionConstraint": {
       "kind": "class",
       "members": [
@@ -1568,6 +1572,14 @@
         "SOURCED"
       ]
     },
+    "REVIEWER_IDENTITY": {
+      "kind": "constant",
+      "type": "str"
+    },
+    "REVIEW_ENFORCEMENT": {
+      "kind": "constant",
+      "type": "str"
+    },
     "ReleaseManifest": {
       "kind": "class",
       "members": [
@@ -1801,6 +1813,198 @@
         "NOT_APPLICABLE",
         "UNKNOWN",
         "UNSUPPORTED"
+      ]
+    },
+    "ReviewCheck": {
+      "kind": "class",
+      "members": [
+        "construct",
+        "copy",
+        "dict",
+        "from_orm",
+        "json",
+        "model_computed_fields",
+        "model_config",
+        "model_construct",
+        "model_copy",
+        "model_dump",
+        "model_dump_json",
+        "model_extra",
+        "model_fields",
+        "model_fields_set",
+        "model_json_schema",
+        "model_parametrized_name",
+        "model_post_init",
+        "model_rebuild",
+        "model_validate",
+        "model_validate_json",
+        "model_validate_strings",
+        "parse_file",
+        "parse_obj",
+        "parse_raw",
+        "rejected",
+        "schema",
+        "schema_json",
+        "update_forward_refs",
+        "validate"
+      ]
+    },
+    "ReviewCode": {
+      "kind": "enum",
+      "members": [
+        "DISPOSITION_DIGEST_MISMATCH",
+        "LEDGER_REQUIREMENT_MISMATCH",
+        "NO_APPROVAL_PATH_FOR_CHANGE",
+        "REQUIREMENT_PACK_MISMATCH",
+        "REVIEW_REQUIREMENT_UNSATISFIED",
+        "REVIEW_STEP_OUT_OF_ORDER",
+        "SEGREGATION_OF_DUTIES_VIOLATED",
+        "SELF_REVIEW",
+        "UNKNOWN_REVIEW_STEP"
+      ],
+      "values": [
+        "DISPOSITION_DIGEST_MISMATCH",
+        "LEDGER_REQUIREMENT_MISMATCH",
+        "NO_APPROVAL_PATH_FOR_CHANGE",
+        "REQUIREMENT_PACK_MISMATCH",
+        "REVIEW_REQUIREMENT_UNSATISFIED",
+        "REVIEW_STEP_OUT_OF_ORDER",
+        "SEGREGATION_OF_DUTIES_VIOLATED",
+        "SELF_REVIEW",
+        "UNKNOWN_REVIEW_STEP"
+      ]
+    },
+    "ReviewDisposition": {
+      "kind": "class",
+      "members": [
+        "construct",
+        "copy",
+        "dict",
+        "from_orm",
+        "json",
+        "model_computed_fields",
+        "model_config",
+        "model_construct",
+        "model_copy",
+        "model_dump",
+        "model_dump_json",
+        "model_extra",
+        "model_fields",
+        "model_fields_set",
+        "model_json_schema",
+        "model_parametrized_name",
+        "model_post_init",
+        "model_rebuild",
+        "model_validate",
+        "model_validate_json",
+        "model_validate_strings",
+        "parse_file",
+        "parse_obj",
+        "parse_raw",
+        "schema",
+        "schema_json",
+        "update_forward_refs",
+        "validate"
+      ]
+    },
+    "ReviewLedger": {
+      "kind": "class",
+      "members": [
+        "construct",
+        "copy",
+        "dict",
+        "from_orm",
+        "json",
+        "model_computed_fields",
+        "model_config",
+        "model_construct",
+        "model_copy",
+        "model_dump",
+        "model_dump_json",
+        "model_extra",
+        "model_fields",
+        "model_fields_set",
+        "model_json_schema",
+        "model_parametrized_name",
+        "model_post_init",
+        "model_rebuild",
+        "model_validate",
+        "model_validate_json",
+        "model_validate_strings",
+        "parse_file",
+        "parse_obj",
+        "parse_raw",
+        "schema",
+        "schema_json",
+        "update_forward_refs",
+        "validate"
+      ]
+    },
+    "ReviewRequirement": {
+      "kind": "class",
+      "members": [
+        "construct",
+        "copy",
+        "dict",
+        "from_orm",
+        "is_blocking",
+        "json",
+        "model_computed_fields",
+        "model_config",
+        "model_construct",
+        "model_copy",
+        "model_dump",
+        "model_dump_json",
+        "model_extra",
+        "model_fields",
+        "model_fields_set",
+        "model_json_schema",
+        "model_parametrized_name",
+        "model_post_init",
+        "model_rebuild",
+        "model_validate",
+        "model_validate_json",
+        "model_validate_strings",
+        "parse_file",
+        "parse_obj",
+        "parse_raw",
+        "schema",
+        "schema_json",
+        "update_forward_refs",
+        "validate"
+      ]
+    },
+    "ReviewStepRequirement": {
+      "kind": "class",
+      "members": [
+        "construct",
+        "copy",
+        "dict",
+        "from_orm",
+        "json",
+        "model_computed_fields",
+        "model_config",
+        "model_construct",
+        "model_copy",
+        "model_dump",
+        "model_dump_json",
+        "model_extra",
+        "model_fields",
+        "model_fields_set",
+        "model_json_schema",
+        "model_parametrized_name",
+        "model_post_init",
+        "model_rebuild",
+        "model_validate",
+        "model_validate_json",
+        "model_validate_strings",
+        "parse_file",
+        "parse_obj",
+        "parse_raw",
+        "schema",
+        "schema_json",
+        "update_forward_refs",
+        "validate"
       ]
     },
     "RoleRelevance": {
@@ -2191,6 +2395,7 @@
         "capability_requirement_extraction_implemented",
         "dependency_semantics_implemented",
         "deterministic_replay_verified",
+        "diff_driven_review_implemented",
         "enterprise_policy_evaluation_implemented",
         "human_review_semantics_implemented",
         "policy_provenance_implemented",
@@ -2442,6 +2647,13 @@
         "name"
       ]
     },
+    "check_review": {
+      "kind": "function",
+      "parameters": [
+        "requirement",
+        "ledger"
+      ]
+    },
     "classify_role_relevance": {
       "kind": "function",
       "parameters": [
@@ -2454,7 +2666,9 @@
         "pack",
         "approval",
         "registry",
-        "require_approval"
+        "require_approval",
+        "review_requirement",
+        "review_ledger"
       ]
     },
     "compile_workflow_v2": {
@@ -2471,6 +2685,13 @@
       "kind": "function",
       "parameters": [
         "pack"
+      ]
+    },
+    "derive_review_requirement": {
+      "kind": "function",
+      "parameters": [
+        "old_pack",
+        "new_pack"
       ]
     },
     "diff_policy_packs": {
@@ -2535,6 +2756,7 @@
   },
   "module": "ugence_policy_workflow_compiler.api",
   "public_names": [
+    "APPROVAL_SENSITIVE_OBJECT_TYPES",
     "ActionConstraint",
     "ApprovalDecision",
     "ApprovalPath",
@@ -2593,6 +2815,8 @@
     "ProvenanceReference",
     "ProvenanceSourceType",
     "ProvenanceStatus",
+    "REVIEWER_IDENTITY",
+    "REVIEW_ENFORCEMENT",
     "ReleaseManifest",
     "ReleaseValidationCode",
     "ReleaseValidationResult",
@@ -2601,6 +2825,12 @@
     "RequiredEvidence",
     "RequirementLevel",
     "ResolutionStatus",
+    "ReviewCheck",
+    "ReviewCode",
+    "ReviewDisposition",
+    "ReviewLedger",
+    "ReviewRequirement",
+    "ReviewStepRequirement",
     "RoleRelevance",
     "SUPPORTED_WORKFLOW_IR_VERSIONS",
     "SemanticDiagnostic",
@@ -2627,10 +2857,12 @@
     "WorkflowNode",
     "WorkflowNodeSemantics",
     "build_approval_record",
+    "check_review",
     "classify_role_relevance",
     "compile_policy_pack",
     "compile_workflow_v2",
     "compute_pack_digest",
+    "derive_review_requirement",
     "diff_policy_packs",
     "digest_compiler_version_for",
     "enrich_workflow",

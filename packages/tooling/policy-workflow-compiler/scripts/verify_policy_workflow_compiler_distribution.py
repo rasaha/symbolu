@@ -45,7 +45,9 @@ SOURCE_DATE_EPOCH = "1700000000"
 
 def _run(cmd, **kw):
     env = kw.pop("env", None)
-    return subprocess.run(cmd, check=True, capture_output=True, text=True, env=env, **kw)
+    # A refusal path is a legitimate expectation, so callers may opt out of check.
+    check = kw.pop("check", True)
+    return subprocess.run(cmd, check=check, capture_output=True, text=True, env=env, **kw)
 
 
 def _sha256(path: Path) -> str:
@@ -273,6 +275,43 @@ def main() -> int:
         cmp = _run([str(cli), "compare-contracts", "v1_ir.json", "v2.json"], env=env, cwd=str(tmp))
         report["steps"]["cli_compare_contracts"] = {
             "passed": json.loads(cmp.stdout)["base_graphs_match"] is True}
+
+        # 5b. P3A review CLI: a sensitive change routes to the pack's declared path
+        # in the installed wheel, and an unsatisfied requirement exits non-zero.
+        exp_packs = (
+            "from ugence_policy_workflow_compiler.reference.procurement import "
+            "build_procurement_policy_pack\n"
+            "from ugence_policy_workflow_compiler.serialization import canonical_json\n"
+            "p=build_procurement_policy_pack()\n"
+            "open('old_pack.json','w').write(canonical_json.dumps_pretty("
+            "p.model_dump(mode='python')))\n"
+            "r=list(p.decision_rules); r[0]=r[0].model_copy(update={'description':'revised'})\n"
+            "n=p.model_copy(update={'decision_rules':tuple(r)})\n"
+            "open('new_pack.json','w').write(canonical_json.dumps_pretty("
+            "n.model_dump(mode='python')))\n"
+            "print('PACKS')\n"
+        )
+        _run([str(py), "-c", exp_packs], env=env, cwd=str(tmp))
+        rr = _run(
+            [str(cli), "review-requirements", "old_pack.json", "new_pack.json"],
+            env=env, cwd=str(tmp),
+        )
+        rrj = json.loads(rr.stdout)
+        (tmp / "requirement.json").write_text(rr.stdout, encoding="utf-8")
+        report["steps"]["cli_review_requirements"] = {
+            "passed": rrj["review_required"] is True
+            and rrj["required_approval_path_id"] != ""
+            and len(rrj["required_steps"]) > 0
+            and rrj["unresolved_codes"] == []}
+        cr = _run(
+            [str(cli), "check-review", "requirement.json"],
+            env=env, cwd=str(tmp), check=False,
+        )
+        crj = json.loads(cr.stdout)
+        report["steps"]["cli_check_review_refuses"] = {
+            "passed": cr.returncode == 1
+            and crj["ok"] is False
+            and "REVIEW_REQUIREMENT_UNSATISFIED" in crj["codes"]}
 
         # 6. Deterministic logical digest + equivalence + public API, in the clean env.
         probe2 = (

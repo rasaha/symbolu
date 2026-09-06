@@ -59,6 +59,21 @@ been pilot-validated or production-certified. See `MATURITY.md` for the full set
 of maturity booleans, what each asserts, and the owner-ratified evidence each gate
 must accumulate before it can be earned.
 
+## Governed review (P3A) limitations
+
+- **A requirement is a two-pack derivation; compilation sees one pack.** The
+  compiler blocks on every review requirement it is given and refuses one that does
+  not describe the pack in hand, but it cannot know about a prior version it was
+  never shown. Deriving the requirement is the caller's obligation, exactly as
+  supplying the approval already is.
+- **The reviewer authority reference is opaque** (ruling P3A-2). The compiler
+  records which reference was asserted; it never establishes that the reference
+  resolves to a real, currently-authorized identity. Identity resolution would need
+  a dependency this package does not have and a separate ruling to acquire.
+- **Routing is read, never inferred.** Where the pack declares several approval
+  paths and none references the changed object, the requirement refuses rather than
+  choosing one. A reviewer is never defaulted.
+
 ## workflow_ir.v2 (Phase 2) limitations
 
 - The functional capability mapping is intentionally small: `EVIDENCE_REQUIREMENT →

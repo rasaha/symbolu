@@ -32,6 +32,12 @@ as importantly — what is not.
 | `release_validation_implemented` | `true` | `CompiledReleaseValidator` with hard authority and digest integrity floors. |
 | `deterministic_replay_verified` | `true` | Enrichment replays identically across processes and input orderings. |
 
+## Phase 3A maturity gate (governed diff-driven review)
+
+| Gate | Value | Meaning |
+| --- | --- | --- |
+| `diff_driven_review_implemented` | `true` | Review requirements are derived deterministically from a structural diff and the pack's own declared approval path, and a fail-closed review gate verifies a ledger against one. Routing and recording only — the compiler never performs, grants or waives an approval. See `DIFF_DRIVEN_REVIEW.md`. |
+
 ## Explicit non-goals
 
 These booleans are hard-coded `false`. They are not roadmap placeholders that a

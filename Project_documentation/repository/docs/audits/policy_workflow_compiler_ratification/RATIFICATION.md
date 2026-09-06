@@ -242,6 +242,18 @@ compiler and pre-execution analyzer. It does not gradually become a runtime
 orchestrator. That is what keeps Policy Authority, the compiler, AWC, the
 decision and risk authorities, and the execution stack cleanly separated.
 
+## PWC-P3A rulings
+
+| Ruling | Decision |
+| --- | --- |
+| **P3A-1** | `REVIEW_ENFORCEMENT = BLOCKING`. An unsatisfied `ReviewRequirement` refuses compilation with a typed refusal when an approval-sensitive change has a declared covering `ApprovalPath`. No minor-change exemption, no approval carry-forward. With no covering path, refuse `NO_APPROVAL_PATH_FOR_CHANGE`; never default a reviewer. |
+| **P3A-2** | `REVIEWER_IDENTITY = OPAQUE_REFERENCE`. `reviewer_authority_reference` stays an uninterpreted binding reference. P3A does not import or resolve `authority-directory`; identity resolution needs a separate ruling. |
+
+The **non-weakening invariant** is ratified with them: P3A never makes an approval
+valid that the existing approval gate would reject. The gates compose as AND — a
+satisfied review cannot rescue a failed approval, and a valid approval cannot excuse
+an unsatisfied review. Design: `../policy_workflow_compiler_p3a/DESIGN.md`.
+
 ## What this ratification does not authorize
 
 - No change to `workflow_ir.v1` or `workflow_ir.v2` canonical output. `[V]` Pinned:

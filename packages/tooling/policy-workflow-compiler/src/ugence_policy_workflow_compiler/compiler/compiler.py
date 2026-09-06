@@ -17,6 +17,8 @@ from typing import List, Optional
 from ..approval.records import compute_pack_digest
 from ..approval.service import ApprovalService
 from ..models.approvals import HumanApprovalRecord
+from ..review.gate import check_review
+from ..review.models import ReviewCode, ReviewLedger, ReviewRequirement
 from ..models.assurance import AssuranceManifest
 from ..models.audit import AuditSchema
 from ..models.common import PolicyPackStatus
@@ -102,6 +104,8 @@ class GovernedWorkflowCompiler:
         approval: Optional[HumanApprovalRecord] = None,
         *,
         require_approval: bool = True,
+        review_requirement: Optional[ReviewRequirement] = None,
+        review_ledger: Optional[ReviewLedger] = None,
     ) -> CompilationResult:
         report = self._validator.validate(pack)
         if not report.ok:
@@ -126,6 +130,36 @@ class GovernedWorkflowCompiler:
                     success=False,
                     validation_report=report.model_copy(
                         update={"diagnostics": tuple(diagnostics)}
+                    ),
+                )
+
+        # Review gate (PWC-P3A, ruling P3A-1: BLOCKING). Additional to the approval
+        # gate above, never a substitute for it: a satisfied review cannot rescue a
+        # failed approval, and a valid approval cannot excuse an unsatisfied review.
+        # A requirement is a two-pack derivation and compilation sees one pack, so
+        # the compiler blocks on every requirement it is given and refuses one that
+        # does not describe this pack — it does not reconstruct history it never saw.
+        if review_requirement is not None:
+            expected = compute_pack_digest(pack)
+            if review_requirement.new_pack_digest != expected:
+                return CompilationResult(
+                    success=False,
+                    validation_report=_review_report(
+                        report,
+                        pack.pack_id,
+                        (ReviewCode.REQUIREMENT_PACK_MISMATCH.value,),
+                        (
+                            "the review requirement describes a different pack digest "
+                            "than the pack being compiled",
+                        ),
+                    ),
+                )
+            check = check_review(review_requirement, review_ledger)
+            if check.rejected:
+                return CompilationResult(
+                    success=False,
+                    validation_report=_review_report(
+                        report, pack.pack_id, check.codes, check.reasons
                     ),
                 )
 
@@ -198,6 +232,29 @@ def _dist_version() -> str:
     return DISTRIBUTION_VERSION
 
 
+def _review_report(
+    report: ValidationReport, pack_id: str, codes, reasons
+) -> ValidationReport:
+    """Merge typed review refusals into the validation report as ERRORs.
+
+    Review findings are refusals (ruling P3A-1); none is ever emitted below ERROR.
+    """
+    diagnostics = list(report.diagnostics)
+    for code, reason in zip(codes, reasons):
+        diagnostics.append(
+            ValidationDiagnostic(
+                code=code,
+                severity=Severity.ERROR,
+                object_id=pack_id,
+                message=reason,
+                suggested_remediation=(
+                    "satisfy the declared approval path for the changed pack digest"
+                ),
+            )
+        )
+    return report.model_copy(update={"diagnostics": tuple(diagnostics)})
+
+
 def _boundary_report(pack_id: str, violations) -> ValidationReport:
     diagnostics = tuple(
         ValidationDiagnostic(
@@ -225,8 +282,14 @@ def compile_policy_pack(
     *,
     registry: Optional[CapabilityRegistry] = None,
     require_approval: bool = True,
+    review_requirement: Optional[ReviewRequirement] = None,
+    review_ledger: Optional[ReviewLedger] = None,
 ) -> CompilationResult:
     """Convenience wrapper around :meth:`GovernedWorkflowCompiler.compile`."""
     return GovernedWorkflowCompiler(registry or DEFAULT_REGISTRY).compile(
-        pack, approval, require_approval=require_approval
+        pack,
+        approval,
+        require_approval=require_approval,
+        review_requirement=review_requirement,
+        review_ledger=review_ledger,
     )

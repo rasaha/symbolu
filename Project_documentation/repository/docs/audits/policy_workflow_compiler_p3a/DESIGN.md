@@ -148,16 +148,38 @@ no side effect. It routes a human review and records its disposition; it never
 performs, grants, or waives an approval. The compiler still does not approve its own
 output.
 
-## Open items
+## Ratified rulings
 
-`[R]` **Blocking or advisory.** Whether an unsatisfied `ReviewRequirement` refuses
-compilation or merely reports. Recommendation: refuse whenever the pack declares a
-covering path. Fail-closed is the house rule, and an advisory review gate is one a
-pipeline learns to ignore.
+### P3A-1 — `REVIEW_ENFORCEMENT = BLOCKING`
 
-`[R]` **Reviewer identity resolution.** Dispositions carry reference strings today,
-consistent with the existing `reviewer_authority_reference`. Whether P3A should
-instead resolve identities against `packages/integration/authority-directory` is a
-boundary question: resolving would add a first-party dependency that the D1 ruling
-would have to permit, and would move this package off its current
-zero-Ugence-dependency posture.
+When an approval-sensitive change has a declared covering `ApprovalPath`, an
+unsatisfied `ReviewRequirement` **refuses compilation** with a typed refusal. There
+is no minor-change exemption and no approval carry-forward. Where no covering path
+exists, the refusal is `NO_APPROVAL_PATH_FOR_CHANGE`; a reviewer is never defaulted.
+
+Honest limit of the mechanism: a review requirement is inherently a **two-pack**
+derivation, and compilation sees one pack. The compiler therefore blocks on every
+requirement it is given, and refuses a requirement whose `new_pack_digest` does not
+match the pack in hand — but it cannot know about a prior version it was never
+shown. Deriving the requirement is the caller's obligation, exactly as supplying the
+approval already is. The compiler attests what it was given; it does not reconstruct
+history.
+
+### P3A-2 — `REVIEWER_IDENTITY = OPAQUE_REFERENCE`
+
+`ReviewDisposition.reviewer_authority_reference` remains an **uninterpreted binding
+reference** in this slice. P3A must not import or resolve
+`packages/integration/authority-directory`. Any identity-resolution integration
+requires a separate ruling.
+
+This keeps the package's zero-Ugence-dependency posture intact and keeps the
+distinction visible: the compiler records *which authority reference was asserted*,
+never *that the reference resolves to a real, currently-authorized identity*.
+
+### The non-weakening invariant — preserved
+
+P3A never makes an approval valid that the existing gate would reject.
+`ApprovalService.check()` runs unchanged and first; the review gate is a second,
+additional condition. The composition is AND in both directions: a satisfied review
+cannot rescue a failed approval, and a valid approval cannot excuse an unsatisfied
+review.

@@ -88,6 +88,21 @@ from .approval import ApprovalService, build_approval_record, compute_pack_diges
 # -- diff ----------------------------------------------------------------------
 from .diff import ChangeType, ImpactSummary, ObjectChange, PolicyPackDiff, diff_policy_packs
 
+# -- governed diff-driven review (P3A) -----------------------------------------
+from .diff.change_impact import APPROVAL_SENSITIVE_OBJECT_TYPES
+from .review import (
+    REVIEW_ENFORCEMENT,
+    REVIEWER_IDENTITY,
+    ReviewCheck,
+    ReviewCode,
+    ReviewDisposition,
+    ReviewLedger,
+    ReviewRequirement,
+    ReviewStepRequirement,
+    check_review,
+    derive_review_requirement,
+)
+
 # -- verification --------------------------------------------------------------
 from .verification import (
     CompiledPackageVerifier,
@@ -213,6 +228,18 @@ __all__ = [
     "ImpactSummary",
     "ChangeType",
     "diff_policy_packs",
+    # governed diff-driven review (P3A)
+    "APPROVAL_SENSITIVE_OBJECT_TYPES",
+    "REVIEW_ENFORCEMENT",
+    "REVIEWER_IDENTITY",
+    "ReviewCode",
+    "ReviewStepRequirement",
+    "ReviewRequirement",
+    "ReviewDisposition",
+    "ReviewLedger",
+    "ReviewCheck",
+    "derive_review_requirement",
+    "check_review",
     # verification
     "VerificationReport",
     "CompiledPackageVerifier",

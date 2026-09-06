@@ -65,7 +65,8 @@ jobs:
                     "capability_requirement_extraction_implemented","typed_contract_references_implemented",
                     "dependency_semantics_implemented","authority_semantics_implemented",
                     "human_review_semantics_implemented","policy_provenance_implemented",
-                    "release_validation_implemented","deterministic_replay_verified"):
+                    "release_validation_implemented","deterministic_replay_verified",
+                    "diff_driven_review_implemented"):
               assert i[k] is True, k
           for k in ("awc_adapter_updated","agent_eligibility_implemented","agent_ranking_implemented",
                     "team_composition_implemented","runtime_execution_implemented",
@@ -198,6 +199,17 @@ jobs:
           pip install -e packages/tooling/policy-workflow-compiler
           pip install -e packages/capabilities/agent-workforce-composer
       - run: python -m pytest packages/capabilities/agent-workforce-composer/tests -q
+
+  review-suite:
+    name: P3A governed diff-driven review (routing, gate, boundary)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.11" }
+      - run: python -m pip install --upgrade pip && pip install pytest pydantic
+      - env: { PYTHONPATH: "${{ env.SRC }}" }
+        run: python -m pytest ${{ env.PKG }}/tests/test_p3a_review.py -q
 
   verifier-report-freshness:
     name: Committed verifier report is not stale

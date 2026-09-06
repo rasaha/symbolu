@@ -66,6 +66,8 @@ REQUIRED_STEPS = (
     "deterministic_digest",
     "procurement_equivalence",
     "deterministic_v2_fingerprint",
+    "cli_review_requirements",
+    "cli_check_review_refuses",
     "public_api_frozen",
     "offline_no_credentials",
     "installed_test_suite",

@@ -33,8 +33,9 @@ capabilities keep decision, approval, authorization, and execution authority.
 
 ## Ratified order
 
-1. **PWC-P3A** — diff-driven review requirements and approval binding.
-2. **`policy_pack.v2`** — source-declarable semantic fields.
+1. ~~**PWC-P3A** — diff-driven review requirements and approval binding.~~
+   **Delivered** — see "Already delivered" below and `DIFF_DRIVEN_REVIEW.md`.
+2. **`policy_pack.v2`** — source-declarable semantic fields (next).
 3. **PA/PWC-X1 carriage and validation** — activated by v2.
 4. **PWC-P3B** — declarative capability/contract binding **validation**.
 5. **PWC-P3C** — deterministic offline simulation.
@@ -74,16 +75,6 @@ assertion.
 The full field set, carriage rules, validation codes and composition-root
 requirements are in
 `Project_documentation/repository/docs/audits/policy_workflow_compiler_x1/DESIGN.md`.
-
-### PWC-P3A — Governed diff-driven review and approval binding
-
-The structural diff already reports change types and an impact summary including
-`approval_re_review_required` (see `STRUCTURAL_DIFF.md`), and the approval gate
-already rejects an approval whose digest does not match the pack (see
-`HUMAN_APPROVAL.md`). P3A builds the governed **workflow** around those existing
-signals: a structurally meaningful change routes to a reviewer, and approval re-binds
-to the new structural digest. P3A does not invent the signals; it governs them. The
-no-self-approval and digest-binding rules carry forward unchanged.
 
 ### `policy_pack.v2` — source-declarable semantic fields
 
@@ -139,6 +130,18 @@ The `workflow_ir.v2` semantic-enrichment contract once described here as future 
 is **implemented** in product 0.2.0 (see `WORKFLOW_IR_V2.md` and the P2 maturity
 flags in `version_info()`). It enriches the workflow description only; it does not
 bind a runtime or execute anything.
+
+### PWC-P3A governed diff-driven review — delivered
+
+Review requirements are derived deterministically from the structural diff and the
+pack's own declared `ApprovalPath`; a fail-closed gate verifies a ledger of reviewer
+dispositions against one, and an unsatisfied requirement refuses compilation
+(ruling P3A-1). The reviewer authority reference stays opaque (ruling P3A-2).
+
+Every artifact is standalone — nothing is stored in the pack, in an approval record,
+or in the release's logical payload — so `policy_pack.v1`, `workflow_ir.v1` and
+`workflow_ir.v2` bytes are unchanged and existing approvals stay valid. See
+`DIFF_DRIVEN_REVIEW.md` and the `diff_driven_review_implemented` gate.
 
 ### AWC P2.1 — delivered, in the AWC package
 

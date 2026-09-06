@@ -12,8 +12,10 @@ from typing import Dict, Tuple
 
 from ..models.common import ObjectType, PolicyObject
 
-# Object types whose change forces a new approval review.
-_APPROVAL_SENSITIVE = frozenset(
+# Object types whose change forces a new approval review. Public because the P3A
+# review router derives its triggering set from exactly this table — two lists would
+# be two answers to one question.
+APPROVAL_SENSITIVE_OBJECT_TYPES = frozenset(
     {
         ObjectType.DECISION_RULE,
         ObjectType.AUTHORITY_REQUIREMENT,
@@ -24,6 +26,9 @@ _APPROVAL_SENSITIVE = frozenset(
         ObjectType.APPROVAL_PATH,
     }
 )
+
+#: Backwards-compatible internal alias.
+_APPROVAL_SENSITIVE = APPROVAL_SENSITIVE_OBJECT_TYPES
 
 # Object types that materialize into workflow nodes.
 _NODE_PRODUCING = frozenset(

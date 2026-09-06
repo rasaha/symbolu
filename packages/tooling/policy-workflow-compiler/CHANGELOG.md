@@ -4,6 +4,38 @@ All notable changes to `ugence-policy-workflow-compiler` are documented here.
 This project adheres to semantic-ish versioning for its distribution wheel; the
 product version tracks capability maturity separately.
 
+## Unreleased — Phase 3A: Governed Diff-Driven Review
+
+Additive and contracts-only. No policy-pack, workflow-IR, compiler, assurance or
+release **semantics** change: `policy_pack.v1`, `workflow_ir.v1` and `workflow_ir.v2`
+canonical bytes and fingerprints are unchanged, and existing approvals stay valid.
+
+### Added
+- **`review/`** — standalone review artifacts (`ReviewRequirement`,
+  `ReviewStepRequirement`, `ReviewDisposition`, `ReviewLedger`, `ReviewCheck`),
+  deterministic routing (`derive_review_requirement`) from the structural diff and
+  the pack's own declared `ApprovalPath`, and a fail-closed gate (`check_review`)
+  with nine typed refusal codes.
+- Compile-time enforcement (ruling **P3A-1**, `REVIEW_ENFORCEMENT = BLOCKING`):
+  `compile_policy_pack(..., review_requirement=, review_ledger=)` refuses an
+  unsatisfied requirement and a requirement that describes a different pack.
+- `APPROVAL_SENSITIVE_OBJECT_TYPES` made public so routing and
+  `approval_re_review_required` read one table rather than two.
+- Public API 105 → 116 names; CLI `review-requirements` and `check-review`; new
+  honest maturity gate `diff_driven_review_implemented`; `DIFF_DRIVEN_REVIEW.md`.
+
+### Rulings implemented
+- **P3A-1** `REVIEW_ENFORCEMENT = BLOCKING` — no minor-change exemption, no approval
+  carry-forward, and no defaulted reviewer when no covering path is declared.
+- **P3A-2** `REVIEWER_IDENTITY = OPAQUE_REFERENCE` — the authority reference is
+  carried verbatim; this package neither imports nor resolves an authority directory.
+- The **non-weakening invariant**: the review gate is additional to the approval
+  gate, never a substitute. A satisfied review cannot rescue a failed approval.
+
+### Not implemented (maturity booleans report false)
+Runtime execution and deployment, action authorization, identity resolution,
+enterprise policy evaluation, pilot validation, production certification.
+
 ## Product 0.2.0 — Phase 2: Semantic Workflow Enrichment (contract `workflow_ir.v2`)
 
 Additive. Distribution and product versions are both **0.2.0**. The version a

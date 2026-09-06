@@ -128,6 +128,8 @@ class VersionInfo:
     policy_provenance_implemented: bool = False
     release_validation_implemented: bool = False
     deterministic_replay_verified: bool = False
+    # -- P3A governed diff-driven review --
+    diff_driven_review_implemented: bool = False
     # -- explicit NON-goals (remain false; this package makes no such claim) --
     awc_adapter_updated: bool = False
     agent_eligibility_implemented: bool = False
@@ -172,6 +174,7 @@ class VersionInfo:
             "policy_provenance_implemented": self.policy_provenance_implemented,
             "release_validation_implemented": self.release_validation_implemented,
             "deterministic_replay_verified": self.deterministic_replay_verified,
+            "diff_driven_review_implemented": self.diff_driven_review_implemented,
             "awc_adapter_updated": self.awc_adapter_updated,
             "agent_eligibility_implemented": self.agent_eligibility_implemented,
             "agent_ranking_implemented": self.agent_ranking_implemented,
@@ -228,6 +231,10 @@ def version_info() -> VersionInfo:
         policy_provenance_implemented=True,
         release_validation_implemented=True,
         deterministic_replay_verified=True,
+        # P3A: governed diff-driven review routing and a fail-closed review gate.
+        # Contracts and gate only — it routes and records a human review, and never
+        # performs, grants or waives one.
+        diff_driven_review_implemented=True,
         # explicit non-goals — never claimed by this package.
         awc_adapter_updated=False,
         agent_eligibility_implemented=False,
