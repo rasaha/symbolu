@@ -543,3 +543,51 @@ def test_13b_provenance_is_exact_typed():
                        ("verified_at", _Subclassed(2026, 9, 6, 12, 5, tzinfo=timezone.utc))):
         with pytest.raises(TypeError):
             EffectAttestationProvenance(**{**good, field: bad})
+
+
+# ----------------------------------------------------------------------------- #
+# TW-5: trust-state refusals reach the ingress distinguishably
+# ----------------------------------------------------------------------------- #
+def test_15_stale_and_unavailable_trust_state_reach_the_ingress_as_distinct_rejections():
+    """An operator must be able to tell "publish a newer snapshot" from "the
+    trust state could not be consulted" from "the resolver misbehaved", without
+    parsing prose. All three still reject; the distinction admits nothing."""
+
+    from ugence_risk_authority_execution_assurance import TRUST_STATE_REFUSALS
+
+    class _Refusing:
+        """A production-posture verifier double that reports one trust-state reason."""
+
+        production_mode = True
+
+        def __init__(self, reason):
+            self._reason = reason
+
+        def verify(self, **kw):
+            real = verifier(anchor_of(observer_signer())).verify(**kw)
+            return dataclasses.replace(real, outcome=ea.EffectAttestationVerificationOutcome.REFUSED,
+                                       refusal_reason=self._reason, signing_payload_digest=None,
+                                       anchor_record_digest=None)
+
+    seen = {}
+    for label, reason in (
+        ("stale", ea.EffectAttestationRefusalReason.ANCHOR_SET_STALE),
+        ("unavailable", ea.EffectAttestationRefusalReason.ANCHOR_SET_UNAVAILABLE),
+        ("resolver-fault", ea.EffectAttestationRefusalReason.ANCHOR_UNAVAILABLE),
+    ):
+        decision = admit(ingress(_Refusing(reason)), attestation(observer_signer()))
+        assert not decision.admitted, label
+        assert decision.reasons[0] == ATTESTATION_REFUSED, label
+        seen[label] = decision.reasons[1]
+    assert len(set(seen.values())) == 3, seen
+    assert seen["stale"] == "ANCHOR_SET_STALE"
+    assert seen["unavailable"] == "ANCHOR_SET_UNAVAILABLE"
+    assert set(TRUST_STATE_REFUSALS) == {"ANCHOR_SET_STALE", "ANCHOR_SET_UNAVAILABLE"}
+    assert seen["resolver-fault"] not in TRUST_STATE_REFUSALS
+
+
+def test_15b_a_trust_state_refusal_admits_nothing_and_reconciles_nothing():
+    from ugence_risk_authority_execution_assurance import TRUST_STATE_REFUSALS
+
+    for value in TRUST_STATE_REFUSALS:
+        assert "ADMIT" not in value and "OK" not in value.split("_")

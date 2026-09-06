@@ -25,7 +25,7 @@ def test_package_name_and_version():
     assert data["project"]["name"] == "ugence-risk-authority-execution-assurance"
     from ugence_risk_authority_execution_assurance import __version__
 
-    assert __version__ == "0.2.0"
+    assert __version__ == "0.3.0"
 
 
 def test_declares_the_ratified_dependency_set():
@@ -35,7 +35,7 @@ def test_declares_the_ratified_dependency_set():
         "ugence-risk-authority-status-runtime>=0.1.0",
         "ugence-decision-authority>=1.0.0",
         "ugence-governance-contracts>=0.8.0",
-        "ugence-risk-authority-effect-attestation>=0.1.0",
+        "ugence-risk-authority-effect-attestation>=0.2.0",
     ]
 
 

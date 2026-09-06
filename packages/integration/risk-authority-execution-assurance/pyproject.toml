@@ -56,7 +56,7 @@ dependencies = [
     # Signed effect-attestation contracts and verifier (RI-1 to RI-5). RA-8 does
     # not import the Trusted Evidence Authority directly; anchors, resolver port
     # and key types reach it only through this package's curated surface.
-    "ugence-risk-authority-effect-attestation>=0.1.0",
+    "ugence-risk-authority-effect-attestation>=0.2.0",
 ]
 
 [project.optional-dependencies]

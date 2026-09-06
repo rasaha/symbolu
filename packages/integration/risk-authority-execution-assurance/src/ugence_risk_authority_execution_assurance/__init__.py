@@ -96,6 +96,7 @@ from .ingress import (
     ATTESTATION_REFUSED,
     ATTESTATION_VERIFIER_FAULT,
     NO_ATTESTATION_VERIFIER,
+    TRUST_STATE_REFUSALS,
 )
 from .reconciler import (
     DecisionAuthorityReconciler,
@@ -143,6 +144,7 @@ __all__ = [
     "ATTESTATION_REFUSED",
     "ATTESTATION_VERIFIER_FAULT",
     "NO_ATTESTATION_VERIFIER",
+    "TRUST_STATE_REFUSALS",
     # provenance gate (RI-3)
     "production_matched_gate",
     "independent_observer_supports",

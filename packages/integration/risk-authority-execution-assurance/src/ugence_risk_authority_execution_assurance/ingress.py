@@ -47,6 +47,7 @@ from ugence_governance_contracts.contracts.execution import (
 )
 from ugence_risk_authority_effect_attestation import (
     EffectAttestation,
+    EffectAttestationRefusalReason,
     EffectAttestationVerificationOutcome,
     EffectAttestationVerificationResult,
     EffectAttestationVerifierPort,
@@ -77,6 +78,7 @@ __all__ = [
     "ATTESTATION_REFUSED",
     "ATTESTATION_VERIFIER_FAULT",
     "NO_ATTESTATION_VERIFIER",
+    "TRUST_STATE_REFUSALS",
 ]
 
 
@@ -98,6 +100,18 @@ INVALID_VERIFICATION_INSTANT = "invalid verification instant (RI-5)"
 ATTESTATION_REFUSED = "attestation refused"
 ATTESTATION_VERIFIER_FAULT = "attestation verifier fault"
 NO_ATTESTATION_VERIFIER = "no attestation verifier configured"
+
+#: TW-5 — the two attestation refusals that describe **trust state** rather than
+#: the attestation itself, surfaced by value so an operator can act on them
+#: differently. ``ANCHOR_SET_STALE`` means publish a newer trust-anchor snapshot;
+#: ``ANCHOR_SET_UNAVAILABLE`` means the trust state could not be consulted at all
+#: (its snapshot never loaded, or its window does not cover the instant). Both
+#: reject exactly as every other refusal does: nothing here admits anything, and
+#: the distinction is for the operator, never for the admission decision.
+TRUST_STATE_REFUSALS: Tuple[str, ...] = (
+    EffectAttestationRefusalReason.ANCHOR_SET_STALE.value,
+    EffectAttestationRefusalReason.ANCHOR_SET_UNAVAILABLE.value,
+)
 
 
 class IngressDisposition(str, Enum):
