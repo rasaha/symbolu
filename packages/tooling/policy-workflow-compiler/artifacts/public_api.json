@@ -1,5 +1,5 @@
 {
-  "count": 121,
+  "count": 123,
   "fingerprints": {
     "APPROVAL_SENSITIVE_OBJECT_TYPES": {
       "kind": "object",
@@ -2528,6 +2528,8 @@
         "action_authorization_implemented",
         "agent_eligibility_implemented",
         "agent_ranking_implemented",
+        "authoritative_source_carriage_implemented",
+        "authoritative_source_verification_implemented",
         "authority_semantics_implemented",
         "awc_adapter_updated",
         "build_commit",
@@ -2788,6 +2790,21 @@
         "name"
       ]
     },
+    "check_authoritative_source": {
+      "kind": "function",
+      "parameters": [
+        "pack",
+        "required"
+      ]
+    },
+    "check_release_source_agreement": {
+      "kind": "function",
+      "parameters": [
+        "package_source",
+        "manifest_coordinate",
+        "pack_id"
+      ]
+    },
     "check_review": {
       "kind": "function",
       "parameters": [
@@ -3003,6 +3020,8 @@
     "WorkflowNode",
     "WorkflowNodeSemantics",
     "build_approval_record",
+    "check_authoritative_source",
+    "check_release_source_agreement",
     "check_review",
     "classify_role_relevance",
     "compile_policy_pack",

@@ -18,6 +18,7 @@ from ..approval.records import compute_pack_digest
 from ..approval.service import ApprovalService
 from ..models.approvals import HumanApprovalRecord
 from ..review.gate import check_review
+from ..validation.authoritative_source import coordinate_string
 from ..review.models import ReviewCode, ReviewLedger, ReviewRequirement
 from ..models.assurance import AssuranceManifest
 from ..models.audit import AuditSchema
@@ -201,6 +202,7 @@ class GovernedWorkflowCompiler:
             schema_version=pack.schema_version,
             compiler_distribution_version=_dist_version(),
             structural_digest=logical_digest,
+            authoritative_source_coordinate=coordinate_string(pack.authoritative_source),
         )
         package = CompiledReleasePackage(
             manifest=manifest,

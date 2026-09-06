@@ -4,6 +4,26 @@ All notable changes to `ugence-policy-workflow-compiler` are documented here.
 This project adheres to semantic-ish versioning for its distribution wheel; the
 product version tracks capability maturity separately.
 
+## Unreleased — PA/PWC-X1: authoritative source carriage
+
+A `policy_pack.v2` pack may carry the exact Policy Authority issuance it was
+compiled from. `policy_pack.v1`, `workflow_ir.v1` and `workflow_ir.v2` are unchanged.
+
+### Added
+- Structural validation of `AuthoritativeSourceRef`: `MISSING_AUTHORITATIVE_SOURCE`
+  (only when a caller requires the linkage), `MALFORMED_AUTHORITATIVE_COORDINATE`,
+  `INCOMPLETE_ISSUANCE_ATTESTATION` (all-or-none), `AUTHORITATIVE_SOURCE_MISMATCH`.
+- `ReleaseManifest.authoritative_source_coordinate` — denormalized for offline
+  inspection, outside the logical digest; the binding stays the pack's own reference.
+- Maturity gates `authoritative_source_carriage_implemented=true` and
+  `authoritative_source_verification_implemented=false`; public API 121 → 123;
+  `AUTHORITATIVE_SOURCE.md`.
+
+### Never claimed
+The compiler attests carriage, not authenticity. It imports nothing from
+`packages/policy-authority` — enforced by a boundary test — and no diagnostic may
+imply a signature, key-trust or revocation check it did not perform.
+
 ## Unreleased — `workflow_ir.v2` consumption of source-declared semantics
 
 Completes decision D2. `workflow_ir.v2` enrichment now reads `policy_pack.v2`

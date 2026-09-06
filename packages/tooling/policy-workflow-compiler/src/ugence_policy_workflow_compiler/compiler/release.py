@@ -59,6 +59,11 @@ class ReleaseManifest(CompilerModel):
     schema_version: str
     compiler_distribution_version: str
     structural_digest: str
+    #: PA/PWC-X1: the pack's authoritative-source coordinate, denormalized for
+    #: offline inspection. Manifest values are outside the logical digest, so this
+    #: is a convenience rendering and never the binding — the binding is the
+    #: pack's own `authoritative_source`, which a v2 pack's digest commits to.
+    authoritative_source_coordinate: str = ""
     file_names: Tuple[str, ...] = PACKAGE_FILES
 
 

@@ -39,6 +39,7 @@ as importantly — what is not.
 | `diff_driven_review_implemented` | `true` | Review requirements are derived deterministically from a structural diff and the pack's own declared approval path, and a fail-closed review gate verifies a ledger against one. Routing and recording only — the compiler never performs, grants or waives an approval. See `DIFF_DRIVEN_REVIEW.md`. |
 | `policy_pack_v2_supported` | `true` | The additive `policy_pack.v2` schema is accepted: source-declared data classification, permission intent, required tools and typed contract versions are carried in a sidecar collection, together with the authoritative-source coordinate. `policy_pack.v1` packs and digests are byte-identical under it. See `POLICY_PACK_SCHEMA.md`. |
 | `source_declared_semantics_implemented` | `true` | `workflow_ir.v2` enrichment reads declared data classification, permission intent, required tools and contract versions into node semantics, each with `EXPLICIT` per-value provenance. An undeclared value stays unresolved and is never defaulted. |
+| `authoritative_source_carriage_implemented` | `true` | A `policy_pack.v2` pack may carry the exact Policy Authority issuance it was compiled from; the reference is digest-bound, structurally validated and denormalized into the release manifest. See `AUTHORITATIVE_SOURCE.md`. |
 
 ## Explicit non-goals
 
@@ -55,6 +56,7 @@ each belongs to a different component.
 | `runtime_execution_implemented` | `false` | The compiler never executes a workflow. |
 | `action_authorization_implemented` | `false` | Authorization is held by canonical capabilities, never the compiler. |
 | `enterprise_policy_evaluation_implemented` | `false` | Enterprise deployment-policy overlay evaluation stays outside the portable compiled workflow. |
+| `authoritative_source_verification_implemented` | `false` | The compiler attests carriage, not authenticity: it never verifies a Policy Authority signature, establishes key trust, or consults revocation state. |
 
 ### `awc_adapter_updated` is deprecated
 

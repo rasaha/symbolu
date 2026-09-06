@@ -96,7 +96,8 @@ def _source_ref():
         scope="global",
         record_id="rec-1",
         policy_body_digest="sha256:" + "b" * 64,
-        issuing_authority_id="authority.policy",
+        # No issuance attestation at all: this test is about the schema gate, and a
+        # partial attestation is refused by X1's all-or-none rule.
         resolved_as_of="2026-09-06T00:00:00Z",
     )
 

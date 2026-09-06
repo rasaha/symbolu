@@ -136,6 +136,12 @@ class VersionInfo:
     # -- policy_pack.v2 source-declarable semantics --
     policy_pack_v2_supported: bool = False
     source_declared_semantics_implemented: bool = False
+    #: X1: the authoritative-source coordinate is carried, digest-bound for a v2
+    #: pack, and structurally validated. Authenticity is never asserted here.
+    authoritative_source_carriage_implemented: bool = False
+    #: Explicit non-goal: this package never verifies a Policy Authority signature,
+    #: key trust or revocation state. Those belong to Policy Authority.
+    authoritative_source_verification_implemented: bool = False
     # -- explicit NON-goals (remain false; this package makes no such claim) --
     awc_adapter_updated: bool = False
     agent_eligibility_implemented: bool = False
@@ -184,6 +190,12 @@ class VersionInfo:
             "policy_pack_v2_supported": self.policy_pack_v2_supported,
             "source_declared_semantics_implemented": (
                 self.source_declared_semantics_implemented
+            ),
+            "authoritative_source_carriage_implemented": (
+                self.authoritative_source_carriage_implemented
+            ),
+            "authoritative_source_verification_implemented": (
+                self.authoritative_source_verification_implemented
             ),
             "awc_adapter_updated": self.awc_adapter_updated,
             "agent_eligibility_implemented": self.agent_eligibility_implemented,
@@ -251,6 +263,9 @@ def version_info() -> VersionInfo:
         # records EXPLICIT per-value provenance. Declared, never inferred: an
         # undeclared value stays unresolved.
         source_declared_semantics_implemented=True,
+        authoritative_source_carriage_implemented=True,
+        # Never claimed: the compiler attests carriage, not authenticity.
+        authoritative_source_verification_implemented=False,
         # explicit non-goals — never claimed by this package.
         awc_adapter_updated=False,
         agent_eligibility_implemented=False,

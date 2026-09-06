@@ -92,6 +92,14 @@ from .approval import ApprovalService, build_approval_record, compute_pack_diges
 # -- diff ----------------------------------------------------------------------
 from .diff import ChangeType, ImpactSummary, ObjectChange, PolicyPackDiff, diff_policy_packs
 
+# -- authoritative source linkage (PA/PWC-X1) ----------------------------------
+# Carriage checks only: presence, shape, completeness and internal agreement. This
+# package never verifies a signature, key trust or revocation state.
+from .validation.authoritative_source import (
+    check_authoritative_source,
+    check_release_source_agreement,
+)
+
 # -- governed diff-driven review (P3A) -----------------------------------------
 from .diff.change_impact import APPROVAL_SENSITIVE_OBJECT_TYPES
 from .review import (
@@ -238,7 +246,10 @@ __all__ = [
     "SemanticDeclaration",
     "DeclaredContractRef",
     "DeclaredValueProvenance",
+    # authoritative source linkage (PA/PWC-X1)
     "AuthoritativeSourceRef",
+    "check_authoritative_source",
+    "check_release_source_agreement",
     # governed diff-driven review (P3A)
     "APPROVAL_SENSITIVE_OBJECT_TYPES",
     "REVIEW_ENFORCEMENT",

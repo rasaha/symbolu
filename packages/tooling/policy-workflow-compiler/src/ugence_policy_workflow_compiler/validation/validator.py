@@ -14,6 +14,7 @@ from ..compiler.capability_registry import CapabilityRegistry, DEFAULT_REGISTRY
 from ..models.policy_pack import PolicyPack
 from . import provenance as _prov
 from . import references as _ref
+from . import authoritative_source as _auth
 from .errors import Severity, ValidationDiagnostic, ValidationReport
 
 
@@ -37,6 +38,8 @@ class PolicyPackValidator:
         diagnostics.extend(_prov.check_provenance(pack))
         diagnostics.extend(_prov.check_secrets(pack))
         diagnostics.extend(_prov.check_determinism(pack))
+        # X1: carriage checks only — never a signature, key-trust or revocation claim.
+        diagnostics.extend(_auth.check_authoritative_source(pack))
         diagnostics = _dedupe(diagnostics)
         return ValidationReport(
             policy_pack_id=pack.pack_id, diagnostics=tuple(diagnostics)
