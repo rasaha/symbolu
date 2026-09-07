@@ -456,18 +456,14 @@ def test_the_authority_reads_are_served_by_the_composed_worker_and_no_write_is(w
     assert read("/authority/grants/no-such-grant/events", expect=404)["result"] == "NOT_FOUND"
     assert read("/authority/grants", params={"principal_id": "not typed"}, expect=422)["result"] == "REFUSED_UNTYPED"
 
-    # -- no unserved write path answers on the composed app; a served write without a
-    # proof is refused, never recorded ----------------------------------------------------
+    # -- no write path answers on the composed app (AP-3 controlling, section 18) --------
     writes = [op for op in PLANE_OPERATIONS if op.kind == "write"]
-    assert len(writes) == 4
+    assert len(writes) == 4 and SERVED_WRITES == ()
     for op in writes:
         path = op.path.format(grant_id=bob_grant.grant_id, constitution_id="c1")
-        r = client.request(op.method, path, json={})
+        r = client.request(op.method, path, json={}, headers={PROOF_HEADER: token})
         answers.append(r.text)
-        if op.operation_id in SERVED_WRITES:
-            assert r.status_code == 409 and r.json()["result"] == "REFUSED_UNAUTHENTICATED", r.text
-        else:
-            assert r.status_code in (404, 405), (op.method, path, r.status_code)
+        assert r.status_code in (404, 405), (op.method, path, r.status_code)
 
     # -- row 8: no DSN and no token anywhere -------------------------------------------
     everything = "\n".join(answers)
@@ -476,20 +472,28 @@ def test_the_authority_reads_are_served_by_the_composed_worker_and_no_write_is(w
 
 
 # --------------------------------------------------------------------------- #
-# the authority plane's two gated writes (AW-1 to AW-5) over the real composition
+# the authority plane's two directory writes (AW-2 to AW-5), as implementation and
+# conformance evidence over the real directory and the real JWT adapter; the composed
+# worker itself serves neither (AP-3 controlling, section 18)
 # --------------------------------------------------------------------------- #
 @requires_postgres
-def test_an_administrator_loads_a_grant_through_the_gated_write_and_a_signed_decision_is_eligible_by_it(
+def test_the_composed_worker_serves_no_write_while_the_implementation_conforms_over_the_real_adapter(
         worker, issuer):
-    """ADR_UGENCE_AUTHORITY_PLANE_SCOPING.md section 16 over the composed worker: a load
-    with a signed admin proof is recorded under the admin's issuer-qualified subject;
-    the grant it loaded is the grant a signed decision is then eligible by; an identical
-    replay is ALREADY_LOADED; no proof, a forged proof and a non-human actor are refused
-    and record nothing; a revoke appends its event under the admin's subject and a
-    second revoke is ALREADY_REVOKED; the unserved writes still answer nothing; and no
-    token or DSN appears in any answer (row 8)."""
+    """ADR_UGENCE_AUTHORITY_PLANE_SCOPING.md sections 16 and 18. On the composed worker a
+    write path answers 405 or 404 even with a valid admin proof, and nothing is recorded.
+    On a conformance harness that mounts the implementation over the worker's own
+    directory, clock and JWT adapter (in-process issuer: implementation and conformance
+    evidence only, never enterprise identity validation): a load with a signed admin
+    proof is recorded under the admin's issuer-qualified subject; the grant it loaded is
+    the grant a signed decision on the worker is then eligible by; an identical replay is
+    ALREADY_LOADED; no proof and a forged proof are refused and record nothing; a revoke
+    appends its event under the admin's subject and a second revoke is ALREADY_REVOKED;
+    and no token or DSN appears in any answer (row 8)."""
 
+    from fastapi import FastAPI
     from fastapi.testclient import TestClient
+    from governed_runtime_worker.authority_plane import IMPLEMENTED_WRITES
+    from governed_runtime_worker.authority_writes import build_authority_writes
 
     client = TestClient(worker.app)
     answers: list[str] = []
@@ -502,8 +506,25 @@ def test_an_administrator_loads_a_grant_through_the_gated_write_and_a_signed_dec
         "authority_reference": f"directory://roles/{ROLE}",
     }
 
+    # -- the composed worker: unserved, proof or not, nothing recorded ---------------------
+    assert SERVED_WRITES == ()
+    r = client.post("/authority/grants", json=load, headers={PROOF_HEADER: admin_token})
+    answers.append(r.text)
+    assert r.status_code == 405, r.text
+    r = client.post("/authority/grants/grant_x/revoke", json={"reason": "x"}, headers={PROOF_HEADER: admin_token})
+    answers.append(r.text)
+    assert r.status_code == 404, r.text
+    assert worker.directory.grants_for(tenant_id=TENANT, principal_id=subject_ref("alice"), as_of=NOW) == ()
+
+    # -- the conformance harness: the implementation over the worker's real seams ---------
+    harness = FastAPI()
+    harness.include_router(build_authority_writes(
+        worker.directory, tenant_id=TENANT, clock=worker.clock.datetime,
+        identity_port=worker.identity_port, serve=IMPLEMENTED_WRITES))
+    hclient = TestClient(harness)
+
     def post(path: str, body: dict, expect: int, **kwargs):
-        r = client.post(path, json=body, **kwargs)
+        r = hclient.post(path, json=body, **kwargs)
         answers.append(r.text)
         assert r.status_code == expect, r.text
         return r.json()
@@ -552,12 +573,13 @@ def test_an_administrator_loads_a_grant_through_the_gated_write_and_a_signed_dec
     assert worker.directory.grants_for(tenant_id=TENANT, principal_id=subject_ref("alice"),
                                        as_of=worker.clock.now) == ()
 
-    # -- the unserved writes answer nothing, proof or not ---------------------------------
+    # -- activate and issue answer nothing anywhere, proof or not ---------------------------
     for op in PLANE_OPERATIONS:
-        if op.kind == "write" and op.operation_id not in SERVED_WRITES:
-            r = client.post(op.path.format(constitution_id="c1"), json={}, headers={PROOF_HEADER: admin_token})
-            answers.append(r.text)
-            assert r.status_code in (404, 405), op.operation_id
+        if op.kind == "write" and op.operation_id not in IMPLEMENTED_WRITES:
+            for c in (client, hclient):
+                r = c.post(op.path.format(constitution_id="c1"), json={}, headers={PROOF_HEADER: admin_token})
+                answers.append(r.text)
+                assert r.status_code in (404, 405), op.operation_id
 
     # -- row 8 ----------------------------------------------------------------------------
     everything = "\n".join(answers)

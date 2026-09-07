@@ -1,7 +1,7 @@
 name: authority-plane-frontend-ci
 
 # The authority plane's front end (ADR_UGENCE_AUTHORITY_PLANE_SCOPING.md §11 step 3):
-# the four AP-5 reads, and since ADR §16 (AW-1) the two grant writes behind the identity gate. The boundary
+# a read-only shell over the governed runtime worker's four AP-5 reads; no write until enterprise issuer validation (AP-3, ADR §18). The boundary
 # verifier binds this app to the worker's committed contract by hash, so a change to
 # that contract re-runs this job.
 

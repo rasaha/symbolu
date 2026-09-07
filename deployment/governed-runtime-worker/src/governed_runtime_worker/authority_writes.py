@@ -1,14 +1,20 @@
-"""The authority plane's two served writes (ADR_UGENCE_AUTHORITY_PLANE_SCOPING.md §16,
-rulings AW-1 to AW-5, under AP-3's invariant).
+"""The authority plane's two directory writes (ADR_UGENCE_AUTHORITY_PLANE_SCOPING.md §16,
+rulings AW-2 to AW-5, under AP-3's invariant; §18, AW-1 reversed).
 
     TWO WRITES OVER THE DIRECTORY THIS WORKER ALREADY OWNS, EACH BEHIND THE IDENTITY GATE.
     NOTHING HERE IS RECORDED WITHOUT AN IDP_AUTHENTICATED HUMAN SUBJECT OF THIS TENANT.
+    NOTHING HERE IS SERVED UNTIL THE CONTRACT NAMES IT (AP-3 CONTROLLING).
 
-The writes are the two AW-2 operations the contract in ``authority_plane.py`` marks
-served: load one time-bounded role grant, and revoke one grant. Each acts on the
-``SqliteAuthorityDirectory`` the composition opened, for this worker's own tenant, at
-the injected clock. The other two writes of the plane, activate and issue, act on
-packages this worker does not compose and stay unserved.
+The writes are the two AW-2 operations: load one time-bounded role grant, and revoke
+one grant. Each acts on the ``SqliteAuthorityDirectory`` the composition opened, for
+this worker's own tenant, at the injected clock. The router built here registers only
+the writes ``authority_plane.SERVED_WRITES`` names, which under AP-3 is none until the
+owner records the adapter's validation against a real enterprise issuer; the composed
+worker therefore answers a write path with the framework's 405 (a path a read shares)
+or 404. Tests exercise the implementation by passing ``serve=IMPLEMENTED_WRITES``
+explicitly: that is implementation and conformance evidence against the in-process
+issuer, never enterprise identity validation. The other two writes of the plane,
+activate and issue, act on packages this worker does not compose.
 
 **The gate (AW-5), stricter than the decision route.** The proof arrives on the same
 header the decision route reads. A worker composed without an identity port refuses
@@ -59,7 +65,7 @@ from ugence_governed_review_service.identity import (
     authentication_reference,
 )
 
-from .authority_plane import PLANE_OPERATIONS, SERVED_WRITES, PlaneOperation
+from .authority_plane import IMPLEMENTED_WRITES, PLANE_OPERATIONS, SERVED_WRITES, PlaneOperation
 from .version import MATURITY
 
 __all__ = [
@@ -70,10 +76,12 @@ __all__ = [
     "build_authority_writes",
 ]
 
-#: The served writes, exactly as the contract names them; the router below is built
-#: from this tuple so it cannot drift from the document a reader sees.
+#: The two writes this module implements, exactly as the contract names them; the
+#: router below is built from this tuple so it cannot drift from the document a reader
+#: sees. Which of them a router actually registers is ``serve``, defaulting to the
+#: contract's ``SERVED_WRITES``.
 WRITE_OPERATIONS: tuple[PlaneOperation, ...] = tuple(
-    op for op in PLANE_OPERATIONS if op.kind == "write" and op.operation_id in SERVED_WRITES)
+    op for op in PLANE_OPERATIONS if op.kind == "write" and op.operation_id in IMPLEMENTED_WRITES)
 
 RULING_GATE = "AW-5"
 RULING_INTAKE = "AW-4"
@@ -177,12 +185,18 @@ def build_authority_writes(
     tenant_id: str,
     clock: Callable[[], datetime],
     identity_port: Optional[Any],
+    serve: tuple[str, ...] = SERVED_WRITES,
 ) -> Any:
-    """A FastAPI router serving the two AW-2 writes over one directory, for one tenant,
-    at one clock, behind one identity port. ``identity_port`` may be ``None``: every
-    write is then refused (AW-5), never recorded as presented."""
+    """A FastAPI router over one directory, for one tenant, at one clock, behind one
+    identity port, registering exactly the writes ``serve`` names. The default is the
+    contract's ``SERVED_WRITES``, empty under AP-3 until enterprise issuer validation is
+    recorded, so the composed worker registers nothing. ``identity_port`` may be
+    ``None``: every write is then refused (AW-5), never recorded as presented."""
     if not _is_typed(tenant_id):
         raise ValueError("tenant_id must be a typed token")
+    unknown = sorted(set(serve) - set(IMPLEMENTED_WRITES))
+    if unknown:
+        raise ValueError(f"not implemented here: {unknown}")
     router = APIRouter(tags=["authority"])
     by_id = {op.operation_id: op for op in WRITE_OPERATIONS}
     grant_op, revoke_op = by_id["authority_grant_role"], by_id["authority_revoke_grant"]
@@ -253,7 +267,6 @@ def build_authority_writes(
             raise _Refused(422, "REFUSED_UNTYPED", f"the {what} body must be a JSON object", RULING_INTAKE)
         return _object(body, f"the {what} body", allowed)
 
-    @router.post(grant_op.path, operation_id=grant_op.operation_id, summary=grant_op.summary)
     async def grant_role(request: Request) -> Any:
         try:
             as_of = clock()
@@ -286,7 +299,6 @@ def build_authority_writes(
             return refusal(grant_op, exc)
         return recorded(grant_op, identity, as_of, stored, "GRANTED")
 
-    @router.post(revoke_op.path, operation_id=revoke_op.operation_id, summary=revoke_op.summary)
     async def revoke_grant(grant_id: str, request: Request) -> Any:
         try:
             as_of = clock()
@@ -314,4 +326,12 @@ def build_authority_writes(
             return refusal(revoke_op, exc)
         return recorded(revoke_op, identity, as_of, revoked, "REVOKED")
 
+    # Registration is the one place the contract's served set is consulted: an
+    # implemented write that the contract does not name is not reachable.
+    if grant_op.operation_id in serve:
+        router.add_api_route(grant_op.path, grant_role, methods=[grant_op.method],
+                             operation_id=grant_op.operation_id, summary=grant_op.summary)
+    if revoke_op.operation_id in serve:
+        router.add_api_route(revoke_op.path, revoke_grant, methods=[revoke_op.method],
+                             operation_id=revoke_op.operation_id, summary=revoke_op.summary)
     return router

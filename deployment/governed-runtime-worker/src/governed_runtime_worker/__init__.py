@@ -12,9 +12,12 @@ definition digest, with nothing supplied by the caller but a correlation id. Sin
 audit-ledger rows by correlation id, with the chain verification as a typed field.
 Since 0.4.0 it also mounts the authority plane's four reads under ``/authority/``
 (ADR_UGENCE_AUTHORITY_PLANE_SCOPING.md AP-5 READS_FIRST), over the directory it already
-opens. Since 0.5.0 it mounts the plane's two directory writes, load and revoke a role
-grant (section 16, AW-1, AW-2), each behind the identity port the decision route uses
-and refused outright without one (AW-5); activate and issue stay unserved.
+opens. 0.5.0 implemented the plane's two directory writes, load and revoke a role grant
+(section 16, AW-2 to AW-5), each behind the identity port the decision route uses and
+refused outright without one; since 0.5.1 they are implemented but not served, the
+owner having reversed AW-1 (section 18): under AP-3 no write is served until the
+identity adapter is validated end to end against a real enterprise issuer. Activate and
+issue are never served here.
 """
 
 from __future__ import annotations

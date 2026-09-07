@@ -1,13 +1,15 @@
 {
   "schema": "governed-runtime-worker.authority-plane-contract.v1",
-  "ruling": "ADR_UGENCE_AUTHORITY_PLANE_SCOPING.md AP-1 AUTHORITY_PLANE_ONLY, AP-2 ADMIN_ROUTES_ON_THE_WORKER, AP-3 IDP_VALIDATED_FIRST, AP-4 GRANT_REVOKE_ACTIVATE_ISSUE_ONLY, AP-5 READS_FIRST; section 16 AW-1 GATED_WRITES_BEFORE_ISSUER_VALIDATION, AW-2 DIRECTORY_WRITES_ONLY, AW-5 STRICTER_THAN_DECISIONS",
+  "ruling": "ADR_UGENCE_AUTHORITY_PLANE_SCOPING.md AP-1 AUTHORITY_PLANE_ONLY, AP-2 ADMIN_ROUTES_ON_THE_WORKER, AP-3 IDP_VALIDATED_FIRST, AP-4 GRANT_REVOKE_ACTIVATE_ISSUE_ONLY, AP-5 READS_FIRST; section 16 AW-2 DIRECTORY_WRITES_ONLY, AW-5 STRICTER_THAN_DECISIONS; section 18 AW-1 REVERSED, AP-3 controlling: no write served before enterprise issuer validation",
   "served": {
     "reads": true,
-    "writes": [
-      "authority_grant_role",
-      "authority_revoke_grant"
-    ]
+    "writes": []
   },
+  "implemented_unserved_writes": [
+    "authority_grant_role",
+    "authority_revoke_grant"
+  ],
+  "implemented_unserved_note": "implemented in authority_writes.py behind the identity gate and proven against the in-process issuer (implementation and conformance evidence only); not served until the adapter is validated end to end against a real enterprise issuer (AP-3 controlling; AW-1 reversed, section 18)",
   "write_proof_header": "X-Ugence-Approver-Proof",
   "home": "deployment/governed-runtime-worker (AP-2): routes on the review service this worker composes, which owns the stores",
   "permitted_verbs": [
@@ -80,9 +82,9 @@
       "kind": "write",
       "names_verb": "grant",
       "acts_on": "SqliteAuthorityDirectory.put_grant",
-      "ruling": "AP-3, AW-1",
+      "ruling": "AP-3",
       "gate": "IDP_AUTHENTICATED subject required; a write reached without one is refused, never recorded as presented (AP-3); a served write also requires a human subject of this tenant and refuses everything else with a typed reason (AW-5)",
-      "served": true
+      "served": false
     },
     {
       "operation_id": "authority_revoke_grant",
@@ -92,9 +94,9 @@
       "kind": "write",
       "names_verb": "revoke",
       "acts_on": "SqliteAuthorityDirectory.revoke_grant",
-      "ruling": "AP-3, AW-1",
+      "ruling": "AP-3",
       "gate": "IDP_AUTHENTICATED subject required; a write reached without one is refused, never recorded as presented (AP-3); a served write also requires a human subject of this tenant and refuses everything else with a typed reason (AW-5)",
-      "served": true
+      "served": false
     },
     {
       "operation_id": "authority_activate_constitution",

@@ -284,10 +284,11 @@ def compose(config: WorkerConfig, *, clock: WorkerClock, workload: Workload,
     app = build_app(service)
     app.add_api_route("/healthz", _healthz, methods=["GET"], include_in_schema=False)
     # -- the authority plane's reads (AP-5 READS_FIRST): four GETs over the directory this
-    # process already opened, for this tenant, at this clock; and since section 16
-    # (AW-1, AW-2) its two directory writes, each behind the same identity port the
-    # decision route uses and refused outright without one (AW-5). Activate and issue
-    # are not mounted: this worker composes neither store.
+    # process already opened, for this tenant, at this clock; and the writes router,
+    # which registers exactly what the contract's SERVED_WRITES names. Under AP-3
+    # (controlling; AW-1 reversed, ADR section 18) that is nothing until the identity
+    # adapter is validated against a real enterprise issuer, so no write path answers
+    # here. Activate and issue are never mounted: this worker composes neither store.
     from .authority_reads import build_authority_reads
     from .authority_writes import build_authority_writes
 

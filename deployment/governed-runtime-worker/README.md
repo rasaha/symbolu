@@ -38,7 +38,7 @@ In one process, in this order (`composition.py`):
 One injected clock (`WorkerClock`: `epoch()` for the engine, `datetime()` for every store
 and the service) is shared by everything. `Worker.close()` unwinds it in reverse.
 
-## The authority plane: its contract, the four reads and the two gated writes it serves
+## The authority plane: its contract, the four reads it serves, and the two writes it holds unserved
 
 Steps 1 and 2 of `docs/architecture/ADR_UGENCE_AUTHORITY_PLANE_SCOPING.md` §11, under
 rulings AP-1 to AP-5. `src/governed_runtime_worker/authority_plane.py` enumerates the
@@ -63,26 +63,34 @@ grant is a typed not-found.
 proves all of that over the composed worker on a real PostgreSQL, in the same CI job as
 the decision relay, and that no AP-3 write path answers (ADR §15).
 
-**Since 0.5.0 the two directory writes are served** (`authority_writes.py`, ADR §16,
-rulings AW-1 to AW-5): `POST /authority/grants` loads one time-bounded role grant from
-a typed body (the worker derives the grant id, so an identical replay answers
-`ALREADY_LOADED` with the standing grant), and `POST /authority/grants/{grant_id}/revoke`
-appends a `REVOKED` event with a reason. Each reads the operator's proof from
-`X-Ugence-Approver-Proof`, the header the decision route reads, and records the
-issuer-qualified subject as `loaded_by` or the revocation's actor. The gate is stricter
-than the decision route's: no identity port composed, no proof, a proof that
-authenticates nobody, a non-human actor, an expired proof, a port that cannot answer, or
-a missing, ambiguous or foreign tenant claim is a typed refusal, and nothing is recorded
-as presented. Every write answer carries `identity_proof: IDP_AUTHENTICATED`, the
-subject, the authentication reference and the adapter's `issuer_validation` label,
-which stays `IN_PROCESS_ISSUER_ONLY` until the owner validates the adapter against a
-real issuer. `tests/test_authority_writes.py` proves the gate and the intake without
-PostgreSQL; `test_end_to_end.py` proves over the real composition that a grant an
-administrator loads through the write is the grant a signed decision is eligible by.
+**The two directory writes are implemented and not served** (`authority_writes.py`,
+ADR §16 rulings AW-2 to AW-5; §18, AW-1 reversed, AP-3 controlling).
+`POST /authority/grants` loads one time-bounded role grant from a typed body (the
+worker derives the grant id, so an identical replay answers `ALREADY_LOADED` with the
+standing grant), and `POST /authority/grants/{grant_id}/revoke` appends a `REVOKED`
+event with a reason. Each reads the operator's proof from `X-Ugence-Approver-Proof`,
+the header the decision route reads, and records the issuer-qualified subject as
+`loaded_by` or the revocation's actor. The gate is stricter than the decision route's:
+no identity port composed, no proof, a proof that authenticates nobody, a non-human
+actor, an expired proof, a port that cannot answer, or a missing, ambiguous or foreign
+tenant claim is a typed refusal, and nothing is recorded as presented.
 
-**Activate and issue are not served.** They act on packages this worker does not
-compose (AW-2). The contract test asserts that only `authority_writes.py` names the
-directory's write methods and that the unserved writes' paths appear nowhere.
+Under AP-3 no write is served until the identity adapter has been validated end to end
+against at least one real enterprise issuer, covering issuer, audience, JWKS trust, the
+tenant claim, the actor-type claim, and the worker's refusal of invalid or mismatched
+assertions. Until the owner records that validation, `authority_plane.SERVED_WRITES` is
+empty, the writes router registers nothing, and a write path on the composed worker
+answers the framework's 405 (on `/authority/grants`, which a read shares) or 404.
+`tests/test_authority_writes.py` proves the gate and the intake by building the router
+with `serve=IMPLEMENTED_WRITES` explicitly, and `test_end_to_end.py` proves the same
+against the real directory and the real JWT adapter over the in-process issuer; both
+are implementation and conformance evidence only, never enterprise identity validation.
+Re-serving the two writes once validation is recorded is one edit to `SERVED_WRITES`,
+the regenerated contract, and the plane app's manifest.
+
+**Activate and issue are never served here.** They act on packages this worker does
+not compose (AW-2). The contract test asserts that only `authority_writes.py` names the
+directory's write methods and that no write path answers on the composed app.
 
 ## Configuration
 
