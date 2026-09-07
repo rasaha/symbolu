@@ -20,18 +20,10 @@ function validity(grant: Grant, key: "issued_at" | "expires_at"): string {
   return v ? String(v[key] ?? "—") : "—";
 }
 
-function isRevoked(grant: Grant): boolean {
-  const v = grant.revoked_at;
-  return v !== null && v !== undefined && v !== "";
-}
-
-export function GrantTable({ grants, label, onEvents, onRevoke, revokeEnabled = false }: {
+export function GrantTable({ grants, label, onEvents }: {
   grants: Grant[];
   label: string;
   onEvents?: (grantId: string) => void;
-  /** Present when the screen offers the revoke write; disabled until a token is presented (AW-3). */
-  onRevoke?: (grantId: string) => void;
-  revokeEnabled?: boolean;
 }) {
   if (grants.length === 0) {
     return (
@@ -40,7 +32,6 @@ export function GrantTable({ grants, label, onEvents, onRevoke, revokeEnabled = 
       </p>
     );
   }
-  const actions = Boolean(onEvents || onRevoke);
   return (
     <div className="overflow-x-auto">
       <table aria-label={label} className="w-full text-[12px]">
@@ -54,7 +45,7 @@ export function GrantTable({ grants, label, onEvents, onRevoke, revokeEnabled = 
             <th className="py-1 pr-3">Expires</th>
             <th className="py-1 pr-3">Loaded by</th>
             <th className="py-1 pr-3">Grant id</th>
-            {actions ? <th className="py-1" /> : null}
+            {onEvents ? <th className="py-1" /> : null}
           </tr>
         </thead>
         <tbody>
@@ -68,27 +59,11 @@ export function GrantTable({ grants, label, onEvents, onRevoke, revokeEnabled = 
               <td className="py-1 pr-3 font-mono">{validity(g, "expires_at")}</td>
               <td className="py-1 pr-3 font-mono">{str(g, "loaded_by")}</td>
               <td className="py-1 pr-3 font-mono">{g.grant_id}</td>
-              {actions ? (
+              {onEvents ? (
                 <td className="py-1">
-                  <div className="flex gap-1">
-                    {onEvents ? (
-                      <button type="button" className="btn-action px-2 py-0.5 text-[11px]" onClick={() => onEvents(g.grant_id)}>
-                        Events
-                      </button>
-                    ) : null}
-                    {onRevoke && !isRevoked(g) ? (
-                      <button
-                        type="button"
-                        className="btn-action px-2 py-0.5 text-[11px]"
-                        aria-label={`revoke ${g.grant_id}`}
-                        title={revokeEnabled ? "revoke this grant" : "present an issuer token to revoke"}
-                        disabled={!revokeEnabled}
-                        onClick={() => onRevoke(g.grant_id)}
-                      >
-                        Revoke…
-                      </button>
-                    ) : null}
-                  </div>
+                  <button type="button" className="btn-action px-2 py-0.5 text-[11px]" onClick={() => onEvents(g.grant_id)}>
+                    Events
+                  </button>
                 </td>
               ) : null}
             </tr>

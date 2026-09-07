@@ -1,14 +1,14 @@
 // The authority plane's boundary verifier (ADR_UGENCE_AUTHORITY_PLANE_SCOPING.md §11
-// step 3, and §16 for the two gated writes).
+// step 3; §18, AP-3 controlling).
 //
 // Five properties, checked against the worker's own committed contract rather than
 // against this app's manifest alone, so a manifest edited to permit something the
 // contract forbids still fails:
 //
 //   1. the manifest's contract hash is the hash of the worker's committed contract;
-//   2. every approved operation is one the contract marks served (a read, or a write
-//      the worker serves), and the forbidden set is exactly the contract's unserved
-//      writes;
+//   2. every approved operation is one the contract marks served (today the four
+//      reads; a write only once the contract names it served after enterprise issuer
+//      validation), and the forbidden set is exactly the contract's unserved writes;
 //   3. the client consumes exactly the approved operations, by real call site and
 //      method;
 //   4. no file outside src/api/client.ts opens an HTTP connection or names a write
@@ -87,6 +87,11 @@ export function detectForbiddenReferences(text, manifest, { allowWriteMethod = f
   for (const p of manifest.forbidden_paths) {
     const literal = p.split(" ")[1];
     const prefix = literal.split("{")[0];
+    if (manifest.approved_paths.some((a) => a.split(" ")[1] === literal)) {
+      // the same literal is an approved read (GET and POST on /authority/grants);
+      // the method cannot be told apart statically, so the write-method scan covers it
+      continue;
+    }
     if (approvedPrefixes.some((a) => a.startsWith(prefix) || prefix.startsWith(a))) {
       // a shared prefix cannot be told apart statically; the exact literal still can
       if (text.includes(literal)) hits.push(`forbidden path ${literal}`);

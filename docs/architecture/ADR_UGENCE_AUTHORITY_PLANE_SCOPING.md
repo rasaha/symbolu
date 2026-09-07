@@ -395,9 +395,9 @@ stricter than the decision route because a grant is the basis of a decision: a d
 under a configured tenant is auditable against its grant; a grant under a configured
 tenant has nothing behind it.
 
-### 16.2 — Ruling AW-1 to AW-5 (owner, 2026-09-07)
+### 16.2 — Ruling AW-1 to AW-5 (2026-09-07; AW-1 reversed by the owner the same day, §18)
 
-The recommended option is ratified in every case, on the owner's instruction to scope
+The recommended option was applied in every case, on the owner's instruction to scope
 and build the plane's administrative screens, under the standing direction that
 recommended defaults apply. **AW-1 supersedes AP-3 in one respect:** the grant and
 revoke writes may ship before the adapter is validated against a real issuer. Every
@@ -406,16 +406,23 @@ what it always meant: no write is recorded without an `IDP_AUTHENTICATED` subjec
 §11 steps 4 and 5 are reordered for these two writes; activate and issue keep the
 original order.
 
+**Reversed.** On the same day, asked which of these decisions needed the owner's own
+word, the owner ruled AW-1 `NO — REVERSE` and AP-3 controlling (§18). AW-2 to AW-5
+stand. The paragraph above is kept as the record of what was applied and for how long.
+
 **What ratifying does not authorize.** No activation or issuance route. No login flow,
 token storage or refresh in the app. No settings screen, no runtime verb (AP-4 stands),
 no second writer, no change to SD-2 or the studio. No claim, on any screen or in any
 answer, that a subject was validated by a real issuer while `issuer_validation` says
 otherwise.
 
-## 17 — Implementation record, the two gated writes (2026-09-07)
+## 17 — Implementation record, the two gated writes (2026-09-07; served for one merge, then unserved under §18)
 
-Shipped as `governed-runtime-worker` 0.5.0 and `apps/authority-plane` 0.2.0. What each
-ruling became, and where it is checked:
+Shipped as `governed-runtime-worker` 0.5.0 and `apps/authority-plane` 0.2.0 in PR
+#1697, merged at `db055f3c`. The owner's reversal of AW-1 (§18) took the two writes out
+of service in the next change; this section stands as the record of what was built and
+proven, all of which remains in the worker. What each ruling became, and where it was
+checked at the time:
 
 | Ruling | What landed | Where it is checked |
 |---|---|---|
@@ -456,3 +463,55 @@ was added: the writes ride on the identity port the worker already composes from
 **Not proven here.** The adapter against a real enterprise issuer: `issuer_validation`
 still reads `IN_PROCESS_ISSUER_ONLY` on every write answer, and the maturity of every
 package on the plane is unchanged. Step 4 of §11 remains the owner's.
+
+## 18 — Owner ruling: AW-1 reversed, AP-3 controlling (owner, 2026-09-07)
+
+Asked which of the §16 decisions needed the owner's own word rather than a standing
+default, the owner ruled on AW-1 alone. The ruling, in the owner's terms:
+
+> **AW-1 = NO — REVERSE. AP-3 remains controlling.** The load and revoke grant-write
+> implementations may remain in the codebase, but they must not remain live or served
+> before the identity adapter has been validated end to end against at least one real
+> enterprise identity issuer. Until that validation is completed: load and revoke remain
+> unserved in the worker contract; the corresponding application controls remain
+> unavailable; attempts against those routes return the repository-defined unserved
+> response, currently 405; the existing in-process issuer evidence establishes
+> implementation and conformance only and must not be represented as enterprise
+> identity validation. Validation against the real issuer must cover, at minimum,
+> issuer, audience, JWKS trust, tenant claim, actor-type claim, and the worker's refusal
+> behaviour for invalid or mismatched identity assertions. Once that validation is
+> recorded, the two already-built writes may be re-served without reopening their
+> functional design unless the validation exposes a contract incompatibility. AW-1
+> reverses only the temporary sequencing change that allowed these writes to ship before
+> issuer validation. It does not repeal or otherwise modify AW-2 through AW-5.
+
+### 18.1 — What the reversal became
+
+Shipped as `governed-runtime-worker` 0.5.1 and `apps/authority-plane` 0.2.1.
+
+| Term of the ruling | What landed | Where it is checked |
+|---|---|---|
+| unserved in the worker contract | `authority_plane.SERVED_WRITES` is empty; `IMPLEMENTED_WRITES` names load and revoke; the committed contract renders `served.writes: []`, the two as `implemented_unserved_writes`, and a note that the in-process evidence is conformance only (sha256 `a0227d16…`). | `test_authority_plane_contract.py::test_no_write_is_served_under_ap3_while_two_are_implemented`, `::test_the_committed_contract_says_what_is_not_on_the_plane` |
+| implementation remains, not live | `authority_writes.py` is unchanged in behaviour; its router registers only the writes the contract names served, so the composed worker registers none. The `serve` parameter exists so tests can exercise the implementation explicitly. | `test_authority_writes.py::test_by_default_the_router_registers_nothing…`; every other test in that file builds the router with `serve=IMPLEMENTED_WRITES` |
+| the unserved response | on the composed worker `POST /authority/grants` answers 405 (a read shares the path) and `POST /authority/grants/{grant_id}/revoke` answers 404, proof or not, and nothing is recorded | `test_authority_plane_contract.py::test_reads_are_served_no_write_is…`; `test_end_to_end.py::test_the_composed_worker_serves_no_write_while_the_implementation_conforms_over_the_real_adapter` |
+| application controls unavailable | the plane app's token panel, Load grant screen and revoke action are removed from the built app; its client names no write, sends no proof header, and its manifest forbids all four writes, bound to the new contract hash. The removed files remain in history at `c3b1ad8c`. | `apps/authority-plane/tests/screens.test.tsx`, `boundary.test.ts`; `npm run verify:boundary` |
+| in-process evidence is conformance only | the contract, the worker README, the app's standing notice and every relevant docstring say so in those words; the end-to-end test that exercised the writes over the real composition now runs them on a conformance harness beside the composed worker, never through it | the same tests; `deployment/governed-runtime-worker/README.md` |
+
+### 18.2 — Verification of the reversal
+
+| Check | Result |
+|---|---|
+| worker suite over PostgreSQL 16.13, `UGENCE_DE_TEST_PG` set | 128 passed, 0 skipped |
+| the contract with `SERVED_WRITES` set back to the two writes, everything else unchanged | the drift test and the served-set tests fail; restored afterwards |
+| plane app: `npm run verify:boundary`, `npm run type-check`, vitest, `vite build` | OK with 4 reads consumed against contract `a0227d16…`, exit 0, 11 passed, exit 0 |
+| studio SD-2 verb test; package import boundaries | 11 passed; OK |
+
+### 18.3 — What re-serving requires
+
+When the owner records the validation the ruling names (issuer, audience, JWKS trust,
+tenant claim, actor-type claim, and the worker's refusal behaviour for invalid or
+mismatched assertions, against at least one real enterprise issuer), re-serving is:
+`SERVED_WRITES = IMPLEMENTED_WRITES` in `authority_plane.py`, the contract regenerated,
+the plane app's manifest re-bound to the new hash with the two writes approved, and the
+app-side controls restored from `c3b1ad8c`. The functional design is not reopened
+unless that validation exposes a contract incompatibility.

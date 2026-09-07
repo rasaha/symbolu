@@ -94,14 +94,23 @@ def test_every_write_carries_the_identity_gate_and_every_read_the_proof_label():
     reads = [op for op in plane.PLANE_OPERATIONS if op.kind == "read"]
     assert len(writes) == 4 and len(reads) == 4
     for op in writes:
-        assert op.ruling.startswith("AP-3") and "IDP_AUTHENTICATED" in op.gate and "refused" in op.gate
-        # AW-1 names the two served writes and no other; the unserved two keep AP-3 alone
-        assert (op.operation_id in plane.SERVED_WRITES) == ("AW-1" in op.ruling), op.operation_id
-    assert plane.WRITE_PROOF_HEADER == PROOF_HEADER, "the writes read the decision route's header"
+        assert op.ruling == "AP-3" and "IDP_AUTHENTICATED" in op.gate and "refused" in op.gate
     for op in reads:
         assert op.ruling == "AP-5" and "PRESENTED_UNPROVEN" in op.gate
     assert {op.names_verb for op in writes} == set(plane.PERMITTED_VERBS), \
         "each of the four permitted verbs is named by exactly one write"
+    assert plane.WRITE_PROOF_HEADER == PROOF_HEADER, "the writes read the decision route's header"
+
+
+def test_no_write_is_served_under_ap3_while_two_are_implemented():
+    """Section 18: the owner reversed AW-1. The contract serves no write until the
+    adapter is validated against a real enterprise issuer; the two directory writes
+    exist as implementation only."""
+    assert plane.SERVED_WRITES == ()
+    assert plane.IMPLEMENTED_WRITES == ("authority_grant_role", "authority_revoke_grant")
+    assert set(plane.SERVED_WRITES) <= set(plane.IMPLEMENTED_WRITES)
+    assert all(op.served is False for op in plane.PLANE_OPERATIONS if op.kind == "write")
+    assert "AP-3 controlling" in plane.RULING and "AW-1 REVERSED" in plane.RULING
 
 
 # --------------------------------------------------------------------------- #
@@ -115,7 +124,7 @@ SERVED_WRITE_OPS = tuple(op for op in plane.PLANE_OPERATIONS
                          if op.kind == "write" and op.operation_id in plane.SERVED_WRITES)
 
 
-def test_reads_and_the_two_directory_writes_are_served_and_no_plane_path_overlaps_the_review_routes(tmp_path):
+def test_reads_are_served_no_write_is_and_no_plane_path_overlaps_the_review_routes(tmp_path):
     from fastapi import FastAPI
     from fastapi.testclient import TestClient
     from ugence_authority_directory import SqliteAuthorityDirectory
@@ -125,16 +134,15 @@ def test_reads_and_the_two_directory_writes_are_served_and_no_plane_path_overlap
     from conftest import TENANT, Clock
 
     assert plane.READS_SERVED is True
-    assert plane.SERVED_WRITES == ("authority_grant_role", "authority_revoke_grant"), "AW-2"
-    assert len(UNSERVED_WRITE_PATHS) == 2
+    assert SERVED_WRITE_OPS == () and len(UNSERVED_WRITE_PATHS) == 4, "AP-3 controlling (section 18)"
     served_paths = {path for _m, path, _o in ROUTES}
     plane_paths = {op.path for op in plane.PLANE_OPERATIONS}
     assert served_paths.isdisjoint(plane_paths)
     assert all(p.startswith("/authority/") for p in plane_paths)
     for m, p, o in plane.REUSED_EXISTING:
         assert (m, p, o) in ROUTES
-    # the routers serve exactly the four reads and the two served writes, with the
-    # contract's ids and summaries; the two unserved writes appear on no path
+    # the routers, built as the composition builds them, serve exactly the four reads
+    # with the contract's ids and summaries; the writes router registers nothing
     directory = SqliteAuthorityDirectory(str(tmp_path / "dir.sqlite3"))
     app = FastAPI()
     app.include_router(build_authority_reads(directory, tenant_id=TENANT, clock=Clock().datetime,
@@ -143,13 +151,18 @@ def test_reads_and_the_two_directory_writes_are_served_and_no_plane_path_overlap
                                               identity_port=None))
     with TestClient(app) as client:
         spec = client.get("/openapi.json").json()
+        # a write path answers the framework's unserved response, proof or not
+        for op in plane.PLANE_OPERATIONS:
+            if op.kind == "write":
+                r = client.post(op.path.format(grant_id="grant_x", constitution_id="c1"), json={},
+                                headers={PROOF_HEADER: "any"})
+                assert r.status_code in (404, 405), op.operation_id
     seen = {(m.upper(), path, op["operationId"], op.get("summary"))
             for path, ops in spec["paths"].items() for m, op in ops.items()}
-    assert seen == {(op.method, op.path, op.operation_id, op.summary)
-                    for op in READ_OPS + SERVED_WRITE_OPS}
+    assert seen == {(op.method, op.path, op.operation_id, op.summary) for op in READ_OPS}
     served_methods = {(m.upper(), path) for path, ops in spec["paths"].items() for m in ops}
     assert not any((op.method, op.path) in served_methods
-                   for op in plane.PLANE_OPERATIONS if op.kind == "write" and not op.served)
+                   for op in plane.PLANE_OPERATIONS if op.kind == "write")
 
 
 def test_only_the_writes_module_names_the_directory_writes_and_the_unserved_paths_appear_nowhere():
@@ -199,15 +212,16 @@ def test_the_committed_contract_is_the_module_rendered_without_drift():
 
 def test_the_committed_contract_says_what_is_not_on_the_plane():
     committed = json.loads(CONTRACT.read_text(encoding="utf-8"))
-    assert committed["served"] == {"reads": True, "writes": list(plane.SERVED_WRITES)}
+    assert committed["served"] == {"reads": True, "writes": []}
+    assert committed["implemented_unserved_writes"] == ["authority_grant_role", "authority_revoke_grant"]
+    assert "conformance evidence only" in committed["implemented_unserved_note"]
+    assert "AP-3 controlling" in committed["implemented_unserved_note"]
     assert committed["write_proof_header"] == PROOF_HEADER
     for op in committed["operations"]:
-        expected = op["kind"] == "read" or op["operation_id"] in plane.SERVED_WRITES
-        assert op["served"] is expected, op["operation_id"]
-    assert [op["operation_id"] for op in committed["operations"] if op["kind"] == "write" and not op["served"]] \
-        == ["authority_activate_constitution", "authority_issue_record"]
+        assert op["served"] is (op["kind"] == "read"), op["operation_id"]
     joined = " ".join(committed["not_on_the_plane"]).lower()
     for absent in ("authorize, clear, execute", "module composition", "nine module rows", "emergency stop"):
         assert absent in joined, absent
     assert committed["schema"] == plane.CONTRACT_SCHEMA
-    assert "AP-1" in committed["ruling"] and "AP-5" in committed["ruling"] and "AW-1" in committed["ruling"]
+    assert "AP-1" in committed["ruling"] and "AP-5" in committed["ruling"]
+    assert "AW-1 REVERSED" in committed["ruling"] and "AP-3 controlling" in committed["ruling"]

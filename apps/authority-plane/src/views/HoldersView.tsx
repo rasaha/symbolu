@@ -2,14 +2,12 @@ import { useState } from "react";
 import { listHolders, type HoldersAnswer, type Outcome } from "@/api/client";
 import { GrantTable } from "@/components/GrantTable";
 import { IdentityBanner, Json, RefusalNotice, Unreachable } from "@/components/Identity";
-import { RevokeBox } from "@/components/RevokeBox";
 
-export function HoldersView({ onEvents, proof }: { onEvents: (grantId: string) => void; proof: string }) {
+export function HoldersView({ onEvents }: { onEvents: (grantId: string) => void }) {
   const [role, setRole] = useState("");
   const [scope, setScope] = useState("");
   const [outcome, setOutcome] = useState<Outcome<HoldersAnswer> | null>(null);
   const [busy, setBusy] = useState(false);
-  const [revoking, setRevoking] = useState<string | null>(null);
   const ready = role.trim() !== "" && scope.trim() !== "";
 
   async function read() {
@@ -47,21 +45,7 @@ export function HoldersView({ onEvents, proof }: { onEvents: (grantId: string) =
             {outcome.answer.holder_count} holder{outcome.answer.holder_count === 1 ? "" : "s"} of{" "}
             <span className="font-mono">{outcome.answer.role}</span> in <span className="font-mono">{outcome.answer.scope}</span>.
           </p>
-          <GrantTable
-            grants={outcome.answer.holders}
-            label="holders"
-            onEvents={onEvents}
-            onRevoke={setRevoking}
-            revokeEnabled={proof !== ""}
-          />
-          {revoking ? (
-            <RevokeBox
-              grantId={revoking}
-              proof={proof}
-              onRecorded={() => void read()}
-              onCancel={() => setRevoking(null)}
-            />
-          ) : null}
+          <GrantTable grants={outcome.answer.holders} label="holders" onEvents={onEvents} />
           <Json value={outcome.answer} label="the worker's answer, verbatim" />
         </div>
       ) : null}

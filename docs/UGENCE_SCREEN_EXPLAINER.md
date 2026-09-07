@@ -1,28 +1,27 @@
 # Ugence screens — an explainer, one entry per screen
 
-**Status:** reference, 2026-09-07, against the AW-1 implementation
-(`ADR_UGENCE_AUTHORITY_PLANE_SCOPING.md` §16 and §17). Every entry is taken from the
-screen's own source: its stated purpose, its stated disclaimer, the operations it
-calls, and the ruling that shaped it. Nothing here describes a screen as doing more
-than its code does.
+**Status:** reference, 2026-09-07, after the owner's ruling that AP-3 controls
+(`ADR_UGENCE_AUTHORITY_PLANE_SCOPING.md` §18). Every entry is taken from the screen's
+own source: its stated purpose, its stated disclaimer, the operations it calls, and the
+ruling that shaped it. Nothing here describes a screen as doing more than its code does.
 
-Four front ends, thirty-three screens. Each entry answers the same five questions:
+Four front ends, thirty-two screens. Each entry answers the same five questions:
 **what it shows**, **who answers it**, **what the operator can do**, **what it never
 does**, and **the ruling that shaped it**.
 
 ## The one thing to know first
 
-None of these is a per-module administration screen: ruling MA-1 refused those, and
-AP-1 to AP-5 admitted an authority plane instead. Across all four front ends there are
-three kinds of screen: **reads** (display what a package, service or deployment
-returned), **typed intakes** (record what a person asserted, conferring nothing), and,
-on the authority plane only, two **gated writes**: loading a role grant and revoking
-one, each recorded only for a human subject of the worker's tenant that its identity
-adapter proved from the token the administrator presents (AW-1, AW-5), and each
-conferring a role grant and nothing else. Of the seven acts that would change what an
-agent may do, grant and revoke live there; issue and activate wait on stores the
-worker does not compose (AW-2); authorize, clear and execute are performed on no
-screen anywhere (SD-2, AP-4).
+None of these is an administration screen. Ruling MA-1 refused a per-module admin
+screen; ruling AP-1 to AP-5 admitted an authority plane instead, and at this step that
+plane reads and does not write. Across all four front ends there are exactly two
+kinds of screen: **reads** (display what a package, service or deployment returned)
+and **typed intakes** (record what a person asserted, conferring nothing). The acts
+that would change what an agent may do (issue, activate, revoke, grant, authorize,
+clear, execute) are performed on no screen anywhere, by ruling SD-2. The worker
+implements loading and revoking a role grant behind its identity gate, but under AP-3,
+which the owner confirmed as controlling (§18), neither is served until the identity
+adapter is validated end to end against a real enterprise issuer; the in-process issuer
+evidence is implementation and conformance evidence only.
 
 ## Module coverage
 
@@ -260,32 +259,30 @@ service's audit ceiling: one process's view, lost on restart.
 
 ---
 
-## D · Authority Plane (5 screens, the governed runtime worker's reads and two gated writes)
+## D · Authority Plane (4 screens, the governed runtime worker's reads)
 
-The administrators' surface, its own deployable (AP-2). It reads the worker's four
-AP-5 reads and, since AW-1, loads and revokes role grants behind the identity gate.
-Every read answer is shown under an identity banner repeating the worker's own words:
-the read was not authenticated; the decision proof the deployment can give; the
-adapter's issuer validation, still in-process only; and that a grant is what an
-administrator loaded. A write is sent only with the issuer token the administrator
-presents for the session, on the worker's proof header, never on a read, never stored
-(AW-3); the plane has no login of its own, because the identity provider is the login.
-Every recorded write shows the proven subject, its authentication reference and the
-issuer-validation label, and says that an in-process issuer proved it.
+The administrators' surface, its own deployable (AP-2). At this step it reads and does
+not write. Every answer is shown under an identity banner repeating the worker's own
+words: the read was not authenticated; the decision proof the deployment can give;
+the adapter's issuer validation, still in-process only; and that a grant is what an
+administrator loaded. The worker implements loading and revoking a role grant behind
+its identity gate (AW-2 to AW-5) but serves neither until the adapter is validated
+against a real enterprise issuer (AP-3 controlling, §18); this app has no write
+control and its client cannot name a write.
 
 ### 29 · Grants
 - **Shows:** the role grants one principal holds in the worker's tenant, active at the worker's clock.
-- **Answered by:** `GET /authority/grants?principal_id=`; the sqlite authority directory the worker composed. Revoke: `POST /authority/grants/{grant_id}/revoke`.
-- **Operator can:** type a principal id and read; follow a grant to its events; with a token presented, revoke a grant with a reason, which the worker records under the proven subject.
-- **Never:** loads a grant here (that is screen 33); revokes without a proven human subject of this tenant, and the worker records nothing as presented.
-- **Ruling:** AP-5 `READS_FIRST`; AW-1, AW-3, AW-5 for the revoke.
+- **Answered by:** `GET /authority/grants?principal_id=`; the sqlite authority directory the worker composed.
+- **Operator can:** type a principal id and read; follow a grant to its events.
+- **Never:** loads or revokes a grant. Those writes are implemented on the worker and not served before enterprise issuer validation (AP-3).
+- **Ruling:** AP-5 `READS_FIRST`.
 
 ### 30 · Holders
 - **Shows:** every principal of the tenant holding one role in one scope, committees included.
-- **Answered by:** `GET /authority/holders?role=&scope=`; revoke as on screen 29.
-- **Operator can:** type a role and scope and read; with a token presented, revoke a holder's grant with a reason.
-- **Never:** adds a holder; that is a load on screen 33.
-- **Ruling:** AP-5; AW-1 for the revoke.
+- **Answered by:** `GET /authority/holders?role=&scope=`.
+- **Operator can:** type a role and scope and read.
+- **Never:** changes a holder.
+- **Ruling:** AP-5.
 
 ### 31 · Committee
 - **Shows:** one committee's counted members against its quorum, at this instant; a lapsed or revoked member is not counted.
@@ -295,24 +292,18 @@ issuer-validation label, and says that an in-process issuer proved it.
 - **Ruling:** AP-5; directory ruling D-4.
 
 ### 32 · Grant events
-- **Shows:** a grant's append-only history: loaded, and possibly revoked, each with the actor recorded as the proven subject that did it. A grant of another tenant reads as unknown.
-- **Answered by:** `GET /authority/grants/{grant_id}/events`; revoke as on screen 29.
-- **Operator can:** read; with a token presented, revoke the grant shown.
+- **Shows:** a grant's append-only history: loaded, and possibly revoked, with the actor recorded. A grant of another tenant reads as unknown.
+- **Answered by:** `GET /authority/grants/{grant_id}/events`.
+- **Operator can:** read.
 - **Never:** edits a grant in place; the directory records loading and revocation only.
-- **Ruling:** AP-5; AW-1 for the revoke.
-
-### 33 · Load grant
-- **Shows:** a typed form for one role grant: principal id and kind, display reference, quorum, role, scope, issued and expiry instants, authority reference, committee membership; then what the worker recorded, under whom, or its typed refusal.
-- **Answered by:** `POST /authority/grants`, with the presented token on `X-Ugence-Approver-Proof`; the worker derives the grant id, so an identical load twice is `ALREADY_LOADED` with the standing grant.
-- **Operator can:** with a token presented, load a grant; without one every control is disabled and nothing is sent.
-- **Never:** grants a permission (an organizational role never becomes an API permission, D-5); records for a subject the adapter did not prove as a human of this tenant, or when no identity port is composed; claims a real issuer proved the subject while the label says in-process only.
-- **Ruling:** AW-1 `GATED_WRITES_BEFORE_ISSUER_VALIDATION`, AW-3, AW-4 `TYPED_INTAKE_DERIVED_ID`, AW-5 `STRICTER_THAN_DECISIONS`.
+- **Ruling:** AP-5; AP-3 for the writes it does not have.
 
 ---
 
 ## What is not a screen, and why
 
-- **Issuing, activating:** the authority plane's two unserved writes, on stores the worker does not compose (AW-2), still behind AP-3.
+- **Granting, revoking:** implemented on the worker behind its identity gate (AW-2 to AW-5) and not served until the identity adapter is validated end to end against a real enterprise issuer (AP-3 controlling, §18). The screens built for them under AW-1 were withdrawn with that ruling's reversal.
+- **Issuing, activating:** the authority plane's other two writes, on stores the worker does not compose (AW-2), behind AP-3.
 - **Authorizing, clearing, executing:** runtime authority, with ActionGate, the Autonomous Control Plane and the runtime. Refused on every front end by SD-2 and AP-4.
 - **Module composition:** providers, hooks and seam files are environment variables read before the port binds. Shown read-only on Status; set nowhere in a browser.
 - **The console's module registry:** behind a withheld route; struck from the studio by MS-1.

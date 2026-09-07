@@ -1,8 +1,13 @@
-"""The authority plane's two gated writes at the worker's edge, without PostgreSQL
-(ADR_UGENCE_AUTHORITY_PLANE_SCOPING.md section 16, rulings AW-1 to AW-5).
+"""The authority plane's two directory writes at the worker's edge, without PostgreSQL
+(ADR_UGENCE_AUTHORITY_PLANE_SCOPING.md section 16, rulings AW-2 to AW-5; section 18,
+AW-1 reversed).
 
-Proven here: the router serves exactly the two served writes and neither unserved one;
-a worker without an identity port refuses every write; the gate refuses, with a typed
+    IMPLEMENTATION AND CONFORMANCE EVIDENCE ONLY. Every router here is built with
+    ``serve=IMPLEMENTED_WRITES`` explicitly; the contract's default serves nothing under
+    AP-3, and one test proves that a default router registers no write.
+
+Proven here: the router serves exactly the two implemented writes when told to and
+nothing by default; a worker without an identity port refuses every write; the gate refuses, with a typed
 reason and without recording, a missing proof, a proof that authenticates nobody, a
 presented-unproven identity, a non-human actor, an expired proof, a port that cannot
 answer, and a missing, ambiguous or foreign tenant claim; a load is recorded under the
@@ -39,7 +44,7 @@ from ugence_governed_review_service.identity import (
     subject_reference,
 )
 
-from governed_runtime_worker.authority_plane import PLANE_OPERATIONS, SERVED_WRITES
+from governed_runtime_worker.authority_plane import IMPLEMENTED_WRITES, PLANE_OPERATIONS, SERVED_WRITES
 from governed_runtime_worker.authority_reads import build_authority_reads
 from governed_runtime_worker.authority_writes import (
     LOAD_BODY_KEYS,
@@ -108,12 +113,12 @@ class _BrokenPort:
         raise RuntimeError("issuer unreachable")
 
 
-def _app(directory, identity_port, clock: Clock) -> FastAPI:
+def _app(directory, identity_port, clock: Clock, serve: tuple[str, ...] = IMPLEMENTED_WRITES) -> FastAPI:
     app = FastAPI()
     app.include_router(build_authority_reads(directory, tenant_id=TENANT, clock=clock.datetime,
                                              identity_port_configured=identity_port is not None))
     app.include_router(build_authority_writes(directory, tenant_id=TENANT, clock=clock.datetime,
-                                              identity_port=identity_port))
+                                              identity_port=identity_port, serve=serve))
     return app
 
 
@@ -156,17 +161,35 @@ def _post(client, path, body, *, proof=ADMIN, expect):
 # --------------------------------------------------------------------------- #
 # what is served
 # --------------------------------------------------------------------------- #
-def test_the_router_serves_exactly_the_two_served_writes(world):
+def test_the_router_serves_exactly_the_two_implemented_writes_when_told_to(world):
     client, _directory, _clock = world
     spec = client.get("/openapi.json").json()
     posts = {(path, op["operationId"]) for path, ops in spec["paths"].items()
              for m, op in ops.items() if m.upper() == "POST"}
     assert posts == {(op.path, op.operation_id) for op in WRITE_OPERATIONS}
-    assert {op.operation_id for op in WRITE_OPERATIONS} == set(SERVED_WRITES)
+    assert {op.operation_id for op in WRITE_OPERATIONS} == set(IMPLEMENTED_WRITES)
     for op in PLANE_OPERATIONS:
-        if op.kind == "write" and op.operation_id not in SERVED_WRITES:
+        if op.kind == "write" and op.operation_id not in IMPLEMENTED_WRITES:
             assert client.post(op.path.format(constitution_id="c1"), json={},
                                headers={PROOF_HEADER: ADMIN}).status_code in (404, 405)
+
+
+def test_by_default_the_router_registers_nothing_because_the_contract_serves_no_write(tmp_path):
+    """Section 18, AP-3 controlling: as the composition builds it, the writes router
+    is empty, and a valid admin proof changes nothing."""
+    assert SERVED_WRITES == ()
+    directory = SqliteAuthorityDirectory(str(tmp_path / "dir.sqlite3"))
+    with TestClient(_app(directory, _adapter(), Clock(), serve=SERVED_WRITES)) as client:
+        spec = client.get("/openapi.json").json()
+        assert not any(m.upper() == "POST" for ops in spec["paths"].values() for m in ops)
+        r = client.post("/authority/grants", json=_load(), headers={PROOF_HEADER: ADMIN})
+        assert r.status_code == 405, r.text
+        r = client.post("/authority/grants/grant_x/revoke", json={"reason": "x"}, headers={PROOF_HEADER: ADMIN})
+        assert r.status_code == 404, r.text
+    assert directory.grants_for(tenant_id=TENANT, principal_id="https%3A%2F%2Fidp.example%7Calice", as_of=NOW) == ()
+    with pytest.raises(ValueError):
+        build_authority_writes(directory, tenant_id=TENANT, clock=Clock().datetime, identity_port=None,
+                               serve=("authority_issue_record",))
 
 
 # --------------------------------------------------------------------------- #

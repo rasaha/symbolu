@@ -20,17 +20,20 @@ every operation id, path and summary here, in the shape of the studio's SD-2 tes
 the sense reversed.
 
 **AP-3 and AP-5, the gate.** Every write requires an ``IDP_AUTHENTICATED`` subject and
-is refused, never recorded as presented, without one. Reads may ship first, each answer
-labelled with the identity proof the deployment can give. Since §16 (AW-1, AW-2) the
-two directory writes, grant and revoke, are served behind that gate before the adapter
-is validated against a real issuer; every write answer labels ``issuer_validation`` so
-nothing claims more than the deployment can prove. Activate and issue act on packages
-this worker does not compose and stay unserved.
+is refused, never recorded as presented, without one. No write is served until the
+approver-identity adapter has been validated end to end against at least one real
+enterprise issuer (AP-3, controlling; the owner reversed AW-1's sequencing change on
+2026-09-07, §18). Reads may ship first, each answer labelled with the identity proof
+the deployment can give. The two directory writes, grant and revoke, are implemented
+in ``authority_writes.py`` behind that gate and proven against the in-process issuer,
+which is implementation and conformance evidence only, never enterprise identity
+validation; ``SERVED_WRITES`` stays empty until the owner records that validation.
+Activate and issue act on packages this worker does not compose.
 
-``composition.py`` mounts the reads through ``authority_reads.py`` (step 2) and the two
-served writes through ``authority_writes.py`` (§16). The test asserts that no other
-module names a write path or the directory's write methods, and that the unserved
-writes' paths appear nowhere but here.
+``composition.py`` mounts the reads through ``authority_reads.py`` (step 2) and the
+writes router, which serves exactly ``SERVED_WRITES`` and so today serves nothing. The
+test asserts that no other module names a write path or the directory's write methods,
+and that no write path answers on the composed app.
 """
 
 from __future__ import annotations
@@ -43,6 +46,7 @@ __all__ = [
     "RULING",
     "READS_SERVED",
     "SERVED_WRITES",
+    "IMPLEMENTED_WRITES",
     "WRITE_PROOF_HEADER",
     "PERMITTED_VERBS",
     "REFUSED_VERBS",
@@ -59,16 +63,23 @@ CONTRACT_SCHEMA = "governed-runtime-worker.authority-plane-contract.v1"
 RULING = ("ADR_UGENCE_AUTHORITY_PLANE_SCOPING.md AP-1 AUTHORITY_PLANE_ONLY, "
           "AP-2 ADMIN_ROUTES_ON_THE_WORKER, AP-3 IDP_VALIDATED_FIRST, "
           "AP-4 GRANT_REVOKE_ACTIVATE_ISSUE_ONLY, AP-5 READS_FIRST; section 16 "
-          "AW-1 GATED_WRITES_BEFORE_ISSUER_VALIDATION, AW-2 DIRECTORY_WRITES_ONLY, "
-          "AW-5 STRICTER_THAN_DECISIONS")
+          "AW-2 DIRECTORY_WRITES_ONLY, AW-5 STRICTER_THAN_DECISIONS; section 18 "
+          "AW-1 REVERSED, AP-3 controlling: no write served before enterprise issuer validation")
 
 #: What each step serves. Step 1 served nothing; step 2 (AP-5 READS_FIRST) serves the
-#: four reads through ``authority_reads.py``; section 16 (AW-1, AW-2) serves the two
-#: directory writes through ``authority_writes.py`` behind the identity gate. Activate
-#: and issue stay unserved: this worker composes neither store. These are read by the
-#: test and by the record, and change only when a later step's record says so.
+#: four reads through ``authority_reads.py``. The two directory writes are implemented
+#: in ``authority_writes.py`` and served only when named here; under AP-3 (controlling,
+#: section 18) this tuple stays empty until the owner records the adapter's validation
+#: against a real enterprise issuer. Activate and issue are never named here: this
+#: worker composes neither store (AW-2). These are read by the test and by the record,
+#: and change only when a later record says so.
 READS_SERVED = True
-SERVED_WRITES: tuple[str, ...] = ("authority_grant_role", "authority_revoke_grant")
+SERVED_WRITES: tuple[str, ...] = ()
+
+#: The two writes whose implementation exists and is proven against the in-process
+#: issuer (implementation and conformance evidence only). Re-serving them is one edit
+#: to ``SERVED_WRITES`` once the validation AP-3 requires is recorded.
+IMPLEMENTED_WRITES: tuple[str, ...] = ("authority_grant_role", "authority_revoke_grant")
 
 #: The header a write's proof arrives on: the same one the decision route reads
 #: (``ugence_governed_review_service.PROOF_HEADER``; a test asserts they are equal).
@@ -152,13 +163,13 @@ PLANE_OPERATIONS: tuple[PlaneOperation, ...] = (
         operation_id="authority_grant_role", method="POST", path="/authority/grants",
         summary="Load one time-bounded role grant for a principal",
         kind="write", names_verb="grant",
-        acts_on="SqliteAuthorityDirectory.put_grant", ruling="AP-3, AW-1"),
+        acts_on="SqliteAuthorityDirectory.put_grant", ruling="AP-3"),
     PlaneOperation(
         operation_id="authority_revoke_grant", method="POST",
         path="/authority/grants/{grant_id}/revoke",
         summary="Revoke one role grant, appending its REVOKED event",
         kind="write", names_verb="revoke",
-        acts_on="SqliteAuthorityDirectory.revoke_grant", ruling="AP-3, AW-1"),
+        acts_on="SqliteAuthorityDirectory.revoke_grant", ruling="AP-3"),
     PlaneOperation(
         operation_id="authority_activate_constitution", method="POST",
         path="/authority/constitutions/{constitution_id}/activate",
@@ -199,6 +210,11 @@ def contract_document() -> dict[str, Any]:
         "schema": CONTRACT_SCHEMA,
         "ruling": RULING,
         "served": {"reads": READS_SERVED, "writes": list(SERVED_WRITES)},
+        "implemented_unserved_writes": list(IMPLEMENTED_WRITES),
+        "implemented_unserved_note": ("implemented in authority_writes.py behind the identity gate and proven "
+                                      "against the in-process issuer (implementation and conformance evidence "
+                                      "only); not served until the adapter is validated end to end against a "
+                                      "real enterprise issuer (AP-3 controlling; AW-1 reversed, section 18)"),
         "write_proof_header": WRITE_PROOF_HEADER,
         "home": "deployment/governed-runtime-worker (AP-2): routes on the review service this worker composes, which owns the stores",
         "permitted_verbs": list(PERMITTED_VERBS),

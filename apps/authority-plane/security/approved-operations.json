@@ -2,30 +2,30 @@
   "$schema": "ugence.authority_plane.approved_operations.v1",
   "contract": "governed-runtime-worker.authority-plane-contract.v1",
   "contract_path": "deployment/governed-runtime-worker/authority-plane-contract.json",
-  "contract_sha256": "fcda3520c0ad967bd1f72c53c21f2098702f965f0a2b0122d8443e2286defcc1",
-  "ruling": "ADR_UGENCE_AUTHORITY_PLANE_SCOPING.md AP-5 READS_FIRST (step 3: the front-end shell over the four reads); section 16 AW-1 GATED_WRITES_BEFORE_ISSUER_VALIDATION, AW-2 DIRECTORY_WRITES_ONLY, AW-3 PROOF_PRESENTED_PER_WRITE_NEVER_STORED (the two grant writes behind the identity gate)",
+  "contract_sha256": "a0227d16c90d7dffec8da159d9956d371a552425af999ab1a772c2d1fe9edb98",
+  "ruling": "ADR_UGENCE_AUTHORITY_PLANE_SCOPING.md AP-5 READS_FIRST (step 3: the front-end shell over the four reads); AP-3 IDP_VALIDATED_FIRST controlling (section 18: AW-1 reversed; no write served before enterprise issuer validation)",
   "write_proof_header": "X-Ugence-Approver-Proof",
   "approved_operation_ids": [
     "authority_list_grants",
     "authority_list_holders",
     "authority_read_committee",
-    "authority_read_grant_events",
-    "authority_grant_role",
-    "authority_revoke_grant"
+    "authority_read_grant_events"
   ],
   "approved_paths": [
     "GET /authority/grants",
     "GET /authority/holders",
     "GET /authority/committees/{committee_id}",
-    "GET /authority/grants/{grant_id}/events",
-    "POST /authority/grants",
-    "POST /authority/grants/{grant_id}/revoke"
+    "GET /authority/grants/{grant_id}/events"
   ],
   "forbidden_operation_ids": [
+    "authority_grant_role",
+    "authority_revoke_grant",
     "authority_activate_constitution",
     "authority_issue_record"
   ],
   "forbidden_paths": [
+    "POST /authority/grants",
+    "POST /authority/grants/{grant_id}/revoke",
     "POST /authority/constitutions/{constitution_id}/activate",
     "POST /authority/issuances"
   ],
@@ -34,5 +34,5 @@
     "clear",
     "execute"
   ],
-  "notes": "This app may consume the four AP-5 reads and the two directory writes the worker's contract marks served, and nothing else. A write is sent only with the token the operator presented for the session, on write_proof_header, never on a read, never stored (AW-3). The two unserved writes, activate and issue, are named here as forbidden so a later step cannot add one without changing this file and the worker's contract together (AW-2). scripts/verify-boundary.mjs checks this file against the worker's committed contract and against the client's real call sites, by method."
+  "notes": "This app may consume only the four AP-5 reads the worker serves, and nothing that writes. The worker implements load and revoke behind its identity gate but serves neither until the identity adapter is validated end to end against a real enterprise issuer (AP-3 controlling, section 18); activate and issue act on stores the worker does not compose (AW-2). All four writes are named here as forbidden so none can be added without changing this file and the worker's contract together. scripts/verify-boundary.mjs checks this file against the worker's committed contract and against the client's real call sites, by method."
 }
