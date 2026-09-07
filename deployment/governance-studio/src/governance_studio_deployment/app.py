@@ -41,9 +41,16 @@ from .middleware import (
 _BACKEND_PATHS = ("/health", "/ready", "/version", "/docs", "/redoc", "/openapi.json")
 
 
-def _build_backend(config: DeploymentConfig):
+def _build_backend(config: DeploymentConfig, *, deployment_report: Optional[dict] = None):
     """Instantiate the FROZEN v1 backend with v2 mounted behind it (CR-2), pinned to
     the synthetic scenario root.
+
+    Since MA-2 as amended (ADR_UGENCE_MODULE_ADMINISTRATION_SCOPING.md MS-2
+    IN_MEMORY_RESULT_AT_COMPOSITION) the studio context also receives
+    ``deployment_report``: the startup integrity report the gate computed before the
+    port bound, handed once, as a dict. The backend copies it and never re-reads it;
+    no file under the runtime volume is read at request time, and no package is
+    imported for it.
 
     The v2 studio context receives from this deployment: the review service base URL
     (CR-2); when a registry path is configured, the activation root of front-door seam
@@ -139,6 +146,7 @@ def _build_backend(config: DeploymentConfig):
         recorded_by=recorded_by,
         vendor_declarations=vendor_declarations,
         received_clearances=received_clearances,
+        deployment_report=deployment_report,
     )
     from .simulation import refuse_permissive_hook
 
@@ -181,9 +189,14 @@ class _Dispatcher:
         return await PlainTextResponse("Not Found", status_code=404)(scope, receive, send)
 
 
-def build_app(config: DeploymentConfig, *, readiness=None, tracker: Optional[FailureTracker] = None, sleep=None):
-    """Assemble the wrapped ASGI application (assumes startup integrity already passed)."""
-    backend = _build_backend(config)
+def build_app(config: DeploymentConfig, *, readiness=None, tracker: Optional[FailureTracker] = None, sleep=None,
+              deployment_report: Optional[dict] = None):
+    """Assemble the wrapped ASGI application (assumes startup integrity already passed).
+
+    ``deployment_report`` is the integrity gate's report (MS-2), handed through to the
+    studio context once. Absent, the Status panel reports its typed gap.
+    """
+    backend = _build_backend(config, deployment_report=deployment_report)
     ready_fn = readiness or (lambda: True)
     dispatcher = _Dispatcher(config, backend, ready_fn)
 

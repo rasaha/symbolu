@@ -1094,6 +1094,26 @@
         ]
       }
     },
+    "/api/v2/observe/deployment": {
+      "get": {
+        "description": "The deployment's own startup attestation: seam states, checks and pins\n(ADR_UGENCE_MODULE_ADMINISTRATION_SCOPING.md MA-2 as amended, MS-1 to MS-5).\n\nWhat is returned is what the deployment's fail-closed integrity gate computed\nbefore the port bound, handed to the studio once at composition (MS-2). Nothing is\nprobed at request time, no file is read, and a configured seam is not a reachable\nengine; the answer says so in its own ceiling field. The console's module registry\nis not here, by ruling (MS-1).",
+        "operationId": "v2_observe_deployment",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Deployment Status",
+        "tags": [
+          "observe"
+        ]
+      }
+    },
     "/api/v2/observe/ledger/{correlation_id}": {
       "get": {
         "description": "The worker's own tenant's audit-ledger rows for one correlation id, as the\nworker read them, with the worker's chain verification (FD-11.3, FD-11.4).\n\nThe studio names no tenant and re-derives, re-orders and re-hashes nothing: what\nis returned is the worker's answer, including its typed refusal when the chain\ndoes not verify.",

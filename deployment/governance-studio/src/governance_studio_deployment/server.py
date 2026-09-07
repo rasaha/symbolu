@@ -50,7 +50,10 @@ def run(config: Optional[DeploymentConfig] = None) -> int:
 
     import uvicorn
 
-    app = build_app(config, readiness=lambda: True)
+    # MA-2 as amended (MS-2 IN_MEMORY_RESULT_AT_COMPOSITION): the gate's own report,
+    # handed once. The file written above is the operator's copy; this is the attested
+    # object, and it is the only source the Status panel ever sees.
+    app = build_app(config, readiness=lambda: True, deployment_report=result.report)
     if config.mode == "test":
         sys.stderr.write("WARNING: UGENCE_STUDIO_DEPLOYMENT_MODE=test (loopback development mode)\n")
 

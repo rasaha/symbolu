@@ -73,6 +73,12 @@ const STUDIO_SCREENS: { route: string; name: string; ready: () => Promise<unknow
     name: "Run Detail",
     ready: () => screen.findByRole("heading", { name: /run detail/i }),
   },
+  // MA-2 as amended (MS-5): the Status panel; bare, it renders its typed gap.
+  {
+    route: "/studio/status",
+    name: "Status",
+    ready: () => screen.findByRole("note", { name: /capability unavailable/i }),
+  },
 ];
 
 describe("accessibility — Governed Agent Studio", () => {

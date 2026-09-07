@@ -55,6 +55,9 @@ export const REQUIRED_V2_OPERATIONS = [
   // the only write, FD-13.4).
   "v2_vendor_declare",
   "v2_vendor_list",
+  // MA-2 as amended (ADR_UGENCE_MODULE_ADMINISTRATION_SCOPING.md MS-1 to MS-5): the
+  // Status panel's one read, the deployment's own startup attestation.
+  "v2_observe_deployment",
 ];
 
 // SD-2, enforced at generation time as well as in the backend suite. If a route

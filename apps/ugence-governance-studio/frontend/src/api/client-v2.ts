@@ -66,6 +66,10 @@ export const V2_OPERATIONS = [
   // declarations. Declare is the only write (FD-13.4) and it confers nothing.
   "v2_vendor_declare",
   "v2_vendor_list",
+  // MA-2 as amended (MS-1 to MS-5): the Status panel's one read. What the deployment
+  // attested about itself before its port bound; seam states, checks and pins only,
+  // no registry rows (MS-1), nothing probed live.
+  "v2_observe_deployment",
 ] as const;
 
 async function v2Request<T>(pathAndQuery: string, init?: RequestInit): Promise<T> {
@@ -173,6 +177,10 @@ export const readAuditChain = (correlationId: string) =>
  */
 export const readLedgerChain = (correlationId: string) =>
   gap(`/api/v2/observe/ledger/${enc(correlationId)}`);
+
+// -- Status (MA-2 as amended, MS-3 OBSERVE_DEPLOYMENT_ONE_READ) --------------
+/** The deployment's startup attestation: seam states, checks and pins. A read. */
+export const readDeploymentStatus = () => gap("/api/v2/observe/deployment");
 
 // -- 7 · Review (GAS-7 HR-D; owner ruling HR-1: display and transmit) -------
 export const listReviewQueue = (requiredRole = "") => {

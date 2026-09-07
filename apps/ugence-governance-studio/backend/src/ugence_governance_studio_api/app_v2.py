@@ -34,6 +34,7 @@ from .security.middleware import (
 )
 from .services.studio_v2 import (
     ClearanceExportService,
+    DeploymentStatusService,
     AuthorityService,
     ConstitutionService,
     ObserveService,
@@ -78,6 +79,7 @@ def build_studio_context(
     recorded_by: str = "",
     vendor_declarations: Any = None,
     received_clearances: Any = None,
+    deployment_report: Any = None,
 ) -> V2Context:
     """Wire the six services from whatever this deployment actually has.
 
@@ -114,6 +116,9 @@ def build_studio_context(
             tenant_id=getattr(received_clearances, "tenant_id", "")),
         start_run=StartRunService(review=review),
         ledger_observe=LedgerObserveService(review=review),
+        # MA-2 as amended (MS-2): the startup integrity report, handed once. A dict,
+        # not a package: no SD-1 entry is involved and no file is read.
+        deployment_status=DeploymentStatusService(report=deployment_report),
     )
 
 

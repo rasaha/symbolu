@@ -394,3 +394,53 @@ registry rows.
 - **No second read, no write, no file read.** One operation; the report is handed
   once and is immutable in the process, as the config it describes is.
 - **No SD-1 entry, no console route, no reopening of FD-11.4.**
+
+## 16 — Implementation record, MA-2 as amended (2026-09-06)
+
+Shipped as `governance-studio-deployment` 0.12.0 and studio contract amendment v2-A7.
+What each ruling became, and where the claim is checked:
+
+| Ruling | What landed | Where it is checked |
+|---|---|---|
+| MS-1 `SEAM_STATES_ONLY` | `DeploymentStatusService` (`services/studio_v2.py`) returns the six seam states, the `checks` map, `result`, `failure_code` and the pins, and has no field that could carry a registry row. | `backend/tests/test_deployment_status.py::test_ms1_*`; `deployment/.../tests/test_deployment_status_seam.py::test_ms1_*`; `frontend/tests/status-screen.test.tsx` ("shows no registry row") |
+| MS-2 `IN_MEMORY_RESULT_AT_COMPOSITION` | `server.run()` hands `result.report` to `build_app(deployment_report=…)`, which hands it to `_build_backend` and on to `build_studio_context(deployment_report=…)`; the service deep-copies it at construction and returns copies. `startup-integrity.json` is still written for the operator and is read by no route. | `test_deployment_status_seam.py::test_ms2_*`: the file corrupted, then deleted, then the handed dict mutated, and four identical answers; `test_deployment_status.py::test_ms2_*` |
+| MS-3 `OBSERVE_DEPLOYMENT_ONE_READ` | `GET /api/v2/observe/deployment`, operation `v2_observe_deployment`, summary "Deployment Status", in the observe router. Amendment v2-A7 chains from v2-A6 (`f42472ab…` → `c6785b26…`); the generated client and its hash were regenerated with `npm run generate:api-v2`. | `test_v2_operation_ids.py` (id, path and summary scans, drift); `test_publish_pin.py`; `verify_openapi_v2.py`; `verify:openapi-v2` and `verify:v2-api-boundary`; `test_deployment_status_seam.py::test_the_seventh_amendment_*` |
+| MS-4 `SEAM_STATES_CHECKS_AND_PINS` | `SEAM_STATE_FIELDS` and `PIN_FIELDS` name the field set; `cert_subject` and `cert_expiry` are named in `excluded_fields` and never in the result. | `test_deployment_status.py::test_ms4_*`; `test_deployment_status_seam.py::test_ms4_*`, against the real gate's certificate facts |
+| MS-5 `SEPARATE_STATUS_PANEL` | `StatusScreen` at `/studio/status`, a "Status" entry in the studio nav; the Observe screen is untouched. | `status-screen.test.tsx` (four tests); the a11y suite's new entry; `observe-two-sources.test.tsx` unchanged and passing |
+| frontend boundary | `approved-v2-api-operations.json`: 25 → 26 operations, 22 → 23 paths, new `openapi_sha256`; `V2_OPERATIONS` and `REQUIRED_V2_OPERATIONS` each gained one line. `v2_export_read` stays deliberately unapproved. | `studio-security.test.ts`; `verify:v2-api-boundary` ("26 operations consumed") |
+| P3E freeze | `approved-runtime-config.json`: version 0.12.0, `frozen.openapi_v2_sha256`, the amendment string led by v2-A7, and a `deployment_status` block. `configuration_added` stays at eight, `first_party_packages_in_image` at seventeen, `front_door_seams.handed_to_build_studio_context` at eight: the report is not a front-door seam and needs no variable or package. | `test_deployment_status_seam.py::test_the_runtime_config_records_the_seam_and_nothing_else_moved`; `test_container_artifacts.py` |
+| composition record | `composition-record.json` is the seam-11 registration (`reg_8dd15380…`, digest `f65c1ae4…`), superseding the clearance-export record kept byte-for-byte as `composition-record.seam-10.json`; `seams_handed_to_build_studio_context` ends in `deployment_report`. The two prior seam tests that pinned the head were re-pointed in the pattern every seam used. | `test_constitution_seam.py` (the chain, seam 10 added and the head moved); `test_clearance_export_seam.py`; `test_deployment_status_seam.py::test_the_composition_record_*` |
+
+**Verified, not asserted.**
+
+| Check | Result |
+|---|---|
+| studio backend suite | 359 passed |
+| `backend/scripts/verify_openapi_v2.py` | in sync, `c6785b26…` |
+| studio frontend: vitest | 26 files, 259 passed, the four status-screen tests and the a11y entry among them |
+| studio frontend: lint, type-check, build, `verify:openapi-v2`, `verify:v2-api-boundary` | all exit 0 |
+| deployment suite | 329 passed, 1 skipped; packaged end-to-end 9 passed |
+| `platform_freeze.verify`, `verify_ratified_pins.py`, `verify_gate_identifiers.py` | all pass |
+
+**What did not change.** The v1 contract (`dc309eab…`). The SD-1 allowlist (eleven
+entries; `sd1_entries_added` is `[]`). The console's served and withheld sets and the
+studio's four-route console allowlist. No environment variable, no image package, no
+credential, no egress destination; the review relay stays the one destination with
+seven routes. The Observe screen's two labelled sources.
+
+**Three decisions the implementation made, recorded rather than made quietly.**
+
+- **The composition record documents its context digest.** Prior records carry a
+  `context_digest` whose derivation is not written down. This one derives it from a
+  named string and records that string in `context_digest_of`, so the next seam can
+  reproduce it instead of inheriting an opaque value.
+- **A non-GET on the route is the framework's 405.** No write handler exists to refuse
+  with a typed reason; the absence is structural, as the export route's is, and the
+  tests assert it.
+- **The operator's file is still written.** MS-2 moves the panel's source into memory;
+  it does not remove the report from the volume, where the container gate and an
+  operator still read it. The tests prove the panel does not.
+
+MA-1, MA-3, MA-4 and MA-5 were implemented or recorded in §13 and §14. With this record
+every ruling in §11 and §15 is implemented, and nothing in §12 or §15.4 is authorized
+beyond it.

@@ -28,6 +28,7 @@ import {
   ReviewQueueScreen,
   RunDetailScreen,
   SimulateScreen,
+  StatusScreen,
   StudioLayout,
 } from "@/features/studio";
 import {
@@ -78,6 +79,8 @@ export function App() {
             {/* GAS-7 HR-D: Review Queue and Run Detail, display and relay only. */}
             <Route path="review" element={<ReviewQueueScreen />} />
             <Route path="review/:instanceId" element={<RunDetailScreen />} />
+            {/* MA-2 as amended (MS-5): the Status panel, one read of the startup attestation. */}
+            <Route path="status" element={<StatusScreen />} />
           </Route>
           <Route path="*" element={<Navigate to="/scenarios" replace />} />
         </Routes>

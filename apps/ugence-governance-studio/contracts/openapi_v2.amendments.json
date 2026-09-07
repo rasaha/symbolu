@@ -96,6 +96,21 @@
         "/api/v2/exports/{receipt_id}"
       ],
       "note": "Clearance export: one read, and only a read. It returns the portable, content-addressed form of a clearance receipt the deployment already received (CE-1) \u2014 never one the studio minted and never a compile result; the reconstruction path refuses compile-shaped keys outright. No write, no operation that accepts a receipt, no new egress destination and no credential. The artifact carries three honesty claims that cannot be omitted, softened or stripped without changing its fingerprint: identity_assurance PRESENTED_UNPROVEN, authenticity UNSIGNED with the unfed trust-anchor prerequisite named, and data_classification SYNTHETIC_DEMONSTRATION_ONLY. The route is named exports, not clearances, so the SD-2 verb scan over operation ids and paths is left exactly as it was. No other operation changed."
+    },
+    {
+      "amendment_id": "v2-A7",
+      "date": "2026-09-06",
+      "ruling": "ADR_UGENCE_MODULE_ADMINISTRATION_SCOPING.md MS-3 OBSERVE_DEPLOYMENT_ONE_READ (with MA-2 as amended by MS-1 SEAM_STATES_ONLY, MS-2 IN_MEMORY_RESULT_AT_COMPOSITION, MS-4 SEAM_STATES_CHECKS_AND_PINS)",
+      "previous_sha256": "f42472ab78a34cd24be4c9454c532074c5d000009c3ca72da243cc9139874431",
+      "sha256": "c6785b267dafe9e2593b58744890606727b26d450ffd1a32f9b544f95a2d0f3e",
+      "operations_added": [
+        "v2_observe_deployment"
+      ],
+      "operations_removed": [],
+      "paths_added": [
+        "/api/v2/observe/deployment"
+      ],
+      "note": "Deployment status: one read returning the deployment's own startup integrity attestation (the six seam states, the checks map, result, failure code and pins), handed to build_studio_context once at composition and never re-read; cert_subject and cert_expiry do not travel; the console's module registry is not here by ruling MS-1; nothing is probed at request time. No other operation changed."
     }
   ]
 }

@@ -18,6 +18,8 @@ const SCREENS = [
   { to: "publish", label: "Publish" },
   { to: "observe", label: "Observe" },
   { to: "review", label: "Review" },
+  // MA-2 as amended (MS-5 SEPARATE_STATUS_PANEL): read-only, no registry, no probe.
+  { to: "status", label: "Status" },
 ] as const;
 
 export function StudioLayout() {

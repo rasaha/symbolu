@@ -23,6 +23,7 @@ presents the answer as though the real thing had run.
 """
 from __future__ import annotations
 
+import json
 import re
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Tuple
@@ -1406,4 +1407,99 @@ class ClearanceExportService:
             "confers": EXPORT_CONFERS,
             "artifact": record,
             "result": record,
+        }
+
+
+# --------------------------------------------------------------------------- #
+# 12 · Deployment status (ADR_UGENCE_MODULE_ADMINISTRATION_SCOPING.md MA-2 as amended
+#      by MS-1 to MS-5)
+# --------------------------------------------------------------------------- #
+#: The six seam states the startup integrity report computes (MS-1 SEAM_STATES_ONLY).
+SEAM_STATE_FIELDS: Tuple[str, ...] = (
+    "constitution_registry",
+    "authority_reads",
+    "simulation_provider",
+    "system_registry",
+    "data_use_declarations",
+    "vendor_declarations",
+)
+
+#: The identity and pin fields that travel with the seam states (MS-4
+#: SEAM_STATES_CHECKS_AND_PINS). ``cert_subject`` and ``cert_expiry`` are deliberately
+#: absent: operator facts with no screen use, ruled out of the field set.
+PIN_FIELDS: Tuple[str, ...] = (
+    "deployment",
+    "deployment_version",
+    "frontend_version",
+    "frontend_build_hash",
+    "backend_api_version",
+    "api_contract",
+    "openapi_sha256",
+    "synthetic_bundle_hash",
+)
+
+#: What the answer is evidence of, and what it is not (§15.4: a configured seam is not
+#: a reachable engine). Travels on every available answer so a reader cannot infer a
+#: live probe from the presence of a status.
+STARTUP_ATTESTATION_CEILING = (
+    "STARTUP_ATTESTATION: what this deployment attested about itself before its port "
+    "bound, handed to the studio once at composition and never re-read. A configured "
+    "seam is not a reachable engine, a passed check is not a live one, and nothing "
+    "here is probed at request time."
+)
+
+
+class DeploymentStatusService:
+    """The one read MA-2 (as amended) ruled: the deployment's own startup attestation.
+
+    **Composition, not a route.** The deployment runs its fail-closed integrity gate
+    before the port binds and hands the resulting report to ``build_studio_context``
+    once (MS-2 ``IN_MEMORY_RESULT_AT_COMPOSITION``). This service copies it at
+    construction and returns copies; nothing at request time can change it, and no
+    file is read.
+
+    **Seam states, checks and pins only (MS-1, MS-4).** The nine console registry rows
+    are struck from MA-2 because no ruling lets them reach the studio; the certificate
+    facts are struck because no screen uses them. What is left is exactly what the
+    gate computed.
+
+    **A missing report is reported, never faked.** A context built without one
+    returns the typed ``unavailable`` shape naming the gap, rather than an empty
+    status that would read as "nothing is configured".
+    """
+
+    CAPABILITY = "deployment_report"
+
+    def __init__(self, report: Optional[Dict[str, Any]] = None) -> None:
+        self._report: Optional[Dict[str, Any]] = (
+            json.loads(json.dumps(report)) if isinstance(report, dict) else None
+        )
+
+    def _gap(self) -> Dict[str, Any]:
+        return _unavailable(
+            self.CAPABILITY,
+            "no startup integrity report was handed to the studio at composition; this "
+            "process was not started through the deployment's integrity gate",
+        )
+
+    def read(self) -> Dict[str, Any]:
+        """The seam states, checks and pins the gate attested, as it attested them."""
+        if self._report is None:
+            return self._gap()
+        seams = {name: str(self._report.get(name, "unset")) for name in SEAM_STATE_FIELDS}
+        checks = self._report.get("checks")
+        pins = {name: self._report.get(name) for name in PIN_FIELDS}
+        result = {
+            "seams": seams,
+            "checks": dict(checks) if isinstance(checks, dict) else {},
+            "result": self._report.get("result"),
+            "failure_code": self._report.get("failure_code"),
+            "pins": pins,
+        }
+        return {
+            "available": True,
+            "ceiling": STARTUP_ATTESTATION_CEILING,
+            "seam_state_fields": list(SEAM_STATE_FIELDS),
+            "excluded_fields": ["cert_subject", "cert_expiry"],
+            "result": result,
         }
