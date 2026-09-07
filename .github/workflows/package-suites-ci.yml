@@ -85,6 +85,7 @@ jobs:
           - packages/integration/execution-reservation
           - packages/integration/incident-response
           - packages/integration/vendor-dependency
+          - packages/tooling/workflow-converters
           - packages/uvi-policy-contracts
     steps:
       - uses: actions/checkout@v4

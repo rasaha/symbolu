@@ -845,3 +845,90 @@ This slice ships phase 1. Phase 2 (converters) needs its own read-only scoping
 audit and ballot before any code. Phases 3 and 4 wait, in that order, on the
 prerequisites named in §22.3 and on §20.5 as it stands. Nothing in §18 to §21
 moves.
+
+---
+
+## 23 — Owner ruling CV-1 to CV-5: Bring Your Workflow phase 2, offline converters (owner, 2026-09-07)
+
+**Status:** ratified by the owner in their own words on 2026-09-07 ("Ratify CV-1
+through CV-5 as recommended ... confirm n8n JSON as the first source format and BPMN
+2.0 as the second, and confirm that LangGraph, CrewAI and AutoGen stay deferred until
+a declarative export exists"), and implemented in the same slice for the first
+format.
+
+### 23.1 — What the repository settled before the ballot `[V]`
+
+- Workflow IR is compiled from a `PolicyPack` plus a `HumanApprovalRecord`. A
+  converter that wrote IR directly would forge compiler provenance and bypass
+  approval; the honest target is the compiler's input, a DRAFT pack.
+- The compiler refuses to compile a DRAFT pack: `DRAFT -> COMPILED` is an illegal
+  lifecycle transition (`models/policy_pack.py`), and `require_approval=False` does
+  not change that. The "preview compile" the audit named is therefore not a compile
+  at all: it is the compiler's public `WorkflowSynthesizer` run over the validated
+  draft, which yields the stage-3 IR with no manifest, release metadata or approval.
+- The composer's v1 adapter identifies its source by a digest, so the preview
+  carries a `structural_digest` that is the digest of the preview's own content, and
+  a `preview` block naming it `PREVIEW_UNAPPROVED`. The adapter accepts it; the
+  Bring Your Workflow gate accepts it (no credential-shaped key with a value, no
+  remote reference, under every limit).
+- IR node kinds are governance constructs; n8n nodes are execution steps. A
+  minority map, none completely; the converter's main output is the list of what did
+  not map, which is the product claim "what must change before enterprise
+  execution".
+- `SEMANTICALLY_EQUIVALENT` is the composer's reserved vocabulary; `MISSING_PROVENANCE`
+  is blocking in the compiler's validator, so every emitted object must cite the
+  export, registered as the pack's `SourceDocument` with the input digest, which is
+  the one provenance the converter truly has; an `ActionConstraint` without an
+  applicable authority fails validation, so none is fabricated for a write.
+- No export of any of the five formats existed in the repository `[G, now closed]`:
+  four synthetic n8n exports are authored under the package's `tests/fixtures`.
+
+### 23.2 — The ruling
+
+| # | Question | Ruling |
+|---|---|---|
+| **CV-1** | Packaging and where converters run | **`NEW_TOOLING_PACKAGE_CLI_OFFLINE`.** `packages/tooling/workflow-converters`, one module per source format, CLI only, no network, never on the SD-1 allowlist, never imported by the studio; the operator brings its output to the screen. Its only first-party dependency is the compiler. |
+| **CV-2** | Target and first format | **`EMIT_DRAFT_POLICY_PACK_THEN_PREVIEW_SYNTHESIS`** (the audit's "preview compile", corrected by §23.1). n8n workflow JSON first, BPMN 2.0 second. LangGraph, CrewAI and AutoGen are deferred until a declarative export exists; a request to convert them is refused by code, `DEFERRED_FORMAT`. |
+| **CV-3** | Report and provenance | **`CONTENT_ADDRESSED_CONVERSION_REPORT`** (`ugence.workflow-converters.conversion-report.v1`): converter identity, source format and detail, input digest and size, a mapping table with one row per construct (`MAPPED`, `UNMAPPED` or `UNSUPPORTED`, with reason code, target object ids and loss codes), unsupported constructs, semantic-loss warnings, governance gaps, tool requirements, credential requirements as handles only, the pack's id, `DRAFT` status, digest and object counts, the compiler's validation summary, the preview's status, version, digest and counts, and `report_digest` computed over everything else. |
+| **CV-4** | Loss and unsupported constructs | **`FAIL_CLOSED_ON_UNKNOWN_EXPLICIT_ON_LOSS`.** Unknown node types and code, command or sub-workflow nodes are `UNSUPPORTED` and the state is `PARTIAL`; every translation loss is a named warning; a secret-shaped key or value anywhere in the export refuses the whole conversion with no output; not JSON, not an object, not an export of the format, over 1 MiB, deeper than 32 levels or more than 200 nodes refuse likewise; nothing is defaulted silently. |
+| **CV-5** | The claim | **`STRUCTURALLY_TRANSLATED_ONLY`.** A conversion ends `STRUCTURALLY_TRANSLATED` or `PARTIAL` and states, verbatim: "Constructs were translated per the mapping table and nothing more. This report makes no claim of semantic equivalence, governance, approval, validation or executability. The emitted pack is a DRAFT for human review; the preview Workflow IR is unapproved." No output text may say equivalent, governed, approved or validated except in negation; `SEMANTICALLY_EQUIVALENT` never appears. |
+
+### 23.3 — What this ruling supersedes, and what it does not authorize
+
+**Supersedes** the sentence "no converter exists yet" in §22's explainer entry and on
+the Bring Your Workflow screen, both amended in place. §22's "Does not authorize:
+framework converters (phase 2, its own scoping)" is discharged by this section for
+n8n only.
+
+**Does not authorize:** the BPMN 2.0 converter before its own fixtures and tests
+land under this ruling's terms (no new ballot is needed; the format is ruled);
+LangGraph, CrewAI or AutoGen converters before a declarative export exists, and then
+only after their own read-only scoping of that export; any conversion that moves a
+pack past `DRAFT`, fabricates an authority requirement, action constraint, approval
+or provenance, evaluates an n8n expression, or reads a node's code; any studio route
+or screen that runs a converter; any persistence of an export, pack or report by the
+studio (phase 3 stands as §22.3 left it); LIVE execution.
+
+### 23.4 — Verification recorded with the slice `[V]`
+
+`packages/tooling/workflow-converters/tests`: the n8n conversion over four synthetic
+fixtures (one row per node; the branch's translated and untranslated predicates; read
+and write nodes; model, trigger, human and data-shaping nodes; code unsupported and
+never inspected; credentials as handles; workflow-level losses; provenance on every
+object; the legacy IF shape; an unknown node; refusal by typed code for a secret,
+YAML, a non-object, a non-export, the three limits, deferred and unknown formats;
+determinism and content addressing), the boundary and claim tests (no network,
+process, dynamic-import, YAML or archive module imported; the compiler alone as
+first-party dependency; the DRAFT pack refused by the compiler with
+`IllegalLifecycleTransition` and `APPROVAL_REQUIRED`; no forbidden claim word outside
+negation in any output; honest `version_info`; the preview passing the Bring Your
+Workflow gate's rules and adapted by the composer with `ok`), and the CLI tests
+(three files and nothing else, two without preview, nothing on refusal with exit 2,
+byte-stable outputs). The package is named by the package-suites CI matrix, and the
+repository's import-boundary and CI-coverage checkers pass with it present.
+
+### 23.5 — Sequence
+
+BPMN 2.0 next, under this ruling's terms. Then, and only after an owner-provided or
+synthetic declarative export exists for one of the three deferred frameworks, a
+read-only scoping of that export. Phases 3 and 4 of §22 are unchanged.
