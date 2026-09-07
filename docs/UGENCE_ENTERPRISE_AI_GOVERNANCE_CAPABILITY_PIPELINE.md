@@ -7,7 +7,9 @@
 
 This document explains how the enterprise AI governance capabilities found under the repository's `packages/` directory fit into one understandable operating sequence. It is intended for business leaders, governance teams, architects, risk officers and engineers.
 
-The inspected repository snapshot contains **47 installable packages**. This document intentionally excludes the two packaged business-solution examples and covers the remaining **45 platform capabilities**. Cloud-scaling packages remain included because they are capability and integration modules that demonstrate how the general governance architecture can govern a consequential operational domain.
+The inspected repository snapshot (default branch at commit `cabd218e`, 7 September 2026) contains **71 installable packages**. This document intentionally excludes the two packaged business-solution examples and covers the remaining **69 platform capabilities**. Cloud-scaling packages remain included because they are capability and integration modules that demonstrate how the general governance architecture can govern a consequential operational domain.
+
+Capability identifiers are stable across revisions. Revision 1.1 numbered the 45 capabilities present on 4 September 2026 in sequence order; revision 2.0 adds the 24 packages merged since as capabilities 46 to 69, each placed in the stage section it belongs to, so numbering inside a section is no longer contiguous. The module map published on 6 September 2026 counted 66 packages including the two products; five further packages landed between that map and this snapshot (Authoritative Policy Compilation, Procurement Policy Compilation, Reasoning-Method Result Attestation, Clearance Export and Console API). Appendix C.4 cross-references every capability to that map's module identifiers.
 
 The package set is not uniformly production-ready. It includes implemented kernels, integration components, experimental or research-only capabilities, and contract-only foundations. A package's presence in the sequence identifies its architectural responsibility; it does not by itself establish production deployment readiness.
 
@@ -114,6 +116,18 @@ These packages do not represent a single business step. They provide the common 
 2. Prevents caller-controlled value multipliers and floating policy references from gaming an assessment.
 3. Gives Policy Authority and downstream evaluators a stable contract boundary without merging policy issuance with measurement.
 
+### 46. Console API
+
+**Package:** `packages/integration/console-api`  
+**Sequence alignment:** Cross-cutting shadow surface over **Propose → Verify → Authorize → Clear**, with audit reads for **Assure**.  
+**Pipeline role:** Packages the consolidated control plane's governed loop as an installable service that runs one proposed action through context minimization, TAP, ActionGate and clearance in shadow, records the trail and serves it back. It exposes four routes the studio's frozen allowlist names and withholds six others by ruling; nothing it serves grants, authorizes, clears or executes.
+
+**Why it is necessary:**
+
+1. Gives the studio and console one bounded HTTP surface whose governance dependencies are required, so the service cannot answer while the governance it advertises is absent.
+2. Publishes its own ceiling on every answer through an audit-ceiling header and body field, so a consumer can never mistake a shadow verdict for enforcement.
+3. Keeps a capability from becoming public API merely because the function exists; restoring a withheld route takes an owner ruling.
+
 ## 5. Define — establish policies, identities and boundaries
 
 ### 6. Policy Authority
@@ -187,6 +201,78 @@ These packages do not represent a single business step. They provide the common 
 1. Lets an organization govern reasoning procedures independently of a model's self-selected behavior.
 2. Makes strategy permission signed, versioned and revocable rather than a mutable local setting.
 3. Prevents permission to reason in a certain way from being confused with permission to act.
+
+### 47. Authority Directory
+
+**Package:** `packages/integration/authority-directory`  
+**Sequence alignment:** **Define**, consumed by **Decide** and **Authorize**.  
+**Pipeline role:** Reports role grants: who may approve what, over which scope, until when, with one-hop narrowing delegation and committee membership. It never authenticates, approves or mints authority; a reported grant is an input to somebody else's decision.
+
+**Why it is necessary:**
+
+1. Closes the gap the approval-workflow design left open, an eligibility port with no production adapter.
+2. Refuses silent breadth: a grant that covers everything must name the root it covers, and delegation narrows by exactly one hop.
+3. Keeps identity proof with the identity provider, so the directory reports organizational truth without attesting that it should exist.
+
+### 48. AI System Registry
+
+**Package:** `packages/integration/ai-system-registry`  
+**Sequence alignment:** **Define**, record for **Assure** and **Measure**.  
+**Pipeline role:** Records what an administrator asserted about an AI system: a bounded registration over the borrowed system identity, keyed by the binding's own digest, owner and validity window. It never admits, promotes, gates, resolves or attests.
+
+**Why it is necessary:**
+
+1. Gives every downstream receipt a registered system to point at without minting a second identity.
+2. Derives the registration id from content, so a collection keyed by id can never silently lose a registration.
+3. Treats a lapsed registration as absent from every answer, so it cannot be argued around downstream.
+
+### 49. Data-Use Admission
+
+**Package:** `packages/integration/data-use-admission`  
+**Sequence alignment:** **Define**, upstream of **Propose**.  
+**Pipeline role:** Records declared data use at the admission seam Context Minimization disclaims: what data a subject says it will use, under an opaque label and a residency value that is metadata, never a verdict. It never inspects, classifies, redacts, admits or governs egress.
+
+**Why it is necessary:**
+
+1. Fills the seam upstream of context minimization without letting a label be interpreted, so a query can be neither widened nor narrowed by reasoning about what a label means.
+2. Keeps the distribution structurally unable to reach data, a context, a model or a network.
+3. Separates data-use declaration from action authorization so a data question is never answered by an action verdict.
+
+### 50. Vendor Dependency
+
+**Package:** `packages/integration/vendor-dependency`  
+**Sequence alignment:** **Define**, record for **Verify** and **Measure**.  
+**Pipeline role:** Records declared vendor dependencies with an opaque posture label, append-only and tenant-bound. It never resolves, verifies, scores, ranks, approves or contacts a vendor; a declaration is a record, not a permission.
+
+**Why it is necessary:**
+
+1. Covers the third-party AI and vendor-risk gap without becoming the Third-Party Gateway that Risk Authority reserves as a connector milestone.
+2. Refuses to invent a risk taxonomy: no grade, score, severity or implied eligibility travels with the record.
+3. Makes declarations immutable and tenant-fixed so a vendor posture cannot be quietly rewritten.
+
+### 51. Authoritative Policy Compilation
+
+**Package:** `packages/integration/authoritative-policy-compilation`  
+**Sequence alignment:** **Define → Propose**.  
+**Pipeline role:** The composition root between Policy Authority and the Policy Workflow Compiler: it resolves a policy through Policy Authority, re-verifies the body digest with Policy Authority's own framing, and derives the authoritative-source reference for a compiled release from that verified resolution. It issues, revokes and approves nothing and holds no key material.
+
+**Why it is necessary:**
+
+1. Binds a compiled release to an issuance that was actually resolved rather than one a caller asserted.
+2. Refuses in five distinct ways before compiling, so drift between the two authorities surfaces as a typed failure rather than a valid-looking release.
+3. Stays out of the approval seam by ruling, so human approval of the pack digest remains a separate act.
+
+### 52. Procurement Policy Compilation
+
+**Package:** `packages/integration/procurement-policy-compilation`  
+**Sequence alignment:** **Define**, for the procurement family.  
+**Pipeline role:** The procurement family's deterministic mapping from a resolved policy artifact to a policy pack, the builder the authoritative compilation root requires and deliberately does not ship. The parser is strict and total: an unknown key is a refusal, and identical artifacts produce identical packs byte for byte.
+
+**Why it is necessary:**
+
+1. Keeps the compiler a leaf with no Policy Authority coupling and keeps the product from inverting the boundary.
+2. Refuses rather than drops unknown content, so a pack never governs less than the policy says.
+3. Never authors an authoritative source; a builder that supplied one would be refused.
 
 ## 6. Propose — prepare advice, plans and candidates
 
@@ -420,6 +506,30 @@ These packages do not represent a single business step. They provide the common 
 2. Keeps policy authenticity distinct from the decision that the proposed scaling action is acceptable.
 3. Makes the domain policy reference independently auditable before exact-action authorization.
 
+### 53. Agent Assurance Evidence
+
+**Package:** `packages/integration/agent-assurance-evidence`  
+**Sequence alignment:** **Verify**, evidence provider into **Decide**.  
+**Pipeline role:** Records what a declarer asserted an assurance exercise found: one system binding tied to one existing evidence reference under an uninterpreted label. It never runs a probe, scores a finding, admits evidence or decides.
+
+**Why it is necessary:**
+
+1. Fills the evidence-provider slot for adversarial and security assurance without becoming a decision authority.
+2. Gives a finding a single evidence identity so no competing reference is minted.
+3. Refuses a finding whose tenant, evidence tenant and subject disagree, rather than reconciling them.
+
+### 54. Reasoning-Method Result Attestation
+
+**Package:** `packages/integration/reasoning-method-result-attestation`  
+**Sequence alignment:** **Verify → Propose** (provenance of the evidence behind a reasoning-method advisory).  
+**Pipeline role:** Wraps a reasoning-method comparison result in a signed attestation under Trusted Evidence Authority custody, recomputing the result digest through the contract at every read. It never runs a comparison, admits an advisory or judges fit, and a verified signature never means the comparison is correct.
+
+**Why it is necessary:**
+
+1. Closes the provenance requirement of the first admission study structurally rather than by policy.
+2. Reuses Trusted Evidence Authority anchors as identical objects, so no second trust store appears.
+3. Keeps factual correctness permanently unestablished by the signature, preventing provenance from being read as validity.
+
 ## 8. Decide — make accountable business and risk determinations
 
 ### 31. Decision Authority
@@ -457,6 +567,54 @@ These packages do not represent a single business step. They provide the common 
 1. Translates domain-specific recommendation facts into the common enterprise risk model.
 2. Preserves one-way dependency so the scaling controller remains advisory and unaware of authority internals.
 3. Allows capacity, workload and operational risks to influence governance before infrastructure mutation.
+
+### 55. Approval Workflow
+
+**Package:** `packages/integration/approval-workflow`  
+**Sequence alignment:** **Decide**, feeding **Authorize**.  
+**Pipeline role:** The canonical approval and exception queue: forward-only request states, read-time expiry, an exception path and exactly-once consumption of a granted approval. It never approves, authenticates, mints authority or executes; a granted approval is an input to a governed decision.
+
+**Why it is necessary:**
+
+1. Gives the platform the sink that HOLD, DEFER and ESCALATE outcomes previously lacked.
+2. Keeps the record in Ugence by ruling, with ServiceNow and Jira as mirrors rather than the system of record.
+3. Converges in any arrival order and never walks a decision back.
+
+### 56. Approver Identity
+
+**Package:** `packages/integration/approver-identity-jwt`  
+**Sequence alignment:** **Decide** (proof of who decided).  
+**Pipeline role:** Validates locally an RFC 9068 access token it did not issue and returns verified claims to the review service's identity port. It mints no identity, holds no credential beyond public keys, never logs or stores a token, and fails closed when the key set cannot be fetched.
+
+**Why it is necessary:**
+
+1. Turns a presented approver reference into a proof from an issuer, the missing half of every recorded decision.
+2. Fails closed on unavailable or symmetric keys so an unverifiable identity blocks rather than passes.
+3. Takes time from an injected clock and never infers actor type from token claims.
+
+### 57. Governed Review
+
+**Package:** `packages/integration/governed-review`  
+**Sequence alignment:** **Decide**, between **Verify** and **Authorize**.  
+**Pipeline role:** Binds a human approval to a parked governed proposal and consumes it exactly once before the durable engine advances, releasing only the Decision Authority hold it satisfied. It never approves, authenticates, mints authority, signals, resumes or executes.
+
+**Why it is necessary:**
+
+1. Is the ESCALATE sink the durable engine lacked; only a hold that carries required approvals is reviewable.
+2. Makes approval use crash-safe and exactly-once, so the action runs once and the approval is spent once.
+3. Changes one field only, the veto, and leaves every other tightening restriction in place.
+
+### 58. Governed Review Service
+
+**Package:** `packages/integration/governed-review-service`  
+**Sequence alignment:** **Decide**, with audit linkage into **Assure**.  
+**Pipeline role:** Lists the review queue joined to each instance's durable checkpoint, renders a run, records a human's decision under a presented identity, re-arms the parked instance and appends the completed round trip's linkage to the audit ledger once. It never approves, authenticates, mints authority, clears or executes.
+
+**Why it is necessary:**
+
+1. Makes a parked instance visible to a human, closing the durability matrix's blind row.
+2. Re-arms rather than resumes, so the decision is still made in the next governed quantum.
+3. Appends the linkage non-blocking, once and named, so an incomplete round trip is a typed not-yet rather than a silent gap.
 
 ## 9. Authorize — permit one exact consequential action
 
@@ -496,6 +654,42 @@ These packages do not represent a single business step. They provide the common 
 2. Provides a deterministic enforcement point immediately before operational clearance and execution.
 3. Preserves separation between authorization and actuation, limiting the consequences of an ActionGate defect or integration error.
 
+### 59. Cloud Scaling Envelope Issuance
+
+**Package:** `packages/integration/cloud-scaling-envelope-issuance`  
+**Sequence alignment:** **Authorize** (cloud-scaling Phase 5B-4).  
+**Pipeline role:** Composes the ladder's verified facts, candidate, producer attestation and policy authenticity, into one call on Risk Authority's Phase 5 issuance seam, which signs. The seam refuses unless all five bindings report verified; a verifier that raises is unavailable, never a pass. An envelope is authority, not execution.
+
+**Why it is necessary:**
+
+1. Turns the previously contained Phase 5 into a real issuance path while keeping every key and clock inside Risk Authority.
+2. Refuses in production any reference-mode application or signer that has not opted in as production-authoritative.
+3. Lifts the same-instance restriction so any application over the decision store may issue.
+
+### 60. Cloud Scaling Action Admission
+
+**Package:** `packages/integration/cloud-scaling-action-admission`  
+**Sequence alignment:** **Authorize** (cloud-scaling Phase 5C).  
+**Pipeline role:** Decides whether a presented capacity action is the action a signed envelope was issued for, and stops there. It implements Risk Authority's action-gate port after the kernel has verified signature, window, tenant, session, revocation and epoch; magnitude is bounded by the target scope and the envelope's execution-target binding. An authorization is admission, not execution.
+
+**Why it is necessary:**
+
+1. Provides the production-authoritative exact-action check for the cloud-scaling domain that the generic gate cannot express.
+2. Returns a stored verdict as replayed for the same triple, so downstream references stay stable.
+3. Reports executable as permanently false, so admission can never be mistaken for dispatch.
+
+### 61. Agent Runtime Governance Hook
+
+**Package:** `packages/integration/agent-runtime-governance`  
+**Sequence alignment:** **Authorize → Clear → Execute** (the hook at the runtime boundary).  
+**Pipeline role:** The production governance hook for Agent Runtime: composes Risk Authority, Decision Authority and ActionGate through the runtime composition engine and projects the resulting execution decision onto the runtime's governance evaluation, binding proposal fingerprint and correlation. It contains no composition logic, no authority and no credentials, and never raises; anything but a grant defaults to block.
+
+**Why it is necessary:**
+
+1. Is the fourth hook, the one a deployment actually uses; the runtime shipped only unconfigured, allow-all and deprecated hooks.
+2. Closes three widening paths: enum look-alikes, self-reported executability and exceptions read as permission.
+3. Makes the disposition faithful to the authority chain without making it actionable, so a credential is still required to act.
+
 ## 10. Clear — recheck present conditions immediately before execution
 
 ### 37. Action Clearance
@@ -509,6 +703,30 @@ These packages do not represent a single business step. They provide the common 
 1. Handles the gap between authorization time and execution time, when environment conditions may change.
 2. Stops stale authorization from overriding freezes, incidents, conflicts, expired dependencies or other current constraints.
 3. Adds a last safe checkpoint without duplicating Decision Authority or ActionGate.
+
+### 62. Execution Reservation
+
+**Package:** `packages/integration/execution-reservation`  
+**Sequence alignment:** **Clear → Execute** (one-time reservation and clearance receipts).  
+**Pipeline role:** One durable adapter that backs Decision Authority's execution ledger and adds the reservation and receipt tables it lacked: exactly one acquired reservation per execution key decided inside one write transaction, forward-only observations, and durable clearance receipts. It never dispatches, observes an external system or mints authority; clear plus acquired is still not execution.
+
+**Why it is necessary:**
+
+1. Keeps the Decision Authority ledger the only ledger, so no third canonical execution record appears.
+2. Guarantees a cleared action can be executed once and only once across retries.
+3. Converges observations in any arrival order and never downgrades a terminal success.
+
+### 63. Clearance Export
+
+**Package:** `packages/integration/clearance-export`  
+**Sequence alignment:** **Clear** (portable read of a received clearance).  
+**Pipeline role:** Serializes a clearance somebody else evaluated into a portable artifact that carries its own ceilings inside the fingerprint preimage, and reports what a reader can check about it. Verification returns a report, not a boolean, and what the artifact confers is nothing. It never clears, authorizes, signs, stores or decides.
+
+**Why it is necessary:**
+
+1. Lets an external runtime consume a clearance without reaching the package that owns the receipt.
+2. Refuses a payload that dropped a ceiling label rather than defaulting it.
+3. Keeps compile-shaped keys out of the reconstruction path so a policy pack can never masquerade as a clearance.
 
 ## 11. Execute — perform only the permitted operation
 
@@ -535,6 +753,42 @@ These packages do not represent a single business step. They provide the common 
 1. Demonstrates how governance reaches a real consequential infrastructure mutation.
 2. Prevents the advisory controller from containing hidden execution capability.
 3. Supports safer adoption through dry-run behavior and explicit authorization-gated mutation.
+
+### 64. Durable Execution
+
+**Package:** `packages/integration/durable-execution`  
+**Sequence alignment:** **Execute** (scheduling and recovery only).  
+**Pipeline role:** Lets an external durable-execution engine, DBOS as ratified, drive Agent Runtime transitions without holding any governance state: every retry re-enters the same transition and re-crosses the governance boundary, and the engine never learns whether governance said hold or escalate. It schedules no retries of its own, authors no policy, mints no authority, holds no credential and interprets no Workflow IR.
+
+**Why it is necessary:**
+
+1. Gives the runtime crash recovery, retry and resume from a proven engine while Ugence keeps ownership of Workflow IR and governance state.
+2. Makes a retry re-clear rather than replay, because the hook runs inside the durable step.
+3. Ties the maturity claim to evidence: all eleven durability-matrix rows pass against a real PostgreSQL in CI, and a skipped row is not a passing row.
+
+### 65. Cloud Scaling Credential Broker
+
+**Package:** `packages/integration/cloud-scaling-credential-broker`  
+**Sequence alignment:** **Authorize → Execute** boundary (cloud-scaling Phase 5X).  
+**Pipeline role:** Exchanges an admitted and reserved capacity action for an opaque, short-lived credential handle through a broker port, deriving a least-privilege role from the target scope and capping the window by authorization, reservation lease, envelope and a fifteen-minute ceiling. It holds no provider secret, key, clock or execution surface; the operating-system, network and cloud modules are banned from its code. A grant is a handle, not execution.
+
+**Why it is necessary:**
+
+1. Makes an authorized action and an unauthorized one use different credentials, which nothing in the platform guaranteed before.
+2. Keeps custody outside the repository by design, so the package can never leak what it never holds.
+3. Lets a broker narrow a role and never widen it, with the window as the strict minimum of four bounds.
+
+### 66. Cloud Scaling Bounded Execution
+
+**Package:** `packages/integration/cloud-scaling-bounded-execution`  
+**Sequence alignment:** **Execute → Assure** (cloud-scaling Phase 5D).  
+**Pipeline role:** The only path from a credential grant to the executor: it re-derives the credential request through the broker's minter, requires a reserved reservation, dispatches exactly one bounded capacity change through the controlled executor and mints the effect observation for reconciliation. LIVE runs only under six proven preconditions; any absence resolves to dry-run, never simulation. It holds no credential and builds no backend.
+
+**Why it is necessary:**
+
+1. Proves the grant rather than trusting it before anything runs.
+2. Narrows blast radius both ways, taking the minimum of configured and role ceilings, and treats rollback as a new admission, reservation and grant.
+3. Hands the observed effect to execution assurance so success is reconciled, not assumed.
 
 ## 12. Assure — monitor authority, trajectory and real-world effect
 
@@ -586,6 +840,42 @@ These packages do not represent a single business step. They provide the common 
 2. Connects context minimization to measurable cost, efficiency and governance outcomes.
 3. Supports tenant isolation, reconciliation and audit of token use across attempts and workflows.
 
+### 67. Risk Authority Effect Attestation
+
+**Package:** `packages/integration/risk-authority-effect-attestation`  
+**Sequence alignment:** **Assure → Verify** (signed external-effect evidence).  
+**Pipeline role:** Signed external-effect verification, contracts first: an executing provider and an independent observer are two non-interchangeable attester roles, and an anchor for one never satisfies the other. It never produces, fetches, reconciles or admits an observation, and a verified signature never means the effect is true.
+
+**Why it is necessary:**
+
+1. Is the successor to execution assurance's non-cryptographic trust in effect sources.
+2. Types the independence thesis: provider self-attestation is not independent effect verification.
+3. Keeps four trust-state refusals distinguishable because an operator must act on each differently.
+
+### 68. Incident Response
+
+**Package:** `packages/integration/incident-response`  
+**Sequence alignment:** **Assure**, feeding **Decide**.  
+**Pipeline role:** Records an incident and proposes containment: it builds the neutral authority-reassessment signal and never delivers it, and closing an incident does not lift containment. It never revokes, executes, rolls back or lifts its own containment; a recorded incident is an input to somebody else's decision.
+
+**Why it is necessary:**
+
+1. Every actor that could act already exists, so the package holds no writer and no client and cannot mutate authority even by mistake.
+2. Makes the close-versus-lift asymmetry structural, because an incident that silently restores service turns containment into theatre.
+3. Enforces its rules as invariants re-run on construction and deserialization, with subclassing refused.
+
+### 69. Control-Plane Root
+
+**Package:** `packages/integration/control-plane-root`  
+**Sequence alignment:** Record for **Assure** and **Measure**; composition root for the control plane.  
+**Pipeline role:** Appends one entry, at one caller-supplied instant, into one tenant's tamper-evident audit chain and returns the audit reference naming it. Update and delete are refused by database triggers. It decides nothing, owns no policy, issues no envelope, brokers no credential, and unifies no existing audit store; it is deliberately an eighth store rather than a migration of seven.
+
+**Why it is necessary:**
+
+1. Gives evidence and audit, the one shared service the roadmap names as unowned, a composable owner.
+2. Makes durability structural, not conventional.
+3. Refuses to become the AI Control Plane product; it is a root under it and never the thing itself.
+
 ## 13. Measure — evaluate readiness and governed value
 
 ### 44. Agent Value Readiness
@@ -614,12 +904,12 @@ These packages do not represent a single business step. They provide the common 
 
 ## 14. End-to-end interpretation
 
-The 45 capabilities form four complementary layers:
+The 69 capabilities form four complementary layers:
 
 1. **Governance definition layer:** establishes policies, constitutions, identities, benchmarks and machine-readable workflow rules.
-2. **Agent intelligence layer:** prepares candidates, teams, reasoning-method advice, model selection, context and domain recommendations without owning authority.
-3. **Authority and execution layer:** verifies claims and evidence, makes the binding decision, mints bounded machine authority, checks the exact action, clears current conditions and executes.
-4. **Assurance and value layer:** observes authority status, runtime trajectory, real-world effect, resource consumption, readiness and governed value.
+2. **Governed proposal layer:** prepares candidates, teams, admitted reasoning-method advice, model selection, context and domain recommendations as typed inputs that own no authority.
+3. **Authority and execution layer:** verifies claims and evidence, records who may decide and consumes their approval once, makes the binding decision, mints bounded machine authority, admits the exact action, clears current conditions, reserves execution once, brokers a short-lived credential and executes one bounded change under a durable engine.
+4. **Assurance, record and value layer:** observes authority status, runtime trajectory and real-world effect, attests effects by role, records incidents, appends every step to a tamper-evident ledger, and measures resource consumption, readiness and governed value.
 
 The platform's differentiation is therefore not any single gate. It is the **non-collapsible chain of accountability**:
 
@@ -636,9 +926,11 @@ Risk authority converts that decision into bounded machine authority
         ↓
 ActionGate matches authority to the exact action
         ↓
-Action Clearance checks the present operational world
+Action Clearance checks the present operational world and reserves execution once
         ↓
-Agent Runtime and domain operations execute without expanding authority
+A credential broker issues a short-lived handle for that reservation only
+        ↓
+Agent Runtime and domain operations execute one bounded change without expanding authority
         ↓
 Assurance reconciles trajectory and real-world effect
         ↓
@@ -661,7 +953,7 @@ Readiness and governed value inform the next policy cycle
 
 ## A.1 Purpose of the appendix
 
-This appendix tests the architecture against one concrete enterprise situation rather than assuming that all 45 capabilities must participate in every transaction. Its purpose is to show:
+This appendix tests the architecture against one concrete enterprise situation rather than assuming that all 69 capabilities must participate in every transaction. Its purpose is to show:
 
 - which capabilities are essential to the live governance path;
 - which are specifically required by the cloud-scaling domain;
@@ -723,11 +1015,13 @@ Risk Authority Evidence Runtime turns admitted evidence and control-assurance re
 
 Decision Authority then owns the binding business determination: for example, approve the increase to 180 replicas for the production payments service, subject to the stated policy, evidence, time window and conditions. The model recommendation is not the decision. TAP support is not the decision. A risk score is not the decision.
 
+Where the policy requires a human, the Authority Directory says who may approve and until when, the Approval Workflow holds the request and its expiry, Approver Identity proves the approver authenticated, and Governed Review binds the granted approval to the exact parked proposal and consumes it once before the durable engine advances. An approval recorded in a ticketing system is a mirror; the consumed approval in Ugence is the record.
+
 Risk Authority evaluates mandatory controls non-compensatorily. A strong forecast cannot compensate for a failed change-freeze control, an untrusted producer or a missing required approval. If controls and the binding decision are valid, Risk Authority creates scoped, time-bound and revocable machine authority that cannot exceed the decision.
 
 ### A.2.6 Authorize: the exact proposed mutation must match the authority
 
-Cloud Scaling Authorization Contracts bind the exact recommendation, risk result, producer and policy references into a capacity-action candidate. Risk Authority Runtime composes the canonical Decision Authority, Risk Authority and ActionGate path.
+Cloud Scaling Authorization Contracts bind the exact recommendation, risk result, producer and policy references into a capacity-action candidate. Cloud Scaling Envelope Issuance presents the verified candidate, producer attestation and policy authenticity to Risk Authority's Phase 5 seam, which signs the envelope. Cloud Scaling Action Admission then checks that the presented action is the one the envelope was issued for, and Risk Authority Runtime composes the canonical Decision Authority, Risk Authority and ActionGate path. Inside the runtime, the Agent Runtime Governance Hook projects that composed decision onto every consequential transition.
 
 ActionGate checks the exact action: the authorized actor, service, environment, operation, present replica count, target replica count, constraints and validity window. Authority to increase the payments service from 120 to 180 replicas cannot be reused to scale another service, change a different environment, increase to 240 replicas or perform an unrelated infrastructure operation.
 
@@ -739,13 +1033,13 @@ Seconds before execution, Action Clearance evaluates trusted current-state signa
 
 If the action remains valid, clearance is `CLEAR`. If information is temporarily incomplete, it can be held. If a human decision is needed, it can be escalated. If a prohibiting condition exists, it is blocked. Action Clearance can narrow or stop existing authority but cannot create or broaden it.
 
-This stage prevents a previously valid authorization from overriding the world as it exists at execution time.
+This stage prevents a previously valid authorization from overriding the world as it exists at execution time. Once clear, Execution Reservation acquires the action exactly once per execution key, so a durable retry can re-clear but never re-apply.
 
 ### A.2.8 Execute: runtime coordination and domain actuation remain separate
 
 Agent Runtime coordinates the workflow transition, governance call, provider invocation, timeout, retry, cancellation, budget, checkpoint and recovery behavior. It preserves one canonical execution state and fails closed for consequential transitions when governance is absent.
 
-Cloud Scaling Operations performs the permitted Kubernetes or ArgoCD change. It receives external authorization and should execute only the operation that was authorized. Dry-run can be used during pilot and assurance testing before production mutation is enabled.
+Durable Execution drives the runtime transitions under the ratified engine, so a crash mid-workflow resumes at the same governed step. The Cloud Scaling Credential Broker exchanges the admitted, reserved action for a short-lived, least-privilege credential handle, and Cloud Scaling Bounded Execution re-verifies that handle and reservation before dispatching exactly one bounded change through Cloud Scaling Operations, which performs the permitted Kubernetes or ArgoCD change. Dry-run is the default and the fallback whenever any live precondition is absent.
 
 The separation matters: the controller recommends, authority components permit, the runtime coordinates and the operations package mutates infrastructure. No single component owns the entire chain.
 
@@ -754,6 +1048,8 @@ The separation matters: the controller recommends, authority components permit, 
 Risk Authority Status Runtime continues to propagate revocation and authority-epoch changes. Runtime Assurance observes whether the workflow trajectory remains consistent with what governance approved. Execution Assurance reconciles the command, execution record and real-world effect.
 
 For example, the Kubernetes API may report success while only 165 of the 180 requested replicas become ready. Latency may remain above the service objective because the bottleneck is a downstream database. Execution Assurance distinguishes command completion from intended effect and can trigger reassessment rather than allowing the system to assume success.
+
+Risk Authority Effect Attestation lets an independent observer, not the executing provider, sign the observed effect once wired into reconciliation. Incident Response records a severity-one incident and proposes containment without lifting it itself. Every decision, clearance, execution and effect is appended to the Control-Plane Root's tamper-evident ledger, which is what an auditor reads afterwards.
 
 Context-Minimization Token-Accounting Runtime is relevant if LLM token consumption participates in workflow budgets. It is optional when the scaling decision path is entirely deterministic and uses no material model context.
 
@@ -802,7 +1098,7 @@ flowchart TD
 | **Evaluation only** | Used in design, testing, readiness or retrospective analysis rather than every live scaling transaction. |
 | **Not applicable** | Unnecessary for the stated single-agent, fixed-execution scenario; it becomes relevant only if the scenario changes. |
 
-## A.5 Complete 45-capability applicability matrix
+## A.5 Complete 69-capability applicability matrix
 
 | # | Capability | Primary stage | Applicability | How it contributes—or why it is not needed |
 |---:|---|---|---|---|
@@ -851,6 +1147,30 @@ flowchart TD
 | 43 | Context-Minimization Token-Accounting Runtime | Assure / Measure | Optional enhancement | Settles measured LLM-token use when model calls participate in the workflow budget. |
 | 44 | Agent Value Readiness | Measure | Evaluation only | Assesses whether the agent is ready for broader autonomy; it does not authorize this action. |
 | 45 | Governed Value | Measure | Optional enhancement | Connects observed reliability benefit and cost to the authorized action. |
+| 46 | Console API | Foundation | Optional enhancement | Runs the pilot's governed loop in shadow and serves the audit chain; not needed once the runtime hook is wired directly. |
+| 47 | Authority Directory | Define | Core required | Names who may approve the bounded capacity increase and the executive who may exceed it. |
+| 48 | AI System Registry | Define | Optional enhancement | Registers the scaling agent as a governed system for the audit chain; the pilot can run on a single known system without it. |
+| 49 | Data-Use Admission | Define | Not applicable | The scaling decision uses workload metrics, not personal or classified data; becomes relevant when an LLM sees customer context. |
+| 50 | Vendor Dependency | Define | Evaluation only | Declares the cloud provider, ArgoCD and model vendors the pilot depends on for the audit record. |
+| 51 | Authoritative Policy Compilation | Define | Core required | Binds the compiled scaling workflow to the exact resolved capacity policy rather than to a caller-supplied reference. |
+| 52 | Procurement Policy Compilation | Define | Not applicable | Procurement-family mapping; the cloud-scaling family would need its own builder. |
+| 53 | Agent Assurance Evidence | Verify | Optional enhancement | Records red-team or injection findings against the scaling agent as evidence for Risk Authority once a probe runner exists. |
+| 54 | Reasoning-Method Result Attestation | Verify | Evaluation only | Attests the comparison evidence behind any reasoning-method advisory used at design time. |
+| 55 | Approval Workflow | Decide | Core required | Holds the executive approval needed above 200 replicas and the exception path when the controller escalates. |
+| 56 | Approver Identity | Decide | Core required | Proves the executive who approved the increase is who the directory says may approve it. |
+| 57 | Governed Review | Decide | Core required | Consumes the executive approval against the exact parked proposal fingerprint before execution resumes. |
+| 58 | Governed Review Service | Decide | Optional enhancement | Gives operators the queue and run detail; a pilot can record decisions through the API without the screens. |
+| 59 | Cloud Scaling Envelope Issuance | Authorize | Domain required | Issues the signed envelope for the exact 120 to 180 replica change once producer and policy are verified. |
+| 60 | Cloud Scaling Action Admission | Authorize | Domain required | Admits the exact replica change against the envelope's target scope and ceilings. |
+| 61 | Agent Runtime Governance Hook | Authorize | Core required | Wires the authority chain into every consequential runtime transition so a retry re-clears. |
+| 62 | Execution Reservation | Clear | Core required | Reserves the cleared scaling action once so a durable retry cannot apply it twice. |
+| 63 | Clearance Export | Clear | Optional enhancement | Hands the clearance to an external runtime or ticketing system in a verifiable form. |
+| 64 | Durable Execution | Execute | Core required | Makes the scaling workflow survive a crash mid-run and re-clear the mutation on retry. |
+| 65 | Cloud Scaling Credential Broker | Execute | Domain required | Issues the short-lived handle the Kubernetes change runs under, scoped to the exact service and namespace. |
+| 66 | Cloud Scaling Bounded Execution | Execute | Domain required | Applies the single bounded replica change under the brokered handle and records the effect for reconciliation. |
+| 67 | Risk Authority Effect Attestation | Assure | Optional enhancement | Lets an independent observer sign the replica and latency effect once wired into reconciliation. |
+| 68 | Incident Response | Assure | Optional enhancement | Records a severity-one incident and proposes containment of the scaling agent for a human to act on. |
+| 69 | Control-Plane Root | Assure | Core required | Holds the append-only audit chain for the decision, clearance, execution and effect of the scaling action. |
 
 ## A.6 Minimum production path
 
@@ -858,17 +1178,17 @@ The minimum path deliberately excludes research evaluation, dynamic model routin
 
 ```mermaid
 flowchart TD
-    P["Policy Authority + Capacity Policy\nDefine bounded scaling rules"]
+    P["Policy Authority + Capacity Policy + Authoritative Compilation\nDefine bounded scaling rules"]
     R["Scaling Controller + Agentic Proposer\nPrepare exact recommendation"]
-    V["TAP + Trusted Evidence + Authenticity\nVerify claims, producer and policy"]
-    D["Decision Authority + Risk Authority\nApprove and mint bounded authority"]
-    G["ActionGate + Action Clearance\nAuthorize exact action and recheck now"]
-    E["Agent Runtime + Scaling Operations\nExecute controlled mutation"]
-    A["Status + Runtime + Execution Assurance\nRevoke, observe and reconcile effect"]
+    V["TAP + Trusted Evidence + Producer and Policy Authenticity\nVerify claims, producer and policy"]
+    D["Directory + Approval + Decision Authority + Risk Authority\nApprove once and mint bounded authority (5B-4)"]
+    G["Action Admission + ActionGate + Clearance + Reservation\nAuthorize exact action, recheck now, reserve once"]
+    E["Durable Execution + Runtime Hook + Credential Broker + Bounded Execution\nExecute one controlled mutation (5X, 5D)"]
+    A["Status + Runtime + Execution Assurance + Effect Attestation + Ledger\nRevoke, observe, reconcile and record"]
     P --> R --> V --> D --> G --> E --> A
 ```
 
-Required supporting foundations are Governance Contracts, Governance Provider Framework and deterministic canonical identity. The Policy Workflow Compiler and cloud-scaling integration contracts prepare the governed artifacts and domain bindings used by the path.
+Required supporting foundations are Governance Contracts, Governance Provider Framework and deterministic canonical identity. The Policy Workflow Compiler and cloud-scaling integration contracts prepare the governed artifacts and domain bindings used by the path. Since revision 2.0 the path is closed end to end in shadow: approval consumption (55 to 57), envelope issuance and admission (59, 60), the runtime hook (61), reservation (62), durable execution (64), credential brokering (65), bounded execution (66) and the ledger (69) all exist as packages, each at reference-grade or last-phase-done and none pilot-validated.
 
 ## A.7 Capability-by-capability problem, solution and competitor analogue
 
@@ -1284,6 +1604,198 @@ Required supporting foundations are Governance Contracts, Governance Provider Fr
 
 **Additional analogues (cross-check supplement):** [ServiceNow AI Control Tower](https://www.servicenow.com/products/ai-control-tower.html) consolidates ROI, productivity, cost avoidance and risk-reduction metrics per AI asset, and [Workday Agent System of Record](https://www.workday.com/en-us/artificial-intelligence/agent-system-of-record.html) measures agents like investments; both report value without separating reported, modeled and observed evidence classes.
 
+### A.7.46 Console API
+
+**The problem:** A studio or console needs a stable service surface for the governed loop, but exposing every package function as an endpoint would let a demo surface become de facto authority.
+
+**What it solves:** Packages exactly four governed-loop routes with required governance dependencies, an audit ceiling on every response and withheld routes that need an owner ruling to open.
+
+**Competitor analogue:** [Amazon Bedrock AgentCore Gateway](https://aws.amazon.com/bedrock/agentcore/) and [Portkey AI Gateway](https://docs.portkey.ai/docs/product/ai-gateway) expose governed tool and model surfaces over HTTP; both are enforcement gateways rather than shadow-only recording surfaces with a published ceiling.
+
+### A.7.47 Authority Directory
+
+**The problem:** Approvals and delegated decisions reference an authority id as a bare string, so nothing can check that the approver held the role at the time.
+
+**What it solves:** A time-bounded, scope-covered grant record with narrowing-only delegation that eligibility checks consult without the directory ever deciding.
+
+**Competitor analogue:** [Microsoft Entra ID](https://learn.microsoft.com/en-us/entra/agent-id/what-is-microsoft-entra-agent-id) role assignments and [SailPoint](https://www.sailpoint.com/) identity governance hold who may act; neither binds a grant window to a governed decision receipt.
+
+### A.7.48 AI System Registry
+
+**The problem:** Organisations cannot say which AI systems exist, who owns them or whether a registration is still current.
+
+**What it solves:** A content-addressed, windowed registration record over the shared system identity contract, with no admission or promotion authority.
+
+**Competitor analogue:** [OneTrust AI Governance](https://www.onetrust.com/solutions/ai-governance/) and [ServiceNow AI Control Tower](https://www.servicenow.com/products/ai-control-tower.html) maintain AI inventories with lifecycle and ownership; both are operational registries, which this package deliberately is not yet.
+
+### A.7.49 Data-Use Admission
+
+**The problem:** Agents consume data nobody declared, and egress is governed only after the fact.
+
+**What it solves:** A declaration record at the admission seam with opaque labels and residency metadata, evaluated independently of action authorization.
+
+**Competitor analogue:** [OneTrust Data Use Governance](https://www.onetrust.com/platform/) applies data-use policies across the data estate with real-time enforcement; this package records declarations and enforces nothing.
+
+### A.7.50 Vendor Dependency
+
+**The problem:** AI systems depend on models, tools and services nobody inventoried, so vendor risk is assessed on memory.
+
+**What it solves:** An append-only, tenant-bound declaration record with an opaque posture label, linked to policy and never scored by the package.
+
+**Competitor analogue:** [OneTrust Third-Party Risk Management](https://www.onetrust.com/products/third-party-risk-management/) inventories, assesses and monitors vendors end to end; this package is the declaration record such a workflow would start from.
+
+### A.7.51 Authoritative Policy Compilation
+
+**The problem:** A compiled workflow can cite a policy the authority never resolved, so the release and the signed policy drift apart.
+
+**What it solves:** A root that compiles only from a verified resolution and derives the authoritative source itself, with fail-closed refusals on every mismatch.
+
+**Competitor analogue:** [OPA signed bundles](https://www.openpolicyagent.org/docs/management-bundles) activate policy only after signature verification; the Ugence root additionally binds the compiled artifact to the resolved issuance record.
+
+### A.7.52 Procurement Policy Compilation
+
+**The problem:** Each policy family needs its own mapping from signed policy to compilable pack, and putting it in the compiler or the product breaks the dependency direction.
+
+**What it solves:** A strict, total, byte-deterministic family builder that lives with the family and supplies nothing the artifact does not state.
+
+**Competitor analogue:** [Credo AI Policy Packs](https://docs.sdk.credo.ai/core-concepts/policy-packs) translate requirements into reusable controls; there is no documented analogue for a per-family deterministic pack builder.
+
+### A.7.53 Agent Assurance Evidence
+
+**The problem:** Security and adversarial findings about an agent have nowhere typed to land, so they cannot become mandatory controls.
+
+**What it solves:** A contract binding a finding to a system identity and an evidence reference, refusing cross-subject mismatches.
+
+**Competitor analogue:** [Lakera](https://www.lakera.ai/prompt-defense) and [Zenity](https://zenity.io/platform) produce agent security findings; neither emits them as typed evidence bound to a governed system identity.
+
+### A.7.54 Reasoning-Method Result Attestation
+
+**The problem:** A reasoning-method advisory may enter the product only on comparison evidence, and unsigned evidence can be substituted.
+
+**What it solves:** A signed, digest-recomputing wrapper over the comparison result under the platform's evidence custody.
+
+**Competitor analogue:** [Sigstore](https://docs.sigstore.dev/logging/overview/) attestations bind results to a signer in a transparency log; [Braintrust](https://www.braintrust.dev/docs/platform/experiments) records experiments but does not sign them.
+
+### A.7.55 Approval Workflow
+
+**The problem:** Escalated proposals have nowhere to go, and approvals recorded in ticketing systems cannot be consumed exactly once by a machine decision.
+
+**What it solves:** A canonical, forward-only approval state machine with derived expiry and once-only consumption that Decision Authority consumes.
+
+**Competitor analogue:** [ServiceNow Change Management](https://www.servicenow.com/docs/bundle/zurich-it-service-management/page/product/change-management/task/t_CreateBlkoutMaintSched.html) and [OneTrust](https://www.onetrust.com/solutions/ai-governance/) run approval workflows; neither guarantees a machine decision consumes an approval exactly once.
+
+### A.7.56 Approver Identity
+
+**The problem:** A recorded approval names an approver, but nothing proves that person authenticated.
+
+**What it solves:** Local validation of an issuer's token against a fetched key set, with fail-closed behaviour and no token retention.
+
+**Competitor analogue:** [Auth0](https://auth0.com/blog/auth0-token-vault-secure-token-exchange-for-ai-agents/) and [Okta](https://www.okta.com/newsroom/press-releases/auth0-platform-innovation/) issue and validate such tokens; this package is the validating consumer bound to a governed decision.
+
+### A.7.57 Governed Review
+
+**The problem:** Even with an approval recorded, nothing ties it to the exact parked proposal or prevents it being used twice.
+
+**What it solves:** A governance input source that binds approval to proposal fingerprint and consumes it once inside the durable step.
+
+**Competitor analogue:** [LangGraph human-in-the-loop](https://docs.langchain.com/oss/python/langchain/human-in-the-loop) and [HumanLayer](https://www.humanlayer.dev/) resume an agent on approval; neither binds the approval to a signed decision or spends it exactly once.
+
+### A.7.58 Governed Review Service
+
+**The problem:** Humans cannot see which agent runs are parked awaiting them or record a decision that the runtime will honour.
+
+**What it solves:** A queue and decision service over the approval ledger and directory that re-arms the exact instance and links the round trip into the ledger.
+
+**Competitor analogue:** [ServiceNow AI Control Tower](https://www.servicenow.com/products/ai-control-tower.html) assigns human oversight to agents; it does not join a review queue to a durable execution checkpoint.
+
+### A.7.59 Cloud Scaling Envelope Issuance
+
+**The problem:** Verified facts about a scaling candidate did not lead to a signed envelope; issuance was contained in production.
+
+**What it solves:** A composition root that presents five verified bindings to the Risk Authority issuance seam and fails closed on any unverified one.
+
+**Competitor analogue:** [SPIFFE/SPIRE](https://spiffe.io/docs/latest/spiffe-about/overview/) issues short-lived signed identities after attestation; the envelope is a short-lived signed authority after policy and producer verification.
+
+### A.7.60 Cloud Scaling Action Admission
+
+**The problem:** A general envelope could be presented with a different service, namespace or magnitude than it was issued for.
+
+**What it solves:** A domain gate that matches the presented action field by field to the envelope's execution-target binding and replays stably.
+
+**Competitor analogue:** [Kyverno](https://kyverno.io/docs/policy-types/cluster-policy/verify-images/sigstore/) and [Amazon Verified Permissions](https://docs.aws.amazon.com/verifiedpermissions/latest/userguide/what-is-avp.html) admit requests against policy; neither binds admission to a signed, revocable authority envelope.
+
+### A.7.61 Agent Runtime Governance Hook
+
+**The problem:** The runtime had a governance hook interface but only test hooks, so a published agent was not actually governed.
+
+**What it solves:** A fail-closed projection of the composed execution decision onto the runtime hook, with no minting and no exception-as-permission.
+
+**Competitor analogue:** [AgentCore Policy](https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/policy.html) intercepts agent tool calls for permission checks; the Ugence hook projects a composed, signed authority decision rather than a permission rule.
+
+### A.7.62 Execution Reservation
+
+**The problem:** A cleared action can be executed twice under retry, and clearance receipts were not durable.
+
+**What it solves:** A single-write-transaction reservation keyed by execution key, with durable receipts and forward-only observation state.
+
+**Competitor analogue:** [Temporal](https://temporal.io/solutions/ai) idempotency and [HCP Terraform run tasks](https://developer.hashicorp.com/terraform/cloud-docs/workspaces/settings/run-tasks) prevent duplicate application; neither ties the reservation to a governance clearance receipt.
+
+### A.7.63 Clearance Export
+
+**The problem:** An external runtime cannot verify a clearance without importing the package that produced it.
+
+**What it solves:** A content-addressed export with embedded ceilings and a pure verifier that reports rather than blesses.
+
+**Competitor analogue:** [Sigstore](https://docs.sigstore.dev/logging/overview/) bundles make a signature portable and verifiable offline; the export is unsigned today and reports that fact in its own preimage.
+
+### A.7.64 Durable Execution
+
+**The problem:** Running an agent is a durable-execution problem, and a home-grown runtime is neither crash-safe nor exactly-once.
+
+**What it solves:** A neutral adapter over a ratified engine that owns scheduling and recovery while governance state stays with Agent Runtime.
+
+**Competitor analogue:** [DBOS](https://github.com/dbos-inc/dbos-transact-py) is the engine behind the adapter, and [Temporal](https://temporal.io/solutions/ai) is the gated second engine; both provide durability without a governance boundary of their own.
+
+### A.7.65 Cloud Scaling Credential Broker
+
+**The problem:** Tools received credentials before, or regardless of, authorization, so an authorized and an unauthorized action looked identical to the target system.
+
+**What it solves:** A broker port that issues an opaque, least-privilege, short-lived handle only for an admitted and reserved action.
+
+**Competitor analogue:** [HashiCorp Vault dynamic secrets](https://developer.hashicorp.com/vault/tutorials/get-started/understand-static-dynamic-secrets) issue unique, short-lived credentials on demand with automatic revocation; the Ugence broker adds binding to an admitted, reserved governed action.
+
+### A.7.66 Cloud Scaling Bounded Execution
+
+**The problem:** Even with authority, credentials and a reservation, the executor could be invoked outside them or apply more than was authorized.
+
+**What it solves:** A single dispatch path that re-verifies grant, reservation and ceilings before one bounded change and emits the effect observation.
+
+**Competitor analogue:** [Argo Rollouts](https://argo-rollouts.readthedocs.io/en/stable/features/analysis/) and [Karpenter](https://karpenter.sh/) apply bounded, progressive changes; neither requires a brokered handle bound to a governed reservation.
+
+### A.7.67 Risk Authority Effect Attestation
+
+**The problem:** Effect observations are trusted on source label alone, so a provider can attest its own success.
+
+**What it solves:** Role-typed signed attestations over effect observations under the platform's evidence custody, with distinguishable trust refusals.
+
+**Competitor analogue:** [Sigstore](https://docs.sigstore.dev/logging/overview/) and [Harness Continuous Verification](https://developer.harness.io/docs/continuous-delivery/verify/verify-deployments-with-the-verify-step/) attest artifacts or verify deployments; neither types executing-provider against independent-observer roles.
+
+### A.7.68 Incident Response
+
+**The problem:** When an agent misbehaves there is no typed incident record, and containment can be lifted by the same automation that caused the incident.
+
+**What it solves:** A record-and-propose package whose containment request is never self-executing and whose close never lifts containment.
+
+**Competitor analogue:** [PagerDuty](https://www.pagerduty.com/platform/automation/runbook/) automates incident response and runbooks, including with AI agents; this package deliberately proposes and never executes.
+
+### A.7.69 Control-Plane Root
+
+**The problem:** Seven stores hold governance records and none is the audit ledger, so a complete decision chain cannot be read from one place.
+
+**What it solves:** A per-tenant append-only chain with trigger-enforced immutability that other packages append to by reference.
+
+**Competitor analogue:** [immudb](https://immudb.io/) and the discontinued [Amazon QLDB](https://docs.aws.amazon.com/qldb/latest/developerguide/what-is.html) provide cryptographically verifiable append-only journals; the Ugence root is a minimal, standard-library chain scoped to governance receipts.
+
 ## A.8 Essential deployment stack versus later enhancements
 
 ### A.8.1 Essential platform controls
@@ -1297,8 +1809,12 @@ The high-assurance production path requires:
 - Risk Authority Evidence Runtime;
 - Decision Authority and Risk Authority;
 - Risk Authority Runtime Composition, ActionGate and Action Clearance;
-- Agent Runtime; and
-- Risk Authority Status, Runtime Assurance and Execution Assurance.
+- Authority Directory, Approval Workflow, Approver Identity and Governed Review;
+- Authoritative Policy Compilation;
+- Agent Runtime, the Agent Runtime Governance Hook and Durable Execution;
+- Execution Reservation;
+- Risk Authority Status, Runtime Assurance and Execution Assurance; and
+- the Control-Plane Root audit ledger.
 
 These capabilities implement the platform's non-collapsible accountability chain. Removing one requires an explicit alternative control; otherwise the system risks confusing policy, recommendation, evidence, decision, authorization, execution or observed effect.
 
@@ -1311,7 +1827,9 @@ The scenario additionally requires:
 - Cloud Scaling Risk Integration;
 - Cloud Scaling Authorization Contracts;
 - Cloud Scaling Producer Attestation;
-- Cloud Scaling Policy Authenticity; and
+- Cloud Scaling Policy Authenticity;
+- Cloud Scaling Envelope Issuance and Cloud Scaling Action Admission;
+- Cloud Scaling Credential Broker and Cloud Scaling Bounded Execution; and
 - Cloud Scaling Operations.
 
 These do not redefine enterprise governance. They translate the general platform into the language of replicas, workload observations, capacity limits and Kubernetes or ArgoCD operations.
@@ -1324,8 +1842,11 @@ The following deepen control or operational efficiency but need not block the fi
 - Strategy-Permission Policy and Runtime Resolver;
 - Model Selection and LLM Steering Controller;
 - Context Minimization and its token-accounting integration;
-- StoryGraph; and
-- Governed Value.
+- StoryGraph;
+- Governed Value;
+- Console API, Governed Review Service and Clearance Export;
+- AI System Registry and Agent Assurance Evidence; and
+- Risk Authority Effect Attestation and Incident Response.
 
 They should be enabled when the deployment introduces dynamic model choice, sensitive context, complex multi-step behavior, reusable agent roles, token budgets or a formal value-realization program.
 
@@ -1335,14 +1856,15 @@ The following should operate outside the per-action critical path:
 
 - Benchmark Registry Contracts and the present Benchmark Registry Authority surface;
 - UVI Policy Contracts and Agent Value Readiness;
-- Reasoning Method Governance, Reasoning Method Advisor and Readiness Comparison; and
-- Trusted Workflow-Fit Pilot.
+- Reasoning Method Governance, Reasoning Method Advisor, Readiness Comparison and Reasoning-Method Result Attestation;
+- Trusted Workflow-Fit Pilot; and
+- Vendor Dependency.
 
 They support research, benchmark governance, readiness and system improvement. Their evidence can influence later policies and deployment decisions, but research-only or contract-only outputs must not be promoted into live action authority.
 
 ### A.8.5 Not required in the stated minimum scenario
 
-Agent Workforce Composer is not required because the scenario uses one preassigned scaling agent. It becomes valuable if the enterprise later composes forecasting, finance, reliability and operations agents dynamically under capability, evidence and least-privilege constraints.
+Agent Workforce Composer is not required because the scenario uses one preassigned scaling agent. It becomes valuable if the enterprise later composes forecasting, finance, reliability and operations agents dynamically under capability, evidence and least-privilege constraints. Data-Use Admission is not required because the scaling decision consumes workload metrics rather than personal or classified data, and Procurement Policy Compilation belongs to a different policy family.
 
 ## A.9 Competitive interpretation
 
@@ -1364,10 +1886,11 @@ The cited products demonstrate that parts of the Ugence architecture have market
 - ServiceNow AI Control Tower, OneTrust AI Governance and Holistic AI overlap AI inventory, approval workflow, risk assessment and value reporting.
 - Temporal, LangGraph, Microsoft Agent Framework, CrewAI and HumanLayer overlap agent runtime, orchestration and human approval.
 - Model Context Protocol and Agent2Agent overlap contract standardization for tools and agent interoperability.
+- HashiCorp Vault overlaps short-lived credential issuance; immudb and the discontinued Amazon QLDB overlap tamper-evident ledgers; PagerDuty overlaps incident automation; OneTrust overlaps vendor and data-use records.
 
 The comparison should not claim that a blank competitor field proves uniqueness. It means only that no sufficiently close analogue was established from the limited official-source review used for this appendix, as supplemented by the cross-check in Appendix C. The more defensible Ugence distinction is architectural: the repository separates proposal, assertion verification, binding business decision, risk-derived machine authority, exact-action authorization, operational clearance, execution coordination, runtime assurance, effect reconciliation and governed-value measurement into explicit non-collapsible responsibilities.
 
-# Appendix B — Development Status of the 45 Capabilities
+# Appendix B — Development Status of the 69 Capabilities
 
 ## B.1 Purpose and evidence basis
 
@@ -1375,7 +1898,9 @@ This appendix answers one question per capability: **where does development stan
 
 Evidence labels follow the repository working agreement: `[V]` verified against the package itself, `[I]` inferred from adjacent repository material. Unless a row is marked `[I]`, every statement in it is `[V]` from the package's README and metadata.
 
-The single most important finding is stated first: **no package among the 45 declares itself pilot-validated, shadow-deployed or production-certified.** Many READMEs disclaim it explicitly; the rest simply make no such claim. The closest pilot evidence in the repository sits outside these packages: the legacy Enterprise Validation Pilot (Phase 5I, `docs/ENTERPRISE_VALIDATION_PILOT.md`) exercised the predecessor distributions of Decision Authority, TAP and ActionGate together, and the excluded AI Hiring product declares `PACKAGE_READY_FOR_CONTROLLED_PILOT`. Both are noted as `[I]` where relevant.
+The single most important finding is stated first: **no package among the 69 declares itself pilot-validated or production-certified.** Nine of the packages added since revision 1.1 declare themselves shadow-only by name (`REFERENCE_GRADE_SHADOW_ONLY`), which is a posture, not a deployment. Many READMEs disclaim it explicitly; the rest simply make no such claim. The closest pilot evidence in the repository sits outside these packages: the legacy Enterprise Validation Pilot (Phase 5I, `docs/ENTERPRISE_VALIDATION_PILOT.md`) exercised the predecessor distributions of Decision Authority, TAP and ActionGate together, and the excluded AI Hiring product declares `PACKAGE_READY_FOR_CONTROLLED_PILOT`. Both are noted as `[I]` where relevant.
+
+Revision 2.0 re-audited every package at commit `cabd218e` (7 September 2026): 24 packages were added as capabilities 46 to 69, 14 existing rows changed version or status, and 31 were unchanged. The changes are itemised in Appendix C.4.
 
 ## B.2 Stage tags
 
@@ -1401,16 +1926,16 @@ The stage tags are not an arbitrary list. They sit at fixed points on one develo
 ```mermaid
 flowchart LR
     subgraph DEF["1 · Define contracts"]
-        CO["Contract-only<br/>3 capabilities"]
+        CO["Contract-only<br/>10 capabilities"]
     end
     subgraph BUILD["2 · Build the kernel"]
-        CI["Core implemented<br/>19 capabilities"]
-        PIP["Phase in progress<br/>6 capabilities"]
-        LPD["Last phase done<br/>3 capabilities"]
+        CI["Core implemented<br/>24 capabilities"]
+        PIP["Phase in progress<br/>7 capabilities"]
+        LPD["Last phase done<br/>6 capabilities"]
         EXP["Experimental kernel<br/>2 capabilities"]
     end
     subgraph HARDEN["3 · Harden for deployment"]
-        RG["Reference-grade<br/>4 capabilities"]
+        RG["Reference-grade<br/>14 capabilities"]
         CIV["CI-verified, pilot pending<br/>2 capabilities"]
     end
     subgraph PILOT["4 · Client pilot"]
@@ -1421,7 +1946,7 @@ flowchart LR
         PC["Production-certified<br/>0 capabilities"]
     end
     subgraph RES["Research track (parallel lane)"]
-        RO["Research-only<br/>4 capabilities"]
+        RO["Research-only<br/>2 capabilities"]
     end
     FZ(["Frozen API<br/>2 capabilities"])
 
@@ -1441,9 +1966,9 @@ flowchart LR
 
 How to read it against the table in B.4:
 
-- **Bands 1–3 hold all 45 capabilities.** Nothing has crossed into band 4, which is the finding stated in B.1.
-- **Band 2 is where a package's own phase ladder lives.** "Phase in progress" and "Last phase done" describe position on that ladder; "Core implemented" means the package has no ladder left inside it. The cloud-scaling thread is the clearest example of a ladder that spans several packages, with Phases 1–5B landed and Risk Authority Phase 5 envelope issuance, 5C, 5X, 5D and 6 still unbuilt.
-- **Band 3 is the step the Risk Authority runtimes and Agent Runtime have reached.** Reference-grade means the logic is operative but its production adapters are delegated; CI-verified, pilot pending means the README itself names pilot or production validation as the next step.
+- **Bands 1–3 hold all 69 capabilities.** Nothing has crossed into band 4, which is the finding stated in B.1.
+- **Band 2 is where a package's own phase ladder lives.** "Phase in progress" and "Last phase done" describe position on that ladder; "Core implemented" means the package has no ladder left inside it. The cloud-scaling thread is the clearest example of a ladder that spans several packages: Phases 1 to 5D and 5X are landed across eleven packages, Risk Authority's Phase 5 issuance and 5C admission seams are production-reachable, and only Phase 6 effect verification remains unbuilt.
+- **Band 3 is now the largest band after the kernel.** The Risk Authority runtimes, the human-approval packages, reservation, the ledger and the attestation packages are all reference-grade, meaning the logic is operative but reference adapters are refused in production and production adapters are delegated; CI-verified, pilot pending means the README itself names pilot or production validation as the next step.
 - **Band 4 has two rungs.** Pilot-ready means the package declares fitness to start a controlled pilot with a client. Pilot-validated means a pilot has run and its results are recorded. The legacy Enterprise Validation Pilot sits near the second rung but ran over predecessor distributions, so it is cited as inferred and not counted.
 - **The research lane is not a shortcut.** Research-only and Experimental-kernel outputs reach the main cycle only as evidence for policy and contract revision, never as authority to deploy.
 
@@ -1453,76 +1978,101 @@ Test counts are `def test_` occurrences under each package's `tests/` tree at th
 
 | # | Capability | Version | Stage tag | Phase position | Where development stands | Tests |
 |---:|---|---|---|---|---|---:|
-| 1 | Governance Contracts | 0.3.1 | Core implemented | Extraction, GV-2E-a, M-3R.3 and 0.3.1 canonicalization done; contract-evolution phase pending | Neutral contracts extracted verbatim from the frozen core; authenticity fields stay permanently `STRUCTURAL_UNVERIFIED` because no ratified system-binding verifier exists yet. | 104 |
+| 1 | Governance Contracts | 0.8.0 | Core implemented | Extraction, GV-2E-a, M-3R.3 and canonicalization done; contract-evolution phase active with G4, G7, G8, DE-5, VR-5 and AE-5 landed | Neutral contracts now carry five further families (idempotency and validity, audit reference, data-classification, vendor-risk and assurance-finding labels); authenticity fields stay permanently `STRUCTURAL_UNVERIFIED` and the contract version is pinned at 1.0.0. | 197 |
 | 2 | Governance Provider Framework | 0.1.0 | Core implemented | Contract version 1.0.0; no phase ladder | Provider registry, resolution and conformance mechanics are in place with reference providers for framework validation only; the README makes no maturity statement. Predecessor distribution was exercised by the legacy Enterprise Validation Pilot `[I]`. | 57 |
 | 3 | JSON Canonicalization Scheme | 0.2.0 | Core implemented | Alpha; extracted from `cer_v0_3/cleanroom` | Byte-exact RFC 8785 canonicalizer with a single consumer; README states alpha, not pilot-validated, not production-certified, and other packages' canonicalizers are not yet converged on it. | 31 |
 | 4 | Benchmark Registry Contracts | 0.1.0 | Contract-only | BR-1 done; BR-2 (registry, trusted resolver, revocation) not started | Digest-bound benchmark identities and typed refusals exist; every identity reports `trusted_resolution_performed = False` until BR-2 lands. | 242 |
 | 5 | UVI Policy Contracts | 0.1.0 | Contract-only | M-2C.1 done; authority, registry and evaluator milestones deferred | Immutable policy and assessment-context shapes with structural fail-closed binding; lifecycle labels and digests remain caller-supplied inputs until a registry exists. | 76 |
-| 6 | Policy Authority | 0.2.0 | Core implemented | ADR P-1 to P-11 ratified; v0.1 semantics; structured supersession pending | Issues, signs, registers, resolves and revokes policies with three external families now registered; production persistence and distributed concurrency are deferred. | 279 |
-| 7 | Policy Workflow Compiler | 0.2.0 | Last phase done | Phase 1 and Phase 2 (`workflow_ir.v2`) complete; downstream adoption in AWC P2.1 done | Deterministic offline compiler from reviewed policy pack to Workflow IR and assurance artifacts; not pilot-validated, not production-certified; document ingestion excluded by design. | 151 |
+| 6 | Policy Authority | 0.3.1 | Core implemented | ADR P-1 to P-11 ratified; §15.7 single-node durable registry closed under D-3; distributed concurrency deferred | SQLite registry with write-ahead logging, append-only tables whose update and delete are refused by triggers, and a hash-linked ledger with chain verification; distributed concurrency remains deferred. | 291 |
+| 7 | Policy Workflow Compiler | 0.2.0 | Phase in progress | Phase 1 and 2 complete; P3A diff-driven review, `policy_pack.v2` with authoritative-source carriage, P3B binding conformance and P3C offline simulation landed with no version bump | Compiler now reviews, validates and simulates offline with deterministic replay across two reference domains; `pilot_validated` is false, simulation grants no authorization and authoritative-source verification is not implemented. | 283 |
 | 8 | Agent Constitution Policy | 0.2.0 | Phase in progress | First-slice family half done (ACC-S1); first release stated to await the OD-C1=B ballot | Constitutions are issuable, signable and resolvable; README says end-to-end conformance is not yet made true, although Agentic Proposer 0.4.0 already records the OD-C1=B binding `[I]`. | 120 |
-| 9 | Agent Constitution Activation | 0.1.0 | Core implemented | ACC-IA-1 to ACC-IA-5 done with an end-to-end issue-activate-resolve-bind-conform proof | Composition root and preflight are complete; proof runs on ephemeral in-process keys and no signing key or trust root exists in the repository. | 89 |
+| 9 | Agent Constitution Activation | 0.2.0 | Core implemented | ACC-IA-1 to ACC-IA-5 done; 0.2.0 adds `DerivedReferenceMap` and the ACC-COUPLING rule | Activation root now accepts only the reference map it derived, a narrowing not a closure since the conformance package's own resolver still accepts any mapping; no signing key or trust root exists in the repository. | 93 |
 | 10 | Cloud Scaling Capacity-Bounds Policy | 0.1.0 | Core implemented | Family adapter and rejection vocabulary done; reconciliation against Phase 5A candidates deferred | Capacity ceilings are issuable and resolvable through Policy Authority, but no composition root calls the family yet; it is not wired into any runtime path. | 70 |
 | 11 | Strategy-Permission Policy | 0.1.0 | Core implemented | Artifact half done; concrete resolver shipped separately as capability 14 | Signed strategy-permission family issued and resolved across a package boundary; a resolution proves integrity, not provenance, and authorizes no runtime action. | 81 |
 | 12 | Agent Constitution Conformance | 0.1.0 | Phase in progress | Second ACC-S1-Q2 change set done; first release awaits the OD-C1=B round | Resolver and structural verifier run end to end with the family package; reference-map population remains a disclosed ungoverned gap. | 103 |
-| 13 | Agentic Proposer | 0.4.0 | Core implemented | S0, S1, S2, S2-B and 0.4.0 constitution binding done; concrete evaluators and semantic auditor deferred | Contracts, identity equations and constitution binding are implemented against stubbed resolvers; classifier is pre-alpha and nothing has been exercised against a real workload. | 521 |
+| 13 | Agentic Proposer | 0.6.0 | Core implemented | S0 to S2-B and constitution binding done; 0.5.0 adds reasoning-method advisory input (RM-3); 0.6.0 cites the signed-result receipt (SCR-1) | Typed advisory candidates with deterministic identity; an admitted reasoning-method advisory enters as typed input and never as authority; concrete evaluators still outside the package. | 529 |
 | 14 | Strategy-Permission Runtime Resolver | 0.1.0 | Core implemented | Ratified surface under owner rulings SURFACE=B and ROLE_LOOKUP=A | Resolves the exact signed strategy policy end to end, verified in a clean offline venv against a genuinely issued policy; role lookup exemption is test-tree-only. | 90 |
 | 15 | Agent Workforce Composer | 0.2.1 | Core implemented | P1, P2 and P2.1 done; permission granting, scheduling and runtime adapters listed as next phases | Eligibility, ranking, bounded team composition and least-privilege proposals implemented offline; README records `pilot_validated=false`, `production_certified=false`. | 178 |
-| 16 | Reasoning Method Governance | 0.1.0 | Research-only | Slice 1 (contracts) done | Shared research-only contracts for methods, task classes, telemetry and fit; issues no envelope and defines no approval or pilot state. | 54 |
-| 17 | Reasoning Method Advisor | 0.1.0 | Research-only | Slice 2 done | Deterministic rule-derived advisor; every advisory is `RESEARCH_ONLY` with comparison evidence absent, and the shipped rule set is a test fixture only. | 42 |
+| 16 | Reasoning Method Governance | 0.2.0 | Contract-only | Slice 1 contracts; 0.2.0 adds the product-entry vocabulary under ADR RM-1 to RM-3 | Contracts only: assessments, plans and results stay `RESEARCH_ONLY`, while the new evidence-present and advisory-input vocabulary lets an advisory leave research through a digest-bound admission; the package issues nothing. | 54 |
+| 17 | Reasoning Method Advisor | 0.3.0 | Core implemented | Slice 2 advisor; slice 3 product entry (admission, validation, one-way proposer bridge) with a signed-result receipt requirement at 0.3.0 | Deterministic rule-derived advisor whose advisories remain research-only; an advisory reaches the Agentic Proposer only through an admission backed by comparison evidence, of which none real exists yet. | 79 |
 | 18 | Readiness Comparison | 0.2.0 | Research-only | Slice 1 engine done; spec correction 30 applied | Pure comparison function with no I/O; every result is requester-asserted and research-scoped, nothing approval-bearing. | 45 |
-| 19 | Trusted Workflow-Fit Pilot | 0.1.0 | Research-only | Phase 4A shipped; Phase 4C slices 1–2 landed, slice 3A/3B split in commissioning `[I]` | Preregistered study harness with separate-process capture and recomputed telemetry; preregistration and evaluator independence remain `DECLARED_UNVERIFIED` and approval status is constant `NONE`. | 83 |
+| 19 | Trusted Workflow-Fit Pilot | 0.1.0 | Research-only | Phase 4A shipped; Phase 4C revisions 27 to 31 landed, G1 and G2 ratified and closed, governed canonicaliser added | Preregistered research pilot with separate-process capture and recomputed telemetry; preregistration and evaluator independence remain `DECLARED_UNVERIFIED` and approval status is the constant NONE. | 144 |
 | 20 | Model Selection | 0.1.0 | Core implemented | Model Authority rename and contract migration done; quality-floor gap from audit still open | Deterministic eligibility and selection kernel; the release is a behavior-preserving migration whose evidence remains primarily synthetic. | 18 |
 | 21 | LLM Steering Controller | 0.1.0 | Core implemented | No phase ladder; provider execution outside the distribution | Advisory routing recommendations with hard-constraint filtering and reproducible evidence; README makes no claim of routing performance or production readiness. | 85 |
 | 22 | Context Minimization | 0.2.0 | Core implemented | v0.1 core plus CM-TA1 token accounting done; Agent Runtime wiring in a separate package | Structural and oracle-verified minimization modes with fail-closed equivalence; carries no live-enterprise validation claim. | 199 |
 | 23 | StoryGraph | 2.0.0 | Frozen | Frozen-but-working; legacy shim removal targeted for 3.0.0 | Sequence-risk analysis with one implemented harmful graph domain; synthetic-only validation and advisory findings only. | 304 |
 | 24 | Cloud Scaling Controller | 0.4.0 | Phase in progress | Phases 1–3 done in shadow mode; Phases 4–6 assigned to other packages | Canonical, predictive and cost-aware recommendations that never feed a live controller; not live-cluster validated, not production-certified. | 788 |
 | 25 | TAP Assertion Governance Provider | 0.1.0 | Core implemented | Beta classifier; outcome-safety release gate in place | Working assertion-governance provider whose uncertainty-never-promoted invariant is CI-enforced; README says not production certified. Predecessor distribution was exercised by the legacy Enterprise Validation Pilot `[I]`. | 60 |
-| 26 | Trusted Evidence Authority | 0.3.0 | Core implemented | TEV-1 and TEV-2 done; BR-2, RA-5 port alignment and DD-10 production posture deferred | Verification orchestration, trust anchors, revocation, signed receipts and independent re-verification implemented; exactly one consumer imports it and production persistence and HSM posture are deferred. | 530 |
-| 27 | Benchmark Registry Authority | 0.2.3 | Contract-only | BR-2A, BR-2B and BR-2C-0 done; BR-2C, BR-2D and BR-2E blocked on verifier design and DD-10 | Lifecycle contracts and pure validation only; every result permanently derives `authority_verified is False` and authority-bearing types are reserved and undefined. | 550 |
+| 26 | Trusted Evidence Authority | 0.6.0 | Core implemented | TEV-1 and TEV-2 done; 0.5.0 signed-snapshot trust-anchor resolver as a production-shaped candidate; consumers now include cloud scaling, effect attestation and reasoning-method result attestation; DD-10 persistence and HSM deferred | Verification authority with trust anchors, key validity, revocation and independently re-verifiable receipts; production persistence and HSM or KMS custody remain deferred. | 550 |
+| 27 | Benchmark Registry Authority | 0.3.0rc1 | Contract-only | BR-2A, BR-2B and BR-2C-0 done; BR-2C candidate verifier at 0.3.0rc1 awaiting owner review and external cryptographic audit; BR-2D and BR-2E blocked | Lifecycle contracts and pure validation plus a candidate verifier of one envelope against one anchor revision; no admission engine, store, resolver or composition root, and every result still derives `authority_verified is False`. | 608 |
 | 28 | Risk Authority Evidence Runtime | 0.1.0 | Reference-grade | RA-5 complete; RA-6 to RA-8 out of this milestone | Production implementations behind Risk Authority's two ports with explicit reference versus production mode; caller-supplied PASS is inert in production mode, and HSM/KMS is excluded. | 67 |
 | 29 | Cloud Scaling Producer Attestation | 0.2.0 | Last phase done | Phase 5B-0A complete; policy authenticity handed to 5B-0B | Producer attestations are mintable and verifiable with a gate-removal mutation sweep; `production_mode` defaults to `False` everywhere and only a reference signer ships. | 324 |
 | 30 | Cloud Scaling Policy Authenticity | 0.9.0 | Phase in progress | 5B-0B, 5B-1, 5B-2 (parts 1 and 2) and 5B-3 done; R-2 closed as narrowed by gate 13 | Verifies the exact trusted capacity policy for tenant, scope and time; the instant stays a recorded fact by ruling, bounded by gate 13 and attested only by Risk Authority Phase 5 envelope issuance. | 309 |
 | 31 | Decision Authority | 1.0.0 | Frozen | Public API, lifecycle, serialization and hashes frozen at 1.0.0 | Bounded binding-decision kernel with no maturity caveat in its README; its legacy `decision_governance` lineage was exercised end to end by the Enterprise Validation Pilot `[I]`. | 33 |
-| 32 | Risk Authority | 0.6.0 | Phase in progress | RA-1 to RA-4 spine plus Phase 4A/4B done; Phase 5 envelope issuance seam landed in 0.6.0 (composed by `cloud-scaling-envelope-issuance`, 5B-4); Phase 6 not implemented | Non-compensatory evaluation and v2 subject-context seam are live behind fail-closed production mode; integration stops at a non-executable `RiskDecision` and uses a reference Ed25519 implementation. | 330 |
+| 32 | Risk Authority | 0.8.0 | Phase in progress | RA-1 to RA-4 spine, Phase 4A/4B, Phase 5 issuance seam (0.6.0), SQLite durable persistence (0.7.0) and Phase 5C admission seam (0.8.0) done; Phase 6 not implemented | Production issuance and admission are reachable only through the production seams composed by capabilities 59 and 60; the legacy case-based `issue_envelope` and `authorize_action` still raise `ProductionContainmentError`, and `executable` is permanently false. | 392 |
 | 33 | Cloud Scaling Risk Integration | 0.1.0 | Last phase done | Phase 4C complete; Phase 5 and 6 excluded | One-way projection into Risk Authority with recommendation-content authenticity; a fully self-consistent forgery still passes because it is not a signature. | 248 |
-| 34 | Cloud Scaling Authorization Contracts | 0.7.0 | Phase in progress | Phase 5A done; 5B, 5C, 5X, 5D and 6 not implemented | Non-authoritative capacity-action candidate with measured mutation coverage; live execution remains structurally blocked until the Credential Broker phase 5X. | 309 |
+| 34 | Cloud Scaling Authorization Contracts | 0.7.0 | Phase in progress | Phase 5A done; 5B-4, 5C, 5X and 5D shipped as separate packages (59, 60, 65, 66); Phase 6 not implemented | Non-authoritative capacity-action candidate with measured mutation coverage; live mutation is now gated by bounded execution and the credential broker rather than structurally blocked. | 309 |
 | 35 | Risk Authority Runtime Composition | 0.1.0 | CI-verified, pilot pending | RA-4.5 composition implemented; F-D enforcement open as issue #1397 | Fail-closed composition of Risk Authority, Decision Authority and ActionGate; README states production deployment validation remains pending. | 62 |
 | 36 | ActionGate | 0.1.0 | Core implemented | Beta classifier; outcome-safety release gate in place | Exact-action authorization provider with CI-enforced authority invariants; README says not production certified. Predecessor distribution was exercised by the legacy Enterprise Validation Pilot `[I]`. | 57 |
 | 37 | Action Clearance | 0.1.0 | Core implemented | v0.1 core; next phases documented under the package `docs/` | Stateless pure-function clearance with CLEAR, HOLD, ESCALATE and BLOCK; no persistence, execution, network or domain adapters yet. | 67 |
 | 38 | Agent Runtime | 0.7.0 | CI-verified, pilot pending | H22-A through H22-D done through 0.6.0; 0.7.0 current | `IMPLEMENTED_AND_CI_VERIFIED` lifecycle, coordination, durability and bounded concurrency; README states not live-verified, pilot-validated, distributed-safe or production-ready. | 339 |
-| 39 | Cloud Scaling Operations | 0.1.2 | Core implemented | No phase ladder; DRY_RUN, SIMULATION, SHADOW and LIVE modes present | Real Kubernetes and ArgoCD actuation behind dry-run default and disabled live mode; not live-cluster validated and idempotency stores are in-memory only. | 129 |
+| 39 | Cloud Scaling Operations | 0.2.0 | Core implemented | No phase ladder; 0.2.0 orchestrator containment under its own ADR | Kubernetes and ArgoCD executors behind a dry-run default; after containment the legacy actuators discover no credentials and hold no ArgoCD token, the service entrypoint refuses any mode but dry-run, and nothing is cluster-validated. | 146 |
 | 40 | Risk Authority Status Runtime | 0.1.0 | Reference-grade | RA-6 operative against the ratified spec; Postgres persistence and signal transport delegated | Revocation and epoch propagation work in-process with a reference in-memory adapter; not globally consistent or zero-window revocation. | 72 |
 | 41 | Risk Authority Runtime Assurance | 0.1.0 | Reference-grade | RA-7 done with as-built record; RA-8 handled by capability 42 | Event-driven trajectory assurance that mints nothing and blocks the hot path only when opted in; reference authenticator and evaluator are refused in production mode. | 96 |
-| 42 | Risk Authority Execution Assurance | 0.1.0 | Reference-grade | RA-8 done including the M-1 non-compensatory closure; last milestone of the RA-5 to RA-8 ladder | Post-effect reconciliation emitting evidence and a neutral reassessment signal; content-hash integrity only, with no signed external receipts or third-party gateway. | 143 |
+| 42 | Risk Authority Execution Assurance | 0.3.0 | Reference-grade | RA-8 done; 0.2.0 attested ingress over effect attestation (RI-1 to RI-5); 0.3.0 trust-state refusals | Reconciles authorized action, execution record and observed effect; the attested path admits only verified signed attestations while unsigned observations remain under the reference posture. | 176 |
 | 43 | Context-Minimization Token-Accounting Runtime | 0.1.0 | Core implemented | CM-TA1 integration; no numbered successor | One-way bridge from Agent Runtime telemetry to accounting records and budget settlement; no real provider adapter and only an in-memory reference sink. | 65 |
 | 44 | Agent Value Readiness | 0.4.1 | Experimental kernel | M-3R.1 to M-3R.3 done plus Trusted Readiness Orchestration; ROI, forecasting and deployment authorization deferred | Deterministic three-dimension readiness determination marked experimental, internal, advisory and non-financial; no allow-all verifier ships by design. | 542 |
-| 45 | Governed Value | 0.2.0 | Experimental kernel | GV-0 and GV-1 done; GV-2 evidence and GV-4 authority layers do not exist | Reported-value calculation kernel over caller-reported inputs; every figure carries `REPORTED` evidence status and `UNVERIFIED` authority status. | 42 |
+| 45 | Governed Value | 0.3.0 | Experimental kernel | GV-0 and GV-1 done; GV-2 observation carriage landed in 0.3.0; GV-3 and GV-4 pending | Scores caller-reported inputs and now binds metric observations to the case, carried outside every monetary term; every figure stays `REPORTED` / `UNVERIFIED` with no authority binding. | 53 |
+| 46 | Console API | 0.2.0 | Reference-grade | CP-1 to CP-5 ratified and packaged; durable audit store left to a later ruling | Shadow-only, reference-grade service with an in-memory audit store; two shadow writes and two audit reads are public, six routes withheld under CP-3. | 30 |
+| 47 | Authority Directory | 0.1.0 | Reference-grade | Grants, delegation, committees and the eligibility adapter done; Risk Authority label resolver deferred to 0.2.0 | Reference-grade, shadow-only, not enforcement-ready; the in-memory directory is refused in production and there is no console surface. | 65 |
+| 48 | AI System Registry | 0.2.0 | Contract-only | Contracts plus one SQLite store (front-door FD-9.2); operational registry and connectors post-v1 under D-5 | Contracts only, not an operational registry; authenticity is permanently structural-unverified and the classification vocabulary is unratified. | 54 |
+| 49 | Data-Use Admission | 0.2.0 | Contract-only | DE-1 to DE-5 ratified; SQLite declarations store added; result egress explicitly deferred | Contracts plus one ruled local file; not enforcement-ready and not an admission engine. | 59 |
+| 50 | Vendor Dependency | 0.2.0 | Contract-only | VR-1 to VR-5 ratified; SQLite declarations store added under FD-13.2 | Contracts plus one ruled local file; not enforcement-ready and not a vendor-risk engine. | 64 |
+| 51 | Authoritative Policy Compilation | 0.1.0 | Core implemented | PA/PWC-X1 root under rulings CR-1 and CR-2; families supply the pack builder | Orchestration, not authority; production-certified is false by its own version info and it ships no builder, refusing without one. | 19 |
+| 52 | Procurement Policy Compilation | 0.1.0 | Core implemented | CR-2 and CR-2a mapping shipped; no further phase named | Deterministic family mapping with no maturity label declared; the composition root stays a test-only dependency. | 20 |
+| 53 | Agent Assurance Evidence | 0.1.0 | Contract-only | AE-1 to AE-5 ratified; neither consumer route (control-evidence record, TAP request) is built | Contracts only, reference-grade ceiling; enforcement disabled and no composition root consumes it. | 48 |
+| 54 | Reasoning-Method Result Attestation | 0.1.0 | Reference-grade | SCR-1 slice done with one comparison-engine role; independent-verifier role and production signer are later slices | Reference-grade, not production-ready; no comparison-engine key exists in the repository and the first study runs unsigned. | 109 |
+| 55 | Approval Workflow | 0.2.0 | Reference-grade | State machine, expiry, exception path, once-only consumption and SQLite store done; enterprise mirrors not shipped | Reference-grade, shadow-only, not enforcement-ready; single-node durability, no mirror, no console surface, signs nothing. | 75 |
+| 56 | Approver Identity | 0.1.0 | Reference-grade | Local validation under IA-1 to IA-4 done; no composition root wires it and no owner-provisioned issuer exists | Reference-grade, shadow-only; validation against a real enterprise identity provider is unproven. | 49 |
+| 57 | Governed Review | 0.3.0 | Reference-grade | GAS-7 step HR-A done; HR-E linkage contract at 0.2.0 | Reference-grade, shadow-only; enforcement disabled, no credential broker or identity provider integration, recorded approver is a presented reference. | 47 |
+| 58 | Governed Review Service | 0.6.0 | Reference-grade | HR-C, HE-1 and HE-5 done; identity proof adapter is a fixture until an issuer exists | Reference-grade, shadow-only; identity proof presented-unproven, every decision feeds fixture providers. | 84 |
+| 59 | Cloud Scaling Envelope Issuance | 0.1.0 | Last phase done | 5B-4 complete over the 5B-0A and 5B-0B verifiers; next is 5C admission | Composition package owning no authority and no key; production posture refuses reference signers and applications. | 55 |
+| 60 | Cloud Scaling Action Admission | 0.1.0 | Last phase done | 5C gate over 5B-4 envelopes complete; 5X credentials and reservation still required before anything runs | Composition package with a production-authoritative gate; no credential, reservation, dispatch or cloud call. | 52 |
+| 61 | Agent Runtime Governance Hook | 0.1.0 | Core implemented | GAS-3 complete with the adversarial suite; HOLD, DEFER, ESCALATE and MANUAL_REVIEW sinks arrived later with GAS-7 | Core implemented, not pilot-validated; Risk Authority production mode still contains issuance outside the 5B-4 path. | 48 |
+| 62 | Execution Reservation | 0.1.0 | Reference-grade | Action Clearance phases E and G closed; enforcement gated and the level-2 signal blocked on a key service | Reference-grade, shadow-only, not enforcement-ready; single-node persistence, distributed consistency disclaimed. | 54 |
+| 63 | Clearance Export | 0.1.0 | Contract-only | CE-1 to CE-7 done with synthetic seeded receipts; authenticity awaits a signing key and identity assurance awaits an enterprise issuer | Contracts only; the deployment holds no clearance any authority granted. | 39 |
+| 64 | Durable Execution | 0.1.0 | Core implemented | GAS-2 complete; DBOS ratified as the initial engine by ruling OD-3; HR-B bounded resume added; Temporal adapter gated | Core implemented, not pilot-validated, not production-certified; multi-region consistency, HSM or KMS custody and key rotation untouched. | 54 |
+| 65 | Cloud Scaling Credential Broker | 0.1.0 | Last phase done | 5X decisions D-1 to D-5 complete; generalises beyond cloud scaling only after 5D | Composition package; the reference broker returns an inert handle and is refused in production, and executable is always false. | 67 |
+| 66 | Cloud Scaling Bounded Execution | 0.1.0 | Last phase done | 5D decisions D-1 to D-5 complete; the backend is built by the deployment from the handle outside the repository | Composition package exercised in simulation against a fake backend; LIVE only under proven posture and never cluster-validated. | 64 |
+| 67 | Risk Authority Effect Attestation | 0.2.0 | Reference-grade | SE-1 to SE-5 ratified with strict point validation; resolver wiring and RA-8 integration are later steps | Reference-grade, not production-ready and not wired into execution assurance; no clock and no Third-Party Gateway. | 98 |
+| 68 | Incident Response | 0.1.0 | Contract-only | Wave 3 scoping ratified; the wave's only new package; durability is the audit reference | Records only; not enforcement-ready and not an operational incident system. | 66 |
+| 69 | Control-Plane Root | 0.2.0 | Reference-grade | Wave 3 root ratified and shipped; consumed by the review service's linkage append; console adoption left to a later ruling | Reference-grade, standard-library-only composition root; tamper-evident, and it never says tamper-proof. | 47 |
 
 ## B.5 Distribution by stage
 
 | Stage tag | Count | Capabilities |
 |---|---:|---|
-| Core implemented | 19 | 1, 2, 3, 6, 9, 10, 11, 13, 14, 15, 20, 21, 22, 25, 26, 36, 37, 39, 43 |
-| Phase in progress | 6 | 8, 12, 24, 30, 32, 34 |
-| Reference-grade | 4 | 28, 40, 41, 42 |
-| Research-only | 4 | 16, 17, 18, 19 |
-| Contract-only | 3 | 4, 5, 27 |
-| Last phase done | 3 | 7, 29, 33 |
+| Core implemented | 24 | 1, 2, 3, 6, 9, 10, 11, 13, 14, 15, 17, 20, 21, 22, 25, 26, 36, 37, 39, 43, 51, 52, 61, 64 |
+| Reference-grade | 14 | 28, 40, 41, 42, 46, 47, 54, 55, 56, 57, 58, 62, 67, 69 |
+| Contract-only | 10 | 4, 5, 16, 27, 48, 49, 50, 53, 63, 68 |
+| Phase in progress | 7 | 7, 8, 12, 24, 30, 32, 34 |
+| Last phase done | 6 | 29, 33, 59, 60, 65, 66 |
 | CI-verified, pilot pending | 2 | 35, 38 |
 | Experimental kernel | 2 | 44, 45 |
 | Frozen | 2 | 23, 31 |
+| Research-only | 2 | 18, 19 |
 | Pilot-ready | 0 | none |
 | Pilot-validated | 0 | none |
 | Production-certified | 0 | none |
 
 ## B.6 Reading the table
 
-1. **The accountability chain is implemented but not piloted.** Every Core-required capability from Appendix A is at least Core implemented, and the four Risk Authority runtime packages are reference-grade with production adapters delegated rather than absent. What is missing is a bounded pilot of the current package lineage; the only pilot evidence is the legacy Enterprise Validation Pilot over predecessor distributions.
-2. **Cloud scaling is the deepest phase ladder and the clearest gap.** Phases 1–5B-4 are landed across seven packages (envelope issuance closed by Risk Authority 0.6.0's seam and `packages/integration/cloud-scaling-envelope-issuance`), but production ActionGate admission (5C), the Credential Broker (5X), bounded execution (5D) and effect verification (6) are all named and unbuilt. Live infrastructure mutation is structurally blocked until 5X.
-3. **Three capabilities are contracts without engines.** Benchmark Registry Contracts, UVI Policy Contracts and Benchmark Registry Authority ship typed shapes whose authority fields are permanently false by construction. They should not be presented as operational registries or authorities.
-4. **The reasoning-method thread is research-only end to end.** Capabilities 16–19 are commissioned under an owner-ratified research ballot and label every output non-approval-bearing; Phase 4C of the workflow-fit pilot is actively landing but does not change that label.
-5. **Version numbers and README phase text drift in places.** Cloud Scaling Authorization Contracts is at 0.7.0 while its README narrates 0.1.0 to 0.2.0; Cloud Scaling Controller's header says 0.3.0 while its Phase 3 section says 0.4.0; Agent Runtime's Status section stops at 0.5.0 while its Maturity block reaches 0.6.0 and the distribution is 0.7.0. The Version column above reports the distribution's `__version__` at the inspected commit.
+1. **The accountability chain is implemented end to end in shadow, and still not piloted.** Every Core-required capability from Appendix A is at least Core implemented or reference-grade. Since revision 1.1 the chain gained its missing links: approval consumption, envelope issuance, action admission, the runtime hook, one-time reservation, durable execution, credential brokering, bounded execution and the audit ledger. What is missing is unchanged: a bounded pilot of the current package lineage, a production key custody posture and a real identity issuer.
+2. **The cloud-scaling ladder is closed through 5D and 5X.** Eleven packages carry Phases 1 to 5D; Risk Authority 0.8.0 exposes production issuance and admission seams; the credential broker holds no secret and bounded execution runs LIVE only under six proven preconditions and is exercised only in simulation. Phase 6 effect verification remains unbuilt, and no cluster has been touched.
+3. **Contracts without engines now number ten.** Benchmark Registry Contracts, UVI Policy Contracts, Benchmark Registry Authority, Reasoning Method Governance, AI System Registry, Data-Use Admission, Vendor Dependency, Agent Assurance Evidence, Incident Response and Clearance Export ship typed shapes, some with one ruled local file, whose authority and authenticity fields are false by construction. They should not be presented as operational registries, engines or authorities.
+4. **The reasoning-method thread has a product entry, not a product.** Governance (16) and Advisor (17) moved out of research-only under ADR RM-1 to RM-3: an advisory can reach the Agentic Proposer only through a digest-bound admission backed by signed comparison evidence. No real comparison evidence exists yet, so the path is open and empty. Readiness Comparison (18) and the Workflow-Fit Pilot (19) remain research-only.
+5. **Reference-grade is the dominant new posture.** Fourteen capabilities carry it, nine of them declaring `REFERENCE_GRADE_SHADOW_ONLY` with `ENFORCEMENT_ENABLED = False` in code. Two vocabularies coexist in READMEs, "reference-grade, shadow-only, not enforcement-ready" and "reference-grade, not production-ready", and this table maps both to one tag.
+6. **Version numbers and README phase text still drift.** Policy Workflow Compiler landed a whole P3 ladder without a version bump; Cloud Scaling Authorization Contracts is at 0.7.0 while its README narrates 0.1.0 to 0.2.0; Cloud Scaling Controller's header says 0.3.0 while its Phase 3 section says 0.4.0; Agent Runtime's Status section stops at 0.5.0 while the distribution is 0.7.0; the four newest cloud-scaling packages state 0.1.0 in prose. The Version column reports the distribution's `__version__` at the inspected commit.
 
 # Appendix C — Cross-Check Log and Competitor Supplement
 
@@ -1566,3 +2116,42 @@ Sourcing rules for the supplement:
 - Open-source projects and open standards (for example DSPy, Presidio, Karpenter, MCP, A2A, SPIFFE) are labelled as such in the text and are included because they are the closest functional analogue, not because they are commercial competitors.
 - A cited analogue overlaps one function of a capability. None was found to reproduce the platform's separation of proposal, verification, decision, machine authority, exact-action authorization, clearance, execution, assurance and value measurement, and the caveat in A.9 about blank fields applies equally to the supplement.
 
+## C.4 Revision 2.0 update record
+
+Revision 2.0 (7 September 2026) re-audited the repository at commit `cabd218e`. The package count moved from 47 to 71; the two business-solution products stay excluded, so the capability count moved from 45 to 69. Every new capability keeps the document's conventions: a pipeline role, three reasons it is necessary, an applicability row in A.5, a competitor entry in A.7 and a status row in B.4, all drawn from the package's own README and metadata.
+
+**Reconciliation with the module map.** The Ugence Module Map published on 6 September 2026 counted 66 packages, including the two products, across fifteen modules M0 to M14. Five packages merged after that map: Authoritative Policy Compilation (51), Procurement Policy Compilation (52), Reasoning-Method Result Attestation (54), Clearance Export (63) and Console API (46). Their module assignments below are this document's, marked with an asterisk, and are not yet in the map.
+
+**What changed among the original 45.** Fourteen rows changed version or status: Governance Contracts (five new contract families), Policy Authority (durable SQLite registry), Policy Workflow Compiler (P3 ladder, now Phase in progress), Constitution Activation (derived reference map), Agentic Proposer (advisory input), Reasoning Method Governance and Advisor (product entry; tags changed from Research-only to Contract-only and Core implemented), Workflow-Fit Pilot (Phase 4C revisions), Trusted Evidence Authority (signed-snapshot resolver), Benchmark Registry Authority (candidate verifier), Risk Authority (durable persistence and admission seam), Cloud Scaling Authorization Contracts, Cloud Scaling Operations (orchestrator containment), Execution Assurance (attested ingress) and Governed Value (observation carriage). Test counts were refreshed for every row. Thirty-one rows were unchanged.
+
+**Corrections to earlier text.** Revision 1.1 and the productization roadmap described the Credential Broker as unbuilt; it exists as capability 65 at 0.1.0 and holds no secret. The B.6 statement that live mutation is structurally blocked until 5X is replaced by the gated posture of bounded execution (66). Section 14's second layer is renamed the governed proposal layer to match how the advisory packages are now bounded.
+
+**Capability to module cross-reference.**
+
+| # | Capability | Module | # | Capability | Module | # | Capability | Module |
+|---:|---|---|---:|---|---|---:|---|---|
+| 1 | Governance Contracts | M0 | 24 | Cloud Scaling Controller | M3 | 47 | Authority Directory | M7 |
+| 2 | Governance Provider Framework | M0 | 25 | TAP Assertion Governance Provider | M5 | 48 | AI System Registry | M12 |
+| 3 | JSON Canonicalization Scheme | M0 | 26 | Trusted Evidence Authority | M5 | 49 | Data-Use Admission | M12 |
+| 4 | Benchmark Registry Contracts | M12 | 27 | Benchmark Registry Authority | M12 | 50 | Vendor Dependency | M12 |
+| 5 | UVI Policy Contracts | M1 | 28 | Risk Authority Evidence Runtime | M5 | 51 | Authoritative Policy Compilation | M1* |
+| 6 | Policy Authority | M1 | 29 | Cloud Scaling Producer Attestation | M10 | 52 | Procurement Policy Compilation | M1* |
+| 7 | Policy Workflow Compiler | M1 | 30 | Cloud Scaling Policy Authenticity | M10 | 53 | Agent Assurance Evidence | M5 |
+| 8 | Agent Constitution Policy | M2 | 31 | Decision Authority | M6 | 54 | Reasoning-Method Result Attestation | M5* |
+| 9 | Agent Constitution Activation | M2 | 32 | Risk Authority | M6 | 55 | Approval Workflow | M7 |
+| 10 | Cloud Scaling Capacity-Bounds Policy | M1 | 33 | Cloud Scaling Risk Integration | M3 | 56 | Approver Identity | M7 |
+| 11 | Strategy-Permission Policy | M2 | 34 | Cloud Scaling Authorization Contracts | M10 | 57 | Governed Review | M7 |
+| 12 | Agent Constitution Conformance | M2 | 35 | Risk Authority Runtime Composition | M6 | 58 | Governed Review Service | M7 |
+| 13 | Agentic Proposer | M3 | 36 | ActionGate | M8 | 59 | Cloud Scaling Envelope Issuance | M10 |
+| 14 | Strategy-Permission Runtime Resolver | M2 | 37 | Action Clearance | M8 | 60 | Cloud Scaling Action Admission | M10 |
+| 15 | Agent Workforce Composer | M3 | 38 | Agent Runtime | M9 | 61 | Agent Runtime Governance Hook | M9 |
+| 16 | Reasoning Method Governance | M3 | 39 | Cloud Scaling Operations | M10 | 62 | Execution Reservation | M8 |
+| 17 | Reasoning Method Advisor | M3 | 40 | Risk Authority Status Runtime | M11 | 63 | Clearance Export | M8* |
+| 18 | Readiness Comparison | M4 | 41 | Risk Authority Runtime Assurance | M11 | 64 | Durable Execution | M9 |
+| 19 | Trusted Workflow-Fit Pilot | M4 | 42 | Risk Authority Execution Assurance | M11 | 65 | Cloud Scaling Credential Broker | M10 |
+| 20 | Model Selection | M3 | 43 | Context-Minimization Token-Accounting Runtime | M3 | 66 | Cloud Scaling Bounded Execution | M10 |
+| 21 | LLM Steering Controller | M3 | 44 | Agent Value Readiness | M13 | 67 | Risk Authority Effect Attestation | M11 |
+| 22 | Context Minimization | M3 | 45 | Governed Value | M13 | 68 | Incident Response | M12 |
+| 23 | StoryGraph | M3 | 46 | Console API | M12* | 69 | Control-Plane Root | M12 |
+
+*Assigned by this document; the package post-dates the 6 September module map.
