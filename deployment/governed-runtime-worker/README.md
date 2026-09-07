@@ -59,6 +59,9 @@ composed, `PRESENTED_UNPROVEN` otherwise), the adapter's `issuer_validation` lab
 the directory's own provenance statement. No proof or credential header is read. An
 untyped identifier is refused before the directory is asked; a missing committee or
 grant is a typed not-found.
+`tests/test_end_to_end.py::test_the_authority_reads_are_served_by_the_composed_worker_and_no_write_is`
+proves all of that over the composed worker on a real PostgreSQL, in the same CI job as
+the decision relay, and that no AP-3 write path answers (ADR §15).
 
 **No write of the plane is served.** The four AP-3 operations wait on the identity
 gate: an `IDP_AUTHENTICATED` subject, refused otherwise, and no write ships until the
