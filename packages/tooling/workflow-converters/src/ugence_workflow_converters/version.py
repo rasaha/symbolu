@@ -19,9 +19,10 @@ CONVERSION_REPORT_SCHEMA = "ugence.workflow-converters.conversion-report.v1"
 #: The preview document's schema (a synthesized, unapproved Workflow IR).
 PREVIEW_SCHEMA = "ugence.workflow-converters.preview-workflow-ir.v1"
 
-#: Source formats, in ruling order. Only the first is implemented in this build.
-IMPLEMENTED_FORMATS: Tuple[str, ...] = ("n8n",)
-NEXT_FORMAT = "bpmn-2.0"
+#: Source formats, in ruling order: both ruled formats are implemented in this build.
+IMPLEMENTED_FORMATS: Tuple[str, ...] = ("n8n", "bpmn-2.0")
+#: No further format is ruled; the deferred three wait for a declarative export.
+NEXT_FORMAT = ""
 DEFERRED_FORMATS: Tuple[str, ...] = ("langgraph", "crewai", "autogen")
 DEFERRED_REASON = ("deferred until a declarative export exists; converting these today would "
                    "mean importing or executing customer code, which CV-2 forbids")
@@ -44,7 +45,7 @@ class VersionInfo:
     deferred_formats: Tuple[str, ...] = DEFERRED_FORMATS
     maturity: Dict[str, bool] = field(default_factory=lambda: {
         "n8n_converter_implemented": True,
-        "bpmn_converter_implemented": False,
+        "bpmn_converter_implemented": True,
         "langgraph_converter_implemented": False,
         "crewai_converter_implemented": False,
         "autogen_converter_implemented": False,

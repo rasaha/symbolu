@@ -66,10 +66,14 @@ def test_the_only_first_party_dependency_is_the_compiler():
             assert m.group(1) in ("ugence_policy_workflow_compiler", "ugence_workflow_converters"), f"{path}: {m.group(1)}"
 
 
-def test_the_pack_is_draft_and_the_compiler_refuses_to_compile_it():
+FIXTURE_BY_FORMAT = [("n8n", "order_review.n8n.json"), ("bpmn-2.0", "purchase_approval.bpmn")]
+
+
+@pytest.mark.parametrize("fmt, name", FIXTURE_BY_FORMAT)
+def test_the_pack_is_draft_and_the_compiler_refuses_to_compile_it(fmt, name):
     from ugence_policy_workflow_compiler.api import GovernedWorkflowCompiler
     from ugence_policy_workflow_compiler.models.policy_pack import IllegalLifecycleTransition
-    outcome = convert("n8n", _bytes("order_review.n8n.json"))
+    outcome = convert(fmt, _bytes(name))
     assert outcome.pack.status.value == "DRAFT"
     with pytest.raises(IllegalLifecycleTransition):
         GovernedWorkflowCompiler().compile(outcome.pack, None, require_approval=False)
@@ -93,8 +97,9 @@ def _texts(value, path="$"):
             yield from _texts(v, f"{path}[{i}]")
 
 
-def test_no_report_pack_or_preview_text_makes_a_forbidden_claim():
-    outcome = convert("n8n", _bytes("order_review.n8n.json"))
+@pytest.mark.parametrize("fmt, name", FIXTURE_BY_FORMAT)
+def test_no_report_pack_or_preview_text_makes_a_forbidden_claim(fmt, name):
+    outcome = convert(fmt, _bytes(name))
     for document in (outcome.report.as_document(), outcome.pack_document, outcome.preview):
         dumped = json.dumps(document)
         assert "SEMANTICALLY_EQUIVALENT" not in dumped
@@ -108,13 +113,14 @@ def test_no_report_pack_or_preview_text_makes_a_forbidden_claim():
 
 def test_version_info_is_honest_about_what_exists():
     info = version_info()
-    assert info.implemented_formats == ("n8n",)
-    assert info.next_format == "bpmn-2.0"
+    assert info.implemented_formats == ("n8n", "bpmn-2.0")
+    assert info.next_format == ""
     assert info.deferred_formats == ("langgraph", "crewai", "autogen")
     assert info.maturity["semantic_equivalence_claimed"] is False
     assert info.maturity["governance_or_approval_conferred"] is False
     assert info.maturity["offline_only"] is True
-    for name in ("bpmn", "langgraph", "crewai", "autogen"):
+    assert info.maturity["bpmn_converter_implemented"] is True
+    for name in ("langgraph", "crewai", "autogen"):
         assert info.maturity[f"{name}_converter_implemented"] is False
 
 
@@ -123,8 +129,9 @@ GATE_CREDENTIAL_KEY = re.compile(r"(secret|password|passwd|token|api[_-]?key|pri
 GATE_REMOTE = re.compile(r"^\s*(https?|ftp|ftps|file|ws|wss|s3|gs|git|ssh)://", re.I)
 
 
-def test_the_preview_passes_the_bring_your_workflow_gate_rules_and_declares_v1():
-    outcome = convert("n8n", _bytes("order_review.n8n.json"))
+@pytest.mark.parametrize("fmt, name", FIXTURE_BY_FORMAT)
+def test_the_preview_passes_the_bring_your_workflow_gate_rules_and_declares_v1(fmt, name):
+    outcome = convert(fmt, _bytes(name))
     preview = outcome.preview
     assert preview is not None
     assert preview["preview"]["status"] == "PREVIEW_UNAPPROVED"
@@ -143,9 +150,10 @@ def test_the_preview_passes_the_bring_your_workflow_gate_rules_and_declares_v1()
     assert len(json.dumps(preview).encode()) < 1024 * 1024
 
 
-def test_the_composer_adapts_the_preview_when_it_is_installed():
+@pytest.mark.parametrize("fmt, name", FIXTURE_BY_FORMAT)
+def test_the_composer_adapts_the_preview_when_it_is_installed(fmt, name):
     awc = pytest.importorskip("ugence_agent_workforce_composer.api")
-    outcome = convert("n8n", _bytes("order_review.n8n.json"))
+    outcome = convert(fmt, _bytes(name))
     envelope = awc.adapt_workflow(outcome.preview, contract_version="workflow_ir.v1")
     assert envelope.ok is True
     assert envelope.adapter_mode == "V1_FROZEN"
@@ -153,13 +161,20 @@ def test_the_composer_adapts_the_preview_when_it_is_installed():
     assert len(dispositions) == len(outcome.preview["workflow_ir"]["nodes"])
 
 
-def test_the_fixtures_carry_no_secret_and_the_leaky_one_is_the_exception():
-    from ugence_workflow_converters.intake import scan_secrets
+def test_the_fixtures_carry_no_secret_and_the_leaky_ones_are_the_exception():
+    import xml.etree.ElementTree as ET
+    from ugence_workflow_converters.intake import scan_secrets, scan_xml_secrets
     from ugence_workflow_converters.report import ConversionRefused
     for name in sorted(os.listdir(FIXTURES)):
-        document = json.loads(_bytes(name))
-        if name == "embedded_secret.n8n.json":
-            with pytest.raises(ConversionRefused):
-                scan_secrets(document)
+        data = _bytes(name)
+        if name.endswith(".json"):
+            scan = lambda: scan_secrets(json.loads(data))  # noqa: E731
+        elif name == "doctype.bpmn":
+            continue  # refused before parsing; its content is the purchase fixture's
         else:
-            scan_secrets(document)
+            scan = lambda: scan_xml_secrets(ET.fromstring(data.decode("utf-8")))  # noqa: E731
+        if name.startswith("embedded_secret."):
+            with pytest.raises(ConversionRefused):
+                scan()
+        else:
+            scan()

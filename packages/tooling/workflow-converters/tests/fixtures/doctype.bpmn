@@ -1,0 +1,117 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE definitions [<!ENTITY lol "lol">]>
+<definitions xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:zeebe="http://camunda.org/schema/zeebe/1.0" xmlns:camunda="http://camunda.org/schema/1.0/bpmn" id="Definitions_purchase" targetNamespace="http://example.invalid/bpmn" exporter="Synthetic Modeler" exporterVersion="1.0">
+  <collaboration id="Collaboration_1">
+    <participant id="Participant_procurement" name="Procurement" processRef="Process_purchase_approval"/>
+    <participant id="Participant_supplier" name="Supplier"/>
+    <messageFlow id="MessageFlow_1" sourceRef="Task_notify_supplier" targetRef="Participant_supplier"/>
+  </collaboration>
+  <process id="Process_purchase_approval" name="Purchase Approval" isExecutable="true">
+    <laneSet id="LaneSet_1">
+      <lane id="Lane_requester" name="Requester">
+        <flowNodeRef>StartEvent_request</flowNodeRef>
+        <flowNodeRef>Task_fetch_order</flowNodeRef>
+        <flowNodeRef>Gateway_over_threshold</flowNodeRef>
+      </lane>
+      <lane id="Lane_finance" name="Finance">
+        <flowNodeRef>Task_approve_purchase</flowNodeRef>
+        <flowNodeRef>Task_risk_score</flowNodeRef>
+      </lane>
+    </laneSet>
+    <startEvent id="StartEvent_request" name="Purchase requested">
+      <outgoing>Flow_1</outgoing>
+    </startEvent>
+    <serviceTask id="Task_fetch_order" name="Fetch order">
+      <extensionElements>
+        <zeebe:taskDefinition type="fetch-order" retries="3"/>
+      </extensionElements>
+      <incoming>Flow_1</incoming>
+      <outgoing>Flow_2</outgoing>
+    </serviceTask>
+    <boundaryEvent id="BoundaryEvent_fetch_failed" name="Fetch failed" attachedToRef="Task_fetch_order">
+      <errorEventDefinition id="ErrorEventDefinition_1" errorRef="Error_fetch"/>
+    </boundaryEvent>
+    <exclusiveGateway id="Gateway_over_threshold" name="Over threshold?" default="Flow_under">
+      <incoming>Flow_2</incoming>
+      <outgoing>Flow_over</outgoing>
+      <outgoing>Flow_under</outgoing>
+    </exclusiveGateway>
+    <userTask id="Task_approve_purchase" name="Approve purchase">
+      <extensionElements>
+        <camunda:formData>
+          <camunda:formField id="approved" label="Approve?" type="boolean"/>
+        </camunda:formData>
+      </extensionElements>
+      <incoming>Flow_over</incoming>
+      <outgoing>Flow_3</outgoing>
+    </userTask>
+    <businessRuleTask id="Task_risk_score" name="Risk score" camunda:decisionRef="risk_scoring">
+      <incoming>Flow_3</incoming>
+      <outgoing>Flow_4</outgoing>
+    </businessRuleTask>
+    <sendTask id="Task_notify_supplier" name="Notify supplier" messageRef="Message_po">
+      <extensionElements>
+        <zeebe:taskDefinition type="send-email"/>
+      </extensionElements>
+      <incoming>Flow_4</incoming>
+      <incoming>Flow_under</incoming>
+      <outgoing>Flow_5</outgoing>
+    </sendTask>
+    <scriptTask id="Task_compute_total" name="Compute total" scriptFormat="javascript">
+      <script>execution.setVariable("total", amount * 1.2);</script>
+      <incoming>Flow_5</incoming>
+      <outgoing>Flow_6</outgoing>
+    </scriptTask>
+    <parallelGateway id="Gateway_fork" name="Fork">
+      <incoming>Flow_6</incoming>
+      <outgoing>Flow_7</outgoing>
+      <outgoing>Flow_8</outgoing>
+    </parallelGateway>
+    <receiveTask id="Task_receive_confirmation" name="Receive confirmation" messageRef="Message_confirm">
+      <incoming>Flow_7</incoming>
+      <outgoing>Flow_9</outgoing>
+    </receiveTask>
+    <intermediateCatchEvent id="Event_wait_day" name="Wait one day">
+      <timerEventDefinition id="TimerEventDefinition_1"><timeDuration>P1D</timeDuration></timerEventDefinition>
+      <incoming>Flow_8</incoming>
+      <outgoing>Flow_10</outgoing>
+    </intermediateCatchEvent>
+    <intermediateThrowEvent id="Event_signal_done" name="Signal done">
+      <signalEventDefinition id="SignalEventDefinition_1" signalRef="Signal_done"/>
+      <incoming>Flow_9</incoming>
+      <outgoing>Flow_11</outgoing>
+    </intermediateThrowEvent>
+    <task id="Task_file_record" name="File record">
+      <incoming>Flow_10</incoming>
+      <outgoing>Flow_12</outgoing>
+    </task>
+    <endEvent id="EndEvent_done" name="Done">
+      <incoming>Flow_11</incoming>
+      <incoming>Flow_12</incoming>
+    </endEvent>
+    <dataStoreReference id="DataStoreReference_erp" name="ERP" dataStoreRef="DataStore_erp"/>
+    <sequenceFlow id="Flow_1" sourceRef="StartEvent_request" targetRef="Task_fetch_order"/>
+    <sequenceFlow id="Flow_2" sourceRef="Task_fetch_order" targetRef="Gateway_over_threshold"/>
+    <sequenceFlow id="Flow_over" name="over" sourceRef="Gateway_over_threshold" targetRef="Task_approve_purchase">
+      <conditionExpression xsi:type="tFormalExpression" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">${amount > 1000 &amp;&amp; status == "OPEN"}</conditionExpression>
+    </sequenceFlow>
+    <sequenceFlow id="Flow_under" name="under" sourceRef="Gateway_over_threshold" targetRef="Task_notify_supplier">
+      <conditionExpression xsi:type="tFormalExpression" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">${amount &lt;= 1000}</conditionExpression>
+    </sequenceFlow>
+    <sequenceFlow id="Flow_3" sourceRef="Task_approve_purchase" targetRef="Task_risk_score"/>
+    <sequenceFlow id="Flow_4" sourceRef="Task_risk_score" targetRef="Task_notify_supplier"/>
+    <sequenceFlow id="Flow_5" sourceRef="Task_notify_supplier" targetRef="Task_compute_total"/>
+    <sequenceFlow id="Flow_6" sourceRef="Task_compute_total" targetRef="Gateway_fork"/>
+    <sequenceFlow id="Flow_7" sourceRef="Gateway_fork" targetRef="Task_receive_confirmation"/>
+    <sequenceFlow id="Flow_8" sourceRef="Gateway_fork" targetRef="Event_wait_day"/>
+    <sequenceFlow id="Flow_9" sourceRef="Task_receive_confirmation" targetRef="Event_signal_done"/>
+    <sequenceFlow id="Flow_10" sourceRef="Event_wait_day" targetRef="Task_file_record"/>
+    <sequenceFlow id="Flow_11" sourceRef="Event_signal_done" targetRef="EndEvent_done"/>
+    <sequenceFlow id="Flow_12" sourceRef="Task_file_record" targetRef="EndEvent_done"/>
+  </process>
+  <message id="Message_po" name="purchase-order"/>
+  <message id="Message_confirm" name="confirmation"/>
+  <signal id="Signal_done" name="done"/>
+  <error id="Error_fetch" name="fetch-failed" errorCode="FETCH_FAILED"/>
+  <bpmndi:BPMNDiagram id="BPMNDiagram_1"><bpmndi:BPMNPlane id="BPMNPlane_1" bpmnElement="Collaboration_1"/></bpmndi:BPMNDiagram>
+</definitions>

@@ -190,7 +190,7 @@ def test_deferred_and_unknown_formats_are_refused_by_code():
             convert(name, b"{}")
         assert excinfo.value.code is RefusalCode.DEFERRED_FORMAT
     with pytest.raises(ConversionRefused) as excinfo:
-        convert("bpmn-2.0", b"<xml/>")
+        convert("zapier", b"{}")
     assert excinfo.value.code is RefusalCode.UNSUPPORTED_FORMAT
 
 

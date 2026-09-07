@@ -929,6 +929,51 @@ repository's import-boundary and CI-coverage checkers pass with it present.
 
 ### 23.5 — Sequence
 
-BPMN 2.0 next, under this ruling's terms. Then, and only after an owner-provided or
+BPMN 2.0 landed under this ruling's terms (§23.6). Then, and only after an owner-provided or
 synthetic declarative export exists for one of the three deferred frameworks, a
 read-only scoping of that export. Phases 3 and 4 of §22 are unchanged.
+
+### 23.6 — BPMN 2.0 converter: verification recorded with its slice (2026-09-07) `[V]`
+
+The second ruled format, in the same package under the same terms, with no new
+ballot. What it added and what was proven:
+
+- **Intake.** A stdlib XML path with the same figures (1 MiB, depth 32, 200 flow
+  nodes, 50 000 elements). The stdlib parser expands internal entities, so a document
+  type or entity declaration is refused by byte scan before the parser sees the
+  export, as `NOT_AN_EXPORT_OF_THIS_FORMAT`; a fixture proves it. The secret scan
+  covers attribute names, name/value attribute pairs, attribute values and text.
+- **Mapping.** Exclusive and inclusive gateways become one `DecisionRule` per
+  conditioned outgoing flow, with a condition translator over `${}`, `#{}` and
+  `=` expressions that carries `variable <op> literal`, `variable` and `!variable`
+  conjunctions and names every loss (disjunction, non-literal right-hand side,
+  non-integer literal, unknown clause shape, default-flow condition). Business rule
+  tasks become predicate-free rules with `DMN_NOT_TRANSLATED`. Receive tasks become
+  connector mapping plus evidence; send tasks and outward throws become connector
+  mappings with `CONSEQUENTIAL_ACTION_WITHOUT_AUTHORITY`; service tasks become
+  connector mappings with `SERVICE_EFFECT_UNDECLARED`, since BPMN does not say
+  whether a service reads or writes. Human tasks, start and end events, waits,
+  parallel and event-based gateways, boundary events, abstract tasks, lanes and
+  pools are `UNMAPPED` with their reasons; scripts, called processes and complex
+  gateways are `UNSUPPORTED`; any other BPMN element under a process is
+  `UNSUPPORTED` and the conversion `PARTIAL`. No authority requirement, action
+  constraint, exception rule or credential is fabricated; BPMN names no credential,
+  so a BPMN report's credential requirements are always empty.
+- **Fixtures.** Five synthetic BPMN exports: a two-lane, two-pool purchase approval
+  covering every mapped and unmapped kind; a minimal process; an unknown element;
+  an embedded secret in an extension property; a document type declaration.
+- **Tests.** `tests/test_bpmn_conversion.py` (one row per construct; the gateway's
+  rules and losses; the business rule task; connector derivations by task kind;
+  every unmapped reason; scripts never inspected; workflow-level losses and empty
+  credentials; provenance on every object; the minimal process; the unknown
+  element; refusal by typed code for the secret, the doctype, non-XML, non-BPMN,
+  an empty definitions, an entity declaration, a secret-shaped attribute and a
+  secret-shaped text; the three limits; a nine-row condition translation table;
+  determinism). The boundary and claim tests, the compiler's refusal to compile the
+  draft, the Bring Your Workflow gate rules and the composer's adaptation of the
+  preview now run over both formats. The CLI converts BPMN to the same three files
+  and refuses the doctype fixture with nothing written. `version_info` reports both
+  formats implemented, no next format, and the three deferred.
+
+The screen's sentence and the explainer's entry now name both converters. §23.3's
+non-authorizations stand: the deferred three wait for a declarative export.

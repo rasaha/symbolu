@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:zeebe="http://camunda.org/schema/zeebe/1.0" xmlns:camunda="http://camunda.org/schema/1.0/bpmn" id="Definitions_min" targetNamespace="http://example.invalid/bpmn">
+  <process id="Process_min" name="Minimal Intake">
+    <startEvent id="Start_1" name="Start"/>
+    <receiveTask id="Task_receive" name="Receive request" messageRef="Message_req"/>
+    <exclusiveGateway id="Gateway_1" name="Decide"/>
+    <endEvent id="End_1" name="End"/>
+    <sequenceFlow id="F1" sourceRef="Start_1" targetRef="Task_receive"/>
+    <sequenceFlow id="F2" sourceRef="Task_receive" targetRef="Gateway_1"/>
+    <sequenceFlow id="F3" sourceRef="Gateway_1" targetRef="End_1"/>
+  </process>
+  <message id="Message_req" name="request"/>
+</definitions>

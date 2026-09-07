@@ -10,7 +10,8 @@ from __future__ import annotations
 
 import json
 import re
-from typing import Any, Mapping
+import xml.etree.ElementTree as ET
+from typing import Any, List, Mapping, Tuple
 
 from ugence_policy_workflow_compiler.serialization import hashing
 
@@ -52,6 +53,77 @@ def parse_export(data: bytes) -> tuple[dict, str]:
     measure(parsed)
     scan_secrets(parsed)
     return parsed, hashing.digest_bytes(data)
+
+
+#: A document type declaration or an entity declaration is refused before the parser
+#: sees the bytes: the stdlib parser expands internal entities, so an export carrying
+#: one could inflate or smuggle content. A BPMN export needs neither.
+XML_DECLARATION = re.compile(rb"<!\s*(DOCTYPE|ENTITY)\b", re.IGNORECASE)
+
+
+def parse_xml_export(data: bytes) -> Tuple[ET.Element, str]:
+    """Bytes in; an element tree root and its digest out, or a typed refusal."""
+    if len(data) > MAX_INPUT_BYTES:
+        raise ConversionRefused(RefusalCode.TOO_LARGE, f"{len(data)} bytes exceed {MAX_INPUT_BYTES}")
+    if XML_DECLARATION.search(data):
+        raise ConversionRefused(RefusalCode.NOT_AN_EXPORT_OF_THIS_FORMAT, "a document type or entity declaration is never accepted")
+    try:
+        text = data.decode("utf-8")
+        root = ET.fromstring(text)
+    except (UnicodeDecodeError, ET.ParseError) as exc:
+        raise ConversionRefused(RefusalCode.NOT_XML, f"not UTF-8 XML: {exc}; YAML, code and archives are never accepted")
+    measure_xml(root)
+    scan_xml_secrets(root)
+    return root, hashing.digest_bytes(data)
+
+
+def measure_xml(root: ET.Element) -> dict:
+    depth = elements = 0
+    stack: List[Tuple[ET.Element, int]] = [(root, 1)]
+    while stack:
+        element, level = stack.pop()
+        elements += 1
+        if elements > MAX_ELEMENTS:
+            raise ConversionRefused(RefusalCode.TOO_LARGE, f"more than {MAX_ELEMENTS} elements")
+        depth = max(depth, level)
+        if depth > MAX_DEPTH:
+            raise ConversionRefused(RefusalCode.TOO_DEEP, f"nesting deeper than {MAX_DEPTH}")
+        stack.extend((child, level + 1) for child in element)
+    return {"depth": depth, "elements": elements}
+
+
+def scan_xml_secrets(root: ET.Element) -> None:
+    """Refuse a secret-shaped attribute name with a value, a name/value pair naming a
+    secret, or a secret-shaped attribute value or text, anywhere."""
+    stack: List[Tuple[ET.Element, str]] = [(root, local_name(root.tag))]
+    while stack:
+        element, where = stack.pop()
+        attrs = {local_name(k): v for k, v in element.attrib.items()}
+        pair_name = attrs.get("name") or attrs.get("key") or ""
+        pair_value = attrs.get("value") if attrs.get("value") is not None else (element.text or "")
+        if pair_name and SECRET_KEY.search(pair_name) and str(pair_value).strip():
+            raise ConversionRefused(RefusalCode.EMBEDDED_SECRET, f"{where}[name={pair_name!r}] names a secret and carries a value")
+        for key, value in attrs.items():
+            if SECRET_KEY.search(key) and value.strip():
+                raise ConversionRefused(RefusalCode.EMBEDDED_SECRET, f"{where}@{key} is named like a secret and carries a value")
+            for pattern in SECRET_VALUE:
+                if pattern.search(value):
+                    raise ConversionRefused(RefusalCode.EMBEDDED_SECRET, f"{where}@{key} carries a secret-shaped value")
+        text = (element.text or "").strip()
+        if text:
+            for pattern in SECRET_VALUE:
+                if pattern.search(text):
+                    raise ConversionRefused(RefusalCode.EMBEDDED_SECRET, f"{where} text carries a secret-shaped value")
+        for child in element:
+            stack.append((child, f"{where}/{local_name(child.tag)}"))
+
+
+def local_name(tag: str) -> str:
+    return tag.split("}", 1)[1] if tag.startswith("{") else tag
+
+
+def namespace_of(tag: str) -> str:
+    return tag[1:].split("}", 1)[0] if tag.startswith("{") else ""
 
 
 def measure(document: Any) -> dict:

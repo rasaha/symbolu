@@ -59,7 +59,7 @@ def test_version_and_formats():
     assert code == 0 and info["distribution_name"] == "ugence-workflow-converters"
     code, formats = _run(["formats"])
     assert code == 0
-    assert formats["implemented"] == ["n8n"] and formats["next"] == "bpmn-2.0"
+    assert formats["implemented"] == ["n8n", "bpmn-2.0"] and formats["next"] is None
     assert set(formats["deferred"]) == {"langgraph", "crewai", "autogen"}
 
 
@@ -77,3 +77,20 @@ def test_usage_errors_exit_nonzero(argv):
     with pytest.raises(SystemExit) as excinfo:
         main(argv)
     assert excinfo.value.code != 0
+
+
+def test_bpmn_convert_writes_the_same_three_files(tmp_path):
+    out = tmp_path / "out"
+    code, summary = _run(["convert", "bpmn-2.0", os.path.join(FIXTURES, "purchase_approval.bpmn"), "--out", str(out)])
+    assert code == 0 and summary["pack_status"] == "DRAFT" and summary["preview"] == "PREVIEW_UNAPPROVED"
+    assert sorted(os.listdir(out)) == sorted(OUTPUT_FILES.values())
+    report = json.loads((out / OUTPUT_FILES["report"]).read_text())
+    assert report["source"]["format"] == "bpmn-2.0"
+    assert report["converter"]["name"] == "bpmn-2.0"
+
+
+def test_a_doctype_is_refused_before_parsing_and_writes_nothing(tmp_path):
+    out = tmp_path / "out"
+    code, summary = _run(["convert", "bpmn-2.0", os.path.join(FIXTURES, "doctype.bpmn"), "--out", str(out)])
+    assert code == 2 and summary["code"] == "NOT_AN_EXPORT_OF_THIS_FORMAT"
+    assert not out.exists()
