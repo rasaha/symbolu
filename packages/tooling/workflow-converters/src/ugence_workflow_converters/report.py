@@ -42,6 +42,7 @@ class RowOutcome(str, Enum):
 
 class RefusalCode(str, Enum):
     NOT_JSON = "NOT_JSON"
+    NOT_XML = "NOT_XML"
     NOT_AN_OBJECT = "NOT_AN_OBJECT"
     NOT_AN_EXPORT_OF_THIS_FORMAT = "NOT_AN_EXPORT_OF_THIS_FORMAT"
     TOO_LARGE = "TOO_LARGE"

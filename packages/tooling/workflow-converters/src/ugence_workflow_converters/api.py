@@ -21,6 +21,7 @@ from typing import Any, Dict, List, Optional, Tuple
 from ugence_policy_workflow_compiler.api import PolicyPack
 from ugence_policy_workflow_compiler.serialization import canonical_json
 
+from .bpmn import convert_bpmn_export
 from .n8n import convert_n8n_export
 from .preview import PREVIEW_STATUS, build_preview, summarize_preview
 from .report import (
@@ -54,6 +55,7 @@ __all__ = [
     "PREVIEW_SCHEMA",
     "PREVIEW_STATUS",
     "OUTPUT_FILES",
+    "CONVERTERS",
     "ConversionOutcome",
     "ConversionRefused",
     "ConversionReport",
@@ -65,6 +67,9 @@ __all__ = [
     "write_outputs",
     "version_info",
 ]
+
+#: One converter per implemented format, by name (CV-1: one module per source format).
+CONVERTERS = {"n8n": convert_n8n_export, "bpmn-2.0": convert_bpmn_export}
 
 #: The only files a conversion writes, by role.
 OUTPUT_FILES = {
@@ -93,8 +98,10 @@ def convert(format_name: str, data: bytes, *, preview: bool = True) -> Conversio
         raise ConversionRefused(RefusalCode.DEFERRED_FORMAT, f"{name}: {DEFERRED_REASON}")
     if name not in IMPLEMENTED_FORMATS:
         raise ConversionRefused(RefusalCode.UNSUPPORTED_FORMAT,
-                                f"{name!r} is not a converter of this build; implemented: {', '.join(IMPLEMENTED_FORMATS)}; next: {NEXT_FORMAT}")
-    pack, report, connections = convert_n8n_export(data)
+                                f"{name!r} is not a converter of this build; implemented: {', '.join(IMPLEMENTED_FORMATS)}"
+                                + (f"; next: {NEXT_FORMAT}" if NEXT_FORMAT else ""))
+    converter = CONVERTERS[name]
+    pack, report, connections = converter(data)
     preview_doc = build_preview(pack, report) if preview else None
     sealed = report.model_copy(update={"preview": summarize_preview(preview_doc)}).sealed()
     return ConversionOutcome(format=name, pack=pack, report=sealed, preview=preview_doc, connections=tuple(connections))

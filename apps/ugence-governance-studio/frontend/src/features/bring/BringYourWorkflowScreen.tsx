@@ -531,8 +531,8 @@ export function BringYourWorkflowScreen() {
             <li>Add to or change the scenario catalog. The pinned scenarios are untouched by anything done here.</li>
             <li>
               Convert from LangGraph, CrewAI, AutoGen, n8n or BPMN in the browser. Conversion is an offline command-line tool: today the
-              n8n converter emits a DRAFT policy pack, a conversion report and a preview Workflow IR labelled PREVIEW_UNAPPROVED that this
-              screen inspects; BPMN 2.0 is next; LangGraph, CrewAI and AutoGen wait for a declarative export.
+              n8n and BPMN 2.0 converters emit a DRAFT policy pack, a conversion report and a preview Workflow IR labelled
+              PREVIEW_UNAPPROVED that this screen inspects; LangGraph, CrewAI and AutoGen wait for a declarative export.
             </li>
           </ul>
         </Section>

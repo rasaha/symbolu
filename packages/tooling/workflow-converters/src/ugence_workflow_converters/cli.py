@@ -3,6 +3,7 @@
     ugence-workflow-converters version
     ugence-workflow-converters formats
     ugence-workflow-converters convert n8n <export.json> --out DIR [--no-preview]
+    ugence-workflow-converters convert bpmn-2.0 <export.bpmn> --out DIR [--no-preview]
 
 Also runnable as ``python -m ugence_workflow_converters``. Offline, deterministic,
 credential-free. Exit 0 on a conversion (PARTIAL included: the report says what did
@@ -39,7 +40,7 @@ def cmd_version(_args) -> int:
 
 
 def cmd_formats(_args) -> int:
-    _print({"implemented": list(IMPLEMENTED_FORMATS), "next": NEXT_FORMAT,
+    _print({"implemented": list(IMPLEMENTED_FORMATS), "next": NEXT_FORMAT or None,
             "deferred": {name: DEFERRED_REASON for name in DEFERRED_FORMATS}})
     return 0
 
@@ -79,7 +80,7 @@ def build_parser() -> argparse.ArgumentParser:
     sub.add_parser("formats").set_defaults(func=cmd_formats)
     conv = sub.add_parser("convert", help="convert one export into a DRAFT pack, a report and a preview IR")
     conv.add_argument("format", help="source format: " + ", ".join(IMPLEMENTED_FORMATS))
-    conv.add_argument("export", help="path of the export file (JSON)")
+    conv.add_argument("export", help="path of the export file (n8n JSON or BPMN 2.0 XML)")
     conv.add_argument("--out", required=True, help="directory to write the three outputs into")
     conv.add_argument("--no-preview", action="store_true", help="write the pack and the report only")
     conv.set_defaults(func=cmd_convert)
