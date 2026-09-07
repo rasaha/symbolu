@@ -228,7 +228,7 @@ section records it in the form the CE and CP records use.
 | # | Ruling |
 |---|---|
 | **MA-1** | **`NO_PER_MODULE_ADMIN`.** No module gains an administration screen. Typed intake — one write that records what an administrator asserted and confers nothing — and read-only display remain the only admissible screen shapes. `ADMIN_FOR_ADVISORY_MODULES_ONLY` and `ADMIN_PER_MODULE` are refused. |
-| **MA-2** | **`ONE_READ_ONLY_STATUS_PANEL`.** One studio panel over the nine static registry rows and the six seam states the startup integrity report already computes. Its cost is one v2 read operation, added as a contract amendment in the shape v2-A1 to v2-A6 established. No new package, no new SD-1 entry, no write, no live-availability probe. |
+| **MA-2** | **`ONE_READ_ONLY_STATUS_PANEL`.** One studio panel over the nine static registry rows and the six seam states the startup integrity report already computes. Its cost is one v2 read operation, added as a contract amendment in the shape v2-A1 to v2-A6 established. No new package, no new SD-1 entry, no write, no live-availability probe. *Amended by §15 (MS-1): the nine registry rows are struck; the panel shows the seam states, checks and pins only.* |
 | **MA-3** | **`TWO_DEPLOYABLES_UNCHANGED`.** The studio and `apps/console` remain the two deployables CP-1 ruled. No third front end is built, and the two independently frozen contracts are not merged. |
 | **MA-4** | **`RETIRE_THE_TWO_CALLS`.** `apps/console` stops calling `/v1/modules` and `/v1/scenarios`. Neither route is served; MA-2's panel supersedes the first. `RULE_TWO_INTROSPECTION_ROUTES` is refused as a new served surface without a CP ruling; `LEAVE_AS_IS` is refused because a front end that calls what nothing serves is the failure this record exists to name. |
 | **MA-5** | **`SCAN_SUMMARY_TOO`.** `test_v2_operation_ids.py` gains the summary scan its docstring already claims. One test; no contract, route or client changes. |
@@ -318,3 +318,79 @@ until a catalogue route is ruled, that is a one-line change and a new ruling is 
 needed for it.
 
 MA-2 remains unimplemented and separately scoped, as §12 requires.
+
+## 15 — MA-2 scoping, and ruling MS-1 to MS-5 (owner, 2026-09-06)
+
+Scoped before implementation, as §12 required, at `ac2703a0`. The scoping found that
+MA-2 as ruled could not be implemented honestly: it promises two things, of which one
+has a lawful source and the other has none.
+
+### 15.1 — The corrected premise `[V]`
+
+- **The six seam states can reach the studio.** They are fields of the startup
+  integrity report (`startup_integrity.py:230-235`), which exists in memory in `run()`
+  (`server.py:38`) before `build_app` is called (`:52`). Every existing seam reaches
+  the backend as a keyword argument to `build_studio_context(...)` (`app_v2.py:64-81`)
+  wrapped in a service that returns the typed `unavailable` shape when absent
+  (`studio_v2.py:129-136`). The report is a dict, not a package: no SD-1 entry is
+  involved. What is missing is that `build_app` (`app.py:184`) and `_build_backend`
+  (`:186`) take no report `[G]`.
+- **The nine `ModuleInfo` rows cannot.** `ugence_console_api` is not in
+  `_PROHIBITED_IMPORTS`; it is refused by
+  `test_no_package_outside_the_allowlist_is_imported` (`test_architecture.py:232-248`),
+  which rejects any `ugence_*` root not allowlisted. The deployment cannot hand the
+  rows in either: it depends on starlette, uvicorn and argon2 only
+  (`deployment/governance-studio/pyproject.toml:10-14`) and its image installs no
+  `console-api` (`Dockerfile:31-61`); installing it would bring the console's four
+  platform packages (`console-api/tests/test_packaging.py:30-35`) into the studio
+  image. Reaching the rows over HTTP needs `/v1/modules`, withheld by CP-3, and a fifth
+  entry in the closed `CONSOLE_ALLOWED_ROUTES` (`clients/console.py:36-38`). Copying
+  them into a fixture is a second registry that drifts.
+- **The amendment precedent is finer than MA-2.** v2-A1 to v2-A6 each cite a ruling
+  that names the operation, its source and its labelling separately. MA-2 named the
+  panel and the cost only.
+
+### 15.2 — Ballot MS-1 to MS-5 (recommended option first)
+
+| # | Decision | Options |
+|---|---|---|
+| **MS-1** | What the panel shows | **`SEAM_STATES_ONLY`**: amend MA-2 to strike the nine rows. `ADMIT_ROWS_VIA_CONSOLE_ROUTE`: reopen `/v1/modules` under a new CP ruling and widen the studio's console allowlist, revisiting SD-2. `FIXTURE_COPY`: ship the rows as a deployment fixture. |
+| **MS-2** | Source of the status | **`IN_MEMORY_RESULT_AT_COMPOSITION`**: `run()` hands `result.report` through `build_app` into `build_studio_context`. `READ_FILE_FROM_RUNTIME_DIR`: the route reads the best-effort copy on the writable volume. |
+| **MS-3** | The operation | **`OBSERVE_DEPLOYMENT_ONE_READ`**: `v2_observe_deployment` at `GET /api/v2/observe/deployment`, amendment v2-A7, the v2-A3 shape. `NEW_STATUS_NAMESPACE`: `/api/v2/status`. |
+| **MS-4** | The field set | **`SEAM_STATES_CHECKS_AND_PINS`**: the six seam states, the `checks` map, `result`, `failure_code`, and the version and hash fields. `WHOLE_REPORT`: also `cert_subject` and `cert_expiry`. |
+| **MS-5** | Where it lives | **`SEPARATE_STATUS_PANEL`** at `/studio/status`. `THIRD_SOURCE_ON_OBSERVE`: a third labelled source on the Observe screen. |
+
+**Why the recommended options.** MS-1 is the only option that costs nothing already
+refused. MS-2 reads the attested fact, not its mutable copy. MS-3 keeps one route in
+an existing family, exactly as A3 did. MS-4 omits two operator facts no screen uses.
+MS-5 leaves FD-11.4 `TWO_LABELLED_SOURCES` untouched; a third source would change the
+count that ruling names, which is that ruling to reopen.
+
+### 15.3 — Ruling MS-1 to MS-5 (owner, 2026-09-06)
+
+The recommended option is ratified in every case, under the owner's standing direction
+that recommended defaults apply and the sequence proceeds without interruption.
+
+| # | Ruling |
+|---|---|
+| **MS-1** | **`SEAM_STATES_ONLY`.** MA-2 is amended: the nine registry rows are struck. The panel shows what the deployment attested about itself at startup and nothing about the console's module registry. `ADMIT_ROWS_VIA_CONSOLE_ROUTE` and `FIXTURE_COPY` are refused. |
+| **MS-2** | **`IN_MEMORY_RESULT_AT_COMPOSITION`.** The integrity report reaches the studio as one composition argument, handed once at startup; no route reads a file. |
+| **MS-3** | **`OBSERVE_DEPLOYMENT_ONE_READ`.** One read, `v2_observe_deployment` at `GET /api/v2/observe/deployment`, contract amendment v2-A7 chaining from v2-A6. |
+| **MS-4** | **`SEAM_STATES_CHECKS_AND_PINS`.** The six seam states, the `checks` map, `result`, `failure_code`, and the deployment, frontend, backend, contract and hash fields. `cert_subject` and `cert_expiry` do not travel. |
+| **MS-5** | **`SEPARATE_STATUS_PANEL`.** A panel at `/studio/status`; the Observe screen keeps its two sources. |
+
+**MA-2 as amended now reads:** one read-only studio panel at `/studio/status` over the
+startup integrity report's seam states, checks and pins, handed to the studio at
+composition; one v2 read operation, `v2_observe_deployment`, added as amendment v2-A7;
+no new package, no new SD-1 entry, no write, no live-availability probe, and no
+registry rows.
+
+### 15.4 — What ratifying does not authorize
+
+- **No registry rows by any route.** The three refused paths stay refused; a later
+  request to show the nine rows is a new ruling under CP-3 and SD-2, not this one.
+- **No live probe.** The panel reports what the gate attested before the port bound.
+  A `configured` seam is not a reachable engine, and the screen must say so.
+- **No second read, no write, no file read.** One operation; the report is handed
+  once and is immutable in the process, as the config it describes is.
+- **No SD-1 entry, no console route, no reopening of FD-11.4.**
