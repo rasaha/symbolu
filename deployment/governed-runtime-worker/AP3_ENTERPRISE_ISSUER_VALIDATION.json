@@ -1,0 +1,57 @@
+{
+  "schema": "governed-runtime-worker.ap3-enterprise-issuer-validation.v1",
+  "ruling": "ADR_UGENCE_AUTHORITY_PLANE_SCOPING.md AP-3 IDP_VALIDATED_FIRST (controlling, section 18); protocol and status in section 20",
+  "ap3_status": "BLOCKED_PENDING_OWNER-PROVISIONED_ENTERPRISE_IDP_TEST_TENANT",
+  "status_note": "No real enterprise issuer has been designated. The worker's in-process issuer is implementation and conformance evidence only and never satisfies this gate. A self-signed fixture or local mock must not be recorded here. Every field below is configuration, never a secret: client secrets, private keys and test tokens stay in the identity provider, the CI secret store or approved runtime custody.",
+  "designation": {
+    "ap3_enterprise_issuer": null,
+    "issuer": null,
+    "audience": null,
+    "jwks_trust": null,
+    "tenant_claim": null,
+    "principal_claim": null,
+    "actor_type_claim_or_mapping": null,
+    "allowed_actor_type": "HUMAN",
+    "directory_binding": null,
+    "failure_behaviour": "FAIL_CLOSED",
+    "jwks_rotation_behaviour": null,
+    "validation_environment": "NON_PRODUCTION",
+    "designated_by": null,
+    "designated_at": null
+  },
+  "validation_matrix": [
+    {"scenario": "correct issuer, audience, tenant and human actor", "required": "ACCEPTED", "result": null},
+    {"scenario": "wrong issuer", "required": "REFUSED", "result": null},
+    {"scenario": "wrong audience", "required": "REFUSED", "result": null},
+    {"scenario": "wrong tenant", "required": "REFUSED", "result": null},
+    {"scenario": "missing tenant claim", "required": "REFUSED", "result": null},
+    {"scenario": "workload identity presented as human", "required": "REFUSED", "result": null},
+    {"scenario": "missing actor-type evidence", "required": "REFUSED", "result": null},
+    {"scenario": "expired or not-yet-valid token", "required": "REFUSED", "result": null},
+    {"scenario": "invalid signature", "required": "REFUSED", "result": null},
+    {"scenario": "unknown signing-key id", "required": "REFUSED", "result": null},
+    {"scenario": "malformed token", "required": "REFUSED", "result": null},
+    {"scenario": "JWKS unavailable with no safely cached key", "required": "REFUSED", "result": null},
+    {"scenario": "signing-key rotation", "required": "NEW_VALID_KEY_ACCEPTED_AFTER_CONTROLLED_REFRESH", "result": null},
+    {"scenario": "valid identity without a directory grant", "required": "AUTHENTICATED_BUT_UNAUTHORIZED", "result": null},
+    {"scenario": "valid identity with a wrong-tenant grant", "required": "UNAUTHORIZED", "result": null},
+    {"scenario": "valid identity with the correct scoped grant", "required": "WRITER_AUTHORIZER_PERMITS_ONLY_THE_NAMED_CAPABILITY", "result": null}
+  ],
+  "evidence": {
+    "identity_provider_classification": null,
+    "test_tenant_classification": null,
+    "claim_mapping_decisions": null,
+    "test_timestamp": null,
+    "token_fingerprints_or_redacted_fixture_ids": [],
+    "jwks_key_identifiers": [],
+    "ci_run_or_signed_report": null,
+    "accepting_owner": null,
+    "validation_environment_limitations": null
+  },
+  "must_never_contain": [
+    "a live token",
+    "a client secret",
+    "a private key",
+    "a self-signed or in-process issuer recorded as the enterprise issuer"
+  ]
+}

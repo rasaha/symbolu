@@ -597,3 +597,104 @@ Nothing below starts before the enterprise issuer validation §18 requires is re
 In one sentence, the owner's own: the studio displays and requests; the authority-plane
 worker authenticates, authorizes and writes; each authoritative store has one process
 owner; external custody remains external.
+
+## 20 — AP-3 validation protocol, and its status (owner, 2026-09-07)
+
+This section is documentation. It fixes what "validated end to end against at least
+one real enterprise identity issuer" (§18) means in evidence, so that AP-3 cannot be
+declared met by choosing an identity provider, writing an OIDC adapter, or running a
+fixture. Its current status line is the only status the repository may claim.
+
+**AP-3 status: `BLOCKED_PENDING_OWNER-PROVISIONED_ENTERPRISE_IDP_TEST_TENANT`.**
+
+No real enterprise issuer has been designated. The in-process issuer used by the
+worker's tests is implementation and conformance evidence only (§18). A self-signed
+fixture or a local mock is not a substitute and must never be recorded as satisfying
+this gate.
+
+### 20.1 — What the owner supplies
+
+Configuration, not secrets. The issuer URL, audience and claim names are
+configuration; client secrets, private keys and test tokens remain in the identity
+provider, the CI secret store or approved runtime custody. The committed record is
+`deployment/governed-runtime-worker/AP3_ENTERPRISE_ISSUER_VALIDATION.json`, whose
+fields are:
+
+| Field | Meaning |
+|---|---|
+| `ap3_enterprise_issuer` | issuer product and non-production test tenant (Entra ID, Okta, Google Workspace, or another OIDC issuer) |
+| `issuer` | the expected issuer identifier |
+| `audience` | the Ugence authority-plane API audience |
+| `jwks_trust` | OIDC discovery or the approved JWKS endpoint |
+| `tenant_claim` | the claim carrying the enterprise tenant identity |
+| `principal_claim` | a stable human identifier, never a mutable display name |
+| `actor_type_claim_or_mapping` | how a human is distinguished from a workload identity |
+| `allowed_actor_type` | `HUMAN` |
+| `directory_binding` | how the verified principal maps to an Authority Directory subject |
+| `failure_behaviour` | `FAIL_CLOSED` |
+| `jwks_rotation_behaviour` | refresh and bounded retry policy |
+| `validation_environment` | `NON_PRODUCTION` |
+| `ap3_status` | `PENDING_VALIDATION` once designated; `MET` or `NOT_MET` after the matrix |
+
+### 20.2 — The validation matrix
+
+AP-3 becomes `MET` only after the worker proves every row against the real issuer,
+with no row skipped.
+
+| Scenario | Required result |
+|---|---|
+| Correct issuer, audience, tenant and human actor | Accepted |
+| Wrong issuer | Refused |
+| Wrong audience | Refused |
+| Wrong tenant | Refused |
+| Missing tenant claim | Refused |
+| Workload identity presented as human | Refused |
+| Missing actor-type evidence | Refused |
+| Expired or not-yet-valid token | Refused |
+| Invalid signature | Refused |
+| Unknown signing-key id | Refused |
+| Malformed token | Refused |
+| JWKS unavailable with no safely cached key | Refused |
+| Signing-key rotation | New valid key accepted after controlled refresh |
+| Valid identity without a directory grant | Authenticated but unauthorized |
+| Valid identity with a wrong-tenant grant | Unauthorized |
+| Valid identity with the correct scoped grant | `WriterAuthorizer` permits only the named capability |
+
+The last three rows are the point of the exercise: a valid token proves identity and
+grants no authority.
+
+### 20.3 — Evidence the record must hold, and must not
+
+The record contains no live token. It records the identity-provider and test-tenant
+classification; the issuer and audience configuration; the claim-mapping decisions;
+the test timestamp; token fingerprints or redacted fixture identifiers; JWKS and key
+identifiers, never private keys; the acceptance or refusal result for every row; the
+CI run or a signed validation report; the named owner who accepts the mapping; and
+the limitations of the validation environment.
+
+### 20.4 — The owner's instruction for the validation slice
+
+Authorized only once an issuer is designated in the record above, and then in the
+owner's words: AP-3 is authorized for validation, not yet declared met. Use the
+owner-designated non-production enterprise OIDC issuer. Validate the issuer, audience,
+signature through approved JWKS trust, tenant claim, stable principal claim and explicit
+human actor-type mapping. Bind the verified principal to the Authority Directory only
+after cryptographic identity validation. Run the complete matrix of §20.2 against the
+real issuer. Fail closed. Store no token, client secret or private key in the
+repository, fixtures, image, logs or report; record only configuration identifiers,
+redacted evidence and results. Open a documentation-and-validation PR and do not
+implement AX-1 or AX-2 in that PR. Declare AP-3 `MET` only if every mandatory row
+executes without skips and passes; otherwise report `NOT_MET` and stop.
+
+### 20.5 — Order of implementation once AP-3 is met
+
+1. Compose the RA-6 status store into the worker with writes still unserved (AX-1).
+2. Move policy-registry process ownership to the worker (AX-2, steps 1 and 2).
+3. Introduce authenticated read relays and remove the studio's direct file access
+   (AX-2, steps 3 and 4).
+4. Compose verified-principal plus directory-grant authorization (AX-5).
+5. Add owner-provisioned signer configuration (AX-3).
+6. Serve each write capability through its separately authorized route, each with its
+   own record.
+
+Identity validation stays ahead of every authority-plane mutation, as §19 intends.
