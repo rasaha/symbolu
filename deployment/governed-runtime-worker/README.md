@@ -38,7 +38,7 @@ In one process, in this order (`composition.py`):
 One injected clock (`WorkerClock`: `epoch()` for the engine, `datetime()` for every store
 and the service) is shared by everything. `Worker.close()` unwinds it in reverse.
 
-## The authority plane: its contract, and the four reads it serves
+## The authority plane: its contract, the four reads and the two gated writes it serves
 
 Steps 1 and 2 of `docs/architecture/ADR_UGENCE_AUTHORITY_PLANE_SCOPING.md` §11, under
 rulings AP-1 to AP-5. `src/governed_runtime_worker/authority_plane.py` enumerates the
@@ -63,10 +63,26 @@ grant is a typed not-found.
 proves all of that over the composed worker on a real PostgreSQL, in the same CI job as
 the decision relay, and that no AP-3 write path answers (ADR §15).
 
-**No write of the plane is served.** The four AP-3 operations wait on the identity
-gate: an `IDP_AUTHENTICATED` subject, refused otherwise, and no write ships until the
-identity adapter is validated against a real issuer. The contract test asserts that no
-module of this worker names a write path or a write method outside the contract.
+**Since 0.5.0 the two directory writes are served** (`authority_writes.py`, ADR §16,
+rulings AW-1 to AW-5): `POST /authority/grants` loads one time-bounded role grant from
+a typed body (the worker derives the grant id, so an identical replay answers
+`ALREADY_LOADED` with the standing grant), and `POST /authority/grants/{grant_id}/revoke`
+appends a `REVOKED` event with a reason. Each reads the operator's proof from
+`X-Ugence-Approver-Proof`, the header the decision route reads, and records the
+issuer-qualified subject as `loaded_by` or the revocation's actor. The gate is stricter
+than the decision route's: no identity port composed, no proof, a proof that
+authenticates nobody, a non-human actor, an expired proof, a port that cannot answer, or
+a missing, ambiguous or foreign tenant claim is a typed refusal, and nothing is recorded
+as presented. Every write answer carries `identity_proof: IDP_AUTHENTICATED`, the
+subject, the authentication reference and the adapter's `issuer_validation` label,
+which stays `IN_PROCESS_ISSUER_ONLY` until the owner validates the adapter against a
+real issuer. `tests/test_authority_writes.py` proves the gate and the intake without
+PostgreSQL; `test_end_to_end.py` proves over the real composition that a grant an
+administrator loads through the write is the grant a signed decision is eligible by.
+
+**Activate and issue are not served.** They act on packages this worker does not
+compose (AW-2). The contract test asserts that only `authority_writes.py` names the
+directory's write methods and that the unserved writes' paths appear nowhere.
 
 ## Configuration
 

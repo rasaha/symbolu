@@ -20,13 +20,17 @@ every operation id, path and summary here, in the shape of the studio's SD-2 tes
 the sense reversed.
 
 **AP-3 and AP-5, the gate.** Every write requires an ``IDP_AUTHENTICATED`` subject and
-is refused, never recorded as presented, without one. No write ships until the
-approver-identity adapter is validated against a real enterprise issuer. Reads may
-ship first, each answer labelled with the identity proof the deployment can give.
+is refused, never recorded as presented, without one. Reads may ship first, each answer
+labelled with the identity proof the deployment can give. Since §16 (AW-1, AW-2) the
+two directory writes, grant and revoke, are served behind that gate before the adapter
+is validated against a real issuer; every write answer labels ``issuer_validation`` so
+nothing claims more than the deployment can prove. Activate and issue act on packages
+this worker does not compose and stay unserved.
 
-``composition.py`` mounts the reads through ``authority_reads.py`` (step 2). No module
-of this worker serves a write, and the test asserts that no write path in this
-contract appears anywhere outside it.
+``composition.py`` mounts the reads through ``authority_reads.py`` (step 2) and the two
+served writes through ``authority_writes.py`` (§16). The test asserts that no other
+module names a write path or the directory's write methods, and that the unserved
+writes' paths appear nowhere but here.
 """
 
 from __future__ import annotations
@@ -38,7 +42,8 @@ __all__ = [
     "CONTRACT_SCHEMA",
     "RULING",
     "READS_SERVED",
-    "WRITES_SERVED",
+    "SERVED_WRITES",
+    "WRITE_PROOF_HEADER",
     "PERMITTED_VERBS",
     "REFUSED_VERBS",
     "WRITE_GATE",
@@ -53,14 +58,21 @@ __all__ = [
 CONTRACT_SCHEMA = "governed-runtime-worker.authority-plane-contract.v1"
 RULING = ("ADR_UGENCE_AUTHORITY_PLANE_SCOPING.md AP-1 AUTHORITY_PLANE_ONLY, "
           "AP-2 ADMIN_ROUTES_ON_THE_WORKER, AP-3 IDP_VALIDATED_FIRST, "
-          "AP-4 GRANT_REVOKE_ACTIVATE_ISSUE_ONLY, AP-5 READS_FIRST")
+          "AP-4 GRANT_REVOKE_ACTIVATE_ISSUE_ONLY, AP-5 READS_FIRST; section 16 "
+          "AW-1 GATED_WRITES_BEFORE_ISSUER_VALIDATION, AW-2 DIRECTORY_WRITES_ONLY, "
+          "AW-5 STRICTER_THAN_DECISIONS")
 
 #: What each step serves. Step 1 served nothing; step 2 (AP-5 READS_FIRST) serves the
-#: four reads through ``authority_reads.py``; the four writes stay unserved until the
-#: identity gate is met (AP-3). These flags are read by the test and by the record, and
-#: change only when a later step's record says so.
+#: four reads through ``authority_reads.py``; section 16 (AW-1, AW-2) serves the two
+#: directory writes through ``authority_writes.py`` behind the identity gate. Activate
+#: and issue stay unserved: this worker composes neither store. These are read by the
+#: test and by the record, and change only when a later step's record says so.
 READS_SERVED = True
-WRITES_SERVED = False
+SERVED_WRITES: tuple[str, ...] = ("authority_grant_role", "authority_revoke_grant")
+
+#: The header a write's proof arrives on: the same one the decision route reads
+#: (``ugence_governed_review_service.PROOF_HEADER``; a test asserts they are equal).
+WRITE_PROOF_HEADER = "X-Ugence-Approver-Proof"
 
 #: AP-4. Matched as substrings, case-insensitively, over operation id, path and summary.
 PERMITTED_VERBS: tuple[str, ...] = ("grant", "revoke", "activate", "issue")
@@ -68,7 +80,9 @@ REFUSED_VERBS: tuple[str, ...] = ("authorize", "clear", "execute")
 
 #: AP-3. The one condition every write carries.
 WRITE_GATE = ("IDP_AUTHENTICATED subject required; a write reached without one is "
-              "refused, never recorded as presented (AP-3)")
+              "refused, never recorded as presented (AP-3); a served write also requires "
+              "a human subject of this tenant and refuses everything else with a typed "
+              "reason (AW-5)")
 
 #: AP-5. What every read answer carries while the deployment cannot prove identity.
 READ_LABEL = "identity_proof: the proof the deployment can actually give; PRESENTED_UNPROVEN until AI-C is validated against a real issuer"
@@ -103,7 +117,7 @@ class PlaneOperation:
 
     @property
     def served(self) -> bool:
-        return READS_SERVED if self.kind == "read" else WRITES_SERVED
+        return READS_SERVED if self.kind == "read" else self.operation_id in SERVED_WRITES
 
 
 #: The plane, in the order a later step would serve it: reads first (AP-5), then the
@@ -138,13 +152,13 @@ PLANE_OPERATIONS: tuple[PlaneOperation, ...] = (
         operation_id="authority_grant_role", method="POST", path="/authority/grants",
         summary="Load one time-bounded role grant for a principal",
         kind="write", names_verb="grant",
-        acts_on="SqliteAuthorityDirectory.put_grant", ruling="AP-3"),
+        acts_on="SqliteAuthorityDirectory.put_grant", ruling="AP-3, AW-1"),
     PlaneOperation(
         operation_id="authority_revoke_grant", method="POST",
         path="/authority/grants/{grant_id}/revoke",
         summary="Revoke one role grant, appending its REVOKED event",
         kind="write", names_verb="revoke",
-        acts_on="SqliteAuthorityDirectory.revoke_grant", ruling="AP-3"),
+        acts_on="SqliteAuthorityDirectory.revoke_grant", ruling="AP-3, AW-1"),
     PlaneOperation(
         operation_id="authority_activate_constitution", method="POST",
         path="/authority/constitutions/{constitution_id}/activate",
@@ -184,7 +198,8 @@ def contract_document() -> dict[str, Any]:
     return {
         "schema": CONTRACT_SCHEMA,
         "ruling": RULING,
-        "served": {"reads": READS_SERVED, "writes": WRITES_SERVED},
+        "served": {"reads": READS_SERVED, "writes": list(SERVED_WRITES)},
+        "write_proof_header": WRITE_PROOF_HEADER,
         "home": "deployment/governed-runtime-worker (AP-2): routes on the review service this worker composes, which owns the stores",
         "permitted_verbs": list(PERMITTED_VERBS),
         "refused_verbs": list(REFUSED_VERBS),

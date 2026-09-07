@@ -18,7 +18,7 @@ import pytest
 
 from _issuer import InProcessIssuer
 from governed_runtime_worker import ShadowWorkload, compose
-from governed_runtime_worker.authority_plane import PLANE_OPERATIONS
+from governed_runtime_worker.authority_plane import PLANE_OPERATIONS, SERVED_WRITES
 from ugence_approval_workflow import ApprovalState, ApproverKind
 from ugence_authority_directory import PrincipalKind, PrincipalRef, RoleGrant, grant_id_for
 from ugence_governance_contracts.api import Validity
@@ -456,16 +456,111 @@ def test_the_authority_reads_are_served_by_the_composed_worker_and_no_write_is(w
     assert read("/authority/grants/no-such-grant/events", expect=404)["result"] == "NOT_FOUND"
     assert read("/authority/grants", params={"principal_id": "not typed"}, expect=422)["result"] == "REFUSED_UNTYPED"
 
-    # -- no AP-3 write path answers on the composed app ---------------------------------
+    # -- no unserved write path answers on the composed app; a served write without a
+    # proof is refused, never recorded ----------------------------------------------------
     writes = [op for op in PLANE_OPERATIONS if op.kind == "write"]
     assert len(writes) == 4
     for op in writes:
         path = op.path.format(grant_id=bob_grant.grant_id, constitution_id="c1")
-        r = client.request(op.method, path, json={}, headers={PROOF_HEADER: token})
+        r = client.request(op.method, path, json={})
         answers.append(r.text)
-        assert r.status_code in (404, 405), (op.method, path, r.status_code)
+        if op.operation_id in SERVED_WRITES:
+            assert r.status_code == 409 and r.json()["result"] == "REFUSED_UNAUTHENTICATED", r.text
+        else:
+            assert r.status_code in (404, 405), (op.method, path, r.status_code)
 
     # -- row 8: no DSN and no token anywhere -------------------------------------------
     everything = "\n".join(answers)
     for secret in (worker.config.app_database_url, worker.config.system_database_url, token):
+        assert secret not in everything
+
+
+# --------------------------------------------------------------------------- #
+# the authority plane's two gated writes (AW-1 to AW-5) over the real composition
+# --------------------------------------------------------------------------- #
+@requires_postgres
+def test_an_administrator_loads_a_grant_through_the_gated_write_and_a_signed_decision_is_eligible_by_it(
+        worker, issuer):
+    """ADR_UGENCE_AUTHORITY_PLANE_SCOPING.md section 16 over the composed worker: a load
+    with a signed admin proof is recorded under the admin's issuer-qualified subject;
+    the grant it loaded is the grant a signed decision is then eligible by; an identical
+    replay is ALREADY_LOADED; no proof, a forged proof and a non-human actor are refused
+    and record nothing; a revoke appends its event under the admin's subject and a
+    second revoke is ALREADY_REVOKED; the unserved writes still answer nothing; and no
+    token or DSN appears in any answer (row 8)."""
+
+    from fastapi.testclient import TestClient
+
+    client = TestClient(worker.app)
+    answers: list[str] = []
+    scope = f"approval/{SUBJECT_KIND}"
+    admin_token = issuer.mint(claims_for(issuer, "root-admin"), kid="rsa-1")
+    load = {
+        "principal": {"principal_id": subject_ref("alice"), "principal_kind": "HUMAN", "display_ref": "alice"},
+        "role": ROLE, "scope": scope,
+        "issued_at": (NOW - timedelta(days=1)).isoformat(), "expires_at": (NOW + timedelta(days=30)).isoformat(),
+        "authority_reference": f"directory://roles/{ROLE}",
+    }
+
+    def post(path: str, body: dict, expect: int, **kwargs):
+        r = client.post(path, json=body, **kwargs)
+        answers.append(r.text)
+        assert r.status_code == expect, r.text
+        return r.json()
+
+    # -- refused, and nothing recorded ----------------------------------------------------
+    assert post("/authority/grants", load, 409)["result"] == "REFUSED_UNAUTHENTICATED"
+    forged = issuer.mint(claims_for(issuer, "root-admin"), kid="rsa-1", pem=issuer.foreign_pem())
+    assert post("/authority/grants", load, 409, headers={PROOF_HEADER: forged})["result"] == "REFUSED_UNAUTHENTICATED"
+    assert worker.directory.grants_for(tenant_id=TENANT, principal_id=subject_ref("alice"), as_of=NOW) == ()
+
+    # -- recorded under the admin's issuer-qualified subject ------------------------------
+    recorded = post("/authority/grants", load, 200, headers={PROOF_HEADER: admin_token})
+    assert recorded["result"] == "RECORDED" and recorded["recorded"] is True and recorded["event"] == "GRANTED"
+    assert recorded["identity_proof"] == IDP_AUTHENTICATED and recorded["subject"] == subject_ref("root-admin")
+    assert recorded["issuer_validation"] == "IN_PROCESS_ISSUER_ONLY" and recorded["ruling"] == "AW-1"
+    admin_claims = worker.identity_port.authenticate(admin_token).claims
+    assert recorded["authentication_reference"] == authentication_reference(admin_claims)
+    grant_id = recorded["grant"]["grant_id"]
+    assert recorded["grant"]["loaded_by"] == subject_ref("root-admin")
+    assert post("/authority/grants", load, 409, headers={PROOF_HEADER: admin_token})["result"] == "ALREADY_LOADED"
+
+    # -- the loaded grant is what a signed decision is eligible by ------------------------
+    _park(worker)
+    (entry,) = client.get("/review/queue").json()["entries"]
+    alice_token = issuer.mint(claims_for(issuer), kid="rsa-1")
+    worker.clock.advance(minutes=2)
+    decided = client.post("/review/decisions", json={
+        "approval_id": entry["approval_id"], "decision": "GRANT", "justification": "reviewed",
+        "presented_approver": {"approver_id": subject_ref("alice"), "approver_kind": "HUMAN",
+                               "role": ROLE, "authority_reference": f"directory://roles/{ROLE}"},
+    }, headers={PROOF_HEADER: alice_token})
+    answers.append(decided.text)
+    assert decided.status_code == 200 and decided.json()["identity_proof"] == IDP_AUTHENTICATED
+
+    # -- revoke, under the admin's subject; a second revoke is typed ------------------------
+    worker.clock.advance(minutes=1)
+    revoked = post(f"/authority/grants/{grant_id}/revoke", {"reason": "rotation"}, 200,
+                   headers={PROOF_HEADER: admin_token})
+    assert revoked["event"] == "REVOKED" and revoked["grant"]["revocation_reason"] == "rotation"
+    assert post(f"/authority/grants/{grant_id}/revoke", {"reason": "again"}, 409,
+                headers={PROOF_HEADER: admin_token})["result"] == "ALREADY_REVOKED"
+    events = client.get(f"/authority/grants/{grant_id}/events").json()
+    answers.append(json.dumps(events))
+    assert [(e["event_type"], e["actor"]) for e in events["events"]] == [
+        ("GRANTED", subject_ref("root-admin")), ("REVOKED", subject_ref("root-admin"))]
+    assert worker.directory.grants_for(tenant_id=TENANT, principal_id=subject_ref("alice"),
+                                       as_of=worker.clock.now) == ()
+
+    # -- the unserved writes answer nothing, proof or not ---------------------------------
+    for op in PLANE_OPERATIONS:
+        if op.kind == "write" and op.operation_id not in SERVED_WRITES:
+            r = client.post(op.path.format(constitution_id="c1"), json={}, headers={PROOF_HEADER: admin_token})
+            answers.append(r.text)
+            assert r.status_code in (404, 405), op.operation_id
+
+    # -- row 8 ----------------------------------------------------------------------------
+    everything = "\n".join(answers)
+    for secret in (worker.config.app_database_url, worker.config.system_database_url,
+                   admin_token, alice_token, forged):
         assert secret not in everything

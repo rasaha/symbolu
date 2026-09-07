@@ -2,11 +2,13 @@ import { useState } from "react";
 import { listGrants, type GrantsAnswer, type Outcome } from "@/api/client";
 import { GrantTable } from "@/components/GrantTable";
 import { IdentityBanner, Json, RefusalNotice, Unreachable } from "@/components/Identity";
+import { RevokeBox } from "@/components/RevokeBox";
 
-export function GrantsView({ onEvents }: { onEvents: (grantId: string) => void }) {
+export function GrantsView({ onEvents, proof }: { onEvents: (grantId: string) => void; proof: string }) {
   const [principalId, setPrincipalId] = useState("");
   const [outcome, setOutcome] = useState<Outcome<GrantsAnswer> | null>(null);
   const [busy, setBusy] = useState(false);
+  const [revoking, setRevoking] = useState<string | null>(null);
 
   async function read() {
     const id = principalId.trim();
@@ -49,7 +51,21 @@ export function GrantsView({ onEvents }: { onEvents: (grantId: string) => void }
             <span className="font-mono">{outcome.answer.principal_id}</span> holds {outcome.answer.grant_count} active grant
             {outcome.answer.grant_count === 1 ? "" : "s"}.
           </p>
-          <GrantTable grants={outcome.answer.grants} label="grants held" onEvents={onEvents} />
+          <GrantTable
+            grants={outcome.answer.grants}
+            label="grants held"
+            onEvents={onEvents}
+            onRevoke={setRevoking}
+            revokeEnabled={proof !== ""}
+          />
+          {revoking ? (
+            <RevokeBox
+              grantId={revoking}
+              proof={proof}
+              onRecorded={() => void read()}
+              onCancel={() => setRevoking(null)}
+            />
+          ) : null}
           <Json value={outcome.answer} label="the worker's answer, verbatim" />
         </div>
       ) : null}

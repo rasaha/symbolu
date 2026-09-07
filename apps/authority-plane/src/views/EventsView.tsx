@@ -2,11 +2,13 @@ import { useEffect, useState } from "react";
 import { readGrantEvents, type EventsAnswer, type Outcome } from "@/api/client";
 import { GrantTable } from "@/components/GrantTable";
 import { IdentityBanner, Json, RefusalNotice, Unreachable } from "@/components/Identity";
+import { RevokeBox } from "@/components/RevokeBox";
 
-export function EventsView({ initialGrantId }: { initialGrantId: string }) {
+export function EventsView({ initialGrantId, proof }: { initialGrantId: string; proof: string }) {
   const [grantId, setGrantId] = useState(initialGrantId);
   const [outcome, setOutcome] = useState<Outcome<EventsAnswer> | null>(null);
   const [busy, setBusy] = useState(false);
+  const [revoking, setRevoking] = useState<string | null>(null);
 
   async function read(id: string) {
     const trimmed = id.trim();
@@ -48,7 +50,15 @@ export function EventsView({ initialGrantId }: { initialGrantId: string }) {
       {outcome?.kind === "answer" ? (
         <div className="space-y-3" data-testid="events-result">
           <IdentityBanner answer={outcome.answer} />
-          <GrantTable grants={[outcome.answer.grant]} label="the grant" />
+          <GrantTable grants={[outcome.answer.grant]} label="the grant" onRevoke={setRevoking} revokeEnabled={proof !== ""} />
+          {revoking ? (
+            <RevokeBox
+              grantId={revoking}
+              proof={proof}
+              onRecorded={() => void read(grantId)}
+              onCancel={() => setRevoking(null)}
+            />
+          ) : null}
           <ol aria-label="grant events" className="space-y-1 text-[12px]">
             {outcome.answer.events.map((e) => (
               <li key={String(e.event_id ?? e.sequence)} className="rounded border border-neutral-200 px-2 py-1">

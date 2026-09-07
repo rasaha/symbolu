@@ -335,3 +335,124 @@ in the suite CI runs over a real PostgreSQL 16 with the in-process issuer, whose
 "not proven here": the plane app was still not driven against a live worker, since its
 screens are proven against the worker's answer shapes and the join of the two waits on
 a cluster and an issuer together. Steps 4 and 5 remain as §14 left them.
+
+## 16 — Scoping audit: the administrative writes (2026-09-07)
+
+**The question.** Can the plane's administrative screens, the ones on which an
+administrator loads and revokes role grants, ship before an enterprise identity
+provider has been validated, which AP-3 `IDP_VALIDATED_FIRST` and §11 step 4 put ahead
+of every write?
+
+**The answer.** Two of the four writes can, and two cannot, for reasons that have
+nothing to do with each other.
+
+- **Grant and revoke** act on `SqliteAuthorityDirectory`, which this worker composes
+  and already exposes to the four reads `[V]` (`composition.py`, `authority_reads.py`).
+  The identity gate they need already exists in this process: the decision route
+  refuses a proof that does not authenticate a human subject, fails closed when the
+  port cannot answer, and records the issuer-qualified subject `[V]`
+  (`ugence_governed_review_service.service.ReviewService._resolve_identity`;
+  `tests/test_end_to_end.py`, `IDP_AUTHENTICATED`). What step 4 adds is not code: the
+  adapter's JWKS URL, issuer and audience are configuration, and its validation against
+  a real issuer is evidence the owner supplies. The label the adapter puts on every
+  answer, `issuer_validation: IN_PROCESS_ISSUER_ONLY`, already says which evidence
+  exists `[V]` (`ugence_approver_identity_jwt.version.ISSUER_VALIDATION`).
+- **Activate and issue** act on `ugence_agent_constitution_activation` and
+  `ugence_policy_authority`, which this worker does not compose `[V]` (`composition.py`
+  imports neither). Serving them would mean either a second composition root for those
+  stores, which §10 refuses as a second writer, or composing them into the worker,
+  which is its own scoping.
+
+**What AP-3 actually guards, read again `[I]`.** Its sentence has two clauses: no write
+ships before issuer validation, and a write without an `IDP_AUTHENTICATED` subject is
+refused, never recorded as presented. The second clause is the invariant; the first was
+sequencing chosen when no gate code existed. The gate now exists and is proven over a
+real PostgreSQL with a signed proof (§15). A write behind that gate, with no
+`PRESENTED_UNPROVEN` path at all, keeps the invariant. What it cannot claim is that the
+subject was proven by a real issuer, and the answer must say so on its face.
+
+**What the screens need that the reads did not `[G]`.** A proof. The plane app holds
+no credential today and forwards none (§14). A write needs the operator's issuer token
+on the same header the decision route reads, `X-Ugence-Approver-Proof`, and nothing
+else: the app has no login of its own, because the identity provider is the login.
+
+### 16.1 — Ballot AW-1 to AW-5 (five decisions, recommended option first)
+
+| # | Decision | Options |
+|---|---|---|
+| **AW-1** | Writes before issuer validation | **`GATED_WRITES_BEFORE_ISSUER_VALIDATION`**: the grant and revoke writes ship now behind the identity gate; every write answer carries `identity_proof`, the subject reference and `issuer_validation`; supersedes AP-3 in its sequencing clause only. `WAIT_FOR_IDP`: build nothing until the owner provisions an issuer. |
+| **AW-2** | Which writes this step | **`DIRECTORY_WRITES_ONLY`**: grant and revoke; activate and issue stay unserved because the worker composes neither store. `COMPOSE_ACTIVATION_INTO_THE_WORKER`: widen the worker now. |
+| **AW-3** | How the app carries the proof | **`PROOF_PRESENTED_PER_WRITE_NEVER_STORED`**: the operator presents the issuer token in a session-only panel; it is sent on writes only, never on reads, never persisted, and the app has no login flow. `APP_OIDC_FLOW`: the app performs the browser login itself, which needs the issuer that does not exist. |
+| **AW-4** | The intake shape | **`TYPED_INTAKE_DERIVED_ID`**: the load form takes `RoleGrant`'s typed fields and nothing else (principal id, kind, display reference, quorum; role; scope; issued and expiry instants; authority reference; committee membership), the worker derives `grant_id` by `grant_id_for`, and a replayed identical load answers `ALREADY_LOADED` with the standing grant. Revoke takes a reason. Delegated grants are not on the form this step. `FREE_JSON_BODY`. |
+| **AW-5** | The gate on writes | **`STRICTER_THAN_DECISIONS`**: no proof, an unauthenticated proof, a non-human actor, an expired proof, a missing, ambiguous or foreign tenant claim, or a port that cannot answer is refused with a typed reason, and a worker composed without an identity port refuses every write (`REFUSED_NO_IDENTITY_PORT`); there is no presented-approver fallback as the decision route has. `SAME_AS_DECISIONS`: allow the configured-tenant fallback. |
+
+**Why the recommended options.** AW-1 keeps AP-3's invariant and drops only the
+ordering it imposed when nothing enforced it. AW-2 follows where the stores are, as
+AP-2 did. AW-3 is the only honest way to carry a proof before an issuer exists: the app
+never mints, stores or refreshes one. AW-4 makes the load a typed intake in the studio's
+FD-4 sense, with the id derived so a replayed file is one grant, not two. AW-5 is
+stricter than the decision route because a grant is the basis of a decision: a decision
+under a configured tenant is auditable against its grant; a grant under a configured
+tenant has nothing behind it.
+
+### 16.2 — Ruling AW-1 to AW-5 (owner, 2026-09-07)
+
+The recommended option is ratified in every case, on the owner's instruction to scope
+and build the plane's administrative screens, under the standing direction that
+recommended defaults apply. **AW-1 supersedes AP-3 in one respect:** the grant and
+revoke writes may ship before the adapter is validated against a real issuer. Every
+other word of AP-3 stands, and §10's "no write before the identity gate" now reads as
+what it always meant: no write is recorded without an `IDP_AUTHENTICATED` subject.
+§11 steps 4 and 5 are reordered for these two writes; activate and issue keep the
+original order.
+
+**What ratifying does not authorize.** No activation or issuance route. No login flow,
+token storage or refresh in the app. No settings screen, no runtime verb (AP-4 stands),
+no second writer, no change to SD-2 or the studio. No claim, on any screen or in any
+answer, that a subject was validated by a real issuer while `issuer_validation` says
+otherwise.
+
+## 17 — Implementation record, the two gated writes (2026-09-07)
+
+Shipped as `governed-runtime-worker` 0.5.0 and `apps/authority-plane` 0.2.0. What each
+ruling became, and where it is checked:
+
+| Ruling | What landed | Where it is checked |
+|---|---|---|
+| AW-1, the two writes | `authority_writes.py` serves `POST /authority/grants` and `POST /authority/grants/{grant_id}/revoke`, built from the contract's operations, mounted by `composition.py` beside the reads. Every recorded answer carries `identity_proof: IDP_AUTHENTICATED`, the subject reference, the authentication reference and `issuer_validation`. The contract's `served` set is now the four reads plus these two; `SERVED_WRITES` replaces the all-or-nothing flag. | `tests/test_authority_writes.py` (36 tests); `test_authority_plane_contract.py`, updated for the served set, the drift-tested rendering (sha256 `fcda3520…`) and the rule that only `authority_writes.py` names the directory's write methods |
+| AW-2, directory writes only | Activate and issue stay unserved and answer 404 or 405 on the composed app; the plane app's manifest names them forbidden and its client cannot name them. | `test_authority_plane_contract.py::test_reads_and_the_two_directory_writes_are_served…`; `apps/authority-plane/tests/boundary.test.ts` |
+| AW-3, the proof per write | A session panel takes the issuer token, held in React state only, sent on the two writes on `X-Ugence-Approver-Proof`, never on a read, never persisted; without one every write control is disabled and the client sends nothing. | `tests/screens.test.tsx`: the read-carries-no-header assertions, the disabled-form test, the header assertions on the load and the revoke |
+| AW-4, the typed intake | The load body is `RoleGrant`'s typed fields and nothing else; unknown keys, untyped tokens, naive or unparsable instants, a bad kind and a negative quorum are refused before the directory is asked; the worker derives `grant_id` and an identical replay is `ALREADY_LOADED` with the standing grant; a second revoke is `ALREADY_REVOKED`; a foreign tenant's grant reads as unknown. | `test_authority_writes.py`: the intake parametrisation, the replay test, the revoke tests |
+| AW-5, the gate | No identity port, no proof, a proof that authenticates nobody, a `PRESENTED_UNPROVEN` identity, a non-human actor, an expired proof, a port that cannot answer, a missing, ambiguous or foreign tenant claim: each a typed 409 and nothing recorded. The static fixture adapter, which relabels everything presented, cannot satisfy the gate; the tests prove that too. | `test_authority_writes.py::test_the_gate_refuses…` (nine cases), `::test_a_worker_without_an_identity_port…`, `::test_a_port_that_cannot_answer_fails_closed` |
+| the loop, end to end | Over the real composition with the in-process issuer, a load with a signed admin proof is recorded under the admin's subject; the grant it loaded is the grant a signed decision is then eligible by; the revoke appends its event under the admin's subject. | `test_end_to_end.py::test_an_administrator_loads_a_grant_through_the_gated_write…` |
+
+**Verified, not asserted.**
+
+| Check | Result |
+|---|---|
+| worker suite over PostgreSQL 16.13, `UGENCE_DE_TEST_PG` set | 126 passed, 0 skipped |
+| the end-to-end write test with the write mount removed from `composition.py` | fails, `405 == 409` on the first write; the mount restored afterwards |
+| plane app: `npm run verify:boundary`, `npm run type-check`, vitest, `vite build` | OK with 6 operations consumed, exit 0, 16 passed, exit 0 |
+| studio SD-2 verb test, package import boundaries, directory package suite | 11 passed; OK; passed |
+| the plane app driven against the composed worker 0.5.0 with a signed token, by hand | a load recorded under `https%3A%2F%2Fissuer.test\|root-admin`, a revoke recorded, both shown on the screens as captured for the explainer |
+
+**What did not change.** The studio, the console, SD-1 and SD-2, the review service's
+seven routes, the directory package and the identity adapter. No environment variable
+was added: the writes ride on the identity port the worker already composes from
+`UGENCE_REVIEW_IDENTITY_*`.
+
+**Three decisions recorded rather than made quietly.**
+
+- **The revoke box stays open after a recorded revoke.** The screen re-reads the list so
+  the revoked grant drops out, and keeps the recorded answer visible where the operator
+  acted; closing it is the operator's act.
+- **A load's window is validated by `Validity` alone.** The worker refuses a window that
+  ends before it starts because the contract type does; it does not refuse a window in
+  the past or far future, since a directory that records history may be loaded with one.
+- **The proof label is checked, not only the `authenticated` flag.** A port answering an
+  authenticated identity labelled `PRESENTED_UNPROVEN` is refused, so a fixture adapter
+  composed in test mode can never make a write record.
+
+**Not proven here.** The adapter against a real enterprise issuer: `issuer_validation`
+still reads `IN_PROCESS_ISSUER_ONLY` on every write answer, and the maturity of every
+package on the plane is unchanged. Step 4 of §11 remains the owner's.

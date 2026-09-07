@@ -1,8 +1,8 @@
 {
   "name": "ugence-authority-plane",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
-  "description": "Ugence Authority Plane — the administrators' surface for authority acts, over the governed runtime worker. Step 3 of ADR_UGENCE_AUTHORITY_PLANE_SCOPING.md: a read-only shell over the four AP-5 reads; no write until the identity gate (AP-3).",
+  "description": "Ugence Authority Plane — the administrators' surface for authority acts, over the governed runtime worker. ADR_UGENCE_AUTHORITY_PLANE_SCOPING.md: the four AP-5 reads, and since section 16 (AW-1) the two grant writes behind the identity gate; activate and issue unserved (AW-2).",
   "type": "module",
   "scripts": {
     "dev": "vite",
