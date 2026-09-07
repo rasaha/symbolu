@@ -24,7 +24,7 @@ export default function App() {
 
   return (
     <div className="min-h-screen">
-      <header className="border-b border-white/10 bg-slate-900/50 backdrop-blur">
+      <header className="border-b border-neutral-300 bg-white">
         <div className="max-w-5xl mx-auto px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-ugence-primary to-ugence-accent flex items-center justify-center">
@@ -32,12 +32,12 @@ export default function App() {
             </div>
             <div>
               <h1 className="text-sm font-semibold leading-tight">Ugence AI Control Plane</h1>
-              <p className="text-xs text-slate-400">Unified governance console</p>
+              <p className="text-xs text-black">Unified governance console</p>
             </div>
           </div>
-          <div className="text-xs text-slate-400">
+          <div className="text-xs text-black">
             {down ? (
-              <span className="text-red-400">API offline</span>
+              <span className="text-red-700">API offline</span>
             ) : health ? (
               <span>API v{health.version} · {health.status}</span>
             ) : (
@@ -52,8 +52,8 @@ export default function App() {
               onClick={() => setTab(t.id)}
               className={`inline-flex items-center gap-2 px-3 py-2 text-sm border-b-2 -mb-px transition-colors ${
                 tab === t.id
-                  ? 'border-ugence-primary text-white'
-                  : 'border-transparent text-slate-400 hover:text-slate-200'
+                  ? 'border-red-700 bg-red-700 text-white rounded-t'
+                  : 'border-transparent text-black hover:text-black'
               }`}
             >
               {t.icon}
@@ -65,7 +65,7 @@ export default function App() {
 
       <main className="max-w-5xl mx-auto px-6 py-8">
         {down && (
-          <div className="mb-6 rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-sm text-amber-300">
+          <div className="mb-6 rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-sm text-amber-800">
             Cannot reach the console API. Start it with{' '}
             <code className="font-mono">python -m ugence_console_api</code> (port 8090).
           </div>

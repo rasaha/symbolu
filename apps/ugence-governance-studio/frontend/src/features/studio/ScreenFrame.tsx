@@ -49,7 +49,7 @@ export function ActionButton({
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className="rounded border border-surface-border bg-surface-2 px-3 py-1.5 text-[12px] font-medium text-ink-0 hover:bg-surface-3 disabled:cursor-not-allowed disabled:opacity-50"
+      className="btn-action text-[12px]"
     >
       {children}
     </button>

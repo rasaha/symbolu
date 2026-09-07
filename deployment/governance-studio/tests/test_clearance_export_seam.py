@@ -143,8 +143,9 @@ def test_the_runtime_config_records_the_seam_and_the_sixth_amendment():
     }
     assert seam["confers"].startswith("nothing")
     assert "No store, no server, no driver, no DSN" in seam["source"]
-    assert cfg["frozen"]["openapi_v2_amendment"].startswith("v2-A6 (CE-5")
-    assert cfg["deployment_version"] == DEPLOYMENT_VERSION == "0.11.0"
+    # v2-A6 stays recorded; the freeze now leads with the amendment that followed it
+    assert "v2-A6 (CE-5" in cfg["frozen"]["openapi_v2_amendment"]
+    assert cfg["deployment_version"] == DEPLOYMENT_VERSION
 
 
 def test_the_ceiling_and_the_prohibitions_are_untouched():
@@ -161,7 +162,8 @@ def test_the_ceiling_and_the_prohibitions_are_untouched():
 
 
 def test_the_composition_record_names_the_new_seam():
-    record = json.load(open(os.path.join(HERE, "composition-record.json"), encoding="utf-8"))
+    # The seam-10 record, kept byte-for-byte since the deployment-status seam superseded it.
+    record = json.load(open(os.path.join(HERE, "composition-record.seam-10.json"), encoding="utf-8"))
     assert record["seams_handed_to_build_studio_context"][-1] == "received_clearances"
     assert record["supersedes_record"] == "composition-record.seam-9.json"
     assert record["binding"]["binding_id"].endswith("front-door/seam-10")

@@ -1,8 +1,8 @@
 {
   "$schema": "governance_studio.approved_v2_api_operations.v1",
-  "description": "The closed set of v2 operations the studio frontend may consume, including the GAS-7 HR-D review routes (display and verbatim relay only, owner ruling HR-1) and, since front-door seam 6 (FD-10), the one relayed start of the worker's own shadow run, since seam 7 (FD-11) the one read of the worker's own audit ledger by correlation id, since seam 8 (FD-12) the typed data-use declaration intake whose only write is declare, and since seam 9 (FD-13) the typed vendor-dependency intake on the same terms. Separate from the v1 manifest because the two contracts are frozen independently. Under owner ruling SD-2 no operation naming issue, activate, revoke, grant, authorize, clear or execute may ever appear here; verify-v2-api-boundary.mjs re-derives that from the contract rather than trusting this file. The v2 contract carries one operation this list deliberately omits: v2_export_read (clearance export, CE-5). CE-5 ruled one server-side read and no screen; the frontend consumes nothing new, so the browser-reachable surface is unchanged and this allowlist stays at twenty-five. Approving it here would be widening the frontend boundary without a ruling that asked for it.",
+  "description": "The closed set of v2 operations the studio frontend may consume, including the GAS-7 HR-D review routes (display and verbatim relay only, owner ruling HR-1) and, since front-door seam 6 (FD-10), the one relayed start of the worker's own shadow run, since seam 7 (FD-11) the one read of the worker's own audit ledger by correlation id, since seam 8 (FD-12) the typed data-use declaration intake whose only write is declare, and since seam 9 (FD-13) the typed vendor-dependency intake on the same terms. Separate from the v1 manifest because the two contracts are frozen independently. Under owner ruling SD-2 no operation naming issue, activate, revoke, grant, authorize, clear or execute may ever appear here; verify-v2-api-boundary.mjs re-derives that from the contract rather than trusting this file. The v2 contract carries one operation this list deliberately omits: v2_export_read (clearance export, CE-5). CE-5 ruled one server-side read and no screen; the frontend consumes nothing new, so the browser-reachable surface was unchanged by it. Since ruling MA-2 as amended (ADR_UGENCE_MODULE_ADMINISTRATION_SCOPING.md MS-1 to MS-5) this list holds twenty-six: the twenty-sixth is v2_observe_deployment, the Status panel's one read of the deployment's own startup attestation (seam states, checks and pins; no registry rows, nothing probed live). Approving v2_export_read here would still be widening the frontend boundary without a ruling that asked for it.",
   "contract": "governance_studio.api.v2",
-  "openapi_sha256": "f42472ab78a34cd24be4c9454c532074c5d000009c3ca72da243cc9139874431",
+  "openapi_sha256": "c6785b267dafe9e2593b58744890606727b26d450ffd1a32f9b544f95a2d0f3e",
   "approved_operation_ids": [
     "v2_authority_list_policies",
     "v2_authority_read_decision",
@@ -13,6 +13,7 @@
     "v2_data_use_list",
     "v2_observe_audit_chain",
     "v2_observe_audit_ids",
+    "v2_observe_deployment",
     "v2_observe_ledger_chain",
     "v2_policy_compile",
     "v2_policy_synthesize",
@@ -39,6 +40,7 @@
     "GET /api/v2/authority/policies/{record_id}",
     "GET /api/v2/observe/audit",
     "GET /api/v2/observe/audit/{correlation_id}",
+    "GET /api/v2/observe/deployment",
     "GET /api/v2/observe/ledger/{correlation_id}",
     "GET /api/v2/review/approvals/{approval_id}",
     "GET /api/v2/review/queue",

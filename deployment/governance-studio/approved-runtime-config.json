@@ -1,7 +1,7 @@
 {
   "schema_version": "1",
   "deployment": "governance-studio-private-hosted",
-  "deployment_version": "0.11.0",
+  "deployment_version": "0.12.0",
   "single_process": true,
   "exposed_ports": [
     "8443/tcp"
@@ -57,8 +57,8 @@
     "openapi_sha256": "dc309eab216e1a4c2f63f286887a4ef218a96ac34f8fa8614bff176db7c36656",
     "served_api": "create_combined_app: governance_studio.api.v1 with governance_studio.api.v2 mounted behind it (CR-2)",
     "api_v2_contract": "governance_studio.api.v2",
-    "openapi_v2_sha256": "f42472ab78a34cd24be4c9454c532074c5d000009c3ca72da243cc9139874431",
-    "openapi_v2_amendment": "v2-A6 (CE-5 EXPORT_IS_A_READ, 2026-09-06): previous 907f360f2ba2127d005c140d6146ab441056794ba2b1f1a35580cf4148956e73; record apps/ugence-governance-studio/contracts/openapi_v2.amendments.json; operations added v2_export_read. v2-A5 (FD-13.3, 2026-09-06): previous 956c8289e77c31afa304a58a2cf94023b057a44f78c9159c83496338202b3b51; record apps/ugence-governance-studio/contracts/openapi_v2.amendments.json; operations added v2_vendor_declare, v2_vendor_list. v2-A4 (FD-12.4, 2026-09-06): previous 6346f2b7cd10430874f2f077ac69c12ce74be138a9462b0c4ccdcb503c624d7b; record apps/ugence-governance-studio/contracts/openapi_v2.amendments.json; operations added v2_data_use_declare, v2_data_use_list. v2-A3 (FD-11.5, 2026-09-06): previous 9d958f9c70ca133509aa7cff02657f7f39c5f98068f9dc6fd12bfb9c2a665cdb; record apps/ugence-governance-studio/contracts/openapi_v2.amendments.json; operations added v2_observe_ledger_chain. v2-A2 (FD-10.4, 2026-09-06): previous 1dbc612681b37b4b82a244a3c30631000856accfd8869f74a3c7a0b69e63cf97; record apps/ugence-governance-studio/contracts/openapi_v2.amendments.json; operations added v2_review_start_shadow_run. v2-A1 (FD-9.4, 2026-09-06): previous dd63180dc91ba7842dc1dc2b6efb3dbc155ea3bd47200f40de7bac85d373f39a; operations added v2_registry_register, v2_registry_list"
+    "openapi_v2_sha256": "c6785b267dafe9e2593b58744890606727b26d450ffd1a32f9b544f95a2d0f3e",
+    "openapi_v2_amendment": "v2-A7 (MS-3 OBSERVE_DEPLOYMENT_ONE_READ, 2026-09-06): previous f42472ab78a34cd24be4c9454c532074c5d000009c3ca72da243cc9139874431; record apps/ugence-governance-studio/contracts/openapi_v2.amendments.json; operations added v2_observe_deployment. v2-A6 (CE-5 EXPORT_IS_A_READ, 2026-09-06): previous 907f360f2ba2127d005c140d6146ab441056794ba2b1f1a35580cf4148956e73; record apps/ugence-governance-studio/contracts/openapi_v2.amendments.json; operations added v2_export_read. v2-A5 (FD-13.3, 2026-09-06): previous 956c8289e77c31afa304a58a2cf94023b057a44f78c9159c83496338202b3b51; record apps/ugence-governance-studio/contracts/openapi_v2.amendments.json; operations added v2_vendor_declare, v2_vendor_list. v2-A4 (FD-12.4, 2026-09-06): previous 6346f2b7cd10430874f2f077ac69c12ce74be138a9462b0c4ccdcb503c624d7b; record apps/ugence-governance-studio/contracts/openapi_v2.amendments.json; operations added v2_data_use_declare, v2_data_use_list. v2-A3 (FD-11.5, 2026-09-06): previous 9d958f9c70ca133509aa7cff02657f7f39c5f98068f9dc6fd12bfb9c2a665cdb; record apps/ugence-governance-studio/contracts/openapi_v2.amendments.json; operations added v2_observe_ledger_chain. v2-A2 (FD-10.4, 2026-09-06): previous 1dbc612681b37b4b82a244a3c30631000856accfd8869f74a3c7a0b69e63cf97; record apps/ugence-governance-studio/contracts/openapi_v2.amendments.json; operations added v2_review_start_shadow_run. v2-A1 (FD-9.4, 2026-09-06): previous dd63180dc91ba7842dc1dc2b6efb3dbc155ea3bd47200f40de7bac85d373f39a; operations added v2_registry_register, v2_registry_list"
   },
   "prohibited": [
     "permission_granting",
@@ -233,5 +233,45 @@
     },
     "confers": "nothing: a seeded receipt exercises the export path and the verifier and is evidence about serialization and integrity and nothing else. No authority granted it and it satisfies no obligation (ADR \u00a713.1)",
     "authenticity_prerequisite": "TrustAnchorResolverPort exists in trusted-evidence-authority and no signing key or trust root is configured; content-addressing establishes integrity, never authenticity"
+  },
+  "deployment_status": {
+    "ruling": "ADR_UGENCE_MODULE_ADMINISTRATION_SCOPING.md MA-1 NO_PER_MODULE_ADMIN, MA-2 ONE_READ_ONLY_STATUS_PANEL as amended by MS-1 SEAM_STATES_ONLY, MS-2 IN_MEMORY_RESULT_AT_COMPOSITION, MS-3 OBSERVE_DEPLOYMENT_ONE_READ, MS-4 SEAM_STATES_CHECKS_AND_PINS, MS-5 SEPARATE_STATUS_PANEL",
+    "contract": "v2_observe_deployment, the seventh amendment of the frozen v2 contract (v2-A7), recorded in frozen.openapi_v2_amendment",
+    "operations": [
+      "v2_observe_deployment"
+    ],
+    "reads_only": "one GET and nothing else; no write, no configuration value, no image package, no credential and no egress destination",
+    "source": "the startup integrity report the gate computed before the port bound, handed to build_studio_context(deployment_report=...) once by server.run() (MS-2); the backend copies it and never re-reads it; startup-integrity.json under the runtime volume is the operator's copy and is read by no route",
+    "field_set": {
+      "seam_states": [
+        "constitution_registry",
+        "authority_reads",
+        "simulation_provider",
+        "system_registry",
+        "data_use_declarations",
+        "vendor_declarations"
+      ],
+      "checks": "the gate's checks map, name to pass/fail",
+      "result_and_failure_code": "PASS/FAIL and the gate's failure code",
+      "pins": [
+        "deployment",
+        "deployment_version",
+        "frontend_version",
+        "frontend_build_hash",
+        "backend_api_version",
+        "api_contract",
+        "openapi_sha256",
+        "synthetic_bundle_hash"
+      ]
+    },
+    "excluded_fields": [
+      "cert_subject",
+      "cert_expiry"
+    ],
+    "registry_rows": "refused (MS-1): the console's nine ModuleInfo rows reach the studio by no ruled path; ugence_console_api is not installed in this image and is refused by the studio's SD-1 allowlist test; /v1/modules stays withheld (CP-3)",
+    "live_probe": "none: a configured seam is not a reachable engine and a passed check is not a live one; every available answer carries the STARTUP_ATTESTATION ceiling saying so",
+    "sd1_entries_added": [],
+    "screen": "/studio/status, a separate panel (MS-5); the Observe screen keeps its two labelled sources (FD-11.4)",
+    "composition_record": "composition-record.json (an ai-system-registry SystemRegistration, FD-3), superseding the seam-10 clearance-export record kept byte-for-byte as composition-record.seam-10.json"
   }
 }

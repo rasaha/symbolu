@@ -39,3 +39,18 @@ def ledger_chain(request: Request, correlation_id: str):
     """
     result = studio(request).ledger_observe.chain(correlation_id)
     return v2_response(request, operation="observe.ledger_chain", result=result)
+
+
+@router.get("/deployment", operation_id="v2_observe_deployment")
+def deployment_status(request: Request):
+    """The deployment's own startup attestation: seam states, checks and pins
+    (ADR_UGENCE_MODULE_ADMINISTRATION_SCOPING.md MA-2 as amended, MS-1 to MS-5).
+
+    What is returned is what the deployment's fail-closed integrity gate computed
+    before the port bound, handed to the studio once at composition (MS-2). Nothing is
+    probed at request time, no file is read, and a configured seam is not a reachable
+    engine; the answer says so in its own ceiling field. The console's module registry
+    is not here, by ruling (MS-1).
+    """
+    result = studio(request).deployment_status.read()
+    return v2_response(request, operation="observe.deployment", result=result)

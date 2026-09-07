@@ -1,5 +1,11 @@
 /**
  * Console API client — talks to ugence_console_api (proxied under /api in dev).
+ *
+ * The packaged service serves five routes and no more (ruling CP-3, asserted by
+ * `packages/integration/console-api/tests/test_served_surface.py`). Under ruling MA-4
+ * this client calls exactly those five: `/v1/modules` and `/v1/scenarios` were withheld
+ * by CP-3 and are no longer called from here. A view that used to read them shows a
+ * typed gap instead.
  */
 
 const BASE = import.meta.env.VITE_CONSOLE_API_URL || '/api';
@@ -21,22 +27,6 @@ async function post<T>(path: string, body?: unknown): Promise<T> {
 }
 
 // ---- types (mirror ugence_console_api/models.py) ------------------------- //
-export interface ModuleInfo {
-  key: string;
-  name: string;
-  layer: string;
-  capability: string;
-  maturity: string;
-  wiring: 'loop' | 'standalone' | 'read-only';
-  question: string;
-}
-
-export interface ScenarioSummary {
-  id: string;
-  title: string;
-  description: string;
-}
-
 export interface StageResult {
   stage: string;
   capability: string;
@@ -77,13 +67,13 @@ export interface AuditChain {
 export interface Health {
   status: string;
   version: string;
+  /** CP-4: the service declares its audit ceiling in the health body and on every answer. */
+  audit_ceiling: string;
   modules: Record<string, { available: boolean; reason: string }>;
 }
 
 export const api = {
   health: () => get<Health>('/health'),
-  modules: () => get<ModuleInfo[]>('/v1/modules'),
-  scenarios: () => get<ScenarioSummary[]>('/v1/scenarios'),
   runScenario: (id: string) =>
     post<GovernedLoopResult>(`/v1/governed-loop/scenario/${id}`),
   auditIds: () => get<string[]>('/v1/audit'),

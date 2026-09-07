@@ -107,7 +107,7 @@ export function EligibilityScreen() {
             className={
               "rounded border px-3 py-1.5 text-sm " +
               (r.role_id === report.role_id
-                ? "border-[#6aa9ff] bg-surface-3 text-ink-0"
+                ? "border-[#b91c1c] bg-surface-3 text-ink-0"
                 : "border-surface-border bg-surface-1 text-ink-2 hover:bg-surface-2")
             }
           >
@@ -135,7 +135,7 @@ export function EligibilityScreen() {
             ))}
           </select>
         </div>
-        <button type="button" onClick={resetFilters} className="rounded border border-surface-border px-2 py-1 text-sm text-ink-2 hover:bg-surface-2">
+        <button type="button" onClick={resetFilters} className="btn-action px-2 py-1">
           Reset
         </button>
         <p className="ml-auto text-[11px] text-ink-3">
@@ -198,7 +198,7 @@ export function EligibilityScreen() {
                         setSelectedAgent(row.agentKey);
                         setAnnounce(`Opened explanation for ${row.agentId}`);
                       }}
-                      className="rounded border border-surface-border bg-surface-2 px-2 py-1 text-xs text-ink-0 hover:bg-surface-3"
+                      className="btn-action px-2 py-1 text-xs"
                       data-testid={`explain-${row.agentId}`}
                     >
                       Explain

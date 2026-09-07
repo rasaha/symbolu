@@ -66,6 +66,14 @@ export const useLedgerChain = (correlationId: string | null) =>
     retry: RETRY,
   });
 
+// -- 12 · Status (MA-2 as amended, MS-3 OBSERVE_DEPLOYMENT_ONE_READ) --------
+export const useDeploymentStatus = () =>
+  useQuery({
+    queryKey: ["v2", "observe", "deployment"],
+    queryFn: () => v2.readDeploymentStatus(),
+    retry: RETRY,
+  });
+
 // -- 7 · Review (GAS-7 HR-D) ------------------------------------------------
 export const useReviewQueue = (requiredRole = "") =>
   useQuery({

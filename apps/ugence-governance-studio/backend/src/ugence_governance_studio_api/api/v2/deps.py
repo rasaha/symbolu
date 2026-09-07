@@ -59,6 +59,12 @@ def _absent_ledger_observe() -> Any:
     return LedgerObserveService(review=None)
 
 
+def _absent_deployment_status() -> Any:
+    from ...services.studio_v2 import DeploymentStatusService
+
+    return DeploymentStatusService(report=None)
+
+
 class V2Context:
     """The six services, plus whatever optional dependencies were configured.
 
@@ -83,6 +89,7 @@ class V2Context:
         vendor: Any = None,
         clearance_export: Any = None,
         ledger_observe: Any = None,
+        deployment_status: Any = None,
     ) -> None:
         self.constitution = constitution
         self.policy = policy
@@ -115,6 +122,11 @@ class V2Context:
         # Front-door seam 7 (FD-11): Observe over the worker's ledger. Absent, the ledger
         # route reports the same review_service gap.
         self.ledger_observe = ledger_observe if ledger_observe is not None else _absent_ledger_observe()
+        # MA-2 as amended (MS-1 to MS-5): the deployment's own startup attestation,
+        # handed once at composition. Absent, the status route reports the gap.
+        self.deployment_status = (
+            deployment_status if deployment_status is not None
+            else _absent_deployment_status())
 
 
 def studio(request: Request) -> V2Context:

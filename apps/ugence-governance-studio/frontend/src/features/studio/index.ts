@@ -10,3 +10,4 @@ export { PublishScreen } from "./PublishScreen";
 export { ObserveScreen } from "./ObserveScreen";
 export { ReviewQueueScreen } from "./ReviewQueueScreen";
 export { RunDetailScreen } from "./RunDetailScreen";
+export { StatusScreen } from "./StatusScreen";

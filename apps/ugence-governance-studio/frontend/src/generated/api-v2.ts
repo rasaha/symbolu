@@ -1,6 +1,6 @@
 // AUTO-GENERATED from apps/ugence-governance-studio/contracts/openapi_v2.json
 // DO NOT EDIT BY HAND. Regenerate with: npm run generate:api-v2
-// source_openapi_sha256: f42472ab78a34cd24be4c9454c532074c5d000009c3ca72da243cc9139874431
+// source_openapi_sha256: c6785b267dafe9e2593b58744890606727b26d450ffd1a32f9b544f95a2d0f3e
 // api_contract_version: governance_studio.api.v2
 
 export interface paths {
@@ -200,6 +200,33 @@ export interface paths {
          *     the record, and a studio-side reconstruction would be a second unverified account.
          */
         get: operations["v2_observe_audit_chain"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v2/observe/deployment": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Deployment Status
+         * @description The deployment's own startup attestation: seam states, checks and pins
+         *     (ADR_UGENCE_MODULE_ADMINISTRATION_SCOPING.md MA-2 as amended, MS-1 to MS-5).
+         *
+         *     What is returned is what the deployment's fail-closed integrity gate computed
+         *     before the port bound, handed to the studio once at composition (MS-2). Nothing is
+         *     probed at request time, no file is read, and a configured seam is not a reachable
+         *     engine; the answer says so in its own ceiling field. The console's module registry
+         *     is not here, by ruling (MS-1).
+         */
+        get: operations["v2_observe_deployment"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1261,6 +1288,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    v2_observe_deployment: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
                 };
             };
         };

@@ -1,0 +1,134 @@
+{
+  "schema": "governed-runtime-worker.authority-plane-contract.v1",
+  "ruling": "ADR_UGENCE_AUTHORITY_PLANE_SCOPING.md AP-1 AUTHORITY_PLANE_ONLY, AP-2 ADMIN_ROUTES_ON_THE_WORKER, AP-3 IDP_VALIDATED_FIRST, AP-4 GRANT_REVOKE_ACTIVATE_ISSUE_ONLY, AP-5 READS_FIRST",
+  "served": {
+    "reads": true,
+    "writes": false
+  },
+  "home": "deployment/governed-runtime-worker (AP-2): routes on the review service this worker composes, which owns the stores",
+  "permitted_verbs": [
+    "grant",
+    "revoke",
+    "activate",
+    "issue"
+  ],
+  "refused_verbs": [
+    "authorize",
+    "clear",
+    "execute"
+  ],
+  "write_gate": "IDP_AUTHENTICATED subject required; a write reached without one is refused, never recorded as presented (AP-3)",
+  "read_label": "identity_proof: the proof the deployment can actually give; PRESENTED_UNPROVEN until AI-C is validated against a real issuer",
+  "operations": [
+    {
+      "operation_id": "authority_list_grants",
+      "method": "GET",
+      "path": "/authority/grants",
+      "summary": "Role grants held by one principal at one instant",
+      "kind": "read",
+      "names_verb": "",
+      "acts_on": "SqliteAuthorityDirectory.grants_for",
+      "ruling": "AP-5",
+      "gate": "identity_proof: the proof the deployment can actually give; PRESENTED_UNPROVEN until AI-C is validated against a real issuer",
+      "served": true
+    },
+    {
+      "operation_id": "authority_list_holders",
+      "method": "GET",
+      "path": "/authority/holders",
+      "summary": "Principals holding one role in one scope at one instant",
+      "kind": "read",
+      "names_verb": "",
+      "acts_on": "SqliteAuthorityDirectory.holders_of",
+      "ruling": "AP-5",
+      "gate": "identity_proof: the proof the deployment can actually give; PRESENTED_UNPROVEN until AI-C is validated against a real issuer",
+      "served": true
+    },
+    {
+      "operation_id": "authority_read_committee",
+      "method": "GET",
+      "path": "/authority/committees/{committee_id}",
+      "summary": "Committee report: members, quorum and whether it is met",
+      "kind": "read",
+      "names_verb": "",
+      "acts_on": "SqliteAuthorityDirectory.committee_report",
+      "ruling": "AP-5",
+      "gate": "identity_proof: the proof the deployment can actually give; PRESENTED_UNPROVEN until AI-C is validated against a real issuer",
+      "served": true
+    },
+    {
+      "operation_id": "authority_read_grant_events",
+      "method": "GET",
+      "path": "/authority/grants/{grant_id}/events",
+      "summary": "The append-only event history of one role grant",
+      "kind": "read",
+      "names_verb": "",
+      "acts_on": "SqliteAuthorityDirectory.grant_events",
+      "ruling": "AP-5",
+      "gate": "identity_proof: the proof the deployment can actually give; PRESENTED_UNPROVEN until AI-C is validated against a real issuer",
+      "served": true
+    },
+    {
+      "operation_id": "authority_grant_role",
+      "method": "POST",
+      "path": "/authority/grants",
+      "summary": "Load one time-bounded role grant for a principal",
+      "kind": "write",
+      "names_verb": "grant",
+      "acts_on": "SqliteAuthorityDirectory.put_grant",
+      "ruling": "AP-3",
+      "gate": "IDP_AUTHENTICATED subject required; a write reached without one is refused, never recorded as presented (AP-3)",
+      "served": false
+    },
+    {
+      "operation_id": "authority_revoke_grant",
+      "method": "POST",
+      "path": "/authority/grants/{grant_id}/revoke",
+      "summary": "Revoke one role grant, appending its REVOKED event",
+      "kind": "write",
+      "names_verb": "revoke",
+      "acts_on": "SqliteAuthorityDirectory.revoke_grant",
+      "ruling": "AP-3",
+      "gate": "IDP_AUTHENTICATED subject required; a write reached without one is refused, never recorded as presented (AP-3)",
+      "served": false
+    },
+    {
+      "operation_id": "authority_activate_constitution",
+      "method": "POST",
+      "path": "/authority/constitutions/{constitution_id}/activate",
+      "summary": "Activate one issued constitution under its activation root",
+      "kind": "write",
+      "names_verb": "activate",
+      "acts_on": "ugence_agent_constitution_activation (permanently outside the studio)",
+      "ruling": "AP-3",
+      "gate": "IDP_AUTHENTICATED subject required; a write reached without one is refused, never recorded as presented (AP-3)",
+      "served": false
+    },
+    {
+      "operation_id": "authority_issue_record",
+      "method": "POST",
+      "path": "/authority/issuances",
+      "summary": "Issue one policy or constitution record under its authority",
+      "kind": "write",
+      "names_verb": "issue",
+      "acts_on": "ugence_policy_authority / ugence_agent_constitution_activation",
+      "ruling": "AP-3",
+      "gate": "IDP_AUTHENTICATED subject required; a write reached without one is refused, never recorded as presented (AP-3)",
+      "served": false
+    }
+  ],
+  "reused_existing": [
+    {
+      "method": "GET",
+      "path": "/review/queue",
+      "operation_id": "review_list_queue",
+      "note": "already served by the review service; the plane's approval-queue read (AP-5) reuses it"
+    }
+  ],
+  "not_on_the_plane": [
+    "authorize, clear, execute: runtime authority, with ActionGate, the Autonomous Control Plane and the runtime (AP-4)",
+    "module composition: providers, hooks, seam files; deployment-time, shown read-only by the studio's Status panel (MA-2 as amended)",
+    "the console's nine module rows (MS-1)",
+    "the tenant emergency stop: Risk Authority's own administrative path"
+  ]
+}

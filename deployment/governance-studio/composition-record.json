@@ -1,24 +1,24 @@
 {
   "schema": "governance-studio.composition-record.v1",
-  "ruling": "ADR_UGENCE_STUDIO_FRONT_DOOR_SCOPING.md FD-3 COMPOSITION_RECORD_IN_REGISTRY: an ai-system-registry SystemRegistration; immutable and versioned by system_version; supersedes composition-record.seam-8.json; no new package for composition metadata",
+  "ruling": "ADR_UGENCE_STUDIO_FRONT_DOOR_SCOPING.md FD-3 COMPOSITION_RECORD_IN_REGISTRY: an ai-system-registry SystemRegistration; immutable and versioned by system_version; supersedes composition-record.seam-10.json; no new package for composition metadata",
   "binding": {
-    "binding_id": "governance-studio-private-hosted/front-door/seam-10",
+    "binding_id": "governance-studio-private-hosted/front-door/seam-11",
     "tenant_id": "ugence-platform",
     "subject_id": "governance-studio",
     "context_id": "p3e-private-hosted",
-    "context_digest": "0259654c3bd704f53644ea624bf20285cc72eec962aa112af892f9b6dea8ff18",
+    "context_digest": "d9ebeb83db45755fc3dad33c956bc5666f080cac5ceba297a5813e6080917828",
     "system_id": "governance-studio-private-hosted",
-    "system_version": "0.11.0",
+    "system_version": "0.12.0",
     "configuration_id": "approved-runtime-config.json",
-    "configuration_digest": "533ae34bc8454dbcfe752ce09fa74d75e17942e5a5be5deff99fb2840e265dd1",
+    "configuration_digest": "8eac694d24db2bcfeb681cbbd1c16f9ac06166f0e38414f20c363a3ea6ea71fc",
     "deployment_environment_ref": "private-hosted"
   },
   "registration": {
-    "registration_id": "reg_a860dc7e07c67c2bdd857e84391a2f66",
-    "binding_digest": "701468dfefa5715f95f63f93685830cbbde7a7d66dbc7d43d66a5aa67c87e779",
+    "registration_id": "reg_8dd15380a80bdf47a456ba0c95ef97f1",
+    "binding_digest": "d2eca31e1efb8596ef6f4588828f5277fcd5054004308c9c0a03a0f80d9cb13c",
     "tenant_id": "ugence-platform",
     "system_id": "governance-studio-private-hosted",
-    "system_version": "0.11.0",
+    "system_version": "0.12.0",
     "owner_ref": "rasaha",
     "classification_label": "REFERENCE_GRADE_SHADOW_ONLY",
     "validity": {
@@ -26,12 +26,12 @@
       "expires_at": "2027-09-06T00:00:00.000000+00:00",
       "stale_after": ""
     },
-    "supersedes": "reg_b9c37e20bd5f7b1edabe45efe806aa00",
-    "registered_by": "governance-studio-deployment/0.11.0",
-    "notes": "Clearance export composition (ADR_UGENCE_CLEARANCE_EXPORT_SCOPING.md CE-1 to CE-7 as ruled): build_studio_context receives one further seam, received_clearances - a read-only SeededClearanceSource built at composition time from clearance_receipts.json fixtures inside the scenario directories the pinned synthetic manifest already hashes (CE-7), so a receipt edited after pinning fails verify_bundle exactly as an edited scenario does. Seeding is composition, not a route: the source has two reads and no write, and no v2 operation accepts a receipt (CE-5, ADR 13.3). The frozen v2 contract is amended a sixth time (v2-A6) by one read, v2_export_read; the SD-1 allowlist gains exactly one entry, ugence_clearance_export, and neither ugence_action_clearance nor ugence_execution_reservation is admitted (CE-6). Every exported artifact carries three honesty claims that cannot be omitted, softened or stripped without changing its fingerprint: identity_assurance PRESENTED_UNPROVEN, authenticity UNSIGNED with the unfed trust-anchor prerequisite named, and data_classification SYNTHETIC_DEMONSTRATION_ONLY. A seeded receipt exercises the export path and the verifier and is evidence about nothing else: no authority granted it and it confers nothing. No credential, LIVE path or egress destination is added, and decision_store, governance_hook and console_base_url stay absent. Supersedes the seam-9 registration, which is never edited."
+    "supersedes": "reg_a860dc7e07c67c2bdd857e84391a2f66",
+    "registered_by": "governance-studio-deployment/0.12.0",
+    "notes": "Deployment status composition (ADR_UGENCE_MODULE_ADMINISTRATION_SCOPING.md MA-2 as amended by MS-1 to MS-5 as ruled: SEAM_STATES_ONLY, IN_MEMORY_RESULT_AT_COMPOSITION, OBSERVE_DEPLOYMENT_ONE_READ, SEAM_STATES_CHECKS_AND_PINS, SEPARATE_STATUS_PANEL): build_studio_context receives one further seam, deployment_report - the startup integrity report the gate computed before the port bound, handed once by server.run() as a dict and copied by the backend; no file under the runtime volume is read by any route, no package is imported for it and no SD-1 entry is added. The frozen v2 contract is amended a seventh time (v2-A7) by one read, v2_observe_deployment, which returns the six seam states, the checks map, the gate result and failure code and the pins; cert_subject and cert_expiry do not travel; the console's nine module rows are struck by MS-1 and reach the studio by no ruled path; nothing is probed at request time and the answer carries the STARTUP_ATTESTATION ceiling saying a configured seam is not a reachable engine. The panel is /studio/status, separate from Observe, whose two labelled sources are unchanged (FD-11.4). No configuration value, image package, credential, LIVE path or egress destination is added, and decision_store, governance_hook and console_base_url stay absent. Supersedes the seam-10 registration, which is never edited."
   },
-  "record_digest": "8ba0fc15cdeceab621c728e65061f9fb4eeca3d7772bf7635351db36c11b54d1",
-  "supersedes_record": "composition-record.seam-9.json",
+  "record_digest": "f65c1ae48643951ca23951536865a6e6be9098104c723030ec936f8dc9bbeb4c",
+  "supersedes_record": "composition-record.seam-10.json",
   "seams_handed_to_build_studio_context": [
     "review_service_base_url",
     "activation_root",
@@ -41,7 +41,9 @@
     "system_registry",
     "data_use_declarations",
     "vendor_declarations",
-    "received_clearances"
+    "received_clearances",
+    "deployment_report"
   ],
-  "configuration_digest_of": "deployment/governance-studio/approved-runtime-config.json (sha-256 of the file bytes)"
+  "configuration_digest_of": "deployment/governance-studio/approved-runtime-config.json (sha-256 of the file bytes)",
+  "context_digest_of": "sha-256 of 'governance-studio-private-hosted/front-door/seam-11|p3e-private-hosted|ADR_UGENCE_MODULE_ADMINISTRATION_SCOPING.md MA-2 as amended by MS-1 to MS-5'"
 }

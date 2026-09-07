@@ -74,7 +74,7 @@ export function ReplayScreen() {
             secrets or local paths.
           </p>
           {!exportOn ? (
-            <button type="button" onClick={() => setExportOn(true)} className="rounded border border-surface-border bg-surface-2 px-3 py-2 text-sm text-ink-0 hover:bg-surface-3">
+            <button type="button" onClick={() => setExportOn(true)} className="btn-action px-3 py-2">
               Load export manifest
             </button>
           ) : exportQuery.isLoading ? (
@@ -89,7 +89,7 @@ export function ReplayScreen() {
                 <Field label="Replay fingerprint"><Fingerprint value={exportManifest?.replay_fingerprint as string} label="replay" /></Field>
                 <Field label="Synthetic-data notice">Synthetic demonstration data — planning only.</Field>
               </dl>
-              <button type="button" onClick={download} className="mt-3 inline-flex items-center gap-2 rounded border border-surface-border bg-surface-2 px-3 py-2 text-sm text-ink-0 hover:bg-surface-3" data-testid="export-download">
+              <button type="button" onClick={download} className="btn-action mt-3 inline-flex items-center gap-2 px-3 py-2" data-testid="export-download">
                 <Download className="h-4 w-4" aria-hidden="true" /> Download export bundle
               </button>
             </>

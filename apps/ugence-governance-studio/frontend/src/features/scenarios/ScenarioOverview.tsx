@@ -15,7 +15,7 @@ function Metric({ label, value, to }: { label: string; value: number | string; t
     </Card>
   );
   return to ? (
-    <Link to={to} className="block rounded-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-[#6aa9ff]">
+    <Link to={to} className="block rounded-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-[#b91c1c]">
       {inner}
     </Link>
   ) : (

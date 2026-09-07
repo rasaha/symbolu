@@ -357,13 +357,20 @@ def test_the_composition_record_is_an_immutable_versioned_registry_record():
     assert seam9["registration"]["supersedes"] == seam8_reg.registration_id
     assert seam9_reg.system_version == "0.10.0"
     assert supersession_refusals(seam9_reg, seam8_reg) == ()
-    # The head of the chain: clearance export (CE-1 to CE-7).
-    assert reg["supersedes"] == seam9_reg.registration_id
-    assert supersession_refusals(rebuilt, seam9_reg) == ()
-    assert rebuilt.registration_id == "reg_a860dc7e07c67c2bdd857e84391a2f66"
-    assert record["record_digest"].startswith("8ba0fc15cdeceab6")
-    assert record["supersedes_record"] == "composition-record.seam-9.json"
+    seam10, seam10_reg = _load("composition-record.seam-10.json")
+    assert seam10_reg.record_digest() == seam10["record_digest"] == \
+        "8ba0fc15cdeceab6" + seam10["record_digest"][16:]
+    assert seam10_reg.registration_id == "reg_a860dc7e07c67c2bdd857e84391a2f66"
+    assert seam10["registration"]["supersedes"] == seam9_reg.registration_id
+    assert seam10_reg.system_version == "0.11.0"
+    assert supersession_refusals(seam10_reg, seam9_reg) == ()
+    # The head of the chain: deployment status (MA-2 as amended by MS-1 to MS-5).
+    assert reg["supersedes"] == seam10_reg.registration_id
+    assert supersession_refusals(rebuilt, seam10_reg) == ()
+    assert rebuilt.registration_id == "reg_8dd15380a80bdf47a456ba0c95ef97f1"
+    assert record["record_digest"].startswith("f65c1ae48643951c")
+    assert record["supersedes_record"] == "composition-record.seam-10.json"
     assert record["seams_handed_to_build_studio_context"] == [
         "review_service_base_url", "activation_root", "policy_registry", "policy_identities",
         "provider_registry", "system_registry", "data_use_declarations",
-        "vendor_declarations", "received_clearances"]
+        "vendor_declarations", "received_clearances", "deployment_report"]

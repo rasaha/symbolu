@@ -14,5 +14,5 @@ export const BAND_CLASS: Record<Band, string> = {
   allow: 'bg-verdict-allow/15 text-verdict-allow border-verdict-allow/30',
   hold: 'bg-verdict-hold/15 text-verdict-hold border-verdict-hold/30',
   block: 'bg-verdict-block/15 text-verdict-block border-verdict-block/30',
-  neutral: 'bg-slate-500/15 text-slate-300 border-slate-500/30',
+  neutral: 'bg-verdict-neutral/15 text-verdict-neutral border-verdict-neutral/30',
 };

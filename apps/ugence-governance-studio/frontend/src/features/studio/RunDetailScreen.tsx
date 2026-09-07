@@ -259,7 +259,7 @@ export function RunDetailScreen() {
                             <button
                               type="button"
                               onClick={() => setApprovalId(str(a.approval_id))}
-                              className="rounded border border-surface-border bg-surface-2 px-2 py-1 font-mono text-[11px] text-ink-0 hover:bg-surface-3"
+                              className="btn-action px-2 py-1 font-mono text-[11px]"
                             >
                               {str(a.approval_id)} · {str(a.state_at)}
                             </button>
