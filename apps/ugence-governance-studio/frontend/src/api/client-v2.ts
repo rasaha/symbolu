@@ -1,7 +1,7 @@
 // Typed HTTP client for the v2 Governed Agent Studio contract.
 //
 // A SEPARATE module from `client.ts`, deliberately. The v1 boundary test asserts
-// that client consumes exactly its 17 approved operations; adding v2 calls to it
+// that client consumes exactly its 20 approved operations; adding v2 calls to it
 // would break that assertion, and relaxing the assertion to accommodate them would
 // discard the guarantee it exists to give. Two clients, two allowlists, two
 // verifications.

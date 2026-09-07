@@ -37,7 +37,7 @@ evidence is implementation and conformance evidence only.
 
 ## A · Governance Studio, Eligibility Explorer (13 screens, contract v1)
 
-Every screen here reads the frozen `governance_studio.api.v1` contract, seventeen
+Every screen here reads the frozen `governance_studio.api.v1` contract, twenty
 approved operations over the Agent Workforce Composer, against pinned synthetic
 scenarios. Nothing on these screens is editable except the What-If controls, which
 act on a temporary copy. The shared banner on every page says it: eligibility is not
