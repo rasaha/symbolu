@@ -1,0 +1,37 @@
+{
+  "$schema": "ugence.authority_plane.approved_operations.v1",
+  "contract": "governed-runtime-worker.authority-plane-contract.v1",
+  "contract_path": "deployment/governed-runtime-worker/authority-plane-contract.json",
+  "contract_sha256": "9dd18a74f51caa68258f892e30ab2523482553e4a8c8130cb2cb8a31855a1f26",
+  "ruling": "ADR_UGENCE_AUTHORITY_PLANE_SCOPING.md AP-5 READS_FIRST (step 3: the front-end shell over the four reads)",
+  "approved_operation_ids": [
+    "authority_list_grants",
+    "authority_list_holders",
+    "authority_read_committee",
+    "authority_read_grant_events"
+  ],
+  "approved_paths": [
+    "GET /authority/grants",
+    "GET /authority/holders",
+    "GET /authority/committees/{committee_id}",
+    "GET /authority/grants/{grant_id}/events"
+  ],
+  "forbidden_operation_ids": [
+    "authority_grant_role",
+    "authority_revoke_grant",
+    "authority_activate_constitution",
+    "authority_issue_record"
+  ],
+  "forbidden_paths": [
+    "POST /authority/grants",
+    "POST /authority/grants/{grant_id}/revoke",
+    "POST /authority/constitutions/{constitution_id}/activate",
+    "POST /authority/issuances"
+  ],
+  "refused_verbs": [
+    "authorize",
+    "clear",
+    "execute"
+  ],
+  "notes": "This app may consume only the four AP-5 reads the worker serves, and nothing that writes. The four AP-3 writes are named here as forbidden so a later step cannot add one without changing this file and the worker's contract together; they wait on the identity gate. scripts/verify-boundary.mjs checks this file against the worker's committed contract and against the client's real call sites."
+}

@@ -1,0 +1,41 @@
+name: authority-plane-frontend-ci
+
+# The authority plane's front end (ADR_UGENCE_AUTHORITY_PLANE_SCOPING.md §11 step 3):
+# a read-only shell over the governed runtime worker's four AP-5 reads. The boundary
+# verifier binds this app to the worker's committed contract by hash, so a change to
+# that contract re-runs this job.
+
+on:
+  push:
+    paths:
+      - "apps/authority-plane/**"
+      - "deployment/governed-runtime-worker/authority-plane-contract.json"
+      - ".github/workflows/authority-plane-frontend-ci.yml"
+  pull_request:
+    paths:
+      - "apps/authority-plane/**"
+      - "deployment/governed-runtime-worker/authority-plane-contract.json"
+      - ".github/workflows/authority-plane-frontend-ci.yml"
+
+jobs:
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/authority-plane
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: apps/authority-plane/package-lock.json
+      - run: npm ci
+      - name: boundary
+        run: npm run verify:boundary
+      - name: typecheck
+        run: npm run type-check
+      - name: tests
+        run: npx vitest run
+      - name: build
+        run: npm run build

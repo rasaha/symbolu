@@ -253,3 +253,49 @@ stays `REFERENCE_GRADE_SHADOW_ONLY`.
 
 Steps 3 to 5 remain unimplemented. Step 4, issuer validation, cannot be taken inside
 this repository.
+
+## 14 — Implementation record, step 3 (2026-09-06)
+
+Shipped as `apps/authority-plane` 0.1.0, the third front end, under AP-2. A read-only
+shell over the four AP-5 reads, in the studio's boundary pattern. What the ruling
+became, and where each claim is checked:
+
+| Ruling | What landed | Where it is checked |
+|---|---|---|
+| AP-2, its own deployable | A Vite and React app with its own address (dev port 3200), proxying `/api` to the worker's private TLS listener. It shares no code with the studio or the console. | `apps/authority-plane/package.json`, `vite.config.ts`; the CI workflow `authority-plane-frontend-ci.yml` |
+| AP-5, the four reads | Four screens: Grants by principal, Holders of a role in a scope, a Committee report counted against its quorum, and a grant's event history; a grant row links to its events with one further GET. | `tests/screens.test.tsx` (4 tests) |
+| AP-5, the label | Every answer is rendered under an identity banner repeating the worker's own words: the read was not authenticated; the decision proof the deployment can give; the adapter's issuer validation; the directory's provenance sentence. The app's header, its standing notice and its footer say the plane reads only, that the writes wait on the identity gate, that nothing on it authorizes, clears or executes, and that no identity provider is provisioned. | `screens.test.tsx::says on its face what it cannot do`; the banner assertions in every read test |
+| the boundary | `security/approved-operations.json` names the four reads it may consume and the four writes it may not, and binds itself to the worker's committed contract by sha256. `scripts/verify-boundary.mjs` checks the manifest against that contract (an approved id must be a served read; the forbidden set must equal the contract's unserved writes), the client's real call sites, and that no file but `src/api/client.ts` opens an HTTP connection. | `npm run verify:boundary`; `tests/boundary.test.ts` (7 tests), including that the verifier can fail on a sneaky fetch, a revoke path and a write method |
+| honest empties | An empty list, a typed refusal and an unreachable worker are rendered differently, and the app issues GETs only. | `screens.test.tsx::an empty list is shown as empty…`; the method assertions on every recorded call |
+
+**Verified, not asserted.**
+
+| Check | Result |
+|---|---|
+| `npm run verify:boundary` | OK, 4 reads consumed, contract `9dd18a74…` |
+| `npm run type-check` | exit 0 |
+| vitest | 2 files, 11 passed |
+| `vite build` | exit 0 |
+
+**What did not change.** The worker, its contract and its tests; the studio, the
+console, and every other contract and allowlist. The plane's client has no method
+that could name a write, so AP-3 is not touched by this step.
+
+**Two decisions recorded rather than made quietly.**
+
+- **The verifier does not scan prose for the three refused verbs.** The app's own
+  copy says it never authorizes, clears or executes, which a verb scan over source
+  would flag. The AP-4 rule is enforced where it belongs, on the contract, by the
+  worker's test; this app's verifier enforces paths, operation ids and methods.
+- **A lockfile is committed.** This is a new app with its own CI, and the studio's
+  precedent is a committed lockfile with `npm ci`; the console's absence of one was
+  left alone under MA-4 because adding it was not that ruling's to make.
+
+**Not proven here.** The app was not driven against a live worker in this
+environment, because composing the worker needs PostgreSQL. Its screens are proven
+against the worker's answer shapes as `authority_reads.py` produces them; the
+end-to-end that joins the two is a later step's work once a cluster and an issuer
+exist.
+
+Steps 4 and 5 remain unimplemented. Step 4, issuer validation, cannot be taken inside
+this repository, and step 5's writes wait on it.
