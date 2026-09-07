@@ -20,6 +20,10 @@ API_CONTRACT = "governance_studio.api.v1"
 AWC_VERSION = "0.2.1"
 COMPILER_VERSION = "0.2.0"
 OPENAPI_SHA256 = "dc309eab216e1a4c2f63f286887a4ef218a96ac34f8fa8614bff176db7c36656"
+#: How many operations the frozen v1 manifest approves. Seventeen through P3E; twenty
+#: since owner ruling BW-3 (ADR_UGENCE_AUTHORITY_PLANE_SCOPING.md section 22) moved the
+#: three workflow operations from forbidden to approved. The OpenAPI hash did not move.
+APPROVED_OPERATION_COUNT = 20
 DATA_CLASSIFICATION = "SYNTHETIC_DEMONSTRATION_ONLY"
 
 __all__ = [
@@ -28,6 +32,7 @@ __all__ = [
     "FRONTEND_VERSION",
     "BACKEND_API_VERSION",
     "API_CONTRACT",
+    "APPROVED_OPERATION_COUNT",
     "AWC_VERSION",
     "COMPILER_VERSION",
     "OPENAPI_SHA256",

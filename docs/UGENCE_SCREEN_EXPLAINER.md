@@ -1,11 +1,11 @@
 # Ugence screens — an explainer, one entry per screen
 
 **Status:** reference, 2026-09-07, after the owner's ruling that AP-3 controls
-(`ADR_UGENCE_AUTHORITY_PLANE_SCOPING.md` §18). Every entry is taken from the screen's
+(`ADR_UGENCE_AUTHORITY_PLANE_SCOPING.md` §18) and the Bring Your Workflow ruling (§22). Every entry is taken from the screen's
 own source: its stated purpose, its stated disclaimer, the operations it calls, and the
 ruling that shaped it. Nothing here describes a screen as doing more than its code does.
 
-Four front ends, thirty-two screens. Each entry answers the same five questions:
+Four front ends, thirty-three screens. Each entry answers the same five questions:
 **what it shows**, **who answers it**, **what the operator can do**, **what it never
 does**, and **the ruling that shaped it**.
 
@@ -29,6 +29,7 @@ evidence is implementation and conformance evidence only.
 |---|---|
 | Context Minimization, Truth Assurance, ActionGate, Autonomous Control Plane | Console: probes on Modules, stages of the Governed Loop, entries in Audit |
 | Agent Runtime | Studio: Simulate (the in-studio path over fixtures), and the worker's shadow run started from Simulate and watched from Review |
+| Agent Workforce Composer's adapter over an operator's own document | Studio: Bring Your Workflow (validate, adapt, compare; ephemeral) |
 | Model Selection, Hybrid LLM, LLM Steering, Autonomous Runtime | No screen. By ruling MS-1 their registry rows do not reach the studio either |
 | The authority directory and approval workflow (not among the nine modules) | Authority Plane: all four screens; Studio: Review Queue and Run Detail |
 
@@ -36,7 +37,7 @@ evidence is implementation and conformance evidence only.
 
 ## A · Governance Studio, Eligibility Explorer (13 screens, contract v1)
 
-Every screen here reads the frozen `governance_studio.api.v1` contract, seventeen
+Every screen here reads the frozen `governance_studio.api.v1` contract, twenty
 approved operations over the Agent Workforce Composer, against pinned synthetic
 scenarios. Nothing on these screens is editable except the What-If controls, which
 act on a temporary copy. The shared banner on every page says it: eligibility is not
@@ -300,6 +301,23 @@ control and its client cannot name a write.
 
 ---
 
+## E · Governance Studio, Bring Your Workflow (1 screen, contract v1)
+
+The one screen on which a document the operator supplies enters the studio. Owner
+ruling BW-1 to BW-5 (§22) admitted it as a read-only Workflow IR inspector and
+superseded, for this surface only, the earlier "no arbitrary JSON / fixture-upload
+input" sentences. The frozen v1 OpenAPI document did not change: three operations it
+already carried moved from the front end's forbidden list to its approved list.
+
+### 33 · Bring Your Workflow (`/bring-your-workflow`)
+- **Shows:** what a pasted or locally chosen Ugence Workflow IR JSON document declares (version, size, nodes, edges, node kinds, dispositions, human review and authority requirements, tool and capability refs, policy pack, fingerprint, canonical digest); then, on request, the server's validation, adaptation (adapter mode, node dispositions, role requirements, fingerprints, diagnostics) and comparison of a v1 and a v2 adaptation. The disclaimer, verbatim: "Accepts Ugence Workflow IR JSON. It does not execute, publish or persist the submitted workflow."
+- **Answered by:** `validate_workflow`, `adapt_workflow`, `compare_adaptations`; nothing else. The guided example is the procurement compiled workflow the catalog serves, bundled with the screen.
+- **Operator can:** paste JSON or choose a local `.json` file (read in the browser); load the guided example; validate; adapt; compare against the same workflow in the other contract version; download the report and the adapted envelope to their device.
+- **Never:** executes, simulates, publishes or persists the document; fetches a URL; reads an archive; accepts code, YAML, a framework-native object or a credential-shaped value; adds to or changes the scenario catalog; converts from LangGraph, CrewAI, AutoGen, n8n or BPMN (a later, separately scoped phase). Both the browser gate and the server refuse a document over 1 MiB, deeper than 32 levels, or with more than 200 nodes or 400 edges; the server's refusal is the typed 422 `workflow_too_complex`.
+- **Ruling:** BW-1 `READ_ONLY_WORKFLOW_IR_INSPECTOR`, BW-2 `PASTE_OR_LOCAL_FILE_BODY_ONLY` with the owner's figures, BW-3 `VALIDATE_ADAPT_COMPARE_ONLY`, BW-4 `EPHEMERAL_NO_SERVER_STORAGE`, BW-5 `REFERENCE_GRADE` (§22).
+
+---
+
 ## What is not a screen, and why
 
 - **Granting, revoking:** implemented on the worker behind its identity gate (AW-2 to AW-5) and not served until the identity adapter is validated end to end against a real enterprise issuer (AP-3 controlling, §18). The screens built for them under AW-1 were withdrawn with that ruling's reversal.
@@ -308,3 +326,4 @@ control and its client cannot name a write.
 - **Module composition:** providers, hooks and seam files are environment variables read before the port binds. Shown read-only on Status; set nowhere in a browser.
 - **The console's module registry:** behind a withheld route; struck from the studio by MS-1.
 - **Risk Authority:** its own package records and one administrative emergency stop, with no web surface; the studio is forbidden to import it.
+- **A general agent uploader or framework converter:** refused by BW-1 and deferred by BW-5. Bring Your Workflow accepts Ugence Workflow IR only; a LangGraph, CrewAI, AutoGen, n8n or BPMN export must be converted first, and no converter exists yet.

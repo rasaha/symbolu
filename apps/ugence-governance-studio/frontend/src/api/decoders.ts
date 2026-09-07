@@ -12,6 +12,13 @@ import type {
   ReplayResult,
   WhatIfResult,
 } from "./types-p3d";
+import type {
+  AdaptWorkflowResult,
+  CompareAdaptationsResult,
+  NodeDispositionView,
+  RoleRequirementView,
+  ValidateWorkflowResult,
+} from "./types-bring";
 
 export class DecodeError extends Error {
   readonly field: string;
@@ -134,4 +141,82 @@ export function decodeWhatIf(result: unknown): WhatIfResult {
   str(req(r, "baseline_state", "whatIf"), "whatIf.baseline_state");
   str(req(r, "modified_state", "whatIf"), "whatIf.modified_state");
   return result as WhatIfResult;
+}
+
+// -- Bring Your Workflow (ADR §22, BW-3) -------------------------------------- //
+
+function bool(value: unknown, field: string): boolean {
+  if (typeof value !== "boolean") throw new DecodeError(field, "expected a boolean");
+  return value;
+}
+function strList(value: unknown, field: string): string[] {
+  return arr(value, field).map((v, i) => str(v, `${field}[${i}]`));
+}
+function records(value: unknown, field: string): Array<Record<string, unknown>> {
+  return arr(value, field).map((v, i) => obj(v, `${field}[${i}]`));
+}
+
+export function decodeValidateWorkflow(result: unknown): ValidateWorkflowResult {
+  const r = obj(result, "validate_workflow");
+  const integrity = obj(req(r, "integrity", "validate_workflow"), "validate_workflow.integrity");
+  return {
+    validation_state: str(req(r, "validation_state", "validate_workflow"), "validate_workflow.validation_state"),
+    declared_contract_version: str(req(r, "declared_contract_version", "validate_workflow"), "validate_workflow.declared_contract_version"),
+    supported_version: bool(req(r, "supported_version", "validate_workflow"), "validate_workflow.supported_version"),
+    supported_contracts: strList(req(r, "supported_contracts", "validate_workflow"), "validate_workflow.supported_contracts"),
+    integrity: {
+      checked: bool(req(integrity, "checked", "validate_workflow.integrity"), "validate_workflow.integrity.checked"),
+      source_digest: typeof integrity.source_digest === "string" ? integrity.source_digest : undefined,
+      computed_digest: typeof integrity.computed_digest === "string" ? integrity.computed_digest : undefined,
+      match: typeof integrity.match === "boolean" ? integrity.match : undefined,
+    },
+    diagnostics: records(req(r, "diagnostics", "validate_workflow"), "validate_workflow.diagnostics"),
+  };
+}
+
+export function decodeAdaptWorkflow(result: unknown): AdaptWorkflowResult {
+  const r = obj(result, "adapt_workflow");
+  const dispositions: NodeDispositionView[] = records(req(r, "node_dispositions", "adapt_workflow"), "adapt_workflow.node_dispositions").map((d, i) => {
+    const f = `adapt_workflow.node_dispositions[${i}]`;
+    return {
+      node_id: str(req(d, "node_id", f), `${f}.node_id`),
+      source_node_kind: str(req(d, "source_node_kind", f), `${f}.source_node_kind`),
+      disposition: str(req(d, "disposition", f), `${f}.disposition`),
+      reason_codes: strList(req(d, "reason_codes", f), `${f}.reason_codes`),
+      role_id: str(req(d, "role_id", f), `${f}.role_id`),
+      is_agent_role: bool(req(d, "is_agent_role", f), `${f}.is_agent_role`),
+    };
+  });
+  const roles: RoleRequirementView[] = records(req(r, "role_requirements", "adapt_workflow"), "adapt_workflow.role_requirements").map((d, i) => {
+    const f = `adapt_workflow.role_requirements[${i}]`;
+    return {
+      role_id: str(req(d, "role_id", f), `${f}.role_id`),
+      role_name: str(req(d, "role_name", f), `${f}.role_name`),
+      source_node_id: str(req(d, "source_node_id", f), `${f}.source_node_id`),
+      source_node_kind: str(req(d, "source_node_kind", f), `${f}.source_node_kind`),
+      required_capabilities: strList(req(d, "required_capabilities", f), `${f}.required_capabilities`),
+    };
+  });
+  return {
+    adapter_mode: str(req(r, "adapter_mode", "adapt_workflow"), "adapt_workflow.adapter_mode"),
+    ok: bool(req(r, "ok", "adapt_workflow"), "adapt_workflow.ok"),
+    adaptation_fingerprint: str(req(r, "adaptation_fingerprint", "adapt_workflow"), "adapt_workflow.adaptation_fingerprint"),
+    adaptation_envelope_fingerprint: str(req(r, "adaptation_envelope_fingerprint", "adapt_workflow"), "adapt_workflow.adaptation_envelope_fingerprint"),
+    node_dispositions: dispositions,
+    role_requirements: roles,
+    non_agent_dispositions: arr(req(r, "non_agent_dispositions", "adapt_workflow"), "adapt_workflow.non_agent_dispositions"),
+    role_dependency_graph: req(r, "role_dependency_graph", "adapt_workflow"),
+    diagnostics: records(req(r, "diagnostics", "adapt_workflow"), "adapt_workflow.diagnostics"),
+    adaptation_envelope: obj(req(r, "adaptation_envelope", "adapt_workflow"), "adapt_workflow.adaptation_envelope"),
+  };
+}
+
+export function decodeCompareAdaptations(result: unknown): CompareAdaptationsResult {
+  const r = obj(result, "compare_adaptations");
+  return {
+    equivalence_state: str(req(r, "equivalence_state", "compare_adaptations"), "compare_adaptations.equivalence_state"),
+    report: obj(req(r, "report", "compare_adaptations"), "compare_adaptations.report"),
+    v1_adaptation_fingerprint: str(req(r, "v1_adaptation_fingerprint", "compare_adaptations"), "compare_adaptations.v1_adaptation_fingerprint"),
+    v2_adaptation_fingerprint: str(req(r, "v2_adaptation_fingerprint", "compare_adaptations"), "compare_adaptations.v2_adaptation_fingerprint"),
+  };
 }

@@ -98,13 +98,17 @@ export const explainEligibility = (scenarioId: string, roleId?: string) =>
 
 // -- P3D planning endpoints (decoded at the boundary) ----------------------
 import {
+  decodeAdaptWorkflow,
   decodeCompare,
+  decodeCompareAdaptations,
   decodeExplainPlan,
   decodePlan,
   decodeRanking,
   decodeReplay,
+  decodeValidateWorkflow,
   decodeWhatIf,
 } from "./decoders";
+import type { AdaptWorkflowResult, CompareAdaptationsResult, ValidateWorkflowResult } from "./types-bring";
 
 export interface PlanSource {
   scenario_id: string;
@@ -151,3 +155,24 @@ export const scenarioWhatIf = (id: string, operation: string, params: Record<str
 
 export const getScenarioExport = (id: string) =>
   envelope<Record<string, unknown>>(`/api/v1/scenarios/${enc(id)}/export`).then((e) => e.result);
+
+// -- Bring Your Workflow (ADR §22, BW-3: validate, adapt, compare only) ------- //
+// The operator's document is the request body and nothing else: no scenario id, no
+// overlay, no URL. Each answer is the whole envelope (request id, awc version, input
+// digests) with the result decoded, so the screen's downloadable report is the
+// server's own record and not a reassembly.
+export const validateWorkflow = (workflow: Record<string, unknown>, contractVersion: string, sourceDigest?: string) =>
+  envelope<unknown>(
+    "/api/v1/workflows/validate",
+    postJson(sourceDigest ? { contract_version: contractVersion, workflow, source_digest: sourceDigest } : { contract_version: contractVersion, workflow }),
+  ).then((e): ApiResponseEnvelope<ValidateWorkflowResult> => ({ ...e, result: decodeValidateWorkflow(e.result) }));
+
+export const adaptWorkflow = (workflow: Record<string, unknown>, contractVersion: string) =>
+  envelope<unknown>("/api/v1/workflows/adapt", postJson({ workflow, contract_version: contractVersion })).then(
+    (e): ApiResponseEnvelope<AdaptWorkflowResult> => ({ ...e, result: decodeAdaptWorkflow(e.result) }),
+  );
+
+export const compareAdaptations = (v1Workflow: Record<string, unknown>, v2Workflow: Record<string, unknown>) =>
+  envelope<unknown>("/api/v1/workflows/compare-adaptations", postJson({ v1_workflow: v1Workflow, v2_workflow: v2Workflow })).then(
+    (e): ApiResponseEnvelope<CompareAdaptationsResult> => ({ ...e, result: decodeCompareAdaptations(e.result) }),
+  );

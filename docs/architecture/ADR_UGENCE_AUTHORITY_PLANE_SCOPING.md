@@ -749,3 +749,99 @@ change, each of which needs its own scoping and ballot; LIVE execution.
 Unchanged: §20.5 in full, then, after AX-1's composition, the propagation seams of
 EN-2; and, after the first authority-plane write is served with its own record, the
 first guided-configuration screen of EN-1, each screen its own slice.
+
+---
+
+## 22 — Owner ruling BW-1 to BW-5: Bring Your Workflow, a read-only Workflow IR inspector (owner, 2026-09-07)
+
+**Status:** ratified by the owner in their own words on 2026-09-07 ("Ratify BW-1
+through BW-5 as recommended ... confirm the BW-2 figures, and confirm that the
+ratification supersedes the 'no arbitrary JSON / fixture-upload input' sentences in
+the studio frontend README and P3D_SECURITY.md"), and implemented in the same slice.
+
+### 22.1 — The question, and what the repository settled before the ballot
+
+The Studio had no way for an operator to bring a workflow of their own: the scenario
+catalog is a fixed tuple, the Simulate screen sends one hard-coded sample, and the
+front end's README and `P3D_SECURITY.md` said "no arbitrary JSON / fixture-upload
+input". The owner's direction was to add the second customer entry path ("bring an
+existing workflow to Ugence for governance") in a tightly bounded first form: a
+read-only Workflow IR inspector, not an agent uploader.
+
+Settled by the repository before the ballot `[V]`:
+
+- The frozen `governance_studio.api.v1` OpenAPI document already carried
+  `validate_workflow`, `adapt_workflow` and `compare_adaptations`
+  (`apps/ugence-governance-studio/backend/src/ugence_governance_studio_api/api/workflows.py`),
+  each accepting a workflow document in the request body and failing closed on any
+  declared version outside `workflow_ir.v1` / `workflow_ir.v2`. The front end's
+  manifest listed the three by name as forbidden.
+- The only limit on such a document was the 2 MiB body middleware; nothing bounded
+  its structure.
+- Workflow IR is the policy compiler's output (nodes, edges, dispositions, human
+  review and authority requirements, capability and tool refs, provenance,
+  fingerprint); it has no agents or tasks, and no customer can produce it today
+  except through Ugence's own compiler. Phase 1 therefore proves the surface;
+  converters make the path real, and they are a later phase `[G]`.
+- The "no arbitrary input" boundary was prose in two documents, not a numbered
+  ruling.
+
+### 22.2 — The ruling
+
+| # | Question | Ruling |
+|---|---|---|
+| **BW-1** | The surface | **`READ_ONLY_WORKFLOW_IR_INSPECTOR`** at `/bring-your-workflow` on the v1 contract, a sibling of the scenario catalog, named "Bring Your Workflow", tagline "Validate and adapt an existing agentic workflow for Ugence governance." A general agent uploader is refused; "Import Agent" is not a name this surface may carry. |
+| **BW-2** | Input and limits | **`PASTE_OR_LOCAL_FILE_BODY_ONLY`**: Workflow IR JSON pasted into the screen or read from a local file in the browser. Figures confirmed by the owner: 1 MiB, nesting depth 32, 200 nodes, 400 edges (and 50 000 values to bound the walk). The browser gate and the server enforce the same figures; the server's refusal is the typed 422 `workflow_too_complex`. The gate also refuses YAML, code, archives, a JSON value that is not an object, an undeclared or unsupported version (never guessed from field presence), a credential-shaped key or value, and a remote reference. |
+| **BW-3** | Backend operations | **`VALIDATE_ADAPT_COMPARE_ONLY`**. The three operations move from the front end's forbidden list to its approved list; no route, schema or status code is added to the frozen OpenAPI document, whose hash is unchanged; one contract-neutral structural guard (`workflow_limits.py`) runs before any adapter. |
+| **BW-4** | Persistence and output | **`EPHEMERAL_NO_SERVER_STORAGE`**. No server write exists for the document and no browser storage is touched; results live in component state, are cleared by any edit, and leave only as a local download of the report (the server's own envelopes, request ids included) and of the adapted envelope. Provenance shown: the client's canonical digest, computed by the backend's own encoding rule, and the server's computed digest, with match or mismatch stated. |
+| **BW-5** | Name and maturity | **"Bring Your Workflow"**, `REFERENCE_GRADE`, with the disclaimer verbatim on the screen: "Accepts Ugence Workflow IR JSON. It does not execute, publish or persist the submitted workflow." LangGraph, CrewAI, AutoGen, n8n and BPMN conversion is deferred to a separately scoped phase. |
+
+Execution, scenario-catalog mutation and remote fetch are forbidden under every
+option and were not balloted.
+
+### 22.3 — What this ruling supersedes, and what it does not authorize
+
+**Supersedes**, for this one surface, the sentences "accepts no arbitrary JSON /
+policy / URL / code / fixture-upload input" in
+`apps/ugence-governance-studio/frontend/README.md` and "no arbitrary JSON/policy/URL/
+code ... no plan or replay-record upload from local files" in
+`apps/ugence-governance-studio/docs/P3D_SECURITY.md`; both documents now say so in
+place. The original boundary was correct for the synthetic Studio and is not a
+permanent product principle; changing it through a versioned, fail-closed feature
+with its own tests is the intended way to move it. The GAS-4/5 "v1 surface
+byte-identical" check is not weakened: the OpenAPI document, the generated client
+and its hash are unchanged; only the manifest moved, and by this ruling.
+
+**Does not authorize:** any framework converter (phase 2, its own scoping); saving an
+uploaded workflow as a draft, assigning an owner or tenant, versioning, linking a
+policy or constitution, or submitting for approval (phase 3, only after tenant
+identity, IAM and the Portfolio Registry exist, each its own ballot); compiling,
+simulating, approving, publishing, issuing clearance or exporting an uploaded
+workflow to a runtime (phase 4, only after the authority plane serves writes under
+AP-3 `MET`); any overlay, scenario id or URL on the screen's requests; any change to
+the v2 contract; LIVE execution.
+
+### 22.4 — Verification recorded with the slice `[V]`
+
+- Backend: `tests/test_workflow_limits.py` (nine tests: figures, measures, refusal
+  by measure on each route, acceptance at the limit, the byte cap answering below
+  the middleware, the element cap ending the walk); the whole studio backend suite
+  passes with the guard in place and the OpenAPI freeze test unchanged.
+- Front end: `tests/bring-gate.test.ts` (twenty-six: every refusal code, both real
+  documents pass, the declared-version rule, and the client's canonical digest of
+  the guided example equal to the digest the real backend computed for it);
+  `tests/bring-screen.test.tsx` (fifteen: disclaimer verbatim, axe clean empty and
+  loaded, refusals with no request sent, local file read in the browser, the exact
+  bodies of the three requests, the server's typed refusal shown, only the three
+  operations ever reached, results cleared on edit, the report and envelope
+  downloads equal to the server's records, and a source scan for browser storage,
+  raw connections and forbidden operations); the allowlist verifier reports twenty
+  consumed operations equal to the manifest; every CI verifier, the full vitest
+  suite and the production build pass.
+
+### 22.5 — Sequence
+
+This slice ships phase 1. Phase 2 (converters) needs its own read-only scoping
+audit and ballot before any code. Phases 3 and 4 wait, in that order, on the
+prerequisites named in §22.3 and on §20.5 as it stands. Nothing in §18 to §21
+moves.
