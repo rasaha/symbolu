@@ -530,8 +530,9 @@ export function BringYourWorkflowScreen() {
             <li>Accept code, YAML, a framework-native agent object or a credential. A value shaped like one is refused before anything is sent.</li>
             <li>Add to or change the scenario catalog. The pinned scenarios are untouched by anything done here.</li>
             <li>
-              Convert from LangGraph, CrewAI, AutoGen, n8n or BPMN. Converters are a separately scoped later phase; today the document must
-              already be Ugence Workflow IR.
+              Convert from LangGraph, CrewAI, AutoGen, n8n or BPMN in the browser. Conversion is an offline command-line tool: today the
+              n8n converter emits a DRAFT policy pack, a conversion report and a preview Workflow IR labelled PREVIEW_UNAPPROVED that this
+              screen inspects; BPMN 2.0 is next; LangGraph, CrewAI and AutoGen wait for a declarative export.
             </li>
           </ul>
         </Section>

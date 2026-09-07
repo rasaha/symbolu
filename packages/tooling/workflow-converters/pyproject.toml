@@ -1,0 +1,57 @@
+# Independent distribution for the Ugence Workflow Converters (tooling).
+#
+# Offline converters from third-party workflow exports into the Policy Workflow
+# Compiler's input: a DRAFT policy pack, a content-addressed conversion report, and a
+# preview Workflow IR labelled PREVIEW_UNAPPROVED (owner ruling CV-1 to CV-5,
+# docs/architecture/ADR_UGENCE_AUTHORITY_PLANE_SCOPING.md section 23).
+#
+# A converter is TOOLING, not a governance authority. It translates constructs per a
+# mapping table and nothing more: it makes no claim of semantic equivalence,
+# governance, approval, validation or executability; it fetches no URL, executes no
+# code, imports no framework object, and stores no secret. The n8n converter is the
+# first; BPMN 2.0 is next; LangGraph, CrewAI and AutoGen are deferred until a
+# declarative export exists.
+#
+# Build:  python -m build packages/tooling/workflow-converters
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ugence-workflow-converters"
+dynamic = ["version"]
+description = "Ugence Workflow Converters — offline conversion of third-party workflow exports (n8n first) into a DRAFT Ugence policy pack, a conversion report and a preview Workflow IR. Tooling, not a governance authority; claims structural translation only."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "Proprietary" }
+authors = [{ name = "Ugence Labs" }]
+keywords = ["workflow", "converter", "n8n", "policy pack", "ugence"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: Other/Proprietary License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Typing :: Typed",
+]
+# The compiler supplies the pack models, the validator and the public synthesizer.
+# No HTTP client, no framework SDK, no YAML parser, no archive reader is a dependency.
+dependencies = [
+    "pydantic>=2",
+    "ugence-policy-workflow-compiler>=0.2.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=7.0", "build>=1.0"]
+
+[project.scripts]
+ugence-workflow-converters = "ugence_workflow_converters.cli:main"
+
+[tool.setuptools.dynamic]
+version = { attr = "ugence_workflow_converters.version.DISTRIBUTION_VERSION" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+ugence_workflow_converters = ["py.typed"]
