@@ -18,6 +18,7 @@ import pytest
 
 from _issuer import InProcessIssuer
 from governed_runtime_worker import ShadowWorkload, compose
+from governed_runtime_worker.authority_plane import PLANE_OPERATIONS
 from ugence_approval_workflow import ApprovalState, ApproverKind
 from ugence_authority_directory import PrincipalKind, PrincipalRef, RoleGrant, grant_id_for
 from ugence_governance_contracts.api import Validity
@@ -361,3 +362,110 @@ def test_the_seventh_route_reads_the_relayed_runs_receipt_from_the_workers_own_l
     assert row["entry_ref"] == run["linkages"][0]["audit_reference"]["entry_ref"]
     for secret in (worker.config.app_database_url, worker.config.system_database_url, token):
         assert secret not in read.text
+
+
+# --------------------------------------------------------------------------- #
+# the authority plane's four reads (AP-5) over the real composition
+# --------------------------------------------------------------------------- #
+@requires_postgres
+def test_the_authority_reads_are_served_by_the_composed_worker_and_no_write_is(worker, issuer):
+    """ADR_UGENCE_AUTHORITY_PLANE_SCOPING.md §11 step 2 over the composed worker, not a
+    hand-built router: the four AP-5 reads answer from the directory this composition
+    opened, at its clock, for its tenant, labelled with the decision proof a composed
+    identity port gives; a proof header is neither required nor read; the grant the
+    decision route consumed is the grant the reads show; no AP-3 write path answers;
+    and no DSN or token appears in any answer (row 8)."""
+
+    from fastapi.testclient import TestClient
+
+    _grant(worker)
+    scope = f"approval/{SUBJECT_KIND}"
+    validity = Validity(issued_at=NOW - timedelta(days=1), expires_at=NOW + timedelta(days=30))
+    bob = PrincipalRef(principal_id=subject_ref("bob"), principal_kind=PrincipalKind.HUMAN, display_ref="bob")
+    bob_grant = worker.directory.put_grant(RoleGrant(
+        grant_id=grant_id_for(TENANT, bob.principal_id, ROLE, scope, validity), tenant_id=TENANT,
+        principal=bob, role=ROLE, scope=scope, validity=validity,
+        authority_reference=f"directory://roles/{ROLE}", member_of="risk-committee",
+    ), as_of=NOW - timedelta(days=1), loaded_by="e2e")
+    committee = PrincipalRef(principal_id="risk-committee", principal_kind=PrincipalKind.COMMITTEE, quorum=2)
+    worker.directory.put_grant(RoleGrant(
+        grant_id=grant_id_for(TENANT, committee.principal_id, ROLE, scope, validity), tenant_id=TENANT,
+        principal=committee, role=ROLE, scope=scope, validity=validity,
+        authority_reference=f"directory://roles/{ROLE}",
+    ), as_of=NOW - timedelta(days=1), loaded_by="e2e")
+
+    client = TestClient(worker.app)
+    answers: list[str] = []
+
+    def read(path: str, expect: int = 200, **kwargs):
+        r = client.get(path, **kwargs)
+        answers.append(r.text)
+        assert r.status_code == expect, r.text
+        body = r.json()
+        if expect == 200:
+            assert body["result"] == "READ" and body["plane"] == "authority" and body["ruling"] == "AP-5"
+            assert body["tenant_id"] == TENANT and body["as_of"] == worker.clock.now.isoformat()
+            assert body["read_authenticated"] is False
+            assert body["decision_identity_proof"] == IDP_AUTHENTICATED, "an identity port is composed"
+            assert body["issuer_validation"] == "IN_PROCESS_ISSUER_ONLY"
+            assert "administrator loaded" in body["provenance"]
+            assert body["maturity"] == "REFERENCE_GRADE_SHADOW_ONLY"
+        return body
+
+    # -- grants for a principal, holders of a role, a committee against its quorum ------
+    alice = read("/authority/grants", params={"principal_id": subject_ref("alice")})
+    assert alice["grant_count"] == 1 and alice["grants"][0]["role"] == ROLE
+    assert alice["grants"][0]["scope"] == scope and alice["grants"][0]["loaded_by"] == "e2e"
+    holders = read("/authority/holders", params={"role": ROLE, "scope": scope})
+    assert sorted(h["principal"]["principal_id"] for h in holders["holders"]) == sorted(
+        [subject_ref("alice"), subject_ref("bob"), "risk-committee"])
+    report = read("/authority/committees/risk-committee", params={"role": ROLE, "scope": scope})["report"]
+    assert report["committee"]["principal_kind"] == "COMMITTEE" and report["quorum"] == 2
+    assert report["member_count"] == 1 and report["quorum_met_at_as_of"] is False
+
+    # -- the grant the decision route consumes is the grant the reads show --------------
+    _park(worker)
+    (entry,) = client.get("/review/queue").json()["entries"]
+    token = issuer.mint(claims_for(issuer), kid="rsa-1")
+    worker.clock.advance(minutes=5)
+    decided = client.post("/review/decisions", json={
+        "approval_id": entry["approval_id"], "decision": "GRANT", "justification": "reviewed",
+        "presented_approver": {"approver_id": subject_ref("alice"), "approver_kind": "HUMAN",
+                               "role": ROLE, "authority_reference": f"directory://roles/{ROLE}"},
+    }, headers={PROOF_HEADER: token})
+    assert decided.status_code == 200 and decided.json()["identity_proof"] == IDP_AUTHENTICATED
+    after = read("/authority/grants", params={"principal_id": subject_ref("alice")})
+    assert after["grants"][0]["grant_id"] == alice["grants"][0]["grant_id"]
+    assert after["as_of"] != alice["as_of"], "the read answers at the composition's clock"
+
+    # -- a proof header is neither required nor read ---------------------------------
+    bare = read("/authority/grants", params={"principal_id": subject_ref("bob")})
+    with_proof = read("/authority/grants", params={"principal_id": subject_ref("bob")},
+                      headers={PROOF_HEADER: token})
+    assert bare == with_proof
+
+    # -- a revocation shows in the event history, and the revoked holder drops out -------
+    worker.directory.revoke_grant(bob_grant.grant_id, as_of=worker.clock.now, reason="left", actor="e2e")
+    worker.clock.advance(minutes=1)
+    events = read(f"/authority/grants/{bob_grant.grant_id}/events")
+    assert [e["event_type"] for e in events["events"]] == ["GRANTED", "REVOKED"]
+    assert events["grant"]["revocation_reason"] == "left"
+    assert subject_ref("bob") not in {
+        h["principal"]["principal_id"]
+        for h in read("/authority/holders", params={"role": ROLE, "scope": scope})["holders"]}
+    assert read("/authority/grants/no-such-grant/events", expect=404)["result"] == "NOT_FOUND"
+    assert read("/authority/grants", params={"principal_id": "not typed"}, expect=422)["result"] == "REFUSED_UNTYPED"
+
+    # -- no AP-3 write path answers on the composed app ---------------------------------
+    writes = [op for op in PLANE_OPERATIONS if op.kind == "write"]
+    assert len(writes) == 4
+    for op in writes:
+        path = op.path.format(grant_id=bob_grant.grant_id, constitution_id="c1")
+        r = client.request(op.method, path, json={}, headers={PROOF_HEADER: token})
+        answers.append(r.text)
+        assert r.status_code in (404, 405), (op.method, path, r.status_code)
+
+    # -- row 8: no DSN and no token anywhere -------------------------------------------
+    everything = "\n".join(answers)
+    for secret in (worker.config.app_database_url, worker.config.system_database_url, token):
+        assert secret not in everything

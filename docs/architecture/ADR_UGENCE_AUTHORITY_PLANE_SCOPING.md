@@ -245,7 +245,8 @@ stays `REFERENCE_GRADE_SHADOW_ONLY`.
   needs PostgreSQL, which this environment lacks, so the mount is proven three ways
   short of that: the router is built and exercised over a real sqlite directory, the
   composition's import of it is asserted structurally, and the end-to-end test that
-  composes for real will exercise it in CI, where it runs against a cluster.
+  composes for real will exercise it in CI, where it runs against a cluster. Closed
+  in §15: that test now exists and ran over a real PostgreSQL 16.
 - **The label names decisions, not reads.** A field called `identity_proof` on an
   unauthenticated read would imply the read was proven. The answer says
   `read_authenticated: false` and `decision_identity_proof`, so what the deployment
@@ -299,3 +300,38 @@ exist.
 
 Steps 4 and 5 remain unimplemented. Step 4, issuer validation, cannot be taken inside
 this repository, and step 5's writes wait on it.
+
+## 15 — Verification addendum, step 2 over the real composition (2026-09-07)
+
+§13 recorded one thing it could not do: exercise the read mount on a composed worker,
+because `compose()` needs PostgreSQL. This addendum closes that gap and changes nothing
+else. No source file of the worker, the plane app, the studio or any contract moved.
+
+**What landed.** One end-to-end test,
+`deployment/governed-runtime-worker/tests/test_end_to_end.py::test_the_authority_reads_are_served_by_the_composed_worker_and_no_write_is`,
+in the suite CI runs over a real PostgreSQL 16 with the in-process issuer, whose
+"skipped is not passed" step already refuses a run without a server. Over the worker
+`compose()` built, not a hand-built router, it proves:
+
+| Claim | How |
+|---|---|
+| the four AP-5 reads answer from the directory the composition opened, for its tenant, at its clock | grants for a principal, holders of a role, a committee report and a grant's event history, each read after the clock is advanced and each `as_of` equal to the composition's clock |
+| the label is the composed one | with an identity port composed every answer says `decision_identity_proof: IDP_AUTHENTICATED`, `read_authenticated: false`, `issuer_validation: IN_PROCESS_ISSUER_ONLY` |
+| the reads show the grant the decision route consumes | a signed `GRANT` through `/review/decisions` records `IDP_AUTHENTICATED`; the grant it was eligible by is the grant the read returns before and after |
+| a proof header is neither required nor read | the same read with and without the proof header returns the same body |
+| a revocation is visible | the event history reads `GRANTED, REVOKED`; the revoked holder drops out of the holders list; a missing grant is `NOT_FOUND`; an untyped identifier is `REFUSED_UNTYPED` |
+| no AP-3 write answers | the contract's four write operations, driven from `PLANE_OPERATIONS`, each meet the framework's 404 or 405 on the composed app |
+| row 8 | neither DSN nor the token appears in any answer |
+
+**Verified, not asserted.**
+
+| Check | Result |
+|---|---|
+| worker suite over PostgreSQL 16.13, `UGENCE_DE_TEST_PG` set | 97 passed, 0 skipped |
+| the new test with the read mount removed from `composition.py` | fails, `404 == 200` on the first read; the mount restored afterwards |
+
+**What this does not change.** The maturity of every package on the plane, the
+`PRESENTED_UNPROVEN` ceiling on every decision the repository can record, and §14's
+"not proven here": the plane app was still not driven against a live worker, since its
+screens are proven against the worker's answer shapes and the join of the two waits on
+a cluster and an issuer together. Steps 4 and 5 remain as §14 left them.
