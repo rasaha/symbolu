@@ -38,18 +38,32 @@ In one process, in this order (`composition.py`):
 One injected clock (`WorkerClock`: `epoch()` for the engine, `datetime()` for every store
 and the service) is shared by everything. `Worker.close()` unwinds it in reverse.
 
-## The authority plane's contract (serves nothing yet)
+## The authority plane: its contract, and the four reads it serves
 
-Step 1 of `docs/architecture/ADR_UGENCE_AUTHORITY_PLANE_SCOPING.md` §11, under rulings
-AP-1 to AP-5. `src/governed_runtime_worker/authority_plane.py` enumerates the plane's
-eight operations, four reads under AP-5 and four writes under AP-3, and
-`authority-plane-contract.json` is its committed, drift-tested rendering. **No route
-in it is served**: neither `composition.py` nor `server.py` imports the module, and
-`tests/test_authority_plane_contract.py` asserts that, along with the AP-4 verb rule
-in the shape of the studio's SD-2 test with the sense reversed: grant, revoke,
-activate and issue may be named; authorize, clear and execute fail the build. Every
-write carries the AP-3 gate (an `IDP_AUTHENTICATED` subject, else refused) and no
-write ships until the identity adapter is validated against a real issuer.
+Steps 1 and 2 of `docs/architecture/ADR_UGENCE_AUTHORITY_PLANE_SCOPING.md` §11, under
+rulings AP-1 to AP-5. `src/governed_runtime_worker/authority_plane.py` enumerates the
+plane's eight operations, four reads under AP-5 and four writes under AP-3, and
+`authority-plane-contract.json` is its committed, drift-tested rendering.
+`tests/test_authority_plane_contract.py` holds the AP-4 verb rule in the shape of the
+studio's SD-2 test with the sense reversed: grant, revoke, activate and issue may be
+named; authorize, clear and execute fail the build.
+
+**Since 0.4.0 the four reads are served** (`authority_reads.py`, mounted by
+`composition.py` beside `/healthz`): `GET /authority/grants?principal_id=`,
+`GET /authority/holders?role=&scope=`, `GET /authority/committees/{committee_id}?role=&scope=`
+and `GET /authority/grants/{grant_id}/events`, each over the `SqliteAuthorityDirectory`
+this process opened, for this worker's own tenant, at the injected clock. A read is not
+authenticated and says so (`read_authenticated: false`); every answer carries the
+decision proof the deployment can give (`IDP_AUTHENTICATED` when an identity port is
+composed, `PRESENTED_UNPROVEN` otherwise), the adapter's `issuer_validation` label, and
+the directory's own provenance statement. No proof or credential header is read. An
+untyped identifier is refused before the directory is asked; a missing committee or
+grant is a typed not-found.
+
+**No write of the plane is served.** The four AP-3 operations wait on the identity
+gate: an `IDP_AUTHENTICATED` subject, refused otherwise, and no write ships until the
+identity adapter is validated against a real issuer. The contract test asserts that no
+module of this worker names a write path or a write method outside the contract.
 
 ## Configuration
 

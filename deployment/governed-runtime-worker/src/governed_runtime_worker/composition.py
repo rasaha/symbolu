@@ -283,6 +283,14 @@ def compose(config: WorkerConfig, *, clock: WorkerClock, workload: Workload,
     )
     app = build_app(service)
     app.add_api_route("/healthz", _healthz, methods=["GET"], include_in_schema=False)
+    # -- the authority plane's reads (AP-5 READS_FIRST): four GETs over the directory this
+    # process already opened, for this tenant, at this clock. No write is mounted; the
+    # AP-3 writes wait on the identity gate (ADR_UGENCE_AUTHORITY_PLANE_SCOPING.md §11).
+    from .authority_reads import build_authority_reads
+
+    app.include_router(build_authority_reads(
+        directory, tenant_id=config.tenant_id, clock=clock.datetime,
+        identity_port_configured=port is not None))
     return Worker(config=config, service=service, app=app, adapter=adapter,
                   reader=reader, ledger=ledger, directory=directory, audit=audit,
                   datasource=datasource, bundle=bundle, identity_port=port, workload=workload,

@@ -1,7 +1,10 @@
 {
   "schema": "governed-runtime-worker.authority-plane-contract.v1",
   "ruling": "ADR_UGENCE_AUTHORITY_PLANE_SCOPING.md AP-1 AUTHORITY_PLANE_ONLY, AP-2 ADMIN_ROUTES_ON_THE_WORKER, AP-3 IDP_VALIDATED_FIRST, AP-4 GRANT_REVOKE_ACTIVATE_ISSUE_ONLY, AP-5 READS_FIRST",
-  "served": false,
+  "served": {
+    "reads": true,
+    "writes": false
+  },
   "home": "deployment/governed-runtime-worker (AP-2): routes on the review service this worker composes, which owns the stores",
   "permitted_verbs": [
     "grant",
@@ -26,7 +29,8 @@
       "names_verb": "",
       "acts_on": "SqliteAuthorityDirectory.grants_for",
       "ruling": "AP-5",
-      "gate": "identity_proof: the proof the deployment can actually give; PRESENTED_UNPROVEN until AI-C is validated against a real issuer"
+      "gate": "identity_proof: the proof the deployment can actually give; PRESENTED_UNPROVEN until AI-C is validated against a real issuer",
+      "served": true
     },
     {
       "operation_id": "authority_list_holders",
@@ -37,7 +41,8 @@
       "names_verb": "",
       "acts_on": "SqliteAuthorityDirectory.holders_of",
       "ruling": "AP-5",
-      "gate": "identity_proof: the proof the deployment can actually give; PRESENTED_UNPROVEN until AI-C is validated against a real issuer"
+      "gate": "identity_proof: the proof the deployment can actually give; PRESENTED_UNPROVEN until AI-C is validated against a real issuer",
+      "served": true
     },
     {
       "operation_id": "authority_read_committee",
@@ -48,7 +53,8 @@
       "names_verb": "",
       "acts_on": "SqliteAuthorityDirectory.committee_report",
       "ruling": "AP-5",
-      "gate": "identity_proof: the proof the deployment can actually give; PRESENTED_UNPROVEN until AI-C is validated against a real issuer"
+      "gate": "identity_proof: the proof the deployment can actually give; PRESENTED_UNPROVEN until AI-C is validated against a real issuer",
+      "served": true
     },
     {
       "operation_id": "authority_read_grant_events",
@@ -59,7 +65,8 @@
       "names_verb": "",
       "acts_on": "SqliteAuthorityDirectory.grant_events",
       "ruling": "AP-5",
-      "gate": "identity_proof: the proof the deployment can actually give; PRESENTED_UNPROVEN until AI-C is validated against a real issuer"
+      "gate": "identity_proof: the proof the deployment can actually give; PRESENTED_UNPROVEN until AI-C is validated against a real issuer",
+      "served": true
     },
     {
       "operation_id": "authority_grant_role",
@@ -70,7 +77,8 @@
       "names_verb": "grant",
       "acts_on": "SqliteAuthorityDirectory.put_grant",
       "ruling": "AP-3",
-      "gate": "IDP_AUTHENTICATED subject required; a write reached without one is refused, never recorded as presented (AP-3)"
+      "gate": "IDP_AUTHENTICATED subject required; a write reached without one is refused, never recorded as presented (AP-3)",
+      "served": false
     },
     {
       "operation_id": "authority_revoke_grant",
@@ -81,7 +89,8 @@
       "names_verb": "revoke",
       "acts_on": "SqliteAuthorityDirectory.revoke_grant",
       "ruling": "AP-3",
-      "gate": "IDP_AUTHENTICATED subject required; a write reached without one is refused, never recorded as presented (AP-3)"
+      "gate": "IDP_AUTHENTICATED subject required; a write reached without one is refused, never recorded as presented (AP-3)",
+      "served": false
     },
     {
       "operation_id": "authority_activate_constitution",
@@ -92,7 +101,8 @@
       "names_verb": "activate",
       "acts_on": "ugence_agent_constitution_activation (permanently outside the studio)",
       "ruling": "AP-3",
-      "gate": "IDP_AUTHENTICATED subject required; a write reached without one is refused, never recorded as presented (AP-3)"
+      "gate": "IDP_AUTHENTICATED subject required; a write reached without one is refused, never recorded as presented (AP-3)",
+      "served": false
     },
     {
       "operation_id": "authority_issue_record",
@@ -103,7 +113,8 @@
       "names_verb": "issue",
       "acts_on": "ugence_policy_authority / ugence_agent_constitution_activation",
       "ruling": "AP-3",
-      "gate": "IDP_AUTHENTICATED subject required; a write reached without one is refused, never recorded as presented (AP-3)"
+      "gate": "IDP_AUTHENTICATED subject required; a write reached without one is refused, never recorded as presented (AP-3)",
+      "served": false
     }
   ],
   "reused_existing": [

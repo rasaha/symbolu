@@ -7,10 +7,11 @@ other three (authorize, clear, execute) fail the build if any operation id, path
 summary names one. A guard that cannot fail is not a guard, so one test proves the scan
 catches a violation.
 
-And the step's other claim: nothing is served. The plane's paths appear in no route
-the review service serves, and neither the composition nor the server imports the
-plane. The committed JSON rendering is drift-tested against the module so the
-document a reader sees is the one the test scanned.
+And what each step serves. Step 2 (AP-5) mounts the four reads through
+``authority_reads.py`` and nothing else: no write path is served, no module of the
+worker names one outside the contract, and the plane's paths appear in no route the
+review service serves. The committed JSON rendering is drift-tested against the module
+so the document a reader sees is the one the test scanned.
 """
 
 from __future__ import annotations
@@ -100,31 +101,68 @@ def test_every_write_carries_the_identity_gate_and_every_read_the_proof_label():
 
 
 # --------------------------------------------------------------------------- #
-# Step 1 serves nothing
+# Step 2 serves the reads and nothing else
 # --------------------------------------------------------------------------- #
-def test_nothing_is_served_and_no_plane_path_overlaps_the_review_routes():
-    assert plane.SERVED is False
+WRITE_PATHS = tuple(op.path for op in plane.PLANE_OPERATIONS if op.kind == "write")
+READ_OPS = tuple(op for op in plane.PLANE_OPERATIONS if op.kind == "read")
+
+
+def test_reads_are_served_and_writes_are_not_and_no_plane_path_overlaps_the_review_routes(tmp_path):
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient
+    from ugence_authority_directory import SqliteAuthorityDirectory
+
+    from governed_runtime_worker.authority_reads import build_authority_reads
+    from conftest import TENANT, Clock
+
+    assert plane.READS_SERVED is True and plane.WRITES_SERVED is False
     served_paths = {path for _m, path, _o in ROUTES}
     plane_paths = {op.path for op in plane.PLANE_OPERATIONS}
     assert served_paths.isdisjoint(plane_paths)
     assert all(p.startswith("/authority/") for p in plane_paths)
-    assert all(not p.startswith("/authority/") for p in served_paths)
-    # the one reused read is a route the service already serves, unchanged
     for m, p, o in plane.REUSED_EXISTING:
         assert (m, p, o) in ROUTES
+    # the router serves exactly the four reads, with the contract's ids and summaries
+    directory = SqliteAuthorityDirectory(str(tmp_path / "dir.sqlite3"))
+    app = FastAPI()
+    app.include_router(build_authority_reads(directory, tenant_id=TENANT, clock=Clock().datetime,
+                                             identity_port_configured=False))
+    with TestClient(app) as client:
+        spec = client.get("/openapi.json").json()
+    seen = {(m.upper(), path, op["operationId"], op.get("summary"))
+            for path, ops in spec["paths"].items() for m, op in ops.items()}
+    assert seen == {("GET", op.path, op.operation_id, op.summary) for op in READ_OPS}
+    # a write shares a path with a read only by method (POST /authority/grants beside
+    # GET /authority/grants); no POST of the plane is served
+    served_methods = {(m.upper(), path) for path, ops in spec["paths"].items() for m in ops}
+    assert not any((op.method, op.path) in served_methods
+                   for op in plane.PLANE_OPERATIONS if op.kind == "write")
 
 
-def test_neither_the_composition_nor_the_server_imports_the_plane():
-    for name in ("composition.py", "server.py", "starter.py", "workload.py", "__init__.py"):
-        tree = ast.parse((SRC / name).read_text(encoding="utf-8"))
-        for node in ast.walk(tree):
-            if isinstance(node, ast.ImportFrom) and node.module and "authority_plane" in node.module:
-                raise AssertionError(f"{name} imports the plane; step 1 serves nothing")
-            if isinstance(node, ast.ImportFrom) and node.module in ("", None) and any(
-                    a.name == "authority_plane" for a in node.names):
-                raise AssertionError(f"{name} imports the plane; step 1 serves nothing")
-            if isinstance(node, ast.Import) and any("authority_plane" in a.name for a in node.names):
-                raise AssertionError(f"{name} imports the plane; step 1 serves nothing")
+def test_no_module_of_the_worker_names_a_write_path_outside_the_contract():
+    """A write route cannot appear by accident: its path is unique to the contract."""
+    for module in SRC.glob("*.py"):
+        if module.name == "authority_plane.py":
+            continue
+        text = module.read_text(encoding="utf-8")
+        for path in WRITE_PATHS:
+            assert path not in text, f"{module.name} names the write path {path}"
+        assert "put_grant" not in text and "revoke_grant" not in text, module.name
+
+
+def test_the_composition_mounts_the_reads_and_nothing_else_of_the_plane():
+    tree = ast.parse((SRC / "composition.py").read_text(encoding="utf-8"))
+    imported = set()
+    for node in ast.walk(tree):
+        # the worker's own modules only (relative imports); the directory package is
+        # a composed dependency, not a plane module
+        if isinstance(node, ast.ImportFrom) and node.level == 1 and node.module \
+                and "authority" in node.module:
+            imported.add(node.module)
+    assert imported == {"authority_reads"}, imported
+    for name in ("server.py", "starter.py", "workload.py", "__init__.py"):
+        text = (SRC / name).read_text(encoding="utf-8")
+        assert "authority_reads" not in text and "authority_plane" not in text, name
 
 
 # --------------------------------------------------------------------------- #
@@ -138,7 +176,8 @@ def test_the_committed_contract_is_the_module_rendered_without_drift():
 
 def test_the_committed_contract_says_what_is_not_on_the_plane():
     committed = json.loads(CONTRACT.read_text(encoding="utf-8"))
-    assert committed["served"] is False
+    assert committed["served"] == {"reads": True, "writes": False}
+    assert all(op["served"] is (op["kind"] == "read") for op in committed["operations"])
     joined = " ".join(committed["not_on_the_plane"]).lower()
     for absent in ("authorize, clear, execute", "module composition", "nine module rows", "emergency stop"):
         assert absent in joined, absent

@@ -1,7 +1,7 @@
 """The authority plane's contract (ADR_UGENCE_AUTHORITY_PLANE_SCOPING.md, step 1 of
 §11, under rulings AP-1 to AP-5).
 
-    THIS MODULE SERVES NOTHING. IT NAMES WHAT THE PLANE WILL SERVE, AND WHAT IT NEVER MAY.
+    THIS MODULE SERVES NOTHING ITSELF. IT NAMES WHAT THE PLANE SERVES, AND WHAT IT NEVER MAY.
 
 The authority plane is the surface for the acts the Governance Studio is ruled never
 to perform: loading and revoking role grants, deciding approvals, activating and
@@ -24,8 +24,9 @@ is refused, never recorded as presented, without one. No write ships until the
 approver-identity adapter is validated against a real enterprise issuer. Reads may
 ship first, each answer labelled with the identity proof the deployment can give.
 
-Nothing in ``composition.py`` or ``server.py`` imports this module. That absence is
-asserted by the test, and it is what "serves nothing yet" means.
+``composition.py`` mounts the reads through ``authority_reads.py`` (step 2). No module
+of this worker serves a write, and the test asserts that no write path in this
+contract appears anywhere outside it.
 """
 
 from __future__ import annotations
@@ -36,7 +37,8 @@ from typing import Any
 __all__ = [
     "CONTRACT_SCHEMA",
     "RULING",
-    "SERVED",
+    "READS_SERVED",
+    "WRITES_SERVED",
     "PERMITTED_VERBS",
     "REFUSED_VERBS",
     "WRITE_GATE",
@@ -53,9 +55,12 @@ RULING = ("ADR_UGENCE_AUTHORITY_PLANE_SCOPING.md AP-1 AUTHORITY_PLANE_ONLY, "
           "AP-2 ADMIN_ROUTES_ON_THE_WORKER, AP-3 IDP_VALIDATED_FIRST, "
           "AP-4 GRANT_REVOKE_ACTIVATE_ISSUE_ONLY, AP-5 READS_FIRST")
 
-#: Step 1 serves nothing. This flag is read by the test, and by the record, and it
-#: changes only when a later step's ruling record says so.
-SERVED = False
+#: What each step serves. Step 1 served nothing; step 2 (AP-5 READS_FIRST) serves the
+#: four reads through ``authority_reads.py``; the four writes stay unserved until the
+#: identity gate is met (AP-3). These flags are read by the test and by the record, and
+#: change only when a later step's record says so.
+READS_SERVED = True
+WRITES_SERVED = False
 
 #: AP-4. Matched as substrings, case-insensitively, over operation id, path and summary.
 PERMITTED_VERBS: tuple[str, ...] = ("grant", "revoke", "activate", "issue")
@@ -95,6 +100,10 @@ class PlaneOperation:
     @property
     def gate(self) -> str:
         return WRITE_GATE if self.kind == "write" else READ_LABEL
+
+    @property
+    def served(self) -> bool:
+        return READS_SERVED if self.kind == "read" else WRITES_SERVED
 
 
 #: The plane, in the order a later step would serve it: reads first (AP-5), then the
@@ -175,14 +184,14 @@ def contract_document() -> dict[str, Any]:
     return {
         "schema": CONTRACT_SCHEMA,
         "ruling": RULING,
-        "served": SERVED,
+        "served": {"reads": READS_SERVED, "writes": WRITES_SERVED},
         "home": "deployment/governed-runtime-worker (AP-2): routes on the review service this worker composes, which owns the stores",
         "permitted_verbs": list(PERMITTED_VERBS),
         "refused_verbs": list(REFUSED_VERBS),
         "write_gate": WRITE_GATE,
         "read_label": READ_LABEL,
         "operations": [
-            {**asdict(op), "gate": op.gate} for op in PLANE_OPERATIONS
+            {**asdict(op), "gate": op.gate, "served": op.served} for op in PLANE_OPERATIONS
         ],
         "reused_existing": [
             {"method": m, "path": p, "operation_id": o,

@@ -212,3 +212,44 @@ account of the same queue. The contract lists it under `reused_existing`.
 
 Steps 2 to 5 remain unimplemented. Step 4, issuer validation, cannot be taken inside
 this repository.
+
+## 13 — Implementation record, step 2 (2026-09-06)
+
+Shipped as `governed-runtime-worker` 0.4.0: the four AP-5 reads, served; nothing
+else of the plane. What the ruling became, and where each claim is checked:
+
+| Ruling | What landed | Where it is checked |
+|---|---|---|
+| AP-5 reads | `src/governed_runtime_worker/authority_reads.py`: a router built from the contract's four read operations, mounted by `composition.py` beside `/healthz` over the `SqliteAuthorityDirectory` the composition already opened, for the worker's own tenant, at the injected clock. Grants for a principal, holders of a role in a scope, a committee report with its quorum, and a grant's append-only event history. | `tests/test_authority_reads.py` (12 tests); `tests/test_authority_plane_contract.py::test_reads_are_served_*` asserts the served surface is exactly the four contract reads by method, path, operation id and summary |
+| AP-5 label | Every answer carries `read_authenticated: false`, `decision_identity_proof` (`IDP_AUTHENTICATED` when an identity port is composed, `PRESENTED_UNPROVEN` otherwise), the adapter's `issuer_validation` label, and the directory's provenance sentence. | `test_authority_reads.py::test_the_decision_proof_label_follows_*`; every `_ok` assertion |
+| tenant and typing | No tenant, instant, proof or credential is taken from the caller. A foreign tenant's grants are not expressible and its grant ids read as unknown. An untyped identifier is refused before the directory is asked; a missing committee or grant is a typed not-found, never an empty success. | `::test_a_foreign_tenants_grant_id_*`; `::test_an_untyped_identifier_*`; `::test_a_missing_committee_*`; `::test_no_proof_or_credential_*` |
+| AP-3 unchanged | No write is served. The contract now carries `served` per operation, reads true and writes false; no module of the worker names a write path or a write method outside the contract; the composition imports the reads module and nothing else of the plane. | `test_authority_plane_contract.py::test_no_module_of_the_worker_names_a_write_path_*`; `::test_the_composition_mounts_the_reads_*`; the drift test over the regenerated `authority-plane-contract.json` |
+| version | 0.3.0 → 0.4.0 at every pinned site: `version.py`, the Dockerfile label, `EXTERNAL_DEPLOYMENT_EVIDENCE.json` (version and the routes sentence), the package docstring. | `test_container_artifacts.py` and `test_maturity_and_boundaries.py` compare the evidence file to `__version__` |
+
+**Verified, not asserted.**
+
+| Check | Result |
+|---|---|
+| `test_authority_plane_contract.py` and `test_authority_reads.py` | 22 passed |
+| worker's other suites (`test_config`, `test_preflight`, `test_maturity_and_boundaries`, `test_container_artifacts`, `test_ledger_read`, `test_start_relay`, `test_end_to_end`) | 70 passed, 4 skipped (the real-PostgreSQL end-to-end test) |
+| `scripts/check_package_import_boundaries.py` | clean |
+
+**What did not change.** The review service and its seven `ROUTES`; the studio, whose
+review client still reaches exactly those seven and cannot reach `/authority/`; every
+contract and allowlist elsewhere. `ENFORCEMENT_ENABLED` stays false and every label
+stays `REFERENCE_GRADE_SHADOW_ONLY`.
+
+**Two decisions recorded rather than made quietly.**
+
+- **The composition mounting is untested by a running composition here.** `compose()`
+  needs PostgreSQL, which this environment lacks, so the mount is proven three ways
+  short of that: the router is built and exercised over a real sqlite directory, the
+  composition's import of it is asserted structurally, and the end-to-end test that
+  composes for real will exercise it in CI, where it runs against a cluster.
+- **The label names decisions, not reads.** A field called `identity_proof` on an
+  unauthenticated read would imply the read was proven. The answer says
+  `read_authenticated: false` and `decision_identity_proof`, so what the deployment
+  can prove about a decision is stated without being borrowed by the read.
+
+Steps 3 to 5 remain unimplemented. Step 4, issuer validation, cannot be taken inside
+this repository.

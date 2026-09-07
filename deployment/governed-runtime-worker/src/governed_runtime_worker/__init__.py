@@ -10,6 +10,9 @@ Since 0.2.0 the review service it composes exposes the sixth route of front-door
 definition digest, with nothing supplied by the caller but a correlation id. Since
 0.3.0 it exposes the seventh (FD-11): a raw read of this deployment's own tenant's
 audit-ledger rows by correlation id, with the chain verification as a typed field.
+Since 0.4.0 it also mounts the authority plane's four reads under ``/authority/``
+(ADR_UGENCE_AUTHORITY_PLANE_SCOPING.md AP-5 READS_FIRST), over the directory it already
+opens; no write of the plane is served (AP-3).
 """
 
 from __future__ import annotations
