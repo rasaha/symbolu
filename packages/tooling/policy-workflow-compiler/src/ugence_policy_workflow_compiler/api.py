@@ -96,6 +96,17 @@ from .diff import ChangeType, ImpactSummary, ObjectChange, PolicyPackDiff, diff_
 # Carriage checks only: presence, shape, completeness and internal agreement. This
 # package never verifies a signature, key trust or revocation state.
 from .validation.binding_conformance import check_binding_conformance
+
+# -- offline simulation (P3C) --------------------------------------------------
+# Evidence, not a gate: no compiler entry point consumes a SimulationRun.
+from .simulation import (
+    NodeObservation,
+    NodeOutcome,
+    OracleComparison,
+    SimulationRun,
+    simulate,
+    simulate_all,
+)
 from .validation.authoritative_source import (
     check_authoritative_source,
     check_release_source_agreement,
@@ -251,6 +262,13 @@ __all__ = [
     "AuthoritativeSourceRef",
     "check_authoritative_source",
     "check_binding_conformance",
+    # offline simulation (P3C)
+    "NodeOutcome",
+    "NodeObservation",
+    "OracleComparison",
+    "SimulationRun",
+    "simulate",
+    "simulate_all",
     "check_release_source_agreement",
     # governed diff-driven review (P3A)
     "APPROVAL_SENSITIVE_OBJECT_TYPES",

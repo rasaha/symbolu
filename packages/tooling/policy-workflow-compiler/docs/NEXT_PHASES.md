@@ -39,7 +39,8 @@ capabilities keep decision, approval, authorization, and execution authority.
 3. **PA/PWC-X1 carriage and validation** — activated by v2.
 4. ~~**PWC-P3B** — declarative capability/contract binding **validation**.~~
    **Delivered** — see `BINDING_CONFORMANCE.md`.
-5. **PWC-P3C** — deterministic offline simulation.
+5. ~~**PWC-P3C** — deterministic offline simulation.~~
+   **Delivered** — see `OFFLINE_SIMULATION.md`.
 6. **AI Hiring reference equivalence.**
 7. A real pilot against a named policy corpus, then `pilot_validated`.
 

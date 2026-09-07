@@ -143,6 +143,11 @@ class VersionInfo:
     authoritative_source_carriage_implemented: bool = False
     #: P3B: emitted capability bindings are validated against the registry.
     binding_conformance_validation_implemented: bool = False
+    #: P3C: offline simulation of a compiled release under a scenario's facts.
+    offline_simulation_implemented: bool = False
+    deterministic_replay_of_simulation_verified: bool = False
+    #: Permanent non-goal: a simulation observes requirements, it never grants one.
+    simulation_grants_authorization: bool = False
     #: Explicit non-goal: this package never verifies a Policy Authority signature,
     #: key trust or revocation state. Those belong to Policy Authority.
     authoritative_source_verification_implemented: bool = False
@@ -204,6 +209,11 @@ class VersionInfo:
             "binding_conformance_validation_implemented": (
                 self.binding_conformance_validation_implemented
             ),
+            "offline_simulation_implemented": self.offline_simulation_implemented,
+            "deterministic_replay_of_simulation_verified": (
+                self.deterministic_replay_of_simulation_verified
+            ),
+            "simulation_grants_authorization": self.simulation_grants_authorization,
             "authoritative_source_verification_implemented": (
                 self.authoritative_source_verification_implemented
             ),
@@ -280,6 +290,11 @@ def version_info() -> VersionInfo:
         # P3B: conformance validation of already-emitted bindings. Validation only —
         # nothing is emitted or inferred here, and no provider is ever imported.
         binding_conformance_validation_implemented=True,
+        # P3C: simulation observes and reports; it never executes, and its result
+        # gates nothing (ruling P3C-1).
+        offline_simulation_implemented=True,
+        deterministic_replay_of_simulation_verified=True,
+        simulation_grants_authorization=False,
         # Never claimed: the compiler attests carriage, not authenticity.
         authoritative_source_verification_implemented=False,
         # explicit non-goals — never claimed by this package.

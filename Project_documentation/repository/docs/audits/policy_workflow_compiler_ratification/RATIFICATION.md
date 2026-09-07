@@ -273,6 +273,47 @@ Design: `../policy_workflow_compiler_pack_v2/DESIGN.md`.
 
 Design and flow: `../policy_workflow_compiler_x1/COMPOSITION_ROOT.md`.
 
+## PWC-P3C rulings
+
+| Ruling | Decision |
+| --- | --- |
+| **P3C-1** | A simulation run is **evidence, not a gate**. It produces a report and never blocks compilation; no compiler entry point accepts a simulation result. Gating compilation on a simulation would put the simulator on the execution path and begin the coupling the phase exists to avoid. |
+| **P3C-2** | A contradicted oracle is an `OracleComparison` **field on the run**, not a validation diagnostic and not a separate report. It is a property of that run against that scenario, not of the release — and a diagnostic would feed validation, which gates compilation, which P3C-1 forbids. |
+
+Design: `../policy_workflow_compiler_p3c/DESIGN.md`.
+
+## D4 pilot-evidence rulings
+
+Both settle a term the D4 list left open. They are ruled **before** a pilot runs, so
+the bar is set independently of the result.
+
+| Ruling | Decision |
+| --- | --- |
+| **D4-A** | "No **critical** unresolved semantics" means the release validator's own blocking set. Row 9 is satisfied when `validate_compiled_release` returns `VALID` (not `VALID_WITH_WARNINGS`) with `binding_ok` true, **and** no node semantics carry `DerivationClass.UNRESOLVED`. Warnings do not block the row; authority, integrity and binding failures always do. |
+| **D4-B** | A pilot **must** include hand-authored fact-complete scenarios so that PWC-P3C contributes simulation evidence. Generated scenarios satisfy the coverage invariant but carry few or no facts, so simulating them blocks at the first evidence node — real behaviour for those inputs, and no evidence about the corpus. Making generated scenarios fact-complete would move every release digest and is **not** ratified; hand-authored scenarios sit beside them and move nothing. |
+
+### Why D4-A is drawn there
+
+The alternative readings both fail. Counting every warning would make the row
+unearnable on any real corpus, since a pack that declares nothing optional warns
+constantly. Counting only fatal errors would let an authority-boundary failure
+through, which the whole product exists to prevent. The validator's blocking set is
+already the line the compiler refuses to cross, and reusing it means the row is
+computable rather than argued.
+
+`DerivationClass.UNRESOLVED` is added because a value the compiler could not resolve
+is exactly a semantic left unresolved — the row's own words — and it is not
+otherwise a validation failure.
+
+### Why D4-B is required rather than optional
+
+Simulation is the only evidence in the D4 set that exercises a corpus's *behaviour*
+rather than its structure. A pilot that skipped it would demonstrate that a corpus
+compiles, validates and re-reviews, but never that it does what its authors meant.
+Hand-authoring a handful of fact-complete scenarios costs little and is the only way
+to get that, since the generated ones cannot be made fact-complete without moving
+digests.
+
 ## What this ratification does not authorize
 
 - No change to `workflow_ir.v1` or `workflow_ir.v2` canonical output. `[V]` Pinned:

@@ -4,6 +4,58 @@ All notable changes to `ugence-policy-workflow-compiler` are documented here.
 This project adheres to semantic-ish versioning for its distribution wheel; the
 product version tracks capability maturity separately.
 
+## Unreleased — PWC-P3C: deterministic offline simulation
+
+The last build phase in the ratified order. It simulates and never executes; every
+digest is unchanged.
+
+### Added
+- `simulation/` — `simulate` and `simulate_all` traverse a compiled release under a
+  scenario's facts, producing a `SimulationRun` with an ordered trace, a terminal
+  state, described audit events, an `OracleComparison` and a `run_digest`. Replay is
+  digest equality.
+- Rulings **P3C-1** (evidence, not a gate — no compiler entry point accepts a run)
+  and **P3C-2** (a contradicted oracle is a field on the run).
+- Gates `offline_simulation_implemented=true`,
+  `deterministic_replay_of_simulation_verified=true`, and the permanent non-goal
+  `simulation_grants_authorization=false`. Public API 124 → 130;
+  `OFFLINE_SIMULATION.md`.
+
+### Two rules found by running it
+An unmodelled constraint is `NOT_EVALUABLE`, never a failure; and no arbitrary
+branch is ever taken — where no edge matches the observed outcome the run reports
+`INCOMPLETE` rather than manufacturing a path.
+
+### Noted
+Generated scenarios satisfy the coverage invariant but carry few or no facts, so
+simulating them blocks at the first evidence node. Making them simulation-ready
+would move every release digest and needs its own ratification.
+
+## Unreleased — PWC-P3C step one: one predicate evaluator
+
+Prerequisite for the offline simulator, delivered on its own so a change to how
+every policy predicate is interpreted is reviewable in isolation. It also fixes a
+live defect.
+
+### Fixed
+The predicate interpretation lived privately inside
+`reference/procurement_equivalence.py` and handled **eight of twelve** comparators:
+`IN`, `NOT_IN`, `NON_EMPTY` and `IS_EMPTY` fell through to `False`, so a policy
+using any of them read as *unsatisfied* rather than raising — a silent wrong answer
+inside a harness whose job is to prove two interpretations agree.
+
+### Added
+- `evaluation/predicates.py` — the single interpreter of the policy language, total
+  over all twelve comparators, with its rules stated: an unevaluable predicate is
+  unsatisfied; absence is emptiness; ordering requires comparable operands and never
+  orders a `bool` against a threshold; an unknown comparator **raises**.
+- `_eval_predicate` is now a thin alias delegating to it.
+- 41 tests covering every comparator, both unevaluable cases, and the delegation.
+
+### Unchanged
+Both equivalence harnesses still report `EQUIVALENT` at 28 and 22 checks; the
+evaluator stays internal, so the public API remains 124 names; every digest holds.
+
 ## Unreleased — PWC-P3B: binding conformance validation
 
 Validation only. No emission path changes, no provider import, and every digest is

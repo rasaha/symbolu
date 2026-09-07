@@ -42,6 +42,8 @@ as importantly — what is not.
 | `source_declared_semantics_implemented` | `true` | `workflow_ir.v2` enrichment reads declared data classification, permission intent, required tools and contract versions into node semantics, each with `EXPLICIT` per-value provenance. An undeclared value stays unresolved and is never defaulted. |
 | `authoritative_source_carriage_implemented` | `true` | A `policy_pack.v2` pack may carry the exact Policy Authority issuance it was compiled from; the reference is digest-bound, structurally validated and denormalized into the release manifest. See `AUTHORITATIVE_SOURCE.md`. |
 | `binding_conformance_validation_implemented` | `true` | Every capability binding `workflow_ir.v2` emits is validated against the capability registry — unknown capabilities, advisory-on-authoritative misuse, optionality conflicts, contract-target disagreement and unresolved required bindings all refuse. Validation only: no provider is imported and nothing is emitted. See `BINDING_CONFORMANCE.md`. |
+| `offline_simulation_implemented` | `true` | A compiled release can be exercised under a scenario's facts in a reproducible offline traversal that observes requirements and never resolves them. Evidence, not a gate — no compiler entry point consumes a run. See `OFFLINE_SIMULATION.md`. |
+| `deterministic_replay_of_simulation_verified` | `true` | A run's digest is a pure function of the release, the scenario and the trace, so replay is digest equality. |
 
 ## Explicit non-goals
 
@@ -59,6 +61,7 @@ each belongs to a different component.
 | `action_authorization_implemented` | `false` | Authorization is held by canonical capabilities, never the compiler. |
 | `enterprise_policy_evaluation_implemented` | `false` | Enterprise deployment-policy overlay evaluation stays outside the portable compiled workflow. |
 | `authoritative_source_verification_implemented` | `false` | The compiler attests carriage, not authenticity: it never verifies a Policy Authority signature, establishes key trust, or consults revocation state. |
+| `simulation_grants_authorization` | `false` | A simulation observes that a requirement exists; it never grants, approves or clears one. Permanent. |
 
 ### `awc_adapter_updated` is deprecated
 
@@ -88,19 +91,36 @@ D4) is in
 `Project_documentation/repository/docs/audits/policy_workflow_compiler_ratification/RATIFICATION.md`.
 Summarized, with what this build already satisfies:
 
-| Pilot evidence | Status |
-| --- | --- |
-| Procurement reference equivalence | satisfied — `EQUIVALENT`, 5 dimensions, 28 checks |
-| AI Hiring reference equivalence | satisfied — `EQUIVALENT`, 5 dimensions, 22 checks |
-| One named real pilot policy corpus | not done |
-| Source policy passed legitimate human approval | mechanism exists; not demonstrated on a pilot corpus |
-| Exact source artifact and digest retained | requires the PA/PWC-X1 source-linkage coordinate |
-| Deterministic compilation | satisfied — verified, with pinned v1 and v2 digests |
-| Diff-driven re-review demonstrated | signal exists; the governed workflow is PWC-P3A |
-| Approval bound to the exact changed pack | implemented; demonstration outstanding |
-| No critical unresolved semantics in the corpus | assessable only against a real corpus |
-| Assurance package generated | satisfied — fail-closed coverage invariant |
-| Replay evidence retained | satisfied — `deterministic_replay_verified` |
+| Pilot evidence | Status | Settled by |
+| --- | --- | --- |
+| Procurement reference equivalence | **satisfied** | `EQUIVALENT`, 5 dimensions, 28 checks; `procurement_reference_equivalence_verified` |
+| AI Hiring reference equivalence | **satisfied** | `EQUIVALENT`, 5 dimensions, 22 checks; `ai_hiring_reference_equivalence_verified` (decision D3's second domain) |
+| One named real pilot policy corpus | outstanding | Only two policy-pack builders exist, both references. The Procurement builder in `packages/integration/procurement-policy-compilation` makes a real corpus compilable without new code. |
+| Source policy passed legitimate human approval | mechanism complete; demonstration outstanding | `approval/service.py` — digest-bound, no compiler self-approval |
+| Exact source artifact and digest retained | **mechanism complete** | PA/PWC-X1 carriage: `authoritative_source` is digest-bound on a `policy_pack.v2` pack and denormalized into the release manifest; `authoritative_source_carriage_implemented` |
+| Deterministic compilation | **satisfied** | `deterministic_compilation_verified`, with pinned v1 and v2 digests |
+| Diff-driven re-review demonstrated | **mechanism complete**; corpus demonstration outstanding | PWC-P3A: requirements derived from the diff and the pack's declared `ApprovalPath`, blocking gate, `diff_driven_review_implemented` |
+| Approval bound to the exact changed pack | **demonstrated in test**; corpus demonstration outstanding | P3A dispositions bind `new_pack_digest`; `DISPOSITION_DIGEST_MISMATCH` refuses a stale one |
+| No critical unresolved semantics | **mechanically assessable** (ruling D4-A) | `validate_compiled_release` returns `VALID` with `binding_ok`, and no node semantics carry `DerivationClass.UNRESOLVED` |
+| Assurance package generated | **satisfied** | Fail-closed coverage invariant |
+| Replay evidence retained | **satisfied** | `deterministic_replay_verified`, and `deterministic_replay_of_simulation_verified` for PWC-P3C runs |
+
+### Two terms the D4 list left open, now ruled
+
+**D4-A — what "critical" means.** Row 9 is satisfied when
+`validate_compiled_release` returns `VALID` — not `VALID_WITH_WARNINGS` — with
+`binding_ok` true, and no node semantics carry `DerivationClass.UNRESOLVED`.
+Counting every warning would make the row unearnable on a real corpus; counting only
+fatal errors would let an authority-boundary failure through. The validator's
+blocking set is already the line the compiler refuses to cross.
+
+**D4-B — a pilot must hand-author fact-complete scenarios.** Generated scenarios
+satisfy the coverage invariant but carry few or no facts, so simulating them blocks
+at the first evidence node — real behaviour for those inputs, and no evidence about
+the corpus. Simulation is the only D4 evidence that exercises a corpus's *behaviour*
+rather than its structure, so a pilot includes hand-authored fact-complete scenarios
+beside the generated ones. Making generated scenarios fact-complete would move every
+release digest and is **not** ratified.
 
 `production_certified` additionally requires distribution integrity, upgrade
 compatibility, a security review, an authority-boundary review, demonstrated
