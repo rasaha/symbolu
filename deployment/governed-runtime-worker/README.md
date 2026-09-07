@@ -38,6 +38,19 @@ In one process, in this order (`composition.py`):
 One injected clock (`WorkerClock`: `epoch()` for the engine, `datetime()` for every store
 and the service) is shared by everything. `Worker.close()` unwinds it in reverse.
 
+## The authority plane's contract (serves nothing yet)
+
+Step 1 of `docs/architecture/ADR_UGENCE_AUTHORITY_PLANE_SCOPING.md` §11, under rulings
+AP-1 to AP-5. `src/governed_runtime_worker/authority_plane.py` enumerates the plane's
+eight operations, four reads under AP-5 and four writes under AP-3, and
+`authority-plane-contract.json` is its committed, drift-tested rendering. **No route
+in it is served**: neither `composition.py` nor `server.py` imports the module, and
+`tests/test_authority_plane_contract.py` asserts that, along with the AP-4 verb rule
+in the shape of the studio's SD-2 test with the sense reversed: grant, revoke,
+activate and issue may be named; authorize, clear and execute fail the build. Every
+write carries the AP-3 gate (an `IDP_AUTHENTICATED` subject, else refused) and no
+write ships until the identity adapter is validated against a real issuer.
+
 ## Configuration
 
 Every value is explicit, `UGENCE_REVIEW_*` or a constructor override; nothing is

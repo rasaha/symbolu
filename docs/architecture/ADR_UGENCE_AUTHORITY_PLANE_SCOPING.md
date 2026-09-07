@@ -177,3 +177,38 @@ enforcement off, and every decision the repository can record today is
 Step 5 is the first point at which the platform could hold a grant that somebody
 verifiably made, and it is behind a gate that only an identity provider outside this
 repository can open.
+
+## 12 — Implementation record, step 1 (2026-09-06)
+
+Shipped on `deployment/governed-runtime-worker`, serving nothing. What the rulings
+became, and where each claim is checked:
+
+| Ruling | What landed | Where it is checked |
+|---|---|---|
+| AP-2 | `src/governed_runtime_worker/authority_plane.py`: the plane's contract as a frozen enumeration of eight `PlaneOperation`s under `/authority/`, and `authority-plane-contract.json`, its committed rendering. The worker's version is unchanged: no behaviour changed. | `tests/test_authority_plane_contract.py::test_the_committed_contract_is_the_module_rendered_without_drift` |
+| AP-5 | Four reads: grants for a principal, holders of a role, a committee report, a grant's event history. Each carries the `PRESENTED_UNPROVEN` label until AI-C is validated. The approval queue is listed as a reuse of the review service's existing `review_list_queue`, not duplicated. | `::test_every_write_carries_the_identity_gate_and_every_read_the_proof_label`; `::test_nothing_is_served_and_no_plane_path_overlaps_the_review_routes` |
+| AP-3 | Four writes: load a grant, revoke a grant, activate a constitution, issue a record. Each carries the gate: an `IDP_AUTHENTICATED` subject, else refused, never recorded as presented. | the same tests |
+| AP-4 | `PERMITTED_VERBS` and `REFUSED_VERBS` partition SD-2's seven exactly. `verb_violations` scans every operation id, path and summary for authorize, clear and execute; the test fails the build on any hit. A self-check proves the scan catches a violation in each of the three scanned fields, and the dataclass refuses a write that names no permitted verb. | `::test_no_operation_id_path_or_summary_names_a_refused_verb`; `::test_the_verb_scan_actually_catches_a_violation`; `::test_the_permitted_and_refused_sets_partition_the_seven_sd2_verbs` |
+| serves nothing | No plane path appears in the review service's `ROUTES`; every plane path is under `/authority/` and every served path is not; neither `composition.py`, `server.py`, `starter.py`, `workload.py` nor `__init__.py` imports the module. | `::test_neither_the_composition_nor_the_server_imports_the_plane` |
+
+**Verified, not asserted.**
+
+| Check | Result |
+|---|---|
+| `tests/test_authority_plane_contract.py` | 10 passed |
+| worker CI suites (`test_config`, `test_preflight`, `test_maturity_and_boundaries`) | 46 passed |
+| worker remaining suites | 13 passed, 4 skipped (the real-PostgreSQL end-to-end test, as it skips without a cluster) |
+| review service `test_boundaries.py` and `test_http.py` | pass; the served surface is still exactly its seven routes |
+| `scripts/check_package_import_boundaries.py` | 70 packages, no violation |
+
+**What did not change.** No route is served. The review service, its `ROUTES`, the
+studio, the console, every contract and every allowlist are as they were. The worker's
+version stays 0.3.0 because nothing it does changed.
+
+**One decision recorded rather than made quietly.** The approval queue is a reuse, not
+a new operation. AP-5 names it as a read of the plane, and the review service already
+serves it as `review_list_queue`; a second route for the same rows would be a second
+account of the same queue. The contract lists it under `reused_existing`.
+
+Steps 2 to 5 remain unimplemented. Step 4, issuer validation, cannot be taken inside
+this repository.
