@@ -12,7 +12,9 @@ definition digest, with nothing supplied by the caller but a correlation id. Sin
 audit-ledger rows by correlation id, with the chain verification as a typed field.
 Since 0.4.0 it also mounts the authority plane's four reads under ``/authority/``
 (ADR_UGENCE_AUTHORITY_PLANE_SCOPING.md AP-5 READS_FIRST), over the directory it already
-opens; no write of the plane is served (AP-3).
+opens. Since 0.5.0 it mounts the plane's two directory writes, load and revoke a role
+grant (section 16, AW-1, AW-2), each behind the identity port the decision route uses
+and refused outright without one (AW-5); activate and issue stay unserved.
 """
 
 from __future__ import annotations

@@ -1,10 +1,14 @@
 {
   "schema": "governed-runtime-worker.authority-plane-contract.v1",
-  "ruling": "ADR_UGENCE_AUTHORITY_PLANE_SCOPING.md AP-1 AUTHORITY_PLANE_ONLY, AP-2 ADMIN_ROUTES_ON_THE_WORKER, AP-3 IDP_VALIDATED_FIRST, AP-4 GRANT_REVOKE_ACTIVATE_ISSUE_ONLY, AP-5 READS_FIRST",
+  "ruling": "ADR_UGENCE_AUTHORITY_PLANE_SCOPING.md AP-1 AUTHORITY_PLANE_ONLY, AP-2 ADMIN_ROUTES_ON_THE_WORKER, AP-3 IDP_VALIDATED_FIRST, AP-4 GRANT_REVOKE_ACTIVATE_ISSUE_ONLY, AP-5 READS_FIRST; section 16 AW-1 GATED_WRITES_BEFORE_ISSUER_VALIDATION, AW-2 DIRECTORY_WRITES_ONLY, AW-5 STRICTER_THAN_DECISIONS",
   "served": {
     "reads": true,
-    "writes": false
+    "writes": [
+      "authority_grant_role",
+      "authority_revoke_grant"
+    ]
   },
+  "write_proof_header": "X-Ugence-Approver-Proof",
   "home": "deployment/governed-runtime-worker (AP-2): routes on the review service this worker composes, which owns the stores",
   "permitted_verbs": [
     "grant",
@@ -17,7 +21,7 @@
     "clear",
     "execute"
   ],
-  "write_gate": "IDP_AUTHENTICATED subject required; a write reached without one is refused, never recorded as presented (AP-3)",
+  "write_gate": "IDP_AUTHENTICATED subject required; a write reached without one is refused, never recorded as presented (AP-3); a served write also requires a human subject of this tenant and refuses everything else with a typed reason (AW-5)",
   "read_label": "identity_proof: the proof the deployment can actually give; PRESENTED_UNPROVEN until AI-C is validated against a real issuer",
   "operations": [
     {
@@ -76,9 +80,9 @@
       "kind": "write",
       "names_verb": "grant",
       "acts_on": "SqliteAuthorityDirectory.put_grant",
-      "ruling": "AP-3",
-      "gate": "IDP_AUTHENTICATED subject required; a write reached without one is refused, never recorded as presented (AP-3)",
-      "served": false
+      "ruling": "AP-3, AW-1",
+      "gate": "IDP_AUTHENTICATED subject required; a write reached without one is refused, never recorded as presented (AP-3); a served write also requires a human subject of this tenant and refuses everything else with a typed reason (AW-5)",
+      "served": true
     },
     {
       "operation_id": "authority_revoke_grant",
@@ -88,9 +92,9 @@
       "kind": "write",
       "names_verb": "revoke",
       "acts_on": "SqliteAuthorityDirectory.revoke_grant",
-      "ruling": "AP-3",
-      "gate": "IDP_AUTHENTICATED subject required; a write reached without one is refused, never recorded as presented (AP-3)",
-      "served": false
+      "ruling": "AP-3, AW-1",
+      "gate": "IDP_AUTHENTICATED subject required; a write reached without one is refused, never recorded as presented (AP-3); a served write also requires a human subject of this tenant and refuses everything else with a typed reason (AW-5)",
+      "served": true
     },
     {
       "operation_id": "authority_activate_constitution",
@@ -101,7 +105,7 @@
       "names_verb": "activate",
       "acts_on": "ugence_agent_constitution_activation (permanently outside the studio)",
       "ruling": "AP-3",
-      "gate": "IDP_AUTHENTICATED subject required; a write reached without one is refused, never recorded as presented (AP-3)",
+      "gate": "IDP_AUTHENTICATED subject required; a write reached without one is refused, never recorded as presented (AP-3); a served write also requires a human subject of this tenant and refuses everything else with a typed reason (AW-5)",
       "served": false
     },
     {
@@ -113,7 +117,7 @@
       "names_verb": "issue",
       "acts_on": "ugence_policy_authority / ugence_agent_constitution_activation",
       "ruling": "AP-3",
-      "gate": "IDP_AUTHENTICATED subject required; a write reached without one is refused, never recorded as presented (AP-3)",
+      "gate": "IDP_AUTHENTICATED subject required; a write reached without one is refused, never recorded as presented (AP-3); a served write also requires a human subject of this tenant and refuses everything else with a typed reason (AW-5)",
       "served": false
     }
   ],
