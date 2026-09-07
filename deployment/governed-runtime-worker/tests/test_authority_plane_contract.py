@@ -102,6 +102,37 @@ def test_every_write_carries_the_identity_gate_and_every_read_the_proof_label():
     assert plane.WRITE_PROOF_HEADER == PROOF_HEADER, "the writes read the decision route's header"
 
 
+AP3_RECORD = PKG / "AP3_ENTERPRISE_ISSUER_VALIDATION.json"
+
+
+def test_the_ap3_record_gates_every_write_and_holds_no_secret():
+    """Section 20: the committed record is the only AP-3 status the repository may
+    claim. While it is not MET no write is served; a designated issuer is never the
+    in-process one; and nothing token-shaped is in the file."""
+    record = json.loads(AP3_RECORD.read_text(encoding="utf-8"))
+    status = record["ap3_status"]
+    assert status in ("BLOCKED_PENDING_OWNER-PROVISIONED_ENTERPRISE_IDP_TEST_TENANT",
+                      "PENDING_VALIDATION", "NOT_MET", "MET"), status
+    if status != "MET":
+        assert plane.SERVED_WRITES == (), "no write is served before AP-3 is MET (section 18)"
+    if status == "MET":
+        rows = record["validation_matrix"]
+        assert len(rows) == 16 and all(r["result"] == r["required"] for r in rows), \
+            "MET requires every matrix row executed and passed"
+        assert record["evidence"]["accepting_owner"] and record["evidence"]["ci_run_or_signed_report"]
+    designation = record["designation"]
+    assert designation["allowed_actor_type"] == "HUMAN"
+    assert designation["failure_behaviour"] == "FAIL_CLOSED"
+    assert designation["validation_environment"] == "NON_PRODUCTION"
+    issuer = designation["issuer"] or ""
+    assert "issuer.test" not in issuer and "127.0.0.1" not in issuer and "localhost" not in issuer, \
+        "the in-process issuer is never the enterprise issuer"
+    text = AP3_RECORD.read_text(encoding="utf-8")
+    import re
+    assert not re.search(r"eyJ[A-Za-z0-9_-]{10,}\.", text), "a JWT-shaped value is in the record"
+    assert "PRIVATE KEY" not in text and "client_secret" not in text.lower().replace("client secrets", "")
+
+
 def test_no_write_is_served_under_ap3_while_two_are_implemented():
     """Section 18: the owner reversed AW-1. The contract serves no write until the
     adapter is validated against a real enterprise issuer; the two directory writes
