@@ -1,0 +1,1311 @@
+{
+  "base_ir": {
+    "edges": [
+      {
+        "edge_id": "edge_0",
+        "kind": "NEXT",
+        "order": 0,
+        "source_id": "proc_request_validation",
+        "target_id": "proc_supplier_evidence"
+      },
+      {
+        "edge_id": "edge_1",
+        "kind": "NEXT",
+        "order": 1,
+        "source_id": "proc_supplier_evidence",
+        "target_id": "proc_supplier_risk"
+      },
+      {
+        "edge_id": "edge_2",
+        "kind": "NEXT",
+        "order": 2,
+        "source_id": "proc_supplier_risk",
+        "target_id": "proc_recommendation"
+      },
+      {
+        "edge_id": "edge_3",
+        "kind": "NEXT",
+        "order": 3,
+        "source_id": "proc_recommendation",
+        "target_id": "proc_binding_approval"
+      },
+      {
+        "edge_id": "edge_4",
+        "kind": "NEXT",
+        "order": 4,
+        "source_id": "proc_binding_approval",
+        "target_id": "proc_purchase_auth"
+      },
+      {
+        "edge_id": "edge_5",
+        "kind": "NEXT",
+        "order": 5,
+        "source_id": "proc_purchase_auth",
+        "target_id": "proc_commit_clearance"
+      },
+      {
+        "edge_id": "edge_6",
+        "kind": "NEXT",
+        "order": 6,
+        "source_id": "proc_commit_clearance",
+        "target_id": "proc_audit"
+      },
+      {
+        "edge_id": "edge_7",
+        "kind": "NEXT",
+        "order": 7,
+        "source_id": "proc_audit",
+        "target_id": "proc_terminal"
+      }
+    ],
+    "ir_version": "workflow_ir.v1",
+    "nodes": [
+      {
+        "audit_requirements": [],
+        "authority_type": "",
+        "disposition": "ADVISORY",
+        "failure_behavior": "BLOCK",
+        "input_object_ids": [],
+        "kind": "DECISION_RULE",
+        "label": "request schema validation",
+        "node_id": "proc_request_validation",
+        "output_contract": "validated_request",
+        "owning_capability": "COMPILER",
+        "public_contract_target": ""
+      },
+      {
+        "audit_requirements": [],
+        "authority_type": "",
+        "disposition": "ADVISORY",
+        "failure_behavior": "BLOCK",
+        "input_object_ids": [
+          "validated_request"
+        ],
+        "kind": "EVIDENCE_REQUIREMENT",
+        "label": "supplier evidence collection",
+        "node_id": "proc_supplier_evidence",
+        "output_contract": "supplier_evidence",
+        "owning_capability": "COMPILER",
+        "public_contract_target": ""
+      },
+      {
+        "audit_requirements": [],
+        "authority_type": "",
+        "disposition": "ADVISORY",
+        "failure_behavior": "BLOCK",
+        "input_object_ids": [
+          "supplier_evidence"
+        ],
+        "kind": "EVIDENCE_REQUIREMENT",
+        "label": "supplier-risk analysis",
+        "node_id": "proc_supplier_risk",
+        "output_contract": "supplier_risk_report",
+        "owning_capability": "COMPILER",
+        "public_contract_target": ""
+      },
+      {
+        "audit_requirements": [],
+        "authority_type": "",
+        "disposition": "ADVISORY",
+        "failure_behavior": "BLOCK",
+        "input_object_ids": [
+          "supplier_risk_report"
+        ],
+        "kind": "EVIDENCE_REQUIREMENT",
+        "label": "procurement recommendation drafting",
+        "node_id": "proc_recommendation",
+        "output_contract": "recommendation_draft",
+        "owning_capability": "COMPILER",
+        "public_contract_target": ""
+      },
+      {
+        "audit_requirements": [],
+        "authority_type": "HUMAN_APPROVER",
+        "disposition": "AUTHORITATIVE",
+        "failure_behavior": "BLOCK",
+        "input_object_ids": [],
+        "kind": "APPROVAL_GATE",
+        "label": "binding approval",
+        "node_id": "proc_binding_approval",
+        "output_contract": "",
+        "owning_capability": "DECISION_AUTHORITY",
+        "public_contract_target": ""
+      },
+      {
+        "audit_requirements": [],
+        "authority_type": "",
+        "disposition": "AUTHORITATIVE",
+        "failure_behavior": "BLOCK",
+        "input_object_ids": [],
+        "kind": "ACTION_CONSTRAINT",
+        "label": "purchase action authorization",
+        "node_id": "proc_purchase_auth",
+        "output_contract": "",
+        "owning_capability": "ACTION_GATE",
+        "public_contract_target": ""
+      },
+      {
+        "audit_requirements": [],
+        "authority_type": "",
+        "disposition": "AUTHORITATIVE",
+        "failure_behavior": "BLOCK",
+        "input_object_ids": [],
+        "kind": "ACTION_CLEARANCE_REQUIREMENT",
+        "label": "commit-time clearance",
+        "node_id": "proc_commit_clearance",
+        "output_contract": "",
+        "owning_capability": "ACTION_CLEARANCE",
+        "public_contract_target": ""
+      },
+      {
+        "audit_requirements": [],
+        "authority_type": "",
+        "disposition": "ADVISORY",
+        "failure_behavior": "BLOCK",
+        "input_object_ids": [],
+        "kind": "AUDIT_EMISSION",
+        "label": "audit emission",
+        "node_id": "proc_audit",
+        "output_contract": "",
+        "owning_capability": "COMPILER",
+        "public_contract_target": ""
+      },
+      {
+        "audit_requirements": [],
+        "authority_type": "",
+        "disposition": "ADVISORY",
+        "failure_behavior": "BLOCK",
+        "input_object_ids": [],
+        "kind": "TERMINAL_OUTCOME",
+        "label": "terminal outcome",
+        "node_id": "proc_terminal",
+        "output_contract": "",
+        "owning_capability": "COMPILER",
+        "public_contract_target": ""
+      }
+    ],
+    "policy_pack_id": "gs_procurement",
+    "policy_pack_version": 1,
+    "referenced_capabilities": [
+      "ACTION_CLEARANCE",
+      "ACTION_GATE",
+      "COMPILER",
+      "DECISION_AUTHORITY"
+    ]
+  },
+  "base_ir_digest": "sha256:7b0e378a7459adfe090d71920d2d08c55995fcf6e0c11ff265d8b3fc48f4cc5c",
+  "capability_reference_manifest": [
+    "ACTION_CLEARANCE",
+    "ACTION_GATE",
+    "DECISION_AUTHORITY",
+    "evidence_extraction"
+  ],
+  "compiler_version": "0.2.0",
+  "contract_reference_manifest": [
+    "recommendation_draft",
+    "supplier_evidence",
+    "supplier_risk_report",
+    "validated_request"
+  ],
+  "contract_version": "workflow_ir.v2",
+  "dependency_semantics": [
+    {
+      "authority_context": "ADVISORY",
+      "condition_ref": "",
+      "contract_version": "workflow_ir.v2",
+      "dependency_kind": "ORDERING_DEPENDENCY",
+      "edge_id": "edge_7",
+      "fingerprint": "sha256:bdfbaa7d11ce928cd9cdb0c849283d99cd46d097219e016703a9b5d0a7b60617",
+      "input_contract_refs": [],
+      "output_contract_refs": [],
+      "provenance": {
+        "compiler_rule": "edge_dependency_mapping",
+        "compiler_version": "0.2.0",
+        "contract_version": "workflow_ir.v2",
+        "derivation_class": "DERIVED_FROM_EDGE",
+        "source_declaration": "NEXT",
+        "source_object_ids": [
+          "proc_audit",
+          "proc_terminal"
+        ],
+        "source_policy_id": "gs_procurement",
+        "source_policy_version": 1,
+        "source_refs": []
+      },
+      "source_node_id": "proc_audit",
+      "target_node_id": "proc_terminal"
+    },
+    {
+      "authority_context": "AUTHORITATIVE",
+      "condition_ref": "",
+      "contract_version": "workflow_ir.v2",
+      "dependency_kind": "GOVERNANCE_DEPENDENCY",
+      "edge_id": "edge_4",
+      "fingerprint": "sha256:3f32b9869e368ffa7afe97021ebf19bb0f8da5a0349a37b9af9fa07799922ea2",
+      "input_contract_refs": [],
+      "output_contract_refs": [],
+      "provenance": {
+        "compiler_rule": "edge_dependency_mapping",
+        "compiler_version": "0.2.0",
+        "contract_version": "workflow_ir.v2",
+        "derivation_class": "DERIVED_FROM_EDGE",
+        "source_declaration": "NEXT",
+        "source_object_ids": [
+          "proc_binding_approval",
+          "proc_purchase_auth"
+        ],
+        "source_policy_id": "gs_procurement",
+        "source_policy_version": 1,
+        "source_refs": []
+      },
+      "source_node_id": "proc_binding_approval",
+      "target_node_id": "proc_purchase_auth"
+    },
+    {
+      "authority_context": "ADVISORY",
+      "condition_ref": "",
+      "contract_version": "workflow_ir.v2",
+      "dependency_kind": "ORDERING_DEPENDENCY",
+      "edge_id": "edge_6",
+      "fingerprint": "sha256:9f0caa55aef8db5768540753593624b8b3865ade928b6deeb8b040992ac2b950",
+      "input_contract_refs": [],
+      "output_contract_refs": [],
+      "provenance": {
+        "compiler_rule": "edge_dependency_mapping",
+        "compiler_version": "0.2.0",
+        "contract_version": "workflow_ir.v2",
+        "derivation_class": "DERIVED_FROM_EDGE",
+        "source_declaration": "NEXT",
+        "source_object_ids": [
+          "proc_commit_clearance",
+          "proc_audit"
+        ],
+        "source_policy_id": "gs_procurement",
+        "source_policy_version": 1,
+        "source_refs": []
+      },
+      "source_node_id": "proc_commit_clearance",
+      "target_node_id": "proc_audit"
+    },
+    {
+      "authority_context": "AUTHORITATIVE",
+      "condition_ref": "",
+      "contract_version": "workflow_ir.v2",
+      "dependency_kind": "GOVERNANCE_DEPENDENCY",
+      "edge_id": "edge_5",
+      "fingerprint": "sha256:b8a77d867b676a9015a7144cd24c13c009b20d40f7e26fabe9f56edb39026e96",
+      "input_contract_refs": [],
+      "output_contract_refs": [],
+      "provenance": {
+        "compiler_rule": "edge_dependency_mapping",
+        "compiler_version": "0.2.0",
+        "contract_version": "workflow_ir.v2",
+        "derivation_class": "DERIVED_FROM_EDGE",
+        "source_declaration": "NEXT",
+        "source_object_ids": [
+          "proc_purchase_auth",
+          "proc_commit_clearance"
+        ],
+        "source_policy_id": "gs_procurement",
+        "source_policy_version": 1,
+        "source_refs": []
+      },
+      "source_node_id": "proc_purchase_auth",
+      "target_node_id": "proc_commit_clearance"
+    },
+    {
+      "authority_context": "AUTHORITATIVE",
+      "condition_ref": "",
+      "contract_version": "workflow_ir.v2",
+      "dependency_kind": "AUTHORITY_DEPENDENCY",
+      "edge_id": "edge_3",
+      "fingerprint": "sha256:b3223154cd5592c287af86810525dca9dd3e6737d89f780731d53a10820314df",
+      "input_contract_refs": [],
+      "output_contract_refs": [],
+      "provenance": {
+        "compiler_rule": "edge_dependency_mapping",
+        "compiler_version": "0.2.0",
+        "contract_version": "workflow_ir.v2",
+        "derivation_class": "DERIVED_FROM_EDGE",
+        "source_declaration": "NEXT",
+        "source_object_ids": [
+          "proc_recommendation",
+          "proc_binding_approval"
+        ],
+        "source_policy_id": "gs_procurement",
+        "source_policy_version": 1,
+        "source_refs": []
+      },
+      "source_node_id": "proc_recommendation",
+      "target_node_id": "proc_binding_approval"
+    },
+    {
+      "authority_context": "ADVISORY",
+      "condition_ref": "",
+      "contract_version": "workflow_ir.v2",
+      "dependency_kind": "DATA_DEPENDENCY",
+      "edge_id": "edge_0",
+      "fingerprint": "sha256:8cf7491ca7844063b6130144067711ecf5805afb8923b7df5a460ba148d53d1f",
+      "input_contract_refs": [
+        "validated_request"
+      ],
+      "output_contract_refs": [
+        "validated_request"
+      ],
+      "provenance": {
+        "compiler_rule": "edge_dependency_mapping",
+        "compiler_version": "0.2.0",
+        "contract_version": "workflow_ir.v2",
+        "derivation_class": "DERIVED_FROM_EDGE",
+        "source_declaration": "NEXT",
+        "source_object_ids": [
+          "proc_request_validation",
+          "proc_supplier_evidence"
+        ],
+        "source_policy_id": "gs_procurement",
+        "source_policy_version": 1,
+        "source_refs": []
+      },
+      "source_node_id": "proc_request_validation",
+      "target_node_id": "proc_supplier_evidence"
+    },
+    {
+      "authority_context": "ADVISORY",
+      "condition_ref": "",
+      "contract_version": "workflow_ir.v2",
+      "dependency_kind": "DATA_DEPENDENCY",
+      "edge_id": "edge_1",
+      "fingerprint": "sha256:8161a5eeb1cd0682061536a7b47cbbd3b1d2cf51416c523765e7e55fcd50b3a3",
+      "input_contract_refs": [
+        "supplier_evidence"
+      ],
+      "output_contract_refs": [
+        "supplier_evidence"
+      ],
+      "provenance": {
+        "compiler_rule": "edge_dependency_mapping",
+        "compiler_version": "0.2.0",
+        "contract_version": "workflow_ir.v2",
+        "derivation_class": "DERIVED_FROM_EDGE",
+        "source_declaration": "NEXT",
+        "source_object_ids": [
+          "proc_supplier_evidence",
+          "proc_supplier_risk"
+        ],
+        "source_policy_id": "gs_procurement",
+        "source_policy_version": 1,
+        "source_refs": []
+      },
+      "source_node_id": "proc_supplier_evidence",
+      "target_node_id": "proc_supplier_risk"
+    },
+    {
+      "authority_context": "ADVISORY",
+      "condition_ref": "",
+      "contract_version": "workflow_ir.v2",
+      "dependency_kind": "DATA_DEPENDENCY",
+      "edge_id": "edge_2",
+      "fingerprint": "sha256:f9d73a2f19cae475e4bf73fa323e28bbfe01a7302f7565956ee7f5f1ea643e57",
+      "input_contract_refs": [
+        "supplier_risk_report"
+      ],
+      "output_contract_refs": [
+        "supplier_risk_report"
+      ],
+      "provenance": {
+        "compiler_rule": "edge_dependency_mapping",
+        "compiler_version": "0.2.0",
+        "contract_version": "workflow_ir.v2",
+        "derivation_class": "DERIVED_FROM_EDGE",
+        "source_declaration": "NEXT",
+        "source_object_ids": [
+          "proc_supplier_risk",
+          "proc_recommendation"
+        ],
+        "source_policy_id": "gs_procurement",
+        "source_policy_version": 1,
+        "source_refs": []
+      },
+      "source_node_id": "proc_supplier_risk",
+      "target_node_id": "proc_recommendation"
+    }
+  ],
+  "diagnostics": [],
+  "ir_version": "workflow_ir.v2",
+  "node_semantics": [
+    {
+      "authority_disposition": "ADVISORY",
+      "canonical_capability_owner": "COMPILER",
+      "contract_version": "workflow_ir.v2",
+      "data_classification_refs": [],
+      "fingerprint": "sha256:652a7523f1d1f364d6b229b268cbea712b09c2c1628488d8b6a8b6bdcaef4cf1",
+      "governance_boundary_refs": [],
+      "human_authority_requirement": false,
+      "human_review_requirement": {
+        "authority_type": "",
+        "contract_version": "workflow_ir.v2",
+        "governance_owner": "",
+        "provenance": {
+          "compiler_rule": "human_review_classification",
+          "compiler_version": "0.2.0",
+          "contract_version": "workflow_ir.v2",
+          "derivation_class": "DETERMINISTIC_MAPPING",
+          "source_declaration": "audit emission",
+          "source_object_ids": [],
+          "source_policy_id": "gs_procurement",
+          "source_policy_version": 1,
+          "source_refs": []
+        },
+        "required": false,
+        "resolution": "DETERMINISTICALLY_INFERRED",
+        "review_kind": "none"
+      },
+      "node_id": "proc_audit",
+      "node_kind": "AUDIT_EMISSION",
+      "optional_capability_refs": [],
+      "permission_intent_refs": [],
+      "produced_output_contract_refs": [],
+      "provenance": {
+        "compiler_rule": "node_semantics_extraction",
+        "compiler_version": "0.2.0",
+        "contract_version": "workflow_ir.v2",
+        "derivation_class": "DETERMINISTIC_MAPPING",
+        "source_declaration": "audit emission",
+        "source_object_ids": [],
+        "source_policy_id": "gs_procurement",
+        "source_policy_version": 1,
+        "source_refs": []
+      },
+      "required_capability_refs": [],
+      "required_input_contract_refs": [],
+      "required_tool_refs": [],
+      "role_relevance": "DETERMINISTIC_SERVICE",
+      "semantic_description": "audit emission",
+      "semantic_purpose": "emit a governed audit record",
+      "source_policy_refs": []
+    },
+    {
+      "authority_disposition": "AUTHORITATIVE",
+      "canonical_capability_owner": "DECISION_AUTHORITY",
+      "contract_version": "workflow_ir.v2",
+      "data_classification_refs": [],
+      "fingerprint": "sha256:84b530f54e892a3c975a5ef4b2ee6dd16a7ba56810ea5dedeb29ebee56549b37",
+      "governance_boundary_refs": [],
+      "human_authority_requirement": true,
+      "human_review_requirement": {
+        "authority_type": "HUMAN_APPROVER",
+        "contract_version": "workflow_ir.v2",
+        "governance_owner": "DECISION_AUTHORITY",
+        "provenance": {
+          "compiler_rule": "human_review_classification",
+          "compiler_version": "0.2.0",
+          "contract_version": "workflow_ir.v2",
+          "derivation_class": "DETERMINISTIC_MAPPING",
+          "source_declaration": "binding approval",
+          "source_object_ids": [],
+          "source_policy_id": "gs_procurement",
+          "source_policy_version": 1,
+          "source_refs": []
+        },
+        "required": true,
+        "resolution": "DETERMINISTICALLY_INFERRED",
+        "review_kind": "human_authority"
+      },
+      "node_id": "proc_binding_approval",
+      "node_kind": "APPROVAL_GATE",
+      "optional_capability_refs": [],
+      "permission_intent_refs": [],
+      "produced_output_contract_refs": [],
+      "provenance": {
+        "compiler_rule": "node_semantics_extraction",
+        "compiler_version": "0.2.0",
+        "contract_version": "workflow_ir.v2",
+        "derivation_class": "DETERMINISTIC_MAPPING",
+        "source_declaration": "binding approval",
+        "source_object_ids": [],
+        "source_policy_id": "gs_procurement",
+        "source_policy_version": 1,
+        "source_refs": []
+      },
+      "required_capability_refs": [
+        {
+          "authority_context": "AUTHORITATIVE",
+          "capability_id": "DECISION_AUTHORITY",
+          "contract_version": "workflow_ir.v2",
+          "fingerprint": "sha256:cbb2e6ca5914c8656cf3656ce891a517707f522bce51769d3abe2b65164dd987",
+          "provenance": {
+            "compiler_rule": "capability_owner_mapping",
+            "compiler_version": "0.2.0",
+            "contract_version": "workflow_ir.v2",
+            "derivation_class": "DETERMINISTIC_MAPPING",
+            "source_declaration": "binding approval",
+            "source_object_ids": [],
+            "source_policy_id": "gs_procurement",
+            "source_policy_version": 1,
+            "source_refs": []
+          },
+          "requirement_level": "REQUIRED",
+          "resolution": "DETERMINISTICALLY_INFERRED",
+          "source": "CAPABILITY_OWNER_MAPPING",
+          "source_ref": "DECISION_AUTHORITY"
+        }
+      ],
+      "required_input_contract_refs": [
+        {
+          "compatibility_requirement": "exact_or_unversioned",
+          "contract_ref": {
+            "contract_data_version": "",
+            "contract_id": "recommendation_draft",
+            "contract_version": "workflow_ir.v2",
+            "data_classification_ref": "",
+            "provenance": {
+              "compiler_rule": "node_output_contract",
+              "compiler_version": "0.2.0",
+              "contract_version": "workflow_ir.v2",
+              "derivation_class": "DERIVED_FROM_CONTRACT",
+              "source_declaration": "recommendation_draft",
+              "source_object_ids": [
+                "supplier_risk_report"
+              ],
+              "source_policy_id": "gs_procurement",
+              "source_policy_version": 1,
+              "source_refs": []
+            },
+            "resolution": "EXPLICITLY_DECLARED",
+            "schema_ref": ""
+          },
+          "contract_version": "workflow_ir.v2",
+          "producer_node_id": "proc_recommendation",
+          "resolution": "EXPLICITLY_DECLARED"
+        }
+      ],
+      "required_tool_refs": [],
+      "role_relevance": "HUMAN_AUTHORITY",
+      "semantic_description": "binding approval",
+      "semantic_purpose": "require human approval",
+      "source_policy_refs": []
+    },
+    {
+      "authority_disposition": "AUTHORITATIVE",
+      "canonical_capability_owner": "ACTION_CLEARANCE",
+      "contract_version": "workflow_ir.v2",
+      "data_classification_refs": [],
+      "fingerprint": "sha256:2feb7b8dd4448b64e8c268c7c616565aec4c1cadfe07b115f9eac3c5f0b69b5a",
+      "governance_boundary_refs": [],
+      "human_authority_requirement": false,
+      "human_review_requirement": {
+        "authority_type": "",
+        "contract_version": "workflow_ir.v2",
+        "governance_owner": "",
+        "provenance": {
+          "compiler_rule": "human_review_classification",
+          "compiler_version": "0.2.0",
+          "contract_version": "workflow_ir.v2",
+          "derivation_class": "DETERMINISTIC_MAPPING",
+          "source_declaration": "commit-time clearance",
+          "source_object_ids": [],
+          "source_policy_id": "gs_procurement",
+          "source_policy_version": 1,
+          "source_refs": []
+        },
+        "required": false,
+        "resolution": "DETERMINISTICALLY_INFERRED",
+        "review_kind": "none"
+      },
+      "node_id": "proc_commit_clearance",
+      "node_kind": "ACTION_CLEARANCE_REQUIREMENT",
+      "optional_capability_refs": [],
+      "permission_intent_refs": [],
+      "produced_output_contract_refs": [],
+      "provenance": {
+        "compiler_rule": "node_semantics_extraction",
+        "compiler_version": "0.2.0",
+        "contract_version": "workflow_ir.v2",
+        "derivation_class": "DETERMINISTIC_MAPPING",
+        "source_declaration": "commit-time clearance",
+        "source_object_ids": [],
+        "source_policy_id": "gs_procurement",
+        "source_policy_version": 1,
+        "source_refs": []
+      },
+      "required_capability_refs": [
+        {
+          "authority_context": "AUTHORITATIVE",
+          "capability_id": "ACTION_CLEARANCE",
+          "contract_version": "workflow_ir.v2",
+          "fingerprint": "sha256:5a7da429a535a7fcf368a8dac72021d7b745469903f5db713625054a050f6b84",
+          "provenance": {
+            "compiler_rule": "capability_owner_mapping",
+            "compiler_version": "0.2.0",
+            "contract_version": "workflow_ir.v2",
+            "derivation_class": "DETERMINISTIC_MAPPING",
+            "source_declaration": "commit-time clearance",
+            "source_object_ids": [],
+            "source_policy_id": "gs_procurement",
+            "source_policy_version": 1,
+            "source_refs": []
+          },
+          "requirement_level": "REQUIRED",
+          "resolution": "DETERMINISTICALLY_INFERRED",
+          "source": "CAPABILITY_OWNER_MAPPING",
+          "source_ref": "ACTION_CLEARANCE"
+        }
+      ],
+      "required_input_contract_refs": [],
+      "required_tool_refs": [],
+      "role_relevance": "GOVERNANCE_OWNED",
+      "semantic_description": "commit-time clearance",
+      "semantic_purpose": "require commit-time action clearance",
+      "source_policy_refs": []
+    },
+    {
+      "authority_disposition": "AUTHORITATIVE",
+      "canonical_capability_owner": "ACTION_GATE",
+      "contract_version": "workflow_ir.v2",
+      "data_classification_refs": [],
+      "fingerprint": "sha256:0a01531955fe6c25a4d695e14939b914143f52d7c711ba95be0d634f9e1d39ed",
+      "governance_boundary_refs": [],
+      "human_authority_requirement": false,
+      "human_review_requirement": {
+        "authority_type": "",
+        "contract_version": "workflow_ir.v2",
+        "governance_owner": "",
+        "provenance": {
+          "compiler_rule": "human_review_classification",
+          "compiler_version": "0.2.0",
+          "contract_version": "workflow_ir.v2",
+          "derivation_class": "DETERMINISTIC_MAPPING",
+          "source_declaration": "purchase action authorization",
+          "source_object_ids": [],
+          "source_policy_id": "gs_procurement",
+          "source_policy_version": 1,
+          "source_refs": []
+        },
+        "required": false,
+        "resolution": "DETERMINISTICALLY_INFERRED",
+        "review_kind": "none"
+      },
+      "node_id": "proc_purchase_auth",
+      "node_kind": "ACTION_CONSTRAINT",
+      "optional_capability_refs": [],
+      "permission_intent_refs": [],
+      "produced_output_contract_refs": [],
+      "provenance": {
+        "compiler_rule": "node_semantics_extraction",
+        "compiler_version": "0.2.0",
+        "contract_version": "workflow_ir.v2",
+        "derivation_class": "DETERMINISTIC_MAPPING",
+        "source_declaration": "purchase action authorization",
+        "source_object_ids": [],
+        "source_policy_id": "gs_procurement",
+        "source_policy_version": 1,
+        "source_refs": []
+      },
+      "required_capability_refs": [
+        {
+          "authority_context": "AUTHORITATIVE",
+          "capability_id": "ACTION_GATE",
+          "contract_version": "workflow_ir.v2",
+          "fingerprint": "sha256:7d9cf37522041589559b56b11b9ae9f92a676b9970c1c4a5c7cbcf17dd5e75bf",
+          "provenance": {
+            "compiler_rule": "capability_owner_mapping",
+            "compiler_version": "0.2.0",
+            "contract_version": "workflow_ir.v2",
+            "derivation_class": "DETERMINISTIC_MAPPING",
+            "source_declaration": "purchase action authorization",
+            "source_object_ids": [],
+            "source_policy_id": "gs_procurement",
+            "source_policy_version": 1,
+            "source_refs": []
+          },
+          "requirement_level": "REQUIRED",
+          "resolution": "DETERMINISTICALLY_INFERRED",
+          "source": "CAPABILITY_OWNER_MAPPING",
+          "source_ref": "ACTION_GATE"
+        }
+      ],
+      "required_input_contract_refs": [],
+      "required_tool_refs": [],
+      "role_relevance": "GOVERNANCE_OWNED",
+      "semantic_description": "purchase action authorization",
+      "semantic_purpose": "constrain a governed action",
+      "source_policy_refs": []
+    },
+    {
+      "authority_disposition": "ADVISORY",
+      "canonical_capability_owner": "COMPILER",
+      "contract_version": "workflow_ir.v2",
+      "data_classification_refs": [],
+      "fingerprint": "sha256:57a7794423f2be9bb507ce34d559b21447de7e10cd492b3a22664d0daaa411a8",
+      "governance_boundary_refs": [],
+      "human_authority_requirement": false,
+      "human_review_requirement": {
+        "authority_type": "",
+        "contract_version": "workflow_ir.v2",
+        "governance_owner": "",
+        "provenance": {
+          "compiler_rule": "human_review_classification",
+          "compiler_version": "0.2.0",
+          "contract_version": "workflow_ir.v2",
+          "derivation_class": "DETERMINISTIC_MAPPING",
+          "source_declaration": "recommendation_draft",
+          "source_object_ids": [
+            "supplier_risk_report"
+          ],
+          "source_policy_id": "gs_procurement",
+          "source_policy_version": 1,
+          "source_refs": []
+        },
+        "required": false,
+        "resolution": "DETERMINISTICALLY_INFERRED",
+        "review_kind": "none"
+      },
+      "node_id": "proc_recommendation",
+      "node_kind": "EVIDENCE_REQUIREMENT",
+      "optional_capability_refs": [],
+      "permission_intent_refs": [],
+      "produced_output_contract_refs": [
+        {
+          "consumer_node_ids": [
+            "proc_binding_approval"
+          ],
+          "contract_ref": {
+            "contract_data_version": "",
+            "contract_id": "recommendation_draft",
+            "contract_version": "workflow_ir.v2",
+            "data_classification_ref": "",
+            "provenance": {
+              "compiler_rule": "node_output_contract",
+              "compiler_version": "0.2.0",
+              "contract_version": "workflow_ir.v2",
+              "derivation_class": "DERIVED_FROM_CONTRACT",
+              "source_declaration": "recommendation_draft",
+              "source_object_ids": [
+                "supplier_risk_report"
+              ],
+              "source_policy_id": "gs_procurement",
+              "source_policy_version": 1,
+              "source_refs": []
+            },
+            "resolution": "EXPLICITLY_DECLARED",
+            "schema_ref": ""
+          },
+          "contract_version": "workflow_ir.v2",
+          "resolution": "EXPLICITLY_DECLARED"
+        }
+      ],
+      "provenance": {
+        "compiler_rule": "node_semantics_extraction",
+        "compiler_version": "0.2.0",
+        "contract_version": "workflow_ir.v2",
+        "derivation_class": "DETERMINISTIC_MAPPING",
+        "source_declaration": "recommendation_draft",
+        "source_object_ids": [
+          "supplier_risk_report"
+        ],
+        "source_policy_id": "gs_procurement",
+        "source_policy_version": 1,
+        "source_refs": []
+      },
+      "required_capability_refs": [
+        {
+          "authority_context": "ADVISORY",
+          "capability_id": "evidence_extraction",
+          "contract_version": "workflow_ir.v2",
+          "fingerprint": "sha256:9c5da7aba70640dddc6967f0eec9c9b19fed4de087f5d2f359c9b41c996ebe7c",
+          "provenance": {
+            "compiler_rule": "node_kind_capability_mapping",
+            "compiler_version": "0.2.0",
+            "contract_version": "workflow_ir.v2",
+            "derivation_class": "DETERMINISTIC_MAPPING",
+            "source_declaration": "recommendation_draft",
+            "source_object_ids": [
+              "supplier_risk_report"
+            ],
+            "source_policy_id": "gs_procurement",
+            "source_policy_version": 1,
+            "source_refs": []
+          },
+          "requirement_level": "REQUIRED",
+          "resolution": "DETERMINISTICALLY_INFERRED",
+          "source": "NODE_KIND_MAPPING",
+          "source_ref": "EVIDENCE_REQUIREMENT"
+        }
+      ],
+      "required_input_contract_refs": [
+        {
+          "compatibility_requirement": "exact_or_unversioned",
+          "contract_ref": {
+            "contract_data_version": "",
+            "contract_id": "supplier_risk_report",
+            "contract_version": "workflow_ir.v2",
+            "data_classification_ref": "",
+            "provenance": {
+              "compiler_rule": "node_output_contract",
+              "compiler_version": "0.2.0",
+              "contract_version": "workflow_ir.v2",
+              "derivation_class": "DERIVED_FROM_CONTRACT",
+              "source_declaration": "supplier_risk_report",
+              "source_object_ids": [
+                "supplier_evidence"
+              ],
+              "source_policy_id": "gs_procurement",
+              "source_policy_version": 1,
+              "source_refs": []
+            },
+            "resolution": "EXPLICITLY_DECLARED",
+            "schema_ref": ""
+          },
+          "contract_version": "workflow_ir.v2",
+          "producer_node_id": "proc_supplier_risk",
+          "resolution": "EXPLICITLY_DECLARED"
+        }
+      ],
+      "required_tool_refs": [],
+      "role_relevance": "ADVISORY_AGENT_ELIGIBLE",
+      "semantic_description": "procurement recommendation drafting",
+      "semantic_purpose": "collect and extract evidence for a governed decision",
+      "source_policy_refs": [
+        "supplier_risk_report"
+      ]
+    },
+    {
+      "authority_disposition": "ADVISORY",
+      "canonical_capability_owner": "COMPILER",
+      "contract_version": "workflow_ir.v2",
+      "data_classification_refs": [],
+      "fingerprint": "sha256:614d6dd67497c6870294c6121c242a89bc7e8dad525032a19cbcdc9415e653ee",
+      "governance_boundary_refs": [],
+      "human_authority_requirement": false,
+      "human_review_requirement": {
+        "authority_type": "",
+        "contract_version": "workflow_ir.v2",
+        "governance_owner": "",
+        "provenance": {
+          "compiler_rule": "human_review_classification",
+          "compiler_version": "0.2.0",
+          "contract_version": "workflow_ir.v2",
+          "derivation_class": "DETERMINISTIC_MAPPING",
+          "source_declaration": "validated_request",
+          "source_object_ids": [],
+          "source_policy_id": "gs_procurement",
+          "source_policy_version": 1,
+          "source_refs": []
+        },
+        "required": false,
+        "resolution": "DETERMINISTICALLY_INFERRED",
+        "review_kind": "none"
+      },
+      "node_id": "proc_request_validation",
+      "node_kind": "DECISION_RULE",
+      "optional_capability_refs": [],
+      "permission_intent_refs": [],
+      "produced_output_contract_refs": [
+        {
+          "consumer_node_ids": [
+            "proc_supplier_evidence"
+          ],
+          "contract_ref": {
+            "contract_data_version": "",
+            "contract_id": "validated_request",
+            "contract_version": "workflow_ir.v2",
+            "data_classification_ref": "",
+            "provenance": {
+              "compiler_rule": "node_output_contract",
+              "compiler_version": "0.2.0",
+              "contract_version": "workflow_ir.v2",
+              "derivation_class": "DERIVED_FROM_CONTRACT",
+              "source_declaration": "validated_request",
+              "source_object_ids": [],
+              "source_policy_id": "gs_procurement",
+              "source_policy_version": 1,
+              "source_refs": []
+            },
+            "resolution": "EXPLICITLY_DECLARED",
+            "schema_ref": ""
+          },
+          "contract_version": "workflow_ir.v2",
+          "resolution": "EXPLICITLY_DECLARED"
+        }
+      ],
+      "provenance": {
+        "compiler_rule": "node_semantics_extraction",
+        "compiler_version": "0.2.0",
+        "contract_version": "workflow_ir.v2",
+        "derivation_class": "DETERMINISTIC_MAPPING",
+        "source_declaration": "validated_request",
+        "source_object_ids": [],
+        "source_policy_id": "gs_procurement",
+        "source_policy_version": 1,
+        "source_refs": []
+      },
+      "required_capability_refs": [],
+      "required_input_contract_refs": [],
+      "required_tool_refs": [],
+      "role_relevance": "UNSUPPORTED",
+      "semantic_description": "request schema validation",
+      "semantic_purpose": "apply a governed decision rule",
+      "source_policy_refs": []
+    },
+    {
+      "authority_disposition": "ADVISORY",
+      "canonical_capability_owner": "COMPILER",
+      "contract_version": "workflow_ir.v2",
+      "data_classification_refs": [],
+      "fingerprint": "sha256:0cf5458d0cf8a9b5f73953abc7bc4e2fbf19fa3f8fb55c00b3abe7d0d2601529",
+      "governance_boundary_refs": [],
+      "human_authority_requirement": false,
+      "human_review_requirement": {
+        "authority_type": "",
+        "contract_version": "workflow_ir.v2",
+        "governance_owner": "",
+        "provenance": {
+          "compiler_rule": "human_review_classification",
+          "compiler_version": "0.2.0",
+          "contract_version": "workflow_ir.v2",
+          "derivation_class": "DETERMINISTIC_MAPPING",
+          "source_declaration": "supplier_evidence",
+          "source_object_ids": [
+            "validated_request"
+          ],
+          "source_policy_id": "gs_procurement",
+          "source_policy_version": 1,
+          "source_refs": []
+        },
+        "required": false,
+        "resolution": "DETERMINISTICALLY_INFERRED",
+        "review_kind": "none"
+      },
+      "node_id": "proc_supplier_evidence",
+      "node_kind": "EVIDENCE_REQUIREMENT",
+      "optional_capability_refs": [],
+      "permission_intent_refs": [],
+      "produced_output_contract_refs": [
+        {
+          "consumer_node_ids": [
+            "proc_supplier_risk"
+          ],
+          "contract_ref": {
+            "contract_data_version": "",
+            "contract_id": "supplier_evidence",
+            "contract_version": "workflow_ir.v2",
+            "data_classification_ref": "",
+            "provenance": {
+              "compiler_rule": "node_output_contract",
+              "compiler_version": "0.2.0",
+              "contract_version": "workflow_ir.v2",
+              "derivation_class": "DERIVED_FROM_CONTRACT",
+              "source_declaration": "supplier_evidence",
+              "source_object_ids": [
+                "validated_request"
+              ],
+              "source_policy_id": "gs_procurement",
+              "source_policy_version": 1,
+              "source_refs": []
+            },
+            "resolution": "EXPLICITLY_DECLARED",
+            "schema_ref": ""
+          },
+          "contract_version": "workflow_ir.v2",
+          "resolution": "EXPLICITLY_DECLARED"
+        }
+      ],
+      "provenance": {
+        "compiler_rule": "node_semantics_extraction",
+        "compiler_version": "0.2.0",
+        "contract_version": "workflow_ir.v2",
+        "derivation_class": "DETERMINISTIC_MAPPING",
+        "source_declaration": "supplier_evidence",
+        "source_object_ids": [
+          "validated_request"
+        ],
+        "source_policy_id": "gs_procurement",
+        "source_policy_version": 1,
+        "source_refs": []
+      },
+      "required_capability_refs": [
+        {
+          "authority_context": "ADVISORY",
+          "capability_id": "evidence_extraction",
+          "contract_version": "workflow_ir.v2",
+          "fingerprint": "sha256:c9c9d9c9690115624c7999ba01321e04b66ff0e8ef97549e453a718f65b1e5de",
+          "provenance": {
+            "compiler_rule": "node_kind_capability_mapping",
+            "compiler_version": "0.2.0",
+            "contract_version": "workflow_ir.v2",
+            "derivation_class": "DETERMINISTIC_MAPPING",
+            "source_declaration": "supplier_evidence",
+            "source_object_ids": [
+              "validated_request"
+            ],
+            "source_policy_id": "gs_procurement",
+            "source_policy_version": 1,
+            "source_refs": []
+          },
+          "requirement_level": "REQUIRED",
+          "resolution": "DETERMINISTICALLY_INFERRED",
+          "source": "NODE_KIND_MAPPING",
+          "source_ref": "EVIDENCE_REQUIREMENT"
+        }
+      ],
+      "required_input_contract_refs": [
+        {
+          "compatibility_requirement": "exact_or_unversioned",
+          "contract_ref": {
+            "contract_data_version": "",
+            "contract_id": "validated_request",
+            "contract_version": "workflow_ir.v2",
+            "data_classification_ref": "",
+            "provenance": {
+              "compiler_rule": "node_output_contract",
+              "compiler_version": "0.2.0",
+              "contract_version": "workflow_ir.v2",
+              "derivation_class": "DERIVED_FROM_CONTRACT",
+              "source_declaration": "validated_request",
+              "source_object_ids": [],
+              "source_policy_id": "gs_procurement",
+              "source_policy_version": 1,
+              "source_refs": []
+            },
+            "resolution": "EXPLICITLY_DECLARED",
+            "schema_ref": ""
+          },
+          "contract_version": "workflow_ir.v2",
+          "producer_node_id": "proc_request_validation",
+          "resolution": "EXPLICITLY_DECLARED"
+        }
+      ],
+      "required_tool_refs": [],
+      "role_relevance": "ADVISORY_AGENT_ELIGIBLE",
+      "semantic_description": "supplier evidence collection",
+      "semantic_purpose": "collect and extract evidence for a governed decision",
+      "source_policy_refs": [
+        "validated_request"
+      ]
+    },
+    {
+      "authority_disposition": "ADVISORY",
+      "canonical_capability_owner": "COMPILER",
+      "contract_version": "workflow_ir.v2",
+      "data_classification_refs": [],
+      "fingerprint": "sha256:f4b982a9954ad10ea8d6ab5d9da576d2252ca972ae21a27c9cd9d1dd12b784a6",
+      "governance_boundary_refs": [],
+      "human_authority_requirement": false,
+      "human_review_requirement": {
+        "authority_type": "",
+        "contract_version": "workflow_ir.v2",
+        "governance_owner": "",
+        "provenance": {
+          "compiler_rule": "human_review_classification",
+          "compiler_version": "0.2.0",
+          "contract_version": "workflow_ir.v2",
+          "derivation_class": "DETERMINISTIC_MAPPING",
+          "source_declaration": "supplier_risk_report",
+          "source_object_ids": [
+            "supplier_evidence"
+          ],
+          "source_policy_id": "gs_procurement",
+          "source_policy_version": 1,
+          "source_refs": []
+        },
+        "required": false,
+        "resolution": "DETERMINISTICALLY_INFERRED",
+        "review_kind": "none"
+      },
+      "node_id": "proc_supplier_risk",
+      "node_kind": "EVIDENCE_REQUIREMENT",
+      "optional_capability_refs": [],
+      "permission_intent_refs": [],
+      "produced_output_contract_refs": [
+        {
+          "consumer_node_ids": [
+            "proc_recommendation"
+          ],
+          "contract_ref": {
+            "contract_data_version": "",
+            "contract_id": "supplier_risk_report",
+            "contract_version": "workflow_ir.v2",
+            "data_classification_ref": "",
+            "provenance": {
+              "compiler_rule": "node_output_contract",
+              "compiler_version": "0.2.0",
+              "contract_version": "workflow_ir.v2",
+              "derivation_class": "DERIVED_FROM_CONTRACT",
+              "source_declaration": "supplier_risk_report",
+              "source_object_ids": [
+                "supplier_evidence"
+              ],
+              "source_policy_id": "gs_procurement",
+              "source_policy_version": 1,
+              "source_refs": []
+            },
+            "resolution": "EXPLICITLY_DECLARED",
+            "schema_ref": ""
+          },
+          "contract_version": "workflow_ir.v2",
+          "resolution": "EXPLICITLY_DECLARED"
+        }
+      ],
+      "provenance": {
+        "compiler_rule": "node_semantics_extraction",
+        "compiler_version": "0.2.0",
+        "contract_version": "workflow_ir.v2",
+        "derivation_class": "DETERMINISTIC_MAPPING",
+        "source_declaration": "supplier_risk_report",
+        "source_object_ids": [
+          "supplier_evidence"
+        ],
+        "source_policy_id": "gs_procurement",
+        "source_policy_version": 1,
+        "source_refs": []
+      },
+      "required_capability_refs": [
+        {
+          "authority_context": "ADVISORY",
+          "capability_id": "evidence_extraction",
+          "contract_version": "workflow_ir.v2",
+          "fingerprint": "sha256:f67f9f833f03dc8e7d1d0c07fa86c7a1cf31a217a850142c8b743ca372392b30",
+          "provenance": {
+            "compiler_rule": "node_kind_capability_mapping",
+            "compiler_version": "0.2.0",
+            "contract_version": "workflow_ir.v2",
+            "derivation_class": "DETERMINISTIC_MAPPING",
+            "source_declaration": "supplier_risk_report",
+            "source_object_ids": [
+              "supplier_evidence"
+            ],
+            "source_policy_id": "gs_procurement",
+            "source_policy_version": 1,
+            "source_refs": []
+          },
+          "requirement_level": "REQUIRED",
+          "resolution": "DETERMINISTICALLY_INFERRED",
+          "source": "NODE_KIND_MAPPING",
+          "source_ref": "EVIDENCE_REQUIREMENT"
+        }
+      ],
+      "required_input_contract_refs": [
+        {
+          "compatibility_requirement": "exact_or_unversioned",
+          "contract_ref": {
+            "contract_data_version": "",
+            "contract_id": "supplier_evidence",
+            "contract_version": "workflow_ir.v2",
+            "data_classification_ref": "",
+            "provenance": {
+              "compiler_rule": "node_output_contract",
+              "compiler_version": "0.2.0",
+              "contract_version": "workflow_ir.v2",
+              "derivation_class": "DERIVED_FROM_CONTRACT",
+              "source_declaration": "supplier_evidence",
+              "source_object_ids": [
+                "validated_request"
+              ],
+              "source_policy_id": "gs_procurement",
+              "source_policy_version": 1,
+              "source_refs": []
+            },
+            "resolution": "EXPLICITLY_DECLARED",
+            "schema_ref": ""
+          },
+          "contract_version": "workflow_ir.v2",
+          "producer_node_id": "proc_supplier_evidence",
+          "resolution": "EXPLICITLY_DECLARED"
+        }
+      ],
+      "required_tool_refs": [],
+      "role_relevance": "ADVISORY_AGENT_ELIGIBLE",
+      "semantic_description": "supplier-risk analysis",
+      "semantic_purpose": "collect and extract evidence for a governed decision",
+      "source_policy_refs": [
+        "supplier_evidence"
+      ]
+    },
+    {
+      "authority_disposition": "ADVISORY",
+      "canonical_capability_owner": "COMPILER",
+      "contract_version": "workflow_ir.v2",
+      "data_classification_refs": [],
+      "fingerprint": "sha256:3eabfae8d8c89c6d5c1195902cd7cee41a4e6c2214e1734342e9ba51a2bc7e65",
+      "governance_boundary_refs": [],
+      "human_authority_requirement": false,
+      "human_review_requirement": {
+        "authority_type": "",
+        "contract_version": "workflow_ir.v2",
+        "governance_owner": "",
+        "provenance": {
+          "compiler_rule": "human_review_classification",
+          "compiler_version": "0.2.0",
+          "contract_version": "workflow_ir.v2",
+          "derivation_class": "DETERMINISTIC_MAPPING",
+          "source_declaration": "terminal outcome",
+          "source_object_ids": [],
+          "source_policy_id": "gs_procurement",
+          "source_policy_version": 1,
+          "source_refs": []
+        },
+        "required": false,
+        "resolution": "DETERMINISTICALLY_INFERRED",
+        "review_kind": "none"
+      },
+      "node_id": "proc_terminal",
+      "node_kind": "TERMINAL_OUTCOME",
+      "optional_capability_refs": [],
+      "permission_intent_refs": [],
+      "produced_output_contract_refs": [],
+      "provenance": {
+        "compiler_rule": "node_semantics_extraction",
+        "compiler_version": "0.2.0",
+        "contract_version": "workflow_ir.v2",
+        "derivation_class": "DETERMINISTIC_MAPPING",
+        "source_declaration": "terminal outcome",
+        "source_object_ids": [],
+        "source_policy_id": "gs_procurement",
+        "source_policy_version": 1,
+        "source_refs": []
+      },
+      "required_capability_refs": [],
+      "required_input_contract_refs": [],
+      "required_tool_refs": [],
+      "role_relevance": "DETERMINISTIC_SERVICE",
+      "semantic_description": "terminal outcome",
+      "semantic_purpose": "terminal workflow outcome",
+      "source_policy_refs": []
+    }
+  ],
+  "policy_pack_id": "gs_procurement",
+  "policy_pack_version": 1,
+  "provenance_manifest": [
+    "gs_procurement"
+  ],
+  "release_metadata": {
+    "synthetic": true
+  },
+  "semantic_features": [
+    {
+      "name": "role_semantics",
+      "present": true
+    },
+    {
+      "name": "typed_contract_refs",
+      "present": true
+    },
+    {
+      "name": "dependency_semantics",
+      "present": true
+    },
+    {
+      "name": "authority_semantics",
+      "present": true
+    },
+    {
+      "name": "human_review_semantics",
+      "present": true
+    },
+    {
+      "name": "policy_provenance",
+      "present": true
+    }
+  ],
+  "workflow_fingerprint": "sha256:28a68579234ad81ee0cf03b9c33b378512abf68a91e1d5a4af453d9dc5f4d1f9"
+}

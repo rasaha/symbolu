@@ -20,11 +20,11 @@ const manifest = JSON.parse(readFileSync(path.join(FRONTEND, "security", "approv
 const clientText = readFileSync(path.join(FRONTEND, "src", "api", "client.ts"), "utf-8");
 
 describe("C1 — public API operation allowlist", () => {
-  it("the real client consumes exactly the approved 17 operations", () => {
+  it("the real client consumes exactly the approved 20 operations", () => {
     const { consumed, unmatched } = detectConsumption(clientText, spec);
     expect(unmatched).toEqual([]);
     expect([...consumed].sort()).toEqual([...manifest.approved_operation_ids].sort());
-    expect(consumed.size).toBe(17);
+    expect(consumed.size).toBe(20);
   });
 
   it("consumed ∩ forbidden = ∅ and consumed ⊆ approved", () => {
@@ -90,7 +90,7 @@ describe("C1 — public API operation allowlist", () => {
   it("an approved/forbidden overlap fails validation", () => {
     const overlap = {
       ...manifest,
-      approved_operation_ids: [...manifest.approved_operation_ids, "validate_workflow"],
+      approved_operation_ids: [...manifest.approved_operation_ids, "compose_workforce"],
     };
     const { errors } = validateManifest(overlap, spec, specSha);
     expect(errors.some((e: string) => e.includes("overlap"))).toBe(true);

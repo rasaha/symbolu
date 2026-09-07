@@ -15,6 +15,7 @@ import { FallbackScreen } from "@/features/fallbacks/FallbackScreen";
 import { ReplayScreen } from "@/features/replay/ReplayScreen";
 import { CompareScreen } from "@/features/compare/CompareScreen";
 import { WhatIfScreen } from "@/features/whatif/WhatIfScreen";
+import { BringYourWorkflowScreen } from "@/features/bring/BringYourWorkflowScreen";
 // Governed Agent Studio (GAS-4/5) — additive, mounted alongside the v1 explorer.
 import {
   AuthorityScreen,
@@ -57,6 +58,7 @@ export function App() {
             <Route path="compare" element={<CompareScreen />} />
             <Route path="what-if" element={<WhatIfScreen />} />
           </Route>
+          <Route path="/bring-your-workflow" element={<BringYourWorkflowScreen />} />
           <Route path="/studio" element={<StudioLayout />}>
             <Route index element={<Navigate to="constitution" replace />} />
             {/* Front-door seam 5 (FD-9): typed registration intake; register is the only write. */}
