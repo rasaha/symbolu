@@ -121,8 +121,11 @@ def test_p7_unclassified_request_is_exploratory_only():
 
 
 def test_p8_no_comparison_field_exists():
+    """Still true after slice 3: product entry is a separate admission record
+    (``admission.py``), so the slice 2 request and advisory keep their field sets
+    and every historical digest of theirs still verifies."""
     for cls in (ReasoningMethodAdvisoryRequest, ReasoningMethodAdvisory):
-        assert not any("comparison" in f.name for f in dataclasses.fields(cls)), cls.__name__
+        assert not any("comparison" in f.name or "evidence_refs" == f.name for f in dataclasses.fields(cls)), cls.__name__
 
 
 def test_p9_undetermined_reversibility_profile_is_allowed():

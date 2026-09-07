@@ -14,7 +14,10 @@ Contents, by specification section:
   UNVERIFIED` as class constants; `ExecutionTelemetry` with mirrored, pinned
   telemetry vocabulary
 - §5 `ReasoningMethodFitAssessment`, `FitOutcome`, `QualityResult`, `ResourceDelta`,
-  `DominationRecord`
+  `DominationRecord`; 0.2.0 adds the product-entry vocabulary
+  `EVIDENCE_STATUS_COMPARISON_EVIDENCE_PRESENT` and `USAGE_SCOPE_ADVISORY_INPUT`,
+  which an *advisory* may carry under `ADR_UGENCE_REASONING_METHOD_PRODUCT_ENTRY.md`;
+  assessments, plans and results stay `RESEARCH_ONLY`
 - §6 `AttestationEnvelope`, `VerificationEnvelope`, `EvidenceStatusView` (shapes only;
   slice 1 issues no envelope)
 - §7 `ReadinessComparisonRequest`, `ReadinessComparisonResult`, `Refusal`

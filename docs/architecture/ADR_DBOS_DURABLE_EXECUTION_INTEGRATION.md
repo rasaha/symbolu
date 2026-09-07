@@ -673,8 +673,20 @@ reachable regardless of engine `[V]` (capability pipeline Appendix B §B.6 ¶2).
 Authority `production_mode` raises `ProductionContainmentError` `[V]`
 (`packages/risk_authority/src/risk_authority/domain/errors.py:19`). ESCALATE now has a
 sink: `packages/integration/governed-review` binds an approval to §8 row 9's parked
-proposal and consumes it before the engine advances (GAS-7 HR-A); the queue and
-decision surfaces (HR-C, HR-D) are not built. Registries are in-memory. Multi-region
+proposal and consumes it before the engine advances (GAS-7 HR-A). **Corrected
+2026-09-06 (VOCAB, RT-SINK-RESTATE):** this passage previously read "the queue and
+decision surfaces (HR-C, HR-D) are not built" and named HOLD, DEFER, ESCALATE and
+MANUAL_REVIEW as unsunk. Both statements are stale. **HR-C is built** —
+`ugence-governed-review-service` 0.6.0 lists the queue, renders a run, records a
+decision and re-arms the instance — and **HR-D is built**, implemented 2026-09-05,
+two screens and five v2 relay routes. And the hook emits only `CLEAR`, `BLOCK`,
+`HOLD` and `ESCALATE`: `DEFER` and `MANUAL_REVIEW` fall to `anything else -> BLOCK`
+and no instance ever parks on them. What remains unsunk is **one** case, a
+`HOLD_NON_EXECUTABLE` carrying no `required_approvals`, ruled deliberately not
+reviewable under HR-5-SCOPE
+(`ADR_UGENCE_AGENT_RUNTIME_PRODUCTION_VALIDATION_SCOPING.md`) — it parks and is
+resumed by an operator, not a reviewer. The monitoring question, that no surface
+tells an operator an instance parked, survives that ruling. Registries are in-memory. Multi-region
 consistency, HSM/KMS custody and key rotation are untouched here. The clock defect in
 §6.4 is open until row 11 passes.
 

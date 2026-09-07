@@ -20,6 +20,7 @@ proposal: the Agent Workforce Composer owns those.
 | Execution | Agent Runtime |
 | Agent eligibility, ranking, team composition, proposed permission bounds | Agent Workforce Composer |
 | Evidence admission | Trusted Evidence Authority / TAP |
+| Reasoning-method fit, and whether an advisory may leave research | Reasoning Method Advisor (`admit`); this package records the admitted reference as typed input, never as authority (`RM-3`, 0.5.0; the signature verification record it cites, `SCR-1`, 0.6.0) |
 
 Owner decisions D1–D5 and the full boundary are recorded in
 [`docs/architecture/ADR_UGENCE_AGENTIC_PROPOSER_MVP_READINESS.md`](../../../docs/architecture/ADR_UGENCE_AGENTIC_PROPOSER_MVP_READINESS.md).

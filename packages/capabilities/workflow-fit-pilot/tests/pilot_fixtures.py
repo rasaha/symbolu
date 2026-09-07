@@ -110,10 +110,22 @@ def rule_set():
     return rf.research_rules_v0()
 
 
+#: The advisor distribution version under which ``V1_MANIFEST_DIGEST_BEFORE_SLICE_2``
+#: was captured. An advisory carries ``advisor_version`` inside its own digest, and the
+#: v1 manifest carries the advisory digest inside *its* digest, so a fixture that read
+#: the installed ``__version__`` would move the historical pin on every advisor release
+#: — which is not what that pin claims to guard (the pilot's own v1 payload). The
+#: fixture therefore restates the captured version literal; the request, catalog,
+#: rule set and evaluation are exactly what ``advise`` produces today.
+ADVISOR_VERSION_AT_V1_CAPTURE = "0.1.0"
+
+
 def advisory(tc: Optional[TaskClassIdentity] = None, tokens=TOKENS):
     tc = tc or task_class(tokens=tokens)
     req = ReasoningMethodAdvisoryRequest(ADVISORY_REQUEST_SCHEMA_VERSION, "pilot.advice", profile(tokens), tc, catalog(), rule_set(), "requester:pilot")
-    return advise(req, advised_at=NOW)
+    adv = advise(req, advised_at=NOW)
+    # Re-settle the self-digest under the captured version literal ("" means compute).
+    return replace(adv, advisor_version=ADVISOR_VERSION_AT_V1_CAPTURE, advisory_digest="")
 
 
 def binding(configuration_digest: str = fx.HEX_A) -> BindingRef:

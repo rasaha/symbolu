@@ -440,9 +440,17 @@ AUTHORIZED_MODULE_BINDING_TEST_MODULES = frozenset(
 #: directory. The same exact symbol grant applies; it is a second named exception, not
 #: a generic one, and the two lent effect capabilities grant nothing here (see
 #: ``tests/authority/test_lent_capability_disjointness.py``).
+#: ``packages/integration/reasoning-method-result-attestation`` — **signed comparison
+#: results.** Authorized by the owner's ruling SCR-1
+#: (``docs/architecture/ADR_UGENCE_SIGNED_COMPARISON_RESULT_SCOPING.md``): reuse this
+#: package's ``TrustAnchorResolverPort`` and anchor representation under one lent
+#: capability, ``COMPARISON_RESULT_ATTESTATION``, with no second trust store and no
+#: package-owned directory. The same exact symbol grant applies; it is a third named
+#: exception, not a generic one, and the lent capability grants nothing here.
 AUTHORIZED_CONSUMERS = (
     "packages/integration/cloud-scaling-producer-attestation",
     "packages/integration/risk-authority-effect-attestation",
+    "packages/integration/reasoning-method-result-attestation",
 )
 
 
@@ -625,6 +633,7 @@ def test_the_consumer_allowlist_is_exactly_the_ratified_set():
     assert AUTHORIZED_CONSUMERS == (
         "packages/integration/cloud-scaling-producer-attestation",
         "packages/integration/risk-authority-effect-attestation",
+        "packages/integration/reasoning-method-result-attestation",
     )
 
 

@@ -435,10 +435,10 @@ falls back to an index.
 
 Tests enforce both directions: nothing outside the standard library and the two
 declared backends is imported, the backends are imported from exactly one
-module, and **exactly one consumer package imports this one**, under an exact,
-reviewed symbol grant.
+module, and **exactly three named consumer packages import this one**, under an
+exact, reviewed symbol grant each.
 
-**The sole consumer exception.**
+**The first consumer exception.**
 `packages/integration/cloud-scaling-producer-attestation` — Cloud Scaling Phase
 5B-0A, producer authenticity — is authorized to import this package's **public
 trust-anchor contracts and resolver port**, and nothing else. The grant exists so
@@ -448,9 +448,12 @@ grown alongside it.
 It is deliberately narrow, and enforced rather than described
 (`tests/packaging/test_dependency_boundary.py`):
 
-* **One consumer.** A second consumer package fails the boundary test, including
-  a sibling directory whose name merely begins with the authorized path — the
-  match is on resolved path components, never a string prefix.
+* **Named consumers only.** The allowlist is a closed tuple of three paths:
+  Cloud Scaling producer attestation (0.3.0), Risk Authority effect attestation
+  (0.4.0) and reasoning-method result attestation (0.6.0). A fourth consumer
+  package fails the boundary test, including a sibling directory whose name
+  merely begins with an authorized path — the match is on resolved path
+  components, never a string prefix.
 * **Exact symbols.** Fifteen production symbols (the trust-anchor contract, the
   resolver port, the Ed25519 key and codec types the contract is spelled in, the
   two ratified signature identifiers and the resolver refusal vocabulary), plus
@@ -474,7 +477,17 @@ receipt-issuance entitlement
 (`tests/authority/test_lent_capability_disjointness.py`). Verification of a
 recommendation attestation belongs entirely to the consumer.
 
-`StaticTrustAnchorDirectory` remains reference grade: the consumer refuses it
+The same grant, one-way arrow and vocabulary-not-authority rule apply to the two
+later consumers. Risk Authority effect attestation (0.4.0, SE-4) is lent
+`EFFECT_ATTESTATION_EXECUTING_PROVIDER` and `EFFECT_ATTESTATION_INDEPENDENT_OBSERVER`.
+Reasoning-method result attestation (0.6.0, SCR-1,
+`docs/architecture/ADR_UGENCE_SIGNED_COMPARISON_RESULT_SCOPING.md`) is lent
+`COMPARISON_RESULT_ATTESTATION`: the key that signs a comparison result as the
+engine that produced it. A verified signature under it proves which engine
+produced the result under which key, never that the comparison is correct, and
+this package verifies nothing under it.
+
+`StaticTrustAnchorDirectory` remains reference grade: every consumer refuses it
 under `production_mode=True`, and every other resolver must opt in explicitly.
 
 This is **not** ADR §30's UVI-EV-1, which remains **DEFERRED**. UVI-EV-1 is
@@ -872,9 +885,11 @@ infrastructure, credential issuance, receipt persistence or distribution
 services, ActionGate or deployment authorization, Cloud Scaling **verification or
 authorization**, and generic multi-algorithm cryptographic agility.
 
-**Exactly one consumer imports this package**, under the exact symbol grant
-described above: Cloud Scaling Phase 5B-0A, for the public trust-anchor contracts
-and resolver port. That package resolves its own anchors and runs its own
-verification; this package supplies the anchor contract and the lent capability
-coordinate, and decides nothing about a Cloud Scaling recommendation. A test
-enforces both the single-consumer rule and the symbol grant.
+**Exactly three named consumers import this package**, under the exact symbol
+grant described above: Cloud Scaling Phase 5B-0A, Risk Authority effect
+attestation and reasoning-method result attestation, each for the public
+trust-anchor contracts and resolver port. Each resolves its own anchors and runs
+its own verification; this package supplies the anchor contract and the lent
+capability coordinates, and decides nothing about a Cloud Scaling recommendation,
+an external effect or a comparison result. A test enforces both the closed
+consumer list and the symbol grant.

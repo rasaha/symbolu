@@ -1,7 +1,7 @@
 {
   "distribution": "ugence-trusted-evidence-authority",
   "namespace": "ugence_trusted_evidence_authority",
-  "package_version": "0.5.0",
+  "package_version": "0.6.0",
   "curated_api_module": "ugence_trusted_evidence_authority.api",
   "note": "Machine-readable snapshot of the curated public API (ugence_trusted_evidence_authority.api.__all__). Generated from the package surface; tests/packaging/test_public_api.py asserts this file equals the actual package surface, and verify_trusted_evidence_authority_distribution.py asserts the same for the built wheel and the isolated installed runtime. Regenerate when the curated API changes.",
   "symbols": {
@@ -590,7 +590,8 @@
         "CLOUD_SCALING_RECOMMENDATION_ATTESTATION",
         "EFFECT_ATTESTATION_EXECUTING_PROVIDER",
         "EFFECT_ATTESTATION_INDEPENDENT_OBSERVER",
-        "TRUST_ANCHOR_SET_PUBLICATION"
+        "TRUST_ANCHOR_SET_PUBLICATION",
+        "COMPARISON_RESULT_ATTESTATION"
       ]
     },
     "TrustAnchorCoordinate": {
