@@ -33,31 +33,31 @@ export function Modules() {
       </TypedGap>
 
       {error && (
-        <div className="rounded-lg border border-red-500/40 bg-red-500/10 p-3 text-sm text-red-300">{error}</div>
+        <div className="rounded-lg border border-red-500/40 bg-red-500/10 p-3 text-sm text-red-700">{error}</div>
       )}
 
       {health && (
         <div>
-          <h3 className="text-xs uppercase tracking-wide text-slate-500 mb-2">
+          <h3 className="text-xs uppercase tracking-wide text-black mb-2">
             Availability probes · from GET /health
           </h3>
           <div className="grid sm:grid-cols-2 gap-3">
             {probes.map(([key, probe]) => (
-              <div key={key} className="rounded-xl border border-white/10 bg-white/5 p-4">
+              <div key={key} className="rounded-xl border border-neutral-300 bg-neutral-50 p-4">
                 <div className="flex items-start justify-between gap-2">
                   <div className="font-mono text-sm">{key}</div>
                   <span
-                    className={`shrink-0 w-2.5 h-2.5 rounded-full mt-1.5 ${probe.available ? 'bg-verdict-allow' : 'bg-slate-600'}`}
+                    className={`shrink-0 w-2.5 h-2.5 rounded-full mt-1.5 ${probe.available ? 'bg-verdict-allow' : 'bg-neutral-400'}`}
                     title={probe.available ? 'engine available' : probe.reason || 'not wired'}
                   />
                 </div>
-                <div className="text-xs text-slate-400 mt-2">
+                <div className="text-xs text-black mt-2">
                   {probe.available ? 'engine available' : probe.reason || 'not wired'}
                 </div>
               </div>
             ))}
           </div>
-          <p className="mt-3 text-[11px] text-slate-500">
+          <p className="mt-3 text-[11px] text-black">
             Audit ceiling, as the service declares it on every answer: {health.audit_ceiling}
           </p>
         </div>

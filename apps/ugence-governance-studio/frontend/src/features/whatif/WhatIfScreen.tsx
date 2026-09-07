@@ -91,11 +91,11 @@ export function WhatIfScreen() {
           </select>
         </div>
         <Controls op={op} fields={fields} set={set} options={options} />
-        <button type="button" onClick={submit} disabled={!canApply} className="rounded border border-[#6aa9ff] bg-surface-3 px-3 py-1.5 text-sm text-ink-0 hover:bg-surface-2 disabled:opacity-50" data-testid="whatif-apply">
+        <button type="button" onClick={submit} disabled={!canApply} className="btn-action" data-testid="whatif-apply">
           Apply
         </button>
         {submitted && (
-          <button type="button" onClick={reset} className="rounded border border-surface-border px-3 py-1.5 text-sm text-ink-2 hover:bg-surface-2" data-testid="whatif-reset">
+          <button type="button" onClick={reset} className="btn-action" data-testid="whatif-reset">
             Reset to baseline
           </button>
         )}

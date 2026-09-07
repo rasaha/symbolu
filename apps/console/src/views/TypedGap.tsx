@@ -22,14 +22,14 @@ export function TypedGap({ code, source, ruling, children }: TypedGapProps) {
   return (
     <div
       role="status"
-      className="rounded-xl border border-dashed border-slate-500/40 bg-slate-500/5 p-4 text-sm text-slate-300"
+      className="rounded-xl border border-dashed border-slate-500/40 bg-neutral-50 p-4 text-sm text-black"
     >
       <div className="flex flex-wrap items-center gap-2 text-[11px]">
         <span className="px-2 py-0.5 rounded-md border border-slate-500/40 font-mono">{code}</span>
-        <span className="font-mono text-slate-400">{source}</span>
-        <span className="text-slate-500">{ruling}</span>
+        <span className="font-mono text-black">{source}</span>
+        <span className="text-black">{ruling}</span>
       </div>
-      <p className="mt-2 text-slate-400">{children}</p>
+      <p className="mt-2 text-black">{children}</p>
     </div>
   );
 }

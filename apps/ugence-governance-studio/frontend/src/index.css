@@ -3,7 +3,7 @@
 @tailwind utilities;
 
 :root {
-  color-scheme: dark;
+  color-scheme: light;
 }
 
 html,
@@ -18,7 +18,7 @@ body {
 
 /* Visible focus for keyboard users everywhere (§24). */
 :focus-visible {
-  outline: 2px solid #6aa9ff;
+  outline: 2px solid #b91c1c;
   outline-offset: 2px;
   border-radius: 2px;
 }
@@ -37,5 +37,12 @@ body {
   @apply sr-only;
 }
 .skip-link:focus {
-  @apply not-sr-only fixed left-3 top-3 z-50 rounded bg-surface-3 px-3 py-2 text-ink-0;
+  @apply not-sr-only fixed left-3 top-3 z-50 rounded bg-action px-3 py-2 text-white;
+}
+
+/* The one button style: red with a white label, everywhere a button acts. */
+@layer components {
+  .btn-action {
+    @apply rounded border border-action bg-action px-3 py-1.5 text-sm font-medium text-white hover:bg-action-hover disabled:cursor-not-allowed disabled:opacity-50;
+  }
 }

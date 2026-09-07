@@ -10,14 +10,14 @@ import { computeLayout } from "./layout";
 
 // Kept in sync with tailwind.config.js state tokens (contrast-verified).
 const TONE_HEX: Record<string, string> = {
-  eligible: "#3ecf8e",
-  ineligible: "#f0685c",
-  indeterminate: "#d9a441",
-  invalid: "#a78bfa",
-  authority: "#5aa2e0",
-  review: "#cf8ccf",
-  governance: "#4fc4cd",
-  deterministic: "#8b95a7",
+  eligible: "#166534",
+  ineligible: "#b91c1c",
+  indeterminate: "#92400e",
+  invalid: "#6d28d9",
+  authority: "#1d4ed8",
+  review: "#a21caf",
+  governance: "#155e75",
+  deterministic: "#4b5563",
 };
 
 export function WorkflowGraph({
@@ -113,7 +113,7 @@ export function WorkflowGraph({
                   height={52}
                   rx={6}
                   fill="#161c2a"
-                  stroke={selected ? "#6aa9ff" : hex}
+                  stroke={selected ? "#b91c1c" : hex}
                   strokeWidth={selected ? 2.5 : 1.5}
                 />
                 <rect width={4} height={52} rx={2} fill={hex} />

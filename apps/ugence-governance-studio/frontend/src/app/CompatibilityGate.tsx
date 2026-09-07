@@ -76,7 +76,7 @@ python -m ugence_governance_studio_api.cli serve`}
       <button
         type="button"
         onClick={() => refetch()}
-        className="mt-4 inline-flex items-center gap-2 rounded border border-surface-border bg-surface-2 px-3 py-2 text-sm text-ink-0 hover:bg-surface-3"
+        className="btn-action mt-4 inline-flex items-center gap-2 px-3 py-2"
       >
         <RefreshCw className={isFetching ? "h-4 w-4 animate-spin" : "h-4 w-4"} aria-hidden="true" />
         Retry compatibility check

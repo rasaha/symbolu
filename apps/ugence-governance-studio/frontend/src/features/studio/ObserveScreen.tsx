@@ -140,7 +140,7 @@ export function ObserveScreen() {
                       <button
                         type="button"
                         onClick={() => setSelected(id)}
-                        className="rounded border border-surface-border bg-surface-2 px-2 py-1 font-mono text-[11px] text-ink-0 hover:bg-surface-3"
+                        className="btn-action px-2 py-1 font-mono text-[11px]"
                       >
                         {id}
                       </button>

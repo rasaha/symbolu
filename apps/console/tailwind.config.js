@@ -6,14 +6,14 @@ export default {
     extend: {
       colors: {
         ugence: {
-          primary: '#4f46e5',
-          accent: '#06b6d4',
+          primary: '#b91c1c',
+          accent: '#7f1d1d',
         },
         verdict: {
-          allow: '#22c55e',
-          hold: '#f59e0b',
-          block: '#ef4444',
-          neutral: '#64748b',
+          allow: '#166534',
+          hold: '#b45309',
+          block: '#b91c1c',
+          neutral: '#4b5563',
         },
       },
     },

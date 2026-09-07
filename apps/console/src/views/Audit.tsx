@@ -26,14 +26,14 @@ export function Audit() {
 
   return (
     <div className="space-y-5">
-      <p className="text-sm text-slate-400">
+      <p className="text-sm text-black">
         Reconstruct a complete decision chain by correlation id — what the agent asserted,
         whether it was supported, who authorized the action, and whether it was safe.
       </p>
 
       <div className="flex gap-2">
-        <div className="flex-1 flex items-center gap-2 bg-slate-900 border border-white/10 rounded-lg px-3">
-          <Search className="w-4 h-4 text-slate-500" />
+        <div className="flex-1 flex items-center gap-2 bg-white border border-neutral-300 rounded-lg px-3">
+          <Search className="w-4 h-4 text-black" />
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
@@ -44,7 +44,7 @@ export function Audit() {
         </div>
         <button
           onClick={() => load(query.trim())}
-          className="px-4 py-2 rounded-lg bg-ugence-primary hover:bg-indigo-500 text-sm font-medium"
+          className="px-4 py-2 rounded-lg bg-red-700 hover:bg-red-800 text-white text-sm font-medium"
         >
           Reconstruct
         </button>
@@ -56,7 +56,7 @@ export function Audit() {
             <button
               key={id}
               onClick={() => load(id)}
-              className="px-2 py-1 rounded-md border border-white/10 bg-white/5 text-xs hover:bg-white/10 font-mono"
+              className="px-2 py-1 rounded-md bg-red-700 text-white text-xs hover:bg-red-800 font-mono"
             >
               {id}
             </button>
@@ -65,18 +65,18 @@ export function Audit() {
       )}
 
       {error && (
-        <div className="rounded-lg border border-red-500/40 bg-red-500/10 p-3 text-sm text-red-300">{error}</div>
+        <div className="rounded-lg border border-red-500/40 bg-red-500/10 p-3 text-sm text-red-700">{error}</div>
       )}
 
       {chain && (
-        <div className="rounded-xl border border-white/10 bg-white/5 p-4">
-          <div className="text-xs text-slate-400">
+        <div className="rounded-xl border border-neutral-300 bg-neutral-50 p-4">
+          <div className="text-xs text-black">
             {chain.correlation_id} · {chain.cer_id} · mode {chain.mode}
           </div>
           <div className="text-sm font-medium mt-1">{chain.final_disposition}</div>
           <table className="w-full mt-4 text-sm">
             <thead>
-              <tr className="text-left text-xs uppercase tracking-wide text-slate-500 border-b border-white/10">
+              <tr className="text-left text-xs uppercase tracking-wide text-black border-b border-neutral-300">
                 <th className="py-2 pr-3">Stage</th>
                 <th className="py-2 pr-3">Module</th>
                 <th className="py-2 pr-3">Decision</th>
@@ -85,15 +85,15 @@ export function Audit() {
             </thead>
             <tbody>
               {chain.entries.map((e, i) => (
-                <tr key={i} className="border-b border-white/5 align-top">
-                  <td className="py-2 pr-3 whitespace-nowrap text-slate-300">{e.stage}</td>
-                  <td className="py-2 pr-3 whitespace-nowrap text-slate-300">{e.module}</td>
+                <tr key={i} className="border-b border-neutral-200 align-top">
+                  <td className="py-2 pr-3 whitespace-nowrap text-black">{e.stage}</td>
+                  <td className="py-2 pr-3 whitespace-nowrap text-black">{e.module}</td>
                   <td className="py-2 pr-3">
                     <span className={`px-2 py-0.5 rounded-md border text-xs font-semibold ${BAND_CLASS[band(e.decision)]}`}>
                       {e.decision}
                     </span>
                   </td>
-                  <td className="py-2 text-slate-400">{e.summary}</td>
+                  <td className="py-2 text-black">{e.summary}</td>
                 </tr>
               ))}
             </tbody>

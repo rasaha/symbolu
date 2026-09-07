@@ -62,7 +62,7 @@ export function RankingScreen() {
             className={
               "rounded border px-3 py-1.5 text-sm " +
               (r.role_id === role.role_id
-                ? "border-[#6aa9ff] bg-surface-3 text-ink-0"
+                ? "border-[#b91c1c] bg-surface-3 text-ink-0"
                 : "border-surface-border bg-surface-1 text-ink-2 hover:bg-surface-2")
             }
           >
@@ -84,7 +84,7 @@ export function RankingScreen() {
           <option value="identity">Agent identity (presentation)</option>
         </select>
         {sort !== "canonical" && (
-          <button type="button" onClick={() => setSort("canonical")} className="rounded border border-surface-border px-2 py-1 text-xs text-ink-2 hover:bg-surface-2">
+          <button type="button" onClick={() => setSort("canonical")} className="btn-action px-2 py-1 text-xs">
             Reset to canonical rank
           </button>
         )}
@@ -145,7 +145,7 @@ function RankRow({ c, provider, open, onToggle }: { c: RankedCandidate; provider
             type="button"
             aria-expanded={open}
             onClick={onToggle}
-            className="rounded border border-surface-border bg-surface-2 px-2 py-1 text-xs text-ink-0 hover:bg-surface-3"
+            className="btn-action px-2 py-1 text-xs"
             data-testid={`breakdown-${c.agent_id}`}
           >
             {open ? "Hide" : "Show"} breakdown

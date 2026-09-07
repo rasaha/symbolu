@@ -54,11 +54,11 @@ export function GovernedLoop() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-2 text-xs font-medium text-amber-400">
+      <div className="flex items-center gap-2 text-xs font-medium text-amber-800">
         <span className="px-2 py-0.5 rounded-full border border-amber-400/40 bg-amber-400/10">
           SHADOW MODE
         </span>
-        <span className="text-slate-400">evaluate &amp; record — nothing is changed</span>
+        <span className="text-black">evaluate &amp; record — nothing is changed</span>
       </div>
 
       <TypedGap
@@ -72,8 +72,8 @@ export function GovernedLoop() {
       </TypedGap>
 
       {/* scenario id, typed */}
-      <div className="rounded-xl border border-white/10 bg-white/5 p-4">
-        <label htmlFor="scenario-id" className="block text-sm text-slate-300 mb-2">
+      <div className="rounded-xl border border-neutral-300 bg-neutral-50 p-4">
+        <label htmlFor="scenario-id" className="block text-sm text-black mb-2">
           Kubernetes / infrastructure-agent workflow · scenario id
         </label>
         <div className="flex flex-col sm:flex-row gap-3">
@@ -83,12 +83,12 @@ export function GovernedLoop() {
             onChange={(e) => setSelected(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && run()}
             placeholder="scenario id"
-            className="flex-1 bg-slate-900 border border-white/10 rounded-lg px-3 py-2 text-sm font-mono outline-none"
+            className="flex-1 bg-white border border-neutral-300 rounded-lg px-3 py-2 text-sm font-mono outline-none"
           />
           <button
             onClick={run}
             disabled={running || !selected.trim()}
-            className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-ugence-primary hover:bg-indigo-500 disabled:opacity-50 text-sm font-medium"
+            className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-red-700 hover:bg-red-800 text-white disabled:opacity-50 text-sm font-medium"
           >
             {running ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />}
             Run governed loop
@@ -97,7 +97,7 @@ export function GovernedLoop() {
       </div>
 
       {error && (
-        <div className="rounded-lg border border-red-500/40 bg-red-500/10 p-3 text-sm text-red-300">
+        <div className="rounded-lg border border-red-500/40 bg-red-500/10 p-3 text-sm text-red-700">
           {error}
         </div>
       )}
@@ -114,18 +114,18 @@ export function GovernedLoop() {
           </div>
 
           {/* stage trail */}
-          <ol className="relative border-l border-white/10 ml-3 space-y-4">
+          <ol className="relative border-l border-neutral-300 ml-3 space-y-4">
             {result.stages.map((s, i) => {
               const b = band(s.decision);
               return (
                 <li key={i} className="ml-6">
-                  <span className="absolute -left-3 flex items-center justify-center w-6 h-6 rounded-full bg-slate-800 border border-white/10">
+                  <span className="absolute -left-3 flex items-center justify-center w-6 h-6 rounded-full bg-neutral-100 border border-neutral-300">
                     {STAGE_ICON[s.stage] || <Filter className="w-4 h-4" />}
                   </span>
-                  <div className="rounded-lg border border-white/10 bg-white/5 p-3">
+                  <div className="rounded-lg border border-neutral-300 bg-neutral-50 p-3">
                     <div className="flex items-center justify-between gap-3">
                       <div>
-                        <span className="text-xs uppercase tracking-wide text-slate-400">
+                        <span className="text-xs uppercase tracking-wide text-black">
                           {s.stage} · {s.capability}
                         </span>
                         <div className="text-sm font-medium">{s.module}</div>
@@ -134,9 +134,9 @@ export function GovernedLoop() {
                         {s.decision}
                       </span>
                     </div>
-                    <p className="mt-1 text-xs text-slate-400 italic">{s.question}</p>
-                    <p className="mt-1 text-sm text-slate-200">{s.summary}</p>
-                    <div className="mt-1 text-[11px] text-slate-500">{s.module_maturity}</div>
+                    <p className="mt-1 text-xs text-black italic">{s.question}</p>
+                    <p className="mt-1 text-sm text-black">{s.summary}</p>
+                    <div className="mt-1 text-[11px] text-black">{s.module_maturity}</div>
                   </div>
                 </li>
               );

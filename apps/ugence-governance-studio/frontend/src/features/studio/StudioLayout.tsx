@@ -35,7 +35,7 @@ export function StudioLayout() {
             className={({ isActive }) =>
               `rounded border px-3 py-1.5 text-[12px] font-medium ${
                 isActive
-                  ? "border-ink-3 bg-surface-3 text-ink-0"
+                  ? "border-action bg-action text-white"
                   : "border-surface-border bg-surface-1 text-ink-1 hover:bg-surface-2"
               }`
             }

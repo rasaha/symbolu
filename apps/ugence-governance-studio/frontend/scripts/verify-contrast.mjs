@@ -112,7 +112,7 @@ const T = (group, key) => {
   if (!v) throw new Error(`missing token ${group}.${key}`);
   return v;
 };
-const ACCENT = "#6aa9ff"; // focus ring / accent (index.css :focus-visible)
+const ACCENT = "#b91c1c"; // focus ring / accent (index.css :focus-visible); also the action colour
 
 // Effective background for a `bg-state-X/10` tint over a surface.
 const tint = (group, key, surface) => composite(T(group, key), 0.1, surface);
@@ -138,6 +138,7 @@ export function buildPairs() {
   add("link/accent on primary background", ACCENT, s0, "non_text_ui", 0, 0, "Accent/link affordance and border; non-text UI (3.0). Ratio also exceeds normal-text 4.5.");
   add("focus indicator on primary background", ACCENT, s0, "focus_indicator", 0, 0, "Focus ring is a non-text UI component (SC 1.4.11, 3.0).");
   add("button text (normal) on surface-2", T("ink", "0"), s2, "normal_text", 14, 600, "Enabled button label 14px/600 meets normal-text 4.5.");
+  add("action button label on action background", "#ffffff", T("action", "DEFAULT"), "normal_text", 14, 500, "Red action button with a white label 14px/500 meets normal-text 4.5.");
   add("button text (disabled) on surface-2", T("ink", "3"), s2, "normal_text", 14, 600, "Disabled control label; brightened ink-3 meets normal-text 4.5 — no inactive-component exception relied upon.");
   add("table body text on card", T("ink", "1"), s1, "normal_text", 14, 400, "Table cell copy 14px/400 meets normal-text 4.5.");
   add("table header text on surface-2", T("ink", "2"), s2, "normal_text", 12, 600, "Table header 12px/600 meets normal-text 4.5.");
@@ -207,6 +208,7 @@ function main() {
     "focus indicator",
     "button text (normal)",
     "button text (disabled)",
+    "action button label",
     "table body text",
     "table header text",
     "drawer/dialog text",
