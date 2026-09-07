@@ -13,7 +13,9 @@ wheels are local, zero third-party deps), then proves inside that env:
   * ``ugence_policy_authority`` imports from site-packages and ships py.typed;
   * the **old** ``ugence_uvi_policy_authority`` namespace is NOT importable, and
     exactly one top-level namespace shipped;
-  * the version, authority protocol id and canonicalization version are exact;
+  * the shipped ``__version__`` equals the installed distribution metadata, and the
+    wheel under test was built from this checkout's declared version;
+  * the authority protocol id and canonicalization version are exact;
   * the generic core imports no policy family and branches on none;
   * a second, synthetic policy family works with no core change;
   * all five merged UVI families issue, resolve and verify end to end;
@@ -34,6 +36,7 @@ Exit code 0 on success; non-zero on the first failed step.
 
 from __future__ import annotations
 
+import ast
 import shutil
 import subprocess
 import sys
@@ -51,14 +54,47 @@ SOURCES = {
     "ugence_governance_contracts": REPO / "packages" / "governance-contracts",
 }
 
+
+def source_version() -> str:
+    """The version this checkout declares, read without importing the package.
+
+    ``pyproject.toml`` takes the distribution version from this attribute, so the
+    wheel built below carries it. Parsing rather than importing keeps the monorepo
+    off the verifying process's import path.
+    """
+    module = PKG / "src" / "ugence_policy_authority" / "__init__.py"
+    tree = ast.parse(module.read_text(encoding="utf-8"))
+    for node in tree.body:
+        if isinstance(node, ast.Assign) and any(
+            isinstance(t, ast.Name) and t.id == "__version__" for t in node.targets
+        ):
+            return ast.literal_eval(node.value)
+    raise AssertionError(f"__version__ not found in {module}")
+
+
+def wheel_version(archive: zipfile.ZipFile) -> str:
+    """The version a built wheel declares, read from its own ``METADATA``."""
+    metadata = [n for n in archive.namelist() if n.endswith(".dist-info/METADATA")]
+    assert len(metadata) == 1, metadata
+    for line in archive.read(metadata[0]).decode("utf-8").splitlines():
+        if line.startswith("Version:"):
+            return line.split(":", 1)[1].strip()
+    raise AssertionError(f"no Version in {metadata[0]}")
+
+
 _CHECK = r'''
-import ast, dataclasses, hashlib, importlib.util, pathlib, sys, unicodedata
+import ast, dataclasses, hashlib, importlib.metadata, importlib.util, pathlib, sys, unicodedata
 from dataclasses import dataclass, replace
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 import ugence_policy_authority as pa
-assert pa.__version__ == "0.3.0", pa.__version__
+# The version is checked against the installed distribution metadata rather than a
+# literal: a pinned literal goes stale on the next release and fails a verifier
+# nothing runs. The outer script separately proves the wheel under test was built
+# from this checkout's source version, so the pair still pins an exact version.
+_installed = importlib.metadata.version("ugence-policy-authority")
+assert pa.__version__ == _installed, (pa.__version__, _installed)
 assert "site-packages" in pa.__file__, pa.__file__
 assert not any("/symbolu" in p for p in sys.path), sys.path
 ROOT = pathlib.Path(pa.__file__).resolve().parent
@@ -394,6 +430,13 @@ def main() -> int:
         authority_wheel = next(links.glob("ugence_policy_authority-*.whl"))
         with zipfile.ZipFile(authority_wheel) as zf:
             names = zf.namelist()
+            built = wheel_version(zf)
+        # The wheel under test must come from this checkout, so the in-environment
+        # check below pins an exact version without naming one. Read from METADATA
+        # rather than the filename, which carries an escaped form of the version.
+        declared = source_version()
+        assert built == declared, (built, declared)
+        print(f"      wheel version {built} matches the declared source version")
         assert any(n.endswith("ugence_policy_authority/py.typed") for n in names), (
             "py.typed missing from the wheel"
         )

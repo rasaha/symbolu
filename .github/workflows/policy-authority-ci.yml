@@ -1,0 +1,96 @@
+name: policy-authority-ci
+
+# Scoped CI for the shared Ugence Policy Authority
+# (docs/architecture/ADR_UGENCE_POLICY_AUTHORITY.md, P-1 … P-11).
+#
+# The package had no workflow of its own. Its suite ran only inside consumers'
+# workflows (agent-constitution-ci, agentic-proposer-strategy-permission-ci,
+# authoritative-policy-compilation-ci), and the two verification entry points its
+# README names — verify_policy_authority_distribution.py and adversarial_probes.py —
+# ran nowhere. Nothing caught the distribution verifier asserting a version the
+# package had already moved past. The sibling authority packages
+# (benchmark-registry, benchmark-registry-authority, trusted-evidence-authority)
+# each run theirs in CI; this brings the Policy Authority in line.
+#
+# No authority semantics are exercised differently here than by the suite itself:
+# the jobs run what already existed. The package is stdlib-only apart from the
+# ugence-uvi-policy-contracts leaf, uses no secret, and contacts no external
+# service; all key material in the suite and probes is fixed non-production test
+# material.
+
+on:
+  pull_request:
+    paths:
+      - "packages/policy-authority/**"
+      - "packages/uvi-policy-contracts/**"
+      - "docs/architecture/ADR_UGENCE_POLICY_AUTHORITY.md"
+      - ".github/workflows/policy-authority-ci.yml"
+  push:
+    # Feature branches and the repository's actual default branch, so a merge
+    # touching the package gets a recorded run.
+    branches:
+      - "claude/setup-symbolu-monorepo-**"
+      - "claude/**"
+    paths:
+      - "packages/policy-authority/**"
+      - "packages/uvi-policy-contracts/**"
+      - "docs/architecture/ADR_UGENCE_POLICY_AUTHORITY.md"
+      - ".github/workflows/policy-authority-ci.yml"
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  package-suite:
+    name: Policy Authority package suite (source)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        # The package itself is stdlib-only; the repository conftest puts src/ and
+        # the uvi-policy-contracts leaf on sys.path, so nothing first-party is
+        # installed here.
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest
+      - name: Package suite (contract, authority, packaging)
+        run: python -m pytest packages/policy-authority/tests -q
+      - name: public_api.json equals the actual curated surface
+        run: python -m pytest packages/policy-authority/tests/packaging/test_public_api.py -q
+      - name: py.typed marker ships
+        run: test -f packages/policy-authority/src/ugence_policy_authority/py.typed
+
+  adversarial-probes:
+    name: Independent adversarial probes (source)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Probe harness (curated API + stdlib only)
+        # Imports no test module, fixture or conftest, and bootstraps its own
+        # sys.path — so it needs no installation step and no PYTHONPATH.
+        run: python packages/policy-authority/adversarial_probes.py
+
+  isolated-install:
+    name: Wheel build and isolated --no-index installation verification
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install build tooling
+        run: |
+          python -m pip install --upgrade pip
+          pip install build
+      - name: Build three wheels, install --no-index into a clean venv, prove the boundary
+        # Also asserts the built wheel carries this checkout's declared version and
+        # that the installed module agrees with its distribution metadata — the
+        # check that replaced a hard-coded version literal.
+        run: python packages/policy-authority/verify_policy_authority_distribution.py
