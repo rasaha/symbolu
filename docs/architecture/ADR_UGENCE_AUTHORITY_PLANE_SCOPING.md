@@ -515,3 +515,85 @@ mismatched assertions, against at least one real enterprise issuer), re-serving 
 the plane app's manifest re-bound to the new hash with the two writes approved, and the
 app-side controls restored from `c3b1ad8c`. The functional design is not reopened
 unless that validation exposes a contract incompatibility.
+
+## 19 — Owner ruling AX-1 to AX-5: where the five pending acts execute (owner, 2026-09-07)
+
+This ruling is documentation. No file outside this record changes under it, and
+nothing here is implemented before AP-3 is met.
+
+### 19.1 — The audit it answers
+
+Asked where the plane's five pending acts should execute, the audit established, from
+the repository: activate and issue act on the `SqlitePolicyRegistry` that the studio
+deployment opens once with deny-all verifiers and a refusing signer, a store with a
+process owner that SD-2 forbids from naming either act `[V]`; tenant emergency stop is
+implemented as `AuthorityLifecycleService.emergency_stop` under the capability
+`authority.lifecycle.emergency_stop`, over an RA-6 authority store that no deployable
+composes `[V]`; agent suspension is a targeted RA-6 subject revocation over the same
+store, since execution assurance emits `EXECUTION_EFFECT_MISMATCH` into the RA-6 intake
+and RA-6 owns authority consequences `[V]`; credential grants are single-use with a
+lifetime of at most fifteen minutes, held in memory, with no revocation operation and
+no deployable composing the broker `[V]`; and only the governed runtime worker composes
+the identity adapter `[V]`.
+
+### 19.2 — The ruling
+
+| # | Ruling |
+|---|---|
+| **AX-1** | **`COMPOSE_STATUS_STORE_IN_THE_WORKER`.** No deployable owns the RA-6 status store, so composing it into the worker establishes the first operational writer rather than duplicating one. The worker may then host tenant emergency stop, targeted agent or subject suspension, authority epoch advancement, and the status reads required before governed operations. Agent suspension is a targeted RA-6 authority revocation, not a new independent governance capability. A separate Risk Authority service would add a deployment and a network boundary without solving an ownership conflict. |
+| **AX-2** | **`MOVE_REGISTRY_TO_THE_WORKER`, with an atomic no-dual-owner cutover.** The studio must not remain the physical owner of an authoritative policy registry while forbidden from exposing its writes. After the move the worker owns the one registry instance and the activation and issuance composition; the studio uses read-only relay routes and never opens or writes the registry file; no second registry copy is created. **A transition period in which both processes open the registry independently is prohibited.** Sequence: (1) add worker-owned registry composition; (2) add an authenticated read relay; (3) move the studio's reads to the relay; (4) remove the studio's registry opening; (5) only then commission activation or issuance routes. |
+| **AX-3** | **`OWNER_PROVISIONED_SIGNER_PORT`.** A file key is unsuitable: repository, image, filesystem and rotation risk. The signer port must be capable of being backed by AWS KMS, Google Cloud KMS, Azure Key Vault, HashiCorp Vault, or an enterprise HSM or signing service. The worker receives only a signer interface and a key reference, never exportable private-key material. Issuance stays unavailable when no signer is configured, the key reference is invalid, the signer cannot establish its issuer identity, the requested tenant is outside the configured key scope, the key is disabled or expired, or AP-3 identity validation has not succeeded. This is fail-closed configuration, not a fallback to an internal key. |
+| **AX-4** | **`NO_PLATFORM_CREDENTIAL_REVOCATION_ACT_IN_THIS_PHASE`.** Ugence does not build a provider-independent credential-revocation act in this phase. Single-use grants, bounded lifetime and authority-epoch advancement stop future issuance and replay. Revocation of an already issued provider credential remains the responsibility of the external credential provider or a later provider-specific adapter. What is not proven, and must not be claimed: that epoch advancement revokes a credential an external provider has already materialized, cancels an active cloud session, or revokes a downstream token whose lifetime and custody are outside the broker. |
+| **AX-5** | **`VERIFIED_PRINCIPAL_PLUS_DIRECTORY_GRANT`.** The chain is: enterprise identity provider authenticates the human; the AP-3 identity adapter verifies issuer and principal; the authority directory verifies a scoped grant; the `WriterAuthorizer` admits the exact capability; the RA-6 lifecycle write proceeds. The worker receives a verified principal context from the identity adapter and then requires a directory grant for the exact tenant, the exact authority role, the exact capability, a permitted target scope, an effective time window, and a non-revoked delegation. For emergency stop, a write is allowed only when identity is verified, the issuer is trusted, the directory grant is active, the tenant matches and the capability matches. A platform administrator role alone never implies emergency-stop authority. |
+
+### 19.3 — What this ruling supersedes
+
+- The studio deployment's ownership of the authoritative policy-registry process
+  (`deployment/governance-studio/.../activation.py`, `app.py`), and §5's placement of
+  activation "permanently outside the studio" without a named home.
+- Any assumption that the studio may write activation or issuance state.
+- The absence of a deployable owner for RA-6 lifecycle state, and §5's row placing the
+  tenant emergency stop on "Risk Authority's own administrative path" without a process.
+- Any implication that emergency stop requires a separate Risk Authority service.
+- Any requirement for generic credential revocation in the present phase.
+- Any reading of a presented human reference as authenticated authority.
+
+AP-1 to AP-5, AW-2 to AW-5, §18 (AP-3 controlling), §10's "no second writer", SD-1,
+SD-2, D-5 and CR-3 are not reopened.
+
+### 19.4 — What this ruling does not authorize
+
+- Implementation before AP-3 is met.
+- Any unauthenticated authority-plane write.
+- Activation or issuance merely because the registry moved.
+- Issuance without an owner-provisioned signer.
+- Private keys in the repository, the image, an environment file or a SQLite database.
+- Direct studio writes to either authority store.
+- A second policy registry or a second RA-6 store.
+- LIVE execution.
+- Credential issuance or custody.
+- Provider-side credential revocation.
+- Broad tenant suspension from a subject-targeted revocation.
+- Treating identity-provider authentication as organizational authority.
+- Treating a directory grant as proof of human identity.
+
+### 19.5 — Sequence behind AP-3
+
+Nothing below starts before the enterprise issuer validation §18 requires is recorded.
+
+1. **AX-1, composition:** the worker composes the RA-6 authority store and lifecycle
+   service; the plane's contract gains the emergency-stop, epoch-advance and targeted
+   subject-revocation operations, unserved; the `WriterAuthorizer` is composed per AX-5
+   over the identity port and the directory.
+2. **AX-2, cutover, in the ruled order:** worker-owned registry composition; the
+   authenticated read relay; the studio's Authority and Constitution reads moved to it
+   under a v2 amendment; the studio's registry opening removed; only then activation
+   and issuance routes commissioned, unserved.
+3. **AX-3, signer:** the signer port composed from configuration, fail closed on every
+   condition in AX-3; issuance served only when the port answers and AP-3 is met.
+4. **Re-serving:** each act is named served in the contract only with its own record,
+   after AP-3, under AX-5's condition; the two grant writes follow §18.3.
+
+In one sentence, the owner's own: the studio displays and requests; the authority-plane
+worker authenticates, authorizes and writes; each authoritative store has one process
+owner; external custody remains external.
