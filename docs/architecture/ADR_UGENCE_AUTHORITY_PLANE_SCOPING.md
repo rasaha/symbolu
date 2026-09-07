@@ -698,3 +698,54 @@ executes without skips and passes; otherwise report `NOT_MET` and stop.
    own record.
 
 Identity validation stays ahead of every authority-plane mutation, as §19 intends.
+
+## 21 — Ruling on the two questions raised by the enterprise-readiness evaluation (2026-09-07)
+
+This section is documentation. Nothing is implemented under it, and nothing here
+changes §18, §19 or §20.
+
+### 21.1 — What was evaluated
+
+An external evaluation of enterprise readiness was read against the repository. Its
+four-way split (governance decides; identity proves; infrastructure bounds; the broker
+releases last) is already the repository's law `[V]` (SD-2, AP-4, AP-3, AX-5, CR-3,
+D-4), and its "most urgent path" is the sequence already ratified in §19.5 and §20.5.
+It is behind the code in one respect: the composed worker already refuses a decision
+without an issuer proof when an identity port is present and records
+`IDP_AUTHENTICATED`; what is missing is evidence against a real issuer, which is why
+AP-3 reads BLOCKED (§20). It names real gaps `[G]`: cryptographic workload identity for
+agents, monetary approval limits and jurisdiction on grants, provisioning-driven
+deprovisioning, KMS or vault backing for the broker, a tenant hierarchy, backup and
+outbox, suspension propagating to queues and connectors, a governed connector model.
+These are later phases, not corrections, and none is scoped by this record.
+
+Two of its recommendations touch rulings already made, and only those two are ruled
+here.
+
+### 21.2 — The ruling
+
+Applied under the owner's standing direction that recommended defaults apply, and
+recorded as such: either may be reversed by the owner's word, as AW-1 was (§18).
+
+| # | Question | Ruling |
+|---|---|---|
+| **EN-1** | Where guided enterprise configuration lives (organization setup, identity-provider connection, owner and authority mapping, environment promotion, incident dashboard) | **`AUTHORITY_PLANE_NOT_STUDIO`.** Guided configuration is added to the authority plane, screen by screen, each under the same identity gate as every other act of the plane, and each with its own record. The Studio keeps typed intake and display: MA-1, MS-1 and §19's sentence stand, composition stays deployment environment attested at startup and shown read-only on the Studio's Status panel, and an evaluation that makes the Studio "the configuration and onboarding plane" is refused as written. A fourth administrative surface is not admitted; the plane is that surface. |
+| **EN-2** | Whether incident and remediation orchestration is a new capability | **`RA6_CONSEQUENCE_PROPAGATION`.** It is not a new capability. Suspending an agent, stopping pending executions, revoking its credentials, disabling a connector and freezing a policy domain are consequences of RA-6 lifecycle writes (targeted subject revocation, epoch advance, emergency stop) propagating outward. It is scoped under AX-1 when the RA-6 store is composed into the worker, as propagation seams from that store to the runtime, the broker, the queues and the connectors, each fail-closed. A separate orchestrator that could suspend without an RA-6 write would be a second authority, and is refused. |
+
+### 21.3 — What this ruling supersedes, and what it does not authorize
+
+**Supersedes** nothing already ruled. It refuses two readings of the evaluation and
+keeps MA-1, MS-1, MA-2 as amended, AP-1 to AP-5, AW-2 to AW-5, AX-1 to AX-5 and §18 to
+§20 as they stand.
+
+**Does not authorize:** any configuration screen on the authority plane before AP-3 is
+`MET` (§20); any write on any surface before AP-3 is `MET`; any propagation seam before
+AX-1's composition; any change to the Studio's allowlist or contract; a tenant
+hierarchy, workload identity, provisioning integration, connector model or persistence
+change, each of which needs its own scoping and ballot; LIVE execution.
+
+### 21.4 — Sequence
+
+Unchanged: §20.5 in full, then, after AX-1's composition, the propagation seams of
+EN-2; and, after the first authority-plane write is served with its own record, the
+first guided-configuration screen of EN-1, each screen its own slice.
