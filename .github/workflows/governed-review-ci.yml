@@ -6,6 +6,16 @@ name: governed-review-ci
 # REAL PostgreSQL (the DBOS adapter) and a real SQLite ledger, so Postgres is installed
 # and driven with pg_ctl exactly as durable-execution-ci does. A skipped row is not a
 # passing row: the last step fails the job if any row skipped.
+#
+# The suite job runs on 3.10, 3.11 and 3.12 — the whole range this package declares
+# with requires-python >= 3.10, and which no job ran until now. What blocked 3.10 was
+# a bare `import tomllib` in the packaging/boundary test: stdlib only from 3.11, and a
+# bare import, so installing the backport was not enough and the import itself had to
+# change. It now falls back to `tomli`, which this job installs — a hard import rather
+# than pytest.importorskip, so a missing backport fails loudly instead of silently
+# dropping the assertions from the 3.10 leg. The `build` job stays on one interpreter, for the
+# artifact reason above. The suite leg is matrixed in full, PostgreSQL cluster included:
+# a 3.10 leg that skipped the database rows would be reporting on a suite it did not run.
 
 on:
   pull_request:
@@ -30,8 +40,13 @@ defaults:
 
 jobs:
   review-suite:
-    name: Human-review matrix rows (real PostgreSQL + SQLite ledger)
+    name: Human-review matrix rows (real PostgreSQL + SQLite ledger, py${{ matrix.python-version }})
     runs-on: ubuntu-latest
+    strategy:
+      # One interpreter's failure must not hide another's.
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.11", "3.12"]
     env:
       PGVERSION: "16"
       PGPORT: "5433"
@@ -45,7 +60,7 @@ jobs:
 
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          python-version: "${{ matrix.python-version }}"
 
       - name: Install PostgreSQL server binaries
         run: |
@@ -69,7 +84,7 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install pytest pydantic "dbos>=2.0" "SQLAlchemy>=2.0" "psycopg[binary]>=3.1"
+          pip install pytest pydantic "dbos>=2.0" "SQLAlchemy>=2.0" "psycopg[binary]>=3.1" tomli
 
       - name: Binding, unit level (real SQLite ledger)
         run: |

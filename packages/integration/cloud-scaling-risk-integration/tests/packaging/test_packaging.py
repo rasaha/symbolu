@@ -15,7 +15,10 @@ import ast
 import os
 import pathlib
 
-import tomllib
+try:  # Python 3.11+ ships tomllib; 3.10 resolves the same parser from tomli.
+    import tomllib
+except ModuleNotFoundError:  # pragma: no cover - only a <3.11 run takes this branch
+    import tomli as tomllib  # type: ignore[no-redef]
 
 import ugence_cloud_scaling_risk_integration
 

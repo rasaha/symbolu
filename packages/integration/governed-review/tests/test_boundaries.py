@@ -11,7 +11,11 @@ from __future__ import annotations
 import ast
 import pathlib
 import sys
-import tomllib
+
+try:  # Python 3.11+ ships tomllib; 3.10 resolves the same parser from tomli.
+    import tomllib
+except ModuleNotFoundError:  # pragma: no cover - only a <3.11 run takes this branch
+    import tomli as tomllib  # type: ignore[no-redef]
 
 import pytest
 
