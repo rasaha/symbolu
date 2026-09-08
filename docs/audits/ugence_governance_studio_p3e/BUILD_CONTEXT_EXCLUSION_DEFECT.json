@@ -6,7 +6,7 @@
   "status": "REPORTED; FIX COMMITTED; BUILD STILL UNPROVEN",
   "status_note": "This record reports a defect and answers three questions about the P3E record set. It marks no gate passed, withdraws no evidence, changes no ratified pin and asserts no build. Commit 20c6560a adds the two Dockerfile.dockerignore files; no image has been produced from either Dockerfile, then or now.",
   "defect": {
-    "statement": "deployment/governance-studio/Dockerfile is built with the repository root as its build context. Docker reads the .dockerignore at the context root, not one beside the Dockerfile. The repository root .dockerignore is `*` followed by re-includes for `symbolu/` and one requirements path — it was written for the GKE controller image (deploy/gke). Under it every COPY source of the P3E Dockerfile lies outside the context, so the build fails at its first COPY.",
+    "statement": "deployment/governance-studio/Dockerfile is built with the repository root as its build context. Docker reads the .dockerignore at the context root, not one beside the Dockerfile. Until 2026-09-08 the repository root .dockerignore was `*` followed by re-includes for `symbolu/` and one requirements path — rules written for the GKE controller image (deploy/gke) and for nothing else. Under them every COPY source of the P3E Dockerfile lay outside the context, so the build failed at its first COPY. Those rules now live in deploy/gke/Dockerfile.dockerignore, where that image's build reads them and no other build does; the root file is ordinary repository-wide excludes.",
     "invocation_sites": [
       {
         "where": ".github/workflows/governance-studio-p3e-private-hosted-ci.yml:245 (was :216 before the build-context-conformance step was added)",
@@ -28,7 +28,8 @@
       "governed_runtime_worker_copy_sources": 19,
       "governed_runtime_worker_excluded_by_root_dockerignore": 19
     },
-    "also_affects": "deployment/governed-runtime-worker/Dockerfile, invoked identically at .github/workflows/governed-runtime-worker-ci.yml:222 (was :208)"
+    "also_affects": "deployment/governed-runtime-worker/Dockerfile, invoked identically at .github/workflows/governed-runtime-worker-ci.yml:222 (was :208)",
+    "statement_tense_note": "This entry was written while the root file still held those rules. It is restated in the past tense to match the tree after the root fix; nothing it asserted is withdrawn, and the counts below are unchanged."
   },
   "verification": {
     "method": "Every COPY source of both Dockerfiles (--from= stage copies excluded) was evaluated against the context-root .dockerignore and against the new sibling file, applying dockerignore ordering semantics: patterns in order, ancestors considered, last match wins, `!` re-includes. Each source was also checked to exist on disk.",
@@ -129,14 +130,15 @@
     "closed_by": {
       "check": "build-context-conformance",
       "script": "deployment/governance-studio/ci/verify_build_context.py (shared; each job names the Dockerfile it owns)",
-      "what_it_asserts": "For each deployment Dockerfile, every COPY source (--from= stage copies excluded) exists on disk and is not excluded by the .dockerignore the build will actually read: the sibling <dockerfile>.dockerignore where one exists, the context root's otherwise. Dockerignore ordering semantics are applied — patterns in order, anchored at the context root, parents matched as Docker matches them, last match wins, `!` re-includes.",
+      "what_it_asserts": "For each deployment Dockerfile, every COPY source (--from= stage copies excluded) exists on disk and is not excluded by the .dockerignore the build will actually read: the sibling <dockerfile>.dockerignore where one exists, the context root's otherwise. Dockerignore ordering semantics are applied — patterns in order, anchored at the context root, parents matched as Docker matches them, last match wins, `!` re-includes. With --root-build it also checks the declared inputs of the repository-root buildpack build, which has no Dockerfile and therefore no sibling file to prefer: each input is recorded with why the build needs it, and checked against the context root's file.",
       "wired_into": [
         ".github/workflows/governance-studio-p3e-private-hosted-ci.yml job 'application', after ratified-pin-conformance — both Dockerfiles; this job guards every push",
         ".github/workflows/governance-studio-p3e-private-hosted-ci.yml job 'container', after ratified-pin-conformance and ahead of mirror-digest-conformance — the studio Dockerfile",
-        ".github/workflows/governed-runtime-worker-ci.yml job 'container', after ratified-pin-conformance and ahead of mirror-digest-conformance — the worker Dockerfile"
+        ".github/workflows/governed-runtime-worker-ci.yml job 'container', after ratified-pin-conformance and ahead of mirror-digest-conformance — the worker Dockerfile",
+        ".github/workflows/governance-studio-p3e-private-hosted-ci.yml job 'application' also passes --root-build and deploy/gke/Dockerfile, so all three Dockerfiles and the no-Dockerfile root build are checked on every push (c45ba52b)"
       ],
       "runs_without": "a container runtime, a registry, a daemon or any network. It is not behind mirror_ready, so it executes on every run.",
-      "validated": "Passes on the committed tree (29 and 19 sources, none excluded, none missing). With the two Dockerfile.dockerignore files temporarily removed — the state before commit 20c6560a — it exits 1 and reports all 48 sources excluded by '*' in the root file, so it reproduces the defect it exists to catch. A synthetic Dockerfile confirms a --from= stage copy is skipped and a non-existent source is reported.",
+      "validated": "Passes on the committed tree (29 and 19 sources, none excluded, none missing). With the two Dockerfile.dockerignore files temporarily removed — the state before commit 20c6560a — it exits 1 and reports all 48 sources excluded by '*' in the root file, so it reproduces the defect it exists to catch. A synthetic Dockerfile confirms a --from= stage copy is skipped and a non-existent source is reported. Against the old root rules the --root-build check exits 1 on four of the five inputs, reproducing the live deployment failure rather than describing it.",
       "label": "[V]"
     },
     "ratified_status": {
@@ -152,8 +154,40 @@
     "governed_runtime_worker_image": "NEVER BUILT",
     "gates": "every P3E-CTR gate and every GRW-CTR gate remains NOT_EXECUTED",
     "evidence_manifests": "INCOMPLETE, unchanged",
-    "what_the_fix_establishes": "only that the context a build reads now contains the sources the Dockerfile names, verified per source and now asserted on every CI run by build-context-conformance",
+    "what_the_fix_establishes": "only that the context each build reads now contains the sources or inputs it names, verified per source and per input, and asserted on every CI run by build-context-conformance including --root-build",
     "what_remains_unproven": "that either image builds. Pip resolution, layer contents, image size and every runtime gate are untested; the mirror coordinates are still null.",
-    "label": "[G]"
+    "label": "[G]",
+    "symbolu_api_root_build": "its declared inputs are in the context again; no deployment from the fixed tree has been observed from this repository [G]"
+  },
+  "third_consumer_the_root_buildpack_build": {
+    "found_on": "2026-09-08, after the two deployment images were fixed",
+    "what_it_is": "The Symbol-U research API service, built from the repository root by a buildpack (nixpacks.toml, Procfile) rather than a Dockerfile.",
+    "how_it_surfaced": "A live deployment failed during its build with `failed to compute cache key: ... \"/pyproject.toml\": not found`, while pyproject.toml was present in the tree. The build's context was filtered by the same root .dockerignore.",
+    "why_the_earlier_fix_did_not_reach_it": "A build with no Dockerfile has no COPY lines to read and no sibling <dockerfile>.dockerignore to prefer. It takes the context root's file and nothing else, so the sibling files added in 20c6560a could not help it.",
+    "declared_inputs": {
+      "pyproject.toml": "EXCLUDED by `*` — nixpacks.toml installs the project with `pip install -e .`",
+      "requirements.txt": "EXCLUDED by `*` — copied by the builder's install phase",
+      "nixpacks.toml": "EXCLUDED by `*` — the build definition itself",
+      "Procfile": "EXCLUDED by the explicit `Procfile` rule — names the start command",
+      "symbolu": "the only input that survived, by the `!symbolu/` re-include"
+    },
+    "counts": {
+      "root_build_declared_inputs": 5,
+      "excluded_by_the_old_root_dockerignore": 4,
+      "surviving": 1
+    },
+    "fixed_by": "c45ba52b (PR #1713): deploy/gke/Dockerfile.dockerignore carries the old rules verbatim so the controller image's context is unchanged, and the root file becomes ordinary repository-wide excludes. All five inputs now resolve.",
+    "label": "[V]"
+  },
+  "reconciled": {
+    "on": "2026-09-08",
+    "with": "c45ba52b (PR #1713), the root .dockerignore fix",
+    "what_changed_here": "defect.statement restated in the past tense; the third consumer recorded; the gate entry extended to say it now covers a build with no Dockerfile.",
+    "what_did_not_change": [
+      "any answer to questions 1, 2 or 3",
+      "the 29-of-29 and 19-of-19 counts",
+      "any gate record, ratified pin or evidence manifest",
+      "the ratified_status of the new check: still a member of no family"
+    ]
   }
 }
