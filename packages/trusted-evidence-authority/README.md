@@ -793,7 +793,11 @@ and no production resolution succeeds without it.
 
 **Maturity:** a production-shaped resolver candidate. Not independently reviewed,
 not externally cryptographically audited, not production-ready. D-38 and D-32(4)
-remain applicable. No consumer is wired to it.
+remain applicable. **No package consumer is wired to it**, and none may be while
+that is true; the one caller is the `experiments/workflow_fit_study` research
+harness, which resolves an experiment-scoped anchor set over committed research
+material under SR-0 to SR-5, and whose own header records what it establishes as
+self-attestation rather than independent verification.
 
 ## TEV-2 delegated decisions
 
@@ -885,11 +889,25 @@ infrastructure, credential issuance, receipt persistence or distribution
 services, ActionGate or deployment authorization, Cloud Scaling **verification or
 authorization**, and generic multi-algorithm cryptographic agility.
 
-**Exactly three named consumers import this package**, under the exact symbol
+**Exactly three named packages import this package**, under the exact symbol
 grant described above: Cloud Scaling Phase 5B-0A, Risk Authority effect
 attestation and reasoning-method result attestation, each for the public
 trust-anchor contracts and resolver port. Each resolves its own anchors and runs
 its own verification; this package supplies the anchor contract and the lent
 capability coordinates, and decides nothing about a Cloud Scaling recommendation,
-an external effect or a comparison result. A test enforces both the closed
-consumer list and the symbol grant.
+an external effect or a comparison result.
+
+**Two trees outside `packages/` import it as well**, and are named and asserted
+in their own separate tiers: `experiments/workflow_fit_study`, the signed
+workflow-fit research harness authorized by SR-0 to SR-5 under SCR-1, under its
+own different symbol grant covering the trust-anchor *publication* and
+*resolution* surface; and `audit/tev2-1446-closure-reaudit`, the independent
+TEV-2 closure re-audit, which is exempt from any symbol grant because probes
+confined to the granted surface could only re-confirm the boundary they exist to
+falsify. Neither ships in a wheel, and no `pyproject.toml` declares a dependency
+on either. Until the packages capability audit widened the scan, neither could be
+reported at all: it globbed `packages/**/*.py`, so an importer anywhere else was
+never allowed and never refused, merely unseen.
+
+A test enforces all three closed lists, both symbol grants, and — repository-wide
+now — that nothing else imports this package at all.

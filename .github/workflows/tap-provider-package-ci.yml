@@ -4,6 +4,23 @@ name: tap-provider-package-ci
 # No live remote service and no network-dependent test runs here: the in-process
 # reference engine is deterministic and offline, and the clean-install proof uses
 # ``pip install --no-index`` against locally built wheels only.
+#
+# Suite jobs run on 3.11 and 3.12; this package declares requires-python >=3.10 and
+# classifiers for 3.10, 3.11 and 3.12. 3.10 is deliberately absent, and the reason is
+# recorded here rather than left to be rediscovered: the blockers are repository-wide
+# couplings in *test* code and committed manifests, not defects in any package's src/.
+# Suites read pyproject.toml with a bare `import tomllib` (stdlib only from 3.11, so
+# installing `tomli` does not satisfy it), and committed public_api.json manifests
+# enumerate `BaseException.add_note`, which does not exist before 3.11. Adding a 3.10 leg
+# means fixing those couplings across the packages that share them and having that
+# reviewed — never relaxing the assertions to make the leg green.
+#
+# The suites run across interpreters in their own job. The single ``tap-package`` job
+# below stays on 3.11 because what it proves is about *artifacts* — bit-for-bit wheel
+# reproducibility, the committed behavioural-equivalence and API-surface baselines, and
+# the platform freeze manifest — all of which are pinned to one interpreter by
+# construction; running them twice would compare a baseline against itself on a second
+# machine, not test anything more.
 
 on:
   push:
@@ -28,6 +45,26 @@ on:
       - ".github/workflows/tap-provider-package-ci.yml"
 
 jobs:
+  tap-suites:
+    name: TAP suites (py${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      # One interpreter's failure must not hide the other's.
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "${{ matrix.python-version }}"
+      - name: Install tooling
+        run: python -m pip install --upgrade pip pytest pydantic
+      - name: Canonical package tests (isolation)
+        run: python -m pytest packages/providers/tap/tests -q
+      - name: Monorepo TAP tests (through the facade)
+        run: python -m pytest tap_provider/tests -q
+
   tap-package:
     runs-on: ubuntu-latest
     env:

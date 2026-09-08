@@ -1,5 +1,68 @@
 # Changelog — ugence-trusted-evidence-authority
 
+## [Unreleased] — the reverse-dependency boundary is scanned repository-wide
+
+No source change, no API change, no version bump: `src/` is untouched, the curated
+export count stays at 99, every pinned digest is byte-identical and no refusal
+reason, capability member or contract shape moves. This corrects a **gate**, and
+two sentences the gate's under-coverage had let go stale.
+
+### Fixed
+
+- `tests/packaging/test_dependency_boundary.py` scanned `packages/**/*.py` for
+  modules importing this package. An importer anywhere else in the repository was
+  therefore never allowed and never refused — it was unseen, and the closed
+  `AUTHORIZED_CONSUMERS` allowlist reported nothing about it. Two real importers
+  had been in that blind spot: `experiments/workflow_fit_study` since SCR-1
+  (reaching `SignedSnapshotTrustAnchorResolver` and the anchor-set publication
+  surface) and `audit/tev2-1446-closure-reaudit` since TEV-2 (reaching
+  `authority.backend`). Found by the packages capability audit. The scan now walks
+  the whole repository, skipping only `.git`, `__pycache__`, `build/` and this
+  package's own tree, and the own-tree skip matches path *containment* rather than a
+  string prefix, so a sibling directory whose name merely begins with
+  `trusted-evidence-authority` is no longer exempt either.
+
+### Added
+
+- Two allowlist tiers, kept separate from `AUTHORIZED_CONSUMERS` and asserted
+  separately, because they authorize something different: that tuple names
+  *distributed* packages whose wheels declare a dependency on this one, and neither
+  tree below ships in a wheel or appears in any `pyproject.toml` dependency list.
+  - `AUTHORIZED_RESEARCH_CONSUMERS` — `experiments/workflow_fit_study`, the signed
+    workflow-fit research harness authorized by owner rulings SR-0 to SR-5 under
+    SCR-1, held to `AUTHORIZED_RESEARCH_SYMBOLS`: the trust-anchor **publication**
+    and **resolution** surface. It is a *different* grant, not a superset — a test
+    asserts neither grant contains the other, so a product consumer still cannot
+    reach `SignedSnapshotTrustAnchorResolver` and the harness still cannot reach
+    `StaticTrustAnchorDirectory`. The property that no grant admits an evidence,
+    receipt or verification surface now holds over this grant too.
+  - `AUTHORIZED_AUDIT_TREES` — `audit/tev2-1446-closure-reaudit`, exempt from any
+    symbol grant. A probe confined to the granted surface could only re-confirm the
+    boundary it exists to falsify; the differential and key-hygiene probes reach
+    `authority.backend` for exactly that reason, and a test fails if that ever stops
+    being true, so the exemption cannot quietly become an unused hole.
+- 36 tests (1265 → 1301), including the regression this closes: an importer planted
+  under `experiments/`, `audit/`, `tools/`, `scripts/`, `sdk/` or the repository root
+  is now reported, where the previous scan could not have seen any of them.
+
+### Changed (README, both corrections)
+
+- *"Exactly three named consumers import this package"* was true of `packages/` and
+  false of the repository. It now reads "three named **packages**", and names the two
+  non-package trees, their tiers and their grants alongside.
+- The resolver's *"No consumer is wired to it"* was falsified by
+  `experiments/workflow_fit_study/signed_admission.py`, which has wired it since
+  SCR-1. It now reads "no **package** consumer is wired to it", and says what the one
+  research caller is and what its own header records that caller as establishing —
+  self-attestation, not independent verification. **Maturity is unchanged**: the
+  signed-snapshot resolver remains a production-shaped candidate, not independently
+  reviewed, not externally cryptographically audited, not production-ready, with D-38
+  and D-32(4) still applicable.
+
+Naming these trees records them against this boundary for the first time. It
+ratifies nothing that was not already ratified elsewhere, and grants nothing new:
+both had been importing this package, unreported, before the scan could see them.
+
 ## [0.6.0] — a third named consumer exception, and one lent comparison-result capability
 
 Additive and backward-compatible over 0.5.0. **Every 0.5.0 symbol remains exported
