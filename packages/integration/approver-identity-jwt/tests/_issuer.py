@@ -133,7 +133,11 @@ class InProcessIssuer:
                 self.wfile.write(body)
 
         self._server = HTTPServer(("127.0.0.1", 0), Handler)
-        self._thread = threading.Thread(target=self._server.serve_forever, daemon=True)
+        # serve_forever's default poll_interval is 0.5s, and shutdown() waits for the
+        # next poll: with a per-test issuer that is half a second of teardown on every
+        # row of the matrix. The interval bounds nothing but that wait.
+        self._thread = threading.Thread(
+            target=lambda: self._server.serve_forever(poll_interval=0.01), daemon=True)
         self._thread.start()
 
     def stop(self) -> None:
