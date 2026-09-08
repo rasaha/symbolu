@@ -7,11 +7,13 @@ rather than behind registry access.
 **Why this exists.** Both deployment images are built with the REPOSITORY ROOT as the
 build context (``docker buildx build ... -f deployment/<unit>/Dockerfile .``), and Docker
 reads the ``.dockerignore`` at the *context root*, never one merely sitting beside the
-Dockerfile. The repository root file is ``*`` plus re-includes for ``symbolu/`` — it
-belongs to the GKE controller image. Under it, every COPY source of both deployment
-Dockerfiles fell outside the context, so neither image could be built at all. Nothing
-caught it: every check that would have needed the registry, and the container jobs went
-red for the unconfigured mirror before the build could go red for the context. See
+Dockerfile. Until 2026-09-08 the repository root file was ``*`` plus re-includes for
+``symbolu/`` — rules belonging to the GKE controller image, which now carries them in its
+own ``deploy/gke/Dockerfile.dockerignore``. Under them every COPY source of both
+deployment Dockerfiles fell outside the context, so neither image could be built at all,
+and nothing caught it: every check that could have seen it sat behind the registry
+blocker, and the container jobs went red for the unconfigured mirror before a build could
+go red for the context. See
 ``docs/audits/ugence_governance_studio_p3e/BUILD_CONTEXT_EXCLUSION_DEFECT.json``.
 
 The fix is a sibling ``<dockerfile>.dockerignore``, which BuildKit reads in preference to
@@ -19,12 +21,20 @@ the context root's. This gate holds that arrangement in place: it resolves the f
 build will actually read, applies dockerignore semantics to every COPY source, and fails
 if any source is excluded or absent from disk.
 
+**The root build has no Dockerfile.** The Symbol-U API service is built from the
+repository root by a buildpack (``nixpacks.toml``, ``Procfile``) rather than a Dockerfile,
+so it has no ``COPY`` lines to read and no sibling file to prefer — it takes the context
+root's ``.dockerignore`` and nothing else. It failed exactly the same way, with
+``"/pyproject.toml": not found``. ``--root-build`` checks that build's declared inputs
+against the same file, so a root-context regression cannot hide behind the absence of a
+Dockerfile.
+
 **What it does not do.** It builds nothing and proves no image. A source being reachable
 is necessary for a build, never sufficient for one. This check belongs to no ratified gate
 family: it is not a member of P3E-CTR or GRW-CTR, satisfies no gate identifier of either,
 and admitting it to either family is an owner decision.
 
-    python deployment/governance-studio/ci/verify_build_context.py \
+    python deployment/governance-studio/ci/verify_build_context.py --root-build \
         deployment/governance-studio/Dockerfile \
         deployment/governed-runtime-worker/Dockerfile
 
@@ -42,12 +52,14 @@ import sys
 from typing import List, Optional, Sequence, Tuple
 
 __all__ = [
+    "ROOT_BUILD_INPUTS",
     "compile_pattern",
     "copy_sources",
     "effective_ignore_file",
     "is_excluded",
     "load_patterns",
     "verify",
+    "verify_root_build",
 ]
 
 
@@ -106,6 +118,47 @@ def is_excluded(path: str, patterns: Sequence[str]) -> Optional[str]:
 
 
 # ---- the Dockerfile --------------------------------------------------------------- #
+
+#: What the repository-root buildpack build needs in its context. ``nixpacks.toml``
+#: installs the project itself (``pip install -e .``), which reads ``pyproject.toml``; the
+#: ``Procfile`` names the start command; the builder copies ``requirements.txt``; and the
+#: start command imports the ``symbolu`` package. None of these is a COPY line anywhere,
+#: so nothing else in CI would notice them leaving the context.
+ROOT_BUILD_INPUTS: Tuple[Tuple[str, str], ...] = (
+    ("pyproject.toml", "nixpacks.toml installs the project with `pip install -e .`"),
+    ("requirements.txt", "copied by the builder's install phase"),
+    ("nixpacks.toml", "the build definition itself"),
+    ("Procfile", "names the start command"),
+    ("symbolu", "the package the start command imports"),
+)
+
+
+def verify_root_build(context: str) -> List[str]:
+    """The root buildpack build has no Dockerfile, so it reads the context root's file."""
+    errors: List[str] = []
+    ignore_file = os.path.join(context, ".dockerignore")
+    patterns = load_patterns(ignore_file) if os.path.isfile(ignore_file) else []
+    print("root buildpack build (nixpacks.toml, Procfile — no Dockerfile)")
+    print(f"  context      {context}")
+    print(f"  ignore file  {ignore_file if patterns else '(none)'} — a build with no "
+          "Dockerfile has no sibling file to prefer")
+    print(f"  inputs       {len(ROOT_BUILD_INPUTS)}")
+    for path, why in ROOT_BUILD_INPUTS:
+        on_disk = os.path.exists(os.path.join(context, path))
+        excluded_by = is_excluded(path, patterns)
+        status = "ok" if on_disk and not excluded_by else "FAIL"
+        note = ""
+        if not on_disk:
+            note = " — not on disk"
+            errors.append(f"root build input {path!r} does not exist ({why})")
+        if excluded_by:
+            note += f" — excluded by {excluded_by!r} in {ignore_file}"
+            errors.append(
+                f"root build input {path!r} is excluded from the build context by "
+                f"{excluded_by!r} in {ignore_file} ({why})")
+        print(f"  {status:4} {path}{note}")
+    return errors
+
 
 def copy_sources(dockerfile: str) -> List[str]:
     """Every context-relative COPY source. Stage copies (``--from=``) are not context."""
@@ -180,9 +233,14 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         prog="verify_build_context.py",
         description="Assert every COPY source survives the .dockerignore the build reads.",
     )
-    parser.add_argument("dockerfile", nargs="+", help="Dockerfile paths, relative to the context")
+    parser.add_argument("dockerfile", nargs="*", help="Dockerfile paths, relative to the context")
     parser.add_argument("--context", default=".", help="build context root (default: the repository root)")
+    parser.add_argument("--root-build", action="store_true",
+                        help="also check the declared inputs of the root buildpack build, "
+                             "which has no Dockerfile and no sibling ignore file")
     args = parser.parse_args(argv)
+    if not args.dockerfile and not args.root_build:
+        parser.error("give at least one Dockerfile, or --root-build, or both")
 
     errors: List[str] = []
     for dockerfile in args.dockerfile:
@@ -190,6 +248,10 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             print(f"no such Dockerfile: {dockerfile}", file=sys.stderr)
             return 2
         errors.extend(verify(dockerfile, args.context))
+        print()
+
+    if args.root_build:
+        errors.extend(verify_root_build(args.context))
         print()
 
     if errors:
@@ -205,7 +267,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         )
         return 1
 
-    print("build context conformance OK: every COPY source is present and not excluded")
+    print("build context conformance OK: every COPY source and root build input is "
+          "present and not excluded")
     return 0
 
 

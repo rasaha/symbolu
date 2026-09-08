@@ -64,11 +64,14 @@ jobs:
         # plus re-includes for symbolu/) excluded all 29 and all 19 COPY sources. No gate
         # saw it: every check that could have seen it sat behind the registry blocker.
         # Reachability only: this builds nothing and satisfies no ratified gate identifier
-        # of P3E-CTR or GRW-CTR (BUILD_CONTEXT_EXCLUSION_DEFECT.json).
+        # of P3E-CTR or GRW-CTR (BUILD_CONTEXT_EXCLUSION_DEFECT.json). This job checks all
+        # three Dockerfiles and, with --root-build, the repository-root buildpack build,
+        # which has no Dockerfile and no sibling file and failed the same way.
         run: |
-          python deployment/governance-studio/ci/verify_build_context.py \
+          python deployment/governance-studio/ci/verify_build_context.py --root-build \
             deployment/governance-studio/Dockerfile \
-            deployment/governed-runtime-worker/Dockerfile
+            deployment/governed-runtime-worker/Dockerfile \
+            deploy/gke/Dockerfile
 
       - name: gate-identifier-conformance
         # The P3E audit records must reference only the canonical container-gate
