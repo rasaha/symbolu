@@ -5,12 +5,21 @@
   "found_while": "establishing whether deployment/governed-runtime-worker could be deployed on a managed cloud host (ADR_UGENCE_REVIEW_SERVICE_COMPOSITION_ROOT_SCOPING.md section 8, RW-2)",
   "status": "REPORTED; FIX COMMITTED; BUILD STILL UNPROVEN",
   "status_note": "This record reports a defect and answers three questions about the P3E record set. It marks no gate passed, withdraws no evidence, changes no ratified pin and asserts no build. Commit 20c6560a adds the two Dockerfile.dockerignore files; no image has been produced from either Dockerfile, then or now.",
-
   "defect": {
     "statement": "deployment/governance-studio/Dockerfile is built with the repository root as its build context. Docker reads the .dockerignore at the context root, not one beside the Dockerfile. The repository root .dockerignore is `*` followed by re-includes for `symbolu/` and one requirements path — it was written for the GKE controller image (deploy/gke). Under it every COPY source of the P3E Dockerfile lies outside the context, so the build fails at its first COPY.",
     "invocation_sites": [
-      {"where": ".github/workflows/governance-studio-p3e-private-hosted-ci.yml:216", "command": "docker buildx build ... -f deployment/governance-studio/Dockerfile .", "context": "repository root", "gated_behind": "steps.mirror.outputs.mirror_ready == 'true'"},
-      {"where": ".github/workflows/governance-studio-p3e-private-hosted-ci.yml:296", "command": "git archive HEAD | tar -x -C \"$TMP\"; docker buildx build ... -f \"$TMP/deployment/governance-studio/Dockerfile\" \"$TMP\"", "context": "an exported copy of the tracked tree, whose root carries the same .dockerignore", "gated_behind": "steps.mirror.outputs.mirror_ready == 'true'"}
+      {
+        "where": ".github/workflows/governance-studio-p3e-private-hosted-ci.yml:245 (was :216 before the build-context-conformance step was added)",
+        "command": "docker buildx build ... -f deployment/governance-studio/Dockerfile .",
+        "context": "repository root",
+        "gated_behind": "steps.mirror.outputs.mirror_ready == 'true'"
+      },
+      {
+        "where": ".github/workflows/governance-studio-p3e-private-hosted-ci.yml:325 (was :296)",
+        "command": "git archive HEAD | tar -x -C \"$TMP\"; docker buildx build ... -f \"$TMP/deployment/governance-studio/Dockerfile\" \"$TMP\"",
+        "context": "an exported copy of the tracked tree, whose root carries the same .dockerignore",
+        "gated_behind": "steps.mirror.outputs.mirror_ready == 'true'"
+      }
     ],
     "sibling_file_was_never_read": "deployment/governance-studio/.dockerignore exists and carries the correct exclusion set, but a plain .dockerignore in the Dockerfile's directory is consulted only when that directory is the context. It never was.",
     "counts": {
@@ -19,32 +28,54 @@
       "governed_runtime_worker_copy_sources": 19,
       "governed_runtime_worker_excluded_by_root_dockerignore": 19
     },
-    "also_affects": "deployment/governed-runtime-worker/Dockerfile, invoked identically at .github/workflows/governed-runtime-worker-ci.yml:208"
+    "also_affects": "deployment/governed-runtime-worker/Dockerfile, invoked identically at .github/workflows/governed-runtime-worker-ci.yml:222 (was :208)"
   },
-
   "verification": {
     "method": "Every COPY source of both Dockerfiles (--from= stage copies excluded) was evaluated against the context-root .dockerignore and against the new sibling file, applying dockerignore ordering semantics: patterns in order, ancestors considered, last match wins, `!` re-includes. Each source was also checked to exist on disk.",
     "result_under_context_root_file": "29 of 29 (studio) and 19 of 19 (worker) COPY sources excluded",
     "result_under_sibling_file": "0 of 29 and 0 of 19 excluded; 0 sources missing from disk",
     "label": "[V]"
   },
-
   "fix": {
     "commit": "20c6560a",
-    "files_added": ["deployment/governance-studio/Dockerfile.dockerignore", "deployment/governed-runtime-worker/Dockerfile.dockerignore"],
+    "files_added": [
+      "deployment/governance-studio/Dockerfile.dockerignore",
+      "deployment/governed-runtime-worker/Dockerfile.dockerignore"
+    ],
     "mechanism": "BuildKit reads `<dockerfile>.dockerignore` beside the Dockerfile in preference to the context root's .dockerignore. Each file carries the exclusion set already committed beside it, unchanged apart from a header stating why the file exists.",
-    "not_changed": ["any COPY line", "any FROM line or ratified digest", "base-images.json", "either existing .dockerignore", "any gate record", "any evidence manifest"],
+    "not_changed": [
+      "any COPY line",
+      "any FROM line or ratified digest",
+      "base-images.json",
+      "either existing .dockerignore",
+      "any gate record",
+      "any evidence manifest"
+    ],
     "tests": "The tests that read the existing .dockerignore files still pass (8 targeted governed-runtime-worker container-artifact tests; the studio's test_dockerignore_excludes_secrets_and_vcs)."
   },
-
   "question_1_does_any_p3e_record_claim_a_build_that_could_not_have_happened": {
     "answer": "NO. No P3E record, audit or gate claims a build, an image, or an executed container gate.",
     "evidence": [
-      {"record": "CONTAINER_GATE_FAMILY.json", "says": "status RATIFIED, with what_ratification_means: 'Ratification defines requirements only. It does NOT execute any gate, mark any gate passed, or assert that any gate has ever run. Every gate below is NOT_EXECUTED.'"},
-      {"record": "CONTAINER_COMPLETION_LIVE_STATE.json", "says": "resource_gate.container_gates_executable false; gate_execution_state_unchanged: 'every P3E-CTR gate and every historical gate remains NOT_EXECUTED; no evidence obligation is marked complete'"},
-      {"record": "CONTAINER_RUNTIME_CAPABILITY.json", "says": "container_gates_executable false; 17 gates listed as blocked"},
-      {"record": "BASE_IMAGE_MIRROR_DECISION.json", "says": "status RATIFIED_PENDING_MIRROR_COORDINATES; mirror.coordinates_provided false"},
-      {"scan": "No standalone token EXECUTED (as distinct from NOT_EXECUTED) appears in any record in this directory, and no field names an image id, image digest or build result.", "label": "[V]"}
+      {
+        "record": "CONTAINER_GATE_FAMILY.json",
+        "says": "status RATIFIED, with what_ratification_means: 'Ratification defines requirements only. It does NOT execute any gate, mark any gate passed, or assert that any gate has ever run. Every gate below is NOT_EXECUTED.'"
+      },
+      {
+        "record": "CONTAINER_COMPLETION_LIVE_STATE.json",
+        "says": "resource_gate.container_gates_executable false; gate_execution_state_unchanged: 'every P3E-CTR gate and every historical gate remains NOT_EXECUTED; no evidence obligation is marked complete'"
+      },
+      {
+        "record": "CONTAINER_RUNTIME_CAPABILITY.json",
+        "says": "container_gates_executable false; 17 gates listed as blocked"
+      },
+      {
+        "record": "BASE_IMAGE_MIRROR_DECISION.json",
+        "says": "status RATIFIED_PENDING_MIRROR_COORDINATES; mirror.coordinates_provided false"
+      },
+      {
+        "scan": "No standalone token EXECUTED (as distinct from NOT_EXECUTED) appears in any record in this directory, and no field names an image id, image digest or build result.",
+        "label": "[V]"
+      }
     ],
     "but": {
       "finding": "Two records give a SINGLE cause for non-execution, and that framing is now incomplete rather than false.",
@@ -54,16 +85,14 @@
     },
     "same_pattern_in_the_worker_record": "deployment/governed-runtime-worker/CONTAINER_GATE_SET.json execution_note says every gate 'halts at mirror-digest-conformance with RESOURCE_BLOCKER_MIRROR_UNCONFIGURED until BASE_IMAGE_MIRROR_DECISION.json carries owner-supplied mirror coordinates', which carries the same single-cause reading."
   },
-
   "question_2_does_the_clean_tree_rebuild_have_the_same_defect": {
     "answer": "YES, and the fix reaches it.",
-    "why_it_had_the_defect": "The step at line 296 exports the tracked tree with `git archive HEAD | tar -x -C \"$TMP\"` and builds with \"$TMP\" as the context. The exported tree's root carries the same .dockerignore, so the same exclusion applied there.",
+    "why_it_had_the_defect": "The clean-checkout-reproducibility step exports the tracked tree with `git archive HEAD | tar -x -C \"$TMP\"` and builds with \"$TMP\" as the context. The exported tree's root carries the same .dockerignore, so the same exclusion applied there.",
     "why_the_fix_reaches_it": "Dockerfile.dockerignore is a tracked file and .gitattributes declares no export-ignore, so git archive carries it into $TMP beside the Dockerfile, where BuildKit reads it in preference to the exported root file.",
     "verified": "git archive HEAD | tar -t lists .dockerignore, deployment/governance-studio/Dockerfile.dockerignore and deployment/governed-runtime-worker/Dockerfile.dockerignore.",
     "label": "[V]",
     "note": "That step compares image ids between the primary and clean builds and reports bit-reproducibility without asserting it as a P3E acceptance requirement. Nothing about that comparison changes; both sides now have a context that contains their sources."
   },
-
   "question_3_re_execution_or_re_statement": {
     "answer": "RE-STATEMENT ONLY. Nothing requires re-execution, because nothing ever executed.",
     "reasoning": [
@@ -72,26 +101,58 @@
       "When the mirror coordinates arrive, the gates execute for the first time against a Dockerfile whose context now contains its sources. That is first execution, not re-execution."
     ],
     "what_would_have_to_be_re_stated": [
-      {"record": "docs/audits/ugence_governance_studio_p3e/CONTAINER_RUNTIME_CAPABILITY.json", "field": "missing_capability", "what_it_would_have_to_say": "that registry egress was one of two independent blockers on 2026-08-29, the second being the context-root .dockerignore, fixed 2026-09-08 in commit 20c6560a"},
-      {"record": "docs/audits/ugence_governance_studio_p3e/CONTAINER_COMPLETION_LIVE_STATE.json", "field": "resource_gate / distinguished_conditions", "what_it_would_have_to_say": "that container_gates_executable false had a cause internal to the repository as well as the recorded environmental one"},
-      {"record": "deployment/governed-runtime-worker/CONTAINER_GATE_SET.json", "field": "execution_note", "what_it_would_have_to_say": "the same, for the worker's own gate set"},
-      {"record": "docs/audits/ugence_governance_studio_p3e/BASE_IMAGE_MIRROR_DECISION.json", "field": "none", "what_it_would_have_to_say": "nothing; that record concerns mirror coordinates and is unaffected"}
+      {
+        "record": "docs/audits/ugence_governance_studio_p3e/CONTAINER_RUNTIME_CAPABILITY.json",
+        "field": "missing_capability",
+        "what_it_would_have_to_say": "that registry egress was one of two independent blockers on 2026-08-29, the second being the context-root .dockerignore, fixed 2026-09-08 in commit 20c6560a"
+      },
+      {
+        "record": "docs/audits/ugence_governance_studio_p3e/CONTAINER_COMPLETION_LIVE_STATE.json",
+        "field": "resource_gate / distinguished_conditions",
+        "what_it_would_have_to_say": "that container_gates_executable false had a cause internal to the repository as well as the recorded environmental one"
+      },
+      {
+        "record": "deployment/governed-runtime-worker/CONTAINER_GATE_SET.json",
+        "field": "execution_note",
+        "what_it_would_have_to_say": "the same, for the worker's own gate set"
+      },
+      {
+        "record": "docs/audits/ugence_governance_studio_p3e/BASE_IMAGE_MIRROR_DECISION.json",
+        "field": "none",
+        "what_it_would_have_to_say": "nothing; that record concerns mirror coordinates and is unaffected"
+      }
     ],
     "not_done_here": "This record changes none of the four. Amending a ratified gate record is an owner action."
   },
-
   "gate_coverage_gap": {
-    "finding": "No gate could have caught this. The two steps that execute without registry access are ratified-pin-conformance (verify_ratified_pins.py, which compares FROM digests against the ratification record) and gate-identifier-conformance. Neither reads a COPY line or evaluates the build context. Every check that would have surfaced the defect sits behind the registry blocker.",
-    "proposal_not_a_change": "An offline gate that resolves each Dockerfile's COPY sources against the .dockerignore the build will actually read would have failed on the first run, without a daemon or a registry. Adding one is a separate decision and is not made here.",
-    "label": "[G]"
+    "finding": "No gate could have caught this. The two steps that executed without registry access were ratified-pin-conformance (verify_ratified_pins.py, which compares FROM digests against the ratification record) and gate-identifier-conformance. Neither reads a COPY line or evaluates the build context. Every check that would have surfaced the defect sat behind the registry blocker.",
+    "closed_by": {
+      "check": "build-context-conformance",
+      "script": "deployment/governance-studio/ci/verify_build_context.py (shared; each job names the Dockerfile it owns)",
+      "what_it_asserts": "For each deployment Dockerfile, every COPY source (--from= stage copies excluded) exists on disk and is not excluded by the .dockerignore the build will actually read: the sibling <dockerfile>.dockerignore where one exists, the context root's otherwise. Dockerignore ordering semantics are applied — patterns in order, anchored at the context root, parents matched as Docker matches them, last match wins, `!` re-includes.",
+      "wired_into": [
+        ".github/workflows/governance-studio-p3e-private-hosted-ci.yml job 'application', after ratified-pin-conformance — both Dockerfiles; this job guards every push",
+        ".github/workflows/governance-studio-p3e-private-hosted-ci.yml job 'container', after ratified-pin-conformance and ahead of mirror-digest-conformance — the studio Dockerfile",
+        ".github/workflows/governed-runtime-worker-ci.yml job 'container', after ratified-pin-conformance and ahead of mirror-digest-conformance — the worker Dockerfile"
+      ],
+      "runs_without": "a container runtime, a registry, a daemon or any network. It is not behind mirror_ready, so it executes on every run.",
+      "validated": "Passes on the committed tree (29 and 19 sources, none excluded, none missing). With the two Dockerfile.dockerignore files temporarily removed — the state before commit 20c6560a — it exits 1 and reports all 48 sources excluded by '*' in the root file, so it reproduces the defect it exists to catch. A synthetic Dockerfile confirms a --from= stage copy is skipped and a non-existent source is reported.",
+      "label": "[V]"
+    },
+    "ratified_status": {
+      "member_of_p3e_ctr": false,
+      "member_of_grw_ctr": false,
+      "satisfies_gate_identifier": null,
+      "note": "This check is not a member of either ratified gate family and marks no gate identifier satisfied. It asserts reachability, which is necessary for a build and never sufficient for one; no gate in either family may be described as passed on its account. Admitting it to a family is an owner decision, and would be recorded in CONTAINER_GATE_FAMILY.json and CONTAINER_GATE_SET.json respectively."
+    },
+    "label": "[V]"
   },
-
   "residual_state_after_the_fix": {
     "governance_studio_image": "NEVER BUILT",
     "governed_runtime_worker_image": "NEVER BUILT",
     "gates": "every P3E-CTR gate and every GRW-CTR gate remains NOT_EXECUTED",
     "evidence_manifests": "INCOMPLETE, unchanged",
-    "what_the_fix_establishes": "only that the context a build reads now contains the sources the Dockerfile names, verified per source",
+    "what_the_fix_establishes": "only that the context a build reads now contains the sources the Dockerfile names, verified per source and now asserted on every CI run by build-context-conformance",
     "what_remains_unproven": "that either image builds. Pip resolution, layer contents, image size and every runtime gate are untested; the mirror coordinates are still null.",
     "label": "[G]"
   }
