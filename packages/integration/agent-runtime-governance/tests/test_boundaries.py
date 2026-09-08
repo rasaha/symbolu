@@ -150,7 +150,46 @@ def test_maturity_is_stated_honestly():
     assert m["production_certified"] is False
     assert m["stage"] == "Core implemented"
     assert "ProductionContainmentError" in m["known_gaps"]
-    assert "no sink" in m["known_gaps"]
+
+
+def test_the_sink_gap_names_hold_and_only_what_this_package_can_emit():
+    """The sink claim is machine-readable, so it must not outlive the gap it names.
+
+    It said HOLD, DEFER, ESCALATE and MANUAL_REVIEW all had no sink. Since GAS-7 an
+    ESCALATE has one — the approval a human gives releases the parked instance — and
+    DEFER and MANUAL_REVIEW were never this package's to sink at all: the projection
+    cannot emit them. Only HOLD is still sink-less, and by ruling rather than by
+    omission (HR-5).
+
+    Two assertions, each of which fails rather than passes quietly when the world
+    changes: naming a disposition the projection cannot emit is a claim about someone
+    else's package, and dropping HOLD is closing the gap, which must be a deliberate
+    edit here and not a silent one.
+    """
+    from ugence_agent_runtime_governance import maturity
+
+    emittable = {"CLEAR", "BLOCK", "HOLD", "ESCALATE"}
+    gaps = maturity()["known_gaps"]
+
+    for name in ("DEFER", "MANUAL_REVIEW"):
+        assert name not in gaps, (
+            f"{name} is named as a gap but project_disposition never emits it; "
+            "this package cannot owe a sink for a disposition it does not produce"
+        )
+
+    assert "HOLD has no sink" in gaps, (
+        "the standing gap is HOLD, and it is the one the claim must name. If a HOLD "
+        "carrying no required approval can now be released by an approval, HR-5 was "
+        "reopened: update this assertion deliberately rather than letting the claim "
+        "drift out of the string"
+    )
+    assert "ESCALATE" in gaps and "ESCALATE, DEFER" not in gaps, (
+        "ESCALATE must appear as the disposition that GAINED a sink, not as one "
+        "lacking it"
+    )
+    # The claim may only speak about dispositions this package can actually produce.
+    named = {n for n in ("CLEAR", "BLOCK", "HOLD", "ESCALATE") if n in gaps}
+    assert named <= emittable and "HOLD" in named
 
 
 def test_readme_does_not_overclaim():

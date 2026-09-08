@@ -17,9 +17,11 @@ Scoped by ``docs/architecture/ADR_DBOS_DURABLE_EXECUTION_INTEGRATION.md`` and se
 as GAS-3 in the Ugence productization roadmap §11.
 
 **Maturity.** Core implemented; **not** pilot-validated and **not** production-certified.
-Risk Authority ``production_mode`` still raises ``ProductionContainmentError``, and HOLD,
-DEFER, ESCALATE and MANUAL_REVIEW still have no sink — a parked instance has nowhere to
-be seen by a human until one is built.
+Risk Authority ``production_mode`` still raises ``ProductionContainmentError``. An
+ESCALATE now has a sink: since GAS-7 a human sees the parked instance and their approval
+releases it. A HOLD still has none, and that is the ruling rather than a missing part —
+a HOLD carrying no required approval is released upstream, never by an approval (HR-5).
+DEFER and MANUAL_REVIEW are not this package's to sink: the projection never emits them.
 """
 from __future__ import annotations
 
@@ -75,7 +77,9 @@ def maturity() -> dict:
         "production_certified": False,
         "known_gaps": (
             "Risk Authority production_mode raises ProductionContainmentError; "
-            "HOLD, DEFER, ESCALATE and MANUAL_REVIEW have no sink; "
+            "HOLD has no sink: an ESCALATE is released by a human approval since "
+            "GAS-7, but a HOLD carrying no required approval is released only "
+            "upstream, never by an approval (HR-5); "
             "no credential broker (cloud-scaling Phase 5X is unbuilt)"
         ),
     }

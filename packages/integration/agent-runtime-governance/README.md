@@ -29,10 +29,16 @@ sequenced as GAS-3 in the Ugence productization roadmap §11.
 What stays blocked, regardless of this package:
 
 - Risk Authority `production_mode` still raises `ProductionContainmentError`.
-- **HOLD, DEFER, ESCALATE and MANUAL_REVIEW still have no sink.** This package emits HOLD
-  and ESCALATE correctly and the runtime parks on them correctly — and then there is
-  nowhere for a human to see the parked instance. The hook makes the disposition
-  faithful; it does not make it actionable.
+- **A HOLD still has no sink, and that is the ruling rather than a missing part.** An
+  ESCALATE gained one at GAS-7: `ugence-governed-review` binds a human approval to the
+  parked proposal and consumes it before the engine advances, `ugence-governed-review-service`
+  records the decision and re-arms the instance, the studio's `ReviewQueueScreen` shows
+  the queue, and `deployment/governed-runtime-worker` composes the four. A HOLD carrying
+  no required approval is released upstream and never by an approval (HR-5,
+  `governed-review/linkage.py:345`), so it has no queue by design. DEFER and
+  MANUAL_REVIEW are not this package's to sink — the projection below never emits them.
+  What is still true of both parkings: the hook makes the disposition faithful, and
+  nothing here is pilot-validated.
 - No credential broker: cloud-scaling Phase 5X is unbuilt, and nothing here substitutes
   for it.
 

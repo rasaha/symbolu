@@ -197,9 +197,13 @@ effect of a green suite.
 ## Known gaps
 
 Multi-region consistency, HSM/KMS custody and key rotation are untouched. ESCALATE has
-a sink since GAS-7 HR-A (`packages/integration/governed-review` binds and consumes an
-approval before the engine advances), but no queue or decision surface is built yet, so
-a parked instance (row 9) is still not visible to a human. Risk Authority `production_mode` still raises
+a sink since GAS-7: `packages/integration/governed-review` binds and consumes an approval
+before the engine advances, `ugence-governed-review-service` lists the queue (`list_queue`,
+HR-C) and records the decision, and the studio's `ReviewQueueScreen` is the surface
+(HR-D), so a parked instance (row 9) is reachable by a human. That path is **not**
+pilot-validated, and this engine composes no queue of its own: it parks the instance and
+re-arms on a signal, and everything a human sees is built above it.
+Risk Authority `production_mode` still raises
 `ProductionContainmentError`. Clock discipline is enforced against the known monotonic
 default; a deployment that hides a monotonic reading behind an unrecognisable wrapper
 defeats the guard, and that residual is stated rather than papered over.
