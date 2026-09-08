@@ -15,7 +15,7 @@ shared, platform-wide registry ratified in
 | Version | `0.1.0` |
 | Runtime dependencies | **none** — stdlib only |
 | Curated public symbols | 31 |
-| Milestone | **BR-1**, implemented. **BR-2 not started.** |
+| Milestone | **BR-1**, implemented and merged. **BR-2 in progress** in [`ugence-benchmark-registry-authority`](../benchmark-registry-authority) — no authoritative registry operation exists before BR-2D. |
 
 ---
 
@@ -74,7 +74,7 @@ There is no member of `BenchmarkRefusalReason` that would represent success, and
 
 ## 3. What is structural, and what is trusted
 
-| Structural (BR-1, here) | Trusted (BR-2, not started) |
+| Structural (BR-1, here) | Trusted (BR-2 — no authoritative operation before BR-2D) |
 |---|---|
 | the exact coordinate that *names* one benchmark version | resolving that coordinate to a record |
 | the twenty-coordinate identity and its digest | verifying the content digest against real content |
@@ -435,7 +435,7 @@ Confirmed by test:
 
 | Remaining work | Milestone | Status |
 |---|---|---|
-| Registry, trusted resolver, §16.2 admission ordering, append-only registration, byte-identical idempotence and typed conflict, exact-coordinate resolution, publisher signature and key trust, trust anchors, signed revocation, cross-tenant non-disclosure, historical resolution | **BR-2** | Not started |
+| Registry, trusted resolver, §16.2 admission ordering, append-only registration, byte-identical idempotence and typed conflict, exact-coordinate resolution, publisher signature and key trust, trust anchors, signed revocation, cross-tenant non-disclosure, historical resolution | **BR-2** | In progress in `packages/benchmark-registry-authority`: BR-2A `0.1.0` registry and exact-resolution **contracts** and BR-2B `0.2.0` the **non-authoritative** lifecycle kernel are shipped; BR-2C is at candidate `0.3.0rc1` (the Ed25519 verifier, engineered and tested, not independently reviewed or audited). Every item in this row that requires an **authoritative** operation — admission ordering, append-only registration, revocation, exact resolution — is **BR-2D**, blocked on ADR DD-10 |
 | Structured successor/predecessor reference — shape, successor authorization, activation instant, predecessor invalidation, historical resolution across the boundary, cross-tenant/cross-family restrictions | **DD-4** | Deferred, undecided |
 | Whether a Policy Authority instance is *entitled* to act as benchmark approval verifier, and for which families | **DD-3** | Deferred, undecided |
 | Which contracts land in `governance-contracts` versus stay capability-local | **DD-2** | Deferred; unblocked by BR-1's shapes but deliberately not decided here |
@@ -451,8 +451,10 @@ Confirmed by test:
 | Agent Readiness through M-3R.3 | Implemented / merged |
 | TEV-1 | Merged |
 | TEV-2 | Merged |
-| **BR-1** | **Implemented in this PR, unmerged** |
-| BR-2 | Not started |
+| **BR-1** | **Implemented / merged** (`eb5ff947`) |
+| BR-2A / BR-2B / BR-2C-0 | Shipped, `ugence-benchmark-registry-authority` `0.1.0`–`0.2.3` — contracts and the non-authoritative kernel |
+| BR-2C | Candidate `0.3.0rc1`; closure blocked on the D-38(i) review and D-32(4)'s external cryptographic audit |
+| BR-2D / BR-2E | Not started; BR-2D blocked on ADR DD-10, BR-2E on BR-2D |
 | M-3R.4 / UVI-EV-1 | Not started |
 | Forecasting / attribution / valuation / verified ROI | Deferred |
 
@@ -460,7 +462,8 @@ Confirmed by test:
 Agent Readiness ledger, which is a separate documentation-only workstream.*
 
 **BR-1 is not trusted registry resolution.** Trusted resolution does not exist
-until BR-2.
+until **BR-2D**: BR-2A, BR-2B and BR-2C ship contracts, a non-authoritative kernel
+and a candidate verifier, none of which can admit, register, revoke or resolve.
 
 ---
 

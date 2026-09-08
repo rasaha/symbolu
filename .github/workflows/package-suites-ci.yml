@@ -123,6 +123,35 @@ jobs:
           cd "${{ matrix.package }}"
           python -m pytest -q
 
+  refusal-mutation-sweep:
+    name: ${{ matrix.package }} refusal sweep
+    runs-on: ubuntu-latest
+    # Two packages ship a sweep that disables each refusal in src/ in turn and
+    # reports the ones no test catches. control-plane-root's README says the
+    # coverage claim "ships rather than being described, so it can be run instead
+    # of believed" — which it could not, while nothing ran it. The suite job above
+    # runs suites only, so these are their own job: the sweep re-runs the whole
+    # package suite once per refusal site and is far slower than the suite itself.
+    strategy:
+      fail-fast: false
+      matrix:
+        package:
+          - packages/integration/control-plane-root
+          - packages/integration/incident-response
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install test dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest
+      - name: Every refusal is observed by some test; a survivor fails this job
+        # The script exits non-zero when any mutant survives, so no separate
+        # assertion on its output is needed.
+        run: python ${{ matrix.package }}/scripts/mutation_sweep.py
+
   clearance-export-distribution:
     name: ugence-clearance-export built artifact (CE-2, CE-3, CE-4, CE-5, CE-7)
     runs-on: ubuntu-latest

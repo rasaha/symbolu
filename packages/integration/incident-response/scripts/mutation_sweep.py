@@ -142,7 +142,9 @@ def main() -> int:
     print(f"\n{len(sites)} refusal sites; {len(survivors)} survived")
     for entry in survivors:
         print(f"  {entry}")
-    return 0
+    # A survivor is a refusal no test observes. Printing it and exiting zero would
+    # let CI call that green, which is the one thing a coverage proof must not do.
+    return 1 if survivors else 0
 
 
 if __name__ == "__main__":
