@@ -16,6 +16,17 @@ name: package-suites-ci
 # Each package runs from its own directory, because several rely on their own
 # conftest.py to put src/ and their first-party dependencies on sys.path and cannot
 # be collected from the repository root.
+#
+# Suites run on 3.10, 3.11 and 3.12 — the whole range these packages declare with
+# requires-python >=3.10. The 3.10 leg was blocked until now by three couplings in test
+# code and committed artifacts, none of them in any package's src/: a bare
+# `import tomllib` (stdlib only from 3.11) now falls back to the `tomli` backport, which
+# the install steps below provide; public_api.json manifests recorded
+# `BaseException.add_note`, a 3.11 addition that made the artifact a statement about the
+# interpreter that generated it, and the generators now exclude inherited exception
+# methods so the manifest reproduces on any interpreter; and one assertion pinned
+# CPython's exact AttributeError wording, which 3.10 spells differently for the same
+# refusal. Each was fixed at the coupling, never by relaxing what the test discriminates.
 
 on:
   pull_request:
@@ -51,13 +62,15 @@ jobs:
         run: python scripts/check_package_ci_coverage.py
 
   package-suite:
-    name: ${{ matrix.package }}
+    name: ${{ matrix.package }} (py${{ matrix.python-version }})
     runs-on: ubuntu-latest
     strategy:
       # One package's failure must not hide another's: this is the first run these
-      # suites have ever had in CI, so surface all of them.
+      # suites have ever had in CI, so surface all of them. The same applies across
+      # interpreters — a 3.12-only failure must not be masked by a green 3.11 leg.
       fail-fast: false
       matrix:
+        python-version: ["3.10", "3.11", "3.12"]
         package:
           - packages/capabilities/action-clearance
           - packages/capabilities/agent-value-readiness
@@ -91,7 +104,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          python-version: "${{ matrix.python-version }}"
       - name: Install test dependencies
         # numpy is a real transitive requirement of the four cloud-scaling packages:
         # each composes ugence-cloud-scaling-controller, whose controller.py imports
@@ -114,7 +127,7 @@ jobs:
         # httpx. Without them those two rulings would be checked by nothing.
         run: |
           python -m pip install --upgrade pip
-          pip install pytest numpy cffi cryptography pydantic pynacl fastapi httpx
+          pip install pytest numpy cffi cryptography pydantic pynacl fastapi httpx tomli
       - name: Suite
         # From the package's own directory: several need their conftest.py to put
         # src/ and their first-party dependencies on sys.path, and cannot be

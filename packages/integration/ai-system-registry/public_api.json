@@ -7,10 +7,7 @@
   "symbols": {
     "AiSystemRegistryError": {
       "kind": "class",
-      "methods": [
-        "add_note",
-        "with_traceback"
-      ]
+      "methods": []
     },
     "AssessedSystemBinding": {
       "fields": [
@@ -42,24 +39,15 @@
     },
     "ContractViolation": {
       "kind": "class",
-      "methods": [
-        "add_note",
-        "with_traceback"
-      ]
+      "methods": []
     },
     "CrossTenantRefused": {
       "kind": "class",
-      "methods": [
-        "add_note",
-        "with_traceback"
-      ]
+      "methods": []
     },
     "DuplicateRegistrationError": {
       "kind": "class",
-      "methods": [
-        "add_note",
-        "with_traceback"
-      ]
+      "methods": []
     },
     "ENFORCEMENT_ENABLED": {
       "kind": "constant",
@@ -75,24 +63,15 @@
     },
     "RegistrationSupersessionError": {
       "kind": "class",
-      "methods": [
-        "add_note",
-        "with_traceback"
-      ]
+      "methods": []
     },
     "RegistryProductionModeError": {
       "kind": "class",
-      "methods": [
-        "add_note",
-        "with_traceback"
-      ]
+      "methods": []
     },
     "RegistryStorageError": {
       "kind": "class",
-      "methods": [
-        "add_note",
-        "with_traceback"
-      ]
+      "methods": []
     },
     "SCHEMA_VERSION": {
       "kind": "constant",

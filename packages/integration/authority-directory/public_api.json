@@ -7,10 +7,7 @@
   "symbols": {
     "AuthorityDirectoryError": {
       "kind": "class",
-      "methods": [
-        "add_note",
-        "with_traceback"
-      ]
+      "methods": []
     },
     "AuthorityDirectoryPort": {
       "kind": "class",
@@ -40,17 +37,11 @@
     },
     "ContractViolation": {
       "kind": "class",
-      "methods": [
-        "add_note",
-        "with_traceback"
-      ]
+      "methods": []
     },
     "DelegationRefused": {
       "kind": "class",
-      "methods": [
-        "add_note",
-        "with_traceback"
-      ]
+      "methods": []
     },
     "DirectoryApproverEligibility": {
       "kind": "class",
@@ -87,10 +78,7 @@
     },
     "GrantAlreadyExistsError": {
       "kind": "class",
-      "methods": [
-        "add_note",
-        "with_traceback"
-      ]
+      "methods": []
     },
     "GrantEvent": {
       "fields": [
@@ -113,10 +101,7 @@
     },
     "GrantNotFoundError": {
       "kind": "class",
-      "methods": [
-        "add_note",
-        "with_traceback"
-      ]
+      "methods": []
     },
     "InMemoryAuthorityDirectory": {
       "kind": "class",
@@ -159,17 +144,11 @@
     },
     "ProductionModeRefused": {
       "kind": "class",
-      "methods": [
-        "add_note",
-        "with_traceback"
-      ]
+      "methods": []
     },
     "RecordIntegrityError": {
       "kind": "class",
-      "methods": [
-        "add_note",
-        "with_traceback"
-      ]
+      "methods": []
     },
     "RoleGrant": {
       "fields": [
@@ -214,10 +193,7 @@
     },
     "StoreUnavailableError": {
       "kind": "class",
-      "methods": [
-        "add_note",
-        "with_traceback"
-      ]
+      "methods": []
     },
     "__version__": {
       "kind": "constant",

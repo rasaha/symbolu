@@ -1,5 +1,16 @@
 # Changelog
 
+## [Unreleased] — the suite runs on Python 3.10, which this package already declared
+
+No source change and no API change: `src/` is untouched and nothing about the package's
+behaviour moves. The packaging/boundary test read `pyproject.toml` with a bare
+`import tomllib`, stdlib only from 3.11 — so the whole module failed to import on 3.10
+and, with every CI job pinned to 3.11, nothing ever noticed that
+`requires-python >= 3.10` was a claim no job checked. The import now falls back to the
+`tomli` backport, and the workflow's suite job runs the full matrix 3.10, 3.11, 3.12.
+The fallback is a hard import rather than `pytest.importorskip`: a missing backport must
+fail the run loudly, not quietly drop the packaging assertions from the 3.10 leg.
+
 ## 0.3.1 — 2026-09-08 — declared floor corrected
 
 Metadata only: no source, contract or behaviour change.

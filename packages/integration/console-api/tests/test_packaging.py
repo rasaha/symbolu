@@ -14,17 +14,14 @@ from __future__ import annotations
 
 import ast
 import pathlib
-import sys
-
-import pytest
 
 PACKAGE_ROOT = pathlib.Path(__file__).resolve().parents[1]
 SRC = PACKAGE_ROOT / "src" / "ugence_console_api"
 
-if sys.version_info >= (3, 11):
+try:  # Python 3.11+ ships tomllib; 3.10 resolves the same parser from tomli.
     import tomllib
-else:  # pragma: no cover - the floor is 3.10
-    tomllib = pytest.importorskip("tomli")
+except ModuleNotFoundError:  # pragma: no cover - only a <3.11 run takes this branch
+    import tomli as tomllib  # type: ignore[no-redef]
 
 #: CP-5. The four platform packages, by distribution name and by import namespace.
 PLATFORM_DEPENDENCIES = {

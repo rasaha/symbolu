@@ -7,6 +7,15 @@ name: agent-runtime-governance-ci
 # other than an unambiguous GRANT can reach CLEAR — exhaustively over the veto
 # vocabulary, and against decision objects deliberately shaped to defeat a naive
 # projection.
+#
+# The suite job runs on 3.10, 3.11 and 3.12 — the range these packages declare with
+# requires-python >= 3.10, and which no job ran until now. This workflow matters beyond
+# its own package: the "Risk Authority composition must be unaffected" step below is the
+# only place RA-6 (risk-authority-status-runtime) has its suite run inside a *suite* job
+# rather than a pinned baseline one, so matrixing here is that package's single path to a
+# 3.10 leg — it ships no workflow of its own. The `build` job stays on one interpreter:
+# it proves what the built artifact contains, which is a property of the wheel and its
+# declared metadata rather than of the interpreter that ran the build.
 
 on:
   pull_request:
@@ -26,13 +35,18 @@ defaults:
 
 jobs:
   suite:
-    name: Adversarial + boundary suite
+    name: Adversarial + boundary suite (py${{ matrix.python-version }})
     runs-on: ubuntu-latest
+    strategy:
+      # One interpreter's failure must not hide another's.
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.11", "3.12"]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          python-version: "${{ matrix.python-version }}"
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
@@ -40,7 +54,7 @@ jobs:
           # the risk-authority-runtime suite re-run below imports. Installed here so the
           # "must be unaffected" step actually runs those suites rather than failing at
           # collection.
-          pip install pytest pydantic
+          pip install pytest pydantic tomli
 
       - name: Adversarial suite (no restrictive disposition may widen to CLEAR)
         run: |

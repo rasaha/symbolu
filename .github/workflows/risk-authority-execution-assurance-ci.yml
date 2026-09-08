@@ -15,6 +15,19 @@ name: risk-authority-execution-assurance-ci
 # unchanged, and runs the package's wheel build + isolated-install verifier and the
 # package-boundary tests (no reverse dependency, no second authority artifact, no
 # third execution ledger, no Agent Runtime import).
+#
+# The suite job runs on 3.10, 3.11 and 3.12 — the whole range this package declares
+# with requires-python >= 3.10, and which no job ran until now. What blocked 3.10 was
+# a bare `import tomllib` in the packaging/boundary test: stdlib only from 3.11, and a
+# bare import, so installing the backport was not enough and the import itself had to
+# change. It now falls back to `tomli`, which this job installs — a hard import rather
+# than pytest.importorskip, so a missing backport fails loudly instead of silently
+# dropping the assertions from the 3.10 leg. The baseline-regression and
+# isolated-install jobs stay on one interpreter: they assert that neighbouring packages
+# and the built wheel are undisturbed, which those packages' own workflows cover. RA-6
+# (risk-authority-status-runtime) is re-run in that pinned baseline step; its 3.10 leg
+# comes from agent-runtime-governance-ci, the one workflow that runs its suite inside a
+# suite job rather than a baseline one.
 
 on:
   pull_request:
@@ -29,8 +42,16 @@ on:
       - ".github/workflows/risk-authority-execution-assurance-ci.yml"
   push:
     branches:
+      # A branch that changes this workflow, or the packages it gates, must be able to
+      # run it. The per-milestone prefixes above are kept, and `claude/**` is added
+      # alongside them — the same filter agent-runtime-governance-ci, governed-review-ci,
+      # package-suites-ci and four others already use. Without it these jobs ran on no
+      # branch but their own milestone's: PR events do not start workflow runs in this
+      # repository, so a workflow whose push filter excludes the working branch is a
+      # workflow whose changes nothing executes before merge.
       - "claude/ra8-**"
       - "claude/setup-symbolu-monorepo-**"
+      - "claude/**"
     paths:
       - "packages/integration/risk-authority-execution-assurance/**"
       - "packages/integration/risk-authority-effect-attestation/**"
@@ -42,19 +63,24 @@ defaults:
 
 jobs:
   ra8-suite:
-    name: RA-8 execution-assurance suite + deny-heavy 42-case matrix (source)
+    name: RA-8 execution-assurance suite + deny-heavy 42-case matrix (source, py${{ matrix.python-version }})
     runs-on: ubuntu-latest
+    strategy:
+      # One interpreter's failure must not hide another's.
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.11", "3.12"]
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          python-version: "${{ matrix.python-version }}"
       - name: Install tooling + first-party packages (editable)
         run: |
           python -m pip install --upgrade pip
-          pip install pytest pydantic "cryptography>=41.0.7,<47.0.0" "PyNaCl>=1.5.0,<2.0.0"
+          pip install pytest pydantic "cryptography>=41.0.7,<47.0.0" "PyNaCl>=1.5.0,<2.0.0" tomli
           pip install -e packages/governance-contracts
           # Signed effect attestation (RI-1 to RI-5) and the Trusted Evidence Authority
           # it is built on. RA-8 imports only the former; TEA is its declared dependency.

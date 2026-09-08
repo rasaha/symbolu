@@ -563,6 +563,14 @@ def test_a_truthy_value_cannot_be_assigned_onto_the_frozen_payload(truthy):
     assert payload.authenticity_verified is False
 
 
+#: The two spellings CPython uses for the *same* refusal — a data descriptor with no
+#: setter rejecting an assignment. 3.11+ says "property 'x' of 'Y' object has no
+#: setter"; 3.10 says "can't set attribute". Matching either keeps the discrimination
+#: (an unrelated AttributeError — a missing attribute, say — matches neither) without
+#: pinning the suite to one interpreter's wording.
+READ_ONLY_DESCRIPTOR_REFUSALS = ("no setter", "can't set attribute")
+
+
 def test_object_setattr_cannot_raise_the_status():
     """``object.__setattr__`` — the usual frozen-dataclass bypass — is blocked.
 
@@ -572,13 +580,21 @@ def test_object_setattr_cannot_raise_the_status():
     dictionary is reached, so even the low-level bypass raises rather than
     shadowing them. A plain field would have been overwritable here; that is
     precisely why these are properties (ADR §14.5's discipline).
+
+    The *reason* it raises is asserted structurally — the class attribute is a
+    ``property`` whose ``fset`` is ``None`` — rather than only through CPython's
+    message text, which differs between 3.10 and 3.11 while the behaviour does not.
     """
 
     payload = receipt()
     for name in ("authenticity_verified", "structural_status"):
+        descriptor = type(payload).__dict__[name]
+        assert isinstance(descriptor, property), (name, descriptor)
+        assert descriptor.fset is None, name        # a data descriptor with no setter
         with pytest.raises(AttributeError) as excinfo:
             object.__setattr__(payload, name, True)
-        assert "no setter" in str(excinfo.value)
+        message = str(excinfo.value)
+        assert any(fragment in message for fragment in READ_ONLY_DESCRIPTOR_REFUSALS), message
     assert payload.authenticity_verified is False
     assert payload.structural_status is EvidenceStructuralStatus.STRUCTURAL_UNVERIFIED
 

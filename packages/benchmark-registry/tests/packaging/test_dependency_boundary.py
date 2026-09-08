@@ -122,7 +122,10 @@ def test_the_distribution_declares_no_runtime_dependency():
         runtime = [r for r in requires if "extra ==" not in r]
         assert runtime == [], runtime
         return
-    import tomllib
+    try:  # Python 3.11+ ships tomllib; 3.10 resolves the same parser from tomli.
+        import tomllib
+    except ModuleNotFoundError:  # pragma: no cover - only a <3.11 run takes this branch
+        import tomli as tomllib  # type: ignore[no-redef]
 
     data = tomllib.loads(pyproject.read_text(encoding="utf-8"))
     assert data["project"]["dependencies"] == []

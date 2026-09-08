@@ -6,6 +6,16 @@ name: approver-identity-jwt-ci
 # time: no egress, no external identity provider, no credential. PyJWT and cryptography
 # are installed within the bounds pyproject.toml declares, and the installed versions are
 # printed so a drift outside them is visible in the log.
+#
+# The suite job runs on 3.10, 3.11 and 3.12 — the whole range this package declares
+# with requires-python >= 3.10, and which no job ran until now. What blocked 3.10 was
+# a bare `import tomllib` in the packaging/boundary test: stdlib only from 3.11, and a
+# bare import, so installing the backport was not enough and the import itself had to
+# change. It now falls back to `tomli`, which this job installs — a hard import rather
+# than pytest.importorskip, so a missing backport fails loudly instead of silently
+# dropping the assertions from the 3.10 leg. The `build` job stays on one interpreter: it
+# proves what the built artifact contains, which is a property of the wheel and its
+# declared metadata rather than of the interpreter that ran the build.
 
 on:
   pull_request:
@@ -28,8 +38,13 @@ defaults:
 
 jobs:
   adapter-suite:
-    name: Approver identity JWT adapter (in-process issuer, no egress)
+    name: Approver identity JWT adapter (in-process issuer, no egress, py${{ matrix.python-version }})
     runs-on: ubuntu-latest
+    strategy:
+      # One interpreter's failure must not hide another's.
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.11", "3.12"]
     env:
       PYTHONPATH: >-
         packages/integration/approver-identity-jwt/src:packages/integration/governed-review-service/src:packages/integration/governed-review/src:packages/integration/control-plane-root/src:packages/integration/approval-workflow/src:packages/integration/authority-directory/src:packages/governance-contracts/src:packages/integration/agent-runtime-governance/src:packages/integration/risk-authority-runtime/src:packages/integration/risk-authority-status-runtime/src:packages/runtime/agent-runtime/src:packages/risk_authority/src:packages/capabilities/decision-authority/src:packages/providers/actiongate/src:packages/integration/durable-execution/src:packages/integration/governed-review/tests:packages/integration/governed-review-service/tests
@@ -38,12 +53,12 @@ jobs:
 
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          python-version: "${{ matrix.python-version }}"
 
       - name: Install dependencies within the declared bounds
         run: |
           python -m pip install --upgrade pip
-          pip install pytest pydantic "dbos>=2.0" "SQLAlchemy>=2.0" \
+          pip install pytest pydantic "dbos>=2.0" "SQLAlchemy>=2.0" tomli \
             "PyJWT[crypto]>=2.8.0,<3.0.0" "cryptography>=41.0.7,<47.0.0"
           python -c "import importlib.metadata as m; print('PyJWT', m.version('PyJWT')); print('cryptography', m.version('cryptography'))"
 

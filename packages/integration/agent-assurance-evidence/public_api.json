@@ -7,10 +7,7 @@
   "symbols": {
     "AgentAssuranceEvidenceError": {
       "kind": "class",
-      "methods": [
-        "add_note",
-        "with_traceback"
-      ]
+      "methods": []
     },
     "AssessedSystemBinding": {
       "fields": [
@@ -70,10 +67,7 @@
     },
     "ContractViolation": {
       "kind": "class",
-      "methods": [
-        "add_note",
-        "with_traceback"
-      ]
+      "methods": []
     },
     "DECLARATION_ID_PREFIX": {
       "kind": "constant",
@@ -81,10 +75,7 @@
     },
     "DeclarationSupersessionError": {
       "kind": "class",
-      "methods": [
-        "add_note",
-        "with_traceback"
-      ]
+      "methods": []
     },
     "ENFORCEMENT_ENABLED": {
       "kind": "constant",

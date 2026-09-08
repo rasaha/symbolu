@@ -10,6 +10,16 @@ name: cloud-scaling-risk-integration-ci
 # Controller and Risk Authority baselines remain green and unchanged, re-verifies the
 # frozen v1/v2 request digests, and builds + installs the wheel offline to prove that
 # installed behavior matches source behavior digest for digest.
+#
+# The suite job runs on 3.10, 3.11 and 3.12 — the whole range this package declares
+# with requires-python >= 3.10, and which no job ran until now. What blocked 3.10 was
+# a bare `import tomllib` in the packaging/boundary test: stdlib only from 3.11, and a
+# bare import, so installing the backport was not enough and the import itself had to
+# change. It now falls back to `tomli`, which this job installs — a hard import rather
+# than pytest.importorskip, so a missing backport fails loudly instead of silently
+# dropping the assertions from the 3.10 leg. The baseline, isolated-install and
+# guard-sweep jobs stay on one interpreter: they measure artifacts, neighbouring
+# packages and a committed sweep ledger, none of which a second interpreter re-decides.
 
 on:
   pull_request:
@@ -31,9 +41,17 @@ on:
       - ".github/workflows/cloud-scaling-risk-integration-ci.yml"
   push:
     branches:
+      # A branch that changes this workflow, or the packages it gates, must be able to
+      # run it. The per-milestone prefixes above are kept, and `claude/**` is added
+      # alongside them — the same filter agent-runtime-governance-ci, governed-review-ci,
+      # package-suites-ci and four others already use. Without it these jobs ran on no
+      # branch but their own milestone's: PR events do not start workflow runs in this
+      # repository, so a workflow whose push filter excludes the working branch is a
+      # workflow whose changes nothing executes before merge.
       - "claude/cloud-scaling-phase-4c-**"
       - "claude/setup-symbolu-monorepo-**"
       - "claude/guard-coverage-**"
+      - "claude/**"
     paths:
       - "packages/integration/cloud-scaling-risk-integration/**"
       - "scripts/cloud_scaling/guard_sweep.py"
@@ -46,19 +64,24 @@ defaults:
 
 jobs:
   adapter-suite:
-    name: Phase 4C adapter suite (source)
+    name: Phase 4C adapter suite (source, py${{ matrix.python-version }})
     runs-on: ubuntu-latest
+    strategy:
+      # One interpreter's failure must not hide another's.
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.11", "3.12"]
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          python-version: "${{ matrix.python-version }}"
       - name: Install tooling + first-party packages (editable)
         run: |
           python -m pip install --upgrade pip
-          pip install pytest build numpy
+          pip install pytest build numpy tomli
           pip install -e packages/risk_authority
           pip install -e packages/capabilities/cloud-scaling-controller
           pip install -e packages/integration/cloud-scaling-risk-integration

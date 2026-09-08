@@ -14,6 +14,16 @@ name: risk-authority-effect-attestation-ci
 # the three neighbouring baselines this slice touches or borrows from (the Trusted
 # Evidence Authority, whose enum lent two capabilities; 5B-0A, the other TEA consumer;
 # RA-8, the future integration target, which must be unchanged).
+#
+# The suite job runs on 3.10, 3.11 and 3.12 — the whole range this package declares
+# with requires-python >= 3.10, and which no job ran until now. What blocked 3.10 was
+# a bare `import tomllib` in the packaging/boundary test: stdlib only from 3.11, and a
+# bare import, so installing the backport was not enough and the import itself had to
+# change. It now falls back to `tomli`, which this job installs — a hard import rather
+# than pytest.importorskip, so a missing backport fails loudly instead of silently
+# dropping the assertions from the 3.10 leg. The neighbouring-baselines and
+# isolated-install jobs stay on one interpreter: they assert that other packages and the
+# built wheel are undisturbed, which each of those packages' own workflows covers.
 
 on:
   pull_request:
@@ -27,8 +37,16 @@ on:
       - ".github/workflows/risk-authority-effect-attestation-ci.yml"
   push:
     branches:
+      # A branch that changes this workflow, or the packages it gates, must be able to
+      # run it. The per-milestone prefixes above are kept, and `claude/**` is added
+      # alongside them — the same filter agent-runtime-governance-ci, governed-review-ci,
+      # package-suites-ci and four others already use. Without it these jobs ran on no
+      # branch but their own milestone's: PR events do not start workflow runs in this
+      # repository, so a workflow whose push filter excludes the working branch is a
+      # workflow whose changes nothing executes before merge.
       - "claude/effect-attestation-**"
       - "claude/setup-symbolu-monorepo-**"
+      - "claude/**"
     paths:
       - "packages/integration/risk-authority-effect-attestation/**"
       - "packages/trusted-evidence-authority/**"
@@ -41,17 +59,22 @@ defaults:
 
 jobs:
   effect-attestation-suite:
-    name: Package suite + public-API parity + measured mutation sweep
+    name: Package suite + public-API parity + measured mutation sweep (py${{ matrix.python-version }})
     runs-on: ubuntu-latest
+    strategy:
+      # One interpreter's failure must not hide another's.
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.11", "3.12"]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          python-version: "${{ matrix.python-version }}"
       - name: Install
         run: |
           python -m pip install --upgrade pip
-          pip install pytest build pyflakes \
+          pip install pytest build pyflakes tomli \
                       "cryptography>=41.0.7,<47.0.0" "PyNaCl>=1.5.0,<2.0.0"
           pip install --no-deps \
             -e packages/governance-contracts \
