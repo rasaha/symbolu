@@ -14,8 +14,11 @@ routes the screen/API audit proposed
 `REFERENCE_GRADE_SHADOW_ONLY`, `ENFORCEMENT_ENABLED = False`, `IDENTITY_PROOF =
 "PRESENTED_UNPROVEN"`. The approver on every decision is a reference the caller
 presented. Since 0.3.0 the service defines the seam a proof enters through (AI-A,
-below), but the only adapter in this repository is a fixture that proves nothing, so
-every decision it records is still `PRESENTED_UNPROVEN`; the ledger's eligibility port,
+below), and `IDENTITY_PROOF` is this package's label when **no** port is configured: a
+decision then records `PRESENTED_UNPROVEN`, as it does behind the fixture adapter. A
+deployment that composes a real adapter — `ugence-approver-identity-jwt` (AI-C), wired
+by `deployment/governed-runtime-worker` — records `IDP_AUTHENTICATED` instead; that
+adapter is proven against an in-process issuer only. The ledger's eligibility port,
 answered by the authority directory, decides only whether that reference *may* decide.
 Every decision feeds a runtime that invokes fixture providers. Nothing is
 pilot-validated or production-certified.
@@ -187,15 +190,24 @@ SQLAlchemy. `fastapi` and
 ## Known gaps `[G]`
 
 - The only real identity adapter, `ugence-approver-identity-jwt` (AI-C), is proven
-  against an in-process issuer only and is wired by no composition root; with the
-  fixture adapter, or without a port, `decided_by` is what the caller presented and
-  nothing proves who did. The approval record and the linkage carry no
-  `authentication_reference` yet (AI-D); no assurance policy or gate exists (AI-E).
+  against an in-process issuer only: real enterprise-issuer validation is unproven, and
+  no issuer, test tenant or key rotation policy is provisioned. It **is** wired by a
+  composition root — `deployment/governed-runtime-worker` builds it in
+  `build_identity_port`
+  (`deployment/governed-runtime-worker/src/governed_runtime_worker/composition.py:168-182`).
+  With the fixture adapter, or without a port, `decided_by` is still what the caller
+  presented and nothing proves who did. No assurance policy or gate exists (AI-E).
 - Requests that expire undecided are not re-requested; the instance stays parked until
   a later step raises a new ordinal.
 - `required_approvals` labels are mapped to one configured role by the binding
   (governed-review's own gap).
-- The queue joins ledger and checkpoint by the `instance:task` reference; there is no
-  single audit artifact joining proposal, approval, consumption and resumed evaluation
-  (HR-E).
-- No screen: HR-D.
+- The single audit artifact joining proposal, approval, consumption and resumed
+  evaluation exists (HR-E, HE-1): `reconstruct()` builds `ReviewLinkage` from the three
+  stores and `LinkageAppender` writes it to the control-plane audit ledger as
+  `governed_review.linkage.v2` (`linkage.py`). It stays non-blocking — a `LinkageError`
+  is the typed `NOT_YET` and the decision is never withheld — so a decision can still
+  stand with no linkage appended, and the queue itself joins ledger and checkpoint by
+  the `instance:task` reference only.
+- The screen exists (HR-D): `apps/ugence-governance-studio/frontend/src/features/studio/ReviewQueueScreen.tsx`
+  over the relay at `backend/.../api/v2/review.py`. It is studio-side and outside this
+  package's boundary; this package still opens no screen of its own.

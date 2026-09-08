@@ -28,13 +28,39 @@ sequenced as GAS-3 in the Ugence productization roadmap §11.
 
 What stays blocked, regardless of this package:
 
-- Risk Authority `production_mode` still raises `ProductionContainmentError`.
-- **HOLD, DEFER, ESCALATE and MANUAL_REVIEW still have no sink.** This package emits HOLD
-  and ESCALATE correctly and the runtime parks on them correctly — and then there is
-  nowhere for a human to see the parked instance. The hook makes the disposition
-  faithful; it does not make it actionable.
-- No credential broker: cloud-scaling Phase 5X is unbuilt, and nothing here substitutes
-  for it.
+- Risk Authority `production_mode` still raises `ProductionContainmentError`, so signed
+  envelope issuance remains Phase 5 and unbuilt.
+- **One disposition has no sink, and no surface reports a park.** See the correction
+  below for what that is and what it is not.
+- **No credential path for Agent Runtime's providers.** Cloud-scaling Phase 5X and 5D
+  are built, but for capacity actions only; nothing here supplies a credential for a
+  provider this hook clears.
+
+**Corrected 2026-09-08.** Two of the three lines above previously read "**HOLD, DEFER,
+ESCALATE and MANUAL_REVIEW still have no sink** … there is nowhere for a human to see the
+parked instance" and "No credential broker: cloud-scaling Phase 5X is unbuilt". Both were
+stale.
+
+*On the sink.* This hook emits exactly four dispositions — `CLEAR`, `BLOCK`, `HOLD` and
+`ESCALATE` (see the projection table below). `DEFER` and `MANUAL_REVIEW` are **never
+emitted**: they fall to `anything else -> BLOCK`, so no instance has ever parked on them,
+and naming them as unsunk overstated the gap. `ESCALATE` **is** sunk — GAS-7 HR-A binds
+an approval to the proposal fingerprint and consumes it before the engine advances, HR-C
+(`packages/integration/governed-review-service`) lists the queue and records the
+decision, and HR-D ships the studio's Review Queue and Run Detail screens. What remains
+is one case: a `HOLD_NON_EXECUTABLE` carrying no `required_approvals`, which this hook
+projects to `HOLD`. That case is ruled **deliberately not reviewable** (HR-5-SCOPE,
+`docs/architecture/ADR_UGENCE_AGENT_RUNTIME_PRODUCTION_VALIDATION_SCOPING.md`): it names
+no approver and states no obligation, so a review queue would show an item with nothing
+decidable in it. The instance parks and an **operator** resumes it. The gap that survives
+that ruling is a monitoring one — no surface tells an operator an instance parked — and
+it is open.
+
+*On the broker.* `ugence-cloud-scaling-credential-broker` 0.1.0 (5X) and
+`ugence-cloud-scaling-bounded-execution` 0.1.0 (5D) exist. Neither imports
+`ugence_agent_runtime`; both are scoped to Cloud Scaling capacity actions, a 5X grant's
+`executable` is always false, and 5D resolves every missing LIVE precondition to
+`dry_run`. So the conclusion holds on its real ground rather than on a package's absence.
 
 ## The projection
 

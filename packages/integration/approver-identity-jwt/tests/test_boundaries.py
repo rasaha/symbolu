@@ -81,8 +81,16 @@ def test_pyproject_declares_exactly_the_ratified_bounded_dependency_set():
         if dep.startswith(("PyJWT", "cryptography")):
             assert "<" in dep and ">=" in dep, f"{dep}: lower and upper bound (IA-2)"
     assert any(d.startswith("PyJWT[crypto]") for d in deps), "the crypto extra is explicit"
+    # The floor is part of the declaration: the adapter fills VerifiedClaims for a
+    # service that records authentication_reference, which arrived in
+    # governed-review-service 0.4.0 (AI-D). The floor is 0.6.1 rather than 0.4.0
+    # because every service release before it declares floors that resolve a
+    # governed-review or approval-workflow without the field, so 0.6.1 is the first
+    # whose own metadata resolves the reference the adapter exists to supply.
+    floors = {re.split(r"[\[><=]", d)[0]: d for d in deps}
+    assert floors["ugence-governed-review-service"] == "ugence-governed-review-service>=0.6.1"
     assert set(data["project"].get("optional-dependencies", {})) <= {"test"}
-    assert pkg.__version__ == "0.1.0"
+    assert pkg.__version__ == "0.1.1"
 
 
 def test_no_clock_is_read_anywhere():
