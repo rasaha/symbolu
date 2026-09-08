@@ -70,6 +70,21 @@ npm run dev            # :3200, proxies /api -> https://127.0.0.1:8444 (WORKER_U
 The plane must sit inside the worker's private segment (CR-3). It holds no credential
 and forwards none; a read carries no header the worker reads.
 
+In a built deployment nothing plays the dev proxy's part, so `server.mjs` does:
+
+```bash
+npm run build
+PORT=8080 WORKER_URL=https://worker.internal:8444 npm start
+```
+
+It serves `dist` with the router's fallback and forwards `/api/*` to the worker, so
+`VITE_WORKER_BASE_URL` stays unset and the client's `/api` default is same-origin — the
+worker's origin never reaches a browser. It forwards GET only, only to a path
+`security/approved-operations.json` approves, and forwards no request header, so it can
+carry no credential and no write. It does not verify the worker's private certificate,
+as the dev proxy does not; the private segment is what protects that hop (CR-3), so it
+must not be given a public worker origin.
+
 ## Maturity
 
 `REFERENCE_GRADE_SHADOW_ONLY`, like everything it reads from. No identity provider is
