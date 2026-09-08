@@ -37,8 +37,16 @@ on:
       - ".github/workflows/risk-authority-evidence-runtime-ci.yml"
   push:
     branches:
+      # A branch that changes this workflow, or the packages it gates, must be able to
+      # run it. The per-milestone prefixes above are kept, and `claude/**` is added
+      # alongside them — the same filter agent-runtime-governance-ci, governed-review-ci,
+      # package-suites-ci and four others already use. Without it these jobs ran on no
+      # branch but their own milestone's: PR events do not start workflow runs in this
+      # repository, so a workflow whose push filter excludes the working branch is a
+      # workflow whose changes nothing executes before merge.
       - "claude/risk-authority-ra5-**"
       - "claude/setup-symbolu-monorepo-**"
+      - "claude/**"
     paths:
       - "packages/integration/risk-authority-evidence-runtime/**"
       - ".github/workflows/risk-authority-evidence-runtime-ci.yml"
