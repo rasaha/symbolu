@@ -39,6 +39,20 @@ authenticity remains non-forgeable, that a genuinely different instant remains
 distinct, that RA-01 remains gate-driven with no family-count heuristic, and that
 `authorizes_deployment` remains permanently `False`.
 
+### Fixed — a stale claim about the RA-owned subject context
+The 0.4.0 entry below and the README described PR #1432's RA-owned subject
+binding as "draft-only and unmerged". Both PRs have merged: **#1425** (the Phase 4
+design ADR) on 2026-08-13 and **#1432** (the implementation) on 2026-08-17, which
+shipped `SubjectContext` / `SubjectBinding` / `validate_subject_binding` in
+`risk_authority.integrations.evaluation_contracts` under schema
+`risk-subject-context-1`. The 0.4.0 entry is left as written — it is the record
+of what was decided then — and this supersedes its merge-status clause only.
+
+**No decision changes.** The reason for the opaque token was never the contract's
+absence: it is that adopting it is UVI's decision (D-14), and this package still
+takes no dependency on `risk_authority` and resolves no such reference. What was
+wrong was the stated reason, not the shape.
+
 ## [0.4.0] — M-3R.3: indicator catalogs and assessed-system binding
 
 Implements UVI ADR §25 milestone **M-3R.3**: the `IntelligenceFitness` /
@@ -118,6 +132,8 @@ imports no UVI, readiness, authority or risk package, so no cycle is possible.
   is draft-only and unmerged (ADR D-14, §26.2), so it is represented **only**
   through the opaque `canonical_subject_context_ref` token. When that contract is
   ratified the token points at it with no shape change and no version bump.
+  *(Merge status superseded in 0.4.1: #1432 merged 2026-08-17. The token, and the
+  reason for it — UVI adoption is D-14's decision — are unchanged.)*
 - **No environment enumeration is invented**: `deployment_environment_ref` is an
   opaque token.
 

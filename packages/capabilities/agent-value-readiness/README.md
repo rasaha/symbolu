@@ -68,7 +68,7 @@ public trusted-resolution service.
 
 - **Distribution:** `ugence-agent-value-readiness`
 - **Namespace:** `ugence_agent_value_readiness`
-- **Version:** 0.4.0
+- **Version:** 0.4.1
 - **Depends on:** stdlib **+ `ugence-governance-contracts>=0.3.1`** (evidence vocabulary + the assessed-system identity contract) **+ `ugence-uvi-policy-contracts>=0.1.0`** (policy/context shapes) **+ `ugence-policy-authority>=0.1.0`** (public trusted policy resolution only) — never `governed-value`, and never an authority internal.
 - **Typing:** fully annotated; ships `py.typed`.
 
@@ -578,11 +578,20 @@ is still only structural; every outcome carries the standing, permanently
 `OUT_OF_SCOPE` `SYSTEM_BINDING_AUTHENTICITY_NOT_VERIFIED` disposition saying so.
 
 `SystemManifest` **remains unresolved and unimplemented** — its home is an open
-owner decision (ADR §26.3), so no such type is minted in either package. PR
-#1432's RA-owned subject binding **remains additive and is not forked**
-(draft-only and unmerged, ADR D-14, §26.2): it is represented here **only**
-through the opaque `canonical_subject_context_ref` token, so a ratified contract
-can be pointed at later with no shape change and no version bump.
+owner decision (ADR §26.3), so no such type is minted in either package. The
+RA-owned subject binding **remains additive and is not forked**: it is
+represented here **only** through the opaque `canonical_subject_context_ref`
+token, so the contract can be pointed at with no shape change and no version
+bump.
+
+That contract now **exists**. It was designed in PR #1425 (merged 2026-08-13,
+`ADR_CLOUD_SCALING_RISK_AUTHORITY_INTEGRATION_PHASE4.md`) and implemented in PR
+#1432 (merged 2026-08-17) as `SubjectContext` / `SubjectBinding` /
+`validate_subject_binding` in `risk_authority.integrations.evaluation_contracts`
+(schema `risk-subject-context-1`; shipped in `ugence-risk-authority` >= 0.3.0).
+What is still outstanding is **UVI's adoption of it** — this package takes no
+dependency on `risk_authority` and resolves no such reference — and that
+adoption is the owner decision D-14 records, not the contract's existence.
 
 ### One required path
 
@@ -613,8 +622,9 @@ the verifier seam and ships only its deny-all default — it implements no
 verifier);
 machine-evaluable threshold semantics and metric-to-threshold calculation;
 structured successor/supersession references; **condition runtime enforcement**;
-the RA-owned canonical `SubjectContext` (draft-only, unmerged — referenced here
-only as an opaque `canonical_subject_context_ref` token); a ratified
+UVI adoption of the RA-owned canonical `SubjectContext` (merged and implemented
+in `risk_authority` — referenced here only as an opaque
+`canonical_subject_context_ref` token, never resolved); a ratified
 system-binding **authenticity verifier**; a durable event
 bus or **signed** determination record; forecasting, realization-probability
 modeling, attributed/verified return, financial valuation, and `governed-value`

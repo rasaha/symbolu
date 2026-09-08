@@ -1,0 +1,103 @@
+name: agent-value-readiness-ci
+
+# The artifact proofs for ugence-agent-value-readiness that nothing was running.
+#
+# The package's pytest suite is already executed by package-suites-ci.yml on 3.10,
+# 3.11 and 3.12, and that stays where it is — this workflow deliberately does not
+# duplicate it. What had no CI at all were the three proofs that cannot be made
+# from the source tree, where every sibling package sits on sys.path and an
+# undeclared import still resolves:
+#
+#   * verify_agent_value_readiness_distribution.py — builds the wheel and its
+#     three declared dependencies, installs --no-index into a clean venv, and
+#     interrogates the installed package: that the evaluator works with no
+#     orchestration configured, that no permissive verifier is importable, and
+#     that governed_value and every other engine/product/authority is absent.
+#   * adversarial_probes.py — 39 probes over the trusted orchestration boundary.
+#   * m3r3_adversarial_probes.py — 43 probes over the M-3R.3 catalogs and the
+#     assessed-system binding, including the no-clock/no-randomness scan.
+#
+# Twenty-four verify_*_distribution.py scripts run in this repository's workflows;
+# this package's was not among them, so its strongest claims — the ones the README
+# leads with — were proved only on whichever machine last ran them by hand.
+#
+# Nothing here publishes, uses a secret, or contacts a network service.
+
+on:
+  pull_request:
+    paths:
+      - "packages/capabilities/agent-value-readiness/**"
+      - "packages/governance-contracts/**"
+      - "packages/uvi-policy-contracts/**"
+      - "packages/policy-authority/**"
+      - "docs/architecture/ADR_UGENCE_VALUE_INTELLIGENCE_GV2C_GV2E_GV3R.md"
+      - ".github/workflows/agent-value-readiness-ci.yml"
+  push:
+    branches:
+      - "claude/**"
+    paths:
+      - "packages/capabilities/agent-value-readiness/**"
+      - "packages/governance-contracts/**"
+      - "packages/uvi-policy-contracts/**"
+      - "packages/policy-authority/**"
+      - "docs/architecture/ADR_UGENCE_VALUE_INTELLIGENCE_GV2C_GV2E_GV3R.md"
+      - ".github/workflows/agent-value-readiness-ci.yml"
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  adversarial-probes:
+    name: Adversarial probes (orchestration boundary, M-3R.3)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Trusted orchestration probes
+        # Both scripts locate their own dependencies; no PYTHONPATH is needed and
+        # none is set, so a probe that only passed because a sibling leaked onto
+        # the path would fail here.
+        run: python packages/capabilities/agent-value-readiness/adversarial_probes.py
+      - name: M-3R.3 catalog and assessed-system-binding probes
+        run: python packages/capabilities/agent-value-readiness/m3r3_adversarial_probes.py
+
+  isolated-install:
+    name: Wheel build and isolated --no-index installation verification
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install build tooling
+        run: |
+          python -m pip install --upgrade pip
+          pip install build
+      - name: Build, install into a clean venv, and interrogate the installed package
+        run: python packages/capabilities/agent-value-readiness/verify_agent_value_readiness_distribution.py
+
+  api-parity:
+    name: Public API parity and packaging invariants (source)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install test tooling
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest
+      - name: public_api.json equals the curated surface; boundaries hold
+        # Run from the package directory: its conftest.py puts src/ and the three
+        # first-party dependencies on sys.path, and the suite cannot be collected
+        # from the repository root without it.
+        run: |
+          cd packages/capabilities/agent-value-readiness
+          python -m pytest tests/packaging -q
+      - name: py.typed marker ships
+        run: |
+          test -f packages/capabilities/agent-value-readiness/src/ugence_agent_value_readiness/py.typed

@@ -27,8 +27,10 @@ here **mints no authority** — trust evaluation (signature, approval, revocatio
 freshness) belongs to the Policy Authority and later admission milestones, which
 are explicitly out of scope. `AssessedSystemBinding` is **owned by
 `ugence-governance-contracts`** (UVI ADR §20) and is not defined here; the
-RA-owned `SubjectContext` (PR #1425, unmerged) remains a **deferred dependency**
-and is likewise not defined here.
+RA-owned `SubjectContext` (designed in PR #1425, implemented in PR #1432, both
+merged; it lives in `risk_authority.integrations.evaluation_contracts`) remains a
+**deferred dependency** here — deferred because UVI has not adopted it, not
+because it is absent — and is likewise not defined here.
 
 ## What's in it
 
@@ -139,7 +141,8 @@ Policy Authority (approval/signing/issuance/revocation), benchmark registry,
 readiness evaluator + target-relative state machine, `ConditionSet` execution,
 value forecasting, attribution/verification engines, financial valuation +
 `ValuationEvidenceManifest` (owned by `governed-value`), and the RA-owned
-`SubjectContext` (PR #1425, unmerged). `AssessedSystemBinding` is **not** deferred
+`SubjectContext` (merged in `risk_authority` via PR #1425/#1432; deferred here
+because UVI has not adopted it). `AssessedSystemBinding` is **not** deferred
 — it is owned by `ugence-governance-contracts` (ADR §20) and consumed by
 `ugence-agent-value-readiness`. See ADR §24–§26.
 

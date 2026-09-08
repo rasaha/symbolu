@@ -123,8 +123,9 @@ is that engine's adapter responsibility.
 The binding is **structural**: `authenticity_status` is a permanently
 `STRUCTURAL_UNVERIFIED` property and `authenticity_verified` a permanently-`False`
 property, because no ratified system-binding verifier exists. The RA-owned
-canonical neutral `SubjectContext` remains a **deferred dependency** (unmerged);
-it and `SystemManifest` are **not** minted here — both are referenced by opaque,
+canonical neutral `SubjectContext` remains a **deferred dependency** (merged and
+implemented in `risk_authority` via PR #1425/#1432; deferred here because no UVI
+package adopts it); it and `SystemManifest` are **not** minted here — both are referenced by opaque,
 co-required ref + digest tokens.
 
 **Canonicalization (0.3.1).** Every timezone-aware datetime in the binding is

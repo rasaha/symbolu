@@ -100,7 +100,7 @@ Honest chain (§17). Existing semantics are preserved and **not renamed**: `Risk
 First-class, versioned policy context — **not** caller-controlled numeric modifiers. Required determinations/references in §15.
 
 ### D-14 — Assessed system & subject context
-**No second subject-context authority.** Reuse the canonical neutral subject-context work from the Risk Authority / cloud-scaling integration ADR **if ratified/available**; it is currently **draft-only (PR #1425, not merged, RA-owned, pending ratification)**, so it is recorded as an **explicit dependency** (§16, §26). Prefer `AssessedSystemBinding` referencing `canonical_subject_context_ref` + a UVI `SystemManifest` bound by digest. Do **not** mint a competing subject-context contract.
+**No second subject-context authority.** Reuse the canonical neutral subject-context work from the Risk Authority / cloud-scaling integration ADR **if ratified/available**; it is **merged and implemented** — designed in PR #1425 (merged 2026-08-13) and implemented in PR #1432 (merged 2026-08-17) as `SubjectContext` / `SubjectBinding` / `validate_subject_binding` in `risk_authority.integrations.evaluation_contracts`, schema `risk-subject-context-1`, shipped in `ugence-risk-authority` >= 0.3.0. It remains an **explicit dependency** (§16, §26) because what is outstanding is **UVI's adoption** of it, not its existence: no UVI package imports `risk_authority` or resolves such a reference. Prefer `AssessedSystemBinding` referencing `canonical_subject_context_ref` + a UVI `SystemManifest` bound by digest. Do **not** mint a competing subject-context contract.
 
 ### D-15 — Contract & package placement
 Boundaries fixed in §20; dependency rules in §21.
@@ -223,7 +223,7 @@ Thresholds are **immutable policy literals** when intrinsic to the signed policy
 
 `SystemManifest` binds the actually-assessed configuration: agent/system identity; model/model-set identities & versions; prompt/configuration versions & digests; tool & capability-set versions & digests; relevant workflow & policy references. **Immutable references + canonical digests** (mirroring the content-digest discipline of `risk_authority.ControlEvidenceRecord`).
 
-**Dependency (explicit):** the canonical neutral `SubjectContext` is defined by the **RA-owned** design in PR #1425 (schema `risk-subject-context-1`, `SubjectBinding risk-subject-binding-1`), which is **draft-only, not merged, and not implemented**. UVI **reuses** that contract via `canonical_subject_context_ref` once ratified/merged; it does **not** mint a competing subject-context contract. Because the RA v2 fact set is scaling-oriented and carries no model/prompt/tool identity, the UVI `SystemManifest` is an **additive, non-competing** artifact bound by digest alongside the canonical subject context. Final placement/shape of `SystemManifest` and confirmation of the reuse boundary are owner decisions (§26).
+**Dependency (explicit):** the canonical neutral `SubjectContext` is defined by the **RA-owned** design in PR #1425 (schema `risk-subject-context-1`, `SubjectBinding risk-subject-binding-1`), which is **merged (2026-08-13) and implemented** by PR #1432 (merged 2026-08-17) in `risk_authority.integrations.evaluation_contracts`. UVI **reuses** that contract via `canonical_subject_context_ref`; it does **not** mint a competing subject-context contract. UVI has **not yet adopted** it — the reference is still carried as an opaque token and resolved by nothing (D-14, §26.2). Because the RA v2 fact set is scaling-oriented and carries no model/prompt/tool identity, the UVI `SystemManifest` is an **additive, non-competing** artifact bound by digest alongside the canonical subject context. Final placement/shape of `SystemManifest` and confirmation of the reuse boundary are owner decisions (§26).
 
 ## 17. Authorization → execution evidence → effect claim → attribution → verification → valuation
 
@@ -293,7 +293,8 @@ contracts     readiness      (0.2.0; later)   (service)
               │  └── uvi-policy-contracts (policy shapes, by value)
               └── governance-contracts
 governed-value ── governance-contracts + uvi-policy-contracts   (later, optional, additive)
-RA-owned SubjectContext (PR #1425)  ◀── referenced by governance-contracts AssessedSystemBinding (once ratified)
+RA-owned SubjectContext (risk_authority, merged #1425/#1432)  ◀── referenced by governance-contracts
+                                        AssessedSystemBinding as an opaque token (not yet resolved)
 ```
 
 Invariants: **every arrow points at a neutral-contract package**; `agent-value-readiness` does **not** import `governed-value`; `governed-value` does **not** import `agent-value-readiness`; neither imports the other's internals; all cross-package communication uses neutral contracts. The benchmark registry depends only on `governance-contracts`. No leaf imports a Policy Authority internal — policies arrive as signed, digest-bound artifacts.
@@ -339,17 +340,21 @@ Each milestone is independently reviewable, fails closed by default, and mints n
 
 ## 26. Unresolved issues (implementation detail only — no boundary/ownership change)
 
-1. ~~**Policy Authority for UVI value-policies**~~ — **RESOLVED (2026-08-16)** by [`ADR_UGENCE_POLICY_AUTHORITY.md`](ADR_UGENCE_POLICY_AUTHORITY.md): the **platform-wide Ugence Policy Authority** owns approval **verification**, signing/issuance, exact registration/resolution, and policy-version revocation, and **UVI is its first policy-family adapter**. It stays an **external platform dependency** of UVI engines. It remains **DEFERRED as implementation** — no such package exists yet, and building it is a **platform dependency milestone**, not a UVI engine milestone (D-1, D-16, §19).
-2. **RA-owned `SubjectContext` dependency** — PR #1425 is draft-only; owner to ratify/merge before UVI references `canonical_subject_context_ref` (D-14).
+1. ~~**Policy Authority for UVI value-policies**~~ — **RESOLVED (2026-08-16)** by [`ADR_UGENCE_POLICY_AUTHORITY.md`](ADR_UGENCE_POLICY_AUTHORITY.md): the **platform-wide Ugence Policy Authority** owns approval **verification**, signing/issuance, exact registration/resolution, and policy-version revocation, and **UVI is its first policy-family adapter**. It stays an **external platform dependency** of UVI engines. **Implementation has since landed**: `packages/policy-authority` (`ugence-policy-authority` 0.3.1) exists and `agent-value-readiness` consumes its public trusted-resolution service through `PolicyAuthorityReadinessPolicyResolver`. Building it was a **platform dependency milestone**, not a UVI engine milestone (D-1, D-16, §19), and the ownership boundary is unchanged: no UVI leaf imports an authority internal.
+2. **RA-owned `SubjectContext` dependency** — **the contract has merged** (design PR #1425, 2026-08-13; implementation PR #1432, 2026-08-17, in `risk_authority.integrations.evaluation_contracts`). What is still open is **UVI's adoption**: whether, and on what terms, UVI resolves `canonical_subject_context_ref` against it rather than carrying it as an opaque token (D-14). PR #1432 also left the D-4 identifier strings deliberately unfrozen, so an adopting change must not assume them.
 3. **`SystemManifest` home** — `governance-contracts` vs `uvi-policy-contracts` vs an assessed-system contract, and confirmation it is a non-competing additive artifact (D-14, §20).
 4. **Producers of `AttributionAssessment` / `VerificationAssessment`** — a new attribution capability / DA extension, and a Runtime-Assurance extension vs new; whether `PARTIALLY_ATTRIBUTED` needs a DA reconciliation-contract extension (D-10).
 5. **Benchmark registry home** — **RESOLVED (2026-08-17)** by
    [`ADR_UGENCE_TRUSTED_EVIDENCE_AND_BENCHMARK_REGISTRY.md`](ADR_UGENCE_TRUSTED_EVIDENCE_AND_BENCHMARK_REGISTRY.md):
    **one shared, platform-wide Ugence Benchmark Registry** (internal platform
    infrastructure, not a UVI-owned leaf and not a fourth UVI engine), with **UVI as its
-   first consumer**. It stays an **external platform dependency** of UVI engines and
-   remains **DEFERRED as implementation** — no such package exists, and building it is a
-   **platform dependency milestone**, not a UVI engine milestone. **Attestation cadence**
+   first consumer**. It stays an **external platform dependency** of UVI engines.
+   **Implementation has since landed**: `packages/benchmark-registry`
+   (`ugence-benchmark-registry` 0.1.0, milestone BR-1 — benchmark definition contracts
+   only, no registry service) and `packages/benchmark-registry-authority` exist. Building
+   them was a **platform dependency milestone**, not a UVI engine milestone. **No UVI
+   engine consumes either yet**, so benchmark resolution remains deferred for
+   `agent-value-readiness` in fact as well as in scope. **Attestation cadence**
    (D-3) **remains open** and is tracked as DD-8 in that ADR.
 6. **`agent-value-readiness` placement** — `packages/capabilities/*` (provisional, D-4) vs top-level leaf.
 7. **`FinancialValuation` eligibility & classification-stamping** location — `IntendedOutcomePolicy` vs a distinct `ValuationPolicy` (D-11).
