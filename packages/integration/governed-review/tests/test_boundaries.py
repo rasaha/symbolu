@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import ast
 import pathlib
+import re
 import sys
 import tomllib
 
@@ -85,6 +86,11 @@ def test_pyproject_declares_the_ratified_dependency_set():
         "ugence-agent-runtime-governance", "ugence-risk-authority-runtime",
         "ugence-governance-contracts",
     }
+    # The floor is part of the declaration: linkage.py copies
+    # ApprovalRecord.authentication_reference, which arrived in approval-workflow 0.2.0
+    # (AI-D, ruling ID-2). A lower floor would resolve a wheel that has no such field.
+    floors = {re.split(r"[><=]", d)[0]: d for d in data["project"]["dependencies"]}
+    assert floors["ugence-approval-workflow"] == "ugence-approval-workflow>=0.2.0"
     joined = " ".join(data["project"]["dependencies"]).lower()
     for forbidden in ("durable-execution", "dbos", "pydantic", "decision-authority",
                       "sqlalchemy", "psycopg", "boto3", "kubernetes", "redis",

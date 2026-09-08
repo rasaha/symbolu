@@ -77,6 +77,12 @@ def test_pyproject_declares_exactly_the_ratified_bounded_dependency_set():
         if dep.startswith(("PyJWT", "cryptography")):
             assert "<" in dep and ">=" in dep, f"{dep}: lower and upper bound (IA-2)"
     assert any(d.startswith("PyJWT[crypto]") for d in deps), "the crypto extra is explicit"
+    # The floor is part of the declaration: the adapter fills VerifiedClaims for a
+    # service that records authentication_reference, which arrived in
+    # governed-review-service 0.4.0 (AI-D). A lower floor would resolve a wheel whose
+    # ReviewService drops the reference the adapter exists to supply.
+    floors = {re.split(r"[\[><=]", d)[0]: d for d in deps}
+    assert floors["ugence-governed-review-service"] == "ugence-governed-review-service>=0.4.0"
     assert set(data["project"].get("optional-dependencies", {})) <= {"test"}
     assert pkg.__version__ == "0.1.0"
 

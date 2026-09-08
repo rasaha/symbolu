@@ -35,8 +35,8 @@ authors = [{ name = "Rakesh Mohan" }]
 keywords = ["governance", "approval", "review", "durable-execution", "ugence"]
 classifiers = ["Typing :: Typed"]
 dependencies = [
-    "ugence-governed-review>=0.2.0",
-    "ugence-approval-workflow>=0.1.0",
+    "ugence-governed-review>=0.3.0",
+    "ugence-approval-workflow>=0.2.0",
     "ugence-authority-directory>=0.1.0",
     "ugence-durable-execution>=0.1.0",
     "ugence-governance-contracts>=0.4.0",

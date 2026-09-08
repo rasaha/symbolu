@@ -11,10 +11,12 @@ HR-5 (`docs/architecture/ADR_UGENCE_HUMAN_REVIEW_DURABLE_RESUME_SCOPING.md`).
 
 `REFERENCE_GRADE_SHADOW_ONLY`, `ENFORCEMENT_ENABLED = False`. The approval ledger and
 the authority directory it composes carry the same label; the runtime it feeds
-invokes fixture providers; no credential broker or IdP integration exists, so a
-recorded approver is a presented reference, not a proven identity. Nothing here is
-pilot-validated or production-certified, and the ADR's ceiling for the whole GAS-7
-sequence is exactly this label.
+invokes fixture providers; no credential broker exists, and this package composes no
+identity port, so the approver it binds is a presented reference. A deployment that
+composes `ugence-approver-identity-jwt` (AI-C) proves the approver at the review
+service instead — that adapter is proven against an in-process issuer only. Nothing
+here is pilot-validated or production-certified, and the ADR's ceiling for the whole
+GAS-7 sequence is exactly this label.
 
 ## What it is
 
@@ -121,7 +123,9 @@ the adapter, the source never imports it. Nothing under `packages/capabilities`.
 - A request that nobody decides within its window expires in the ledger and is not
   re-requested automatically; the instance stays parked until a new ordinal is raised
   by a later step.
-- `decided_by` is what the caller of the ledger presented. The review service (HR-C)
-  records it as `PRESENTED_UNPROVEN`; no identity provider integration exists.
+- `decided_by` is what the caller of the ledger presented. This package proves
+  nothing about it and composes no identity port; the review service (HR-C) records
+  `PRESENTED_UNPROVEN` unless a deployment composes a real adapter (AI-C), which no
+  test here exercises.
 - The adapter's `resume` is bounded since HR-B: it re-arms and runs nothing, and the
   rows here rely on the following `advance` to perform the single run.
