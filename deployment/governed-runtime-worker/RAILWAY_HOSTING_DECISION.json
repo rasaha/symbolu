@@ -1,0 +1,104 @@
+{
+  "schema": "governed-runtime-worker.railway-hosting-decision.v1",
+  "deployment": "governed-runtime-worker",
+  "deployment_version": "0.5.1",
+  "ruling": "ADR_UGENCE_REVIEW_SERVICE_COMPOSITION_ROOT_SCOPING.md section 8, RW-1 to RW-6 (owner, 2026-09-08); CR-3 PRIVATE_NETWORK_TLS_IDENTITY_MANDATORY, CR-4 ONE_DEPLOYMENT_MODE_SWITCH and CR-5 ALLOWLISTED_JWKS_HOST controlling; AP-3 IDP_VALIDATED_FIRST controlling on identity",
+  "ratification_status": "RULED_NOT_IMPLEMENTED",
+  "ratification_note": "The owner answered six questions about hosting this deployment on Railway. This file records the answers and how each stands against what the repository enforces today; it changes no code, no configuration and no ruling of CR-1 to CR-5. Where an answer requires behaviour the repository does not implement, the entry says so under contradicts_repository_today and no gate, test or check below is marked satisfied on that account.",
+  "authorizes": [
+    "investigation of the bind question on a throwaway Railway deployment (RW-1)",
+    "a single-instance test-mode Railway deployment over synthetic data, labelled PRESENTED_UNPROVEN, as demonstration evidence only (RW-4, RW-6)"
+  ],
+  "authorizes_not": [
+    "a production-mode Railway deployment of this worker",
+    "a Railway native source or Dockerfile build of a production image",
+    "any enterprise-production, high-availability or certification claim",
+    "any code change; implementation is entered only by its own prompt"
+  ],
+  "maturity_unchanged": "REFERENCE_GRADE_SHADOW_ONLY",
+  "decisions": {
+    "RW-1": {
+      "name": "DEFER_PENDING_NETWORK_PROOF",
+      "subject": "which interface the listener binds on Railway",
+      "ruling": "CR-3",
+      "answer": "Do not ratify bind-by-discovery and do not permit the unspecified address because the deployment is on Railway. Preserve the current is_private_bind enforcement. Require a deployment proof establishing the locally bindable address, routing behaviour, redeployment behaviour and absence of public ingress. Authorizes investigation only, not implementation.",
+      "repository_today": "config.py:36-55 refuses the unspecified address before testing is_private, so '::' is refused and a unique-local address passes; a hostname is refused outright. config.py:158-162 raises the CR-3 refusal in production mode.",
+      "contradicts_repository_today": false,
+      "required_proof": [
+        "the address the container can locally bind, and by what means it is discovered",
+        "that a sibling service reaches the listener on that address over the private network",
+        "that the address remains valid for the process lifetime and across a redeployment",
+        "that the service publishes no public domain and no TCP proxy"
+      ],
+      "proof_state": "NOT_OBTAINED"
+    },
+    "RW-2": {
+      "name": "EXTERNALLY_GATED_DIGEST_PINNED_IMAGE_ONLY",
+      "subject": "where a production image is built and what Railway may run",
+      "ruling": "SEPARATE_P3E_EQUIVALENT_EVIDENCE (section 5); CONTAINER_GATE_SET.json",
+      "answer": "Railway is admissible as a runtime host. Railway native source or Dockerfile builds are not admissible for production. The image is built, inspected, SBOM-produced, vulnerability-scanned, secret-scanned and verified by the ratified external gate pipeline, pushed to the approved private registry and deployed by immutable digest. No production deployment is authorized until the base-image mirror coordinates and all required gates are satisfied.",
+      "repository_today": "CONTAINER_GATE_SET.json is DEFINED_NOT_RATIFIED and NOT_EXECUTED; eight of its ten gates halt at RESOURCE_BLOCKER_MIRROR_UNCONFIGURED. docs/audits/ugence_governance_studio_p3e/BASE_IMAGE_MIRROR_DECISION.json carries registry_host, repository_prefix and secret_name as null with coordinates_provided false. A Railway source build would pull the base from docker.io, the first entry of this gate set's never list.",
+      "contradicts_repository_today": false,
+      "blocked_by": [
+        "mirror host, repository prefix and secret name (owner-supplied, outside this repository)",
+        "a registry credential mechanism, which no workflow implements today",
+        "a publish-to-registry step, which the container job does not have"
+      ],
+      "gate_state": "NOT_EXECUTED"
+    },
+    "RW-3": {
+      "name": "OWNER_CA_ISSUED_AND_CLIENT_VERIFIED",
+      "subject": "the certificate and key of the private TLS listener",
+      "ruling": "CR-3",
+      "answer": "CR-3 requires authenticated TLS identity on the private listener. Unverified self-signed TLS, generated keys persisted on the application volume, ssl.CERT_NONE and rejectUnauthorized:false are refused. Use an owner-controlled CA, externally provisioned key custody and certificate verification by every client. Mutual TLS is not required unless separately ratified.",
+      "repository_today": "config.py:163-170 requires a readable certificate and key in production and refuses a plain listener, but nothing verifies the certificate: container-healthcheck.py:27 sets ssl.CERT_NONE and apps/authority-plane/server.mjs:139 sets rejectUnauthorized false. No certificate authority and no key custody mechanism exists in this repository.",
+      "contradicts_repository_today": true,
+      "contradiction": "Two committed clients disable certificate verification, which this ruling refuses. Neither is changed by this record. Until they verify an owner-controlled CA, the deployment does not satisfy RW-3 and must not be described as satisfying CR-3's TLS identity requirement.",
+      "affected_clients": [
+        "deployment/governed-runtime-worker/container-healthcheck.py",
+        "apps/authority-plane/server.mjs"
+      ],
+      "mutual_tls": "NOT_REQUIRED_UNLESS_SEPARATELY_RATIFIED"
+    },
+    "RW-4": {
+      "name": "REAL_AP3_HTTPS_JWKS_ISSUER_REQUIRED_FOR_PRODUCTION",
+      "subject": "the identity port in production mode",
+      "ruling": "CR-3, CR-5, AP-3",
+      "answer": "Production requires validation against a genuine HTTPS JWKS issuer, including issuer, audience, signature and key rotation, tenant and actor-type claims, with fail-closed behaviour. No Railway-specific identity exception is authorized. Test mode is permitted only for controlled demonstrations over synthetic data and must remain labelled PRESENTED_UNPROVEN.",
+      "repository_today": "config.py:172-181 requires issuer, audience and JWKS URL in production and requires the JWKS URL to be https (CR-5); composition.py:149-150 refuses composition without an identity port. Every authority read carries decision_identity_proof PRESENTED_UNPROVEN and issuer_validation IN_PROCESS_ISSUER_ONLY until AP-3's validation is recorded.",
+      "contradicts_repository_today": false,
+      "depends_on": "AP3_ENTERPRISE_ISSUER_VALIDATION.json, currently BLOCKED_PENDING_OWNER-PROVISIONED_ENTERPRISE_IDP_TEST_TENANT"
+    },
+    "RW-5": {
+      "name": "ONE_POSTGRES_SERVICE_TWO_LOGICAL_DATABASES",
+      "subject": "how the two PostgreSQL databases are provisioned for the reference pilot",
+      "ruling": "CR-4",
+      "answer": "For the reference pilot, one PostgreSQL 16 service containing separate DBOS system and application databases, with distinct DSNs, database names, roles and credentials. Public database exposure disabled. Encrypted, certificate-verified connections required. Separate PostgreSQL services remain an optional future isolation or resilience enhancement.",
+      "repository_today": "config.py:139-147 requires both DSNs, requires each to begin 'postgresql', and requires them to differ. composition.py:221-229 hands them to DBOS as system_database_url and application_database_url. The DSN check is a prefix test only.",
+      "contradicts_repository_today": true,
+      "contradiction": "The ruling requires encrypted, certificate-verified database connections. The repository does not implement that requirement: a plaintext DSN passes validate() today. Recorded here at the owner's instruction; no validation rule is changed by this record.",
+      "future_option": "two PostgreSQL services, for administrative isolation or resilience"
+    },
+    "RW-6": {
+      "name": "SINGLE_INSTANCE_REFERENCE_DEPLOYMENT_ONLY",
+      "subject": "the three SQLite stores and the attached volume",
+      "ruling": "CR-1",
+      "answer": "The three SQLite stores and attached volume are accepted only for a single-instance reference-grade pilot. This does not authorize a highly available or enterprise-production claim. Production authorization requires PostgreSQL-backed or otherwise durable shared implementations, or a separate explicit acceptance of single-writer availability, backup, recovery and deployment-downtime limitations.",
+      "repository_today": "composition.py:205-217 opens the authority directory, the approval ledger and the audit ledger as three SQLite files under data_dir; Dockerfile:68 declares that path a volume. A platform volume attaches to one instance and is not shared with replicas.",
+      "contradicts_repository_today": false,
+      "gap": "No test pins the single-instance constraint, and no record states the backup, recovery and downtime expectations the alternative acceptance would need.",
+      "production_authorization_requires_one_of": [
+        "PostgreSQL-backed or otherwise durable shared implementations of the three stores",
+        "a separate explicit owner acceptance of single-writer availability, backup, recovery and deployment-downtime limitations"
+      ]
+    }
+  },
+  "blocks_production_authorization": ["RW-1", "RW-2", "RW-3", "RW-4", "RW-6"],
+  "never": [
+    "a production-mode deployment described as satisfying CR-3 while any client disables certificate verification",
+    "a Railway-built image described as gate-evidenced",
+    "a test-mode deployment cited as production, pilot or enterprise evidence",
+    "an is_private_bind relaxation adopted as a side effect of RW-1's investigation",
+    "a credential value printed, stored or committed"
+  ]
+}
