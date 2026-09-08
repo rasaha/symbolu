@@ -91,18 +91,20 @@ def test_pyproject_declares_the_ratified_dependency_set():
                     "ugence-authority-directory", "ugence-durable-execution",
                     "ugence-governance-contracts", "ugence-control-plane-root", "SQLAlchemy"}
     # The floors are part of the declaration: the service emits
-    # governed_review.linkage.v2 (governed-review 0.3.0) and passes
-    # authentication_reference to the ledger's decide() (approval-workflow 0.2.0), both
-    # AI-D. A lower floor would resolve a wheel that has neither.
+    # governed_review.linkage.v2 and passes authentication_reference to the ledger's
+    # decide(), both AI-D. approval-workflow 0.2.0 is where the field arrived.
+    # governed-review is pinned at 0.3.1 rather than 0.3.0, which introduced the shape:
+    # 0.3.0 declares approval-workflow>=0.1.0 and so resolves a ledger with no such
+    # field, and 0.3.1 is the first release whose own floors resolve correctly.
     floors = {re.split(r"[><=]", d)[0]: d for d in data["project"]["dependencies"]}
-    assert floors["ugence-governed-review"] == "ugence-governed-review>=0.3.0"
+    assert floors["ugence-governed-review"] == "ugence-governed-review>=0.3.1"
     assert floors["ugence-approval-workflow"] == "ugence-approval-workflow>=0.2.0"
     joined = " ".join(data["project"]["dependencies"]).lower()
     for forbidden in ("agent-runtime", "dbos", "pydantic", "decision-authority", "psycopg",
                       "boto3", "kubernetes", "redis", "jwt", "authlib", "ldap"):
         assert forbidden not in joined, forbidden
     assert set(data["project"]["optional-dependencies"]["http"]) == {"fastapi>=0.110", "starlette>=0.36"}
-    assert pkg.__version__ == "0.6.0"
+    assert pkg.__version__ == "0.6.1"
 
 
 def test_no_clock_is_read_anywhere():

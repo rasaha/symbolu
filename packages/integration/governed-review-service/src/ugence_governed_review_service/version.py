@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-__version__ = "0.6.0"
+__version__ = "0.6.1"
 
 #: The wire contract this release presents: the five routes of the screen/API audit
 #: plus, since v5, the one start relay,

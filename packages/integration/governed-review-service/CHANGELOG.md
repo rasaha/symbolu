@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.6.1 — 2026-09-08 — declared floors corrected
+
+Metadata only: contract stays `governed_review_service.v6`; no source or behaviour
+change.
+
+- `ugence-approval-workflow` floor raised `>=0.1.0` -> `>=0.2.0`: the service passes
+  `authentication_reference` to the ledger's `decide()`, which 0.2.0 added (AI-D).
+- `ugence-governed-review` floor raised `>=0.2.0` -> `>=0.3.1`: the service emits
+  `governed_review.linkage.v2`, whose shape is governed-review 0.3.0, and 0.3.1 is the
+  first governed-review release whose own floors resolve an approval-workflow that has
+  the field.
+- `tests/test_boundaries.py` now pins both floors, so lowering either fails the suite.
+
 ## 0.6.0 — 2026-09-06 — front-door seam 7 (FD-11)
 
 Contract `governed_review_service.v6`: the six routes plus one ledger read.

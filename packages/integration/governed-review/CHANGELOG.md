@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.3.1 — 2026-09-08 — declared floor corrected
+
+Metadata only: no source, contract or behaviour change.
+
+- `ugence-approval-workflow` floor raised `>=0.1.0` -> `>=0.2.0`. `linkage.py` copies
+  `ApprovalRecord.authentication_reference`, which arrived in approval-workflow 0.2.0
+  (AI-D, ruling ID-2); the old floor could resolve a ledger with no such field. The
+  source tree puts siblings on `PYTHONPATH`, so this was invisible to CI and would
+  only have failed on a wheel install.
+- `tests/test_boundaries.py` now pins the floor itself, not just the dependency name,
+  so lowering it fails the suite.
+
 ## 0.3.0 — 2026-09-05 — AI-D (approver-identity ruling ID-2)
 
 - `ReviewLinkage.authentication_reference`, copied from the approval record by

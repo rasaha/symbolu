@@ -1,5 +1,17 @@
 # Changelog — ugence-approver-identity-jwt
 
+## 0.1.1 — 2026-09-08 — declared floor corrected
+
+Metadata only: no source, claim-mapping or behaviour change; the package stays
+`REFERENCE_GRADE_SHADOW_ONLY`, `ISSUER_VALIDATION = "IN_PROCESS_ISSUER_ONLY"`.
+
+- `ugence-governed-review-service` floor raised `>=0.3.0` -> `>=0.6.1`. 0.3.0 defines
+  the port (AI-A) but drops the reference this adapter exists to supply; 0.4.0 records
+  it (AI-D); and every service release before 0.6.1 declares floors that resolve a
+  `governed-review` or `approval-workflow` without the field. 0.6.1 is therefore the
+  first release whose own metadata resolves what this adapter needs.
+- `tests/test_boundaries.py` now pins the floor itself, so lowering it fails the suite.
+
 ## 0.1.0 — 2026-09-05 — AI-C, initial release
 
 Scoped and ruled by `docs/architecture/ADR_UGENCE_APPROVER_IDENTITY_ADAPTER_SCOPING.md`
