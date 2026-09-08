@@ -272,12 +272,17 @@ UGENCE_REVIEW_SYSTEM_DATABASE_URL=${{Postgres.DATABASE_URL}}   # edit the databa
                                     # at the end to sysdb — the two must differ (config.py:146)
 UGENCE_REVIEW_TENANT_ID=tenant-demo
 UGENCE_REVIEW_REQUIRED_ROLE=approver
-UGENCE_REVIEW_DEFINITION_DIGEST=<the workload digest>
+UGENCE_REVIEW_DEFINITION_DIGEST=shadow-v1
 ```
 
 `WorkerConfig.validate()` returns empty for exactly these values in `test` mode `[V]`: the
 bind check, the TLS requirement and the identity requirement apply in production mode only
 (`config.py:158-179`).
+
+`DEFINITION_DIGEST` is a free-form required label naming the compiled definition this
+worker runs, not a value you compute: `validate()` asks only that it be non-empty
+(`config.py:152`), and the worker README's own run line uses `shadow-v1`
+(`deployment/governed-runtime-worker/README.md:132`) `[V]`.
 
 **5.5** Deploy, and never generate a domain for it.
 
@@ -289,6 +294,18 @@ Railway's private DNS name is `<service>.railway.internal`, resolves only inside
 environment, and requires the listener to accept connections on the container's IPv6
 interface `[I]`. That behaviour is vendor-documented and not measured here; RW-1's proof is
 what would put it on the record `[G]`.
+
+> **The worker image has never been built anywhere** `[V]`
+> (`CONTAINER_GATE_SET.json`: `execution_state: NOT_EXECUTED`). Until 2026-09-08 it could
+> not have been: this Dockerfile is built with the repository root as its context — by the
+> container job (`-f deployment/governed-runtime-worker/Dockerfile .`) and by any managed
+> host — where the root `.dockerignore` (`*`, re-including `symbolu/` only, written for the
+> GKE controller image) excluded **all 19** of its `COPY` sources `[V]`. The container gate
+> set has never executed, so nothing caught it. `Dockerfile.dockerignore` beside the
+> Dockerfile now carries that deployment's own exclusion set, which BuildKit reads in
+> preference to the context root's; the same defect and the same fix apply to
+> `deployment/governance-studio/Dockerfile` (29 of 29 sources) `[V]`. The build itself
+> remains unproven: no image has been produced from either Dockerfile `[G]`.
 
 > **Do not switch to production mode.** The composition refuses it in three independent
 > places: an unspecified bind (RW-1 preserves that check), missing TLS certificate and key
