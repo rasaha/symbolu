@@ -18,6 +18,13 @@ The published record moves from `GUARD_SWEEP.md`/`guard_sweep.json` (sweep outpu
 `GUARD_INVENTORY.md`/`guard_inventory.json`/`guard_classification.json` (regenerable
 inventory and classification); sweep results are CI artifacts.
 
+Separately, and also with no `src/` change: `public_api.json`'s `class` entries for
+exception types listed `add_note` and `with_traceback`, inherited from `BaseException`
+rather than declared here, and `add_note` exists only from Python 3.11 — so the committed
+manifest recorded the interpreter that generated it and no 3.10 run could reproduce it.
+`scripts/generate_public_api.py` now excludes inherited exception methods and the manifest
+is regenerated; no exported symbol, kind, field list or version moves.
+
 ## Unreleased — fixture re-pins for Cloud Scaling Phase 5B-1
 
 **No source change, and the version does not move.** Phase 5B-1 added the required policy

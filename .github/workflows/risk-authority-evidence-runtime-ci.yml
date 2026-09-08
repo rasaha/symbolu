@@ -11,15 +11,16 @@ name: risk-authority-evidence-runtime-ci
 # remain green and unchanged), the package's wheel build + fully offline
 # isolated-install verifier, and the package-boundary tests.
 #
-# Suite jobs run on 3.11 and 3.12; this package declares requires-python >=3.10 and
-# classifiers for 3.10, 3.11 and 3.12. 3.10 is deliberately absent, and the reason is
-# recorded here rather than left to be rediscovered: the blockers are repository-wide
-# couplings in *test* code and committed manifests, not defects in any package's src/.
-# Suites read pyproject.toml with a bare `import tomllib` (stdlib only from 3.11, so
-# installing `tomli` does not satisfy it), and committed public_api.json manifests
-# enumerate `BaseException.add_note`, which does not exist before 3.11. Adding a 3.10 leg
-# means fixing those couplings across the packages that share them and having that
-# reviewed — never relaxing the assertions to make the leg green.
+# Suites run on 3.10, 3.11 and 3.12 — the whole range these packages declare with
+# requires-python >=3.10. The 3.10 leg was blocked until now by three couplings in test
+# code and committed artifacts, none of them in any package's src/: a bare
+# `import tomllib` (stdlib only from 3.11) now falls back to the `tomli` backport, which
+# the install steps below provide; public_api.json manifests recorded
+# `BaseException.add_note`, a 3.11 addition that made the artifact a statement about the
+# interpreter that generated it, and the generators now exclude inherited exception
+# methods so the manifest reproduces on any interpreter; and one assertion pinned
+# CPython's exact AttributeError wording, which 3.10 spells differently for the same
+# refusal. Each was fixed at the coupling, never by relaxing what the test discriminates.
 #
 # The wheel/isolated-install job stays on a single interpreter: it proves what the built
 # artifact installs and refuses, which is a property of the wheel and its declared
@@ -54,7 +55,7 @@ jobs:
       # One interpreter's failure must not hide the other's.
       fail-fast: false
       matrix:
-        python-version: ["3.11", "3.12"]
+        python-version: ["3.10", "3.11", "3.12"]
     steps:
       - uses: actions/checkout@v4
         with:
@@ -65,7 +66,7 @@ jobs:
       - name: Install tooling + first-party packages (editable)
         run: |
           python -m pip install --upgrade pip
-          pip install pytest build
+          pip install pytest build tomli
           pip install -e packages/governance-contracts
           pip install -e packages/governance-provider-framework
           pip install -e packages/providers/tap
@@ -86,7 +87,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.11", "3.12"]
+        python-version: ["3.10", "3.11", "3.12"]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -95,7 +96,7 @@ jobs:
       - name: Install tooling
         run: |
           python -m pip install --upgrade pip
-          pip install pytest pydantic
+          pip install pytest pydantic tomli
           pip install -e packages/governance-contracts
           pip install -e packages/governance-provider-framework
           pip install -e packages/providers/actiongate

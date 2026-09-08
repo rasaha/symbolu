@@ -26,17 +26,11 @@
     },
     "ContractViolation": {
       "kind": "class",
-      "methods": [
-        "add_note",
-        "with_traceback"
-      ]
+      "methods": []
     },
     "ControlPlaneRootError": {
       "kind": "class",
-      "methods": [
-        "add_note",
-        "with_traceback"
-      ]
+      "methods": []
     },
     "GENESIS_DIGEST": {
       "kind": "constant",
@@ -55,10 +49,7 @@
     },
     "LedgerIntegrityError": {
       "kind": "class",
-      "methods": [
-        "add_note",
-        "with_traceback"
-      ]
+      "methods": []
     },
     "MATURITY": {
       "kind": "constant",
@@ -74,10 +65,7 @@
     },
     "SchemaVersionMismatch": {
       "kind": "class",
-      "methods": [
-        "add_note",
-        "with_traceback"
-      ]
+      "methods": []
     },
     "StoredEntry": {
       "kind": "class",

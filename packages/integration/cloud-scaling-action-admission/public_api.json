@@ -15,24 +15,15 @@
     },
     "ActionAdmissionConfigurationError": {
       "kind": "class",
-      "methods": [
-        "add_note",
-        "with_traceback"
-      ]
+      "methods": []
     },
     "ActionAdmissionContractError": {
       "kind": "class",
-      "methods": [
-        "add_note",
-        "with_traceback"
-      ]
+      "methods": []
     },
     "ActionAdmissionExactTypeError": {
       "kind": "class",
-      "methods": [
-        "add_note",
-        "with_traceback"
-      ]
+      "methods": []
     },
     "BINDING_KIND_AUTHORIZATION_CANDIDATE": {
       "kind": "constant",
@@ -88,10 +79,7 @@
     },
     "CloudScalingActionAdmissionError": {
       "kind": "class",
-      "methods": [
-        "add_note",
-        "with_traceback"
-      ]
+      "methods": []
     },
     "PURPOSE_CAPACITY_ACTION": {
       "kind": "constant",

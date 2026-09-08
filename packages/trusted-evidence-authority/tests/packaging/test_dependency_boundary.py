@@ -210,7 +210,10 @@ def test_the_distribution_declares_exactly_the_two_backends():
     not name is a dependency that install would silently satisfy from the host.
     """
 
-    import tomllib
+    try:  # Python 3.11+ ships tomllib; 3.10 resolves the same parser from tomli.
+        import tomllib
+    except ModuleNotFoundError:  # pragma: no cover - only a <3.11 run takes this branch
+        import tomli as tomllib  # type: ignore[no-redef]
 
     pyproject = PKG_ROOT.parents[1] / "pyproject.toml"
     if not pyproject.is_file():  # running from an installed wheel

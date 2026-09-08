@@ -29,18 +29,16 @@ name: trusted-evidence-authority-ci
 # shape. Audit evidence nothing re-executes decays into a claim about a tree that no
 # longer exists, so it is executed here on every change to either tree.
 #
-# Suite and probe jobs run on 3.11 and 3.12; the package declares requires-python >=3.10.
-# 3.10 is NOT in the matrix, and the reason is recorded rather than left to be
-# rediscovered: three couplings to 3.11+, none of them in src/. (1) The suite's
-# dependency-boundary test reads pyproject.toml with `import tomllib`, stdlib only from
-# 3.11 — a bare import, so installing `tomli` does not satisfy it. (2)
-# tests/contract/test_receipt_payload.py asserts the exact CPython text "no setter";
-# 3.10 words the same AttributeError "can't set attribute". The security property (the
-# data descriptor refuses object.__setattr__) holds identically on 3.10. (3) The same
-# `tomllib` pattern and 3.11's BaseException.add_note appear across other packages'
-# suites and committed public_api.json manifests repository-wide. Adding 3.10 means
-# fixing those couplings, not relaxing the assertions; until that is done and reviewed,
-# claiming a 3.10 leg that never ran would be worse than not claiming it.
+# Suites run on 3.10, 3.11 and 3.12 — the whole range these packages declare with
+# requires-python >=3.10. The 3.10 leg was blocked until now by three couplings in test
+# code and committed artifacts, none of them in any package's src/: a bare
+# `import tomllib` (stdlib only from 3.11) now falls back to the `tomli` backport, which
+# the install steps below provide; public_api.json manifests recorded
+# `BaseException.add_note`, a 3.11 addition that made the artifact a statement about the
+# interpreter that generated it, and the generators now exclude inherited exception
+# methods so the manifest reproduces on any interpreter; and one assertion pinned
+# CPython's exact AttributeError wording, which 3.10 spells differently for the same
+# refusal. Each was fixed at the coupling, never by relaxing what the test discriminates.
 #
 # It publishes nothing, uses no secret, and contacts no external trust service. All
 # cryptographic key material it touches is fixed, hard-coded, unmistakably
@@ -78,7 +76,7 @@ jobs:
       # One interpreter's failure must not hide the other's.
       fail-fast: false
       matrix:
-        python-version: ["3.11", "3.12"]
+        python-version: ["3.10", "3.11", "3.12"]
     steps:
       - uses: actions/checkout@v4
         with:
@@ -93,7 +91,7 @@ jobs:
         # PyNaCl directly to cross-check the package against libsodium.
         run: |
           python -m pip install --upgrade pip
-          pip install pytest "cryptography>=41.0.7,<47.0.0" "PyNaCl>=1.5.0,<2.0.0"
+          pip install pytest tomli "cryptography>=41.0.7,<47.0.0" "PyNaCl>=1.5.0,<2.0.0"
           python -c "import importlib.metadata as m; print('cryptography', m.version('cryptography')); print('PyNaCl', m.version('PyNaCl'))"
       - name: Package suite (contracts, authority, canonicalization, packaging)
         run: python -m pytest packages/trusted-evidence-authority/tests -q
@@ -169,7 +167,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.11", "3.12"]
+        python-version: ["3.10", "3.11", "3.12"]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -258,7 +256,7 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install pytest "cryptography>=41.0.7,<47.0.0" "PyNaCl>=1.5.0,<2.0.0"
+          pip install pytest tomli "cryptography>=41.0.7,<47.0.0" "PyNaCl>=1.5.0,<2.0.0"
       - name: public_api.json equals the actual curated surface
         run: |
           python -m pytest \

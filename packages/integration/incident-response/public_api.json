@@ -34,10 +34,7 @@
     },
     "ContainmentLiftRefused": {
       "kind": "class",
-      "methods": [
-        "add_note",
-        "with_traceback"
-      ]
+      "methods": []
     },
     "ContainmentRequest": {
       "fields": [
@@ -60,10 +57,7 @@
     },
     "ContractViolation": {
       "kind": "class",
-      "methods": [
-        "add_note",
-        "with_traceback"
-      ]
+      "methods": []
     },
     "ENFORCEMENT_ENABLED": {
       "kind": "constant",
@@ -75,10 +69,7 @@
     },
     "IllegalTransitionError": {
       "kind": "class",
-      "methods": [
-        "add_note",
-        "with_traceback"
-      ]
+      "methods": []
     },
     "IncidentJournalPort": {
       "kind": "class",
@@ -110,10 +101,7 @@
     },
     "IncidentResponseError": {
       "kind": "class",
-      "methods": [
-        "add_note",
-        "with_traceback"
-      ]
+      "methods": []
     },
     "IncidentState": {
       "kind": "enum",

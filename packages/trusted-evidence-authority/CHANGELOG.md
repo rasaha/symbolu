@@ -1,6 +1,6 @@
 # Changelog — ugence-trusted-evidence-authority
 
-## [Unreleased] — the reverse-dependency boundary is scanned repository-wide
+## [Unreleased] — the reverse-dependency boundary is scanned repository-wide, and the suite runs on every interpreter it claims
 
 No source change, no API change, no version bump: `src/` is untouched, the curated
 export count stays at 99, every pinned digest is byte-identical and no refusal
@@ -62,6 +62,26 @@ two sentences the gate's under-coverage had let go stale.
 Naming these trees records them against this boundary for the first time. It
 ratifies nothing that was not already ratified elsewhere, and grants nothing new:
 both had been importing this package, unreported, before the scan could see them.
+
+### Fixed — the suite now runs on 3.10, which `requires-python >= 3.10` had always claimed
+
+Two couplings to CPython 3.11+ lived in the tests, not in `src/`, and between them meant
+no CI job had ever executed this package on the oldest interpreter it declares support
+for. Both are fixed at the coupling; neither assertion is relaxed.
+
+- `tests/packaging/test_dependency_boundary.py` and
+  `verify_trusted_evidence_authority_distribution.py` read `pyproject.toml` with a bare
+  `import tomllib`, stdlib only from 3.11. They now fall back to the `tomli` backport —
+  a hard import, not `pytest.importorskip`, so a missing backport fails the run loudly
+  instead of deleting the packaging assertions from the 3.10 leg without saying so.
+- `tests/contract/test_receipt_payload.py::test_object_setattr_cannot_raise_the_status`
+  asserted CPython's exact wording, `"no setter"`. 3.10 words the *same* refusal
+  `"can't set attribute"`, and the property under test — a read-only data descriptor
+  rejecting `object.__setattr__` — holds identically on both. The test now asserts that
+  reason **structurally**, that the class attribute is a `property` whose `fset` is
+  `None`, and accepts either of the two CPython spellings of the descriptor refusal. An
+  unrelated `AttributeError` still fails it, so the discrimination is stronger than the
+  substring match it replaces, not weaker.
 
 ## [0.6.0] — a third named consumer exception, and one lent comparison-result capability
 
