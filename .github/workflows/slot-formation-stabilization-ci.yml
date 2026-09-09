@@ -103,7 +103,10 @@ jobs:
           D=hybrid_llm_vnext_lab/experiments/slot_formation_stabilization
           ! grep -rniE "READY_FOR_KDA_VALIDATION[^_]" $D/PREREGISTRATION.md $D/ACCEPTANCE_GATES.json | grep -v NOT_READY || (echo "found bare KDA-ready claim" && exit 1)
           ! test -f $D/pyproject.toml && ! test -f $D/setup.py && echo "no packaging files"
-          ! grep -rniE "PhaseAttentionLayer|HybridPhaseTransformer|import kda|import mla" $D/*.py || (echo "forbidden import" && exit 1)
+          # complexity_report.py names these strings in order to forbid them, so this
+          # crude grep matches the checker itself. Exclude it; its own scan is the real one,
+          # and it runs above as "Complexity / boundary report".
+          ! grep -rniE "PhaseAttentionLayer|HybridPhaseTransformer|import kda|import mla" $D/*.py --exclude=complexity_report.py || (echo "forbidden import" && exit 1)
 
       - name: Frozen historical artifact unchanged (post)
         run: |
