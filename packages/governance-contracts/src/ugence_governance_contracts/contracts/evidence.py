@@ -31,7 +31,8 @@ organizational verification.
 
 Subject binding uses the existing repository convention (plain ``tenant_id`` /
 ``subject_id`` strings). The RA-owned canonical neutral subject-context contract
-is a **deferred dependency**; ``AssessedSystemBinding`` / ``SubjectContext`` are
+is merged in ``risk_authority`` and **permanently not adopted** by UVI (ADR D-14,
+ratified 2026-09-09); ``AssessedSystemBinding`` / ``SubjectContext`` are
 intentionally **out of scope** for GV-2E-a and are not defined here (no competing
 subject-context contract is minted).
 """

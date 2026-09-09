@@ -98,7 +98,9 @@ first-class UVI policy families — schema + IR only, **no authority minted**.
   *(Historical. `AssessedSystemBinding` is no longer deferred: it is owned by
   `ugence-governance-contracts` >= 0.3.0 per UVI ADR §20 and consumed by
   `ugence-agent-value-readiness`. It is still not defined in this package. The
-  RA-owned `SubjectContext` remains deferred and unmerged.)*
+  RA-owned `SubjectContext` merged 2026-08-17 in `risk_authority` (PR #1432) and
+  is **permanently not adopted** by UVI per D-14, ratified 2026-09-09, closing
+  UVI ADR §26.2; it too is still not defined here.)*
 
 ### Placement note
 - `AssessmentContext` is placed here (rather than in `governance-contracts`, the

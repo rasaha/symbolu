@@ -53,6 +53,11 @@ absence: it is that adopting it is UVI's decision (D-14), and this package still
 takes no dependency on `risk_authority` and resolves no such reference. What was
 wrong was the stated reason, not the shape.
 
+*(D-14 was subsequently ratified on 2026-09-09: UVI **permanently does not
+adopt** the RA-owned `SubjectContext`, closing UVI ADR §26.2. The token is now
+opaque by settled decision rather than by pending one. Still no shape change, no
+version bump and no dependency — see the README for the three recorded grounds.)*
+
 ## [0.4.0] — M-3R.3: indicator catalogs and assessed-system binding
 
 Implements UVI ADR §25 milestone **M-3R.3**: the `IntelligenceFitness` /
@@ -132,8 +137,9 @@ imports no UVI, readiness, authority or risk package, so no cycle is possible.
   is draft-only and unmerged (ADR D-14, §26.2), so it is represented **only**
   through the opaque `canonical_subject_context_ref` token. When that contract is
   ratified the token points at it with no shape change and no version bump.
-  *(Merge status superseded in 0.4.1: #1432 merged 2026-08-17. The token, and the
-  reason for it — UVI adoption is D-14's decision — are unchanged.)*
+  *(Merge status superseded in 0.4.1: #1432 merged 2026-08-17. The token is
+  unchanged; the reason for it is now settled rather than pending — D-14 was
+  ratified 2026-09-09 as permanent non-adoption, closing UVI ADR §26.2.)*
 - **No environment enumeration is invented**: `deployment_environment_ref` is an
   opaque token.
 

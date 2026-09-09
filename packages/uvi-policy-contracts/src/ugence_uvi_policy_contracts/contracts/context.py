@@ -26,8 +26,8 @@ Structural invariants enforced here:
 Subject binding uses the existing repository convention (plain ``tenant_id`` /
 ``subject_id``); only cross-tenant consistency is enforced. ``AssessedSystemBinding``
 / ``SubjectContext`` (RA-owned; merged via PR #1425/#1432 and implemented in
-``risk_authority.integrations.evaluation_contracts``) are a **deferred dependency**
-— deferred because UVI has not adopted it, not because it is absent — and
+``risk_authority.integrations.evaluation_contracts``) are **permanently not
+adopted** by UVI — ADR D-14, ratified 2026-09-09, closing §26.2 — and are
 intentionally not defined here (ADR D-14, §16).
 
 Two time inputs are kept deliberately distinct: ``bind_policies``'s mandatory

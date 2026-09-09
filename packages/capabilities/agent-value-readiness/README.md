@@ -589,9 +589,20 @@ That contract now **exists**. It was designed in PR #1425 (merged 2026-08-13,
 #1432 (merged 2026-08-17) as `SubjectContext` / `SubjectBinding` /
 `validate_subject_binding` in `risk_authority.integrations.evaluation_contracts`
 (schema `risk-subject-context-1`; shipped in `ugence-risk-authority` >= 0.3.0).
-What is still outstanding is **UVI's adoption of it** — this package takes no
-dependency on `risk_authority` and resolves no such reference — and that
-adoption is the owner decision D-14 records, not the contract's existence.
+
+**This package does not adopt it, and that is settled** — D-14 ratified
+2026-09-09, closing UVI ADR §26.2. The token is permanently opaque, not
+awaiting a decision. Three independent grounds: the RA fact set is
+capacity-shaped (`action_type`, `environment`, `region`, `zone`,
+`compute_group`, `resource_class`, `magnitude_before`/`magnitude_after`) and
+carries **no model, prompt, tool or agent identity**, so it describes nothing
+readiness assesses; adopting it would point a UVI arrow at an **authority**
+package, which ADR §21 forbids and this package's own
+`tests/packaging/test_dependency_boundary.py` already refuses by listing
+`risk_authority` as prohibited; and PR #1432 left the D-4 identifier strings
+deliberately unfrozen, so there is nothing stable to bind to. If readiness ever
+needs such facts, they arrive through a **neutral** contract in
+`governance-contracts` — a new decision, never this one.
 
 ### One required path
 
@@ -622,9 +633,10 @@ the verifier seam and ships only its deny-all default — it implements no
 verifier);
 machine-evaluable threshold semantics and metric-to-threshold calculation;
 structured successor/supersession references; **condition runtime enforcement**;
-UVI adoption of the RA-owned canonical `SubjectContext` (merged and implemented
-in `risk_authority` — referenced here only as an opaque
-`canonical_subject_context_ref` token, never resolved); a ratified
+UVI adoption of the RA-owned canonical `SubjectContext` — **permanently
+deferred by ratified decision**, not pending (D-14, 2026-09-09): it is merged and
+implemented in `risk_authority`, and is referenced here only as an opaque
+`canonical_subject_context_ref` token that nothing resolves; a ratified
 system-binding **authenticity verifier**; a durable event
 bus or **signed** determination record; forecasting, realization-probability
 modeling, attributed/verified return, financial valuation, and `governed-value`
