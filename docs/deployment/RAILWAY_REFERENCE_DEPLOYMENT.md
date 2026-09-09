@@ -452,8 +452,37 @@ proof header `[V]`.
 
 Deploy only to give the plane data.
 
-**7.1** Project → New → Database → Add PostgreSQL. One service suffices; the worker needs
-two databases that differ, so connect once and `CREATE DATABASE sysdb;`. No public domain.
+**7.1** Project → New → Database → Add PostgreSQL. One service suffices: the worker needs
+two DSNs that differ, not two servers. No public domain.
+
+Railway's **Data** tab browses tables; it does not execute SQL, so `sysdb` cannot be
+created there. It is created through the CLI, which tunnels to the private instance and
+never exposes Postgres publicly:
+
+```powershell
+npm install -g @railway/cli        # add --allow-scripts=@railway/cli if npm blocks the install script
+railway login
+railway link                       # workspace → project → production → the Postgres service
+railway connect Postgres           # opens psql over an SSH tunnel
+```
+
+At the `railway=#` prompt:
+
+```sql
+CREATE DATABASE sysdb;
+SELECT datname FROM pg_database WHERE datname = 'sysdb';
+```
+
+`railway connect` shells out to `psql`, which must be installed locally — Node and npm do
+not provide it (`winget install --id PostgreSQL.PostgreSQL.18 --exact`, then put its `bin`
+on PATH). It also needs an SSH key registered with Railway; `ssh-keygen -t ed25519` and
+answering **Yes** at the registration prompt is enough. A console code-page warning from
+`psql` on Windows is informational.
+
+Create `sysdb` **before** the worker's first deploy. A DSN naming a database that does not
+exist passes `validate()` — which checks the prefix, not existence (`config.py:139-146`)
+`[V]` — and fails later at connect, where the error looks nothing like a configuration
+mistake.
 
 **7.2** Add a service from `rasaha/symbolu`, then Settings:
 
@@ -466,7 +495,10 @@ Dockerfile Path:  deployment/governed-runtime-worker/Dockerfile
 Rename it `worker` — the name must match `WORKER_URL` from 6.3, and that matching only
 means anything within one project and environment.
 
-**7.3** Settings → Volumes → Add Volume, mount path `/var/lib/ugence-review`. The three
+**7.3** Attach the volume from the **project canvas**, not the service Settings page:
+right-click the `worker` tile → **Attach Volume** (or `Ctrl+K` → *Attach Volume*), mount
+path `/var/lib/ugence-review`. The dialog closes without reopening; confirm a
+`worker-volume` appears under the worker tile rather than attaching a second one. The three
 SQLite stores live there (`composition.py:205-217`) `[V]`. A volume attaches to one
 instance, which is what makes this deployment single-replica by construction `[I]`.
 
@@ -485,13 +517,41 @@ UGENCE_REVIEW_DEPLOYMENT_MODE=test
 UGENCE_REVIEW_BIND_HOST=::
 UGENCE_REVIEW_PORT=8444
 UGENCE_REVIEW_DATA_DIR=/var/lib/ugence-review
-UGENCE_REVIEW_APP_DATABASE_URL=${{Postgres.DATABASE_URL}}
-UGENCE_REVIEW_SYSTEM_DATABASE_URL=${{Postgres.DATABASE_URL}}   # edit the database name
-                                    # at the end to sysdb — the two must differ (config.py:146)
 UGENCE_REVIEW_TENANT_ID=tenant-demo
 UGENCE_REVIEW_REQUIRED_ROLE=approver
 UGENCE_REVIEW_DEFINITION_DIGEST=shadow-v1
+RAILWAY_RUN_UID=0
 ```
+
+Then the two DSNs, from **Postgres → Variables → `DATABASE_PRIVATE_URL`** (the private
+address, not `DATABASE_URL`, which routes over the public proxy). Reveal it, and enter both
+as literals — same credentials, same host, differing only in the database name:
+
+```
+UGENCE_REVIEW_APP_DATABASE_URL     …@<private-host>:5432/railway
+UGENCE_REVIEW_SYSTEM_DATABASE_URL  …@<private-host>:5432/sysdb
+```
+
+**Literals, not `${{Postgres.DATABASE_PRIVATE_URL}}` `[V]`.** A Railway reference resolves
+as one whole value, so it cannot be extended to swap `/railway` for `/sysdb`; the system
+DSN has to be literal regardless. In the 2026-09-09 deployment the *application* reference
+also resolved empty at runtime while appearing correct in the UI, and the worker reported
+`UGENCE_REVIEW_APP_DATABASE_URL is required`. Literals fixed it. The cost is that a
+credential rotation no longer propagates — update both DSNs by hand when Postgres rotates.
+
+Never paste a resolved DSN into a screenshot, ticket or chat: it carries the password.
+The worker's own startup line prints it as `postgresql://<redacted>@…` `[V]`.
+
+`RAILWAY_RUN_UID=0` is required and is not cosmetic. Railway mounts the volume owned by
+root; the image runs as `USER 10001:10001`, so without it the worker composes nothing and
+dies on `sqlite3.OperationalError: unable to open database file` `[V]`. It runs the worker
+as root, discarding the image's non-root posture — acceptable for a `test`-mode reference
+deployment, and a production follow-up: an entrypoint that fixes ownership as root and
+drops privileges before starting. That is a reviewed repository change, not a deployment
+improvisation `[G]`.
+
+Check the spelling of `UGENCE_REVIEW_DEFINITION_DIGEST` before deploying; a typo surfaces
+only as `WORKER_CONFIG_INVALID` on the next boot.
 
 `WorkerConfig.validate()` returns empty for exactly these values in `test` mode `[V]`: the
 bind check, the TLS requirement and the identity requirement apply in production mode only
@@ -504,16 +564,68 @@ worker runs, not a value you compute: `validate()` asks only that it be non-empt
 
 **7.5** Deploy, and never generate a domain for it.
 
-Pass condition: the log shows `WARNING: UGENCE_REVIEW_DEPLOYMENT_MODE=test` — leave that
-line visible, it is the label this deployment runs under — and the plane's four screens
-answer under a banner reading `PRESENTED_UNPROVEN` and `IN_PROCESS_ISSUER_ONLY` `[V]`.
+Worker pass condition, on stderr — which Railway paints red; that colour is not an error
+`[V]` (`server.py:31-36` writes both lines with `sys.stderr.write`):
+
+```
+governed-runtime-worker 0.5.1 REFERENCE_GRADE_SHADOW_ONLY enforcement_enabled=False
+mode=test listener=http://:::8444 config={…}
+WARNING: UGENCE_REVIEW_DEPLOYMENT_MODE=test (loopback development mode)
+```
+
+Leave that warning visible: it is the label this deployment runs under. In the redacted
+config that follows, check `app_database_url` ends `/railway`, `system_database_url` ends
+`/sysdb`, `data_dir` is `/var/lib/ugence-review`, and `port` is `8444`.
+
+**7.6** Set `WORKER_URL` on the plane per 6.3, then **apply the staged change**. A
+GitHub-triggered plane deploy can succeed while an edited variable is still staged; if the
+canvas shows *Apply 1 change*, the plane is running without it.
+
+**7.7 Plane pass condition — and it needs no data.** `decision_identity_proof` and
+`issuer_validation` are envelope fields computed once at router construction from
+`identity_port_configured`, not stored records (`authority_reads.py:117-131`) `[V]`, and
+the plane renders `IdentityBanner` on any 200 (`GrantsView.tsx:45-47`) `[V]`. On **Grants**,
+enter any typed token — non-empty, ≤256 characters, NFC, no whitespace (`_is_typed`,
+`authority_reads.py:56-62`) — and read:
+
+```
+read_authenticated: false
+decision proof: PRESENTED_UNPROVEN
+issuer validation: IN_PROCESS_ISSUER_ONLY
+REFERENCE_GRADE_SHADOW_ONLY          … holds 0 active grants
+```
+
+Zero grants is a successful read, not a refusal.
+
+**Two of the four screens, not four.** On an empty directory:
+
+| Screen | Empty-store result | Banner |
+|---|---|---|
+| Grants (`principal_id`) | 200, `grant_count: 0` | shown |
+| Holders (`role`, `scope`) | 200, `holder_count: 0` | shown |
+| Committee | 404 `NOT_FOUND` (`authority_reads.py:176-179`) | refusal notice instead |
+| Grant events | 404 `NOT_FOUND` (`authority_reads.py:190-192`) | refusal notice instead |
+
+Committee and Grant events returning 404 for a token nothing holds is correct behaviour,
+not broken connectivity. On Holders, `role` is `approver` — your own
+`UGENCE_REVIEW_REQUIRED_ROLE`; `scope` and `principal_id` have no repository-backed value,
+and on an empty directory any typed token returns the same count of zero.
+
+> **No seed path exists, and none is needed `[V]`.** The four write operations are in the
+> plane's `forbidden_operation_ids`; `authority_writes.py` is implemented on the worker but
+> not served until the identity adapter is validated against a real enterprise issuer
+> (AP-3); and outside the worker the only callers of `SqliteAuthorityDirectory` are the
+> library and its tests — no CLI, no console script, no fixture loader. A deployed worker's
+> directory cannot be populated by any commissioned means. Writing to the SQLite file
+> directly would bypass the governance path this deployment exists to demonstrate.
 
 Railway's private DNS name resolves only inside the environment and requires the listener
-to accept connections on the container's IPv6 interface `[I]`. It is **not** derived from
-the service's current name: it is assigned at creation and survives a rename `[V]` — read
-each service's `RAILWAY_PRIVATE_DOMAIN` from its Variables tab rather than assuming
-`<service>.railway.internal`. The resolution and IPv6 behaviour is vendor-documented and not
-measured here; RW-1's proof is what would put it on the record `[G]`.
+to accept connections on the container's IPv6 interface. Measured on 2026-09-09: the plane
+reached the worker at `worker.railway.internal:8444` over plain HTTP and all four reads
+answered, with the worker bound to `:::8444` `[V]`. The name is **not** derived from the
+service's current name — it is assigned at creation and survives a rename `[V]` — so read
+each service's `RAILWAY_PRIVATE_DOMAIN` from its Variables tab. RW-1's own probe remains
+unrun and its record still carries the `[G]`; this walkthrough is not that record `[I]`.
 
 > **The worker image has never been built anywhere** `[V]`
 > (`CONTAINER_GATE_SET.json`: `execution_state: NOT_EXECUTED`). Until 2026-09-08 it could
@@ -565,6 +677,16 @@ environment.
 | Console fetches fail against the deployed origin | `VITE_CONSOLE_API_URL` unset, so the client fell back to a relative `/api` | 5.3 |
 | Plane reports the worker unreachable | Correct until part 7; after it, check the service is named `worker` — **or** the plane and worker are in different Railway projects, in which case no configuration fixes it | 0.4, 6.3, 7.2 |
 | Worker exits at boot printing a list | It reports every reason at once; usually the two DSNs are identical | 7.4 |
+| `WORKER_CONFIG_INVALID: … APP_DATABASE_URL is required` with the variable visibly set | A `${{Postgres.…}}` reference resolved empty at runtime | 7.4 — use literals |
+| `WORKER_CONFIG_INVALID: … DEFINITION_DIGEST is required` | The variable name is misspelled | 7.4 |
+| `sqlite3.OperationalError: unable to open database file` | Railway mounts the volume as root; the image runs as uid 10001 | 7.4 — `RAILWAY_RUN_UID=0` |
+| Build fails: `docker VOLUME … is not supported, use Railway Volumes` | A `VOLUME` instruction reached the Dockerfile again | it was removed in `bba9d118`; do not restore it |
+| No Volumes control in the worker's Settings | Volumes are attached from the project canvas | 7.3 |
+| `CREATE DATABASE sysdb;` only filters a table list | The Data tab browses tables and runs no SQL | 7.1 — `railway connect Postgres` |
+| `psql must be installed to continue` | `railway connect` shells out to psql; npm does not supply it | 7.1 |
+| Plane still reports the worker unreachable after setting `WORKER_URL` | The variable edit is staged, not applied | 7.6 |
+| Committee or Grant events answers 404 on the smoke test | Nothing holds that token; a typed refusal carries no banner | 7.7 |
+| Worker logs appear red | Both startup lines go to stderr by design | 7.5 |
 | A service builds from `rasaha/demo` | That repository is a generated snapshot, not a deployment source | the note in *One repository* |
 
 ## Verification of this document
@@ -626,6 +748,14 @@ command now in 2.3 installs into a clean virtual environment outside this reposi
 four modules `"available": true` `[V]`. A build succeeding locally is what the old step
 lacked, and what the studio's own step in 1.3 always had.
 
+**Part 7 completed on Railway, 2026-09-09 `[V]`, reported by the owner.** The worker image
+was built for the first time anywhere (`sha256:06afb2f5…`, 80.3 MB) and reached Online after
+three defects this walkthrough had never been able to surface: the root `.dockerignore`
+exclusion, Railway's rejection of the `VOLUME` instruction, and a bare `postgresql://` DSN
+resolving to a psycopg2 dialect the image does not ship (fixed in `bba9d118` and `6c3f36e5`).
+The plane then read all four operations across Railway's private network. Every claim in 7.5
+and 7.7 above is transcribed from that deployment rather than inferred.
+
 **Observed on Railway `[I]`, reported by the owner.** `studio-api`, `console-api` and the
 root `web` service are Online; `console-api` came up on the corrected part 2 command.
 `studio-api` serves `studio-api-production-851c.up.railway.app` on port 8080. `studio-web`
@@ -637,8 +767,20 @@ builder, whose install phase, cache mounts and `--omit=dev` default are part of 
 environment the command runs in. A step describing a build deserves `[V]` only once a
 builder has accepted it; until then it is `[I]`.
 
-**Not verified `[G]`.** No pass condition from part 3 onward has been confirmed against a
-live deployment; the corrected build command has been run here, not yet on Railway. Railway's UI
-wording, its per-service repository selection, and its private-network scoping are vendor
-documentation `[I]` and may drift — in particular, the claim in 0.4 that no cross-project
-private networking exists is inferred, not measured.
+**Still not verified `[G]`.** Every part of this walkthrough has now been run on Railway,
+so what remains unproven is narrower and worth naming precisely:
+
+- **0.4's cross-project claim.** Every service here sits in one project, so the assertion
+  that private networking does not cross projects was never exercised — it stays `[I]`.
+- **RW-1's own probe.** The plane reaching the worker is evidence about this deployment,
+  not the ratified network proof RW-1 asks for; that record keeps its `[G]`.
+- **The container gate set.** An image now exists, but `CONTAINER_GATE_SET.json` still
+  reads `execution_state: NOT_EXECUTED`: the gates run against a mirrored base image whose
+  coordinates are null. A Railway build is not that pipeline (RW-2).
+- **The non-root posture.** `RAILWAY_RUN_UID=0` runs the worker as root. The image's
+  `USER 10001:10001` is presently decorative on Railway.
+- **Durability.** No restart, redeploy or volume-detach has been exercised against the
+  three SQLite stores; that they survive is designed, not observed.
+
+Railway's UI wording and per-service repository selection remain vendor documentation `[I]`
+and may drift.
