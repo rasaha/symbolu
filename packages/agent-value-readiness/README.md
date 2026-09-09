@@ -638,8 +638,18 @@ package** in UVI ADR §20; the one implementation in the repository,
 `ugence-readiness-comparison`, is `RESEARCH_ONLY` / `REQUESTER_ASSERTED` and
 approval-bearing for nothing.
 
-So no conforming verifier can be written yet, and none is being written
-(recorded 2026-09-09, §26.10). **The practical consequence:** with a working
+**Ruled 2026-09-09 (§26.10).** A **shared, non-authoritative
+governed-threshold-evaluation leaf** is commissioned to own the third obligation
+(ADR §25 M-GTE.1). It consumes verified evidence receipts, issued policy
+coordinates and resolved benchmark values; it may neither verify source evidence
+nor resolve a `BenchmarkReference`, which stays exclusively with
+`benchmark-registry-authority`. A conforming `GateResultVerifier` **composes**
+the three independently owned legs (M-GVR.1) and **may not ship until all three
+are releasable** — in particular not before `benchmark-registry-authority`
+reaches `0.3.0` with its required reviews complete. `readiness-comparison` is
+**not** promoted; only its comparison logic may inform the new leaf. Neither
+milestone is started, and nothing in this package changes when they are: the
+seam it already ships is what they plug into. **The practical consequence:** with a working
 policy resolver and the shipped `DenyAllGateResultVerifier`, every supplied gate
 result is refused, so **any policy carrying at least one applicable gate cannot
 reach a headline readiness classification**. `assess_readiness` is complete and

@@ -605,15 +605,24 @@ These packages do not represent a single business step. They provide the common 
 names this package as the readiness artifact behind the Simulate screen, but that
 screen BLOCKs by design in P3E and `console-api` does not import the package, so
 the consumer is **intended, not existing**, and no workstream owns the wiring.
-Two further things gate any end-to-end use and are not scheduled: `assess_readiness`
-ships only deny-all verifiers, so with a working policy resolver any policy carrying
-an applicable gate cannot reach a headline classification (UVI ADR §26.10); and
-metric-to-threshold evaluation is assigned to no package. **The wiring is therefore
-deferred until §26.10 resolves** (recorded 2026-09-09): wiring it sooner would
-surface a screen that can only ever render `NOT_EVALUATED`, which is worse than
-the honest BLOCK the screen shows today. That is a sequencing consequence of
-§26.10, not a resourcing decision — **assigning the workstream remains an open
-owner ruling**, and the question reopens on its own when §26.10 closes.
+What gates any end-to-end use: `assess_readiness` ships only deny-all verifiers, so
+with a working policy resolver any policy carrying an applicable gate cannot reach a
+headline classification. A conforming `GateResultVerifier` composes three
+independently owned legs — trusted evidence verification, benchmark resolution and
+the **governed-threshold-evaluation leaf commissioned on 2026-09-09** (UVI ADR
+§26.10; §25 M-GTE.1 and M-GVR.1) — and may not ship until all three are releasable,
+which requires `benchmark-registry-authority` at `0.3.0` with its reviews complete.
+
+**Ruled 2026-09-09:** wiring is deferred until §26.10 is resolved *in
+implementation* and that whole chain is releasable. Wiring sooner would expose a
+capability that can only return `NOT_EVALUATED`, misleading users into treating a
+deliberately incomplete path as a functioning simulation; the honest BLOCK the
+screen shows today is the better state. The future consumer is the **Studio
+Simulate / front-door workstream**, which owns the wiring and the screen but not
+readiness semantics and not verification. `agent-value-readiness` is an **intended**
+consumer-reachable capability and is expressly **not** a terminal leaf — it reaches
+users through UVI, the one customer-facing capability, while the package itself
+stays an internal engine (UVI ADR §4, D-18).
 
 ### 45. Governed Value
 
@@ -629,9 +638,10 @@ owner ruling**, and the question reopens on its own when §26.10 closes.
 
 **Consumers (recorded 2026-09-09).** Nothing in the repository imports
 `governed_value`, and unlike Agent Value Readiness it is named by **no** screen row
-in `ADR_UGENCE_STUDIO_FRONT_DOOR_SCOPING.md`. It is a **terminal leaf today**: a
-kernel that computes correctly, is verified end to end from an isolated wheel, and
-that no product calls. That is a deliberate stopping point rather than an
+in `ADR_UGENCE_STUDIO_FRONT_DOOR_SCOPING.md`. It is a **terminal leaf today** — deliberately unlike
+Agent Value Readiness above, which the 2026-09-09 ruling expressly declined to
+declare terminal: a kernel that computes correctly, is verified end to end from an
+isolated wheel, and that no product calls. That is a deliberate stopping point rather than an
 oversight — the kernel scores caller-reported inputs and pins every result at
 `REPORTED` / `UNVERIFIED`, so wiring it into a product surface would put unverified
 figures in front of users under a governance banner. **Whether to name a consuming
