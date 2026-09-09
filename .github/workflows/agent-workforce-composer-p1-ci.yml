@@ -44,20 +44,38 @@ jobs:
         env:
           PYTHONPATH: ${{ env.SRC }}
         run: python -m pytest ${{ env.PKG }}/tests -q
-      - name: Version / maturity metadata is honest
+      - name: Contract + honest P1 maturity
         env:
           PYTHONPATH: ${{ env.SRC }}
         run: |
           python -m ugence_agent_workforce_composer.cli version
           python - <<'PY'
+          # What this job asserts is P1's invariants — the contract P1 established and
+          # the capabilities P1 delivered — and deliberately NOT the distribution's
+          # current version.
+          #
+          # It used to assert `__version__ == "0.1.0"`, and went red the day P2 shipped
+          # 0.2.0, staying red through P2.1. Every phase workflow re-pinned the current
+          # version, so only the newest phase could ever pass and each release turned its
+          # predecessors red. The literal also lived in three workflows plus the package's
+          # own suite, which is four places to update for one fact.
+          #
+          # The version is pinned exactly once now, in the package's own
+          # tests/test_public_api.py and its distribution verifier — both of which travel
+          # with the package and change in the same commit the version does. This job runs
+          # that suite in the step above, so the fact is still checked; it is just no
+          # longer duplicated here where it cannot be kept true.
           import ugence_agent_workforce_composer as u
-          assert u.__version__ == "0.1.0" and u.CONTRACT_VERSION == "awc.v1"
+          # awc.v1 is a real P1 invariant: P2 and P2.1 are additive and must not move it.
+          assert u.CONTRACT_VERSION == "awc.v1", u.CONTRACT_VERSION
           i = u.version_info().to_dict()
           for k in ("canonical_object_model_implemented","compiler_adapter_implemented",
                     "hard_constraint_eligibility_implemented","deterministic_replay_verified"):
               assert i[k] is True, k
-          for k in ("agent_ranking_implemented","team_composition_implemented",
-                    "permission_assignment_implemented","runtime_handoff_implemented",
+          # `agent_ranking_implemented` and `team_composition_implemented` were in this
+          # list and are now True: P2 implements them, and agent-workforce-composer-p2-ci
+          # asserts them True. A later phase delivering them is not this phase regressing.
+          for k in ("permission_assignment_implemented","runtime_handoff_implemented",
                     "h16_migration_implemented","live_registry_implemented",
                     "pilot_validated","production_certified"):
               assert i[k] is False, k
