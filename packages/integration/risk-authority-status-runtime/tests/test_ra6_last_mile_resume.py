@@ -30,6 +30,7 @@ from ugence_agent_runtime.governance.interfaces import (
 )
 from ugence_agent_runtime.models.proposal import TransitionProposal
 from ugence_risk_authority_status_runtime import (
+    AuthorityApplicability,
     PreEffectContext,
     make_pre_effect_recheck,
 )
@@ -213,15 +214,77 @@ def test_W_fresh_replacement_envelope_after_reassessment_proceeds():
 
 
 def test_non_authority_action_passes_through():
-    # A recheck whose resolver returns None (not an authority-bound action) is a
-    # low-latency pass-through — non-consequential behavior is preserved (§8).
+    # ADR §8/D-D overturned the previous behavior here. A resolver returning None used to
+    # be a low-latency pass-through; caller omission alone no longer establishes that an
+    # action is outside Risk Authority scope. Only an authenticated, applicable Policy
+    # Authority rule can, so the two halves are now asserted separately.
     h = C.build()
     _box, clock = _base_time_clock(h)
-    passthrough = make_pre_effect_recheck(
+
+    # (a) No applicability resolver at all → authority required, fails closed.
+    no_resolver = make_pre_effect_recheck(
         reader=h.cache,
         policy=StalenessPolicy.fail_closed_defaults(),
         key_ring=h.key_ring,
         clock=clock,
         resolve=lambda e, p: None,
     )
-    assert _validate(h, recheck=passthrough)[0]
+    assert not _validate(h, recheck=no_resolver)[0]
+
+    # (b) An issued policy rule naming the exemption → genuine pass-through.
+    exempt = make_pre_effect_recheck(
+        reader=h.cache,
+        policy=StalenessPolicy.fail_closed_defaults(),
+        key_ring=h.key_ring,
+        clock=clock,
+        resolve=lambda e, p: None,
+        applicability=_ExemptingPolicy("pol_not_authority_bound"),
+    )
+    assert _validate(h, recheck=exempt)[0]
+
+
+class _ExemptingPolicy:
+    """A stand-in for the Policy Authority resolver that issued an explicit exemption."""
+
+    def __init__(self, policy_id: str) -> None:
+        self._policy_id = policy_id
+
+    def applicability_for(self, evaluation, proposal):
+        return AuthorityApplicability(
+            authority_required=False, policy_id=self._policy_id, rule_id="R-1")
+
+
+def test_applicability_failure_modes_all_require_authority():
+    """ADR §8/D-D: absence, failure, ambiguity and malformed answers all fail closed."""
+
+    h = C.build()
+    _box, clock = _base_time_clock(h)
+
+    class _Raises:
+        def applicability_for(self, evaluation, proposal):
+            raise RuntimeError("policy store unreachable")
+
+    class _AbsentAnswer:
+        def applicability_for(self, evaluation, proposal):
+            return None
+
+    class _Malformed:
+        def applicability_for(self, evaluation, proposal):
+            return object()
+
+    class _ExemptWithoutPolicyId:
+        # authority_required=False but no policy names the exemption → not an exemption.
+        def applicability_for(self, evaluation, proposal):
+            return AuthorityApplicability(authority_required=False)
+
+    for resolver in (_Raises(), _AbsentAnswer(), _Malformed(), _ExemptWithoutPolicyId()):
+        recheck = make_pre_effect_recheck(
+            reader=h.cache,
+            policy=StalenessPolicy.fail_closed_defaults(),
+            key_ring=h.key_ring,
+            clock=clock,
+            resolve=lambda e, p: None,
+            applicability=resolver,
+        )
+        ok, codes = _validate(h, recheck=recheck)
+        assert not ok, f"{type(resolver).__name__} must not establish an exemption"

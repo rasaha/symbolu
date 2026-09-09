@@ -27,7 +27,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Callable, Optional, Tuple
+from typing import Callable, Optional, Protocol, Tuple, runtime_checkable
 
 from risk_authority.crypto.keys import KeyRing
 from risk_authority.domain.actions import ActionAuthorization, CanonicalAction
@@ -49,11 +49,81 @@ from risk_authority.services.authority_status import (
 )
 
 __all__ = [
+    "StatusGateConfigurationError",
+    "AuthorityApplicability",
+    "ApplicabilityPort",
     "StatusAwareGateResult",
     "StatusAwareActionGate",
     "PreEffectContext",
     "make_pre_effect_recheck",
 ]
+
+
+class StatusGateConfigurationError(Exception):
+    """A status-aware gate was constructed without an explicit, posture-declared gate."""
+
+
+@dataclass(frozen=True)
+class AuthorityApplicability:
+    """Whether an action class is subject to Risk Authority (ADR §8/D-D).
+
+    Policy Authority owns this rule. The Policy Workflow Compiler may compile an issued
+    rule into deterministic metadata, but neither grants exemptions nor makes runtime
+    authorization decisions — this object *reports* an issued rule, it does not invent one.
+
+    ``authority_required=False`` is only meaningful when ``policy_id`` names the
+    authenticated, applicable policy that explicitly placed the action outside Risk
+    Authority scope. An instance without one is treated as no answer at all.
+    """
+
+    authority_required: bool
+    policy_id: str = ""
+    rule_id: str = ""
+
+    @property
+    def exempt(self) -> bool:
+        """An exemption exists only when an identified policy explicitly granted it."""
+
+        return self.authority_required is False and bool(self.policy_id)
+
+
+@runtime_checkable
+class ApplicabilityPort(Protocol):
+    """Resolves the issued Policy Authority applicability rule for an action.
+
+    Any outcome other than a returned :class:`AuthorityApplicability` whose ``exempt`` is
+    ``True`` means authority is required. Absence, lookup failure, ambiguity, a raised
+    exception and caller omission all land there — deliberately, and identically.
+    """
+
+    def applicability_for(
+        self, evaluation: object, proposal: object
+    ) -> Optional[AuthorityApplicability]: ...
+
+
+def _authority_required(
+    applicability: Optional[ApplicabilityPort], evaluation: object, proposal: object
+) -> Tuple[bool, Tuple[str, ...]]:
+    """Fail-closed applicability resolution (ADR §8/D-D).
+
+    Returns ``(authority_required, reason_codes)``. Every failure mode returns ``True``.
+    Deployment configuration alone cannot produce an exemption: without a resolver, the
+    answer is authority-required, not "unconfigured, therefore exempt".
+    """
+
+    if applicability is None:
+        return True, ("RA6_APPLICABILITY_NO_RESOLVER",)
+    try:
+        answer = applicability.applicability_for(evaluation, proposal)
+    except Exception as exc:  # noqa: BLE001 - any resolver failure is authority-required
+        return True, ("RA6_APPLICABILITY_LOOKUP_FAILED", f"{type(exc).__name__}")
+    if answer is None:
+        return True, ("RA6_APPLICABILITY_ABSENT",)
+    if type(answer) is not AuthorityApplicability:
+        return True, ("RA6_APPLICABILITY_MALFORMED",)
+    if not answer.exempt:
+        return True, ()
+    return False, ("RA6_NOT_AUTHORITY_BOUND", f"policy:{answer.policy_id}")
 
 
 @dataclass(frozen=True)
@@ -78,11 +148,65 @@ class StatusAwareActionGate:
         reader: AuthorityStatusReader,
         *,
         policy: StalenessPolicy,
-        gate: Optional[ActionGatePort] = None,
+        gate: ActionGatePort,
+        production: bool = False,
     ) -> None:
+        """Construct with an explicit gate. Prefer :meth:`production` or :meth:`reference`.
+
+        The implicit ``gate or ReferenceActionGate()`` default was removed at 0.2.0
+        (ADR §8/D-E): it made a reference-grade enforcer reachable at the commit point
+        without any caller stating that intent.
+        """
+
+        if gate is None:
+            raise StatusGateConfigurationError(
+                "StatusAwareActionGate requires an explicit ActionGatePort as of 0.2.0. "
+                "Use StatusAwareActionGate.production(...) for production enforcement or "
+                "StatusAwareActionGate.reference(...) for conformance/test use.")
         self._reader = reader
         self._policy = policy
-        self._gate = gate or ReferenceActionGate()
+        self._gate = gate
+        self._production = bool(production)
+
+    # ------------------------------------------------------------------ factories
+    @classmethod
+    def production(
+        cls,
+        reader: AuthorityStatusReader,
+        *,
+        policy: StalenessPolicy,
+        gate: ActionGatePort,
+    ) -> "StatusAwareActionGate":
+        """A production status-aware gate. Fails closed on any reference-grade gate."""
+
+        if isinstance(gate, ReferenceActionGate):
+            raise StatusGateConfigurationError(
+                "production status gate refuses ReferenceActionGate and any subclass of it; "
+                "the reference gate is a conformance component, never production enforcement")
+        if getattr(gate, "is_production_authoritative", False) is not True or not callable(
+            getattr(gate, "authorize", None)
+        ):
+            raise StatusGateConfigurationError(
+                "production status gate requires an ActionGatePort declaring "
+                "is_production_authoritative=True; silence is refusal")
+        return cls(reader, policy=policy, gate=gate, production=True)
+
+    @classmethod
+    def reference(
+        cls,
+        reader: AuthorityStatusReader,
+        *,
+        policy: StalenessPolicy,
+        gate: Optional[ActionGatePort] = None,
+    ) -> "StatusAwareActionGate":
+        """A labelled conformance status-aware gate. Never production."""
+
+        return cls(reader, policy=policy,
+                   gate=gate if gate is not None else ReferenceActionGate(), production=False)
+
+    @property
+    def is_production(self) -> bool:
+        return self._production
 
     def authorize(
         self,
@@ -162,6 +286,7 @@ def make_pre_effect_recheck(
     clock: Callable[[], datetime],
     resolve: Callable[[object, object], Optional[PreEffectContext]],
     sync: Optional[Callable[[], None]] = None,
+    applicability: Optional[ApplicabilityPort] = None,
 ) -> Callable[[object, object, float], Tuple[bool, Tuple[str, ...]]]:
     """Build a neutral ``authority_recheck`` callable for the Agent Runtime seam.
 
@@ -185,7 +310,14 @@ def make_pre_effect_recheck(
     def _recheck(evaluation: object, proposal: object, now_float: float) -> Tuple[bool, Tuple[str, ...]]:
         ctx = resolve(evaluation, proposal)
         if ctx is None:
-            return True, ()  # not an authority-bound consequential action
+            # ADR §8/D-D: a missing context is caller omission, which never establishes an
+            # exemption. Only an authenticated, applicable Policy Authority rule can, and
+            # every other outcome — no resolver, lookup failure, ambiguity, malformed
+            # answer — is authority-required and therefore fails closed here.
+            required, codes = _authority_required(applicability, evaluation, proposal)
+            if required:
+                return False, ("RA6_PRE_EFFECT_AUTHORITY_REQUIRED",) + codes
+            return True, codes
         if sync is not None:
             sync()
         snapshot = reader.snapshot(tenant_id=ctx.envelope.tenant_id)

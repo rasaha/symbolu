@@ -12,7 +12,7 @@ from __future__ import annotations
 from datetime import datetime, timedelta
 from typing import Optional
 
-from ..crypto.keys import SigningKeyRecord
+from ..crypto.keys import SigningKeyRecord, key_window_valid_at
 from ..crypto.signing import SIGNATURE_ALG
 from ..domain.decision import RiskDecision
 from ..domain.envelope import (
@@ -23,7 +23,7 @@ from ..domain.envelope import (
 )
 from ..domain.errors import MonotonicityViolationError, RiskAuthorityError
 from ..domain.scope import Scope, subset_violations
-from .envelope_signer import EnvelopeSignerPort
+from .envelope_signer import EnvelopeSignerPort, signer_window
 from .revocation import RevocationState
 
 __all__ = ["EnvelopeIssuer", "validate_envelope_subset", "DEFAULT_ENVELOPE_TTL"]
@@ -126,6 +126,29 @@ class EnvelopeIssuer:
             key_id=signer.key_id if signer is not None else key_record.key_id,
             signature_alg=signer.signature_alg if signer is not None else SIGNATURE_ALG,
         )
+
+        # Key validity window, enforced independently of the verifier (issue #1398,
+        # F-G item 2). An expired or not-yet-valid key must not be able to sign, and this
+        # check must not rely on some later verification catching it: the issuer is where
+        # the signing key is actually held. ``now`` is the injected trusted instant, the
+        # same one stamped into ``issued_at`` above.
+        #
+        # Both paths are covered. The in-process ``key_record`` carries its own window;
+        # an external ``signer`` declares one through the additive
+        # ``WindowedEnvelopeSignerPort`` capability, and a signer that declares none is
+        # unbounded-valid, so no existing implementation changes behavior.
+        if signer is not None:
+            signer_not_before, signer_not_after = signer_window(signer)
+            if not key_window_valid_at(
+                now, not_before=signer_not_before, not_after=signer_not_after
+            ):
+                raise RiskAuthorityError(
+                    f"signer key {signer.key_id!r} is outside its validity window "
+                    f"[{signer_not_before}, {signer_not_after}) at {now}")
+        elif not key_record.is_valid_at(now):
+            raise RiskAuthorityError(
+                f"signing key {key_record.key_id!r} is outside its validity window "
+                f"[{key_record.not_before}, {key_record.not_after}) at {now}")
 
         payload = unsigned.signing_payload()
         if signer is not None:
