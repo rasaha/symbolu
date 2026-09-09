@@ -39,6 +39,48 @@ authenticity remains non-forgeable, that a genuinely different instant remains
 distinct, that RA-01 remains gate-driven with no family-count heuristic, and that
 `authorizes_deployment` remains permanently `False`.
 
+### Changed — the package moved to `packages/agent-value-readiness`
+UVI ADR §26.6 was an open owner decision: `packages/capabilities/*` (provisional
+under D-4) or a top-level leaf. **Ratified 2026-09-09 as a top-level leaf**, so
+the distribution now lives at `packages/agent-value-readiness`, a peer of
+`governed-value`. That is the tiering ADR §21's dependency diagram already drew —
+both UVI engines directly above `governance-contracts` — and that §20's ownership
+table already assumed; only the directory disagreed.
+
+**Path-only.** No symbol, contract shape, field, enum value, digest,
+classification, dependency or version changed, and the `ugence_agent_value_readiness`
+namespace is untouched — an installed wheel cannot tell the difference. What moved
+with it: this package's `conftest.py`, the two probe harnesses and the distribution
+verifier (each computed `packages/` by walking up one level too many), the
+repository-root `conftest.py`, the readiness/ROI doc-drift gate, two sibling
+capability boundary tests, and three workflows.
+
+One of those siblings needed more than a path. `reasoning-method-advisor`'s
+boundary test built each slice-1 package's path as
+`packages/capabilities/<name>/src` and scanned it with `rglob`; against a
+directory that no longer exists that scan finds nothing and the assertion passes
+vacuously. It now carries each package's real location and asserts both that the
+directory exists and that at least one module was scanned.
+
+### Fixed — a stale claim about the RA-owned subject context
+The 0.4.0 entry below and the README described PR #1432's RA-owned subject
+binding as "draft-only and unmerged". Both PRs have merged: **#1425** (the Phase 4
+design ADR) on 2026-08-13 and **#1432** (the implementation) on 2026-08-17, which
+shipped `SubjectContext` / `SubjectBinding` / `validate_subject_binding` in
+`risk_authority.integrations.evaluation_contracts` under schema
+`risk-subject-context-1`. The 0.4.0 entry is left as written — it is the record
+of what was decided then — and this supersedes its merge-status clause only.
+
+**No decision changes.** The reason for the opaque token was never the contract's
+absence: it is that adopting it is UVI's decision (D-14), and this package still
+takes no dependency on `risk_authority` and resolves no such reference. What was
+wrong was the stated reason, not the shape.
+
+*(D-14 was subsequently ratified on 2026-09-09: UVI **permanently does not
+adopt** the RA-owned `SubjectContext`, closing UVI ADR §26.2. The token is now
+opaque by settled decision rather than by pending one. Still no shape change, no
+version bump and no dependency — see the README for the three recorded grounds.)*
+
 ## [0.4.0] — M-3R.3: indicator catalogs and assessed-system binding
 
 Implements UVI ADR §25 milestone **M-3R.3**: the `IntelligenceFitness` /
@@ -118,6 +160,9 @@ imports no UVI, readiness, authority or risk package, so no cycle is possible.
   is draft-only and unmerged (ADR D-14, §26.2), so it is represented **only**
   through the opaque `canonical_subject_context_ref` token. When that contract is
   ratified the token points at it with no shape change and no version bump.
+  *(Merge status superseded in 0.4.1: #1432 merged 2026-08-17. The token is
+  unchanged; the reason for it is now settled rather than pending — D-14 was
+  ratified 2026-09-09 as permanent non-adoption, closing UVI ADR §26.2.)*
 - **No environment enumeration is invented**: `deployment_environment_ref` is an
   opaque token.
 

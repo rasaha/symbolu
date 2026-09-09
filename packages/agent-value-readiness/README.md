@@ -68,7 +68,7 @@ public trusted-resolution service.
 
 - **Distribution:** `ugence-agent-value-readiness`
 - **Namespace:** `ugence_agent_value_readiness`
-- **Version:** 0.4.0
+- **Version:** 0.4.1
 - **Depends on:** stdlib **+ `ugence-governance-contracts>=0.3.1`** (evidence vocabulary + the assessed-system identity contract) **+ `ugence-uvi-policy-contracts>=0.1.0`** (policy/context shapes) **+ `ugence-policy-authority>=0.1.0`** (public trusted policy resolution only) — never `governed-value`, and never an authority internal.
 - **Typing:** fully annotated; ships `py.typed`.
 
@@ -502,20 +502,20 @@ no second calculation route that could diverge from the ratified precedence.
 ## Install & use
 
 ```bash
-python -m build packages/capabilities/agent-value-readiness
+python -m build packages/agent-value-readiness
 pip install --find-links dist ugence-agent-value-readiness   # resolves the contract leaves + the shared authority
 ```
 
 Independent-distribution proof (builds all four wheels, installs `--no-index`):
 
 ```bash
-python packages/capabilities/agent-value-readiness/verify_agent_value_readiness_distribution.py
+python packages/agent-value-readiness/verify_agent_value_readiness_distribution.py
 ```
 
 Independent adversarial probes (public API only, no shared test fixtures):
 
 ```bash
-python packages/capabilities/agent-value-readiness/adversarial_probes.py
+python packages/agent-value-readiness/adversarial_probes.py
 ```
 
 ## Extensibility & trust notes
@@ -578,11 +578,31 @@ is still only structural; every outcome carries the standing, permanently
 `OUT_OF_SCOPE` `SYSTEM_BINDING_AUTHENTICITY_NOT_VERIFIED` disposition saying so.
 
 `SystemManifest` **remains unresolved and unimplemented** — its home is an open
-owner decision (ADR §26.3), so no such type is minted in either package. PR
-#1432's RA-owned subject binding **remains additive and is not forked**
-(draft-only and unmerged, ADR D-14, §26.2): it is represented here **only**
-through the opaque `canonical_subject_context_ref` token, so a ratified contract
-can be pointed at later with no shape change and no version bump.
+owner decision (ADR §26.3), so no such type is minted in either package. The
+RA-owned subject binding **remains additive and is not forked**: it is
+represented here **only** through the opaque `canonical_subject_context_ref`
+token, so the contract can be pointed at with no shape change and no version
+bump.
+
+That contract now **exists**. It was designed in PR #1425 (merged 2026-08-13,
+`ADR_CLOUD_SCALING_RISK_AUTHORITY_INTEGRATION_PHASE4.md`) and implemented in PR
+#1432 (merged 2026-08-17) as `SubjectContext` / `SubjectBinding` /
+`validate_subject_binding` in `risk_authority.integrations.evaluation_contracts`
+(schema `risk-subject-context-1`; shipped in `ugence-risk-authority` >= 0.3.0).
+
+**This package does not adopt it, and that is settled** — D-14 ratified
+2026-09-09, closing UVI ADR §26.2. The token is permanently opaque, not
+awaiting a decision. Three independent grounds: the RA fact set is
+capacity-shaped (`action_type`, `environment`, `region`, `zone`,
+`compute_group`, `resource_class`, `magnitude_before`/`magnitude_after`) and
+carries **no model, prompt, tool or agent identity**, so it describes nothing
+readiness assesses; adopting it would point a UVI arrow at an **authority**
+package, which ADR §21 forbids and this package's own
+`tests/packaging/test_dependency_boundary.py` already refuses by listing
+`risk_authority` as prohibited; and PR #1432 left the D-4 identifier strings
+deliberately unfrozen, so there is nothing stable to bind to. If readiness ever
+needs such facts, they arrive through a **neutral** contract in
+`governance-contracts` — a new decision, never this one.
 
 ### One required path
 
@@ -605,6 +625,38 @@ separate. **Structured policy successor/supersession references** remain
 separate. Agent Value Readiness contracts being structurally complete does
 **not** mean the UVI/ROI roadmap is complete.
 
+### What the deny-all default means for end-to-end use (UVI ADR §26.10)
+
+`GateResultVerifier` makes one implementation responsible for the claimed
+`GateStatus` **and** for the supporting evidence, benchmark resolution and
+threshold evaluation behind it. Only the first has an authoritative owner today
+(`ugence-trusted-evidence-authority` 0.6.0 — and a verified receipt establishes
+"not policy sufficiency", so a receipt is not a gate status). Benchmark
+resolution waits on `ugence-benchmark-registry-authority` reaching `0.3.0`, still
+a candidate at `0.3.0rc1`. Metric-to-threshold evaluation is assigned to **no
+package** in UVI ADR §20; the one implementation in the repository,
+`ugence-readiness-comparison`, is `RESEARCH_ONLY` / `REQUESTER_ASSERTED` and
+approval-bearing for nothing.
+
+**Ruled 2026-09-09 (§26.10).** A **shared, non-authoritative
+governed-threshold-evaluation leaf** is commissioned to own the third obligation
+(ADR §25 M-GTE.1). It consumes verified evidence receipts, issued policy
+coordinates and resolved benchmark values; it may neither verify source evidence
+nor resolve a `BenchmarkReference`, which stays exclusively with
+`benchmark-registry-authority`. A conforming `GateResultVerifier` **composes**
+the three independently owned legs (M-GVR.1) and **may not ship until all three
+are releasable** — in particular not before `benchmark-registry-authority`
+reaches `0.3.0` with its required reviews complete. `readiness-comparison` is
+**not** promoted; only its comparison logic may inform the new leaf. Neither
+milestone is started, and nothing in this package changes when they are: the
+seam it already ships is what they plug into. **The practical consequence:** with a working
+policy resolver and the shipped `DenyAllGateResultVerifier`, every supplied gate
+result is refused, so **any policy carrying at least one applicable gate cannot
+reach a headline readiness classification**. `assess_readiness` is complete and
+correct as a fail-closed boundary; it is not usable end-to-end in production
+until those two owners exist. Read the precedence table and the orchestration
+guarantees above with that in mind.
+
 Also deferred: deployment authorization; policy signing, approval, issuance and revocation
 (owned by the shared Ugence Policy Authority, consumed here through its public
 resolution service only); the **benchmark registry** and benchmark-value
@@ -613,8 +665,10 @@ the verifier seam and ships only its deny-all default — it implements no
 verifier);
 machine-evaluable threshold semantics and metric-to-threshold calculation;
 structured successor/supersession references; **condition runtime enforcement**;
-the RA-owned canonical `SubjectContext` (draft-only, unmerged — referenced here
-only as an opaque `canonical_subject_context_ref` token); a ratified
+UVI adoption of the RA-owned canonical `SubjectContext` — **permanently
+deferred by ratified decision**, not pending (D-14, 2026-09-09): it is merged and
+implemented in `risk_authority`, and is referenced here only as an opaque
+`canonical_subject_context_ref` token that nothing resolves; a ratified
 system-binding **authenticity verifier**; a durable event
 bus or **signed** determination record; forecasting, realization-probability
 modeling, attributed/verified return, financial valuation, and `governed-value`

@@ -52,10 +52,13 @@ Deferred references, deliberately opaque
 ``canonical_subject_context_ref`` and ``system_manifest_ref`` /
 ``system_manifest_digest`` are **opaque tokens**, exactly as UVI ADR §16
 prescribes. The canonical neutral ``SubjectContext`` is Risk-Authority-owned and
-**unmerged** (ADR D-14, §26.2), and ``SystemManifest``'s home is an **open owner
-decision** (§26.3). This package mints **neither** — it references them by value
-+ digest so that, once either is ratified, the token points at it with no shape
-change here. The minimum system/version/configuration coordinates are carried
+**merged** (PR #1425/#1432, in ``risk_authority.integrations.evaluation_contracts``),
+but UVI **permanently does not adopt it** — ADR D-14, ratified 2026-09-09,
+closing §26.2 — so ``canonical_subject_context_ref`` stays opaque by decision
+rather than by absence, and nothing here resolves it. ``SystemManifest``'s home
+remains an **open owner decision** (§26.3). This package mints **neither** — it
+references them by value + digest, so the shape here is already final for the
+subject-context half and would not move if the manifest half were ratified. The minimum system/version/configuration coordinates are carried
 directly because ADR §23.5 requires determinations to "bind exact identity +
 digests … preventing swap/replay/misattribution", and that guarantee cannot wait
 on an unratified artifact.

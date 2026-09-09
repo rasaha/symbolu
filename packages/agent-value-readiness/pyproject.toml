@@ -14,8 +14,8 @@
 # is resolved through the PUBLIC API of the shared Ugence Policy Authority, whose
 # internals are never imported.
 #
-# Build:    python -m build packages/capabilities/agent-value-readiness
-# Verify:   python packages/capabilities/agent-value-readiness/verify_agent_value_readiness_distribution.py
+# Build:    python -m build packages/agent-value-readiness
+# Verify:   python packages/agent-value-readiness/verify_agent_value_readiness_distribution.py
 [build-system]
 requires = ["setuptools>=61.0"]
 build-backend = "setuptools.build_meta"

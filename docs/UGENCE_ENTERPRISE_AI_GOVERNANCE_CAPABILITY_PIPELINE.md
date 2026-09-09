@@ -590,7 +590,7 @@ These packages do not represent a single business step. They provide the common 
 
 ### 44. Agent Value Readiness
 
-**Package:** `packages/capabilities/agent-value-readiness`  
+**Package:** `packages/agent-value-readiness`  
 **Sequence alignment:** **Define → Verify → Measure**.  
 **Pipeline role:** Produces a deterministic, advisory and non-financial readiness determination across intelligence fitness, capability readiness and adoption readiness, under governed policy and system-binding context.
 
@@ -599,6 +599,31 @@ These packages do not represent a single business step. They provide the common 
 1. Tests whether an agent is ready for an intended business outcome before jumping directly to ROI claims.
 2. Keeps readiness multidimensional so strength in one area cannot automatically compensate for a mandatory weakness elsewhere.
 3. Separates advisory readiness from deployment authorization, preserving accountability for the actual deployment decision.
+
+**Consumers (recorded 2026-09-09).** Nothing in the repository imports
+`ugence_agent_value_readiness`. `ADR_UGENCE_STUDIO_FRONT_DOOR_SCOPING.md` row 7
+names this package as the readiness artifact behind the Simulate screen, but that
+screen BLOCKs by design in P3E and `console-api` does not import the package, so
+the consumer is **intended, not existing**. The 2026-09-09 ruling names the
+**Studio Simulate / front-door workstream** as that future consumer.
+What gates any end-to-end use: `assess_readiness` ships only deny-all verifiers, so
+with a working policy resolver any policy carrying an applicable gate cannot reach a
+headline classification. A conforming `GateResultVerifier` composes three
+independently owned legs — trusted evidence verification, benchmark resolution and
+the **governed-threshold-evaluation leaf commissioned on 2026-09-09** (UVI ADR
+§26.10; §25 M-GTE.1 and M-GVR.1) — and may not ship until all three are releasable,
+which requires `benchmark-registry-authority` at `0.3.0` with its reviews complete.
+
+**Ruled 2026-09-09:** wiring is deferred until §26.10 is resolved *in
+implementation* and that whole chain is releasable. Wiring sooner would expose a
+capability that can only return `NOT_EVALUATED`, misleading users into treating a
+deliberately incomplete path as a functioning simulation; the honest BLOCK the
+screen shows today is the better state. The future consumer is the **Studio
+Simulate / front-door workstream**, which owns the wiring and the screen but not
+readiness semantics and not verification. `agent-value-readiness` is an **intended**
+consumer-reachable capability and is expressly **not** a terminal leaf — it reaches
+users through UVI, the one customer-facing capability, while the package itself
+stays an internal engine (UVI ADR §4, D-18).
 
 ### 45. Governed Value
 
@@ -611,6 +636,17 @@ These packages do not represent a single business step. They provide the common 
 1. Connects governance controls to measurable business value instead of presenting governance only as compliance overhead.
 2. Distinguishes reported, forecast and observed outcomes so weak evidence is not promoted into financial truth.
 3. Feeds cost, loss, benefit and authorization outcomes back into policy revision and future investment decisions.
+
+**Consumers (recorded 2026-09-09).** Nothing in the repository imports
+`governed_value`, and unlike Agent Value Readiness it is named by **no** screen row
+in `ADR_UGENCE_STUDIO_FRONT_DOOR_SCOPING.md`. It is a **terminal leaf today** — deliberately unlike
+Agent Value Readiness above, which the 2026-09-09 ruling expressly declined to
+declare terminal: a kernel that computes correctly, is verified end to end from an
+isolated wheel, and that no product calls. That is a deliberate stopping point rather than an
+oversight — the kernel scores caller-reported inputs and pins every result at
+`REPORTED` / `UNVERIFIED`, so wiring it into a product surface would put unverified
+figures in front of users under a governance banner. **Whether to name a consuming
+workstream is an open owner ruling.**
 
 ## 14. End-to-end interpretation
 

@@ -16,7 +16,7 @@ import pytest
 REPO = pathlib.Path(__file__).resolve().parents[5]
 CONTRACTS_SRC = REPO / "packages" / "capabilities" / "reasoning-method-governance" / "src" / "ugence_reasoning_method_governance"
 ENGINE_SRC = REPO / "packages" / "capabilities" / "readiness-comparison" / "src" / "ugence_readiness_comparison"
-AVR_SRC = REPO / "packages" / "capabilities" / "agent-value-readiness" / "src" / "ugence_agent_value_readiness"
+AVR_SRC = REPO / "packages" / "agent-value-readiness" / "src" / "ugence_agent_value_readiness"
 
 RUNTIME_FORBIDDEN = {"agentic", "agentic_framework", "reasoning_workflows", "adaptive_prompts", "external_actions", "symbolu"}
 FORBIDDEN_NAMES = {"WorkflowResult", "WorkflowType", "WorkflowRegistry", "WorkflowSelector"}

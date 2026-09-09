@@ -20,7 +20,7 @@ on:
       - "docs/AGENT_READINESS_AND_ROI_PLAIN_ENGLISH.md"
       - "tests/test_readiness_governed_value_doc_drift.py"
       - "conftest.py"
-      - "packages/capabilities/agent-value-readiness/**"
+      - "packages/agent-value-readiness/**"
       - "packages/governed-value/**"
       - "packages/policy-authority/**"
       - "packages/uvi-policy-contracts/**"
@@ -33,7 +33,7 @@ on:
       - "docs/AGENT_READINESS_AND_ROI_PLAIN_ENGLISH.md"
       - "tests/test_readiness_governed_value_doc_drift.py"
       - "conftest.py"
-      - "packages/capabilities/agent-value-readiness/**"
+      - "packages/agent-value-readiness/**"
       - "packages/governed-value/**"
       - "packages/policy-authority/**"
       - "packages/uvi-policy-contracts/**"
@@ -54,7 +54,7 @@ env:
     packages/governance-contracts
     packages/uvi-policy-contracts
     packages/policy-authority
-    packages/capabilities/agent-value-readiness
+    packages/agent-value-readiness
     packages/governed-value
 
 jobs:

@@ -294,7 +294,13 @@ that no merged contract defines.
 
 ### Nothing unratified was minted
 `SystemManifest`'s home is an open owner decision (UVI ADR §26.3) and the
-RA-owned `SubjectContext` is unmerged (D-14, §26.2). Neither is defined here:
+RA-owned `SubjectContext` is unmerged (D-14, §26.2).
+*(Historical. `SubjectContext` merged 2026-08-17 in `risk_authority` via PR
+#1432, and D-14 was ratified 2026-09-09: UVI **permanently does not adopt it**,
+closing §26.2. The token stays opaque — by decision now, not by absence — so
+nothing about this entry's shape or reasoning changes. `SystemManifest` §26.3
+remains open.)*
+Neither is defined here:
 both are carried as **opaque, co-required ref + digest tokens**, so a ratified
 contract can be pointed at later with no shape change. No environment
 enumeration is invented either.
@@ -335,7 +341,9 @@ advances to `0.2.0`. Remains a stdlib-only leaf with no dependency on any UVI le
   unmerged) and intentionally excluded. `governed-value` 0.2.0 is unchanged; its
   compatibility mapping is documentation only.
   *(Historical, accurate as of 0.2.0 — `AssessedSystemBinding` is **owned by this
-  package** as of 0.3.0 below, per UVI ADR §20. `SubjectContext` remains deferred.)*
+  package** as of 0.3.0 below, per UVI ADR §20. `SubjectContext` merged 2026-08-17
+  in `risk_authority` (PR #1432) and is **permanently not adopted** by UVI per
+  D-14, ratified 2026-09-09; it is still not defined here.)*
 
 ## [Unreleased] — package hardening (audit follow-up, no contract change)
 

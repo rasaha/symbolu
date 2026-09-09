@@ -72,8 +72,8 @@ jobs:
       matrix:
         python-version: ["3.10", "3.11", "3.12"]
         package:
+          - packages/agent-value-readiness
           - packages/capabilities/action-clearance
-          - packages/capabilities/agent-value-readiness
           - packages/capabilities/llm-steering-controller
           - packages/capabilities/model-selection
           - packages/capabilities/readiness-comparison
