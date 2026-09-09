@@ -87,8 +87,9 @@ picker, this is why `[I]`.
 
 **0.4 Create one project, and put every service in it.** This is the constraint the whole
 arrangement turns on. Railway's private network is scoped to a single project *and* a
-single environment: `worker.railway.internal` resolves only for services inside that same
-project and environment, and from another project the name does not resolve at all `[I]`.
+single environment: a service's `*.railway.internal` name resolves only for services inside
+that same project and environment, and from another project it does not resolve at all
+`[I]`.
 
 
 > **Can the authority plane reach the worker if they are in different projects? No.**
@@ -267,14 +268,28 @@ The studio's browser app. It needs `studio-api`'s URL *before* it builds.
 Repository:     rasaha/symbolu
 Branch:         <the default branch>
 Root Directory: apps/ugence-governance-studio/frontend
-Build Command:  npm ci && npm run build
+Build Command:  npm install --include=dev && npm run build
 Start Command:  npx -y serve@14 -s dist -l $PORT
 ```
 
 `-s` serves `index.html` for unknown paths, so the router survives a refresh.
 
-Verified in this tree: `npm ci` resolves against the committed `package-lock.json` and
-`npm run build` — `tsc --noEmit && vite build` — produces a bundle `[V]`.
+**Not `npm ci`, on any Node service here.** Railway's builder runs its own `npm install`
+before your build command, and mounts a build cache *inside* `node_modules`. `npm ci`
+begins by deleting that directory and cannot remove a mount point, so it exits 240 on the
+cache it did not create:
+
+```
+npm error code EBUSY
+npm error syscall rmdir
+npm error path /app/node_modules/.vite
+```
+
+`npm install` reconciles in place and leaves the mount alone. `--include=dev` is the other
+half: the builder runs npm with `--omit=dev` set, and `vite` and `typescript` are
+devDependencies of all three front ends, so without it the build fails with
+`vite: not found`. Verified: this command installs and `npm run build` —
+`tsc --noEmit && vite build` — produces a bundle under `NODE_ENV=production` `[V]`.
 
 **3.3** Variables:
 
@@ -335,14 +350,15 @@ The control-plane console. Note the build command: it is **not** the one parts 3
 Repository:     rasaha/symbolu
 Branch:         <the default branch>
 Root Directory: apps/console
-Build Command:  npm install && npm run build      # NOT npm ci
+Build Command:  npm install --include=dev && npm run build
 Start Command:  npx -y serve@14 -s dist -l $PORT
 ```
 
-`apps/console` ships **no `package-lock.json`** — it is not a tracked file `[V]`. `npm ci`
-exits non-zero with *"can only install with an existing package-lock.json"*; `npm install`
-succeeds and `npm run build` completes, 1365 modules `[V]`. Copying part 3's build command
-verbatim to this service is the first failure you will hit.
+Same command as parts 3 and 6 — and this service has a second, independent reason for it.
+`apps/console` ships **no `package-lock.json`**; it is not a tracked file `[V]`, so `npm ci`
+here would also fail with *"can only install with an existing package-lock.json"* before it
+ever reached the cache-mount problem. `npm install --include=dev && npm run build`
+completes, 1365 modules `[V]`.
 
 **5.3** Variables:
 
@@ -376,14 +392,16 @@ Railway project — see 0.4.
 Repository:     rasaha/symbolu
 Branch:         <the default branch>
 Root Directory: apps/authority-plane
-Build Command:  npm ci && npm run build
+Build Command:  npm install --include=dev && npm run build
 Start Command:  npm start
 ```
 
 `npm start` runs the plane's own `server.mjs`: it serves the built app and proxies `/api`
 to the worker server-side, so the worker's address never reaches a browser (CR-3).
 `server.mjs`, the `start` script and `security/approved-operations.json` are all committed
-here, and the app builds cleanly `[V]`.
+here, and the app builds cleanly with the part 3 command `[V]`. `npm ci` fails here for the
+same cache-mount reason; `server.mjs` itself needs no dependency at all, being Node
+builtins only.
 
 > **The plane's own checks run in this repository, and they belong in review rather than in
 > a Railway build.** `npm run verify:boundary` passes here against the worker's committed
@@ -396,11 +414,18 @@ here, and the app builds cleanly `[V]`.
 
 ```
 NODE_VERSION=22
-WORKER_URL=http://worker.railway.internal:8444
+WORKER_URL=http://<the worker's RAILWAY_PRIVATE_DOMAIN>:8444
 ```
 
-Valid only if this service and `worker` are in the same Railway project and environment,
-and only if the worker service is named exactly `worker`. `http:`, not `https:` — under
+**Read that name; do not derive it from the service name.** Railway assigns the private
+domain from the name the service had when it was created, and renaming the service
+afterwards does not change it — a service renamed `studio-api` in this deployment kept
+`ravishing-insight.railway.internal` `[V]`. Open the **worker's** Variables tab and copy
+its `RAILWAY_PRIVATE_DOMAIN` verbatim. `worker.railway.internal` is correct only when the
+worker was created under that name and never renamed.
+
+Valid only if this service and the worker are in the same Railway project and environment.
+`http:`, not `https:` — under
 RW-3 the worker runs `test` mode over plain HTTP inside the private segment, which differs
 from `server.mjs`'s own `https://127.0.0.1:8444` default, the local development shape.
 
@@ -476,10 +501,12 @@ Pass condition: the log shows `WARNING: UGENCE_REVIEW_DEPLOYMENT_MODE=test` — 
 line visible, it is the label this deployment runs under — and the plane's four screens
 answer under a banner reading `PRESENTED_UNPROVEN` and `IN_PROCESS_ISSUER_ONLY` `[V]`.
 
-Railway's private DNS name is `<service>.railway.internal`, resolves only inside the
-environment, and requires the listener to accept connections on the container's IPv6
-interface `[I]`. That behaviour is vendor-documented and not measured here; RW-1's proof is
-what would put it on the record `[G]`.
+Railway's private DNS name resolves only inside the environment and requires the listener
+to accept connections on the container's IPv6 interface `[I]`. It is **not** derived from
+the service's current name: it is assigned at creation and survives a rename `[V]` — read
+each service's `RAILWAY_PRIVATE_DOMAIN` from its Variables tab rather than assuming
+`<service>.railway.internal`. The resolution and IPv6 behaviour is vendor-documented and not
+measured here; RW-1's proof is what would put it on the record `[G]`.
 
 > **The worker image has never been built anywhere** `[V]`
 > (`CONTAINER_GATE_SET.json`: `execution_state: NOT_EXECUTED`). Until 2026-09-08 it could
@@ -508,7 +535,7 @@ what would put it on the record `[G]`.
 | `VITE_API_BASE_URL` | `studio-web` | `https://<studio-api>.up.railway.app` | build time — redeploy |
 | `VITE_CONSOLE_API_URL` | `console-web` | `https://<console-api>.up.railway.app` | build time — redeploy |
 | `UGS_API_CORS_ALLOWED_ORIGINS` | `studio-api` | `https://<studio-web>.up.railway.app` | restart |
-| `WORKER_URL` | `authority-plane` | `http://worker.railway.internal:8444` | restart |
+| `WORKER_URL` | `authority-plane` | `http://<worker's RAILWAY_PRIVATE_DOMAIN>:8444` | restart |
 
 The first two are public HTTPS domains compiled into a browser bundle. The last is a
 private address that must never be public, and resolves only within one project and
@@ -524,7 +551,10 @@ environment.
 | `No matching distribution found for ugence-context-minimization` | `console-api` built with the distribution path alone; its first-party dependencies are not on PyPI | 2.3 |
 | "API is not compatible / Detected contract: unknown" | CORS origin mismatch, not a version mismatch | 4.1 |
 | Studio or console still calls the old API after a variable change | `VITE_*` is compiled into the bundle | redeploy that service |
+| `npm ci` fails: `EBUSY … rmdir '/app/node_modules/.vite'`, exit 240 | `npm ci` deletes `node_modules`, which holds Railway's build cache mount | 3.2 |
+| `vite: not found` during the build | `--include=dev` omitted; the builder runs npm with `--omit=dev` | 3.2 |
 | `npm ci` fails: *can only install with an existing package-lock.json* | `console-web`; that app ships no lockfile | 5.2 |
+| Plane cannot resolve the worker's host name | The worker's private domain was assumed from its service name instead of read from `RAILWAY_PRIVATE_DOMAIN` | 6.3 |
 | Console fetches fail against the deployed origin | `VITE_CONSOLE_API_URL` unset, so the client fell back to a relative `/api` | 5.3 |
 | Plane reports the worker unreachable | Correct until part 7; after it, check the service is named `worker` — **or** the plane and worker are in different Railway projects, in which case no configuration fixes it | 0.4, 6.3, 7.2 |
 | Worker exits at boot printing a list | It reports every reason at once; usually the two DSNs are identical | 7.4 |
@@ -544,18 +574,38 @@ returned empty for the 7.4 variables.
 
 Re-run on 2026-09-09 against the default branch, after the split was withdrawn `[V]`:
 
-- `studio-web` builds: `npm ci && npm run build`, `tsc --noEmit` exit 0, bundle produced.
-- `authority-plane` builds, and its own checks pass in this tree — `npm run verify:boundary`
-  reports 4 operations consumed against contract `sha256 a0227d16…`, and `npm test` is 11
-  passed. Neither could run in a copy that omitted `deployment/governed-runtime-worker`.
-- `console-web` builds with `npm install && npm run build`, 1365 modules. `apps/console`
-  ships no tracked `package-lock.json`, so `npm ci` is the wrong command for it.
+- `authority-plane`'s own checks pass in this tree — `npm run verify:boundary` reports 4
+  operations consumed against contract `sha256 a0227d16…`, and `npm test` is 11 passed.
+  Neither could run in a copy that omitted `deployment/governed-runtime-worker`.
+- All three front ends build with `npm install --include=dev && npm run build` under
+  `NODE_ENV=production`: `studio-web` 1859 modules with
+  `studio-api-production-851c.up.railway.app` compiled into the bundle, `authority-plane`
+  and `console-web` likewise. `apps/console` ships no tracked `package-lock.json`.
 - `ugence_console_api.__main__` reads `CONSOLE_API_PORT` and ignores `$PORT`;
   `create_app()` sets `allow_origins=["*"]`.
 - `server.mjs` forwards `GET` only, to the four approved paths, forwards no request header,
   and sets `rejectUnauthorized: false`.
 - `verify_build_context.py --root-build` passes: all three Dockerfiles resolve every COPY
   source, and the root build's five declared inputs are in the context.
+
+**Corrected twice on 2026-09-09 by Railway builds `[V]`.** Two steps carried `[V]` on
+local evidence that no builder had ever tested. Railway rejected both.
+
+*Part 3, and by inheritance part 6.* The build command was `npm ci && npm run build`.
+Railway's builder runs its own `npm install` first and mounts a build cache inside
+`node_modules`; `npm ci` deletes that directory and cannot remove a mount point, so the
+deploy died on `EBUSY … rmdir '/app/node_modules/.vite'`, exit 240. The document's own
+evidence line said `npm ci` "resolves against the committed `package-lock.json`", which was
+true and beside the point: the lockfile was never what failed. All three front ends now use
+`npm install --include=dev && npm run build`, which additionally survives the builder's
+`--omit=dev`, and which builds all three here under `NODE_ENV=production` `[V]`.
+
+*Part 6.3 and the private-networking notes.* `WORKER_URL` was written as
+`http://worker.railway.internal:8444` on the assumption that a service's private domain
+follows its name. It does not: this deployment's `studio-api` carries
+`ravishing-insight.railway.internal`, the name it was created under, and the rename did not
+propagate `[V]`. Every private address must now be read from the target service's
+`RAILWAY_PRIVATE_DOMAIN`.
 
 **Corrected on 2026-09-09 by a Railway build `[V]`.** Part 2 previously gave
 `pip install ./packages/integration/console-api` as the whole build command and labelled it
@@ -569,13 +619,19 @@ command now in 2.3 installs into a clean virtual environment outside this reposi
 four modules `"available": true` `[V]`. A build succeeding locally is what the old step
 lacked, and what the studio's own step in 1.3 always had.
 
-**Observed on Railway `[I]`, reported by the owner.** `studio-api` and the root `web`
-service reached Online after the `.dockerignore` fix; `console-api` failed at build for the
-reason above and has not been rebuilt against the corrected command. No other service in
-this walkthrough has been observed running on Railway.
+**Observed on Railway `[I]`, reported by the owner.** `studio-api`, `console-api` and the
+root `web` service are Online; `console-api` came up on the corrected part 2 command.
+`studio-api` serves `studio-api-production-851c.up.railway.app` on port 8080. `studio-web`
+has a domain but has not yet completed a build. Parts 4 through 7 have not been reached.
 
-**Not verified `[G]`.** Parts 3 through 7 have run only locally, never on Railway's
-builders, so their pass conditions are unconfirmed against a live deployment. Railway's UI
+**A pattern worth stating.** Both corrections above were local-evidence failures of the
+same kind: a command that builds in this repository does not thereby build on Railway's
+builder, whose install phase, cache mounts and `--omit=dev` default are part of the
+environment the command runs in. A step describing a build deserves `[V]` only once a
+builder has accepted it; until then it is `[I]`.
+
+**Not verified `[G]`.** No pass condition from part 3 onward has been confirmed against a
+live deployment; the corrected build command has been run here, not yet on Railway. Railway's UI
 wording, its per-service repository selection, and its private-network scoping are vendor
 documentation `[I]` and may drift — in particular, the claim in 0.4 that no cross-project
 private networking exists is inferred, not measured.
