@@ -379,7 +379,12 @@ jobs:
     name: Every inventoried guard produced exactly one result
     runs-on: ubuntu-latest
     needs: guard-sweep
-    if: always()
+    # Not always(): always() runs this even when the run itself was cancelled, and a
+    # superseded run's shards upload nothing, so the aggregate would download zero
+    # shards and report the whole inventory as unreported — a failure that describes
+    # the cancellation, not the code. !cancelled() still runs it when a shard FAILS,
+    # which is the case always() was here for.
+    if: ${{ !cancelled() }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
