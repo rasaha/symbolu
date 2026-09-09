@@ -130,16 +130,47 @@
     "closed_by": {
       "check": "build-context-conformance",
       "script": "deployment/governance-studio/ci/verify_build_context.py (shared; each job names the Dockerfile it owns)",
-      "what_it_asserts": "For each deployment Dockerfile, every COPY source (--from= stage copies excluded) exists on disk and is not excluded by the .dockerignore the build will actually read: the sibling <dockerfile>.dockerignore where one exists, the context root's otherwise. Dockerignore ordering semantics are applied — patterns in order, anchored at the context root, parents matched as Docker matches them, last match wins, `!` re-includes. With --root-build it also checks the declared inputs of the repository-root buildpack build, which has no Dockerfile and therefore no sibling file to prefer: each input is recorded with why the build needs it, and checked against the context root's file.",
+      "what_it_asserts": "For each deployment Dockerfile, every local COPY source (--from= stage copies skipped, because those name another stage or image) resolves in the build context and reaches the build with content, against the ignore file the build will actually read: the sibling <dockerfile>.dockerignore where one exists, the context root's otherwise. Dockerignore ordering semantics are applied — patterns in order, anchored at the context root, parents matched as Docker matches them, last match wins, `!` re-includes. A literal source must exist; a glob must match at least one surviving path; a directory passes when content survives inside it and fails only when every path it matches is excluded, so a package whose __pycache__ is ignored still passes while one wholly excluded does not. With --root-build it also checks the declared inputs of the repository-root buildpack build, which has no Dockerfile and therefore no sibling file to prefer.",
       "wired_into": [
-        ".github/workflows/governance-studio-p3e-private-hosted-ci.yml job 'application', after ratified-pin-conformance — both Dockerfiles; this job guards every push",
-        ".github/workflows/governance-studio-p3e-private-hosted-ci.yml job 'container', after ratified-pin-conformance and ahead of mirror-digest-conformance — the studio Dockerfile",
-        ".github/workflows/governed-runtime-worker-ci.yml job 'container', after ratified-pin-conformance and ahead of mirror-digest-conformance — the worker Dockerfile",
-        ".github/workflows/governance-studio-p3e-private-hosted-ci.yml job 'application' also passes --root-build and deploy/gke/Dockerfile, so all three Dockerfiles and the no-Dockerfile root build are checked on every push (c45ba52b)"
+        ".github/workflows/governance-studio-p3e-private-hosted-ci.yml job 'application', after ratified-pin-conformance — all three Dockerfiles plus --root-build; no `if:` at step or job level, so it runs on every push",
+        ".github/workflows/governance-studio-p3e-private-hosted-ci.yml job 'application' — the fixture suite, immediately after, so the gate cannot drift from its stated semantics unnoticed",
+        ".github/workflows/governance-studio-p3e-private-hosted-ci.yml job 'container', after ratified-pin-conformance and ahead of mirror-digest-conformance; outside every mirror_ready condition",
+        ".github/workflows/governed-runtime-worker-ci.yml job 'container', same position, same absence of condition"
       ],
       "runs_without": "a container runtime, a registry, a daemon or any network. It is not behind mirror_ready, so it executes on every run.",
       "validated": "Passes on the committed tree (29 and 19 sources, none excluded, none missing). With the two Dockerfile.dockerignore files temporarily removed — the state before commit 20c6560a — it exits 1 and reports all 48 sources excluded by '*' in the root file, so it reproduces the defect it exists to catch. A synthetic Dockerfile confirms a --from= stage copy is skipped and a non-existent source is reported. Against the old root rules the --root-build check exits 1 on four of the five inputs, reproducing the live deployment failure rather than describing it.",
-      "label": "[V]"
+      "label": "[V]",
+      "status": "IMPLEMENTED. The check runs on every push, outside every mirror_ready condition, and is accompanied by a fixture suite that holds it to its stated semantics.",
+      "fails_closed": "The checker refuses rather than approximates any source form it does not model exactly: an interpolated variable, an unsupported COPY flag (--exclude above all, which filters the source set), an absolute or context-escaping source, a heredoc source, an ADD with a local path, or a COPY with fewer than two operands. Each is an error naming the Dockerfile, the line and the instruction. Approximating them would let a real exclusion pass silently, which is the failure this gate exists to catch.",
+      "failure_output": "Each failure names the Dockerfile, the line number, the offending source and the instruction text.",
+      "fixtures": {
+        "path": "deployment/governance-studio/ci/tests/test_verify_build_context.py",
+        "count": 24,
+        "builds_real_contexts": "Each fixture writes a real directory tree, ignore file and Dockerfile to disk; the property under test is what a build would find in the context, not what a mocked filesystem would report.",
+        "covers": [
+          "ordered exclusion hides a source",
+          "a later negation re-includes what an earlier rule excluded",
+          "order matters: a later exclusion wins over an earlier negation",
+          "the sibling <dockerfile>.dockerignore overrides the context root",
+          "a directory whose descendants are partly ignored is valid",
+          "a directory with every descendant excluded fails",
+          "an excluded directory holding a re-included file still reaches the build",
+          "a missing literal source fails",
+          "a glob passes when any match survives and fails when none do",
+          "a glob matching nothing fails",
+          "the JSON array form is read and its last operand is the destination",
+          "a --from stage copy is skipped",
+          "line continuations and multiple sources read as one instruction",
+          "six unmodelled source forms are refused rather than guessed",
+          "a source escaping the context is refused",
+          "a failure names the Dockerfile, the line and the instruction",
+          "both shipped Dockerfiles and the root buildpack inputs pass"
+        ],
+        "defect_this_suite_caught": "The escape check used lstrip('./'), which strips a character set rather than a prefix and silently turned '../outside' into 'outside' — normalising an escape into an in-context path. Fixed before the gate was committed."
+      },
+      "what_it_does_not_prove": "Context availability only. It performs no build, pull, registry access, network call or daemon invocation, and proves neither image builds. The container jobs remain intentionally red for RESOURCE_BLOCKER_MIRROR_UNCONFIGURED; this gate makes the .dockerignore fix observable independently of that blocker, so one blocker can no longer mask the other.",
+      "ratified_family_membership": "NONE. This check is not a member of P3E-CTR or GRW-CTR, satisfies no gate identifier of either family, and no identifier of either family is marked satisfied by its implementation or by this record. Admitting it to either family remains a separate owner decision.",
+      "authorized_on": "2026-09-09"
     },
     "ratified_status": {
       "member_of_p3e_ctr": false,

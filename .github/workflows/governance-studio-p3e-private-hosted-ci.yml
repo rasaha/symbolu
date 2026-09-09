@@ -73,6 +73,16 @@ jobs:
             deployment/governed-runtime-worker/Dockerfile \
             deploy/gke/Dockerfile
 
+      - name: build-context-gate-fixtures
+        # The gate above is only worth its blocking status if it still means what it says.
+        # These fixtures build real contexts on disk and assert the properties that matter:
+        # ordered exclusions and later negation, the sibling file overriding the context
+        # root, a directory whose descendants are partly ignored passing while one wholly
+        # excluded fails, glob expansion, the JSON form, --from being skipped, and every
+        # unmodelled source form raising rather than being approximated. Offline, no
+        # daemon, and it satisfies no ratified gate identifier either.
+        run: python -m pytest deployment/governance-studio/ci/tests -q
+
       - name: gate-identifier-conformance
         # The P3E audit records must reference only the canonical container-gate
         # identifiers published in CONTAINER_GATE_DEFINITION.json (or a declared
