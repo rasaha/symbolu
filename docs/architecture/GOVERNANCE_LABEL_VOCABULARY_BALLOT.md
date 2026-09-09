@@ -245,6 +245,13 @@ records what was *done*, leaving what it *permits* to Policy Authority. It is
 harder to read and it is the honest option; the owner may prefer the ladder and
 accept the conflation.
 
+**The vocabulary is named `vendor-dependency-assessment-state`** — `PUB-1a`, resolved
+under owner delegation, 2026-09-09. `PUB-1` had proposed `vendor-dependency-permission`,
+which named the very semantics these members refuse and `VR-3` forbids; naming the
+vocabulary after its members removes that conflation at its source. Nothing about the
+members changed. It is **authorized for publication and not yet published**, unlike
+the other four.
+
 ### 3.5 Incident severity — `incident-response`
 
 Placement `[R]`: **stays capability-local as `str` for now** — see §4, blocked on `LP-5`.

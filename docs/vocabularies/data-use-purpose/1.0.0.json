@@ -1,0 +1,38 @@
+{
+  "authority": {
+    "issued_by_policy_authority": false,
+    "repository_published": true,
+    "statement": "This specification establishes the canonical content of the vocabulary. It is not issuance by Policy Authority, and no part of the repository may describe it as an issued or signed organizational policy. Production authority still requires an issued Policy Authority coordinate (PUB-1)."
+  },
+  "binding_status": "Not implemented. VV-D requires this binding to be independent of the data classification binding and never borrowed from it; PUB-2 authorizes it and PUB-1 sequences it behind this publication.",
+  "content_digest": "sha256:615fb22f4986b009cb923ff08bda721645d37e410ab05338c1cbe561d43e5613",
+  "examples_status": "None. LV-E anticipates a governance document listing worked examples without closing the set; no examples have been ratified, and inventing them here would publish content no owner ruled.",
+  "further_rulings": [
+    "LV-A",
+    "DE-3",
+    "PUB-1"
+  ],
+  "governing_documents": [
+    "docs/architecture/GOVERNANCE_LABEL_VOCABULARY_BALLOT.md",
+    "docs/architecture/LV1_VOCABULARY_PUBLICATION_RULINGS.md"
+  ],
+  "governing_ruling": "LV-E",
+  "immutable": true,
+  "intended_binding": "DataUseDeclaration.purpose_label (ugence-data-use-admission)",
+  "interpretation_rules": [
+    "A purpose label names an activity and its beneficiary. Both parts are required; a label naming only an activity does not conform.",
+    "The set is not closed, and no member list is normative. A conforming label that appears here for the first time is conforming, not unrecognized.",
+    "Non-conformance to this shape is a documentation finding, never a refusal in code: DE-3 keeps the label opaque, so no package may reject a label for its shape and none does.",
+    "This vocabulary neither closes nor reinterprets LV-E, and it does not stand in for the lawful-basis and purpose-limitation vocabularies a privacy regime imposes, which this repository does not own."
+  ],
+  "members": null,
+  "non_normative_examples": [],
+  "ordering": null,
+  "ordering_note": "An open shape has no members to order.",
+  "scope": "Organization-wide, not tenant-scoped. Describes the intent of a data use. Deliberately open: LV-E ratified a shape rather than a set.",
+  "shape": "open",
+  "tenant": null,
+  "title": "Purpose of a data use — an open shape, not a closed set",
+  "version": "1.0.0",
+  "vocabulary": "data-use-purpose"
+}

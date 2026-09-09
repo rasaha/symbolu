@@ -145,6 +145,12 @@ products and applications may import it; no capability package may, enforced by
   runbook, never in code. The cost is accepted and stated: "every incident at or
   above SEV2" is a question this repository cannot answer. A distinct ordered kind
   waits for an operational surface that needs it, and gets its own ruling then; a
-  rank field beside the label was considered and refused.
+  rank field beside the label was considered and refused. The vocabulary is now
+  **published** as an immutable specification at
+  `docs/vocabularies/incident-severity/1.0.0.json`, which records the unordering
+  explicitly rather than leaving it to be inferred from four names that look ranked.
+  It is canonical content, **not** issued Policy Authority policy, and **no field
+  here cites it**: the record-local reference is authorized by `PUB-2` and not
+  implemented.
 - The control plane the wave 3 rows assume still does not exist, so nothing here
   composes into an operational surface.

@@ -1,0 +1,61 @@
+{
+  "authority": {
+    "issued_by_policy_authority": false,
+    "repository_published": true,
+    "statement": "This specification establishes the canonical content of the vocabulary. It is not issuance by Policy Authority, and no part of the repository may describe it as an issued or signed organizational policy. Production authority still requires an issued Policy Authority coordinate (PUB-1)."
+  },
+  "binding_status": "Not implemented. PUB-2 authorizes a record-local authoritative reference and PUB-1 sequences it behind this publication; no field exists yet.",
+  "content_digest": "sha256:673f0d6e3773877566631bc58e18e72614d9c324b2c861adab60c6ee811a152b",
+  "further_rulings": [
+    "LV-A",
+    "LV-F",
+    "PUB-1",
+    "PUB-3",
+    "PUB-5"
+  ],
+  "governing_documents": [
+    "docs/architecture/GOVERNANCE_LABEL_VOCABULARY_BALLOT.md",
+    "docs/architecture/LV1_VOCABULARY_PUBLICATION_RULINGS.md"
+  ],
+  "governing_ruling": "LV-B",
+  "immutable": true,
+  "intended_binding": "SystemRegistration.classification_label (ugence-ai-system-registry)",
+  "interpretation_rules": null,
+  "members": [
+    {
+      "citation": "Regulation (EU) 2024/1689, Article 5 — prohibited AI practices",
+      "definition": "The organization has ruled this class of system may not be built or run at all.",
+      "member": "PROHIBITED"
+    },
+    {
+      "citation": "Regulation (EU) 2024/1689, Article 6, with Annexes I and III",
+      "definition": "Consequential to health, safety, rights, livelihood or legal standing; the heaviest obligations attach.",
+      "member": "HIGH_RISK"
+    },
+    {
+      "citation": "Regulation (EU) 2024/1689, Article 50",
+      "definition": "Interacts with people, recognizes emotion or biometrically categorizes, or generates or manipulates content — so disclosure duties attach, but not the high-risk set.",
+      "member": "TRANSPARENCY_OBLIGATIONS"
+    },
+    {
+      "citation": null,
+      "citation_absent_because": "\"Minimal or no risk\" is the Commission's explanatory description of systems the Act subjects to no specific rules. No classification article establishes it, and PUB-5 refuses to invent one.",
+      "definition": "No obligation beyond ordinary engineering governance.",
+      "member": "MINIMAL_RISK"
+    },
+    {
+      "citation": null,
+      "citation_absent_because": "An internal registry state with no statutory counterpart. It exists because D-2 guarantees no refusal for an unrecognized label, so without it the first registration of an unassessed system would force a false claim.",
+      "definition": "Registered before classification was assessed. Not a judgment that risk is low.",
+      "member": "UNCLASSIFIED"
+    }
+  ],
+  "ordering": null,
+  "ordering_note": "The members are names, not ranks. Nothing in this vocabulary establishes an ordering, and D-2 keeps the recording package unable to infer one.",
+  "scope": "Organization-wide, not tenant-scoped. Classifies AI *systems* only. General-purpose AI models are a different regulated object under Chapter V of the Act and are out of scope by ruling PUB-3, which gives them their own record rather than a member here; until that record exists they are uncovered.",
+  "shape": "closed",
+  "tenant": null,
+  "title": "AI system classification, tracking the EU AI Act",
+  "version": "1.0.0",
+  "vocabulary": "eu-ai-act-system-classification"
+}

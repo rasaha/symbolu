@@ -36,7 +36,7 @@ Five stable vocabulary identifiers, each published at initial version `1.0.0`:
 | `eu-ai-act-system-classification` | `LV-B` | `SystemRegistration.classification_label` |
 | `data-classification` | `LV-A` / `DE-3` | `DataUseDeclaration.classification` |
 | `data-use-purpose` | `LV-E` (open shape) | `DataUseDeclaration.purpose_label` |
-| `vendor-dependency-permission` | `LV-C` | `VendorDependencyDeclaration.risk_posture` — **see the naming conflict below** |
+| `vendor-dependency-assessment-state` | `LV-C` | `VendorDependencyDeclaration.risk_posture` — renamed by `PUB-1a` below |
 | `incident-severity` | `LV-D` | `IncidentRecord.severity_label` |
 
 **Each publication is immutable**, and identified by all six of:
@@ -54,6 +54,23 @@ interpretation requires a **new major version**. A citation or wording correctio
 that *provably* changes no meaning may take a **patch** version. **Minor versions
 are reserved** until an additive-compatibility rule is separately established.
 
+**Published, 2026-09-09** `[V]` — four of the five, at
+`docs/vocabularies/<identifier>/1.0.0.json`:
+`eu-ai-act-system-classification`, `data-classification`, `data-use-purpose` and
+`incident-severity`. The fifth is `PUB-1a` below.
+
+Each file carries its own digest, and the digests are deliberately **not** repeated
+here: a second copy in prose is a second source of truth that nothing keeps honest.
+What is worth recording is that they are enforced. `[V]`
+`scripts/check_vocabulary_publications.py` recomputes each digest — SHA-256 over the
+specification's canonical JSON with the digest field removed — so an **edit to a
+published version fails CI** rather than passing under a stale digest. The same gate
+holds each closed vocabulary's members to the ballot section that ratified them,
+refuses a mutable `latest` in any form, and refuses any file claiming Policy Authority
+issuance. Its twin, `tests/boundaries/test_vocabulary_publications.py`, provokes each
+of those failures, so the gate is known to be able to fail. Immutability is enforced
+here, not asserted.
+
 **What publication here is, and is not.** These repository specifications establish
 the **canonical vocabulary content**. They do **not** constitute issuance by Policy
 Authority, and nothing in the repository may describe them as an issued or signed
@@ -61,34 +78,42 @@ organizational policy. Production authority still requires an **issued Policy
 Authority coordinate**. `LV-1` said the vocabularies are Policy-Authority-*owned*;
 this ruling supplies the content, not the issuance.
 
-### `[R]` A naming conflict that blocks publication of one of the five
+### `PUB-1a` — the fifth vocabulary is renamed `vendor-dependency-assessment-state`
 
-`vendor-dependency-permission` names semantics its own ratified members refuse, and
-which `VR-3` forbids outright.
+**Resolved under owner delegation, 2026-09-09.** The owner named three options and
+directed the choice; option **(a), rename**, is taken, and the ground is recorded here
+because the delegation does not make the reasoning less inspectable.
 
-`[V]` `LV-C` ratified an **assessment-state** set — `NOT_ASSESSED`,
-`ASSESSED_NO_FINDINGS`, `ASSESSED_WITH_FINDINGS`, `ASSESSMENT_LAPSED`,
-`ASSESSMENT_REFUSED` — and refused a permission ladder on the explicit ground that
-it "would read as the implied eligibility `VR-3` forbids, whatever the type says".
-`VR-3` itself rules the label carries "no grade, enum, taxonomy, ordering, severity,
-score, dominance **or implied eligibility**".
+The conflict `PUB-1` flagged was real. `[V]` `LV-C` ratified an **assessment-state**
+set — `NOT_ASSESSED`, `ASSESSED_NO_FINDINGS`, `ASSESSED_WITH_FINDINGS`,
+`ASSESSMENT_LAPSED`, `ASSESSMENT_REFUSED` — and refused a permission ladder on the
+explicit ground that it "would read as the implied eligibility `VR-3` forbids,
+whatever the type says". `VR-3` itself rules the label carries "no grade, enum,
+taxonomy, ordering, severity, score, dominance **or implied eligibility**"
+(`ADR_UGENCE_VENDOR_RISK_SCOPING.md:60`). A vocabulary called `…-permission` whose
+members are assessment states would reinstate by filename the conflation `LV-C` was
+decided to prevent.
 
-Publishing a vocabulary called `…-permission` whose members are assessment states,
-bound to a field whose governing ruling forbids implied eligibility, would reinstate
-by filename the conflation `LV-C` was decided to prevent. Three resolutions, none
-taken here:
+**Why (a) and not the other two.** The name is what a reader sees first, and that is
+the whole reason `LV-C` rejected `APPROVED`, `CONDITIONAL` and `BLOCKED` — not because
+the *type* would confer eligibility, which it never could, but because the *words*
+would be read as conferring it. Option (b) keeps the misleading word and appends a
+disclaimer, which is the shape of the defect rather than its repair: a reader who
+stops at the identifier is exactly the reader the disclaimer does not reach. Option
+(c) is factually wrong about this repository — `risk_posture` has a ratified vocabulary
+today, and declaring it unbound would misdescribe a field that `VendorRiskLabel`
+already constrains (`vendor-dependency/src/ugence_vendor_dependency/declaration.py:130`)
+`[V]`.
 
-- **rename** to `vendor-dependency-assessment-state` (or similar), matching the
-  members and `LV-C`;
-- **keep the name** and record explicitly that it denotes the assessment-state
-  vocabulary and confers nothing — weaker, since the name is what a reader sees
-  first;
-- **treat it as a genuinely different, future vocabulary** about permissions — in
-  which case it has no ratified members, `risk_posture` does not bind to it, and it
-  should not be among the five published now.
+Naming the vocabulary after its members costs nothing and removes the conflation at
+its source. **The vocabulary that a future permission ladder would need does not exist,
+has no ratified members, and is not reserved by this ruling** — should the owner ever
+want one, it is a new vocabulary requiring its own ballot, and `VR-3` would have to
+move first.
 
-The other four may publish on this ruling as written. **This one is held until the
-owner resolves the name.**
+**Publication under the corrected name is authorized and not yet done.** It was
+outside the scope of the publication step that accompanied this ruling, which
+published the four vocabularies that were never blocked.
 
 ---
 
@@ -188,8 +213,8 @@ treating it as a different object rather than another rung.
 
 | Step | Authorized by | Blocked on |
 |---|---|---|
-| Publish four of the five vocabularies at `1.0.0` | `PUB-1` | nothing |
-| Publish `vendor-dependency-permission` | `PUB-1` | **the naming conflict above** `[R]` |
+| ~~Publish four of the five vocabularies at `1.0.0`~~ | `PUB-1` | **done** — `docs/vocabularies/` |
+| Publish `vendor-dependency-assessment-state` | `PUB-1`, `PUB-1a` | nothing — authorized, not yet done |
 | Implement record bindings | `PUB-2` | publication of the vocabulary each cites |
 | Scope `GeneralPurposeAIModelRegistration` | — | its own authorization (`PUB-3`) |
 | Scope the regulatory-status field | — | its own authorization (`PUB-4`) |

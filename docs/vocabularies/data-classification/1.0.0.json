@@ -1,0 +1,53 @@
+{
+  "authority": {
+    "issued_by_policy_authority": false,
+    "repository_published": true,
+    "statement": "This specification establishes the canonical content of the vocabulary. It is not issuance by Policy Authority, and no part of the repository may describe it as an issued or signed organizational policy. Production authority still requires an issued Policy Authority coordinate (PUB-1)."
+  },
+  "binding_status": "Not implemented. PUB-2 authorizes a record-local authoritative reference and PUB-1 sequences it behind this publication; no field exists yet.",
+  "content_digest": "sha256:cc9462e5350d8721f2074314c3e4e3b241db4dcd86df2f7f16f26faf8a8f3925",
+  "further_rulings": [
+    "DE-3",
+    "DE-5",
+    "PUB-1",
+    "PUB-4"
+  ],
+  "governing_documents": [
+    "docs/architecture/GOVERNANCE_LABEL_VOCABULARY_BALLOT.md",
+    "docs/architecture/LV1_VOCABULARY_PUBLICATION_RULINGS.md"
+  ],
+  "governing_ruling": "LV-A",
+  "immutable": true,
+  "intended_binding": "DataUseDeclaration.classification (ugence-data-use-admission)",
+  "interpretation_rules": null,
+  "members": [
+    {
+      "citation": null,
+      "definition": "Disclosure outside the organization causes no harm.",
+      "member": "PUBLIC"
+    },
+    {
+      "citation": null,
+      "definition": "For employees and contracted parties; disclosure is unwanted but not damaging.",
+      "member": "INTERNAL"
+    },
+    {
+      "citation": null,
+      "definition": "Disclosure causes commercial, contractual or reputational harm.",
+      "member": "CONFIDENTIAL"
+    },
+    {
+      "citation": null,
+      "definition": "Disclosure causes serious harm to a person or the organization; access is individually granted.",
+      "member": "RESTRICTED"
+    }
+  ],
+  "ordering": null,
+  "ordering_note": "The four members describe increasing consequence of disclosure in prose, but this vocabulary establishes no ordering a program may act on: DE-3 rules the label opaque, and no package may compare two members.",
+  "scope": "Organization-wide, not tenant-scoped. Classifies the sensitivity of data a declaration references. Regulatory applicability is a separate, orthogonal status by ruling PUB-4 and is deliberately not a rung here; no field records it yet.",
+  "shape": "closed",
+  "tenant": null,
+  "title": "Data sensitivity classification",
+  "version": "1.0.0",
+  "vocabulary": "data-classification"
+}

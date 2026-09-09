@@ -164,7 +164,13 @@ roots, products and applications may import it; no capability package may — en
   uninterpreted anyway, and by ruling rather than by omission: `D-2` makes it a
   non-empty opaque value, and `LV-1` puts the vocabulary in a Policy-Authority
   document rather than an enum here, so this package still records and never
-  classifies. A blank label is refused; an unrecognized one is not.
+  classifies. A blank label is refused; an unrecognized one is not. The vocabulary
+  is now **published** as an immutable specification at
+  `docs/vocabularies/eu-ai-act-system-classification/1.0.0.json` — canonical content,
+  and explicitly **not** issued Policy Authority policy. **No field here cites it**:
+  the record-local reference is authorized by `PUB-2` and not implemented, so this
+  package still cannot say which vocabulary version a registration was written
+  against.
 - The ratified set covers AI **systems** only, and now by ruling rather than by
   omission: `LV-F` is decided (`PUB-3`) — general-purpose AI models are a
   **different regulated object**, governed separately under Chapter V, and no GPAI

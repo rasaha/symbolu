@@ -1,0 +1,52 @@
+{
+  "authority": {
+    "issued_by_policy_authority": false,
+    "repository_published": true,
+    "statement": "This specification establishes the canonical content of the vocabulary. It is not issuance by Policy Authority, and no part of the repository may describe it as an issued or signed organizational policy. Production authority still requires an issued Policy Authority coordinate (PUB-1)."
+  },
+  "binding_status": "Not implemented. PUB-2 authorizes a record-local authoritative reference and PUB-1 sequences it behind this publication; no field exists yet.",
+  "content_digest": "sha256:11b2320d5f544ab547bbac5956c82b8147fbca007b63c2346a2906a99e75ae13",
+  "further_rulings": [
+    "LV-A",
+    "AE-3",
+    "PUB-1"
+  ],
+  "governing_documents": [
+    "docs/architecture/GOVERNANCE_LABEL_VOCABULARY_BALLOT.md",
+    "docs/architecture/LV1_VOCABULARY_PUBLICATION_RULINGS.md"
+  ],
+  "governing_ruling": "LV-D",
+  "immutable": true,
+  "intended_binding": "IncidentRecord.severity_label (ugence-incident-response)",
+  "interpretation_rules": null,
+  "members": [
+    {
+      "citation": null,
+      "definition": "Ongoing harm to people, data or money; containment takes precedence over service.",
+      "member": "SEV1"
+    },
+    {
+      "citation": null,
+      "definition": "Governed behaviour is materially wrong and a customer or regulator would be entitled to know.",
+      "member": "SEV2"
+    },
+    {
+      "citation": null,
+      "definition": "Contained or bounded; correctness or control is degraded without ongoing harm.",
+      "member": "SEV3"
+    },
+    {
+      "citation": null,
+      "definition": "Noted for the record; no containment expected.",
+      "member": "SEV4"
+    }
+  ],
+  "ordering": null,
+  "ordering_note": "Severity genuinely is a rank, and this vocabulary still establishes none — LV-D ruled option (a), opaque and unordered. SEV1 through SEV4 are four names; any ordering lives in the responder's runbook, never in code, and \"all incidents at or above SEV2\" is deliberately unanswerable in this repository. LV-D keeps option (b) — a distinct ordered kind — available for when an operational surface needs that query, under its own ruling rather than an extension of DE-3.",
+  "scope": "Organization-wide, not tenant-scoped. Describes the severity an incident was recorded at.",
+  "shape": "closed",
+  "tenant": null,
+  "title": "Incident severity",
+  "version": "1.0.0",
+  "vocabulary": "incident-severity"
+}

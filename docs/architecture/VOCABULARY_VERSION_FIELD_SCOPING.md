@@ -235,13 +235,21 @@ answer matters more than the fact of it:
   major version for any normative change. **No record reference is implemented before
   the vocabulary it cites is published.**
 
-Two qualifications survive the rulings. `[R]` `vendor-dependency-permission` is
-**held from publication** pending an owner resolution of its name, which denotes
-permission semantics its own `LV-C` members refuse and `VR-3` forbids; the binding on
-`VendorDependencyDeclaration` is blocked behind that. And `PUB-1` is explicit that
-repository publication establishes the **canonical vocabulary content only** — it is
-**not** issuance by Policy Authority, and nothing here may describe it as an issued
-or signed organizational policy.
+One qualification survives the rulings, and one has since been resolved. `PUB-1` is
+explicit that repository publication establishes the **canonical vocabulary content
+only** — it is **not** issuance by Policy Authority, and nothing here may describe it
+as an issued or signed organizational policy. And the vocabulary once called
+`vendor-dependency-permission`, held from publication because it named permission
+semantics its own `LV-C` members refuse, is renamed **`vendor-dependency-assessment-state`**
+by `PUB-1a`; it is authorized for publication and not yet published, so the binding on
+`VendorDependencyDeclaration` waits on the file rather than on a decision.
+
+`[V]` **Four vocabularies are published** at
+`docs/vocabularies/<identifier>/1.0.0.json` —
+`eu-ai-act-system-classification`, `data-classification`, `data-use-purpose` and
+`incident-severity`, each immutable under a content digest that
+`scripts/check_vocabulary_publications.py` recomputes in CI. Those four now exist to be
+cited, which is what `PUB-1` required before any binding is written.
 
 ---
 
@@ -281,9 +289,13 @@ record binding is implemented only after the vocabulary it cites exists to be ci
 A binding to a referent that does not exist is a field that records nothing while
 appearing to record provenance.
 
-So the next step is to publish the four unblocked vocabularies at `1.0.0` —
-`eu-ai-act-system-classification`, `data-classification`, `data-use-purpose` and
-`incident-severity` — each carrying its identifier, version, content digest, scope,
-governing `LV` ruling and normative members. The four bindings those enable follow;
-the fifth, on `VendorDependencyDeclaration`, waits on the `vendor-dependency-permission`
-naming resolution `[R]`.
+`[V]` **That publication has happened** for four of the five, at
+`docs/vocabularies/`. The fifth, `vendor-dependency-assessment-state`, is renamed and
+authorized by `PUB-1a` and remains to be published.
+
+So the next step is the first binding, against a vocabulary that now exists: a new
+record version and schema version carrying the vocabulary's identity, exact version and
+content digest, required and covered by `record_digest()` per `VV-B`, and participating
+in the derived id only where the label already does per `VV-C`. Each package is its own
+change, and `VendorDependencyDeclaration` waits for its vocabulary to be published
+first.

@@ -175,7 +175,13 @@ import it; no capability package may — enforced repository-wide by
   set is deliberately not closed, because every closed purpose set grows an `OTHER`.
   Both labels stay uninterpreted by ruling rather than by omission — `DE-3` makes
   them opaque values, and `LV-1` keeps the vocabularies in a Policy-Authority
-  document rather than an enum here.
+  document rather than an enum here. Both are now **published** as immutable
+  specifications — `docs/vocabularies/data-classification/1.0.0.json` and
+  `docs/vocabularies/data-use-purpose/1.0.0.json`, the second publishing
+  interpretation rules rather than members because `LV-E` ruled the shape open. They
+  are canonical content, explicitly **not** issued Policy Authority policy, and
+  **neither is cited by any field here**: the two independent record-local references
+  `VV-D` requires are authorized by `PUB-2` and not implemented.
 - Result egress and residency consolidation stay out of scope until a further
   ruling.
 - A dynamic `importlib.import_module(name)` cannot be caught by any static checker;
