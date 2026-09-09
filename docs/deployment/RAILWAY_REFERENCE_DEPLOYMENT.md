@@ -14,37 +14,40 @@ production data.
 Evidence labels as the ADRs use them: `[V]` verified against this repository, `[I]`
 inferred or from vendor documentation, `[G]` gap.
 
-## Two repositories, one deployment
+## One repository
 
-The three front ends no longer deploy from this repository. `tools/export_demo.py` and the
-`demo-export-publish` workflow generate them into `rasaha/demo`, which now holds that
-content — first successful run 2026-09-09, source commit `40ff3818`, 141 files, five
-verifiers passed `[V]`.
+Every service deploys from `rasaha/symbolu`. An earlier revision of this document split the
+three front ends into `rasaha/demo`; that split is withdrawn.
 
 | Service | Deploys from | Root directory |
 |---|---|---|
 | `studio-api` | `rasaha/symbolu` | `/` |
 | `console-api` | `rasaha/symbolu` | `/` |
+| `studio-web` | `rasaha/symbolu` | `apps/ugence-governance-studio/frontend` |
+| `console-web` | `rasaha/symbolu` | `apps/console` |
+| `authority-plane` | `rasaha/symbolu` | `apps/authority-plane` |
 | `worker` | `rasaha/symbolu` | `/` (Dockerfile) |
-| `studio-web` | `rasaha/demo` | `apps/ugence-governance-studio/frontend` |
-| `console-web` | `rasaha/demo` | `apps/console` |
-| `authority-plane` | `rasaha/demo` | `apps/authority-plane` |
 
-The root directories under `rasaha/demo` are identical to the paths those applications
-occupy here: the export preserves the tree layout, so only the repository field changes
-`[V]`.
+Nothing about the repository's size argues for a split: Railway clones **14 MB** of tracked
+files, and per-service root directories keep each build to its own subtree `[V]`. What did
+break root-context builds was the repository root `.dockerignore`, and that is fixed —
+`deploy/gke/Dockerfile.dockerignore` now carries the rules that belonged to one image, and
+`verify_build_context.py --root-build` asserts on every push that the root build's declared
+inputs stay in the context `[V]`.
 
-> **`rasaha/demo` is generated. A deployment is never fixed by editing it.**
-> `replace-destination-content` removes every tracked file before copying the export in,
-> and `commit-and-push` force-pushes, so anything committed there by hand is discarded
-> without warning on the next export. This is observed, not theoretical: the destination's
-> first commit added `.github/workflows/blank.yml`, and the first export deleted it `[V]`.
->
-> The practical consequence for this walkthrough is that **no Railway configuration file
-> can live in `rasaha/demo`** — a `railway.json`, `nixpacks.toml` or `Procfile` committed
-> there does not survive. Configure the three demo services entirely through the Railway
-> dashboard, or add the file to `tools/export_demo.py` here so the export generates it.
-> A fix to a front end belongs in this repository and reaches the demo by being exported.
+Keeping one repository also keeps two proofs where the deployment is. The authority plane's
+`verify:boundary` binds its manifest to the worker's committed contract by hash, and its
+suite runs against that contract: both pass here `[V: boundary OK against contract sha256
+a0227d16…; 11 tests passed]`. In a copy that omitted `deployment/` they could not run at all.
+
+> **`tools/export_demo.py` and `demo-export-publish` are not part of deploying.**
+> They generate a read-only snapshot of the three front ends into `rasaha/demo` — one
+> successful run, 2026-09-09, source commit `40ff3818`, 141 files `[V]`. That repository is
+> a generated artefact, not a deployment source: `commit-and-push` force-pushes over it, so
+> anything committed there by hand is discarded on the next export, observed directly when
+> the first export deleted the destination's `.github/workflows/blank.yml` `[V]`. Do not
+> point a Railway service at it. Archiving it is the surest way to keep a service from
+> being wired to a snapshot that will silently go stale.
 
 ## What the rulings allow here
 
@@ -69,34 +72,31 @@ what may be deployed on a managed cloud host and what may be claimed of it.
 **0.1 Sign in and check the plan.** Hobby is enough. Pro is needed only to deploy a
 pre-built image from a private registry, which this walkthrough does not do `[I]`.
 
-**0.2 Connect GitHub and grant access to both repositories.** Account Settings → Connected
-Accounts, then grant `rasaha/symbolu` **and** `rasaha/demo`. Three services come from each.
-If a repository does not appear in the service picker, this is why `[I]`.
+**0.2 Connect GitHub and grant access to `rasaha/symbolu`.** Account Settings → Connected
+Accounts. Every service comes from it. If the repository does not appear in the service
+picker, this is why `[I]`.
 
-**0.3 Use each repository's default branch.**
+**0.3 Use the repository's default branch.**
 
 > An earlier revision of this document pinned every service to
 > `claude/railway-hosting-setup-r5qk1s`, because the authority plane's `server.mjs` and its
-> `start` script existed only there. That is no longer true — both are on this repository's
-> default branch, as are all seventeen packages in the 1.3 install list `[V]`. The pin is
-> withdrawn, and it must not be reinstated for the demo services: that branch does not
-> exist in `rasaha/demo` at all. The export publishes one commit to the default branch, so
-> a demo service pointed at that name fails to resolve.
+> `start` script existed only there. That is no longer true — both are on the default
+> branch, as are all seventeen packages in the 1.3 install list `[V]`. The pin is
+> withdrawn: leave every service on the default branch, so a deploy follows what has been
+> merged rather than a feature branch that may be deleted.
 
 **0.4 Create one project, and put every service in it.** This is the constraint the whole
 arrangement turns on. Railway's private network is scoped to a single project *and* a
 single environment: `worker.railway.internal` resolves only for services inside that same
 project and environment, and from another project the name does not resolve at all `[I]`.
 
-A Railway project draws each of its services from whichever repository you point it at, so
-the repository split does not force a project split. Keep them together.
 
 > **Can the authority plane reach the worker if they are in different projects? No.**
 > There is no cross-project private networking to configure, and `WORKER_URL` has no valid
 > value in that arrangement. If you must use two projects — separate billing, separate
 > collaborator access — then `studio-web` and `console-web` may sit alone in one, because
 > both reach their APIs over public HTTPS and are genuinely project-agnostic. The
-> `authority-plane` goes in the *worker's* project despite deploying from `rasaha/demo`.
+> `authority-plane` must go in the *worker's* project.
 >
 > Do not bridge the gap by giving the worker a public domain. `server.mjs` sets
 > `rejectUnauthorized: false` unconditionally and says why in its own header: *"this
@@ -108,8 +108,8 @@ the repository split does not force a project split. Keep them together.
 >
 > The third option is legitimate: **do not deploy the worker at all.** The plane's four
 > screens then render under *"The authority plane's worker is not reachable"*, which is
-> part 6.4's own pass condition. Decide this deliberately — under a split it is the
-> permanent state, not a step you pass through.
+> part 6.4's own pass condition. Decide that deliberately: it is then the permanent state,
+> not a step you pass through.
 
 ---
 
@@ -229,16 +229,15 @@ with `allow_origins=["*"]`, because the console is served from a separate static
 
 ## Part 3 — `studio-web`
 
-The studio's browser app, now built from `rasaha/demo`. It needs `studio-api`'s URL
-*before* it builds.
+The studio's browser app. It needs `studio-api`'s URL *before* it builds.
 
-**3.1** Add a service from **`rasaha/demo`**; rename it `studio-web`.
+**3.1** Add a service from `rasaha/symbolu`; rename it `studio-web`.
 
 **3.2** Settings:
 
 ```
-Repository:     rasaha/demo
-Branch:         <the repository default branch>
+Repository:     rasaha/symbolu
+Branch:         <the default branch>
 Root Directory: apps/ugence-governance-studio/frontend
 Build Command:  npm ci && npm run build
 Start Command:  npx -y serve@14 -s dist -l $PORT
@@ -246,9 +245,8 @@ Start Command:  npx -y serve@14 -s dist -l $PORT
 
 `-s` serves `index.html` for unknown paths, so the router survives a refresh.
 
-Verified against the published export tree: `package-lock.json` travels, `tsc --noEmit`
-exits 0 even though `tests/` and `vitest.config.ts` are withheld, and `vite build` produces
-a bundle `[V]`.
+Verified in this tree: `npm ci` resolves against the committed `package-lock.json` and
+`npm run build` — `tsc --noEmit && vite build` — produces a bundle `[V]`.
 
 **3.3** Variables:
 
@@ -280,10 +278,9 @@ Exactly the origin the browser sends: scheme included, no trailing slash, no pat
 `cors_allowed_origins` defaults to an empty list (`settings.py:74`) `[V]`, so unset means
 allow nothing.
 
-Nothing about CORS itself changes under the split — it is origin-based and indifferent to
-repositories and projects. What changes is the ordering: the origin now belongs to a
-service built from the other repository, so part 3 must complete before this value exists.
-Do not add the console's origin here; the console does not call this API.
+CORS is origin-based and indifferent to projects, but it is order-dependent: the value is
+`studio-web`'s public domain, so part 3 must complete before this value exists. Do not add
+the console's origin here; the console does not call this API.
 
 **4.2** Redeploy `studio-api`, then reload the studio.
 
@@ -302,22 +299,22 @@ Screens whose seams are unconfigured report typed gaps — `available: false` wi
 
 The control-plane console. Note the build command: it is **not** the one parts 3 and 6 use.
 
-**5.1** Add a service from **`rasaha/demo`**; rename it `console-web`.
+**5.1** Add a service from `rasaha/symbolu`; rename it `console-web`.
 
 **5.2** Settings:
 
 ```
-Repository:     rasaha/demo
-Branch:         <the repository default branch>
+Repository:     rasaha/symbolu
+Branch:         <the default branch>
 Root Directory: apps/console
 Build Command:  npm install && npm run build      # NOT npm ci
 Start Command:  npx -y serve@14 -s dist -l $PORT
 ```
 
-`apps/console` ships **no `package-lock.json`**, in either repository. `npm ci` exits
-non-zero with *"can only install with an existing package-lock.json"*; `npm install`
-succeeds and the build completes `[V]`. Copying part 3's build command verbatim to this
-service is the first failure you will hit.
+`apps/console` ships **no `package-lock.json`** — it is not a tracked file `[V]`. `npm ci`
+exits non-zero with *"can only install with an existing package-lock.json"*; `npm install`
+succeeds and `npm run build` completes, 1365 modules `[V]`. Copying part 3's build command
+verbatim to this service is the first failure you will hit.
 
 **5.3** Variables:
 
@@ -340,16 +337,16 @@ under the keys it returns, and the two withheld routes show as
 
 ## Part 6 — `authority-plane`
 
-Deploy before the worker; it runs on its own and says so. Built from `rasaha/demo`, but it
-belongs in the **worker's** Railway project — see 0.4.
+Deploy before the worker; it runs on its own and says so. It belongs in the **worker's**
+Railway project — see 0.4.
 
-**6.1** Add a service from **`rasaha/demo`**; rename it `authority-plane`.
+**6.1** Add a service from `rasaha/symbolu`; rename it `authority-plane`.
 
 **6.2** Settings:
 
 ```
-Repository:     rasaha/demo
-Branch:         <the repository default branch>
+Repository:     rasaha/symbolu
+Branch:         <the default branch>
 Root Directory: apps/authority-plane
 Build Command:  npm ci && npm run build
 Start Command:  npm start
@@ -357,16 +354,15 @@ Start Command:  npm start
 
 `npm start` runs the plane's own `server.mjs`: it serves the built app and proxies `/api`
 to the worker server-side, so the worker's address never reaches a browser (CR-3).
-`server.mjs`, the `start` script and `security/approved-operations.json` are all in the
-export, and the exported app builds cleanly `[V]`.
+`server.mjs`, the `start` script and `security/approved-operations.json` are all committed
+here, and the app builds cleanly `[V]`.
 
-> **Do not wire the export's other scripts into a build.** `package.json` is copied
-> unchanged, so `verify:boundary` and `test` are still listed — but
-> `scripts/verify-boundary.mjs`, `vitest.config.ts` and `tests/` are withheld from the
-> export. Those scripts fail in `rasaha/demo` by construction, because the worker's
-> contract they bind to by hash stays here. That is the design, recorded in
-> `EXPORT_PROVENANCE.json` under `proofs_that_do_not_travel`; the verifier ran *here*
-> before the export was written.
+> **The plane's own checks run in this repository, and they belong in review rather than in
+> a Railway build.** `npm run verify:boundary` passes here against the worker's committed
+> contract (`sha256 a0227d16…`, four operations consumed) and `npm test` is 11 passed `[V]`
+> — both work precisely because `deployment/governed-runtime-worker` is in the same tree.
+> There is no reason to add them to the Railway build command: CI already runs them, and a
+> deploy that fails on a governance check is a worse signal than a pull request that does.
 
 **6.3** Variables:
 
@@ -401,7 +397,7 @@ proof header `[V]`.
 
 ## Part 7 — `worker` (optional, `test` mode only)
 
-Deploy only to give the plane data. Unchanged by the split: it stays in `rasaha/symbolu`.
+Deploy only to give the plane data.
 
 **7.1** Project → New → Database → Add PostgreSQL. One service suffices; the worker needs
 two databases that differ, so connect once and `CREATE DATABASE sysdb;`. No public domain.
@@ -494,7 +490,6 @@ environment.
 
 | What you see | What it is | Fix |
 |---|---|---|
-| A demo service's branch will not resolve | `claude/railway-hosting-setup-r5qk1s` does not exist in `rasaha/demo` | 0.3 |
 | `ModuleNotFoundError: ugence_agent_runtime` | Incomplete install list; the v2 surface imports it at module load | 1.3 |
 | `studio-api` serves an unrelated API | Start command blank, so the root `Procfile` won | 1.4 |
 | `console-api` answers on 8090, not `$PORT` | `python -m ugence_console_api` used instead of the uvicorn line | 2.2 |
@@ -504,43 +499,39 @@ environment.
 | Console fetches fail against the deployed origin | `VITE_CONSOLE_API_URL` unset, so the client fell back to a relative `/api` | 5.3 |
 | Plane reports the worker unreachable | Correct until part 7; after it, check the service is named `worker` — **or** the plane and worker are in different Railway projects, in which case no configuration fixes it | 0.4, 6.3, 7.2 |
 | Worker exits at boot printing a list | It reports every reason at once; usually the two DSNs are identical | 7.4 |
-| A hand edit to `rasaha/demo` vanished | The next export discarded it; that is the design | the note at the top |
+| A service builds from `rasaha/demo` | That repository is a generated snapshot, not a deployment source | the note in *One repository* |
 
 ## Verification of this document
 
-The parts that stayed in this repository were run against it on 2026-09-08, outside
-Railway: the 1.3 install list installs cleanly into a clean virtual environment and the 1.4
-start command serves v1 and v2 with `/health`, `/ready` and `/version` answering 200; the
-3.4 failure was reproduced with a mismatched CORS origin and cleared by 4.1, after which
-the scenario catalog loaded with no console errors; the plane's four reads answered through
-`server.mjs` over a self-signed TLS listener carrying the worker's real
+Every part of this walkthrough was run against **this** repository, outside Railway.
+
+On 2026-09-08: the 1.3 install list installs cleanly into a clean virtual environment and
+the 1.4 start command serves v1 and v2 with `/health`, `/ready` and `/version` answering
+200; the 3.4 failure was reproduced with a mismatched CORS origin and cleared by 4.1, after
+which the scenario catalog loaded with no console errors; the plane's four reads answered
+through `server.mjs` over a self-signed TLS listener carrying the worker's real
 `build_authority_reads` router, with `POST` refused 405; and `WorkerConfig.validate()`
 returned empty for the 7.4 variables.
 
-The split was verified on 2026-09-09 against the **published export tree**, which is not
-this tree — `tests/`, `vitest.config.ts`, `playwright.config.ts` and the plane's boundary
-verifier are all withheld from it, so the earlier front-end verification did not carry
-over `[V]`:
+Re-run on 2026-09-09 against the default branch, after the split was withdrawn `[V]`:
 
-- `rasaha/demo` holds the export at `df3716fc`; `EXPORT_PROVENANCE.json` names source
-  commit `40ff3818`, five verifiers passed, `verifiers_skipped: false`, 141 files.
-- All three front ends build from that tree: `studio-web` (`tsc --noEmit` exit 0, 1859
-  modules), `authority-plane` (38 modules), `console-web` (1365 modules, after
-  `npm install`; `npm ci` fails as part 5.2 describes).
-- `VITE_API_BASE_URL` appears verbatim in the studio bundle after a build with it set.
-- `server.mjs`, the `start` script and `security/approved-operations.json` are present in
-  the export; `scripts/verify-boundary.mjs`, `vitest.config.ts` and `tests/` are not.
-- `server.mjs` forwards `GET` only, to the four approved paths, forwards no request header,
-  and sets `rejectUnauthorized: false`.
+- `studio-web` builds: `npm ci && npm run build`, `tsc --noEmit` exit 0, bundle produced.
+- `authority-plane` builds, and its own checks pass in this tree — `npm run verify:boundary`
+  reports 4 operations consumed against contract `sha256 a0227d16…`, and `npm test` is 11
+  passed. Neither could run in a copy that omitted `deployment/governed-runtime-worker`.
+- `console-web` builds with `npm install && npm run build`, 1365 modules. `apps/console`
+  ships no tracked `package-lock.json`, so `npm ci` is the wrong command for it.
 - `ugence_console_api.__main__` reads `CONSOLE_API_PORT` and ignores `$PORT`;
   `create_app()` sets `allow_origins=["*"]`.
-- The export deleted the destination's pre-existing `.github/workflows/blank.yml`,
-  demonstrating the one-way property directly.
+- `server.mjs` forwards `GET` only, to the four approved paths, forwards no request header,
+  and sets `rejectUnauthorized: false`.
+- `verify_build_context.py --root-build` passes: all three Dockerfiles resolve every COPY
+  source, and the root build's five declared inputs are in the context.
 
-**Not verified `[G]`.** No Railway deployment has been performed, before or after the
-split. Every build above ran locally; none ran on Railway's builders. Railway's UI wording,
-its per-service repository selection, and its private-network scoping are vendor
-documentation `[I]` and may drift — in particular, the claim in 0.4 that no cross-project
-private networking exists is inferred, not measured. No service in this walkthrough has
-been observed running on Railway, so not one of the pass conditions above has been
-confirmed against a live deployment.
+**Not verified `[G]`.** No Railway deployment has been performed. Every build above ran
+locally; none ran on Railway's builders. Railway's UI wording, its per-service repository
+selection, and its private-network scoping are vendor documentation `[I]` and may drift —
+in particular, the claim in 0.4 that no cross-project private networking exists is
+inferred, not measured. No service in this walkthrough has been observed running on
+Railway, so not one of the pass conditions above has been confirmed against a live
+deployment.
