@@ -87,8 +87,9 @@ risk_posture, policy_ref, validity, supersedes, declared_by, correlation_id, not
 - **`vendor_ref`** is an opaque, non-secret reference to the vendor in the caller's
   own spelling. Never an address, credential or endpoint: nothing here can reach it.
 - **`risk_posture`** is what the declarer assigned, and it is **uninterpreted**
-  (VR-3). A blank label is refused upstream; an unrecognized one is not, because
-  there is no recognized set.
+  (VR-3). A blank label is refused upstream; an unrecognized one is not — a set is
+  now ratified, but as a Policy-Authority document under ballot `LV-1`, never as an
+  enum here, so nothing in this package can recognize a member.
 - **`policy_ref`** is recorded and compared as text, and never resolved (VR-4).
 - **`declaration_id`** is derived from the binding's digest, the vendor reference,
   the label's digest, the policy reference and the window — no UUID, no clock — and
@@ -168,8 +169,14 @@ authorizes an engine.
 - The store persists the record and nothing else. It confers no approval, no
   onboarding status, no tier and no certification, and a composition root still holds
   every other decision.
-- The posture vocabulary is unratified, so the label stays uninterpreted until an
-  owner fixes a taxonomy.
+- The posture vocabulary **is** ratified — `NOT_ASSESSED`,
+  `ASSESSED_NO_FINDINGS`, `ASSESSED_WITH_FINDINGS`, `ASSESSMENT_LAPSED`,
+  `ASSESSMENT_REFUSED` (ballot `LV-C`, `docs/architecture/GOVERNANCE_LABEL_VOCABULARY_BALLOT.md`). The
+  members record what an exercise *did*, never what it permits: a permission ladder
+  (`APPROVED` / `CONDITIONAL` / `BLOCKED`) was considered and refused, because it
+  would read as the implied eligibility `VR-3` forbids whatever the type says. The
+  label stays uninterpreted by ruling rather than by omission, and `LV-1` keeps the
+  vocabulary in a Policy-Authority document rather than an enum here.
 - A `policy_ref` that names nothing is indistinguishable here from one that names a
   real version; only Policy Authority can tell, and it is never asked.
 - A dynamic `importlib.import_module(name)` cannot be caught by any static checker;

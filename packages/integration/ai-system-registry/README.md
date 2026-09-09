@@ -74,7 +74,9 @@ validity, supersedes, registered_by, notes)`.
   **uninterpreted** (D-2). The package knows no taxonomy, no ordering and no
   severity, so `select_by_classification` matches exactly and can neither widen nor
   narrow a query by reasoning about what a label means. A blank label is refused; an
-  unrecognized one is not, because there is no recognized set. There is no
+  unrecognized one is not — a set is now ratified, but as a Policy-Authority
+  document under ballot `LV-1`, never as an enum here, so nothing in this package
+  can recognize a member. There is no
   `severity`, `risk_level`, `tier` or `is_high_risk` anywhere on the record.
 - **`registration_id`** is derived from the binding's own canonical digest, the
   owner and the window — no UUID, no clock — and the record **verifies** it at
@@ -156,8 +158,15 @@ roots, products and applications may import it; no capability package may — en
 - The store persists the registration and nothing else. It confers no admission,
   no promotion and no attestation, and a composition root still holds every other
   decision.
-- The classification vocabulary is unratified, so the label stays uninterpreted
-  until an owner fixes a taxonomy.
+- The classification vocabulary **is** ratified — `PROHIBITED`, `HIGH_RISK`,
+  `TRANSPARENCY_OBLIGATIONS`, `MINIMAL_RISK`, `UNCLASSIFIED`, tracking the EU AI
+  Act (ballot `LV-B`, `docs/architecture/GOVERNANCE_LABEL_VOCABULARY_BALLOT.md`). The label stays
+  uninterpreted anyway, and by ruling rather than by omission: `D-2` makes it a
+  non-empty opaque value, and `LV-1` puts the vocabulary in a Policy-Authority
+  document rather than an enum here, so this package still records and never
+  classifies. A blank label is refused; an unrecognized one is not.
+- The ratified set covers AI **systems** only. General-purpose AI models, which the
+  regime governs on a separate axis, have no member — open as ballot `LV-F`.
 - (Closed for static imports) The repository now enforces "no capability package
   may import it" repository-wide, in `scripts/check_package_import_boundaries.py`.
   A dynamic `importlib.import_module(name)` cannot be caught by any static
