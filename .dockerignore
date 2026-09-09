@@ -1,33 +1,63 @@
-# Ignore everything except what the controller needs
-*
-!symbolu/
-!symbolu/**
-!deploy/gke/requirements-controller.txt
+# Repository-wide build excludes, for any image built with this repository as its context.
+#
+# This file used to be `*` plus re-includes for `symbolu/` and one requirements path: rules
+# written for deploy/gke/Dockerfile and for nothing else. Docker reads the .dockerignore at
+# the CONTEXT ROOT, so those rules applied to every root-context build and put every other
+# build's sources outside its own context — the Symbol-U API service failed with
+# `"/pyproject.toml": not found`, and neither deployment image could be built at all
+# (docs/audits/ugence_governance_studio_p3e/BUILD_CONTEXT_EXCLUSION_DEFECT.json).
+#
+# Those rules now live in deploy/gke/Dockerfile.dockerignore, which BuildKit reads in
+# preference to this file, so that image's context is unchanged. What follows excludes
+# only what no image wants. A build needing more than this carries its own
+# `<dockerfile>.dockerignore`; deployment/governance-studio and
+# deployment/governed-runtime-worker already do.
+#
+# deployment/governance-studio/ci/verify_build_context.py checks, offline and on every CI
+# run, that each Dockerfile's COPY sources and the root build's declared inputs survive
+# whichever of these files its build actually reads.
 
-# Re-exclude non-controller symbolu subpackages to keep image small
-symbolu/experimental/
-symbolu/mechanical/
-symbolu/core/
-symbolu/robotics/
-symbolu/__pycache__/
+# Version control and CI metadata
+.git/
+.gitignore
+.github/
+
+# Dependencies and virtual environments
+node_modules/
+**/node_modules/
+.venv/
+venv/
+**/.venv/
+
+# Build output and caches
+dist/
+**/dist/
+build/
+**/build/
+*.egg-info/
+**/*.egg-info/
+__pycache__/
 **/__pycache__/
 **/*.pyc
-*.egg-info/
+.pytest_cache/
+**/.pytest_cache/
+.mypy_cache/
+**/.mypy_cache/
+.ruff_cache/
+**/.vite/
+coverage/
+**/coverage/
+**/playwright-report/
+**/test-results/
 
-# Dev/CI files
-.git/
-.github/
-tests/
-scripts/
-docs/
-benchmarks/
-artifacts/
-results/
-configs/
-data/
-frontend/
-examples/
-*.md
-*.json
-*.jsonl
-Procfile
+# Secrets and credentials: never in a build context, never in a layer
+.env
+.env.*
+**/.env
+**/.env.*
+*.key
+*.pem
+*.p12
+*.pfx
+secrets/
+**/secrets/
