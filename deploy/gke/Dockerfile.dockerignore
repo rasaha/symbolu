@@ -1,0 +1,42 @@
+# BuildKit reads `<dockerfile>.dockerignore` beside the Dockerfile in preference to the
+# context root's `.dockerignore`. This file carries, verbatim, the rules the repository
+# root `.dockerignore` held until 2026-09-08 — they were written for THIS image and for no
+# other. Keeping them here leaves the controller image's build context byte-for-byte what
+# it has always been, while the root file becomes ordinary repository-wide excludes so
+# that every other root-context build (the Symbol-U API from the root `Procfile`, among
+# them) can see the repository at all. See
+# docs/audits/ugence_governance_studio_p3e/BUILD_CONTEXT_EXCLUSION_DEFECT.json.
+
+# Ignore everything except what the controller needs
+*
+!symbolu/
+!symbolu/**
+!deploy/gke/requirements-controller.txt
+
+# Re-exclude non-controller symbolu subpackages to keep image small
+symbolu/experimental/
+symbolu/mechanical/
+symbolu/core/
+symbolu/robotics/
+symbolu/__pycache__/
+**/__pycache__/
+**/*.pyc
+*.egg-info/
+
+# Dev/CI files
+.git/
+.github/
+tests/
+scripts/
+docs/
+benchmarks/
+artifacts/
+results/
+configs/
+data/
+frontend/
+examples/
+*.md
+*.json
+*.jsonl
+Procfile
