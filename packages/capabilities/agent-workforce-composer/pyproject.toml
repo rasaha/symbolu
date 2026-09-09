@@ -29,7 +29,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "ugence-agent-workforce-composer"
 dynamic = ["version"]
-description = "Ugence Agent Workforce Composer — deterministic, offline workflow-role adaptation and hard-constraint agent eligibility (P1). No ranking, team composition, runtime, or execution. Not pilot-validated, not production-certified."
+description = "Ugence Agent Workforce Composer — deterministic, offline workflow-role adaptation, hard-constraint agent eligibility (P1), and ranking, team composition, permission bounding and fallback planning over the eligible sets (P2). No permission granting, runtime handoff, or execution. Not pilot-validated, not production-certified."
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "Proprietary" }

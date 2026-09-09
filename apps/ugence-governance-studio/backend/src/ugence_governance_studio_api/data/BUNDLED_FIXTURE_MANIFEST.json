@@ -10,7 +10,7 @@
     "v2 conformance artifacts"
   ],
   "files": {
-    "conformance_v2/EQUIVALENCE_MANIFEST.json": "5d43427bb70af79a4e6a036e91bf52df6464668ccf8958dabb4ef9fcf665e33e",
+    "conformance_v2/EQUIVALENCE_MANIFEST.json": "c7f0eb13e92877f0b8837b1b359da21f6f74ae1f8727bad37a2c5b0ebc1fc412",
     "conformance_v2/customer_support/composition_policy.json": "1fbada6d8c843f034d9695e11a5f73a8e8062bdae29bccfd636b28bc57eee348",
     "conformance_v2/customer_support/eligibility_policy.json": "cfdeb5506554786a84cc97db8ef6ad2f6f42fa1b55ee10702ad8edfe5d232665",
     "conformance_v2/customer_support/enterprise_policy.json": "426bd391d6d5fc21bfe1b1aa8971e72d529620565c485687c167f5a071831e89",
@@ -21,7 +21,7 @@
     "conformance_v2/customer_support/v1_overlay.json": "313e765ca5211ef4ff1a9159a099f14d5eb0dae4e3eb42805e425f3a3e0a9a9c",
     "conformance_v2/customer_support/v1_workflow.json": "5db92121a1d916ec4c2d90a7772b8185de69f2f3772048c7b2d36f812a003ba2",
     "conformance_v2/customer_support/v2_overlay.json": "9380a7b6b77af2f86fa71de4936f5c7f15c47a428c6bca76a625ddbd7ee6ad7d",
-    "conformance_v2/customer_support/v2_workflow.json": "b248a4c94d759bab4f94aa907aa5c99488252ec930fd3080e0e8dfe59c684bfc",
+    "conformance_v2/customer_support/v2_workflow.json": "46bdc47a40a87e8d4567a995e0cd5369ca5d53fabebf8e8bc351387a43a5a3ec",
     "conformance_v2/cybersecurity_no_feasible_team/composition_policy.json": "d0c1069516a6a099ac589dbcea5bf5378603d9d0fc8e2d21fec175212f99097e",
     "conformance_v2/cybersecurity_no_feasible_team/eligibility_policy.json": "cfdeb5506554786a84cc97db8ef6ad2f6f42fa1b55ee10702ad8edfe5d232665",
     "conformance_v2/cybersecurity_no_feasible_team/enterprise_policy.json": "b0eda6d06ed5ad8d91c2dd86c7383ee98c706d7af3587953533bcb81cb1df43e",
@@ -32,7 +32,7 @@
     "conformance_v2/cybersecurity_no_feasible_team/v1_overlay.json": "066dedb09b91fae1cca4f0f798d6d79bb12f5017253861a6196393b858fbe734",
     "conformance_v2/cybersecurity_no_feasible_team/v1_workflow.json": "82c0a7cde7b33f6a5fa2bfbe3fc641f1dfc3985503cea98f1c4628366383a85c",
     "conformance_v2/cybersecurity_no_feasible_team/v2_overlay.json": "e491993377e37a8e8f1ddb9f2b983673e79f35bf766dc439f16fde602e25a323",
-    "conformance_v2/cybersecurity_no_feasible_team/v2_workflow.json": "ffd49ee2045dade79ed3f162b2b24bc0709be8c99a6d099d7668f03c29dfc19a",
+    "conformance_v2/cybersecurity_no_feasible_team/v2_workflow.json": "b8167cade6e2309fddbfa06e38079c9d5f823eb898072d7b1da7ec5565cb619d",
     "conformance_v2/cybersecurity_success/composition_policy.json": "1fbada6d8c843f034d9695e11a5f73a8e8062bdae29bccfd636b28bc57eee348",
     "conformance_v2/cybersecurity_success/eligibility_policy.json": "cfdeb5506554786a84cc97db8ef6ad2f6f42fa1b55ee10702ad8edfe5d232665",
     "conformance_v2/cybersecurity_success/enterprise_policy.json": "93d9770bcf3264f56ea9da557519a7e17de5a2a29074c5b8aeefd999f642a92f",
@@ -43,7 +43,7 @@
     "conformance_v2/cybersecurity_success/v1_overlay.json": "e956f8a69c5ac45e9982e20abb31cd158009177e3a72950bde75aa4e0c2a1394",
     "conformance_v2/cybersecurity_success/v1_workflow.json": "7b91af0d7c573cd3aa54e6fb67fd5a09442abbb08e70901c66e88f27b22031b7",
     "conformance_v2/cybersecurity_success/v2_overlay.json": "c994e109f4ef6c6dd369ce33e8591f41cd7da265e2642d5db18da788cb99a0a4",
-    "conformance_v2/cybersecurity_success/v2_workflow.json": "b481c4965512b499f4a14352f963a53c8ae7c2c73b5500a078bfec9c48f4a643",
+    "conformance_v2/cybersecurity_success/v2_workflow.json": "9faf3e1ead0fef5c178ebc545fd154a87692ce46dc2f91ad164fc405b4bd17e3",
     "conformance_v2/procurement/composition_policy.json": "1fbada6d8c843f034d9695e11a5f73a8e8062bdae29bccfd636b28bc57eee348",
     "conformance_v2/procurement/eligibility_policy.json": "cfdeb5506554786a84cc97db8ef6ad2f6f42fa1b55ee10702ad8edfe5d232665",
     "conformance_v2/procurement/enterprise_policy.json": "991782f49cbd359c5acac0553adebffea54d2f210b0b64f02e9a72e889a80bdc",
@@ -54,7 +54,7 @@
     "conformance_v2/procurement/v1_overlay.json": "9348ec250714676bf15ae791ba84cc3f8bed567e34bfbc3c8fc0ee1ae22593d6",
     "conformance_v2/procurement/v1_workflow.json": "07a010387450da9323d9612edb84527aa03519da8ea64a2f6bcbc2724bd1d86d",
     "conformance_v2/procurement/v2_overlay.json": "6aa07f919d5c929937bae6bca75ef2232f51d627e89f9b9e875bd2a82a0476fa",
-    "conformance_v2/procurement/v2_workflow.json": "293871efeb7db0c832d93ca0e7f0b32b52bf9530a960af9739375f2280659688",
+    "conformance_v2/procurement/v2_workflow.json": "e3bdde1ac2566dfb3ad6a03e123d8c6f71001bc01c2f2f1d75cdb83ab3845aca",
     "demo_data/customer_support/agent_registry_snapshot.json": "7fb071b01a73abfe1c844eeeede3cc735ad3ef84fc1a762bd024c7e4ca95e82b",
     "demo_data/customer_support/compiled_workflow.json": "5db92121a1d916ec4c2d90a7772b8185de69f2f3772048c7b2d36f812a003ba2",
     "demo_data/customer_support/composition_policy.json": "1fbada6d8c843f034d9695e11a5f73a8e8062bdae29bccfd636b28bc57eee348",
@@ -126,6 +126,6 @@
     "expected_outputs/procurement/ranking.json": "0e095ff6c7b678064625a247a5bcc9492b00dfc2de31ba6573523572cf059afd",
     "expected_outputs/procurement/replay_record.json": "d4238e36933c5f1c453dc4c1321a88691a6e869ad1bfaf5c1648046121c13ba1"
   },
-  "manifest_digest": "c607fd0c778ce0cc71626325f09c1daadfabcf64fe62fefd190e22de8b10fddb",
+  "manifest_digest": "3b73397361abe4550e947a5919d35c9286c6ef7809b51fd42d2f6ece9aa81d2c",
   "schema": "governance_studio.bundled_fixture_manifest.v1"
 }

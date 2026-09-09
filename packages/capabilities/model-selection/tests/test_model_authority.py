@@ -73,7 +73,8 @@ def test_allow_authorizes_eligible_model():
     assert decision.authorized_model_id == "m1"
     assert decision.authorized_provider_id == "anthropic"
     assert AuthorityReasonCode.AUTHORIZED.value in decision.reason_codes
-    assert decision.policy_version == "exec_gate_v1"
+    # A new decision identifies the semantics that produced it. See test_policy_version.py.
+    assert decision.policy_version == "exec_gate_v2"
     assert decision.decision_id.startswith("mad_")
     assert decision.expires_at == NOW + 3600.0  # evidence-TTL freshness bound
 

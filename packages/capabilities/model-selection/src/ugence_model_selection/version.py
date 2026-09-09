@@ -20,15 +20,36 @@ Platform v1.0 freeze; this package is its first canonical distribution.
 """
 from __future__ import annotations
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 
 VERSION = __version__
 VERSION_INFO: tuple[int, int, int] = tuple(int(p) for p in __version__.split("."))  # type: ignore[assignment]
 
-#: The eligibility/selection policy-record version stamped on decisions by this core.
-#: Mirrors the legacy ``GateConfig.policy_version`` default ("exec_gate_v1"), preserved
-#: verbatim so serialized decision records are byte-identical across the migration.
-POLICY_VERSION = "exec_gate_v1"
+#: The first policy version: the eligibility algorithm as it stood through 0.1.0, before
+#: the non-compensatory capability floor existed. Retained as a *readable* version —
+#: stored records stamped with it stay valid, replayable and verifiable forever — but no
+#: longer a writable one. See ``SUPPORTED_POLICY_VERSIONS``.
+POLICY_VERSION_V1 = "exec_gate_v1"
+
+#: The current policy version, and what this implementation stamps on every decision it
+#: makes. 0.2.0 added the ``quality_within_floor`` condition, so with a floor configured
+#: this code can reach a different outcome from 0.1.0 on identical inputs. A policy
+#: version identifies *decision semantics*, not record shape, and two implementations
+#: that can disagree must not both answer to "exec_gate_v1" — that is precisely what
+#: replay and audit use the field to rule out.
+#:
+#: The bump does not reach backwards. It changes what new decisions are stamped with; it
+#: neither rewrites nor invalidates a single stored record.
+POLICY_VERSION_V2 = "exec_gate_v2"
+
+#: The version this core stamps on new decisions.
+POLICY_VERSION = POLICY_VERSION_V2
+
+#: Every version this core can read back and verify, oldest first. Writing is confined to
+#: :data:`POLICY_VERSION`; reading spans all of these. An unrecognized version — including
+#: a *newer* one written by a future release — is refused rather than guessed at, because
+#: a record whose semantics this code does not know is not one it may attest to.
+SUPPORTED_POLICY_VERSIONS: tuple[str, ...] = (POLICY_VERSION_V1, POLICY_VERSION_V2)
 
 
 def major_of(version: str) -> int:
