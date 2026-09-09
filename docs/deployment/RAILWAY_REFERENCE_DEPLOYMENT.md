@@ -204,22 +204,50 @@ can be built any time before part 5.
 
 ```
 Branch:          <the repository default branch>
-Root Directory:  /
+Root Directory:  /                 # the repository root, as in 1.2 and for the same reason
 Watch Paths:     packages/integration/console-api/**
-Build Command:   pip install ./packages/integration/console-api
-Start Command:   uvicorn ugence_console_api.app:create_app --factory \
-                   --host 0.0.0.0 --port $PORT
+                 packages/**
+```
+
+**2.3** Settings → Build → Build Command. Installing the distribution alone does **not**
+work. `packages/integration/console-api/pyproject.toml:53-61` requires four first-party
+packages — `ugence-context-minimization`, `ugence-governance-provider-framework`,
+`ugence-actiongate-provider`, `ugence-tap-provider` — and none of them is published to
+PyPI, so pip has no index to resolve them from. Supply their paths, and the path of the
+one package they in turn need, exactly as 1.3 does for the studio:
+
+```bash
+pip install "fastapi>=0.100" "pydantic>=2" "uvicorn>=0.20" \
+  ./packages/capabilities/context-minimization \
+  ./packages/governance-contracts \
+  ./packages/governance-provider-framework \
+  ./packages/providers/actiongate \
+  ./packages/providers/tap \
+  ./packages/integration/console-api
+```
+
+Six local paths, dependency-first. `ugence-governance-contracts` is not a direct
+dependency of this service; `ugence-context-minimization` needs it, and pip would look for
+it on PyPI too `[V]`.
+
+**2.4** Settings → Deploy → Start Command:
+
+```bash
+uvicorn ugence_console_api.app:create_app --factory --host 0.0.0.0 --port $PORT
 ```
 
 Use uvicorn directly rather than `python -m ugence_console_api`: the module entry point
 reads `CONSOLE_API_PORT` and defaults to 8090, ignoring Railway's `$PORT` `[V]`.
 
-**2.3** No CORS variable pairs with this service. `create_app()` installs `CORSMiddleware`
+**2.5** No CORS variable pairs with this service. `create_app()` installs `CORSMiddleware`
 with `allow_origins=["*"]`, because the console is served from a separate static host `[V]`.
 
-**2.4** Generate a domain.
+**2.6** Generate a domain. Healthcheck path `/health`.
 
-**2.5 Check.** `/health` answers 200 carrying the audit-ceiling header.
+**2.7 Check.** `/health` answers 200 with `"status":"ok"` and a `modules` block reporting
+`context_minimization`, `tap`, `actiongate` and `autonomous_control_plane` all
+`"available": true`. A module reporting `false` there means its package did not install —
+go back to 2.3.
 
 > The service serves five routes and no more (CP-3), and its audit store is in-memory and
 > lost on restart (CP-4). Both are declared, not incidental; the console shows a typed
@@ -492,7 +520,8 @@ environment.
 |---|---|---|
 | `ModuleNotFoundError: ugence_agent_runtime` | Incomplete install list; the v2 surface imports it at module load | 1.3 |
 | `studio-api` serves an unrelated API | Start command blank, so the root `Procfile` won | 1.4 |
-| `console-api` answers on 8090, not `$PORT` | `python -m ugence_console_api` used instead of the uvicorn line | 2.2 |
+| `console-api` answers on 8090, not `$PORT` | `python -m ugence_console_api` used instead of the uvicorn line | 2.4 |
+| `No matching distribution found for ugence-context-minimization` | `console-api` built with the distribution path alone; its first-party dependencies are not on PyPI | 2.3 |
 | "API is not compatible / Detected contract: unknown" | CORS origin mismatch, not a version mismatch | 4.1 |
 | Studio or console still calls the old API after a variable change | `VITE_*` is compiled into the bundle | redeploy that service |
 | `npm ci` fails: *can only install with an existing package-lock.json* | `console-web`; that app ships no lockfile | 5.2 |
@@ -528,10 +557,25 @@ Re-run on 2026-09-09 against the default branch, after the split was withdrawn `
 - `verify_build_context.py --root-build` passes: all three Dockerfiles resolve every COPY
   source, and the root build's five declared inputs are in the context.
 
-**Not verified `[G]`.** No Railway deployment has been performed. Every build above ran
-locally; none ran on Railway's builders. Railway's UI wording, its per-service repository
-selection, and its private-network scoping are vendor documentation `[I]` and may drift —
-in particular, the claim in 0.4 that no cross-project private networking exists is
-inferred, not measured. No service in this walkthrough has been observed running on
-Railway, so not one of the pass conditions above has been confirmed against a live
-deployment.
+**Corrected on 2026-09-09 by a Railway build `[V]`.** Part 2 previously gave
+`pip install ./packages/integration/console-api` as the whole build command and labelled it
+`[V]`. That label was wrong: it rested on the distribution's own metadata, never on an
+install. Railway's builder rejected it —
+`ERROR: No matching distribution found for ugence-context-minimization>=0.1.0` — because
+the four first-party dependencies at
+`packages/integration/console-api/pyproject.toml:53-61` are not on PyPI. The six-path
+command now in 2.3 installs into a clean virtual environment outside this repository, and
+`uvicorn ugence_console_api.app:create_app --factory` then answers `/health` 200 with all
+four modules `"available": true` `[V]`. A build succeeding locally is what the old step
+lacked, and what the studio's own step in 1.3 always had.
+
+**Observed on Railway `[I]`, reported by the owner.** `studio-api` and the root `web`
+service reached Online after the `.dockerignore` fix; `console-api` failed at build for the
+reason above and has not been rebuilt against the corrected command. No other service in
+this walkthrough has been observed running on Railway.
+
+**Not verified `[G]`.** Parts 3 through 7 have run only locally, never on Railway's
+builders, so their pass conditions are unconfirmed against a live deployment. Railway's UI
+wording, its per-service repository selection, and its private-network scoping are vendor
+documentation `[I]` and may drift — in particular, the claim in 0.4 that no cross-project
+private networking exists is inferred, not measured.
