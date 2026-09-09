@@ -34,7 +34,7 @@ Import the curated surface from :mod:`ugence_policy_authority.api`. See
 
 from __future__ import annotations
 
-__version__ = "0.3.1"
+__version__ = "0.4.0"
 
 from .api import *  # noqa: F401,F403,E402
 from .api import __all__ as _api_all  # noqa: E402

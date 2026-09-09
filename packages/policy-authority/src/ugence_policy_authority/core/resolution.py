@@ -84,6 +84,11 @@ from .records import PolicyResolution
 from .registry import PolicyRegistry
 from .revocation import verify_revocation_record
 from .supersession import verify_supersession_record
+from .suspension import (
+    suspension_sequence_defect,
+    suspension_state_at,
+    verify_suspension_record,
+)
 from .signing import PolicySignatureVerifier
 from .statuses import (
     HistoricalResolutionRule,
@@ -91,6 +96,7 @@ from .statuses import (
     KeyVerificationStatus,
     PolicyResolutionReason,
     PolicyResolutionStatus,
+    PolicySuspensionAction,
 )
 
 __all__ = ["resolve_policy"]
@@ -330,6 +336,45 @@ def resolve_policy(
         # ALLOW_BEFORE_REVOCATION: the answer is explicitly historical and is
         # labelled so it can never be read as current validity.
         historical = True
+
+    # -- policy-version suspension (`ACC-SUSP-IA-7`) ------------------------
+    # Last of the three lifecycle stores, and deliberately so: revocation is
+    # terminal and supersession is a replacement, so either is the more
+    # informative answer when it applies. Suspension is a reversible pause.
+    #
+    # Two independent things are checked, in this order. First the stored history
+    # must be *well-formed* — every record verifies, the sequence is strictly
+    # monotonic, and every transition is valid. Then, and only then, the latest
+    # record effective at `as_of` decides. A history that cannot be trusted is
+    # never interpreted: it fails closed, on REVOCATION_INTEGRITY_INVALID's exact
+    # precedent, rather than being partially believed or ignored.
+    suspensions = registry.suspensions_for(coordinate)
+    if suspensions:
+        for suspension in suspensions:
+            verification = verify_suspension_record(
+                suspension,
+                coordinate=coordinate,
+                signature_verifier=signature_verifier,
+                as_of=as_of,
+            )
+            if not verification.valid:
+                return deny(
+                    PolicyResolutionReason.SUSPENSION_INTEGRITY_INVALID,
+                    f"a suspension record targets this version but does not verify: "
+                    f"{verification.status.value}",
+                )
+        defect = suspension_sequence_defect(suspensions)
+        if defect is not None:
+            return deny(
+                PolicyResolutionReason.SUSPENSION_INTEGRITY_INVALID,
+                f"the stored suspension history is inadmissible: {defect}",
+            )
+        current = suspension_state_at(suspensions, as_of=as_of)
+        if current is not None and current.action is PolicySuspensionAction.SUSPEND:
+            return deny(
+                PolicyResolutionReason.SUSPENDED,
+                f"suspended at {current.effective_at.isoformat()}",
+            )
 
     return PolicyResolution(
         status=PolicyResolutionStatus.RESOLVED,

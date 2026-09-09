@@ -177,6 +177,12 @@ same obligation.
 
 ### `ACC-SUSP-IA-6` — the three `ACC-SUSP-2` ordering cases: **NOT SETTLED** `[G]`
 
+> **Settled by amendment (2026-09-09, second sitting).** The heading and the
+> section below are retained verbatim as the record of what was open when this
+> ADR was first written. `[V]` The three cases are **now ruled** — see §9
+> (`ACC-SUSP-IA-7`), which also **corrects** the out-of-order recommendation
+> made below. This note reopens nothing.
+
 `ACC-SUSP-2` recorded, as `[G]`, that suspension is *"the first state in this
 authority whose current value is not simply 'a record exists'"*, that the
 ordering rule must be total and unambiguous, and that **the
@@ -240,6 +246,11 @@ member, so `ACC-SU-4`'s standing obligation — the same one `ACC-SUSP-4` impose
 overlap surface is bounded.
 
 ### `ACC-OVL-6` — the enumeration attempted, and the two blockers it found `[G]`
+
+> **Answered by amendment (2026-09-09, second sitting).** Retained verbatim as
+> the record of the two blockers as found. `[V]` Both are **now ruled** — see §9
+> (`ACC-OVL-7`, `ACC-OVL-8`). The findings themselves stand unchanged; what
+> changes is that the owner has said what to do about them.
 
 Discharging `ACC-OVL-5` before writing anything surfaced two obstacles that are
 **owner questions, not implementation details**. Recorded here rather than
@@ -309,7 +320,11 @@ that duplicates the ADRs will drift from them again; the ADRs are the record.
 
 ---
 
-## 5. What remains open
+## 5. What remained open at first writing
+
+> `[V]` **All five questions in this section were ruled on 2026-09-09 in a
+> second sitting.** The section is retained as the record of what was put to
+> the owner and how it was framed. For the answers, read §9.
 
 `[G]` **The three `ACC-SUSP-2` ordering cases** (`ACC-SUSP-IA-6`) — the one
 question blocking the suspension change set. Recommended answers, each derived
@@ -403,3 +418,114 @@ Agentic Proposer at `0.6.0`; `agent-constitution-policy` at `0.2.0`;
 suspension change set, and the two `ACC-OVL-6` questions, which unblock the
 overlap round. Both are put in §5. Nothing else in either round is waiting on
 anything but these.
+
+---
+
+## 9. Amendment — the five rulings of 2026-09-09 (second sitting)
+
+**Status:** **Accepted (ratified owner declaration).** The owner ruled all five
+questions §5 put, in a second sitting the same day, and **corrected** one of the
+recommendations this ADR had offered. Recorded here rather than by editing §2–§5,
+so that what was recommended and what was ruled stay separately legible.
+
+**Numbering.** `[R]` Two further ADR-scoped labels: **`ACC-SUSP-IA-7`** (the
+settled ordering rules) and **`ACC-OVL-7`** – **`ACC-OVL-8`** (the seam and the
+delegation deferral).
+
+### `ACC-SUSP-IA-7` — the three ordering cases, ruled `[R]`
+
+The single organising rule: **the accepted history is append-only and strictly
+time-monotonic.** Arrival order is never authoritative — the signed instants
+establish order — but the append-only log may not be **retroactively rewritten**
+by inserting an earlier record.
+
+**1. Equal signed timestamps — refuse ambiguity.** For the same policy
+coordinate, two **distinct** suspension lifecycle records may not share the same
+signed instant. Refuse the second at append time. If a collision is nevertheless
+present at resolution, fail closed as `SUSPENSION_INTEGRITY_INVALID`.
+
+`[R]` **An exact replay of the same record identity and signed payload is an
+idempotent no-op, not a second append.** A *different* record at the same instant
+is an integrity failure. This is the distinction the revocation and supersession
+stores already draw between "identical repeat" and "conflicting record", carried
+into a sequence store.
+
+**2. Out-of-order arrival — refuse retroactive insertion.** Do **not** sort
+arbitrary arrivals into the stored history. A candidate record's signed instant
+must be **strictly later** than the latest accepted lifecycle record for that
+coordinate; an older candidate is refused at append time. At resolution,
+independently verify that the stored sequence is strictly monotonic, and return
+`SUSPENSION_INTEGRITY_INVALID` if it is not.
+
+`[R]` **This corrects the recommendation at §5.2**, which proposed ordering
+arbitrary arrivals by signed instant. The owner's ground, recorded because it is
+the load-bearing one: *accepting reordered records conflicts with rejecting
+orphan reinstatements* — under a sort-on-read rule, whether a reinstatement is an
+orphan would depend on **delivery order**, which is exactly the property rule 3
+exists to deny. Strict monotonicity at append time makes the two rules
+consistent; sorting makes them contradict.
+
+**3. Reinstatement without an effective prior suspension — refuse.** A
+reinstatement is valid only when the latest valid accepted lifecycle state is
+*suspended*. Refuse reinstatement from an active or never-suspended state at
+append time. Re-check the transition sequence at **every** resolution and fail
+closed as `SUSPENSION_INTEGRITY_INVALID` if an invalid transition is stored.
+
+**Authorized by this ruling:** implementation of the two already-enumerated
+`PolicyResolutionReason` members and their downstream mappings
+(`ACC-SUSP-IA-5`), under the ratified signature, approval, append-only and
+resolution-time re-verification boundaries. `[R]` **Fixtures and deterministic
+implementation only.** It does not authorize genuine issuance, activation or
+suspension, key custody, or the closure of any `ACC-FC-5` gate —
+`ACC-SUSP-IA-2` and `ACC-SUSP-IA-4` are unchanged and still bind.
+
+### `ACC-OVL-7` — a family-neutral exclusivity seam in Policy Authority `[R]`
+
+**Ruled**, answering §5.4. Policy Authority owns **authoritative** overlap
+enforcement at issuance and resolution. The Agent Constitution adapter owns the
+**projection** of constitution-specific meaning into a normalized, family-neutral
+exclusivity claim. Conformance **mirrors** the check and produces diagnostic
+evidence, but **cannot be the sole enforcement boundary, because conformance is
+not issuance authority**.
+
+Binding constraints on the implementation:
+
+* the Policy Authority core **must not import or branch on constitution types** —
+  the seam is generic and optional, and an adapter projects claims through it
+  (tenant, scope, governed role);
+* **existing families with no exclusivity semantics produce no claims**, so
+  nothing changes for them;
+* the **constitution family must fail closed** if its required projection is
+  missing, malformed or unresolved;
+* before a second constitution issues, the authority **compares normalized claims
+  against all simultaneously effective constitution claims and refuses
+  unresolved overlap**;
+* `[R]` **registration, mapping and arrival order may never choose a winner.**
+
+**Sequencing, as ruled:** implement suspension **first**; record the overlap seam
+design and enumeration **before** changing Policy Authority's public surface;
+and `[R]` **if adding the generic seam changes existing adapter obligations or
+serialized descriptors, stop and report the exact compatibility impact before
+implementing.**
+
+### `ACC-OVL-8` — delegation deferred to its own round `[R]`
+
+**Ruled:** ship **supersession-only**. The overlap exception narrows to an
+**explicitly verified supersession relationship**. `[R]` Delegation is absent
+from the current contracts and **must not be invented inside this
+implementation**.
+
+`[R]` **`ACC-OVL-1`'s delegation language is deferred, not implemented**, and
+this record says so rather than leaving the wording to imply capability that does
+not exist. Any future delegation exception requires its own contract and owner
+round, covering: delegated authority bounds, identity, scope, duration,
+revocation, and the **monotonic rule that delegated authority cannot exceed
+issued authority**.
+
+### What §9 does not change
+
+`[R]` No `ACC-FC-5` gate is closed or advanced. No constitution is issued,
+activated, superseded, suspended or revoked. No signing key, trust root or
+approval artifact enters this repository. `ACC-OVL-4`'s sequencing constraint —
+no second constitution before the overlap invariant is implemented and verified —
+stands unchanged and still binds.

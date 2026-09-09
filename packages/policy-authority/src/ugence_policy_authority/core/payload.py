@@ -24,9 +24,11 @@ __all__ = [
     "ISSUANCE_SIGNING_DOMAIN",
     "REVOCATION_SIGNING_DOMAIN",
     "SUPERSESSION_SIGNING_DOMAIN",
+    "SUSPENSION_SIGNING_DOMAIN",
     "issuance_signing_payload",
     "revocation_signing_payload",
     "supersession_signing_payload",
+    "suspension_signing_payload",
 ]
 
 #: Domain tag for an issuance signature.
@@ -39,6 +41,11 @@ REVOCATION_SIGNING_DOMAIN = "ugence.policy-authority/policy-revocation/v1"
 #: `ACC-LC-IA-2`. Its own domain: a supersession signature can never be
 #: replayed as an issuance or a revocation, and vice versa.
 SUPERSESSION_SIGNING_DOMAIN = "ugence.policy-authority/policy-supersession/v1"
+#: `ACC-SUSP-IA-7`. Its own domain, on the same ground: a suspension signature
+#: can never be replayed as an issuance, a revocation or a supersession. The
+#: **action** is inside the signed body, so a ``SUSPEND`` signature can never be
+#: presented as the ``REINSTATE`` that would lift it.
+SUSPENSION_SIGNING_DOMAIN = "ugence.policy-authority/policy-suspension/v1"
 
 
 def _coordinate_fields(coordinate: PolicyCoordinate) -> dict:
@@ -129,6 +136,41 @@ def revocation_signing_payload(
     }
     body.update(_coordinate_fields(coordinate))
     return _framed(REVOCATION_SIGNING_DOMAIN, body)
+
+
+def suspension_signing_payload(
+    *,
+    suspension_id: str,
+    coordinate: PolicyCoordinate,
+    action: object,
+    suspending_authority_id: str,
+    key_id: str,
+    signature_alg: str,
+    effective_at: datetime,
+) -> bytes:
+    """Return the exact bytes a suspension lifecycle signature covers.
+
+    ``action`` and ``effective_at`` are both inside the frame. That is what makes
+    the ordering rules enforceable against a holder rather than merely checked at
+    the door: neither the act nor the instant that orders it can be rewritten
+    without invalidating the signature.
+    """
+
+    body = {
+        "domain": SUSPENSION_SIGNING_DOMAIN,
+        "authority_protocol": AUTHORITY_PROTOCOL,
+        "authority_protocol_version": AUTHORITY_PROTOCOL_VERSION,
+        "authority_protocol_id": AUTHORITY_PROTOCOL_ID,
+        "canonicalization": CANONICALIZATION_VERSION,
+        "suspension_id": suspension_id,
+        "action": action,
+        "suspending_authority_id": suspending_authority_id,
+        "key_id": key_id,
+        "signature_alg": signature_alg,
+        "effective_at": effective_at,
+    }
+    body.update(_coordinate_fields(coordinate))
+    return _framed(SUSPENSION_SIGNING_DOMAIN, body)
 
 
 def supersession_signing_payload(

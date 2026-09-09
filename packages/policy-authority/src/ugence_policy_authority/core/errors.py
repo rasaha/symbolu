@@ -24,6 +24,7 @@ __all__ = [
     "PolicyIssuanceError",
     "PolicyRegistryConflictError",
     "PolicyRevocationError",
+    "PolicySuspensionError",
 ]
 
 
@@ -109,6 +110,25 @@ class PolicySupersessionError(PolicyAuthorityError):
     another tenant or scope, or is the artifact naming itself. Distinct from
     :class:`UnsupportedSupersessionError`, which refuses the *unstructured*
     string and is unchanged. Nothing is signed and nothing is stored.
+    """
+
+
+class PolicySuspensionError(PolicyAuthorityError):
+    """A suspension lifecycle act was refused, and nothing was signed or stored.
+
+    `ACC-SUSP-IA-7`. Raised when the targeted version was never issued, is
+    already revoked or superseded, when the signing key is not entitled to
+    :attr:`~ugence_policy_authority.core.statuses.KeyEntitlement.SUSPEND_POLICY`,
+    or when the candidate record would break either ordering invariant:
+
+    * its signed instant is **not strictly later** than the latest accepted
+      record for that coordinate — a retroactive insertion, refused rather than
+      sorted into place;
+    * it is a ``REINSTATE`` whose latest accepted state is not ``SUSPEND`` — a
+      reinstatement cannot manufacture the transition it claims to reverse.
+
+    An **exact replay** of an already-stored record is not an error: it is an
+    idempotent no-op, on the revocation store's precedent.
     """
 
 
