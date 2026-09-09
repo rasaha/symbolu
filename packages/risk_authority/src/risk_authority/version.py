@@ -30,4 +30,13 @@ from __future__ import annotations
 #: every existing windowless key and signer behaves exactly as before; the MINOR bump is for
 #: the ``KeyRing`` entry-type change, not a behavior change for existing callers. No
 #: canonical serialization, digest or signature format is touched.
-__version__ = "0.9.0"
+#: ``0.10.0`` closes the production-v1 clock asymmetry (issue #1398 item 1, D-B). The
+#: trusted production evaluation seam now rejects a caller-supplied ``evaluation_time``
+#: on **both** v1 and v2 with the same typed ``CALLER_SUPPLIED_EVALUATION_TIME``
+#: non-decision, stamped with the trusted clock. This narrowly supersedes the earlier
+#: "v1 honors evaluation_time in any mode" decision: the two schema versions were held to
+#: different clock-authority rules in one seam for no reason but the order they were
+#: built. Reference mode is unchanged and still honors the field, which is what keeps the
+#: conformance suites and the distribution verifiers deterministically replayable. No
+#: other v1 behavior, and no canonical serialization, digest or signature format, changes.
+__version__ = "0.10.0"

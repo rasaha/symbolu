@@ -271,6 +271,22 @@ class RiskEvaluationSeam:
                 "request must be a SubjectRiskEvaluationRequest or "
                 "SubjectRiskEvaluationRequestV2"
             )
+        # v1, trusted PRODUCTION path: a caller-supplied evaluation_time is rejected
+        # fail-closed, exactly as v2 already does (#1398 item 1, D-B). This narrowly
+        # supersedes the earlier "v1 honors evaluation_time in any mode" decision: the
+        # two schema versions were being held to different clock-authority rules in the
+        # same production seam for no reason but their order of arrival, and a
+        # caller-controlled instant can move validity and authorization.
+        #
+        # The rejection is stamped with the TRUSTED clock, so a caller cannot influence
+        # even the timestamp of its own rejection. The labelled reference seam is
+        # untouched and still honors the field, which is what keeps the conformance
+        # suites deterministic and replayable.
+        if self._production and request.evaluation_time is not None:
+            return self._non_decision(
+                request, self._clock(),
+                SubjectRiskNonDecisionReason.CALLER_SUPPLIED_EVALUATION_TIME,
+                "evaluation_time:caller_supplied")
         return self._evaluate_admitted(request, now=None, validation=None)
 
     # --------------------------------------------------------------- v2 admission

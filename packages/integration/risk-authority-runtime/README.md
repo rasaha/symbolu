@@ -22,9 +22,9 @@ verified envelope → ActionAuthorization binding → VerifiedRiskAuthorityResul
 ```
 
 ```python
-enforcer = RiskAuthorityEnforcer.production(gate=my_production_gate)
+enforcer = RiskAuthorityEnforcer.production(gate=my_production_gate, clock=trusted_clock)
 verified = enforcer.derive(authorization_id=..., envelope=..., action=..., identity=...,
-                           key_ring=..., revocation_state=..., now=trusted_clock())
+                           key_ring=..., revocation_state=...)
 decision = RiskAuthorityCompositionEngine().compose_verified(
     risk_authority=verified, decision_authority=da_veto, actiongate=ag_veto)
 ```
@@ -45,6 +45,30 @@ Three changes break callers at 0.2.0:
 
 A warning-only transition was rejected: it would have preserved the ambiguity it warns
 about. `compose` itself is unchanged, so reference and test callers keep working.
+
+## Clock authority — breaking change at 0.3.0
+
+Issue #1398 item 1, ruling D-A. **`derive` no longer accepts `now`.** A production enforcer
+requires an injected callable clock and refuses construction without one; `derive` reads it
+**once** per call.
+
+| Was (0.2.0) | Now (0.3.0) |
+|---|---|
+| `RiskAuthorityEnforcer.production(gate=…)` | `…production(gate=…, clock=trusted_clock)` — a missing clock is a typed refusal |
+| `derive(…, now=caller_supplied)` | `derive(…)` — the instant comes from the injected clock, never the caller |
+| `reference()` | `reference(clock=lambda: FIXED_NOW)` for deterministic replay; still never production posture |
+
+The reason this mattered here and not in the RA leaf: the leaf's services are pure functions
+of an instant, which is what makes them offline-testable and replayable, and no facade or
+network path can supply a clock to them. `derive`, by contrast, is the production entry point
+that mints a `VerifiedRiskAuthorityResult` — and its caller-supplied instant governed the
+envelope window, the revocation epoch, and (since kernel 0.9.0) the signing key's own validity
+window. Everything else on that path is fail-closed and envelope-bound; the clock was the one
+input still taken on trust. Reading it once also means those three questions are judged at a
+single instant, so a slow derive cannot straddle an expiry boundary.
+
+Every RA leaf signature and the `ActionGatePort` protocol are unchanged — `enforce`, which
+returns the non-authoritative `RiskAuthorityMachineResult`, still takes `now`.
 
 `resolve(...) → None` in the RA-6 pre-effect recheck no longer passes through on caller
 omission. Only an authenticated Policy Authority rule, supplied through the new

@@ -46,6 +46,7 @@ from risk_authority.integrations import (
     EVALUATION_REQUEST_SCHEMA_VERSION,
     EVALUATION_REQUEST_SCHEMA_VERSION_V2,
     InMemoryWorkflowIRSource,
+    ReferencePolicyResolver,
     ReferenceSubjectAwarePolicyResolver,
     SubjectContext,
     SubjectRiskDisposition,
@@ -571,7 +572,7 @@ def _v1_request(**kw):
         subject_type="cloud_scaling.capacity_action", subject_id="wl-checkout-api",
         subject_digest="sha256:" + "e" * 64, tenant_id=TENANT,
         requested_purpose=PURPOSE, requested_domain=DOMAIN, requested_scope=V2_SCOPE,
-        requested_risk_class=RiskClass.HIGH, evaluation_time=CALLER_TIME)
+        requested_risk_class=RiskClass.HIGH)
     base.update(kw)
     return SubjectRiskEvaluationRequest(**base)
 
@@ -588,11 +589,53 @@ def test_v1_still_uses_the_legacy_resolver_method_unchanged():
     assert downstream(log)[:2] == ["policy", "evidence"]
 
 
-def test_v1_still_honors_a_caller_supplied_evaluation_time_in_production():
-    # The v2 rejection must NOT leak into v1: v1's evaluation_time semantics are frozen.
+def test_v1_rejects_a_caller_supplied_evaluation_time_in_production():
+    """#1398 item 1, D-B — this assertion is the inverse of what it used to be.
+
+    It previously read "v1 still honors a caller-supplied evaluation_time in production",
+    pinning the ratified rule that v1's clock semantics were frozen while v2 rejected the
+    field. That rule is narrowly superseded: production v1 and v2 were being held to
+    different clock-authority rules in the same seam because of the order they were built,
+    not because of any difference in what a caller-controlled instant can do — and it can
+    move validity and authorization on both.
+
+    Everything else about v1 is untouched. Only the trusted production path refuses;
+    reference mode still honors the field, which is what keeps conformance replay
+    deterministic (see the companion test below).
+    """
+
     seam, _ = production_seam()
     result = seam.evaluate(_v1_request(evaluation_time=CALLER_TIME))
-    assert result.disposition is SubjectRiskDisposition.RISK_PASSED
+
+    assert result.disposition is SubjectRiskDisposition.NOT_EVALUATED
+    assert (result.non_decision_reason
+            is SubjectRiskNonDecisionReason.CALLER_SUPPLIED_EVALUATION_TIME)
+    assert "evaluation_time:caller_supplied" in result.reason_codes
+    # The refusal is stamped with the TRUSTED clock: a caller cannot influence even the
+    # timestamp of its own rejection.
+    assert result.evaluated_at == TRUSTED_NOW
+    assert result.evaluated_at != CALLER_TIME
+
+
+def test_v1_reference_mode_still_honors_evaluation_time_for_deterministic_replay():
+    """The other half of D-B: reference mode is deliberately unchanged.
+
+    The conformance suites and the isolated-distribution verifiers replay against a fixed
+    instant; taking that away would make them non-deterministic to close an exposure that
+    only exists on the trusted production path.
+    """
+
+    src = InMemoryWorkflowIRSource()
+    workflow = src.register(_workflow())
+    seam = RiskEvaluationSeam.reference(
+        workflow_source=src, key_record=KEY, clock=lambda: TRUSTED_NOW,
+        policy_resolver=ReferencePolicyResolver(
+            by_purpose_domain={(PURPOSE, DOMAIN): workflow}))
+
+    result = seam.evaluate(_v1_request(evaluation_time=CALLER_TIME))
+
+    assert (result.non_decision_reason
+            is not SubjectRiskNonDecisionReason.CALLER_SUPPLIED_EVALUATION_TIME)
     assert result.evaluated_at == CALLER_TIME
 
 

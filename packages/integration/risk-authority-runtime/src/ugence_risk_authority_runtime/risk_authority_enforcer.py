@@ -23,8 +23,8 @@ provider`` *policy* engine composed additively in
 
 from __future__ import annotations
 
-from datetime import datetime
-from typing import Optional
+from datetime import datetime, timezone
+from typing import Callable, Optional
 
 from risk_authority.crypto import KeyRing
 from risk_authority.domain import (
@@ -76,12 +76,23 @@ class RiskAuthorityEnforcer:
     :class:`VerifiedRiskAuthorityResult` the production composition path requires.
     """
 
-    def __init__(self, gate: ActionGatePort, *, production: bool = False) -> None:
-        """Construct with an explicit gate. Prefer :meth:`production` or :meth:`reference`.
+    def __init__(
+        self,
+        gate: ActionGatePort,
+        *,
+        production: bool = False,
+        clock: Optional[Callable[[], datetime]] = None,
+    ) -> None:
+        """Construct with an explicit gate and clock. Prefer :meth:`production` / :meth:`reference`.
 
         Direct construction is retained so an existing external caller that already passes
         a gate keeps working; the removed behavior is the *implicit* one. ``production``
         defaults to ``False``, so a direct construction is never silently production-grade.
+
+        ``clock`` is the authoritative time source for :meth:`derive` (#1398 item 1, D-A).
+        It is **required whenever ``production`` is true** — a production enforcer that
+        could fall back to a caller-supplied instant would be the exposure this ruling
+        closes. Reference construction may omit it and gets real UTC time.
         """
 
         if gate is None:
@@ -90,12 +101,21 @@ class RiskAuthorityEnforcer:
                 "Use RiskAuthorityEnforcer.production(gate=...) for production enforcement "
                 "or RiskAuthorityEnforcer.reference() for conformance/test use. The former "
                 "implicit ReferenceActionGate default was never production-eligible.")
+        if production and not callable(clock):
+            raise EnforcerConfigurationError(
+                "a production enforcer requires an injected callable clock; the "
+                "authoritative instant may never come from the caller of derive() "
+                "(#1398 item 1, D-A)")
         self._gate = gate
         self._production = bool(production)
+        self._clock: Callable[[], datetime] = (
+            clock if callable(clock) else (lambda: datetime.now(timezone.utc)))
 
     # ------------------------------------------------------------------ factories
     @classmethod
-    def production(cls, *, gate: ActionGatePort) -> "RiskAuthorityEnforcer":
+    def production(
+        cls, *, gate: ActionGatePort, clock: Callable[[], datetime]
+    ) -> "RiskAuthorityEnforcer":
         """A production enforcer. Fails closed on any reference-grade gate (ADR §8/D-E).
 
         Mirrors the refusals ``ActionAdmissionSeam.production`` already applies in the RA
@@ -112,17 +132,28 @@ class RiskAuthorityEnforcer:
             raise EnforcerConfigurationError(
                 "production enforcer requires an ActionGatePort declaring "
                 "is_production_authoritative=True; silence is refusal")
-        return cls(gate, production=True)
+        if not callable(clock):
+            raise EnforcerConfigurationError(
+                "production enforcer requires an injected callable clock (#1398 item 1, D-A)")
+        return cls(gate, production=True, clock=clock)
 
     @classmethod
-    def reference(cls, *, gate: Optional[ActionGatePort] = None) -> "RiskAuthorityEnforcer":
+    def reference(
+        cls,
+        *,
+        gate: Optional[ActionGatePort] = None,
+        clock: Optional[Callable[[], datetime]] = None,
+    ) -> "RiskAuthorityEnforcer":
         """A labelled conformance enforcer over the in-package reference gate. Never production.
 
         Everything it derives is stamped ``production=False`` and is refused by the
-        verified production composition path.
+        verified production composition path. ``clock`` may be a deterministic stand-in
+        (``lambda: FIXED_NOW``) so a conformance run replays byte-for-byte; omitting it
+        gives real UTC time. Passing one never confers production posture.
         """
 
-        return cls(gate if gate is not None else ReferenceActionGate(), production=False)
+        return cls(gate if gate is not None else ReferenceActionGate(),
+                   production=False, clock=clock)
 
     @property
     def is_production(self) -> bool:
@@ -217,19 +248,34 @@ class RiskAuthorityEnforcer:
         identity: RuntimeIdentity,
         key_ring: KeyRing,
         revocation_state: RevocationState,
-        now: datetime,
         satisfied_conditions: frozenset[str] = frozenset(),
     ) -> "VerifiedRiskAuthorityResult":
         """Run the gate, then verify and bind its answer to the envelope (ADR §8/D-A).
 
-        This is the only route to a :class:`VerifiedRiskAuthorityResult`. ``now`` is the
-        composition root's trusted instant; nothing here reads a clock.
+        This is the only route to a :class:`VerifiedRiskAuthorityResult`.
+
+        **The caller does not supply the instant** (#1398 item 1, D-A). The clock injected
+        at construction is read **once**, here, and that single instant governs every
+        temporal question downstream: the envelope window, the revocation epoch, and — since
+        0.9.0 of the kernel — the signing key's own validity window. Before this, ``derive``
+        took ``now`` as a parameter, which made the one input the whole verified path took
+        on trust a caller-controlled value.
+
+        Reading the clock once rather than per check also means the envelope, the key and
+        the epoch are all judged at the same instant, so a long-running derive cannot
+        straddle an expiry boundary and produce an internally inconsistent verdict.
 
         Unlike :meth:`enforce`, this does not swallow a gate exception into an ``ERROR``
         verdict — a gate that raises produced no authorization to bind, so there is nothing
         to derive from and the caller must handle it. Composition-level fail-closed
         behavior for that case lives in the composition path, not here.
         """
+
+        now = self._clock()  # the one clock read of this act (D-A)
+        if not isinstance(now, datetime):
+            raise EnforcerConfigurationError(
+                "the injected clock must return a datetime; refusing to derive without a "
+                "usable authoritative instant")
 
         authorization = self._gate.authorize(
             authorization_id=authorization_id,
