@@ -53,15 +53,18 @@ digest it reports as expected.
 | `data-classification` | 1.0.0 | `LV-A` / `DE-3` | closed, 4 members | `DataUseDeclaration.classification` |
 | `data-use-purpose` | 1.0.0 | `LV-E` | open shape | `DataUseDeclaration.purpose_label` |
 | `incident-severity` | 1.0.0 | `LV-D` | closed, 4 members | `IncidentRecord.severity_label` |
+| `vendor-dependency-assessment-state` | 1.0.0 | `LV-C` | closed, 5 members | `VendorDependencyDeclaration.risk_posture` |
 
 **No binding is implemented.** Every "intended binding" above names the field a future
 `PUB-2` change will attach a reference to; none carries one today, and each file says
 so of itself.
 
-**`vendor-dependency-assessment-state` is ruled and not yet published.** Its name was
-resolved by `PUB-1a` — the members `LV-C` ratified are assessment states, and the
-earlier `vendor-dependency-permission` named a permission the members refuse and `VR-3`
-forbids. Publication under the corrected name is authorized and remains to be done.
+**`vendor-dependency-assessment-state` is named for its members, and that is the whole
+point of the name.** `PUB-1a` renamed it from `vendor-dependency-permission`, which
+denoted a permission its own `LV-C` members refuse and `VR-3` forbids. Its
+specification carries an `eligibility` field fixed at `null`, beside the `ordering`
+field every closed vocabulary here carries: the two things `VR-3` forbids a vendor
+label to imply are recorded as absent rather than left to be inferred from silence.
 
 ## Where the rulings live
 

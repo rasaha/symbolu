@@ -176,7 +176,14 @@ authorizes an engine.
   (`APPROVED` / `CONDITIONAL` / `BLOCKED`) was considered and refused, because it
   would read as the implied eligibility `VR-3` forbids whatever the type says. The
   label stays uninterpreted by ruling rather than by omission, and `LV-1` keeps the
-  vocabulary in a Policy-Authority document rather than an enum here.
+  vocabulary in a Policy-Authority document rather than an enum here. It is now
+  **published** as an immutable specification at
+  `docs/vocabularies/vendor-dependency-assessment-state/1.0.0.json` — named for its
+  members by `PUB-1a`, and recording `ordering` and `eligibility` as explicitly
+  absent, which is the two things `VR-3` forbids stated rather than left to be
+  inferred. It is canonical content, **not** issued Policy Authority policy, and **no
+  field here cites it**: `PUB-2` authorizes a distinct reference and determined that
+  `policy_ref` may not carry it, but nothing is implemented.
 - A `policy_ref` that names nothing is indistinguishable here from one that names a
   real version; only Policy Authority can tell, and it is never asked.
 - A dynamic `importlib.import_module(name)` cannot be caught by any static checker;

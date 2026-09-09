@@ -240,16 +240,14 @@ explicit that repository publication establishes the **canonical vocabulary cont
 only** — it is **not** issuance by Policy Authority, and nothing here may describe it
 as an issued or signed organizational policy. And the vocabulary once called
 `vendor-dependency-permission`, held from publication because it named permission
-semantics its own `LV-C` members refuse, is renamed **`vendor-dependency-assessment-state`**
-by `PUB-1a`; it is authorized for publication and not yet published, so the binding on
-`VendorDependencyDeclaration` waits on the file rather than on a decision.
+semantics its own `LV-C` members refuse, is renamed
+**`vendor-dependency-assessment-state`** by `PUB-1a` and published under that name.
 
-`[V]` **Four vocabularies are published** at
-`docs/vocabularies/<identifier>/1.0.0.json` —
-`eu-ai-act-system-classification`, `data-classification`, `data-use-purpose` and
-`incident-severity`, each immutable under a content digest that
-`scripts/check_vocabulary_publications.py` recomputes in CI. Those four now exist to be
-cited, which is what `PUB-1` required before any binding is written.
+`[V]` **All five vocabularies are published** at
+`docs/vocabularies/<identifier>/1.0.0.json`, each immutable under a content digest that
+`scripts/check_vocabulary_publications.py` recomputes in CI. Every binding this
+document scopes now has a referent that exists, which is what `PUB-1` required before
+any of them is written.
 
 ---
 
@@ -289,13 +287,17 @@ record binding is implemented only after the vocabulary it cites exists to be ci
 A binding to a referent that does not exist is a field that records nothing while
 appearing to record provenance.
 
-`[V]` **That publication has happened** for four of the five, at
-`docs/vocabularies/`. The fifth, `vendor-dependency-assessment-state`, is renamed and
-authorized by `PUB-1a` and remains to be published.
+`[V]` **That publication has happened**, for all five, at `docs/vocabularies/`. The
+prior condition is discharged: nothing this document scopes is now waiting on a
+missing referent.
 
-So the next step is the first binding, against a vocabulary that now exists: a new
-record version and schema version carrying the vocabulary's identity, exact version and
-content digest, required and covered by `record_digest()` per `VV-B`, and participating
-in the derived id only where the label already does per `VV-C`. Each package is its own
-change, and `VendorDependencyDeclaration` waits for its vocabulary to be published
-first.
+So the next step is the first binding, and the choice of which record goes first is the
+only judgment left in it. A new record version and schema version carries the
+vocabulary's identity, exact version and content digest; the binding is required
+(`VV-E`), covered by `record_digest()` (`VV-B`), and in the derived id only where the
+label already participates in identity (`VV-C`) — `DataUseDeclaration` and
+`VendorDependencyDeclaration`. Each package is its own change, and
+`data-use-admission` is the hardest of the four rather than the easiest: it is the only
+record needing **two** independent bindings, and `VV-D` forbids the purpose binding
+from being borrowed from the classification one. Doing it first proves the shape
+against the difficult case instead of discovering it on the fourth.

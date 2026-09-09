@@ -63,6 +63,7 @@ IDENTITY = {
 BALLOT_SECTIONS = {
     "eu-ai-act-system-classification": "3.1",
     "data-classification": "3.2",
+    "vendor-dependency-assessment-state": "3.4",
     "incident-severity": "3.5",
 }
 

@@ -54,10 +54,11 @@ interpretation requires a **new major version**. A citation or wording correctio
 that *provably* changes no meaning may take a **patch** version. **Minor versions
 are reserved** until an additive-compatibility rule is separately established.
 
-**Published, 2026-09-09** `[V]` — four of the five, at
+**Published, 2026-09-09** `[V]` — **all five**, at
 `docs/vocabularies/<identifier>/1.0.0.json`:
-`eu-ai-act-system-classification`, `data-classification`, `data-use-purpose` and
-`incident-severity`. The fifth is `PUB-1a` below.
+`eu-ai-act-system-classification`, `data-classification`, `data-use-purpose`,
+`incident-severity`, and `vendor-dependency-assessment-state` under the corrected name
+`PUB-1a` gives it below.
 
 Each file carries its own digest, and the digests are deliberately **not** repeated
 here: a second copy in prose is a second source of truth that nothing keeps honest.
@@ -111,9 +112,13 @@ has no ratified members, and is not reserved by this ruling** — should the own
 want one, it is a new vocabulary requiring its own ballot, and `VR-3` would have to
 move first.
 
-**Publication under the corrected name is authorized and not yet done.** It was
-outside the scope of the publication step that accompanied this ruling, which
-published the four vocabularies that were never blocked.
+**Published under the corrected name** `[V]`, at
+`docs/vocabularies/vendor-dependency-assessment-state/1.0.0.json`. The specification
+carries an `eligibility` field fixed at `null` beside the `ordering` field the other
+closed vocabularies carry: the two things `VR-3` forbids this label to imply are
+recorded as absent rather than left to be inferred from a silence. Its five members are
+held to ballot §3.4 by the same gate that holds the other four, so the rename changed
+the identifier and provably nothing else.
 
 ---
 
@@ -213,8 +218,7 @@ treating it as a different object rather than another rung.
 
 | Step | Authorized by | Blocked on |
 |---|---|---|
-| ~~Publish four of the five vocabularies at `1.0.0`~~ | `PUB-1` | **done** — `docs/vocabularies/` |
-| Publish `vendor-dependency-assessment-state` | `PUB-1`, `PUB-1a` | nothing — authorized, not yet done |
+| ~~Publish all five vocabularies at `1.0.0`~~ | `PUB-1`, `PUB-1a` | **done** — `docs/vocabularies/` |
 | Implement record bindings | `PUB-2` | publication of the vocabulary each cites |
 | Scope `GeneralPurposeAIModelRegistration` | — | its own authorization (`PUB-3`) |
 | Scope the regulatory-status field | — | its own authorization (`PUB-4`) |
