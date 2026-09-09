@@ -82,8 +82,8 @@ from ugence_agentic_proposer import (
 )
 ```
 
-The full 51-name public surface (H3 as amended by OD-7 and by S2-B, plus OD-6(ii)'s
-`CrossContractViolationError`)
+The full 52-name public surface (H3 as amended by OD-7 and by S2-B, plus OD-6(ii)'s
+`CrossContractViolationError`, and `RM-3`'s `ReasoningMethodAdvisoryInput` at `0.5.0`)
 is pinned in
 [`public_api.json`](public_api.json) and drift-tested by
 `tests/test_public_api.py`. Every one of the classification enums above is an
@@ -127,8 +127,9 @@ advisory this package builds, implementing `ACC-AM-BASE` and `ACC-AM-1` – `ACC
 recorded in
 [`ADR_UGENCE_AGENT_CONSTITUTION_AMENDMENT_ROUND_RATIFICATION.md`](../../../docs/architecture/ADR_UGENCE_AGENT_CONSTITUTION_AMENDMENT_ROUND_RATIFICATION.md).
 Three required fields land and **no public name is added, removed or renamed** — the
-curated surface stays at fifty-one (`ACC-AM-5`), which is why the import block and the
-51-name statement above are unchanged by this release.
+curated surface stayed at fifty-one at this release (`ACC-AM-5`), which is why the import
+block above was unchanged by it. It reached fifty-two later, at `0.5.0`, for a reason
+unrelated to this binding.
 
 * `CognitiveRoleContract` bears **`constitution_ref`** (`ACC-AM-1`) — a required reference
   to an externally issued, signed, versioned and revocable Policy Authority agent
@@ -221,10 +222,20 @@ Status: S1 contracts and equations implemented, drift-tested against a pinned
 public-API snapshot; at `0.2.0`, candidate selection under selection-policy v1 and the
 **injected** `DomainEvaluationProvider` boundary shipped with it (OD-7 through OD-10);
 at `0.3.0`, Reasoning Strategy Permission and the **injected** `StrategyPolicyResolver`
-boundary (S2-B); at `0.3.1`, the resolver-answer boundary hardening; and at `0.4.0`, the
+boundary (S2-B); at `0.3.1`, the resolver-answer boundary hardening; at `0.4.0`, the
 `OD-C1=B` constitution binding — `constitution_ref` on the role contract and the
 package-stamped constitution identity pair inside `P_unsigned` — with the curated surface
-unmoved at fifty-one names.
+unmoved at fifty-one names; at `0.5.0`, `RM-3`'s `ReasoningMethodAdvisoryInput`, the one
+name that took the surface to **fifty-two**, carrying an *admitted* reasoning-method
+advisory into the process record as typed input; and at `0.6.0`, `SCR-1`'s optional
+`result_signature_receipt_digest` on that input — one field, no public name, and
+`P_unsigned` untouched by either, so **no advisory digest moves after `0.4.0`**.
+
+Both of the last two are references, never verdicts: this package records that an
+admission and a signature verification happened elsewhere, and performs neither. Whether
+a reasoning-method advisory was admitted, and whether an engine's comparison result was
+signed, are the Reasoning Method Advisor's and the Trusted Evidence Authority's to
+establish — not this package's, and not readable from here.
 Not pilot-validated, not production-certified. Nothing in this package has been
 exercised against a real workload. What remains absent: **concrete domain evaluators**
 (the provider is supplied by the caller and this package embeds none), **substantive
