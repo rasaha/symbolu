@@ -103,7 +103,11 @@ def test_dockerfile_runs_non_root_exposes_one_port_and_holds_no_secret():
     assert "USER 10001:10001" in df and "--uid 10001" in df and "--gid 10001" in df
     assert [ln for ln in df.splitlines() if ln.strip().startswith("EXPOSE")] == ["EXPOSE 8444/tcp"]
     assert "HEALTHCHECK" in df and 'ENTRYPOINT ["python", "-m", "governed_runtime_worker"]' in df
-    assert 'VOLUME ["/var/lib/ugence-review"]' in df
+    # No VOLUME instruction: Railway rejects one, and the image could not be built there
+    # with it present. Durability is the deployment's to provide by mounting a volume at
+    # the data directory, which the image can no longer require — see RW-6's [G].
+    assert "VOLUME" not in df
+    assert "/var/lib/ugence-review" in df, "the image still creates and owns the data directory"
     for forbidden in ("DATABASE_URL=", "postgresql://", "PASSWORD", "PRIVATE KEY", "_TOKEN", "ARG ", "npm", "node:"):
         assert forbidden not in df, forbidden
     assert f'org.opencontainers.image.version="{worker.__version__}"' in df
