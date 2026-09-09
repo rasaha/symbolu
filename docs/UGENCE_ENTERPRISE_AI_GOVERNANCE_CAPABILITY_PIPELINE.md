@@ -604,7 +604,8 @@ These packages do not represent a single business step. They provide the common 
 `ugence_agent_value_readiness`. `ADR_UGENCE_STUDIO_FRONT_DOOR_SCOPING.md` row 7
 names this package as the readiness artifact behind the Simulate screen, but that
 screen BLOCKs by design in P3E and `console-api` does not import the package, so
-the consumer is **intended, not existing**, and no workstream owns the wiring.
+the consumer is **intended, not existing**. The 2026-09-09 ruling names the
+**Studio Simulate / front-door workstream** as that future consumer.
 What gates any end-to-end use: `assess_readiness` ships only deny-all verifiers, so
 with a working policy resolver any policy carrying an applicable gate cannot reach a
 headline classification. A conforming `GateResultVerifier` composes three
