@@ -73,6 +73,10 @@ reasoning exempt from it?
 
 ### D-2 — Where does the provider run, and what happens to CR-5?
 
+**Owner's stated preference: `SEPARATE_EGRESS_UNIT`** — keep the worker private and
+preserve CR-5 rather than allow it to call vendors. Recorded as a preference; the decision
+is open, and §4b states what each option costs.
+
 | Option | Consequence |
 |---|---|
 | `AMEND_CR_5_ALLOWLIST_VENDOR` | The worker's allowlist gains named vendor hosts. Smallest change; directly weakens the egress claim, which is currently absolute and easy to state. |
@@ -110,63 +114,107 @@ procurement scenario is non-greedy team selection under provider concentration l
 | `LIMITS_BIND_AT_EXECUTION` | The vendor mix a plan promised is the mix that runs. Closes the gap between planned and actual governance. |
 | `PLANNING_ONLY` | Concentration limits stay advisory. A plan may promise a mix the runtime does not honour, which is a gap worth stating plainly rather than discovering. |
 
-## 4a — A proposed execution sequence, and what it costs
+## 4a — The execution sequence, and where it still needs a decision
 
-A seven-step sequence has been put forward: *runtime invokes the model → the model
-produces a candidate action → the runtime converts it to a typed proposal → the control
-plane verifies policy, evidence, authority and risk → the worker persists and evaluates →
-ActionGate returns permit, deny or escalate → an authorized executor acts.*
+An earlier seven-step sequence was put forward and corrected. What follows is the
+**owner's preferred spine**, recorded with the boundaries the owner set. It is a stated
+preference, not a ratification: D-2 in particular remains open, and §4b says why.
 
-The spine matches the seams that exist. Four things in it are decisions rather than
-details, and each attaches to a ballot item above.
+### The preferred spine
 
-**ActionGate is not the last gate, and the sequence makes it one.** The deployed loop runs
-`CLEAR` after `AUTHORIZE` — Context Minimization, then Truth & Evidence, then ActionGate,
-then the Autonomous Control Plane `[V]`. Both refusals in the shipped console scenarios
-turn on precisely this: ActionGate returns `AUTHORIZED` with `reasons: ['policy_allow']`
-and the action is stopped anyway, once by operational clearance and once by the evidence
-gate. Placing ActionGate immediately before the executor leaves an operational HOLD —
-change freeze, exhausted error budget — with nowhere to live. Authorization and
-operational safety are separate questions asked in that order, and collapsing them
-forfeits the strongest property the loop currently demonstrates.
+```
+separate Agent Runtime invokes the model
+  → constrained tool-schema output
+  → typed proposal OR typed refusal
+  → Context Minimization
+  → TAP evidence verification
+  → ActionGate authorization
+  → authorization disposition recorded
+  → Autonomous Control Plane operational clearance
+  → clearance / HOLD / denial / escalation recorded
+  → named human approval workflow, when escalated
+  → executor independently verifies the clearance receipt
+  → action executes
+  → Runtime Assurance verifies and records the outcome
+```
 
-**Step 1 answers D-2 without ratifying it.** "The runtime invokes the model" places model
-egress inside the worker, whose only permitted egress is the JWKS host (CR-5). That is a
-defensible answer — it is `AMEND_CR_5_ALLOWLIST_VENDOR` — but it must be chosen, not
-inherited from a diagram.
+The distinction the spine preserves, and the reason ActionGate cannot be the last gate:
 
-**The conversion step carries the risk the sequence gives it no weight for.** Free model
-output becoming a typed proposal is where prompt injection and misrepresentation land, and
-in this ordering the converter sits downstream of untrusted output with no independent
-check. Two properties belong in whatever D-1 ratifies: the model emits through a
-**constrained tool schema** rather than free text parsed afterwards, and **"this output
-maps to no proposable action" is a first-class typed refusal**, not an exception. A
+> **Authorization** answers whether the action is allowed in principle.
+> **Clearance** answers whether it is safe and appropriate to execute *now*.
+
+Both shipped console refusals turn on exactly that separation: ActionGate returns
+`AUTHORIZED` with `reasons: ['policy_allow']` and the action is stopped anyway, once by
+operational clearance under a change freeze and once by the evidence gate `[V]`. The
+deployed order is already Context Minimization → TAP → ActionGate → Autonomous Control
+Plane `[V]`.
+
+### The boundaries the owner set
+
+1. **Vendor-model egress is not ratified.** `AMEND_CR_5_ALLOWLIST_VENDOR` stays an explicit
+   D-2 decision and is not implied by this spine — see §4b.
+2. **Record at more than one point.** The proposal and its evidence are persisted *before*
+   evaluation; the authorization and operational-clearance dispositions are persisted
+   *before* execution. Recording is a precondition of acting, not a consequence of it.
+3. **Authorization and clearance are separate and non-substitutable.** Neither may stand in
+   for the other, and neither may be skipped because the other passed.
+4. **An escalation is routed to a named, scoped human approver**, carrying an approval
+   reference and an expiry. Escalation is a destination, not a status.
+5. **The executor independently verifies the clearance receipt** — its `cer-…` identifier,
+   the action it binds to, its scope, its expiry and its integrity — rather than trusting
+   its caller.
+6. **The execution outcome is recorded afterward through Runtime Assurance.**
+
+### What each boundary rests on today
+
+| Boundary | Repository state |
+|---|---|
+| Ordered authorize-then-clear | Implemented and demonstrated `[V]` |
+| Clearance receipts exist to be verified | `cer-…` identifiers ride every disposition, and `clearance_receipts.json` is part of each scenario `[V]` |
+| An approval workflow to escalate into | `ugence-approval-workflow` and the approver identity adapter are composed into the worker `[V]`; the approver stays `PRESENTED_UNPROVEN` until AP-3 is validated `[G]` |
+| Constrained tool-schema output | Nothing. No model call exists, so no output contract does either `[G]` |
+| Executor-side receipt verification | Nothing. No executor exists, and no code verifies a receipt's binding, scope, expiry or integrity `[G]` |
+| Runtime Assurance | `packages/integration/risk-authority-runtime-assurance` exists (RA-7) but is **not installed in the worker image** — the Dockerfile copies `risk-authority-runtime` and `risk-authority-status-runtime` and not this one `[V]` |
+
+**One correction to boundary 6 as written.** RA-7 does not "verify" an execution in the
+sense of validating it. Its own contract says `RA-7 OBSERVES AND ASSESSES. RA-6 OWNS
+AUTHORITY CONSEQUENCES.`: it risk-types the trajectory, emits a neutral
+`AuthorityReassessmentSignal` on material deviation, and RA-6 enforces the consequence
+*at the next commit* `[V]`. So Runtime Assurance cannot un-execute an action. It records
+the outcome and changes what is permitted next. Stated that way it is a strong final step;
+stated as verification it would promise a rollback the design does not have.
+
+**Two `[G]`s worth naming before they are assumed.** A typed refusal from the conversion
+step — "this output maps to no proposable action" — must be first-class, because a
 converter that always yields a proposal is the same defect as a planner that always yields
-a team — and the studio already refuses to be that (`NO_FEASIBLE_TEAM`) `[V]`.
+a team, which the studio already refuses to be `[V]`. And the approver a human approval
+routes to is presented and unproven until AP-3's validation; an escalation today would name
+an approver the deployment cannot authenticate.
 
-**Two steps are absent.**
+## 4b — D-2 is a cost, not a consequence
 
-- *Record before act.* Nothing in the sequence persists the decision before the executor
-  runs. Today every disposition carries a correlation id and a clearance id and the ledger
-  appends `[V]`; left implicit, the audit becomes a side effect of execution rather than a
-  precondition for it. This is D-4's subject, and D-4 governs only *what* is recorded —
-  *when* is a separate property and should be stated with it.
-- *The destination of an escalation.* "Permit, deny or escalate" names no recipient. The
-  approval workflow and approver identity adapter already exist for this, behind AP-3's
-  validation. Without a step, escalate is a status with no consumer.
+The spine places the model call in a **separate Agent Runtime** with controlled vendor
+egress, which submits typed proposals inward. The governance worker stays private and keeps
+its existing restricted egress. That is `SEPARATE_EGRESS_UNIT` in D-2, and it preserves
+CR-5 intact rather than amending it.
 
-**Step 7 is a convention unless the executor checks.** "Only an authorized executor
-performs the action" holds only if the executor **verifies the clearance receipt itself**
-rather than trusting its caller. The `cer-…` clearance ids exist and are already carried on
-every disposition `[V]`; making the executor verify one turns the sentence into a control.
-Otherwise anything that can reach the executor can act, whatever the diagram says.
+**This is the owner's stated preference and it is recorded as such, not as ratified.**
+D-2 stays open, and it stays open in both directions:
 
-**The sequence with these applied:** invoke → constrained output → typed proposal **or
-typed refusal** → policy, evidence, authority → **record** → authorize → **clear** →
-permit, deny or **escalate to a named human** → executor **verifies the receipt** → act.
+- Choosing the separate runtime **costs a deployment unit, a new trust boundary and a new
+  CR-family ruling** for what may cross it. Nothing in this repository implements that
+  boundary today `[G]`.
+- Choosing `AMEND_CR_5_ALLOWLIST_VENDOR` costs the egress claim — currently absolute, and
+  worth stating in one sentence: *the worker calls one host, and that host is your identity
+  provider*.
 
-This section proposes; it ratifies nothing. Whether the loop is arranged this way is part
-of D-1, and where the first step runs is D-2.
+**Ratify `AMEND_CR_5_ALLOWLIST_VENDOR` only if there is a concrete need for the worker
+itself — not the separate Agent Runtime — to call a model vendor.** No such need is
+recorded in this repository today `[G]`. Until one is, the amendment buys nothing and
+spends a claim.
+
+Nothing in §4a or §4b ratifies anything. Whether the loop is arranged this way is part of
+D-1; where the first step runs is D-2; and both remain unanswered.
 
 ## 5 — What this document does not do
 
