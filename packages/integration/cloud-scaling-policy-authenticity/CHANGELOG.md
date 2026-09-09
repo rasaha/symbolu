@@ -1,5 +1,56 @@
 # Changelog — ugence-cloud-scaling-policy-authenticity
 
+## 0.11.0 — carrying the authority's exclusivity refusal
+
+The consumer half of the `ACC-OVL` round, enumerated in advance under
+`ACC-OVL-5`. Additive: one outcome member, one mapping entry, nothing removed and
+no existing outcome re-pointed.
+
+Policy Authority `0.5.0` added `PolicyResolutionReason.EXCLUSIVITY_CONFLICT`.
+The reason mapping is total and injective over the authority's refusals, so it
+needs its own member here: **`EXCLUSIVITY_CONFLICT`** — another simultaneously
+effective version holds an equal exclusivity claim and no verified supersession
+permits it.
+
+**One member, not two.** The suspension round needed a paired
+`*_INTEGRITY_INVALID`; this round introduces no store of signed records and so
+has no separate integrity failure mode.
+
+`[R]` It deliberately does **not** join `TEMPORAL_OUTCOMES`. A conflict is a
+property of two artifacts' declared intervals, not of the injected `as_of`:
+moving `as_of` cannot turn an unresolved overlap into a resolved one, which is
+exactly what membership of that set would imply.
+
+The authority pin moves from `0.4.0` to `0.5.0` — the pin doing its job again.
+
+## 0.10.0 — carrying the authority's two suspension refusals
+
+The consumer half of the `ACC-SUSP` round, enumerated in advance under
+`ACC-SUSP-4` and authorized by `ACC-SUSP-IA-5`. Additive, on `0.9.0`'s exact
+precedent: two new outcome members, two new mapping entries, nothing removed and
+no existing outcome re-pointed.
+
+Policy Authority `0.4.0` added `PolicyResolutionReason.SUSPENDED` and
+`SUSPENSION_INTEGRITY_INVALID`. This package's reason mapping is **total** over
+the authority's refusals and **injective**, so each new reason needs its own
+member here or the suite fails:
+
+- **`POLICY_SUSPENDED`** — a verified suspension applies at the injected instant.
+  Named on `POLICY_SUPERSEDED`'s precedent. Distinct from `REVOKED` (terminal)
+  and `POLICY_SUPERSEDED` (replaced): a pause can be lifted, so a later `as_of`
+  may resolve.
+- **`SUSPENSION_INTEGRITY_INVALID`** — the stored suspension history cannot be
+  trusted. Neither honoured nor ignored.
+
+`POLICY_SUSPENDED` joins `TEMPORAL_OUTCOMES`: a pause applies from its signed
+instant and can be lifted at a later one, so which side of it an answer falls on
+is decided by the injected `as_of` — the same property that put `REVOKED` there.
+
+**The moving pin moved.** `tests/test_phase5a_untouched.py` pinned the authority
+at `0.3.1`; it now pins `0.4.0`. That is the pin doing its job rather than being
+loosened (`ACC-LC-IA-BASE-A1`): a change in the authority surfaced **here**, in a
+consumer, exactly as `0.2.0`'s supersession round did.
+
 ## 0.9.0 — carrying the authority's two supersession refusals
 
 The change authorized by `ACC-LC-IA-BASE-A1` (see

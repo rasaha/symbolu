@@ -18,12 +18,15 @@ declared vocabulary sets must stay within.
 
 ## Status — what this distribution does and does not make true
 
-It makes an agent constitution **issuable**. It does **not** make constitution
-conformance verifiable end to end: a family that can be issued still needs the
-conformance distribution's concrete resolver and structural verifier, which ship
-separately as their own change set (`ACC-S1-Q2`), and first release additionally
-awaits the separately balloted `OD-C1=B` contract-amendment round. Until those
-land, nothing here should be read as saying otherwise.
+It makes an agent constitution **issuable**. It does **not**, alone, make
+constitution conformance verifiable end to end: replay needs the conformance
+distribution's concrete resolver and structural verifier. Those shipped as their
+own `ACC-S1-Q2` change set, and the `OD-C1=B` contract-amendment round that first
+release additionally required has since been ratified (`ACC-AM-IMPL=YES`) and
+implemented — so neither condition is outstanding. What remains outstanding is
+operational and outside this repository: no `ACC-FC-5` gate is closed, and **no
+constitution has been issued or activated**. Nothing here should be read as
+saying otherwise.
 
 ## What it is
 

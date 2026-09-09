@@ -5,6 +5,154 @@ All notable changes to this package are documented here. The surface snapshot in
 `tests/packaging/test_public_api.py`, including dataclass field order and the
 exact value of every string constant.
 
+## 0.5.0 — the family-neutral exclusivity seam (the `ACC-OVL` round)
+
+The change set authorized by `ACC-OVL-7` (see
+`docs/architecture/ADR_UGENCE_AGENT_CONSTITUTION_RECONCILIATION_SUSPENSION_AND_OVERLAP_RULINGS.md`
+§9 and `AGENT_CONSTITUTION_GOVERNED_ROLE_OVERLAP_SEAM_DESIGN.md`). Additive: two
+new public names, one new resolution reason, one optional descriptor field.
+**Nothing removed or renamed, and no digest moved.**
+
+The invariant: **two simultaneously effective versions may not hold an equal
+exclusivity claim within the same tenant and scope**, unless an explicitly
+verified supersession permits it.
+
+### Added
+
+- **`ExclusivityClaim`** — a frozen `(namespace, subject)` token an adapter
+  projects. The core compares these for **equality and never parses them**; that
+  is the whole of what keeps the seam family-neutral. Scope and tenant are
+  deliberately **not** fields: they are read from the artifact's own coordinate
+  at comparison time, so an adapter cannot restate them and thereby widen its own
+  claim's reach.
+- **`PolicyArtifactDescriptor.exclusivity_claims`** — optional, defaulting to
+  empty. Every family with no exclusivity semantics projects nothing, constructs
+  exactly as before, and is unaffected — including in cost, since both call sites
+  skip the work entirely when an artifact claims nothing.
+- **`PolicyExclusivityError`** and **`PolicyResolutionReason.EXCLUSIVITY_CONFLICT`**
+  — the issuance refusal and the resolution reason. One reason member, not two:
+  this round adds no store of signed records, so it has no separate integrity
+  failure mode to name.
+- **`PolicyRegistry.issued_records_for_family`** — every issued version of one
+  family within one scope and tenant. Exclusivity is compared *across* policy
+  identities, which `issued_records_for_identity` cannot answer.
+
+### Enforced in two places, on purpose
+
+**At issuance**, before the digest, before approval, before signing and before
+any mutation — registry reads only, on `require_admissible_supersession`'s exact
+precedent. **At resolution**, re-derived rather than trusted, because
+issuance-time enforcement alone would be a check at the door on a store that can
+be filled another way — the same reasoning that re-verifies a stored revocation
+on every use.
+
+`[R]` **No order breaks a tie** (`ACC-OVL-3`). Registration, mapping and arrival
+order are all barred; an unresolved overlap **refuses**, both ways round.
+
+### Two judgements, both resolved toward refusal
+
+- **A record no adapter can describe is a conflict, not an absence.** Its claims
+  are unreadable, and an unreadable incumbent is exactly the "unresolved" case
+  that must refuse. Skipping it would let such a record silently release what it
+  governs.
+- **A suspended version keeps its claims.** Revocation and supersession are
+  terminal and release them; a pause is not a release. If a paused version
+  released its claim, a second artifact could take it and the reinstatement would
+  create precisely the overlap this invariant forbids, with no act left to refuse
+  it.
+
+### Changed — a deviation from the recorded design, and why
+
+`[R]` The design document costed a **claims index** with a `v3` sqlite schema.
+The implementation **derives** claims from the authoritative issuance records
+instead, and the schema is **unchanged at `v2`**. A side index can drift from the
+records it describes — a write that lands without its index entry leaves a claim
+invisible, which fails *open* — while a derivation cannot. The read is bounded to
+one family within one scope and tenant, and is skipped entirely for artifacts
+that claim nothing, so the cost the index existed to avoid does not arise.
+
+### Scope, stated plainly
+
+`[G]` Like supersession and suspension before it, this invariant is
+**unexercisable in production on the day it lands**: no constitution has been
+issued and the `ACC-FC-5` gates are shut. Nothing here issues or activates a
+constitution, closes a gate, or grants any execution authority. `ACC-OVL-8`:
+**delegation is deferred**, not implemented — the exception is supersession and
+nothing else.
+
+## 0.4.0 — signed, reversible policy-version suspension (the `ACC-SUSP` round)
+
+The change set authorized by `ACC-SUSP-IA-1` and settled by `ACC-SUSP-IA-7` (see
+`docs/architecture/ADR_UGENCE_AGENT_CONSTITUTION_RECONCILIATION_SUSPENSION_AND_OVERLAP_RULINGS.md`,
+over the `ACC-SUSP-BASE`/`ACC-SUSP-1`..`ACC-SUSP-5` ratification). Additive: six
+new public names, two new resolution reasons, **nothing removed or renamed, and
+no existing digest moved**.
+
+Suspension is a **pause**, not a withdrawal and not a replacement. Revocation
+stays terminal, supersession stays a replacement, and none of the three implies
+another.
+
+### Added
+
+- **`suspend_policy` / `reinstate_policy`** — the two signed acts, sharing one
+  entitlement (`ACC-SUSP-3`: an authority that may pause may unpause). Every
+  instant is caller-supplied; no clock is read.
+- **`PolicySuspensionRecord`, `PolicySuspensionAction`, `PolicySuspensionError`,
+  `verify_suspension_record`** — the record, its two-member act vocabulary, the
+  typed refusal, and the verifier that runs at write time **and again
+  independently at every resolution**.
+- **`KeyEntitlement.SUSPEND_POLICY`** — deliberately **not** a reuse of
+  `REVOKE_POLICY`. Reusing it would have silently widened every already-
+  registered revoker's authority to include pausing: a privilege change to
+  existing trust anchors, delivered by a library upgrade. A new member means no
+  existing key gains a new power.
+- **`PolicyResolutionReason.SUSPENDED` and `SUSPENSION_INTEGRITY_INVALID`** —
+  enumerated in advance under `ACC-SUSP-4`, with their two required
+  `cloud-scaling-policy-authenticity` counterparts landing in that package's
+  `0.10.0`.
+- **An ordered suspension store** on both registries, and its own signing domain
+  (`SUSPENSION_SIGNING_DOMAIN`) carrying the **action** inside the signed frame,
+  so a `SUSPEND` signature can never be presented as the `REINSTATE` that lifts
+  it.
+
+### The three ordering rules (`ACC-SUSP-IA-7`)
+
+This is the first state in this authority whose current value is not simply *"a
+record exists"*, so the ordering rule has to be total and unambiguous. It is
+enforced at append time **and** re-derived at every resolution, because a history
+assembled another way — a hand-edited database, a restored backup, a registry
+with a bug — must still fail closed rather than be believed.
+
+1. **Equal signed instants are refused.** Two *distinct* records may not share
+   one instant. An **exact replay** of a stored record is an idempotent no-op,
+   not a second append.
+2. **An earlier candidate is refused, never sorted into place.** A candidate's
+   instant must be strictly later than the latest accepted record's. `[R]` The
+   ground, recorded because it is load-bearing: sorting arbitrary arrivals would
+   make *whether a reinstatement is an orphan* depend on **delivery order**,
+   which is exactly what rule 3 exists to deny.
+3. **A reinstatement is valid only from a suspended state.** It cannot
+   manufacture the transition it claims to reverse.
+
+### Changed
+
+- **`SQLITE_REGISTRY_SCHEMA_VERSION` is now `…/registry-sqlite/v2`.** `[R]` The
+  bump is deliberate and fail-closed: a `v1` binary opening a database carrying
+  suspension history would not read the new table, and would therefore resolve a
+  **suspended** policy as valid. Refusing to open is the safe failure. Nothing
+  needs migrating — no policy has ever been issued.
+
+### Scope, stated plainly
+
+`[G]` Suspension is **unexercisable in production on the day it lands**, exactly
+as supersession is and for the same reason: nothing has ever been issued and the
+`ACC-FC-5` gates are shut. Under `ACC-SUSP-IA-4` it is exercised through
+deterministic tests and fixtures only. Nothing here issues, activates or suspends
+a genuine constitution, names an approving authority, takes custody of a signing
+key, closes any gate, adds an administration endpoint, or grants ActionGate or
+execution authority. `ACC-SUSP-1` holds: no act writes `lifecycle_state`, and
+`ADMITTED_LIFECYCLE_STATES` stays closed exactly as ratified.
+
 ## 0.3.1 — decode_dataclass is public
 
 - `decode_dataclass(cls, value, *, path)` is exported from the curated surface. It is

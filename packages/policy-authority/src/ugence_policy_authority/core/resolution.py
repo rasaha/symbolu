@@ -83,7 +83,17 @@ from .errors import (
 from .records import PolicyResolution
 from .registry import PolicyRegistry
 from .revocation import verify_revocation_record
+from .exclusivity import (
+    PolicyExclusivityError,
+    conflicting_holders,
+    effective_claim_holders,
+)
 from .supersession import verify_supersession_record
+from .suspension import (
+    suspension_sequence_defect,
+    suspension_state_at,
+    verify_suspension_record,
+)
 from .signing import PolicySignatureVerifier
 from .statuses import (
     HistoricalResolutionRule,
@@ -91,6 +101,7 @@ from .statuses import (
     KeyVerificationStatus,
     PolicyResolutionReason,
     PolicyResolutionStatus,
+    PolicySuspensionAction,
 )
 
 __all__ = ["resolve_policy"]
@@ -330,6 +341,89 @@ def resolve_policy(
         # ALLOW_BEFORE_REVOCATION: the answer is explicitly historical and is
         # labelled so it can never be read as current validity.
         historical = True
+
+    # -- policy-version suspension (`ACC-SUSP-IA-7`) ------------------------
+    # Last of the three lifecycle stores, and deliberately so: revocation is
+    # terminal and supersession is a replacement, so either is the more
+    # informative answer when it applies. Suspension is a reversible pause.
+    #
+    # Two independent things are checked, in this order. First the stored history
+    # must be *well-formed* — every record verifies, the sequence is strictly
+    # monotonic, and every transition is valid. Then, and only then, the latest
+    # record effective at `as_of` decides. A history that cannot be trusted is
+    # never interpreted: it fails closed, on REVOCATION_INTEGRITY_INVALID's exact
+    # precedent, rather than being partially believed or ignored.
+    suspensions = registry.suspensions_for(coordinate)
+    if suspensions:
+        for suspension in suspensions:
+            verification = verify_suspension_record(
+                suspension,
+                coordinate=coordinate,
+                signature_verifier=signature_verifier,
+                as_of=as_of,
+            )
+            if not verification.valid:
+                return deny(
+                    PolicyResolutionReason.SUSPENSION_INTEGRITY_INVALID,
+                    f"a suspension record targets this version but does not verify: "
+                    f"{verification.status.value}",
+                )
+        defect = suspension_sequence_defect(suspensions)
+        if defect is not None:
+            return deny(
+                PolicyResolutionReason.SUSPENSION_INTEGRITY_INVALID,
+                f"the stored suspension history is inadmissible: {defect}",
+            )
+        current = suspension_state_at(suspensions, as_of=as_of)
+        if current is not None and current.action is PolicySuspensionAction.SUSPEND:
+            return deny(
+                PolicyResolutionReason.SUSPENDED,
+                f"suspended at {current.effective_at.isoformat()}",
+            )
+
+    # -- exclusivity (`ACC-OVL-1`..`ACC-OVL-3`) ----------------------------
+    # Re-derived here rather than trusted from issuance. Issuance-time
+    # enforcement alone would be a check at the door on a store that can be
+    # filled another way — the same reasoning that re-verifies a stored
+    # revocation on every use. Last, because it is the only check that reads
+    # *other* versions, and skipped outright when this artifact claims nothing,
+    # so no existing family pays for it.
+    if descriptor.exclusivity_claims:
+        try:
+            holders = effective_claim_holders(
+                records=registry.issued_records_for_family(
+                    policy_family=coordinate.policy_family,
+                    scope=coordinate.scope,
+                    tenant_id=coordinate.tenant_id,
+                ),
+                adapters=adapters,
+                registry=registry,
+                exclude=coordinate,
+            )
+        except PolicyExclusivityError as exc:
+            # An incumbent whose claims cannot be read is unresolved, not absent.
+            return deny(PolicyResolutionReason.EXCLUSIVITY_CONFLICT, str(exc))
+        permitted = tuple(
+            supersession.coordinate
+            for supersession in registry.supersessions_for(coordinate)
+        )
+        conflicts = conflicting_holders(
+            claims=descriptor.exclusivity_claims,
+            coordinate=coordinate,
+            effective_from=descriptor.effective_from,
+            effective_to=descriptor.effective_to,
+            holders=holders,
+            permitted=permitted,
+        )
+        if conflicts:
+            key, holder = conflicts[0]
+            return deny(
+                PolicyResolutionReason.EXCLUSIVITY_CONFLICT,
+                f"{key[1]!r} in {key[0]!r} is also governed by "
+                f"{holder.coordinate.policy_id}@{holder.coordinate.version} over an "
+                "overlapping effective period; an unresolved overlap is refused, never "
+                "decided by registration or arrival order",
+            )
 
     return PolicyResolution(
         status=PolicyResolutionStatus.RESOLVED,

@@ -45,9 +45,11 @@ from .codec import (
     decode_issued_record,
     decode_revocation_record,
     decode_supersession_record,
+    decode_suspension_record,
     encode_issued_record,
     encode_revocation_record,
     encode_supersession_record,
+    encode_suspension_record,
     identity_slot_key,
 )
 from .consistency import PolicyRegistryConsistencyDescriptor, PolicyRegistryConsistencyScope
@@ -60,12 +62,18 @@ from .records import (
     IssuedPolicyRecord,
     PolicyRevocationRecord,
     PolicySupersessionRecord,
+    PolicySuspensionRecord,
 )
 from .registry import _record_bytes
 
 __all__ = ["SqlitePolicyRegistry", "SQLITE_REGISTRY_SCHEMA_VERSION"]
 
-SQLITE_REGISTRY_SCHEMA_VERSION = "ugence.policy-authority/registry-sqlite/v1"
+#: `ACC-SUSP-IA-7` bumped this to ``v2`` when the suspensions table landed.
+#: The bump is deliberate and fail-closed: a ``v1`` binary opening a database
+#: that carries suspension history would not read the table, and would therefore
+#: resolve a **suspended** policy as valid. Refusing to open is the safe failure.
+#: Nothing needs migrating — no policy has ever been issued.
+SQLITE_REGISTRY_SCHEMA_VERSION = "ugence.policy-authority/registry-sqlite/v2"
 _GENESIS = "0" * 64
 
 _SCHEMA = """
@@ -82,6 +90,11 @@ CREATE TABLE IF NOT EXISTS revocations (
 CREATE TABLE IF NOT EXISTS supersessions (
     predecessor_key TEXT PRIMARY KEY, successor_key TEXT NOT NULL,
     record_bytes BLOB NOT NULL, payload_json TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS suspensions (
+    coordinate_key TEXT NOT NULL, seq INTEGER NOT NULL, effective_at TEXT NOT NULL,
+    action TEXT NOT NULL, record_bytes BLOB NOT NULL, payload_json TEXT NOT NULL,
+    PRIMARY KEY (coordinate_key, seq));
+CREATE INDEX IF NOT EXISTS suspensions_coordinate ON suspensions (coordinate_key, seq);
 CREATE TABLE IF NOT EXISTS ledger_events (
     seq INTEGER PRIMARY KEY, kind TEXT NOT NULL, subject_key TEXT NOT NULL,
     record_digest TEXT NOT NULL, prev_digest TEXT NOT NULL, chain_digest TEXT NOT NULL);
@@ -97,6 +110,10 @@ CREATE TRIGGER IF NOT EXISTS supersessions_no_update BEFORE UPDATE ON supersessi
     BEGIN SELECT RAISE(ABORT, 'supersessions is append-only'); END;
 CREATE TRIGGER IF NOT EXISTS supersessions_no_delete BEFORE DELETE ON supersessions
     BEGIN SELECT RAISE(ABORT, 'supersessions is append-only'); END;
+CREATE TRIGGER IF NOT EXISTS suspensions_no_update BEFORE UPDATE ON suspensions
+    BEGIN SELECT RAISE(ABORT, 'suspensions is append-only'); END;
+CREATE TRIGGER IF NOT EXISTS suspensions_no_delete BEFORE DELETE ON suspensions
+    BEGIN SELECT RAISE(ABORT, 'suspensions is append-only'); END;
 CREATE TRIGGER IF NOT EXISTS ledger_no_update BEFORE UPDATE ON ledger_events
     BEGIN SELECT RAISE(ABORT, 'ledger_events is append-only'); END;
 CREATE TRIGGER IF NOT EXISTS ledger_no_delete BEFORE DELETE ON ledger_events
@@ -278,6 +295,19 @@ class SqlitePolicyRegistry:
         matches = [decode_issued_record(json.loads(r[0]), self._codec) for r in rows]
         return tuple(sorted(matches, key=lambda r: (r.coordinate.version, r.record_id)))
 
+    def issued_records_for_family(
+        self, *, policy_family: str, scope: str, tenant_id: str
+    ) -> tuple[IssuedPolicyRecord, ...]:
+        # Uses the existing issuances_identity index, whose leading column is
+        # policy_family — no new table and no schema change.
+        rows = self._read().execute(
+            "SELECT payload_json FROM issuances WHERE policy_family=? AND scope=? AND tenant_id=?",
+            (policy_family, scope, tenant_id)).fetchall()
+        matches = [decode_issued_record(json.loads(r[0]), self._codec) for r in rows]
+        return tuple(
+            sorted(matches, key=lambda r: (r.coordinate.policy_id, r.coordinate.version, r.record_id))
+        )
+
     # ------------------------------------------------------------------
     # Revocation
     # ------------------------------------------------------------------
@@ -352,6 +382,62 @@ class SqlitePolicyRegistry:
                    canonical_dumps(encode_supersession_record(record))))
         self._append_event(c, "supersession", key, encoded)
         return record
+
+    def append_suspension(self, record: PolicySuspensionRecord) -> PolicySuspensionRecord:
+        if not isinstance(record, PolicySuspensionRecord):
+            raise PolicyRegistryConflictError("append_suspension requires a PolicySuspensionRecord")
+        with self._tx() as c:
+            return self._append_suspension_in(c, record)
+
+    def _append_suspension_in(self, c: sqlite3.Connection,
+                              record: PolicySuspensionRecord) -> PolicySuspensionRecord:
+        coordinate = record.coordinate
+        key = coordinate_key(coordinate)
+        encoded = canonical_bytes(record)
+
+        rows = c.execute(
+            "SELECT seq, effective_at, record_bytes, payload_json FROM suspensions "
+            "WHERE coordinate_key=? ORDER BY seq", (key,)).fetchall()
+
+        # An exact replay is an idempotent no-op, not a second append.
+        for row in rows:
+            if bytes(row[2]) == encoded:
+                return decode_suspension_record(json.loads(row[3]))
+
+        if rows:
+            # Compare instants as datetimes, decoded from the stored record —
+            # never as strings. A textual comparison would silently depend on the
+            # timestamp format staying fixed-width and UTC-normalised.
+            latest = decode_suspension_record(json.loads(rows[-1][3]))
+            if record.effective_at == latest.effective_at:
+                raise PolicyRegistryConflictError(
+                    f"a different suspension record already carries the instant "
+                    f"{record.effective_at.isoformat()} for "
+                    f"{coordinate.policy_id}@{coordinate.version}; two distinct records "
+                    "may not share one signed instant")
+            if record.effective_at < latest.effective_at:
+                raise PolicyRegistryConflictError(
+                    f"suspension records are append-forward: "
+                    f"{record.effective_at.isoformat()} is earlier than the latest stored "
+                    f"{latest.effective_at.isoformat()} for "
+                    f"{coordinate.policy_id}@{coordinate.version}")
+            seq = rows[-1][0] + 1
+        else:
+            seq = 0
+
+        c.execute("INSERT INTO suspensions VALUES (?,?,?,?,?,?)",
+                  (key, seq, record.effective_at.isoformat(), record.action.value, encoded,
+                   canonical_dumps(encode_suspension_record(record))))
+        self._append_event(c, "suspension", key, encoded)
+        return record
+
+    def suspensions_for(self, coordinate: PolicyCoordinate) -> tuple[PolicySuspensionRecord, ...]:
+        if not isinstance(coordinate, PolicyCoordinate):
+            return ()
+        rows = self._read().execute(
+            "SELECT payload_json FROM suspensions WHERE coordinate_key=? ORDER BY seq",
+            (coordinate_key(coordinate),)).fetchall()
+        return tuple(decode_suspension_record(json.loads(row[0])) for row in rows)
 
     def supersessions_for(self, coordinate: PolicyCoordinate) -> tuple[PolicySupersessionRecord, ...]:
         if not isinstance(coordinate, PolicyCoordinate):

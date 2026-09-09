@@ -33,8 +33,9 @@ from .records import (
     IssuedPolicyRecord,
     PolicyRevocationRecord,
     PolicySupersessionRecord,
+    PolicySuspensionRecord,
 )
-from .statuses import PolicyRevocationReasonCode
+from .statuses import PolicyRevocationReasonCode, PolicySuspensionAction
 
 __all__ = [
     "PolicyArtifactCodec",
@@ -45,7 +46,9 @@ __all__ = [
     "encode_revocation_record",
     "decode_revocation_record",
     "encode_supersession_record",
+    "encode_suspension_record",
     "decode_supersession_record",
+    "decode_suspension_record",
 ]
 
 
@@ -214,6 +217,17 @@ def encode_supersession_record(record: PolicySupersessionRecord) -> dict:
 
 def decode_supersession_record(value: Any, *, path: str = "$") -> PolicySupersessionRecord:
     return decode_dataclass(PolicySupersessionRecord, value, path=path)
+
+
+def encode_suspension_record(record: PolicySuspensionRecord) -> dict:
+    return to_canonical_obj(record)
+
+
+def decode_suspension_record(value: Any, *, path: str = "$") -> PolicySuspensionRecord:
+    record = decode_dataclass(PolicySuspensionRecord, value, path=path)
+    if not isinstance(record.action, PolicySuspensionAction):
+        raise PolicyRegistryStorageError(f"{path}.action: not a suspension action")
+    return record
 
 
 def coordinate_key(coordinate: PolicyCoordinate) -> str:

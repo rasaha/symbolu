@@ -1,7 +1,7 @@
 {
   "distribution": "ugence-policy-authority",
   "namespace": "ugence_policy_authority",
-  "package_version": "0.3.1",
+  "package_version": "0.5.0",
   "curated_api_module": "ugence_policy_authority.api",
   "authority_protocol": "ugence.policy-authority",
   "authority_protocol_version": "v0.1",
@@ -19,7 +19,7 @@
     "POLICY_BODY_DIGEST_DOMAIN": "ugence.policy-authority/policy-body/v1",
     "REVOCATION_SIGNING_DOMAIN": "ugence.policy-authority/policy-revocation/v1",
     "SIGNATURE_ALG": "ed25519",
-    "SQLITE_REGISTRY_SCHEMA_VERSION": "ugence.policy-authority/registry-sqlite/v1",
+    "SQLITE_REGISTRY_SCHEMA_VERSION": "ugence.policy-authority/registry-sqlite/v2",
     "SUPERSESSION_PREDECESSOR_INADMISSIBLE": "SUPERSESSION_PREDECESSOR_INADMISSIBLE",
     "SUPERSESSION_REFERENCE_UNSUPPORTED": "SUPERSESSION_REFERENCE_UNSUPPORTED",
     "SUPERSESSION_SIGNING_DOMAIN": "ugence.policy-authority/policy-supersession/v1",
@@ -97,6 +97,13 @@
     "Ed25519PolicySigner": {
       "kind": "class"
     },
+    "ExclusivityClaim": {
+      "kind": "dataclass",
+      "fields": [
+        "namespace",
+        "subject"
+      ]
+    },
     "GLOBAL_TENANT": {
       "kind": "str_constant",
       "value": ""
@@ -140,7 +147,8 @@
       "kind": "enum",
       "values": [
         "ISSUE_POLICY",
-        "REVOKE_POLICY"
+        "REVOKE_POLICY",
+        "SUSPEND_POLICY"
       ]
     },
     "KeyVerification": {
@@ -189,7 +197,8 @@
         "supersedes_ref",
         "supersedes_coordinate",
         "effective_from",
-        "effective_to"
+        "effective_to",
+        "exclusivity_claims"
       ]
     },
     "PolicyAuthorityError": {
@@ -213,6 +222,9 @@
       ]
     },
     "PolicyDigestMismatchError": {
+      "kind": "exception"
+    },
+    "PolicyExclusivityError": {
       "kind": "exception"
     },
     "PolicyFamilyAdapter": {
@@ -296,7 +308,10 @@
         "REVOCATION_INTEGRITY_INVALID",
         "SUPERSESSION_REFERENCE_UNSUPPORTED",
         "SUPERSEDED",
-        "SUPERSESSION_INTEGRITY_INVALID"
+        "SUPERSESSION_INTEGRITY_INVALID",
+        "SUSPENDED",
+        "SUSPENSION_INTEGRITY_INVALID",
+        "EXCLUSIVITY_CONFLICT"
       ]
     },
     "PolicyResolutionStatus": {
@@ -366,6 +381,32 @@
         "authority_protocol_version"
       ]
     },
+    "PolicySuspensionAction": {
+      "kind": "enum",
+      "values": [
+        "SUSPEND",
+        "REINSTATE"
+      ]
+    },
+    "PolicySuspensionError": {
+      "kind": "exception"
+    },
+    "PolicySuspensionRecord": {
+      "kind": "dataclass",
+      "fields": [
+        "suspension_id",
+        "coordinate",
+        "action",
+        "suspending_authority_id",
+        "key_id",
+        "signature_alg",
+        "signature",
+        "effective_at",
+        "detail",
+        "authority_protocol",
+        "authority_protocol_version"
+      ]
+    },
     "PolicyVerificationKey": {
       "kind": "dataclass",
       "fields": [
@@ -390,7 +431,7 @@
     },
     "SQLITE_REGISTRY_SCHEMA_VERSION": {
       "kind": "str_constant",
-      "value": "ugence.policy-authority/registry-sqlite/v1"
+      "value": "ugence.policy-authority/registry-sqlite/v2"
     },
     "SUPERSESSION_PREDECESSOR_INADMISSIBLE": {
       "kind": "str_constant",
@@ -469,6 +510,9 @@
     "issue_policy": {
       "kind": "function"
     },
+    "reinstate_policy": {
+      "kind": "function"
+    },
     "require_admissible_supersession": {
       "kind": "function"
     },
@@ -484,6 +528,9 @@
     "sha256_hex": {
       "kind": "function"
     },
+    "suspend_policy": {
+      "kind": "function"
+    },
     "to_canonical_obj": {
       "kind": "function"
     },
@@ -494,6 +541,9 @@
       "kind": "function"
     },
     "verify_supersession_record": {
+      "kind": "function"
+    },
+    "verify_suspension_record": {
       "kind": "function"
     }
   }

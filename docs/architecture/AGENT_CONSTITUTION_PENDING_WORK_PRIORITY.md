@@ -1,5 +1,51 @@
 # Agent Constitution — pending work, prioritised
 
+> # ⚠ RETIRED — 2026-09-09. Do not plan from this document.
+>
+> **Retired as an authoritative plan by `ACC-PWP-1`**
+> ([`ADR_UGENCE_AGENT_CONSTITUTION_RECONCILIATION_SUSPENSION_AND_OVERLAP_RULINGS.md`](ADR_UGENCE_AGENT_CONSTITUTION_RECONCILIATION_SUSPENSION_AND_OVERLAP_RULINGS.md),
+> which lands in the same commit as this header). It is preserved **verbatim
+> below as historical evidence** of what was outstanding on 2026-09-01, and for
+> no other purpose. `[R]` It rules nothing, and it is superseded as a statement
+> of current fact.
+>
+> **Three specific things in it are no longer current** `[V]`:
+>
+> 1. **Its baseline does not exist.** `ab0205df` is **not an object in this
+>    repository's history**, so nothing below can be re-verified against it.
+> 2. **Its versions are behind the tree.** It pins proposer `0.4.0`, activation
+>    `0.1.0` and authority `0.2.0`; the tree carries `0.6.0`, `0.2.0` and
+>    `0.3.1`. Its public-name counts moved with them (the proposer's curated
+>    surface is fifty-two, not fifty-one).
+> 3. **Its P0 is closed.** The `LR-1`/`LR-2` `approval_digest` exclusion was
+>    ruled `LR-1=A LR-2=A` in
+>    `ADR_UGENCE_AGENT_CONSTITUTION_DEPLOYMENT_GATE_RUNBOOK_AMENDMENT.md`
+>    (commit `5d602fdbadbdcf8fe4cbe5b7f9d68e7f4e01ed00`). Its P1 items were
+>    ruled the same day — `CV2_SURFACE=YES CV2-1=A`… and
+>    `SUSP_SURFACE=YES SUSP-1=A`…
+>
+> **Every still-valid open item was migrated before retirement** (`ACC-PWP-1`
+> §4). In particular, item 5 — cross-artifact governed-role overlap — is now the
+> ratified `ACC-OVL` invariant, with a sequencing constraint: **no second
+> constitution may be issued until it is implemented and verified.**
+>
+> **Where to look instead**, by immutable commit SHA:
+>
+> | For | Read | Commit |
+> |---|---|---|
+> | The scoping rulings `OD-C1`–`OD-C5` | `ADR_UGENCE_AGENT_CONSTITUTION_AND_CONFORMANCE_SCOPING.md` | `5d602fdbadbdcf8fe4cbe5b7f9d68e7f4e01ed00` |
+> | The first slice | `ADR_UGENCE_AGENT_CONSTITUTION_FIRST_SLICE_RATIFICATION.md` | `5d602fdbadbdcf8fe4cbe5b7f9d68e7f4e01ed00` |
+> | `OD-C1=B` and `ACC-AM-IMPL=YES` | `ADR_UGENCE_AGENT_CONSTITUTION_AMENDMENT_ROUND_RATIFICATION.md` | `5d602fdbadbdcf8fe4cbe5b7f9d68e7f4e01ed00` |
+> | Issuance & activation | `ADR_UGENCE_AGENT_CONSTITUTION_ISSUANCE_ACTIVATION_RATIFICATION.md` | `5d602fdbadbdcf8fe4cbe5b7f9d68e7f4e01ed00` |
+> | The first-constitution content and the `ACC-FC-5` gates | `ADR_UGENCE_AGENT_CONSTITUTION_FIRST_CONSTITUTION_RATIFICATION.md` | `5d602fdbadbdcf8fe4cbe5b7f9d68e7f4e01ed00` |
+> | The gate runbook and `ACC-FC5R-4`'s narrowed permitted set | `ADR_UGENCE_AGENT_CONSTITUTION_DEPLOYMENT_GATE_RUNBOOK_RATIFICATION.md`, then `…_AMENDMENT.md` | `5d602fdbadbdcf8fe4cbe5b7f9d68e7f4e01ed00` |
+> | Lifecycle, supersession and suspension | `ADR_UGENCE_AGENT_CONSTITUTION_LIFECYCLE_ROUND_RATIFICATION.md`, `…_SUSPENSION_ROUND_RATIFICATION.md` | `5d602fdbadbdcf8fe4cbe5b7f9d68e7f4e01ed00` |
+> | `ACC-COUPLING`, `ACC-FACTS`, `ACC-ATTESTER` | `ADR_UGENCE_AGENT_CONSTITUTION_LIVE_ATTESTATION_SCOPING.md` | `c0e48ca3e89631ca6eab978a3a1037d114cd082a` |
+>
+> `[V]` **The one fact below that is unchanged** is the one that mattered most:
+> no constitution has ever been issued, no `ACC-FC-5` gate is closed, and **no
+> pull request can advance gates 1 or 2**.
+
 **Working document, not a ratification.** It records what is outstanding and in
 what order I would take it. It rules nothing, authorises nothing, and every
 ballot it references stays unanswered until the owner answers it.
