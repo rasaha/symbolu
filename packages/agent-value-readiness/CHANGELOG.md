@@ -39,6 +39,29 @@ authenticity remains non-forgeable, that a genuinely different instant remains
 distinct, that RA-01 remains gate-driven with no family-count heuristic, and that
 `authorizes_deployment` remains permanently `False`.
 
+### Changed — the package moved to `packages/agent-value-readiness`
+UVI ADR §26.6 was an open owner decision: `packages/capabilities/*` (provisional
+under D-4) or a top-level leaf. **Ratified 2026-09-09 as a top-level leaf**, so
+the distribution now lives at `packages/agent-value-readiness`, a peer of
+`governed-value`. That is the tiering ADR §21's dependency diagram already drew —
+both UVI engines directly above `governance-contracts` — and that §20's ownership
+table already assumed; only the directory disagreed.
+
+**Path-only.** No symbol, contract shape, field, enum value, digest,
+classification, dependency or version changed, and the `ugence_agent_value_readiness`
+namespace is untouched — an installed wheel cannot tell the difference. What moved
+with it: this package's `conftest.py`, the two probe harnesses and the distribution
+verifier (each computed `packages/` by walking up one level too many), the
+repository-root `conftest.py`, the readiness/ROI doc-drift gate, two sibling
+capability boundary tests, and three workflows.
+
+One of those siblings needed more than a path. `reasoning-method-advisor`'s
+boundary test built each slice-1 package's path as
+`packages/capabilities/<name>/src` and scanned it with `rglob`; against a
+directory that no longer exists that scan finds nothing and the assertion passes
+vacuously. It now carries each package's real location and asserts both that the
+directory exists and that at least one module was scanned.
+
 ### Fixed — a stale claim about the RA-owned subject context
 The 0.4.0 entry below and the README described PR #1432's RA-owned subject
 binding as "draft-only and unmerged". Both PRs have merged: **#1425** (the Phase 4

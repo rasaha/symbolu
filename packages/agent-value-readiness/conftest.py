@@ -11,8 +11,8 @@ import pathlib
 import sys
 
 HERE = pathlib.Path(__file__).resolve().parent
-# packages/capabilities/agent-value-readiness -> packages/capabilities -> packages
-PACKAGES = HERE.parents[1]
+# packages/agent-value-readiness -> packages
+PACKAGES = HERE.parent
 SRC = HERE / "src"
 GOV = PACKAGES / "governance-contracts" / "src"
 UVI = PACKAGES / "uvi-policy-contracts" / "src"

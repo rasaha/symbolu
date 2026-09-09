@@ -590,7 +590,7 @@ These packages do not represent a single business step. They provide the common 
 
 ### 44. Agent Value Readiness
 
-**Package:** `packages/capabilities/agent-value-readiness`  
+**Package:** `packages/agent-value-readiness`  
 **Sequence alignment:** **Define → Verify → Measure**.  
 **Pipeline role:** Produces a deterministic, advisory and non-financial readiness determination across intelligence fitness, capability readiness and adoption readiness, under governed policy and system-binding context.
 

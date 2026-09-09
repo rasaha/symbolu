@@ -1,6 +1,6 @@
 """A package README that states a version must state the version it ships.
 
-``packages/capabilities/agent-value-readiness/README.md`` said ``Version: 0.4.0``
+``packages/agent-value-readiness/README.md`` said ``Version: 0.4.0``
 while ``__init__.py`` said ``0.4.1``. The package's own ``public_api.json`` had the
 right number and its suite was green, because nothing compared the two: the
 repository's one documentation-drift gate

@@ -9,7 +9,7 @@ them is wrong — that is the point of keeping them separate.
 
 Run in-tree::
 
-    python packages/capabilities/agent-value-readiness/m3r3_adversarial_probes.py
+    python packages/agent-value-readiness/m3r3_adversarial_probes.py
 
 or against an installed wheel, from any directory::
 
@@ -30,7 +30,7 @@ from datetime import datetime, timezone
 # In-tree convenience: resolve the four sibling src trees when the package is
 # not installed. A wheel install needs none of this.
 _HERE = pathlib.Path(__file__).resolve().parent
-_PACKAGES = _HERE.parents[1]
+_PACKAGES = _HERE.parent
 for _candidate in (
     _HERE / "src",
     _PACKAGES / "governance-contracts" / "src",

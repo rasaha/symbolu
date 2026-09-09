@@ -55,8 +55,25 @@ def test_no_clock_read_anywhere():
             assert needle not in text, f"{path.name} reads a clock: {needle}"
 
 
+#: Slice-1 packages and where each one actually lives. ``agent-value-readiness``
+#: sits directly under ``packages/`` (UVI ADR §26.6, ratified 2026-09-09); the
+#: others remain under ``packages/capabilities/``. The location is carried per
+#: package rather than assumed, because a path that no longer exists makes the
+#: check below pass by finding nothing — the one failure mode a boundary test
+#: must not have.
+_SLICE_1_SOURCES = (
+    "packages/capabilities/reasoning-method-governance/src",
+    "packages/capabilities/readiness-comparison/src",
+    "packages/agent-value-readiness/src",
+)
+
+
 def test_slice_1_packages_do_not_import_the_advisor():
-    for pkg in ("reasoning-method-governance", "readiness-comparison", "agent-value-readiness"):
-        src = REPO / "packages" / "capabilities" / pkg / "src"
+    for relative in _SLICE_1_SOURCES:
+        src = REPO / relative
+        assert src.is_dir(), f"{relative} does not exist; this check would pass vacuously"
+        scanned = 0
         for path in src.rglob("*.py"):
+            scanned += 1
             assert "ugence_reasoning_method_advisor" not in path.read_text(encoding="utf-8"), path
+        assert scanned, f"no module scanned under {relative}"

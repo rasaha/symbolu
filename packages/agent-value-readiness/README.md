@@ -502,20 +502,20 @@ no second calculation route that could diverge from the ratified precedence.
 ## Install & use
 
 ```bash
-python -m build packages/capabilities/agent-value-readiness
+python -m build packages/agent-value-readiness
 pip install --find-links dist ugence-agent-value-readiness   # resolves the contract leaves + the shared authority
 ```
 
 Independent-distribution proof (builds all four wheels, installs `--no-index`):
 
 ```bash
-python packages/capabilities/agent-value-readiness/verify_agent_value_readiness_distribution.py
+python packages/agent-value-readiness/verify_agent_value_readiness_distribution.py
 ```
 
 Independent adversarial probes (public API only, no shared test fixtures):
 
 ```bash
-python packages/capabilities/agent-value-readiness/adversarial_probes.py
+python packages/agent-value-readiness/adversarial_probes.py
 ```
 
 ## Extensibility & trust notes

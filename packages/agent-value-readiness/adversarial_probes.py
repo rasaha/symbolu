@@ -9,7 +9,7 @@ hole.
 Each probe states an attack an untrusted caller might attempt and asserts the
 boundary refuses it. Run:
 
-    python packages/capabilities/agent-value-readiness/adversarial_probes.py
+    python packages/agent-value-readiness/adversarial_probes.py
 
 Exit code 0 when every probe held; non-zero on the first breach.
 """
@@ -28,9 +28,9 @@ from decimal import Decimal
 _HERE = pathlib.Path(__file__).resolve().parent
 for _path in (
     _HERE / "src",
-    _HERE.parent.parent / "governance-contracts" / "src",
-    _HERE.parent.parent / "uvi-policy-contracts" / "src",
-    _HERE.parent.parent / "policy-authority" / "src",
+    _HERE.parent / "governance-contracts" / "src",
+    _HERE.parent / "uvi-policy-contracts" / "src",
+    _HERE.parent / "policy-authority" / "src",
 ):
     if str(_path) not in sys.path:
         sys.path.insert(0, str(_path))

@@ -37,7 +37,7 @@ then proves inside that env:
   * NO ``governed_value`` / capability / product / framework / third-party package
     is importable.
 
-Run:  python packages/capabilities/agent-value-readiness/verify_agent_value_readiness_distribution.py
+Run:  python packages/agent-value-readiness/verify_agent_value_readiness_distribution.py
 Exit code 0 on success; non-zero on the first failed step.
 """
 
@@ -52,7 +52,7 @@ import zipfile
 from pathlib import Path
 
 PKG = Path(__file__).resolve().parent
-REPO = PKG.parents[2]  # packages/capabilities/agent-value-readiness -> capabilities -> packages -> repo
+REPO = PKG.parents[1]  # packages/agent-value-readiness -> packages -> repo
 
 SOURCES = {
     "ugence_agent_value_readiness": PKG,

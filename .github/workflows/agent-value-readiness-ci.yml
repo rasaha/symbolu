@@ -26,7 +26,7 @@ name: agent-value-readiness-ci
 on:
   pull_request:
     paths:
-      - "packages/capabilities/agent-value-readiness/**"
+      - "packages/agent-value-readiness/**"
       - "packages/governance-contracts/**"
       - "packages/uvi-policy-contracts/**"
       - "packages/policy-authority/**"
@@ -36,7 +36,7 @@ on:
     branches:
       - "claude/**"
     paths:
-      - "packages/capabilities/agent-value-readiness/**"
+      - "packages/agent-value-readiness/**"
       - "packages/governance-contracts/**"
       - "packages/uvi-policy-contracts/**"
       - "packages/policy-authority/**"
@@ -60,9 +60,9 @@ jobs:
         # Both scripts locate their own dependencies; no PYTHONPATH is needed and
         # none is set, so a probe that only passed because a sibling leaked onto
         # the path would fail here.
-        run: python packages/capabilities/agent-value-readiness/adversarial_probes.py
+        run: python packages/agent-value-readiness/adversarial_probes.py
       - name: M-3R.3 catalog and assessed-system-binding probes
-        run: python packages/capabilities/agent-value-readiness/m3r3_adversarial_probes.py
+        run: python packages/agent-value-readiness/m3r3_adversarial_probes.py
 
   isolated-install:
     name: Wheel build and isolated --no-index installation verification
@@ -77,7 +77,7 @@ jobs:
           python -m pip install --upgrade pip
           pip install build
       - name: Build, install into a clean venv, and interrogate the installed package
-        run: python packages/capabilities/agent-value-readiness/verify_agent_value_readiness_distribution.py
+        run: python packages/agent-value-readiness/verify_agent_value_readiness_distribution.py
 
   api-parity:
     name: Public API parity and packaging invariants (source)
@@ -96,8 +96,8 @@ jobs:
         # first-party dependencies on sys.path, and the suite cannot be collected
         # from the repository root without it.
         run: |
-          cd packages/capabilities/agent-value-readiness
+          cd packages/agent-value-readiness
           python -m pytest tests/packaging -q
       - name: py.typed marker ships
         run: |
-          test -f packages/capabilities/agent-value-readiness/src/ugence_agent_value_readiness/py.typed
+          test -f packages/agent-value-readiness/src/ugence_agent_value_readiness/py.typed
