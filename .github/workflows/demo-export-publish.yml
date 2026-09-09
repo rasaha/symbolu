@@ -61,6 +61,18 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: "22" }
 
+      - name: install-verifier-dependencies
+        # Four of the five verifiers are stdlib-Node and need nothing installed. The fifth
+        # is not: verify-openapi.mjs imports generate-api.mjs, which imports
+        # openapi-typescript — a devDependency of the studio frontend. Without this, the
+        # export step below fails on every clean runner with ERR_MODULE_NOT_FOUND, and
+        # nothing is ever published.
+        #
+        # --ignore-scripts: no verifier needs a package's install hooks, and publishing to
+        # another repository must not turn on third-party lifecycle scripts to do it.
+        working-directory: source/apps/ugence-governance-studio/frontend
+        run: npm ci --ignore-scripts
+
       - name: export
         # Runs the five verifiers in the source repository first. A failure exits 1 with
         # nothing written, and this step fails the job before the destination is cloned.
