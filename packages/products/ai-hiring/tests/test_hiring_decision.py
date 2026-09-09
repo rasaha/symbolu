@@ -14,6 +14,8 @@ Focused on the required invariants:
 from __future__ import annotations
 
 import inspect
+import json
+import subprocess
 import sys
 
 import pydantic
@@ -144,9 +146,31 @@ def test_eligibility_derives_from_gates_only_no_score_input():
 
 
 # --- Overall Fit ≠ Policy -------------------------------------------------
+def _plane_import_loads(plane: str, forbidden_prefixes: tuple[str, ...]) -> list[str]:
+    """Import ``plane`` in a clean interpreter; return forbidden modules it pulled in.
+
+    This has to run in a subprocess. Asserting against *this* process's sys.modules
+    describes only what the rest of the pytest session happened to import — not a
+    property of the plane — so such a check passes or fails on test ordering and on
+    what is importable, which is what it did before.
+    """
+    code = (
+        f"import {plane}, sys, json; "
+        f"pre = {forbidden_prefixes!r}; "
+        "print(json.dumps([m for m in sys.modules if m.startswith(pre)]))"
+    )
+    result = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True)
+    assert result.returncode == 0, result.stderr
+    return json.loads(result.stdout.strip().splitlines()[-1])
+
+
 def test_importing_decision_plane_does_not_load_analytics():
-    # fresh import state check: the plane must never pull in the analytics path
-    assert "ugence_ai_hiring.hiring_decision.analytics" not in sys.modules
+    # Overall Fit is analytics, not policy: importing the plane must not pull it in.
+    loaded = _plane_import_loads(
+        "ugence_ai_hiring.hiring_decision",
+        ("ugence_ai_hiring.hiring_decision.analytics",),
+    )
+    assert not loaded, loaded
 
 
 @pytest.mark.parametrize(
@@ -337,9 +361,11 @@ def test_fakes_satisfy_port_protocols():
 
 def test_decision_plane_import_pulls_no_shared_service():
     # importing the plane must not load any shared platform provider module
-    for name in list(sys.modules):
-        assert not name.startswith("ugence_tap_provider")
-        assert not name.startswith("ugence_actiongate_provider")
+    loaded = _plane_import_loads(
+        "ugence_ai_hiring.hiring_decision",
+        ("ugence_tap_provider", "ugence_actiongate_provider"),
+    )
+    assert not loaded, loaded
 
 
 # --- action request → CER payload ----------------------------------------

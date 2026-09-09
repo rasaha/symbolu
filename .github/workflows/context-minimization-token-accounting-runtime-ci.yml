@@ -12,6 +12,13 @@ name: context-minimization-token-accounting-runtime-ci
 # a regression of BOTH core suites to prove the additive seams are unchanged, and the
 # integration package's wheel build + isolated-install verifier.
 
+concurrency:
+  # A superseded run proves nothing about the commit that replaced it. Cancel
+  # in-flight runs for the same ref on pull requests; never on a branch push,
+  # where each commit's run is the evidence that commit was green.
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 on:
   pull_request:
     paths:
@@ -42,6 +49,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+          cache: pip
+          cache-dependency-path: requirements.txt
       - name: Install tooling
         run: |
           python -m pip install --upgrade pip
@@ -57,6 +66,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+          cache: pip
+          cache-dependency-path: requirements.txt
       - name: Install tooling
         run: |
           python -m pip install --upgrade pip
@@ -74,6 +85,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+          cache: pip
+          cache-dependency-path: requirements.txt
       - name: Install build tooling
         run: |
           python -m pip install --upgrade pip

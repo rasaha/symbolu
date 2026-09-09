@@ -9,6 +9,13 @@ name: bindingslots-confirmatory-replication-ci
 #
 # The expensive confirmatory run (A+/B0/CR1 x seeds 13-17) is available ONLY via manual dispatch.
 
+concurrency:
+  # A superseded run proves nothing about the commit that replaced it. Cancel
+  # in-flight runs for the same ref on pull requests; never on a branch push,
+  # where each commit's run is the evidence that commit was green.
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 on:
   push:
     paths:
@@ -42,6 +49,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
+          cache: pip
+          cache-dependency-path: requirements.txt
 
       # --- historical-artifact-integrity (pre) ---
       - name: Frozen abc.json digest (pre)
@@ -106,6 +115,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
+          cache: pip
+          cache-dependency-path: requirements.txt
       - name: Frozen abc.json digest (pre)
         run: sha256sum experiments/phase_lc/results/abc.json | tee /tmp/abc_before.txt
       - name: Confirmatory pre-registration integrity

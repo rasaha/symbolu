@@ -7,6 +7,13 @@ name: governance-studio-p3e-base-image-drift
 # re-pins or substitutes a digest (rule 4). The report is an artifact for the owner's
 # controlled base-image refresh decision.
 
+concurrency:
+  # A superseded run proves nothing about the commit that replaced it. Cancel
+  # in-flight runs for the same ref on pull requests; never on a branch push,
+  # where each commit's run is the evidence that commit was green.
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 on:
   schedule:
     - cron: "17 6 * * 1"
@@ -30,7 +37,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
-        with: { python-version: "3.11" }
+        with: { python-version: "3.11", cache: pip, cache-dependency-path: requirements.txt }
 
       - name: ratified-pin-conformance (context only)
         # The advisory report is read beside a conformance answer; this step is the same

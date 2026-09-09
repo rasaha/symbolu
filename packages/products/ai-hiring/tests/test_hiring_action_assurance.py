@@ -9,6 +9,8 @@ reconciliation classification.
 from __future__ import annotations
 
 import inspect
+import json
+import subprocess
 import sys
 from datetime import datetime, timezone
 
@@ -374,9 +376,22 @@ def test_spine_runs_standalone_with_fakes_only():
         runtime_assurance_port=RecRuntime([]), execution_port=FakeHRISExecutionPort())
     result = svc.run(case, hdc, actor="hm", now=NOW)
     assert result.receipt.execution_status is ExecutionStatus.SUCCEEDED
-    for name in list(sys.modules):
-        assert not name.startswith("ugence_tap_provider")
-        assert not name.startswith("ugence_actiongate_provider")
+
+
+def test_action_assurance_plane_import_pulls_no_shared_service():
+    # The spine must run on fakes alone: importing it must not load a provider.
+    # This runs in a clean interpreter on purpose — scanning this process's
+    # sys.modules would report what the rest of the session imported, not what
+    # importing the plane does, and would pass or fail on test ordering.
+    code = (
+        "import ugence_ai_hiring.hiring_decision, sys, json; "
+        "pre = ('ugence_tap_provider', 'ugence_actiongate_provider'); "
+        "print(json.dumps([m for m in sys.modules if m.startswith(pre)]))"
+    )
+    proc = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True)
+    assert proc.returncode == 0, proc.stderr
+    loaded = json.loads(proc.stdout.strip().splitlines()[-1])
+    assert not loaded, loaded
 
 
 def test_hris_fake_satisfies_port_protocol():

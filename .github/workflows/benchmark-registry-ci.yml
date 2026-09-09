@@ -21,6 +21,13 @@ name: benchmark-registry-ci
 # or touches key material of any kind; BR-1 performs no cryptography beyond one
 # sha-256 digest path.
 
+concurrency:
+  # A superseded run proves nothing about the commit that replaced it. Cancel
+  # in-flight runs for the same ref on pull requests; never on a branch push,
+  # where each commit's run is the evidence that commit was green.
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 on:
   pull_request:
     paths:
@@ -55,6 +62,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+          cache: pip
+          cache-dependency-path: requirements.txt
       - name: Install test tooling only
         # pytest and nothing else. The package itself has no dependency to
         # install; if a runtime dependency ever appeared, the dependency-boundary
@@ -121,6 +130,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+          cache: pip
+          cache-dependency-path: requirements.txt
       - name: Independent probe harness (curated API + stdlib only)
         # Imports no test module, no _builders helper, no conftest and no private
         # submodule; reconstructs canonical bytes by hand.
@@ -136,6 +147,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+          cache: pip
+          cache-dependency-path: requirements.txt
       - name: Install build tooling
         run: |
           python -m pip install --upgrade pip
@@ -157,6 +170,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+          cache: pip
+          cache-dependency-path: requirements.txt
       - name: Install test tooling
         run: |
           python -m pip install --upgrade pip
@@ -177,6 +192,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+          cache: pip
+          cache-dependency-path: requirements.txt
       - name: Install tooling
         run: |
           python -m pip install --upgrade pip
@@ -198,6 +215,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+          cache: pip
+          cache-dependency-path: requirements.txt
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip

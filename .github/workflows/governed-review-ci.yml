@@ -17,6 +17,13 @@ name: governed-review-ci
 # artifact reason above. The suite leg is matrixed in full, PostgreSQL cluster included:
 # a 3.10 leg that skipped the database rows would be reporting on a suite it did not run.
 
+concurrency:
+  # A superseded run proves nothing about the commit that replaced it. Cancel
+  # in-flight runs for the same ref on pull requests; never on a branch push,
+  # where each commit's run is the evidence that commit was green.
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 on:
   pull_request:
     paths:
@@ -61,6 +68,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "${{ matrix.python-version }}"
+          cache: pip
+          cache-dependency-path: requirements.txt
 
       - name: Install PostgreSQL server binaries
         run: |
@@ -149,6 +158,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+          cache: pip
+          cache-dependency-path: requirements.txt
       - run: |
           python -m pip install --upgrade pip
           pip install build

@@ -12,6 +12,13 @@ name: slot-formation-stabilization-ci
 # verify_only), installs a CPU torch wheel, verifies the frozen historical artifact before and
 # after, uploads run artifacts, and NEVER auto-merges or packages.
 
+concurrency:
+  # A superseded run proves nothing about the commit that replaced it. Cancel
+  # in-flight runs for the same ref on pull requests; never on a branch push,
+  # where each commit's run is the evidence that commit was green.
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 on:
   push:
     paths:
@@ -58,6 +65,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
+          cache: pip
+          cache-dependency-path: requirements.txt
 
       - name: Frozen historical artifact digest (pre)
         run: sha256sum experiments/phase_lc/results/abc.json | tee /tmp/abc_before.txt
@@ -94,7 +103,10 @@ jobs:
           D=hybrid_llm_vnext_lab/experiments/slot_formation_stabilization
           ! grep -rniE "READY_FOR_KDA_VALIDATION[^_]" $D/PREREGISTRATION.md $D/ACCEPTANCE_GATES.json | grep -v NOT_READY || (echo "found bare KDA-ready claim" && exit 1)
           ! test -f $D/pyproject.toml && ! test -f $D/setup.py && echo "no packaging files"
-          ! grep -rniE "PhaseAttentionLayer|HybridPhaseTransformer|import kda|import mla" $D/*.py || (echo "forbidden import" && exit 1)
+          # complexity_report.py names these strings in order to forbid them, so this
+          # crude grep matches the checker itself. Exclude it; its own scan is the real one,
+          # and it runs above as "Complexity / boundary report".
+          ! grep -rniE "PhaseAttentionLayer|HybridPhaseTransformer|import kda|import mla" $D/*.py --exclude=complexity_report.py || (echo "forbidden import" && exit 1)
 
       - name: Frozen historical artifact unchanged (post)
         run: |
@@ -115,6 +127,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
+          cache: pip
+          cache-dependency-path: requirements.txt
 
       - name: Frozen historical artifact digest (pre)
         run: sha256sum experiments/phase_lc/results/abc.json | tee /tmp/abc_before.txt

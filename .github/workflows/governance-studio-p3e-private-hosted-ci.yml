@@ -4,6 +4,13 @@ name: governance-studio-p3e-private-hosted-ci
 # the synthetic fixtures, the P3E audits and this workflow. No deploy, no secrets, no
 # external model APIs. Container build/run + image scan are gated in a separate job that
 # only runs where a container runtime is available.
+concurrency:
+  # A superseded run proves nothing about the commit that replaced it. Cancel
+  # in-flight runs for the same ref on pull requests; never on a branch push,
+  # where each commit's run is the evidence that commit was green.
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 on:
   push:
     paths:
@@ -41,6 +48,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+          cache: pip
+          cache-dependency-path: requirements.txt
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
@@ -171,7 +180,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
-        with: { python-version: "3.11" }
+        with: { python-version: "3.11", cache: pip, cache-dependency-path: requirements.txt }
 
       - name: evidence-dir-init
         # Runtime evidence is written OUTSIDE the checkout, to a fresh directory keyed by
