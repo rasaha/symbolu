@@ -14,6 +14,15 @@ contract-amendment round, which alone ratifies the role- and proposal-surface
 binding. It performs no caller authorization, maps no failure to any
 operational outcome, and holds no authority of any kind.
 
+> **Superseded as a statement of current fact (2026-09-09, `ACC-DR`).**
+> The paragraph above is retained verbatim as the record of what was true at
+> this release. `[V]` It is **no longer current**: the `OD-C1=B` round was ratified (`ACC-AM-IMPL=YES`) and
+> implemented, so it no longer gates the slice. The rest of the paragraph stands:
+> this distribution still performs no caller authorization, maps no failure to any
+> operational outcome, and holds no authority of any kind. `[R]` This note
+> records a fact, ratifies nothing, and reopens no ruling. No constitution has
+> been issued or activated, and no `ACC-FC-5` gate is closed.
+
 ### Added
 
 - **`PolicyAuthorityConstitutionResolver`** — the concrete §5.2 resolver on the

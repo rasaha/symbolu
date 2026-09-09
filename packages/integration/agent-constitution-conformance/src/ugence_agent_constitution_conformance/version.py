@@ -3,9 +3,9 @@
 First release of the conformance half of the ratified Agent Constitution first
 slice. `ACC-S1-IMPL=YES` authorizes it, as the second of the two `ACC-S1-Q2`
 change sets. With the family distribution it makes constitution issuance,
-resolution and structural conformance replay run end to end; first release of
-the slice as a whole still awaits the separately balloted `OD-C1=B`
-contract-amendment round.
+resolution and structural conformance replay run end to end; the `OD-C1=B`
+contract-amendment round that first release of the slice additionally required
+has since been ratified and implemented.
 """
 
 from __future__ import annotations

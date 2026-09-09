@@ -40,9 +40,10 @@ What it deliberately does not do
 * **No clock, socket, storage or plugin loading.** Every instant is a caller's.
 
 **Status.** This distribution alone does not make Agent Constitution conformance
-verifiable end to end: a family that can be issued still needs the conformance
-distribution's resolver and verifier before anything replays. That distribution
-ships separately, as its own change set.
+verifiable end to end: replay needs the conformance distribution's resolver and
+verifier. That distribution ships separately and has landed; with the pair,
+issuance, binding and structural replay run end to end. No constitution has been
+issued or activated, and no ``ACC-FC-5`` gate is closed.
 
 Wiring is the composition root's job: call
 :func:`register_agent_constitution_policy_family` on the ``AdapterRegistry`` that

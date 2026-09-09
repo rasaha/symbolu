@@ -1,0 +1,346 @@
+# ADR: Ugence Agent Constitution — documentation reconciliation, suspension implementation authority, governed-role overlap, and the retirement of the pending-work ledger
+
+**Status:** **Accepted (ratified owner declaration).** This ADR records four
+rulings made by the repository owner in one sitting on 2026-09-09, over the
+capability audit of the five `packages/integration` distributions that opened
+that session.
+
+`ACC-DR` is **performed** by the same change set that carries this ADR
+(documentation only). `ACC-SUSP-IA` and `ACC-OVL` **authorize** implementation
+and perform none: authorization is not implementation. `ACC-PWP` is performed
+here as a header on the retired document.
+
+**No constitution is authored, issued, activated, superseded, suspended or
+revoked by virtue of this record. No `ACC-FC-5` gate is closed or advanced by
+it. No signing key, trust root or approval artifact enters this repository.**
+
+**Date:** 2026-09-09.
+
+**Decision owner:** the repository owner, ruling personally in conversation on
+2026-09-09. On the standing precedent: **where the conversation and this ADR
+differ, this ADR governs.**
+
+**Baseline:** default head `dbeae82c246d9e532f0364d03f994238166243cb`, clean
+tree, all scoped gates green at ruling time `[V]`.
+
+**Numbering.** `[R]` Four ADR-scoped registers on the standing precedent:
+**`ACC-DR`**, **`ACC-SUSP-IA-1`** – **`ACC-SUSP-IA-6`**, **`ACC-OVL-1`** –
+**`ACC-OVL-5`**, and **`ACC-PWP-1`**. No `OD`, `ACC-S1`, `ACC-AM`, `ACC-FC`,
+`ACC-FC5R`, `ACC-IA`, `ACC-PR`, `ACC-LC`, `ACC-SU`, `ACC-SUSP` or `CV2` number is
+assigned, moved or reopened.
+
+---
+
+## 1. `ACC-DR` — documentation reconciliation: **authorized and performed**
+
+**Ruled:** make the documentation-only corrections proposed by the audit;
+remove only the **discharged** resolver and `OD-C1=B` blockers; preserve every
+genuine disclosure; claim no issuance or activation; change no behaviour,
+version, public API or surface ruling.
+
+### What was stale, and why
+
+| Site | The discharged claim | Evidence it is discharged |
+|---|---|---|
+| `agentic-proposer-strategy-permission-policy` — `README.md`, `src/…/__init__.py`, `src/…/version.py` | "still needs a concrete resolver… cannot execute end to end"; "not yet wired by any composition root" | `[V]` `ugence-agentic-proposer-strategy-permission-runtime` 0.1.0 ships the resolver **and** `build_strategy_policy_resolver`, which registers this family's adapter |
+| `agent-constitution-policy` — `README.md`, `src/…/__init__.py` | "still needs the conformance distribution's resolver and verifier"; "first release additionally awaits… `OD-C1=B`" | `[V]` conformance 0.1.0 shipped as the second `ACC-S1-Q2` change set; `OD-C1=B` ratified with `ACC-AM-IMPL=YES` and implemented in Agentic Proposer 0.4.0 (`contracts.py` `constitution_ref`, `constitution_policy_id`) |
+| `agent-constitution-conformance` — `README.md`, `src/…/__init__.py`, `src/…/version.py` | "first release awaits the separately balloted `OD-C1=B` contract-amendment round" | as above |
+
+`[V]` **Nothing pinned this drift.** No test asserts any of these status
+sentences, which is why they survived the change sets that discharged them —
+the same failure mode `S2B_STRATEGY_PERMISSION_POLICY_FAMILY_AND_RESOLVER_DESIGN.md`
+§10 step 6 predicted in writing ("no test pins them, so nothing will flag the
+drift").
+
+### What was deliberately preserved
+
+`[R]` Every genuine disclosure stands, unedited: `ACC-COUPLING`'s
+narrowed-not-eliminated reference-map gap (`build_constitution_resolver` still
+accepts any mapping); `ACC-FACTS` (presented facts remain a disclosed caller
+assertion, no `verified` boolean); `ACC-ATTESTER` (deferred behind the Trusted
+Evidence Authority); the runtime's `[G]` on the weakness of a raw-text scan; and
+every open `ACC-FC-5` gate. Each corrected site now **states** that no
+constitution has been issued or activated and that no `ACC-FC-5` gate is closed,
+so the correction cannot be misread as a readiness claim.
+
+`[R]` **The three CHANGELOG statements were not rewritten.** On the
+`ADDITIONAL_STALE_SITES=EXACT_FIVE` precedent, each release paragraph is
+retained verbatim as the record of what was true at that release and carries a
+dated superseded marker. A CHANGELOG is history; editing it to reflect later
+state would be worse practice, not better.
+
+### What `ACC-DR` did not touch
+
+`[V]` No behaviour, no `version.py` version literal, no `public_api.json`, no
+package metadata, no CI workflow, no platform-freeze artifact, and no test. The
+`__init__.py` and `version.py` edits are **module docstrings only**.
+
+---
+
+## 2. `ACC-SUSP-IA` — suspension implementation authority: **YES, bounded**
+
+This is the implementation-authority ruling that
+[`ADR_UGENCE_AGENT_CONSTITUTION_SUSPENSION_ROUND_RATIFICATION.md`](ADR_UGENCE_AGENT_CONSTITUTION_SUSPENSION_ROUND_RATIFICATION.md)
+(`ACC-SUSP-BASE`, `ACC-SUSP-1` – `ACC-SUSP-5`, ruled
+`SUSP_SURFACE=YES SUSP-1=A SUSP-2=A SUSP-3=A SUSP-4=A SUSP-5=A`) sequenced after
+itself, and which that ADR made a precondition of any source change under its
+record.
+
+### `ACC-SUSP-IA-1` — the authorization `[R]`
+
+**Ruled: YES**, limited to the round's **already-ratified** contracts,
+deterministic validation, lifecycle-state handling and fail-closed resolution
+behaviour.
+
+### `ACC-SUSP-IA-2` — what this does **not** authorize `[R]`
+
+Recorded as ruled, in the owner's own enumeration:
+
+* issuing, activating or suspending a **genuine** constitution;
+* naming or impersonating an approving authority;
+* generating or assuming custody of signing keys;
+* closing any `ACC-FC-5` gate;
+* adding an operational administration endpoint;
+* granting ActionGate or execution authority.
+
+### `ACC-SUSP-IA-3` — the standing invariants, restated as binding `[R]`
+
+Policy Authority remains the owner of authoritative constitution lifecycle
+records. Approval must precede signing. Approval must be checked on **every**
+use, not once at issuance. Records remain append-only. Suspension or revocation
+must **prevent** successful resolution.
+
+### `ACC-SUSP-IA-4` — exercise is test-only until the gates close `[R]`
+
+Until the custody and approving-authority gates (`ACC-FC-5` gates 1 and 2)
+close, the implementation is exercised **only** through deterministic tests and
+fixtures. `[G]` Suspension will therefore be **unexercisable in production on
+the day it lands**, exactly as supersession is, and for the same reason: nothing
+has been issued and the gates are shut. That is expected, not a defect.
+
+### `ACC-SUSP-IA-5` — the `ACC-SUSP-4` consumer enumeration, **discharged** `[V]`
+
+`ACC-SUSP-4` obliged this ballot to name the new `PolicyResolutionReason`
+member(s) **and** the consumer outcome members required by
+`cloud-scaling-policy-authenticity`'s total, injective mapping, **before** the
+surface is bounded. Enumerated from the repository at the baseline commit:
+
+**Producer — `ugence_policy_authority.core.statuses.PolicyResolutionReason`**
+(currently 20 members). Two members are added, on the exact
+revocation/supersession precedent — a member for the applied state, and a member
+for a record that exists but does not verify:
+
+| New member | Meaning |
+|---|---|
+| `SUSPENDED` | A verified suspension record is the latest applicable record at `as_of`. The version is paused, not withdrawn and not replaced; its record stays readable and it may later resolve again |
+| `SUSPENSION_INTEGRITY_INVALID` | A suspension-store record targeting this version exists but does not verify — unsigned, wrong key, unauthorized signer, tampered, or ambiguous under `ACC-SUSP-IA-6`. Neither honoured nor ignored: it fails closed |
+
+**Consumer — `ugence_cloud_scaling_policy_authenticity.outcomes`.** The mapping
+`RESOLUTION_REASON_OUTCOMES` is asserted **total** over every non-`RESOLVED`
+reason and **injective** by
+`cloud-scaling-policy-authenticity/tests/test_typed_outcomes.py`
+(`test_the_reason_mapping_is_total_over_the_authority_s_refusals`,
+`test_the_reason_mapping_is_injective_so_no_refusal_is_collapsed_into_another`).
+`[V]` Adding a producer member without the matching consumer member **fails that
+suite** — this is the coupling that made `ACC-LC-IA-BASE`'s surface
+unsatisfiable and forced the `A1` amendment. Two distinct members are therefore
+added to `PolicyAuthenticityOutcome`, with two matching mapping entries:
+
+| Producer reason | Consumer outcome member |
+|---|---|
+| `SUSPENDED` | `POLICY_SUSPENDED` (named on `POLICY_SUPERSEDED`'s precedent, avoiding a bare-verb collision) |
+| `SUSPENSION_INTEGRITY_INVALID` | `SUSPENSION_INTEGRITY_INVALID` |
+
+**The rest of the surface the two members touch**, enumerated at the baseline so
+the change set is bounded before it is written:
+
+| Site | What it needs | Why |
+|---|---|---|
+| `packages/policy-authority/public_api.json` | the two new values appended to the `PolicyResolutionReason` `values` list | `[V]` the snapshot pins enum members literally, so an added member without it is an API-snapshot drift |
+| `packages/policy-authority` version | an **additive minor** bump | two members added, none removed or renamed |
+| `cloud-scaling-policy-authenticity/tests/test_adversarial.py:311` | nothing | `[V]` parametrizes by **iterating** the enum, so it adapts — but it will newly exercise both members and must pass |
+| `agentic-proposer-strategy-permission-runtime/tests/test_no_authority_claimed.py:197` | nothing | `[V]` same: iterates rather than pinning a literal list |
+
+`[V]` **No other consumer is affected.** Every other module that imports
+`PolicyResolutionReason` — read individually at the baseline across
+`agent-value-readiness` (`deny.py`, `service.py`, `trace.py`), the three
+constitution distributions, the strategy-permission pair,
+`authoritative-policy-compilation`, `procurement-policy-compilation` and
+`cloud-scaling-capacity-bounds-policy` — either branches on one named member
+(`NOT_FOUND`), type-checks the enum without enumerating it, or carries the
+reason opaquely on an error attribute. `[G]` That is a statement about
+**today's** call sites, verified by reading each; it is not a guarantee that no
+future consumer will mirror the enum totally, and any that does inherits this
+same obligation.
+
+### `ACC-SUSP-IA-6` — the three `ACC-SUSP-2` ordering cases: **NOT SETTLED** `[G]`
+
+`ACC-SUSP-2` recorded, as `[G]`, that suspension is *"the first state in this
+authority whose current value is not simply 'a record exists'"*, that the
+ordering rule must be total and unambiguous, and that **the
+implementation-authority ballot must settle three cases explicitly**: equal
+timestamps, out-of-order arrival, and a reinstate with no prior suspend.
+
+`[G]` **The 2026-09-09 ruling did not reach these three cases**, and this ADR
+does not invent answers for them. They are the one open ownership question
+blocking the suspension change set, and they are put to the owner in §5.
+
+`[R]` **Consequence, recorded rather than worked around:** `ACC-SUSP-IA-1`
+authorizes the change set, but `ACC-SUSP-2` conditions it on these three
+settlements. **No suspension store, record type, resolution reason or act is
+implemented under this ADR.** The enumeration in `ACC-SUSP-IA-5` stands ready
+and is unaffected by how the three cases are ruled — which is why it was
+discharged here rather than deferred with them.
+
+---
+
+## 3. `ACC-OVL` — cross-artifact governed-role overlap: **ratified, close before second issuance**
+
+The gap this closes was recorded as item 5 of the retired pending-work ledger
+(§4) and is `[V]` real: `governed_role_refs` is not consulted at issuance, so
+two separately issued constitutions may claim the same governed role. The
+backstop is downstream — `populate_reference_map` raises
+`ReferenceMapConflictError` at activation — which refuses the *map*, not the
+*issuance*.
+
+### `ACC-OVL-1` — the invariant `[R]`
+
+**Ratified, fail-closed:** two **simultaneously effective** constitutions may
+not govern the same role within the same tenant and scope, unless an
+**explicitly ratified** supersession or delegation relationship permits it.
+
+### `ACC-OVL-2` — ownership of the two halves `[R]`
+
+**Conformance owns detection and diagnostic evidence. Policy Authority owns
+enforcement**, at issuance and at resolution. `[R]` The split is deliberate:
+detection that lives where enforcement lives is a single point of failure, and
+conformance must remain unable to authorize anything.
+
+### `ACC-OVL-3` — how an overlap must fail `[R]`
+
+An **unresolved, ambiguous or conflicting** overlap must refuse issuance and
+refuse resolution. `[R]` It must **never** be resolved by mapping order or
+last-write-wins behaviour. A deployment that would have to guess must instead
+be told it cannot proceed.
+
+### `ACC-OVL-4` — the sequencing constraint `[R]`
+
+**Do not issue a second constitution until this invariant is implemented and
+verified.** `[R]` This ruling **does not authorize a second constitution**, and
+nothing in it advances an `ACC-FC-5` gate.
+
+### `ACC-OVL-5` — the consumer obligation carries `[R]`
+
+`[R]` Enforcement at **resolution** adds at least one `PolicyResolutionReason`
+member, so `ACC-SU-4`'s standing obligation — the same one `ACC-SUSP-4` imposed
+— applies to this round too: the reason member(s) and their
+`cloud-scaling-policy-authenticity` counterparts must be enumerated before the
+overlap surface is bounded.
+
+---
+
+## 4. `ACC-PWP-1` — `AGENT_CONSTITUTION_PENDING_WORK_PRIORITY.md`: **retired**
+
+**Ruled:** do not refresh another duplicate status ledger. Preserve the document
+as historical evidence, mark it retired/superseded and dated 2026-09-09, state
+that its versions, baseline and P0 claims are no longer current, point readers
+to the canonical ADR decisions by immutable commit SHA, and move any still-valid
+open item that exists **only** there into a canonical record before retiring it.
+
+`[V]` **Why it had to be retired rather than refreshed.** Its own baseline
+`ab0205df` is **not an object in this repository's history**; its pinned
+versions (proposer 0.4.0, activation 0.1.0, authority 0.2.0) trail the tree
+(0.6.0, 0.2.0, 0.3.1); and its P0 — the `approval_digest` exclusion — was ruled
+`LR-1=A LR-2=A` in
+`ADR_UGENCE_AGENT_CONSTITUTION_DEPLOYMENT_GATE_RUNBOOK_AMENDMENT.md`. A ledger
+that duplicates the ADRs will drift from them again; the ADRs are the record.
+
+**Migration of still-valid open items** `[V]`, so retirement loses nothing:
+
+| Ledger item | Where it now lives |
+|---|---|
+| 5 — cross-artifact governed-role overlap | **`ACC-OVL`, §3 of this ADR** (ratified, with a sequencing constraint) |
+| 1 (P0), 2 (`CV2`), 3 (suspension design) | Already ruled; the ADRs are canonical |
+| 4 — proposer README stops at 0.3.0 | `[G]` **Still open and untracked elsewhere.** Carried forward in §5 as a residual item; it is a documentation gap in `packages/capabilities/agentic-proposer/README.md`, not in the five audited distributions, and no ruling in this ADR authorizes editing it |
+| 6 — global `policy_family` uniqueness | `[G]` Defence-in-depth gap, unchanged, no live hole; `ACC-S1-Q3`'s registration-time collision guard protects every supported composition path |
+| 7 — the two malformed-resolver edge cases | Already disclosed in `agentic-proposer/version.py`; needs an owner decision about the boundary's contract, not a bug fix |
+| 8 (P3) — close the four `ACC-FC-5` gates | Unchanged and **operational**: gates 1 and 2 are unadvanceable by any pull request |
+
+---
+
+## 5. What remains open
+
+`[G]` **The three `ACC-SUSP-2` ordering cases** (`ACC-SUSP-IA-6`) — the one
+question blocking the suspension change set. Recommended answers, each derived
+from `ACC-SUSP-IA-3`'s fail-closed and deterministic-validation constraints, are
+offered as recommendations only and are **not** ruled here:
+
+1. **Equal timestamps** — two records for one coordinate at the same instant are
+   **ambiguous**, and ambiguity refuses: reject the second at append time, and
+   fail closed at resolution as `SUSPENSION_INTEGRITY_INVALID` if one is ever
+   present. Recommended because the alternative is a tie broken by insertion
+   order, which is last-write-wins under another name.
+2. **Out-of-order arrival** — order by the record's **own signed instant**,
+   never by arrival or insertion order, so an append sequence cannot change a
+   resolution. Recommended because arrival order is not signed and therefore
+   not evidence.
+3. **Reinstate with no prior suspend** — refuse at append time; nothing is
+   paused, so nothing can be unpaused.
+
+`[G]` **`ACC-OVL` is authorized but unimplemented** at the close of this record;
+its `ACC-OVL-5` enumeration is the next step for that round.
+
+`[G]` **The residual documentation item** carried from the retired ledger:
+`packages/capabilities/agentic-proposer/README.md` describes the surface only
+through 0.3.0 and does not explain the 0.4.0 constitution binding. Unauthorized
+here.
+
+`[G]` **The binding constraint is unmoved.** No constitution has ever been
+issued, no `ACC-FC-5` gate is closed, and **no pull request can advance gates 1
+or 2** (custody; approving authority).
+
+## 6. Canonical records, by immutable commit SHA
+
+Readers arriving from the retired ledger should use these, not it. Each SHA is
+the commit at which the named document currently stands.
+
+| Document | Commit |
+|---|---|
+| `ADR_UGENCE_AGENT_CONSTITUTION_AND_CONFORMANCE_SCOPING.md` (`OD-C1`–`OD-C5`) | `5d602fdbadbdcf8fe4cbe5b7f9d68e7f4e01ed00` |
+| `ADR_UGENCE_AGENT_CONSTITUTION_FIRST_SLICE_RATIFICATION.md` | `5d602fdbadbdcf8fe4cbe5b7f9d68e7f4e01ed00` |
+| `ADR_UGENCE_AGENT_CONSTITUTION_AMENDMENT_ROUND_RATIFICATION.md` (`OD-C1=B`, `ACC-AM-IMPL=YES`) | `5d602fdbadbdcf8fe4cbe5b7f9d68e7f4e01ed00` |
+| `ADR_UGENCE_AGENT_CONSTITUTION_ISSUANCE_ACTIVATION_RATIFICATION.md` | `5d602fdbadbdcf8fe4cbe5b7f9d68e7f4e01ed00` |
+| `ADR_UGENCE_AGENT_CONSTITUTION_FIRST_CONSTITUTION_RATIFICATION.md` (`ACC-FC-*`) | `5d602fdbadbdcf8fe4cbe5b7f9d68e7f4e01ed00` |
+| `ADR_UGENCE_AGENT_CONSTITUTION_LIFECYCLE_ROUND_RATIFICATION.md` | `5d602fdbadbdcf8fe4cbe5b7f9d68e7f4e01ed00` |
+| `ADR_UGENCE_AGENT_CONSTITUTION_SUSPENSION_ROUND_RATIFICATION.md` | `5d602fdbadbdcf8fe4cbe5b7f9d68e7f4e01ed00` |
+| `ADR_UGENCE_AGENT_CONSTITUTION_CLAUSES_V2_ROUND_RATIFICATION.md` | `5d602fdbadbdcf8fe4cbe5b7f9d68e7f4e01ed00` |
+| `ADR_UGENCE_AGENT_CONSTITUTION_DEPLOYMENT_GATE_RUNBOOK_RATIFICATION.md` (`ACC-FC5R-*`) | `5d602fdbadbdcf8fe4cbe5b7f9d68e7f4e01ed00` |
+| `ADR_UGENCE_AGENT_CONSTITUTION_DEPLOYMENT_GATE_RUNBOOK_AMENDMENT.md` (`LR-1=A LR-2=A`) | `5d602fdbadbdcf8fe4cbe5b7f9d68e7f4e01ed00` |
+| `ADR_UGENCE_AGENT_CONSTITUTION_LIVE_ATTESTATION_SCOPING.md` (`ACC-COUPLING`, `ACC-FACTS`, `ACC-ATTESTER`) | `c0e48ca3e89631ca6eab978a3a1037d114cd082a` |
+
+## 7. Non-claims, carried forward unchanged
+
+No agent runs, is enrolled, or is claimed governed by virtue of this record. No
+lifecycle authority over agents or roles exists or is implied (`OD-C4=A`).
+Constitution binding grants no compute, tools, evidence access or consequential
+execution; digest membership proves integrity after construction, never
+provenance; no verifier emits a disposition or reserved authority term
+(`OD-C3=B`). Conformance replay proves conformance of **presented facts** only,
+and that those facts equal a live role's declarations remains the caller's
+assertion (`ACC-FACTS`). No constitution is issued, superseded, suspended or
+revoked by virtue of this record.
+
+## 8. What this ADR changed
+
+This ADR, the `ACC-DR` documentation-only corrections enumerated in §1, and the
+`ACC-PWP-1` retirement header on
+`AGENT_CONSTITUTION_PENDING_WORK_PRIORITY.md`. **No production source, test,
+`public_api.json`, `version.py`, package metadata, CI workflow or
+platform-freeze artifact is modified.** Policy Authority remains at `0.3.1`;
+Agentic Proposer at `0.6.0`; `agent-constitution-policy` at `0.2.0`;
+`agent-constitution-activation` at `0.2.0`; `agent-constitution-conformance`,
+`agentic-proposer-strategy-permission-policy` and
+`agentic-proposer-strategy-permission-runtime` at `0.1.0`.
+
+**Next step:** rule the three `ACC-SUSP-IA-6` ordering cases, which unblocks the
+suspension change set; the `ACC-OVL-5` enumeration may proceed in parallel.

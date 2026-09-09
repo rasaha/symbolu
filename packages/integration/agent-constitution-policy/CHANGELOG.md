@@ -70,6 +70,14 @@ a separate distribution and a separate change set; first release of the slice
 additionally awaits the separately balloted `OD-C1=B` contract-amendment round.
 Until those land the capability cannot replay end to end.
 
+> **Superseded as a statement of current fact (2026-09-09, `ACC-DR`).**
+> The paragraph above is retained verbatim as the record of what was true at
+> this release. `[V]` It is **no longer current**: the conformance distribution landed as the second `ACC-S1-Q2`
+> change set, and the `OD-C1=B` contract-amendment round was ratified
+> (`ACC-AM-IMPL=YES`) and implemented. Neither condition is outstanding. `[R]` This note
+> records a fact, ratifies nothing, and reopens no ruling. No constitution has
+> been issued or activated, and no `ACC-FC-5` gate is closed.
+
 ### Added
 
 - **`AgentConstitutionPolicy`** — a declarative, versioned, digest-bound

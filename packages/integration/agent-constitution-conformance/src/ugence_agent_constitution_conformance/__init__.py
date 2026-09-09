@@ -11,9 +11,10 @@ signed bounds.
 
 Together with `ugence-agent-constitution-policy` it completes the two ratified
 `ACC-S1-Q2` change sets: issuance, binding and structural conformance replay run
-end to end. First release of the slice as a whole still awaits the separately
-balloted `OD-C1=B` contract-amendment round, which alone ratifies the role- and
-proposal-surface binding.
+end to end. The `OD-C1=B` contract-amendment round that first release of the
+slice additionally required — which alone ratifies the role- and proposal-surface
+binding — has since been ratified and implemented. No constitution has been
+issued or activated, and no ``ACC-FC-5`` gate is closed.
 
 What it is not
 --------------
