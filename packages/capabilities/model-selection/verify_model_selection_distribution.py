@@ -33,9 +33,11 @@ import sys
 import ugence_model_selection as ms
 from ugence_model_selection import api
 assert ms.__version__ == "0.2.0", ms.__version__
+assert api.POLICY_VERSION == "exec_gate_v2", api.POLICY_VERSION
+assert api.SUPPORTED_POLICY_VERSIONS == ("exec_gate_v1", "exec_gate_v2"), api.SUPPORTED_POLICY_VERSIONS
 assert "site-packages" in ms.__file__, ms.__file__
 assert not any("/symbolu" in p for p in sys.path), sys.path
-assert api.POLICY_VERSION == "exec_gate_v1", api.POLICY_VERSION
+
 
 from ugence_model_selection.api import (
     ExecutionGate, ExecutableRegistry, ModelRecord, Candidate, Request, Signal,
@@ -84,6 +86,24 @@ assert sel3.selected is None and sel3.abstained is True, "a floored candidate mu
 # and the marker that makes the annotations visible to a consumer
 import importlib.resources as _r
 assert _r.files("ugence_model_selection").joinpath("py.typed").is_file(), "py.typed missing from wheel"
+# backward replay of a stored v1 record, proved against the installed wheel
+from ugence_model_selection.api import EligibilityDecision, UnsupportedPolicyVersionError
+STORED_V1 = {"provider": "anthropic", "model_id": "m", "state": "ELIGIBLE",
+             "reasons": ["OK"], "policy_version": "exec_gate_v1",
+             "evaluated_at": 1.0, "ttl_seconds": 60.0,
+             "conditions": [{"condition": "provider_reachable", "verdict": "PASS",
+                             "reason": "OK", "criticality": "CRITICAL_OP",
+                             "evidence": {"source": "live_probe", "timestamp": 1.0,
+                                          "confidence": 1.0, "ttl_seconds": 60.0,
+                                          "raw_signal": None}, "detail": ""}]}
+assert EligibilityDecision.from_dict(STORED_V1).to_dict() == STORED_V1, "v1 replay broke"
+assert fingerprint(EligibilityDecision.from_dict(STORED_V1).to_dict()) == fingerprint(STORED_V1)
+try:
+    EligibilityDecision.from_dict(dict(STORED_V1, policy_version="exec_gate_v3"))
+except UnsupportedPolicyVersionError:
+    pass
+else:
+    raise AssertionError("an unsupported policy version must fail closed")
 print("CANONICAL-WHEEL-ONLY: OK")
 '''
 

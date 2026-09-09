@@ -5,6 +5,7 @@ from dataclasses import dataclass, field
 from typing import Any, Dict, Optional, Set
 
 from .states import Evidence
+from .version import POLICY_VERSION
 
 
 @dataclass
@@ -66,9 +67,19 @@ class GateConfig:
     # CRITICAL-OP conditions whose UNKNOWN is INDETERMINATE rather than fail-closed:
     indeterminate_on_unknown: Set[str] = field(
         default_factory=lambda: {"billing_active", "credential_expiry_valid"})
-    policy_version: str = "exec_gate_v1"
+    #: Stamped onto every decision this configuration produces. It must be the version
+    #: this code actually implements: writing an older version from newer code is the one
+    #: thing a policy version exists to make impossible. Reading an older version is a
+    #: separate, supported capability — see ``EligibilityDecision.from_dict``.
+    policy_version: str = POLICY_VERSION
 
     def __post_init__(self) -> None:
+        if self.policy_version != POLICY_VERSION:
+            raise ValueError(
+                f"this implementation stamps {POLICY_VERSION!r} and may not write "
+                f"{self.policy_version!r}. Stored records of an earlier version stay "
+                f"readable through EligibilityDecision.from_dict; they are not "
+                f"reproducible by this code, which is why it may not claim to be it.")
         floor = self.quality_floor
         if floor is None:
             return

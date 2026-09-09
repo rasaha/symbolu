@@ -42,15 +42,45 @@ construction: `_aggregate` makes a `CRITICAL_OP` failure INELIGIBLE, and `policy
 only ever sees `dec.selectable`. A quality weight of 10,000 still cannot rescue a floored
 candidate.
 
+### Changed — policy version `exec_gate_v1` → `exec_gate_v2`
+
+A policy version identifies **decision semantics**, not record shape. With a floor
+configured this code can reach a different outcome from `0.1.0` on identical inputs, so it
+may not keep answering to `exec_gate_v1`: two implementations that can disagree must not
+both claim one policy version, since ruling that out is what replay and audit use the
+field for.
+
+**The bump reaches forward only. No stored record is rewritten or invalidated.**
+
+- New decisions are stamped `exec_gate_v2`. `GateConfig.policy_version` defaults to it and
+  **refuses** to be set to an older one — reading v1 is supported, *writing* it is not,
+  because this code cannot reproduce v1 semantics and so may not claim to be them.
+- Stored `exec_gate_v1` records stay readable and verifiable through the new
+  `EligibilityDecision.from_dict`, which round-trips them byte-identically — their own
+  stamp included — and leaves their fingerprints unchanged. A v1 record has no
+  `quality_within_floor` condition; that is what a v1 decision was, and nothing invents
+  one.
+- `SUPPORTED_POLICY_VERSIONS` is the read set. An unrecognized version — including a
+  *newer* one from a future release, and a missing one — raises the new
+  `UnsupportedPolicyVersionError` rather than being guessed at or defaulted.
+
+Public API 33 → 37 names: `UnsupportedPolicyVersionError`, `POLICY_VERSION_V1`,
+`POLICY_VERSION_V2`, `SUPPORTED_POLICY_VERSIONS`.
+
 ### Compatibility
 
 **No new selection behaviour, and no behaviour change without configuration.** With
-`quality_floor` unset — the default — the condition is not evaluated at all, so decision
-records are byte-identical to `0.1.0`, including their serialized condition list. The
-soft `PolicyWeights.quality` term is untouched and still orders the survivors; among
+`quality_floor` unset — the default — the condition is not evaluated at all, so a v2
+decision's condition list is exactly the fifteen conditions v1 produced, in the same
+order. It is still honestly stamped `exec_gate_v2`, because the *implementation* is v2:
+it is the code that could have applied a floor, and a reader is entitled to know which
+code answered.
+
+The soft `PolicyWeights.quality` term is untouched and still orders the survivors; among
 candidates the floor admits, ranking is byte-identical to an unfloored run. The eligibility
-aggregation, the authority contract, the fallback chain, the reason-code meanings and the
-`exec_gate_v1` policy version are all unchanged. All 18 pre-existing tests pass unmodified.
+aggregation, the authority contract, the fallback chain and the reason-code meanings are
+unchanged. All 18 pre-existing tests pass unmodified except two version pins, which now
+assert the v2 identity.
 
 The floor **narrows only**: it can remove a candidate from the eligible set and can never
 add one. A perfect score does not approve an unapproved provider or rescue a residency,

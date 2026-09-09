@@ -30,6 +30,7 @@ from .states import (
     Evidence,
     EvidenceSource,
     SOURCE_PRECEDENCE,
+    UnsupportedPolicyVersionError,
     Verdict,
 )
 
@@ -59,7 +60,14 @@ from .registry import ExecStatus, ExecutableRegistry, ModelRecord
 
 # --- versioning + deterministic fingerprint ----------------------------------------
 from .fingerprint import fingerprint
-from .version import POLICY_VERSION, VERSION, __version__
+from .version import (
+    POLICY_VERSION,
+    POLICY_VERSION_V1,
+    POLICY_VERSION_V2,
+    SUPPORTED_POLICY_VERSIONS,
+    VERSION,
+    __version__,
+)
 
 __all__ = [
     # reason codes
@@ -67,6 +75,9 @@ __all__ = [
     # states / evidence
     "Criticality", "ConditionResult", "EligibilityDecision", "EligibilityState",
     "Evidence", "EvidenceSource", "SOURCE_PRECEDENCE", "Verdict",
+    # policy-version identity + backward replay admission
+    "UnsupportedPolicyVersionError", "POLICY_VERSION_V1", "POLICY_VERSION_V2",
+    "SUPPORTED_POLICY_VERSIONS",
     # request / candidate / signal / config
     "Candidate", "GateConfig", "Request", "Signal",
     # eligibility

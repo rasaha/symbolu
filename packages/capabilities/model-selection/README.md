@@ -61,7 +61,7 @@ replayable `ModelAuthorizationDecision`:
   per-condition `ReasonCode` values that drove the outcome). Free-text is never the
   authoritative signal.
 - `fallback_model_ids` — governed fallback chain; every entry is already eligible.
-- `policy_version` — decision provenance (`exec_gate_v1`).
+- `policy_version` — decision provenance (`exec_gate_v2`; stored `exec_gate_v1` records stay readable, see [`docs/POLICY_VERSIONING.md`](docs/POLICY_VERSIONING.md)).
 - `decision_id` / `expires_at` — a stable deterministic handle a downstream runtime can
   reference, and an evidence-freshness bound (epoch seconds) after which the decision must
   be re-evaluated.
@@ -173,6 +173,7 @@ added. Not pilot-validated, not production-certified. See
 | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | The three stages, the modules, criticality classes, evidence and time, determinism. |
 | [`docs/AUTHORITY_BOUNDARY.md`](docs/AUTHORITY_BOUNDARY.md) | What it may and may not do; why it can approve no provider and override no policy. |
 | [`docs/QUALITY_FLOOR.md`](docs/QUALITY_FLOOR.md) | The floor, its fail-closed table, and the three design decisions behind it. |
+| [`docs/POLICY_VERSIONING.md`](docs/POLICY_VERSIONING.md) | What `POLICY_VERSION` identifies, backward replay of stored v1 records, and fail-closed admission. |
 | [`docs/LIMITATIONS.md`](docs/LIMITATIONS.md) | Evidence tiers and what is explicitly not established. |
 | [`CHANGELOG.md`](CHANGELOG.md) | Release history. |
 

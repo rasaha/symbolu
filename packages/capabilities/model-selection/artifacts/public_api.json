@@ -1,5 +1,5 @@
 {
-  "count": 33,
+  "count": 37,
   "fingerprints": {
     "AuthorityReasonCode": {
       "kind": "enum",
@@ -55,6 +55,7 @@
       "kind": "class",
       "members": [
         "evaluated_at",
+        "from_dict",
         "policy_version",
         "selectable",
         "to_dict",
@@ -220,6 +221,14 @@
       "kind": "constant",
       "type": "str"
     },
+    "POLICY_VERSION_V1": {
+      "kind": "constant",
+      "type": "str"
+    },
+    "POLICY_VERSION_V2": {
+      "kind": "constant",
+      "type": "str"
+    },
     "PolicyWeights": {
       "kind": "class",
       "members": [
@@ -302,6 +311,10 @@
       "kind": "object",
       "type": "dict"
     },
+    "SUPPORTED_POLICY_VERSIONS": {
+      "kind": "object",
+      "type": "tuple"
+    },
     "Selection": {
       "kind": "class",
       "members": []
@@ -310,6 +323,12 @@
       "kind": "class",
       "members": [
         "reason_hint"
+      ]
+    },
+    "UnsupportedPolicyVersionError": {
+      "kind": "class",
+      "members": [
+        "args"
       ]
     },
     "VERSION": {
