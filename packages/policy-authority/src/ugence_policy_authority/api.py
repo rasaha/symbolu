@@ -22,6 +22,7 @@ from .adapters.uvi import (
 from .core.adapters import (
     GLOBAL_TENANT,
     AdapterRegistry,
+    ExclusivityClaim,
     PolicyArtifactDescriptor,
     PolicyCoordinate,
     PolicyFamilyAdapter,
@@ -62,6 +63,7 @@ from .core.errors import (
     PolicyRevocationError,
     PolicySupersessionError,
     PolicySuspensionError,
+    PolicyExclusivityError,
     PolicySigningError,
     UnsupportedPolicyArtifactError,
     UnsupportedSupersessionError,
@@ -145,6 +147,7 @@ __all__ = [
     "PolicyRevocationError",
     "PolicySupersessionError",
     "PolicySuspensionError",
+    "PolicyExclusivityError",
     "SUPERSESSION_REFERENCE_UNSUPPORTED",
     # Statuses / reasons
     "ApprovalVerificationStatus",
@@ -158,6 +161,7 @@ __all__ = [
     # Family-neutral identity and the adapter seam
     "GLOBAL_TENANT",
     "PolicyCoordinate",
+    "ExclusivityClaim",
     "PolicyArtifactDescriptor",
     "PolicyFamilyAdapter",
     "AdapterRegistry",

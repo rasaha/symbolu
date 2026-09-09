@@ -51,6 +51,7 @@ from __future__ import annotations
 
 from .composition import build_constitution_resolver
 from .conformance import role_facts_conform
+from .overlap import GovernedRoleOverlap, governed_role_overlaps
 from .errors import (
     AgentConstitutionConformanceError,
     ConstitutionArtifactTypeError,
@@ -84,6 +85,9 @@ __all__ = [
     "role_facts_conform",
     # Composition
     "build_constitution_resolver",
+    # Mirrored overlap detection - diagnostic evidence only (`ACC-OVL-2`)
+    "GovernedRoleOverlap",
+    "governed_role_overlaps",
     # Errors
     "AgentConstitutionConformanceError",
     "ConstitutionFactsError",

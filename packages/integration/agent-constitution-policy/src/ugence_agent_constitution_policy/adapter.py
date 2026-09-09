@@ -36,6 +36,7 @@ from __future__ import annotations
 from typing import Any, Optional
 
 from ugence_policy_authority.api import (
+    ExclusivityClaim,
     PolicyArtifactDescriptor,
     PolicyAuthorityRequestError,
     PolicyCoordinate,
@@ -48,6 +49,7 @@ from .identifiers import (
     AGENT_CONSTITUTION_ADAPTER_ID,
     AGENT_CONSTITUTION_POLICY_FAMILY,
     AGENT_CONSTITUTION_POLICY_TYPE,
+    GOVERNED_ROLE_EXCLUSIVITY_NAMESPACE,
 )
 from .policy import AgentConstitutionPolicy, AgentConstitutionPolicyMetadata
 
@@ -145,7 +147,57 @@ class AgentConstitutionPolicyFamilyAdapter:
             supersedes_coordinate=metadata.supersedes_coordinate,
             effective_from=metadata.effective_from,
             effective_to=metadata.effective_to,
+            exclusivity_claims=self._exclusivity_claims(artifact),
         )
+
+    # ------------------------------------------------------------------
+    # Exclusivity projection (`ACC-OVL-7`)
+    # ------------------------------------------------------------------
+    @staticmethod
+    def _exclusivity_claims(artifact: Any) -> tuple:
+        """One claim per governed role, or a refusal.
+
+        `ACC-OVL-7` requires this family to **fail closed** when its projection
+        is missing, malformed or unresolved, and the reason is structural rather
+        than cautious: Policy Authority's core cannot distinguish *"this family
+        has nothing to claim"* from *"this family failed to project what it
+        should have claimed"* — both arrive as an empty tuple, and the first is
+        the ruled, correct behaviour for every family without exclusivity
+        semantics. So the distinction has to be drawn **here**, in the family
+        that knows its claims are load-bearing, before a descriptor carrying no
+        claims can be constructed.
+
+        A constitution governs at least one role by construction, so an empty,
+        malformed or duplicated set is a defect, never an artifact that governs
+        nothing.
+        """
+
+        refs = getattr(artifact, "governed_role_refs", None)
+        if not isinstance(refs, tuple) or not refs:
+            raise UnsupportedPolicyArtifactError(
+                "AgentConstitutionPolicy.governed_role_refs must be a non-empty tuple: a "
+                "constitution that governs no role cannot be projected, and an absent "
+                "projection would be indistinguishable to the authority from a family "
+                "with nothing to claim"
+            )
+        claims = []
+        for ref in refs:
+            if not isinstance(ref, str) or not ref.strip():
+                raise UnsupportedPolicyArtifactError(
+                    "AgentConstitutionPolicy.governed_role_refs must contain non-empty "
+                    "strings; an unusable reference cannot be projected as a claim"
+                )
+            claims.append(
+                ExclusivityClaim(
+                    namespace=GOVERNED_ROLE_EXCLUSIVITY_NAMESPACE, subject=ref
+                )
+            )
+        if len({claim.subject for claim in claims}) != len(claims):
+            raise UnsupportedPolicyArtifactError(
+                "AgentConstitutionPolicy.governed_role_refs contains a duplicate; a role "
+                "is governed once or not at all"
+            )
+        return tuple(claims)
 
     # ------------------------------------------------------------------
     # Canonical projection

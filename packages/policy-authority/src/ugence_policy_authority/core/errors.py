@@ -25,6 +25,7 @@ __all__ = [
     "PolicyRegistryConflictError",
     "PolicyRevocationError",
     "PolicySuspensionError",
+    "PolicyExclusivityError",
 ]
 
 
@@ -110,6 +111,20 @@ class PolicySupersessionError(PolicyAuthorityError):
     another tenant or scope, or is the artifact naming itself. Distinct from
     :class:`UnsupportedSupersessionError`, which refuses the *unstructured*
     string and is unchanged. Nothing is signed and nothing is stored.
+    """
+
+
+class PolicyExclusivityError(PolicyAuthorityError):
+    """An artifact claimed exclusive governance of something already governed.
+
+    `ACC-OVL-1` – `ACC-OVL-3`. Raised at issuance when another simultaneously
+    effective version, in the same tenant and scope, holds an equal exclusivity
+    claim and no verified supersession relationship permits the overlap.
+
+    `[R]` There is no variant of this that resolves the overlap by choosing a
+    winner. Registration order, mapping order and arrival order are all refused
+    as tie-breakers, so an ambiguous state is reported rather than silently
+    decided. Nothing is signed and nothing is stored.
     """
 
 

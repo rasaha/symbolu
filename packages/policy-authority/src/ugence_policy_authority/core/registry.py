@@ -76,6 +76,18 @@ class PolicyRegistry(Protocol):
         """Every issued version of one identity. Never selects one."""
         ...
 
+    def issued_records_for_family(
+        self, *, policy_family: str, scope: str, tenant_id: str
+    ) -> tuple[IssuedPolicyRecord, ...]:
+        """Every issued version of one family within one scope and tenant.
+
+        `ACC-OVL-7`. Exclusivity is compared **across** policy identities — two
+        different constitutions claiming one role — so
+        :meth:`issued_records_for_identity`, which is keyed by ``policy_id``,
+        cannot answer it. Never selects one, and never orders by insertion.
+        """
+        ...
+
     def append_revocation(self, record: PolicyRevocationRecord) -> PolicyRevocationRecord:
         """Append a policy-version revocation; idempotent iff identical."""
         ...
@@ -219,6 +231,24 @@ class InMemoryPolicyRegistry:
         # Sorted by identity, never by insertion order, so the result cannot
         # depend on the order in which versions were registered.
         return tuple(sorted(matches, key=lambda r: (r.coordinate.version, r.record_id)))
+
+    def issued_records_for_family(
+        self, *, policy_family: str, scope: str, tenant_id: str
+    ) -> tuple[IssuedPolicyRecord, ...]:
+        with self._lock:
+            matches = [
+                record
+                for coordinate, record in self._issued.items()
+                if coordinate.policy_family == policy_family
+                and coordinate.scope == scope
+                and coordinate.tenant_id == tenant_id
+            ]
+        # `ACC-OVL-3`: sorted by identity, never by insertion order. A comparison
+        # whose result depended on registration order would be the very
+        # tie-breaking the ruling forbids.
+        return tuple(
+            sorted(matches, key=lambda r: (r.coordinate.policy_id, r.coordinate.version, r.record_id))
+        )
 
     # ------------------------------------------------------------------
     # Revocation

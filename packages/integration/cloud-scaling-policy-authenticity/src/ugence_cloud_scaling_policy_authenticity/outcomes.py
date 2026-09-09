@@ -116,6 +116,11 @@ class PolicyAuthenticityOutcome(str, Enum):
     #: does not verify, two distinct records share one signed instant, the sequence is not
     #: strictly monotonic, or a stored transition is invalid. Neither honoured nor ignored.
     SUSPENSION_INTEGRITY_INVALID = "SUSPENSION_INTEGRITY_INVALID"
+    #: Another simultaneously effective version, in the same tenant and scope, holds an
+    #: equal exclusivity claim, and no verified supersession permits the overlap. The
+    #: overlap is **unresolved**, so it refuses: the authority will not pick a winner by
+    #: registration or arrival order, and neither does this vocabulary.
+    EXCLUSIVITY_CONFLICT = "EXCLUSIVITY_CONFLICT"
 
     # --- this package's own gates, on top of a RESOLVED answer ---------------------------
     #: The answer is a historical one. A historical resolution describes the past and can
@@ -285,6 +290,9 @@ RESOLUTION_REASON_OUTCOMES: Final[dict] = {
     PolicyResolutionReason.SUSPENDED: PolicyAuthenticityOutcome.POLICY_SUSPENDED,
     PolicyResolutionReason.SUSPENSION_INTEGRITY_INVALID: (
         PolicyAuthenticityOutcome.SUSPENSION_INTEGRITY_INVALID
+    ),
+    PolicyResolutionReason.EXCLUSIVITY_CONFLICT: (
+        PolicyAuthenticityOutcome.EXCLUSIVITY_CONFLICT
     ),
 }
 

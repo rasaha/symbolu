@@ -295,6 +295,19 @@ class SqlitePolicyRegistry:
         matches = [decode_issued_record(json.loads(r[0]), self._codec) for r in rows]
         return tuple(sorted(matches, key=lambda r: (r.coordinate.version, r.record_id)))
 
+    def issued_records_for_family(
+        self, *, policy_family: str, scope: str, tenant_id: str
+    ) -> tuple[IssuedPolicyRecord, ...]:
+        # Uses the existing issuances_identity index, whose leading column is
+        # policy_family — no new table and no schema change.
+        rows = self._read().execute(
+            "SELECT payload_json FROM issuances WHERE policy_family=? AND scope=? AND tenant_id=?",
+            (policy_family, scope, tenant_id)).fetchall()
+        matches = [decode_issued_record(json.loads(r[0]), self._codec) for r in rows]
+        return tuple(
+            sorted(matches, key=lambda r: (r.coordinate.policy_id, r.coordinate.version, r.record_id))
+        )
+
     # ------------------------------------------------------------------
     # Revocation
     # ------------------------------------------------------------------

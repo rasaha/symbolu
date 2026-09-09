@@ -1,5 +1,28 @@
 # Changelog — ugence-cloud-scaling-policy-authenticity
 
+## 0.11.0 — carrying the authority's exclusivity refusal
+
+The consumer half of the `ACC-OVL` round, enumerated in advance under
+`ACC-OVL-5`. Additive: one outcome member, one mapping entry, nothing removed and
+no existing outcome re-pointed.
+
+Policy Authority `0.5.0` added `PolicyResolutionReason.EXCLUSIVITY_CONFLICT`.
+The reason mapping is total and injective over the authority's refusals, so it
+needs its own member here: **`EXCLUSIVITY_CONFLICT`** — another simultaneously
+effective version holds an equal exclusivity claim and no verified supersession
+permits it.
+
+**One member, not two.** The suspension round needed a paired
+`*_INTEGRITY_INVALID`; this round introduces no store of signed records and so
+has no separate integrity failure mode.
+
+`[R]` It deliberately does **not** join `TEMPORAL_OUTCOMES`. A conflict is a
+property of two artifacts' declared intervals, not of the injected `as_of`:
+moving `as_of` cannot turn an unresolved overlap into a resolved one, which is
+exactly what membership of that set would imply.
+
+The authority pin moves from `0.4.0` to `0.5.0` — the pin doing its job again.
+
 ## 0.10.0 — carrying the authority's two suspension refusals
 
 The consumer half of the `ACC-SUSP` round, enumerated in advance under

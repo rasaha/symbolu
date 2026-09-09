@@ -5,6 +5,81 @@ All notable changes to this package are documented here. The surface snapshot in
 `tests/packaging/test_public_api.py`, including dataclass field order and the
 exact value of every string constant.
 
+## 0.5.0 — the family-neutral exclusivity seam (the `ACC-OVL` round)
+
+The change set authorized by `ACC-OVL-7` (see
+`docs/architecture/ADR_UGENCE_AGENT_CONSTITUTION_RECONCILIATION_SUSPENSION_AND_OVERLAP_RULINGS.md`
+§9 and `AGENT_CONSTITUTION_GOVERNED_ROLE_OVERLAP_SEAM_DESIGN.md`). Additive: two
+new public names, one new resolution reason, one optional descriptor field.
+**Nothing removed or renamed, and no digest moved.**
+
+The invariant: **two simultaneously effective versions may not hold an equal
+exclusivity claim within the same tenant and scope**, unless an explicitly
+verified supersession permits it.
+
+### Added
+
+- **`ExclusivityClaim`** — a frozen `(namespace, subject)` token an adapter
+  projects. The core compares these for **equality and never parses them**; that
+  is the whole of what keeps the seam family-neutral. Scope and tenant are
+  deliberately **not** fields: they are read from the artifact's own coordinate
+  at comparison time, so an adapter cannot restate them and thereby widen its own
+  claim's reach.
+- **`PolicyArtifactDescriptor.exclusivity_claims`** — optional, defaulting to
+  empty. Every family with no exclusivity semantics projects nothing, constructs
+  exactly as before, and is unaffected — including in cost, since both call sites
+  skip the work entirely when an artifact claims nothing.
+- **`PolicyExclusivityError`** and **`PolicyResolutionReason.EXCLUSIVITY_CONFLICT`**
+  — the issuance refusal and the resolution reason. One reason member, not two:
+  this round adds no store of signed records, so it has no separate integrity
+  failure mode to name.
+- **`PolicyRegistry.issued_records_for_family`** — every issued version of one
+  family within one scope and tenant. Exclusivity is compared *across* policy
+  identities, which `issued_records_for_identity` cannot answer.
+
+### Enforced in two places, on purpose
+
+**At issuance**, before the digest, before approval, before signing and before
+any mutation — registry reads only, on `require_admissible_supersession`'s exact
+precedent. **At resolution**, re-derived rather than trusted, because
+issuance-time enforcement alone would be a check at the door on a store that can
+be filled another way — the same reasoning that re-verifies a stored revocation
+on every use.
+
+`[R]` **No order breaks a tie** (`ACC-OVL-3`). Registration, mapping and arrival
+order are all barred; an unresolved overlap **refuses**, both ways round.
+
+### Two judgements, both resolved toward refusal
+
+- **A record no adapter can describe is a conflict, not an absence.** Its claims
+  are unreadable, and an unreadable incumbent is exactly the "unresolved" case
+  that must refuse. Skipping it would let such a record silently release what it
+  governs.
+- **A suspended version keeps its claims.** Revocation and supersession are
+  terminal and release them; a pause is not a release. If a paused version
+  released its claim, a second artifact could take it and the reinstatement would
+  create precisely the overlap this invariant forbids, with no act left to refuse
+  it.
+
+### Changed — a deviation from the recorded design, and why
+
+`[R]` The design document costed a **claims index** with a `v3` sqlite schema.
+The implementation **derives** claims from the authoritative issuance records
+instead, and the schema is **unchanged at `v2`**. A side index can drift from the
+records it describes — a write that lands without its index entry leaves a claim
+invisible, which fails *open* — while a derivation cannot. The read is bounded to
+one family within one scope and tenant, and is skipped entirely for artifacts
+that claim nothing, so the cost the index existed to avoid does not arise.
+
+### Scope, stated plainly
+
+`[G]` Like supersession and suspension before it, this invariant is
+**unexercisable in production on the day it lands**: no constitution has been
+issued and the `ACC-FC-5` gates are shut. Nothing here issues or activates a
+constitution, closes a gate, or grants any execution authority. `ACC-OVL-8`:
+**delegation is deferred**, not implemented — the exception is supersession and
+nothing else.
+
 ## 0.4.0 — signed, reversible policy-version suspension (the `ACC-SUSP` round)
 
 The change set authorized by `ACC-SUSP-IA-1` and settled by `ACC-SUSP-IA-7` (see

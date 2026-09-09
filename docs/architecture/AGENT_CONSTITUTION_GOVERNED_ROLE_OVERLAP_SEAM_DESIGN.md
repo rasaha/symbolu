@@ -1,9 +1,13 @@
 # Governed-role overlap — the family-neutral exclusivity seam, designed and enumerated
 
-**Status:** design and enumeration only. **No source is changed by this
-document**, and Policy Authority's public surface is untouched. It exists
-because `ACC-OVL-7` requires the seam design and its enumeration to be recorded
-**before** that surface changes.
+**Status:** design and enumeration. `[V]` **Implemented**, in Policy Authority
+`0.5.0`, `agent-constitution-policy` `0.3.0`, `agent-constitution-conformance`
+`0.2.0` and `cloud-scaling-policy-authenticity` `0.11.0` — with **one deviation
+from §3.3, recorded at §6**. This document remains the design of record; §6 says
+where the implementation departed from it and why.
+
+It exists because `ACC-OVL-7` required the seam design and its enumeration to be
+recorded **before** Policy Authority's public surface changed.
 
 **Governing rulings:** `ACC-OVL-1` – `ACC-OVL-8`
 ([`ADR_UGENCE_AGENT_CONSTITUTION_RECONCILIATION_SUSPENSION_AND_OVERLAP_RULINGS.md`](ADR_UGENCE_AGENT_CONSTITUTION_RECONCILIATION_SUSPENSION_AND_OVERLAP_RULINGS.md)).
@@ -225,3 +229,43 @@ implementation has landed.
 **Next step:** implement §2 and §3 as one change set, family half and core half
 together — the two halves are only meaningful jointly, on `ACC-S1-Q2`'s
 precedent.
+
+
+---
+
+## 6. Where the implementation departed from this design
+
+`[V]` **§3.3 costed a claims index and a `v3` sqlite schema. Neither was
+built.** The implementation derives claims from the authoritative issuance
+records instead, through one new read-only registry method
+(`issued_records_for_family`), and the sqlite schema stays at **`v2`**.
+
+`[R]` **The reason is a fail-open risk the index carried and the derivation does
+not.** A side index is a second copy of a fact, and a second copy can drift from
+the first: a write that lands without its index entry leaves a claim invisible,
+and an invisible claim is one that silently fails to be enforced. A derivation
+from the records themselves cannot drift, because there is nothing to drift
+from. Where an index would have needed its own atomicity argument against the
+issuance write, the derivation needs none.
+
+`[V]` **The cost the index existed to avoid does not arise.** The read is bounded
+to one policy family within one scope and tenant — the sqlite query uses the
+existing `issuances_identity` index, whose leading column is `policy_family`, so
+no new table and no migration — and **both call sites skip it entirely when the
+artifact projects no claims**, which is every family that has not adopted the
+seam.
+
+`[R]` Recorded rather than quietly substituted, because §3.3 named the index as
+the largest single piece of the change and asked for it to be costed rather than
+discovered. It was costed, and then it turned out not to be needed.
+
+Everything else in §2 and §3 landed as designed, including the §4 compatibility
+finding: `[V]` no digest moved, and all four pre-existing adapters construct and
+behave identically.
+
+`[V]` **One thing the invariant caught immediately**, recorded because it is the
+best evidence the seam is real: an existing activation test was issuing a second
+constitution governing the same role as the first, with no supersession
+declared. That is precisely the overlap `ACC-OVL-1` forbids. The test was
+issuing into a shared registry to exercise something unrelated, and now uses its
+own — but until this round, nothing anywhere would have refused it.

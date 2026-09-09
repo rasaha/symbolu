@@ -52,8 +52,16 @@ def test_phase_5a_is_at_the_version_5b1_moved_it_to():
 
 
 @pytest.mark.invariant
-def test_the_policy_authority_stays_at_0_4_0():
-    """``0.4.0`` since the `ACC-SUSP` round: signed, reversible policy-version
+def test_the_policy_authority_stays_at_0_5_0():
+    """``0.5.0`` since the `ACC-OVL` round: the family-neutral exclusivity seam.
+    Additive again — two exported names, one optional
+    ``PolicyArtifactDescriptor`` field, and **one** new
+    ``PolicyResolutionReason`` member (``EXCLUSIVITY_CONFLICT``), absorbed here
+    as the outcome member of the same name. One member and not two, because that
+    round adds no store of signed records and so has no separate integrity
+    failure mode to name.
+
+    ``0.4.0`` was the `ACC-SUSP` round: signed, reversible policy-version
     suspension. Additive — six exported names, and **two new
     ``PolicyResolutionReason`` members** (``SUSPENDED``,
     ``SUSPENSION_INTEGRITY_INVALID``), which is precisely why the pin exists.
@@ -71,7 +79,7 @@ def test_the_policy_authority_stays_at_0_4_0():
     it is never deleted or loosened (`ACC-LC-IA-BASE-A1`)."""
 
     init = (REPO / "packages" / "policy-authority" / "src" / "ugence_policy_authority" / "__init__.py").read_text()
-    assert '__version__ = "0.4.0"' in init
+    assert '__version__ = "0.5.0"' in init
 
 
 @pytest.mark.invariant
@@ -125,7 +133,7 @@ def test_this_package_ships_at_the_version_its_profile_change_requires():
         __version__,
     )
 
-    assert __version__ == "0.10.0"
+    assert __version__ == "0.11.0"
     # ``0.10.0`` is the `ACC-SUSP` consumer half: two outcome members and two
     # mapping entries, absorbing the authority's two new suspension reasons. The
     # profile deliberately does **not** move with it — no verification source

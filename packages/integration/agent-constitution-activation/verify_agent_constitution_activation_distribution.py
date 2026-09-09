@@ -101,8 +101,8 @@ import ugence_agent_constitution_policy as family
 import ugence_agentic_proposer as ap
 
 assert activation.__version__ == "0.2.0", activation.__version__
-assert conformance.__version__ == "0.1.0", conformance.__version__
-assert family.__version__ == "0.2.0", family.__version__
+assert conformance.__version__ == "0.2.0", conformance.__version__
+assert family.__version__ == "0.3.0", family.__version__
 assert "site-packages" in activation.__file__, activation.__file__
 assert not any("/symbolu" in p for p in sys.path), sys.path
 

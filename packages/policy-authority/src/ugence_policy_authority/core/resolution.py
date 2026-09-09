@@ -83,6 +83,11 @@ from .errors import (
 from .records import PolicyResolution
 from .registry import PolicyRegistry
 from .revocation import verify_revocation_record
+from .exclusivity import (
+    PolicyExclusivityError,
+    conflicting_holders,
+    effective_claim_holders,
+)
 from .supersession import verify_supersession_record
 from .suspension import (
     suspension_sequence_defect,
@@ -374,6 +379,50 @@ def resolve_policy(
             return deny(
                 PolicyResolutionReason.SUSPENDED,
                 f"suspended at {current.effective_at.isoformat()}",
+            )
+
+    # -- exclusivity (`ACC-OVL-1`..`ACC-OVL-3`) ----------------------------
+    # Re-derived here rather than trusted from issuance. Issuance-time
+    # enforcement alone would be a check at the door on a store that can be
+    # filled another way — the same reasoning that re-verifies a stored
+    # revocation on every use. Last, because it is the only check that reads
+    # *other* versions, and skipped outright when this artifact claims nothing,
+    # so no existing family pays for it.
+    if descriptor.exclusivity_claims:
+        try:
+            holders = effective_claim_holders(
+                records=registry.issued_records_for_family(
+                    policy_family=coordinate.policy_family,
+                    scope=coordinate.scope,
+                    tenant_id=coordinate.tenant_id,
+                ),
+                adapters=adapters,
+                registry=registry,
+                exclude=coordinate,
+            )
+        except PolicyExclusivityError as exc:
+            # An incumbent whose claims cannot be read is unresolved, not absent.
+            return deny(PolicyResolutionReason.EXCLUSIVITY_CONFLICT, str(exc))
+        permitted = tuple(
+            supersession.coordinate
+            for supersession in registry.supersessions_for(coordinate)
+        )
+        conflicts = conflicting_holders(
+            claims=descriptor.exclusivity_claims,
+            coordinate=coordinate,
+            effective_from=descriptor.effective_from,
+            effective_to=descriptor.effective_to,
+            holders=holders,
+            permitted=permitted,
+        )
+        if conflicts:
+            key, holder = conflicts[0]
+            return deny(
+                PolicyResolutionReason.EXCLUSIVITY_CONFLICT,
+                f"{key[1]!r} in {key[0]!r} is also governed by "
+                f"{holder.coordinate.policy_id}@{holder.coordinate.version} over an "
+                "overlapping effective period; an unresolved overlap is refused, never "
+                "decided by registration or arrival order",
             )
 
     return PolicyResolution(

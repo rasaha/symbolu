@@ -163,6 +163,12 @@ class PolicyResolutionReason(str, Enum):
     #: effective prior suspension). On ``REVOCATION_INTEGRITY_INVALID``'s exact
     #: precedent: neither honoured nor ignored, it fails closed.
     SUSPENSION_INTEGRITY_INVALID = "SUSPENSION_INTEGRITY_INVALID"
+    #: `ACC-OVL-1`..`ACC-OVL-3`. Another simultaneously effective version, in the
+    #: same tenant and scope, holds an equal exclusivity claim, and no verified
+    #: supersession relationship permits the overlap. The overlap is
+    #: **unresolved**, so resolution refuses rather than choosing between them —
+    #: registration, mapping and arrival order are all barred as tie-breakers.
+    EXCLUSIVITY_CONFLICT = "EXCLUSIVITY_CONFLICT"
 
 
 class PolicySuspensionAction(str, Enum):
