@@ -65,7 +65,6 @@ COPY deployment/governed-runtime-worker/container-healthcheck.py /app/container-
 
 USER 10001:10001
 WORKDIR /app
-VOLUME ["/var/lib/ugence-review"]
 EXPOSE 8444/tcp
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
