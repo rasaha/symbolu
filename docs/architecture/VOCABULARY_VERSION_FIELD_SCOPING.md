@@ -19,9 +19,13 @@ and why; the superseded recommendations are left visible beside them rather than
 edited out, because a scoping document that hides what it got wrong is worth less
 next time.
 
-**Still no implementation, and none authorized.** This document adds no field, no
-type, no canonical projection and no schema. **Date:** scoped and ratified
-2026-09-09.
+**Implementation is now authorized elsewhere, and sequenced behind publication.**
+This document still adds no field, no type, no canonical projection and no schema.
+The per-package contract change it recorded as unauthorized in §5A was authorized by
+`PUB-2`, and `PUB-1` requires the vocabulary a binding cites to be published first —
+both in `LV1_VOCABULARY_PUBLICATION_RULINGS.md`, ratified 2026-09-09. §5A and §7
+below are updated accordingly; nothing in `VV-A` to `VV-E` changed. **Date:** scoped
+and ratified 2026-09-09; §5A and §7 reconciled with `PUB-1`/`PUB-2` the same day.
 
 **Why this exists.** `LV-1` ratified the vocabularies as Policy-Authority-owned
 documentation. §2 of the ballot lists four conditions that must hold before any
@@ -208,22 +212,47 @@ than `VV-D` anticipated** `[V]`:
 So the blocker is not confined to purpose: **three of the four packages have nowhere
 to put an authoritative reference**, and `data-use-admission` needs two. `VR-4`'s
 `policy_ref` is the shape to copy — an opaque string that identifies without
-resolving, which keeps these packages from importing Policy Authority — but adopting
-it elsewhere is a contract change per package and is **not authorized here** `[R]`.
+resolving, which keeps these packages from importing Policy Authority.
 
-`[G]` **And the referent does not exist yet.** `LV-1` ratified the vocabularies as
-Policy-Authority-owned documentation, but no such document has been published and no
-versioning scheme for one has been ruled. A binding cannot cite what nobody has
-issued, so the first implementation step is not code: it is publishing the
-vocabularies under `LV-1` with versions a record can name.
+**Both blockers above are now ruled**, in
+`LV1_VOCABULARY_PUBLICATION_RULINGS.md` (`PUB-1` to `PUB-5`, ratified 2026-09-09).
+They are recorded here as answered rather than deleted, because the shape of the
+answer matters more than the fact of it:
+
+- **The per-package contract change is authorized** (`PUB-2`), with no new neutral
+  type in `governance-contracts` — which is `VV-A` holding. Every binding must carry
+  or resolve to the vocabulary's identity, exact version **and content digest**; a
+  bare version string is insufficient.
+- **`vendor-dependency` does not reuse `policy_ref`.** `PUB-2` authorized the reuse
+  only if `policy_ref` normatively identifies the exact permission-vocabulary policy,
+  and determined `[V]` that it does not: `VR-4` rules it an **opaque** string the
+  package "must not resolve, verify, interpret or fetch"
+  (`ADR_UGENCE_VENDOR_RISK_SCOPING.md:61`), and a string forbidden to be interpreted
+  cannot normatively identify anything. So all four packages gain a distinct
+  reference; `policy_ref` remains the shape, not the carrier.
+- **The referent is being published, and publication comes first** (`PUB-1`): five
+  vocabularies as separate immutable specifications at `1.0.0`, no mutable `latest`,
+  major version for any normative change. **No record reference is implemented before
+  the vocabulary it cites is published.**
+
+Two qualifications survive the rulings. `[R]` `vendor-dependency-permission` is
+**held from publication** pending an owner resolution of its name, which denotes
+permission semantics its own `LV-C` members refuse and `VR-3` forbids; the binding on
+`VendorDependencyDeclaration` is blocked behind that. And `PUB-1` is explicit that
+repository publication establishes the **canonical vocabulary content only** — it is
+**not** issuance by Policy Authority, and nothing here may describe it as an issued
+or signed organizational policy.
 
 ---
 
 ## 6. Not blocked on this
 
-`[R]` **`LV-F`** — whether general-purpose AI models belong in the
-system-classification set — is independent. The field records *which version* was
-used, not *which members exist*, so `LV-F` can be ruled before or after.
+**`LV-F`** — whether general-purpose AI models belong in the system-classification
+set — was independent, and has since been ruled by `PUB-3`: a separate
+`GeneralPurposeAIModelRegistration` record, no member added here. The reasoning holds
+either way, which is why it was independent: the field records *which version* was
+used, not *which members exist*. The new record, when scoped, carries its own binding
+under the same `VV-A` to `VV-E` rules.
 
 `[R]` **`LP-5`** — the shared uninterpreted-label base — is only entangled under
 2A. If `VV-A` is ruled 2B, this scoping adds nothing wave 5 must work around, which
@@ -245,8 +274,16 @@ derived ids changing in two of the four; new record versions throughout and new
 store versions in three; a version-discriminated read path so historical records
 stay readable as `UNVERSIONED_LEGACY`; and `governance-contracts` untouched.
 
-**None of it can start yet.** §5A's blocker comes first: three packages have nowhere
-to put an authoritative reference, and no vocabulary document has been published
-under `LV-1` for a binding to cite. Publishing the vocabularies with citable
-versions, and ruling how a `VR-4`-shaped reference lands in the three packages that
-lack one, are both prior to any field.
+**It is authorized, and it starts with publication, not code.** `PUB-2` grants the
+per-package contract change §5A recorded as unauthorized, and `PUB-1` sequences it:
+the five vocabulary specifications are published as immutable documents first, and a
+record binding is implemented only after the vocabulary it cites exists to be cited.
+A binding to a referent that does not exist is a field that records nothing while
+appearing to record provenance.
+
+So the next step is to publish the four unblocked vocabularies at `1.0.0` —
+`eu-ai-act-system-classification`, `data-classification`, `data-use-purpose` and
+`incident-severity` — each carrying its identifier, version, content digest, scope,
+governing `LV` ruling and normative members. The four bindings those enable follow;
+the fifth, on `VendorDependencyDeclaration`, waits on the `vendor-dependency-permission`
+naming resolution `[R]`.

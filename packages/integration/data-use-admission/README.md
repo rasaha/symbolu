@@ -165,8 +165,12 @@ import it; no capability package may — enforced repository-wide by
   answer.
 - Both vocabularies **are** ratified (`docs/architecture/GOVERNANCE_LABEL_VOCABULARY_BALLOT.md`), and
   differently. Data classification has a closed set — `PUBLIC`, `INTERNAL`,
-  `CONFIDENTIAL`, `RESTRICTED`, `REGULATED` — with one question still open, whether
-  `REGULATED` is an orthogonal member or a fifth rung. Purpose is ratified as an
+  `CONFIDENTIAL`, `RESTRICTED`. `REGULATED` is **not** a fifth rung: ruling `PUB-4`
+  removed it from the ladder, because regulatory applicability coexists with any
+  sensitivity rather than displacing one — regulated data can be low-sensitivity.
+  It is to be scoped as a separate status, and **no such field exists here yet**;
+  until one is ruled and implemented, this package records nothing about whether a
+  regulated regime applies. Purpose is ratified as an
   **open shape** (`LV-E`): a label names an activity and its beneficiary, and the
   set is deliberately not closed, because every closed purpose set grows an `OTHER`.
   Both labels stay uninterpreted by ruling rather than by omission — `DE-3` makes

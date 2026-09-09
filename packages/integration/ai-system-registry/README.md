@@ -165,8 +165,14 @@ roots, products and applications may import it; no capability package may — en
   non-empty opaque value, and `LV-1` puts the vocabulary in a Policy-Authority
   document rather than an enum here, so this package still records and never
   classifies. A blank label is refused; an unrecognized one is not.
-- The ratified set covers AI **systems** only. General-purpose AI models, which the
-  regime governs on a separate axis, have no member — open as ballot `LV-F`.
+- The ratified set covers AI **systems** only, and now by ruling rather than by
+  omission: `LV-F` is decided (`PUB-3`) — general-purpose AI models are a
+  **different regulated object**, governed separately under Chapter V, and no GPAI
+  member is added to this vocabulary. A separate `GeneralPurposeAIModelRegistration`
+  record is to be scoped, distinguishing the model's status from whether it presents
+  systemic risk. **Until that record exists, GPAI models remain uncovered by this
+  package**, and this disclosure is retained deliberately so the gap stays visible
+  rather than closed on paper.
 - (Closed for static imports) The repository now enforces "no capability package
   may import it" repository-wide, in `scripts/check_package_import_boundaries.py`.
   A dynamic `importlib.import_module(name)` cannot be caught by any static
