@@ -70,8 +70,25 @@ this result's (`COMPARISON_RESULT_SIGNATURE_MISMATCH`) and a record naming anoth
 record by `result_signature_receipt_digest`, `None` in the research posture, and the
 bridge carries it with the C6 prefix. This package still imports neither the engine, the
 attestation package nor the authority: it trusts the composition root's verification, and
-an auditor re-verifies from the cited digest outside it. No key for any comparison engine
-exists, so today `require_signature=True` refuses every result — the correct behaviour.
+an auditor re-verifies from the cited digest outside it.
+
+**Custody, ruled** (`docs/architecture/ADR_UGENCE_COMPARISON_RESULT_SIGNING_CUSTODY.md`,
+CRSC-1 to CRSC-4, 2026-09-09). The trusted issuer identity, signing profile and
+verification contract belong to the Trusted Evidence Authority; a production private key
+lives in an external KMS or HSM under that authority and is never generated, embedded or
+persisted in this repository. **This package does not issue or self-custody a trust key**
+— it is handed a typed `VerifiedResultSignature` and checks it. A verified signature is
+provenance and integrity only; Decision Authority and Risk Authority keep consequential
+authorization. Slice 3 stays `RESEARCH_ONLY` until the production profile, the custody
+arrangement and the verification path exist **and have been independently reviewed**.
+
+A **research** trust chain does exist and runs: under SR-0 to SR-5 the first admission
+study signs with a reference signer and verifies under `production_mode=True`, so
+`require_signature=True` succeeds there `[V]`
+(`tests/experiments/workflow_fit_study/test_signed_admission.py`, 17 tests). No
+**production** key exists, no trust-anchor set outside the committed research snapshot
+names `ugence-readiness-comparison`, and revocation is implemented nowhere — so a
+production result still cannot be admitted, and the refusal is the correct behaviour.
 
 **What citing the result does and does not establish.** A hand-assembled tuple of
 assessments can no longer be admitted, and the result contract binds every assessment

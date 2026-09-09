@@ -208,6 +208,7 @@
     "validated_request"
   ],
   "contract_version": "workflow_ir.v2",
+  "declared_value_provenance": [],
   "dependency_semantics": [
     {
       "authority_context": "ADVISORY",

@@ -46,11 +46,20 @@ def test_one_entry_derives_per_governed_role_reference(issued):
     }
 
 
-def test_a_multi_role_constitution_yields_one_entry_each(issued):
-    world, _, _ = issued
+def test_a_multi_role_constitution_yields_one_entry_each():
+    """Its own world, because `ACC-OVL` now forbids what this used to rely on.
+
+    This test needs one constitution governing two roles; it does **not** need a
+    second constitution coexisting with the module fixture's. It used to issue
+    `1.1.0` into the module-scoped registry alongside `1.0.0`, and both governed
+    `GOVERNED_ROLE_REF` with no supersession declared — precisely the overlap
+    `ACC-OVL-1` refuses, and a real hazard the invariant surfaced rather than
+    created. A fresh world keeps what the test proves and drops what it never
+    meant to assert.
+    """
+
+    world = make_world()
     other_ref = "ugence.roles/ugence/other-governed/v1"
-    # A distinct version: the module-scoped registry already holds 1.0.0, and a
-    # version identity is never reusable with different content.
     policy = make_first_constitution(
         governed_role_refs=tuple(sorted((GOVERNED_ROLE_REF, other_ref))),
         version="1.1.0",

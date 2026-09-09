@@ -25,6 +25,7 @@ from typing import Final
 __all__ = [
     "AGENT_CONSTITUTION_ADAPTER_ID",
     "AGENT_CONSTITUTION_POLICY_FAMILY",
+    "GOVERNED_ROLE_EXCLUSIVITY_NAMESPACE",
     "AGENT_CONSTITUTION_POLICY_TYPE",
     "CONSTITUTION_VOCABULARY_VERSION",
     "POLICY_SCOPE_GLOBAL",
@@ -66,6 +67,14 @@ AGENT_CONSTITUTION_POLICY_TYPE: Final[str] = "AgentConstitutionPolicy"
 #: an edit. No process for versioning the clause vocabulary is settled by that
 #: ruling, and none is implied here.
 CONSTITUTION_VOCABULARY_VERSION: Final[str] = "ugence.agent-constitution/clauses/v1"
+
+#: `ACC-OVL-7`. The namespace this family's exclusivity claims are projected
+#: under. Namespacing is what lets a second family adopt exclusivity semantics
+#: without ever colliding with this one, and without either family appearing in
+#: Policy Authority's core.
+GOVERNED_ROLE_EXCLUSIVITY_NAMESPACE: Final[str] = (
+    "ugence.agent-constitution/governed-role"
+)
 
 POLICY_SCOPE_GLOBAL: Final[str] = "GLOBAL"
 POLICY_SCOPE_TENANT: Final[str] = "TENANT"

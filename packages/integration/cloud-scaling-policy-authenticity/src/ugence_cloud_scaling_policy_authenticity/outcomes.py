@@ -107,6 +107,20 @@ class PolicyAuthenticityOutcome(str, Enum):
     #: A supersession record targeting this version exists but does not itself verify. On
     #: ``REVOCATION_INTEGRITY_INVALID``'s exact precedent: neither honoured nor ignored.
     SUPERSESSION_INTEGRITY_INVALID = "SUPERSESSION_INTEGRITY_INVALID"
+    #: A verified suspension applies at the injected instant: the version is **paused**.
+    #: Distinct from ``REVOKED`` (terminal) and ``POLICY_SUPERSEDED`` (replaced) — a pause
+    #: can be lifted, so a later ``as_of`` may resolve — and kept a separate member
+    #: because the mapping is injective. Named on ``POLICY_SUPERSEDED``'s precedent.
+    POLICY_SUSPENDED = "POLICY_SUSPENDED"
+    #: The stored suspension history targeting this version cannot be trusted: a record
+    #: does not verify, two distinct records share one signed instant, the sequence is not
+    #: strictly monotonic, or a stored transition is invalid. Neither honoured nor ignored.
+    SUSPENSION_INTEGRITY_INVALID = "SUSPENSION_INTEGRITY_INVALID"
+    #: Another simultaneously effective version, in the same tenant and scope, holds an
+    #: equal exclusivity claim, and no verified supersession permits the overlap. The
+    #: overlap is **unresolved**, so it refuses: the authority will not pick a winner by
+    #: registration or arrival order, and neither does this vocabulary.
+    EXCLUSIVITY_CONFLICT = "EXCLUSIVITY_CONFLICT"
 
     # --- this package's own gates, on top of a RESOLVED answer ---------------------------
     #: The answer is a historical one. A historical resolution describes the past and can
@@ -273,6 +287,13 @@ RESOLUTION_REASON_OUTCOMES: Final[dict] = {
     PolicyResolutionReason.SUPERSESSION_INTEGRITY_INVALID: (
         PolicyAuthenticityOutcome.SUPERSESSION_INTEGRITY_INVALID
     ),
+    PolicyResolutionReason.SUSPENDED: PolicyAuthenticityOutcome.POLICY_SUSPENDED,
+    PolicyResolutionReason.SUSPENSION_INTEGRITY_INVALID: (
+        PolicyAuthenticityOutcome.SUSPENSION_INTEGRITY_INVALID
+    ),
+    PolicyResolutionReason.EXCLUSIVITY_CONFLICT: (
+        PolicyAuthenticityOutcome.EXCLUSIVITY_CONFLICT
+    ),
 }
 
 #: The refusals that depend on the injected ``as_of``. Named as a set because D-5B0B-5's
@@ -283,6 +304,9 @@ TEMPORAL_OUTCOMES: Final[frozenset] = frozenset(
         PolicyAuthenticityOutcome.NOT_YET_EFFECTIVE,
         PolicyAuthenticityOutcome.EXPIRED,
         PolicyAuthenticityOutcome.REVOKED,
+        # A pause applies from its signed instant and can be lifted at a later one,
+        # so which side of it an answer falls on is decided by the injected as_of.
+        PolicyAuthenticityOutcome.POLICY_SUSPENDED,
         PolicyAuthenticityOutcome.KEY_REVOKED,
         PolicyAuthenticityOutcome.APPROVAL_PROOF_INVALID,
     }

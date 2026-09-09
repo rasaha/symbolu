@@ -17,11 +17,13 @@ bounds. This distribution is that boundary, the second of the two ratified
 
 With the family package it makes constitution issuance, binding and structural
 conformance replay run **end to end**: issue through the real authority, resolve
-by role reference, verify presented facts against the signed bounds. It does
-**not** complete the first slice's release path: first release awaits the
-separately balloted `OD-C1=B` contract-amendment round, which alone ratifies the
-role- and proposal-surface binding. Nothing here should be read as saying
-otherwise.
+by role reference, verify presented facts against the signed bounds. The
+`OD-C1=B` contract-amendment round that first release additionally required —
+the round that alone ratifies the role- and proposal-surface binding — has since
+been ratified (`ACC-AM-IMPL=YES`) and implemented, so it no longer gates the
+slice. What remains is operational and outside this repository: no `ACC-FC-5`
+gate is closed, and **no constitution has been issued or activated**. Nothing
+here should be read as saying otherwise.
 
 ## The resolver (§5.2 of the ratified specification)
 

@@ -26,6 +26,7 @@ from .payload import (
     issuance_signing_payload,
     revocation_signing_payload,
     supersession_signing_payload,
+    suspension_signing_payload,
 )
 from .statuses import (
     AUTHORITY_PROTOCOL,
@@ -33,12 +34,14 @@ from .statuses import (
     PolicyResolutionReason,
     PolicyResolutionStatus,
     PolicyRevocationReasonCode,
+    PolicySuspensionAction,
 )
 
 __all__ = [
     "IssuedPolicyRecord",
     "PolicyRevocationRecord",
     "PolicySupersessionRecord",
+    "PolicySuspensionRecord",
     "PolicyResolution",
 ]
 
@@ -195,6 +198,78 @@ class PolicyRevocationRecord:
             signature_alg=self.signature_alg,
             revoked_at=self.revoked_at,
             replacement_coordinate=self.replacement_coordinate,
+        )
+
+
+@dataclass(frozen=True)
+class PolicySuspensionRecord:
+    """One signed act in a policy version's suspension history — pause or resume.
+
+    `ACC-SUSP-2`, `ACC-SUSP-IA-7`. Unlike revocation and supersession, which are
+    terminal and therefore stored one-per-coordinate, suspension records form an
+    **ordered sequence**: this is the first state in this authority whose current
+    value is not simply *"a record exists"*. Two invariants make that sequence
+    unambiguous, and both are enforced at append time **and** re-checked at every
+    resolution:
+
+    * **strictly time-monotonic** — each accepted record's ``effective_at`` is
+      strictly later than the previous accepted one's. Arrival order is not
+      authoritative, but the log is never rewritten by inserting an earlier
+      record;
+    * **transition-valid** — a ``REINSTATE`` is accepted only when the latest
+      accepted state is ``SUSPEND``.
+
+    ``lifecycle_state`` is never written (`ACC-SUSP-1`): the artifact keeps its
+    issued lifecycle label, and only this store stops it resolving.
+    """
+
+    suspension_id: str
+    coordinate: PolicyCoordinate
+    action: PolicySuspensionAction
+    suspending_authority_id: str
+    key_id: str
+    signature_alg: str
+    signature: bytes
+    effective_at: datetime
+    detail: str = ""
+    authority_protocol: str = AUTHORITY_PROTOCOL
+    authority_protocol_version: str = AUTHORITY_PROTOCOL_VERSION
+
+    def __post_init__(self) -> None:
+        _require_nonempty(self.suspension_id, "PolicySuspensionRecord.suspension_id")
+        if not isinstance(self.coordinate, PolicyCoordinate):
+            raise PolicyAuthorityRequestError(
+                "PolicySuspensionRecord.coordinate must be a PolicyCoordinate"
+            )
+        if not isinstance(self.action, PolicySuspensionAction):
+            raise PolicyAuthorityRequestError(
+                "PolicySuspensionRecord.action must be a PolicySuspensionAction; a bare "
+                "string or boolean cannot suspend or reinstate a policy"
+            )
+        _require_nonempty(
+            self.suspending_authority_id, "PolicySuspensionRecord.suspending_authority_id"
+        )
+        _require_nonempty(self.key_id, "PolicySuspensionRecord.key_id")
+        _require_nonempty(self.signature_alg, "PolicySuspensionRecord.signature_alg")
+        if not isinstance(self.signature, (bytes, bytearray)) or not self.signature:
+            raise PolicyAuthorityRequestError(
+                "PolicySuspensionRecord.signature must be non-empty bytes — an unsigned "
+                "suspension is not 'suspension pending', it is invalid"
+            )
+        object.__setattr__(self, "signature", bytes(self.signature))
+        require_tzaware(self.effective_at, path="PolicySuspensionRecord.effective_at")
+
+    def signing_payload(self) -> bytes:
+        """Recompute the exact bytes this record's signature must cover."""
+
+        return suspension_signing_payload(
+            suspension_id=self.suspension_id,
+            coordinate=self.coordinate,
+            action=self.action,
+            suspending_authority_id=self.suspending_authority_id,
+            key_id=self.key_id,
+            signature_alg=self.signature_alg,
+            effective_at=self.effective_at,
         )
 
 

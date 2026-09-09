@@ -52,22 +52,34 @@ def test_phase_5a_is_at_the_version_5b1_moved_it_to():
 
 
 @pytest.mark.invariant
-def test_the_policy_authority_stays_at_0_3_1():
-    """``0.3.1`` since ``decode_dataclass`` became part of Policy Authority's public
-    surface (P3E front-door seam 1 needed it and SD-1 forbids ``.core`` imports).
-    Purely additive — one exported name, no ``PolicyResolutionReason`` member
-    moved, so this package's total, injective reason mapping stays complete — and
-    it surfaced here, in a consumer, after the authority's change merged, which is
-    exactly what this file exists to do.
+def test_the_policy_authority_stays_at_0_5_0():
+    """``0.5.0`` since the `ACC-OVL` round: the family-neutral exclusivity seam.
+    Additive again — two exported names, one optional
+    ``PolicyArtifactDescriptor`` field, and **one** new
+    ``PolicyResolutionReason`` member (``EXCLUSIVITY_CONFLICT``), absorbed here
+    as the outcome member of the same name. One member and not two, because that
+    round adds no store of signed records and so has no separate integrity
+    failure mode to name.
 
-    ``0.3.0`` closed ADR §15.7 under decision D-3 (durable single-node
-    ``SqlitePolicyRegistry``, ``PolicyArtifactCodec`` port, typed consistency
-    descriptor); ``0.2.0`` was the `ACC-LC` round (structured supersession, two
-    new reasons). The pin **moves**; it is never deleted or loosened
-    (`ACC-LC-IA-BASE-A1`)."""
+    ``0.4.0`` was the `ACC-SUSP` round: signed, reversible policy-version
+    suspension. Additive — six exported names, and **two new
+    ``PolicyResolutionReason`` members** (``SUSPENDED``,
+    ``SUSPENSION_INTEGRITY_INVALID``), which is precisely why the pin exists.
+    Those two members are what this package's total, injective reason mapping had
+    to grow to absorb, and it did: ``POLICY_SUSPENDED`` and
+    ``SUSPENSION_INTEGRITY_INVALID`` in :mod:`.outcomes`. The change surfaced
+    here, in a consumer, exactly as intended — on ``0.2.0``'s precedent, which was
+    the same shape of change.
+
+    ``0.3.1`` was ``decode_dataclass`` joining the public surface (P3E front-door
+    seam 1 needed it and SD-1 forbids ``.core`` imports); ``0.3.0`` closed ADR
+    §15.7 under decision D-3 (durable single-node ``SqlitePolicyRegistry``,
+    ``PolicyArtifactCodec`` port, typed consistency descriptor); ``0.2.0`` was the
+    `ACC-LC` round (structured supersession, two new reasons). The pin **moves**;
+    it is never deleted or loosened (`ACC-LC-IA-BASE-A1`)."""
 
     init = (REPO / "packages" / "policy-authority" / "src" / "ugence_policy_authority" / "__init__.py").read_text()
-    assert '__version__ = "0.3.1"' in init
+    assert '__version__ = "0.5.0"' in init
 
 
 @pytest.mark.invariant
@@ -121,7 +133,11 @@ def test_this_package_ships_at_the_version_its_profile_change_requires():
         __version__,
     )
 
-    assert __version__ == "0.9.0"
+    assert __version__ == "0.11.0"
+    # ``0.10.0`` is the `ACC-SUSP` consumer half: two outcome members and two
+    # mapping entries, absorbing the authority's two new suspension reasons. The
+    # profile deliberately does **not** move with it — no verification source
+    # changed, and no frozen digest is computed over the outcome vocabulary.
     assert VERIFICATION_PROFILE_VERSION == "v4"
 
 
