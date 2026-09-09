@@ -11,19 +11,25 @@ while three are neutral contract types, an asymmetry no decision explains; and n
 package owns the interpreting layer.** This ballot rules on those three things and
 does not disturb `D-2`, `DE-3`, `VR-3` or `AE-3`.
 
-**Status: RATIFIED on `LV-A`, `LV-C`, `LV-D` and `LV-E`. `LV-B` is OPEN.**
-Ratified 2026-09-09 on the repository owner's instruction to rule all five and
-record each with its ground; the owner named the options and directed the ruling,
-and each was resolved to the recommendation §3 and §5 already argued for.
+**Status: RATIFIED on `LV-A` to `LV-E`. `LV-F` is OPEN.**
+Ratified 2026-09-09. `LV-A`, `LV-C`, `LV-D` and `LV-E` were ruled on the owner's
+instruction to rule them and record each with its ground: the owner named the
+options and directed the ruling, and each resolved to the recommendation §3 and §5
+already argued for. `LV-B` was ruled by the owner selecting among four stated
+options, and its route there is set out below.
 
-**`LV-B` was withdrawn the same day, on the owner's instruction, and is not
-ratified.** Which legal regime an organization's AI-system classification tracks is
-a legal and product determination, and this repository's working agreement keeps
-legal requirements and owner-ratified product intent as *separate authorities* from
-anything the repository settles. Recording it as ratified put a decision nobody here
-is entitled to make into the same table as four that were. The recommendation and
-its ground stand unchanged in §3.1 and §5 as a **proposal awaiting an owner
-ruling** — withdrawing the ruling withdraws the authority claim, not the analysis.
+**`LV-B` has a three-step history, recorded rather than tidied.** It was ruled on
+2026-09-09 without the owner selecting an option, withdrawn the same day because
+which legal regime an organization tracks is a legal and product determination that
+this repository's working agreement keeps as a *separate authority* from anything
+the repository settles, and then **ruled by the owner**, who chose
+`TRACK_THE_REGIME_CORRECTED` from four stated options. The middle step is the one
+that matters: the withdrawal was not a change of mind about the analysis, and this
+ruling is not a return to the withdrawn one — it is the same proposal, with two
+defects corrected, carried this time by an authority entitled to carry it.
+
+**`LV-F` is opened by that ruling and is not decided.** The tiers classify AI
+*systems*; the Act governs general-purpose AI *models* separately. See §3.1.
 
 **Documentation only.** Ratification settles *what the vocabularies are and who owns
 them*. It authorizes **no implementation**: no enum, no new neutral type, no package
@@ -130,25 +136,38 @@ Placement `[R]`: **stays capability-local as `str` for now** — see §4, blocke
 |---|---|
 | `PROHIBITED` | The organization has ruled this class of system may not be built or run at all. |
 | `HIGH_RISK` | Consequential to health, safety, rights, livelihood or legal standing; the heaviest obligations attach. |
-| `LIMITED_RISK` | Interacts with people or generates content, so disclosure and transparency obligations attach, but not the high-risk set. |
+| `TRANSPARENCY_OBLIGATIONS` | Interacts with people, recognizes emotion or biometrically categorizes, or generates or manipulates content — so disclosure duties attach, but not the high-risk set. |
 | `MINIMAL_RISK` | No obligation beyond ordinary engineering governance. |
 | `UNCLASSIFIED` | Registered before classification was assessed. Not a judgment that risk is low. |
 
-`[R]` **`LV-B` is OPEN: this set is a proposal, not a ruling.** A ruling was
-recorded on 2026-09-09 and withdrawn the same day — which legal regime the
-organization tracks is a legal and product determination, not one this repository
-settles. The proposal: the four tiers track the EU AI Act's structure, because a
-tier set that maps onto no external regime creates a second mapping to maintain. A
-different regime, or an organization-internal set, is equally implementable.
-`UNCLASSIFIED` is proposed because without it the first registration of an
-unassessed system forces a false claim, and `D-2` guarantees no refusal for an
-unrecognized label anyway.
+**Ratified by `LV-B` (`TRACK_THE_REGIME_CORRECTED`), by the owner, 2026-09-09.**
+The tiers track the EU AI Act's structure, because a tier set that maps onto no
+external regime creates a second mapping to maintain and re-argue at every audit,
+while tracking the regime makes the mapping the identity. `UNCLASSIFIED` is ratified
+with them because without it the first registration of an unassessed system forces a
+false claim, and `D-2` guarantees no refusal for an unrecognized label anyway.
 
-**One correction the owner's ruling should weigh** `[V]`: `LIMITED_RISK` is
+**The correction the ruling adopted** `[V]`: the earlier draft's `LIMITED_RISK` was
 commentary shorthand, not the Act's own term — the Act imposes *transparency
 obligations* on those systems rather than naming a "limited risk" tier. A set whose
-whole ground is that it tracks the regime should use the regime's own vocabulary, so
-adopting this proposal should rename that member rather than inherit the shorthand.
+whole ground is that it tracks the regime must use the regime's vocabulary, so the
+member is `TRANSPARENCY_OBLIGATIONS`.
+
+`[R]` **Article citations are not yet verified.** The tiers correspond to the Act's
+prohibited practices, its high-risk classification, its transparency duties and the
+unregulated remainder. This ballot deliberately cites no article numbers: they were
+renumbered between draft and adopted text, and nothing here has been checked against
+the Official Journal. Whoever publishes the vocabulary under `LV-1` should add the
+citations from the official text, not from this document.
+
+`[R]` **`LV-F` — general-purpose AI models are outside this set, and nothing covers
+them.** These five members classify AI *systems*. The Act governs general-purpose AI
+*models* on a separate axis, with its own sub-tier for models posing systemic risk,
+and a registry whose subject is "AI systems" has no member for either. Three
+answers are open and none is taken here: extend this set with GPAI members; rule
+that `ai-system-registry` records systems only and models belong to a different
+record; or rule the distinction immaterial for a label nobody interprets. Raised
+by the `LV-B` ruling rather than settled by it.
 
 ### 3.2 Data classification — `data-use-admission`
 
@@ -272,21 +291,22 @@ the member set is written.
 
 ---
 
-## 5. Ratified decisions
+## 5. Decisions
 
 | # | Decision | Ruling | Ground |
 |---|---|---|---|
 | `LV-A` | Adopt `LV-1` — vocabularies ratified as Policy-Authority-owned documentation, never as enums in the recording packages or `governance-contracts`? | **`ADOPT_LV_1`.** | It closes the real gap — no member set written down anywhere — without disturbing `D-2`, `DE-3`, `VR-3` or `AE-3`. No type surface moves and no `CONTRACT_VERSION` moves, so no recording package becomes a classifier, which is the single ground all four existing rulings gave. The alternative — enums in the packages — would overturn four rulings to solve a documentation problem. |
-| `LV-B` | Do the system-classification tiers track the EU AI Act, or an organization-internal set? | **`OPEN` — withdrawn 2026-09-09, not ratified.** `[R]` | A ruling was recorded and then withdrawn on the owner's instruction: which legal regime the organization tracks is a legal and product determination, held by this repository's working agreement to be a *separate authority* from what the repository settles, so it is not carried by the grounds below. **The proposal that stands, awaiting an owner ruling:** the four tiers of §3.1 plus `UNCLASSIFIED`, on the ground that an internal set creates a mapping to an external regime that must be maintained forever and re-argued at every audit, while tracking the regime makes the mapping the identity. `UNCLASSIFIED` belongs with them either way, because `D-2` guarantees no refusal for an unrecognized label and without it the first registration of an unassessed system would force a false claim. |
+| `LV-B` | Do the system-classification tiers track the EU AI Act, or an organization-internal set? | **`TRACK_THE_REGIME_CORRECTED`** — ruled by the owner, 2026-09-09, from four stated options. `PROHIBITED`, `HIGH_RISK`, `TRANSPARENCY_OBLIGATIONS`, `MINIMAL_RISK`, `UNCLASSIFIED`. | An internal set creates a mapping to an external regime that must be maintained forever and re-argued at every audit; tracking the regime makes the mapping the identity. Two defects in the withdrawn draft are corrected: `LIMITED_RISK` was commentary shorthand and becomes `TRANSPARENCY_OBLIGATIONS`, the Act's own framing; and the general-purpose-model gap is raised as `LV-F` rather than papered over with an invented tier. `UNCLASSIFIED` is ratified because `D-2` guarantees no refusal for an unrecognized label, so without it the first registration of an unassessed system would force a false claim. **History:** ruled without an owner selection, withdrawn the same day as an authority this repository does not hold, then ruled by the owner. |
+| `LV-F` | Do general-purpose AI models belong in the system-classification set, in a separate record, or nowhere? | **`OPEN`.** `[R]` | Opened by the `LV-B` ruling, not settled by it. The five members classify AI *systems*; the Act governs general-purpose AI *models* separately, with its own systemic-risk sub-tier, and no member covers either. Extending the set, ruling models out of `ai-system-registry` entirely, or ruling the distinction immaterial for an uninterpreted label are all open. See §3.1. |
 | `LV-C` | Vendor posture: the assessment-state set proposed in §3.4, or a permission ladder (`APPROVED` / `CONDITIONAL` / `BLOCKED`)? | **`ASSESSMENT_STATE_SET`.** `NOT_ASSESSED`, `ASSESSED_NO_FINDINGS`, `ASSESSED_WITH_FINDINGS`, `ASSESSMENT_LAPSED`, `ASSESSMENT_REFUSED`. | `VR-3` rules the label carries "no implied eligibility". A member reading `APPROVED` would be read as a permission by every human who saw it, whatever the type says, and `vendor-dependency` "confers no approval and no onboarding status". The assessment-state set records what was *done* and leaves what it *permits* to Policy Authority. It is harder to read; that is the cost of not conflating a record with a permission. |
 | `LV-D` | Incident severity: (a) opaque and unordered, (b) a distinct ordered kind, or (c) an explicit rank field? | **`(a)_OPAQUE_AND_UNORDERED` now; `(b)` when an operational surface needs the query. `(c)` is refused.** | (a) is consistent with every existing ruling and costs only that "all incidents at or above SEV2" is unanswerable in this repository — a query nothing today asks. (b) stays available because severity genuinely *is* ranked, and when a surface needs that it deserves its own ruling rather than an extension of `DE-3`. (c) is refused as the false compromise: it makes the package carry an ordering it must not interpret, and creates two sources of truth about one incident. |
 | `LV-E` | Purpose: open shape as recommended, or closed set? | **`OPEN_SHAPE`.** A purpose label names an activity and its beneficiary; a governance document lists worked examples without closing the set. | Purpose describes an intent, and intents are generative. Every closed purpose set in practice grows a member named `OTHER`, which is the set admitting it should not have been closed. A closed set here would also collide with the lawful-basis and purpose-limitation vocabularies a privacy regime already imposes, which this repository does not own. |
 
-**What ratification did not decide.** `LV-B` itself, which is open. Placement for
-system classification, purpose and severity stays deferred to wave 5 with `LP-5`
-(§4) — the four rulings that did land fix *which names exist and who owns them*,
-never *what type carries them*. The three fields stay bare `str`, and nothing in §6
-is authorized.
+**What ratification did not decide.** `LV-F`, opened above; and the Act's article
+citations, which §3.1 marks unverified. Placement for system classification, purpose
+and severity stays deferred to wave 5 with `LP-5` (§4) — these five rulings fix
+*which names exist and who owns them*, never *what type carries them*. The three
+fields stay bare `str`, and nothing in §6 is authorized.
 
 ---
 
