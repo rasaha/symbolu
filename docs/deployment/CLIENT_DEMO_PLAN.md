@@ -147,6 +147,27 @@ one only if refusal typing is the topic, and say plainly that it is empty:
 | Is identity verified? | No. Presented and unproven. That is why it says so on every read. |
 | What would a pilot need? | The enterprise issuer validated end to end, then real authority records loaded. Writes come after that, not before. |
 | Can it take our workflows? | Yes, on Bring Your Workflow — once expressed as Ugence Workflow IR. There is no converter from agent-framework code, and that conversion is scoping work. |
+| Which model is this using? | None. No service here calls a model; the decisions are deterministic. |
+| Does our data reach a model vendor? | Nothing leaves this deployment. There is no LLM SDK, no API key and no outbound inference call in any of the three services. |
+| What does a demo cost in tokens? | Nothing. There is no inference to pay for. |
+| Where would our API keys go later? | Nowhere yet — no configuration point exists. Execution would attach at the worker's provider registry, which is build work behind identity validation, not an environment variable. |
+
+### Why there is no model key to configure
+
+Worth raising before a technical buyer finds it: no OpenAI, Anthropic or Mistral key is
+configured anywhere in this deployment, because no service makes an inference call. No LLM
+SDK appears in any dependency list, no key is read in any code path, and the maturity block
+reports `agent_execution_implemented: false` with `no_agent_execution: true` on every
+domain response `[V]`.
+
+The provider names visible in the plans — `anthropic`, `openai` — are **governance
+metadata, not connection strings.** The registry records which vendor each candidate agent
+would come from so that policy can constrain the mix: the procurement scenario is
+non-greedy team selection under provider concentration limits, and refusing to concentrate
+a team on one vendor is the point of it.
+
+> "This is the layer that decides whether a model-driven action may proceed. It reaches
+> that decision deterministically, which is why it needs no model of its own."
 
 ## Do not claim
 
