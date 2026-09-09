@@ -1,22 +1,26 @@
 name: agent-workforce-composer-spec-ci
 
-# Scoped, documentation-only CI for the Agent Workforce Composer Phase 0
-# reconciliation. This phase adds NO production package and changes NO runtime
-# behavior. The workflow enforces exactly that, plus documentation consistency:
+# Scoped, documentation-only CI for the Agent Workforce Composer architecture
+# documents. It checks that the documents agree with the boundaries contract and the
+# reconciliation ADR:
 #   - architecture-assertion validation (boundaries contract);
 #   - stale-terminology scan (no active "spec-only" / "when it ships" compiler claim);
-#   - Markdown-link validation for the new docs/ADR;
+#   - Markdown-link validation for the AWC documents, the ADR and the audit set;
 #   - platform-freeze verification (blocking; digest must be unchanged);
-#   - confirmation that no AWC production package was added;
 #   - confirmation that H16 source behavior was not modified;
 #   - confirmation that Policy Workflow Compiler source behavior was not modified.
 # Triggered only by changes to the AWC docs, the ADR/boundary artifacts, the
 # validation script, or this workflow.
+#
+# This described a "Phase 0" that adds no production package. That phase ended when
+# the AWC P1 package shipped in 36f520396 (2026-08-03); the package now has its own
+# p1, p2 and p2-1 workflows, which are where its production behavior is proved. What
+# remains here is documentation consistency, and the two upstream-source guards.
 
 on:
   pull_request:
     paths:
-      - "AGENT_WORKFORCE_COMPOSER_*.md"
+      - "Project_documentation/governance/workforce_composer/AGENT_WORKFORCE_COMPOSER_*.md"
       - "docs/architecture/ADR_AGENT_WORKFORCE_COMPOSER_H16_CANONICALIZATION.md"
       - "docs/architecture/agent_workforce_composer_boundaries.json"
       - "docs/audits/agent_workforce_composer_phase0/**"
@@ -28,7 +32,7 @@ on:
       - "claude/awc-phase0-**"
       - "chatgpt/awc-phase0-**"
     paths:
-      - "AGENT_WORKFORCE_COMPOSER_*.md"
+      - "Project_documentation/governance/workforce_composer/AGENT_WORKFORCE_COMPOSER_*.md"
       - "docs/architecture/ADR_AGENT_WORKFORCE_COMPOSER_H16_CANONICALIZATION.md"
       - "docs/architecture/agent_workforce_composer_boundaries.json"
       - "docs/audits/agent_workforce_composer_phase0/**"
@@ -57,7 +61,13 @@ jobs:
           python - <<'PY'
           import pathlib, re, sys
           repo = pathlib.Path(".")
-          docs = list(repo.glob("AGENT_WORKFORCE_COMPOSER_*.md"))
+          # The seven AWC documents moved out of the repository root in the Stage-1
+          # documentation migration; glob them where they live, or this finds nothing
+          # and reports "links OK" over a set that excludes them.
+          awc = repo / "Project_documentation/governance/workforce_composer"
+          docs = sorted(awc.glob("AGENT_WORKFORCE_COMPOSER_*.md"))
+          if len(docs) != 7:
+              sys.exit(f"expected 7 AWC documents under {awc}, found {len(docs)}")
           docs.append(repo / "docs/architecture/ADR_AGENT_WORKFORCE_COMPOSER_H16_CANONICALIZATION.md")
           docs += list((repo / "docs/audits/agent_workforce_composer_phase0").glob("*.md"))
           link = re.compile(r"\[[^\]]*\]\((?!https?://|mailto:)([^)#]+)(?:#[^)]*)?\)")
@@ -80,20 +90,24 @@ jobs:
           print(f"Markdown links OK across {len(docs)} documents")
           PY
 
-  no-production-code:
-    name: No production package / no H16 or compiler source change
+  no-upstream-source-change:
+    # This job used to begin by asserting that
+    # packages/capabilities/agent-workforce-composer did not exist. That assertion
+    # became false in 36f520396 (2026-08-03), when the AWC P1 package shipped, and
+    # it cannot pass again: the package is a released capability with its own three
+    # workflows. An assertion that can never hold gates nothing — it only keeps the
+    # check permanently red, which teaches readers to ignore it. It is removed
+    # rather than relaxed. See the pull request for the ratification this needs.
+    #
+    # The two guards below are the part that still means something and are
+    # unchanged: a change to the AWC documents must not smuggle in a change to H16
+    # coordination or to Policy Workflow Compiler source.
+    name: No H16 or compiler source change
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: No AWC production package was added
-        run: |
-          if [ -e packages/capabilities/agent-workforce-composer ]; then
-            echo "FAIL: packages/capabilities/agent-workforce-composer must not exist in Phase 0"
-            exit 1
-          fi
-          echo "OK: no AWC production package present"
       - name: Determine diff base
         id: base
         run: |
