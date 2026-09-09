@@ -100,9 +100,17 @@ def test_the_ratification_record_is_untouched_by_the_worker():
 # --------------------------------------------------------------------------- #
 def test_dockerfile_runs_non_root_exposes_one_port_and_holds_no_secret():
     df = _read("Dockerfile")
-    assert "USER 10001:10001" in df and "--uid 10001" in df and "--gid 10001" in df
+    # The image provisions 10001:10001 and reaches it through the entrypoint rather than a
+    # USER instruction: a USER that has already dropped cannot chown a mounted volume, and
+    # the platform's alternative is to run the whole worker as root. entrypoint.py holds
+    # root only to prepare the data directory and refuses to exec the worker without
+    # dropping. A USER instruction here would defeat it.
+    assert "--uid 10001" in df and "--gid 10001" in df
+    assert not [ln for ln in df.splitlines() if ln.strip().startswith("USER ")], \
+        "a USER instruction would leave the entrypoint unable to chown the volume"
     assert [ln for ln in df.splitlines() if ln.strip().startswith("EXPOSE")] == ["EXPOSE 8444/tcp"]
-    assert "HEALTHCHECK" in df and 'ENTRYPOINT ["python", "-m", "governed_runtime_worker"]' in df
+    assert "HEALTHCHECK" in df and 'ENTRYPOINT ["python", "/app/entrypoint.py"]' in df
+    assert "COPY deployment/governed-runtime-worker/entrypoint.py /app/entrypoint.py" in df
     # No VOLUME instruction: Railway rejects one, and the image could not be built there
     # with it present. Durability is the deployment's to provide by mounting a volume at
     # the data directory, which the image can no longer require — see RW-6's [G].

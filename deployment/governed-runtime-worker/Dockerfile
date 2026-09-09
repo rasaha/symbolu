@@ -62,8 +62,11 @@ RUN groupadd --gid 10001 ugence \
 COPY --from=backend /opt/venv /opt/venv
 COPY deployment/governed-runtime-worker/EXTERNAL_DEPLOYMENT_EVIDENCE.json /app/deployment/EXTERNAL_DEPLOYMENT_EVIDENCE.json
 COPY deployment/governed-runtime-worker/container-healthcheck.py /app/container-healthcheck.py
+COPY deployment/governed-runtime-worker/entrypoint.py /app/entrypoint.py
 
-USER 10001:10001
+# No USER instruction: the container starts as root so the entrypoint can chown a mounted
+# volume the image's build-time chown cannot reach, and drops to 10001:10001 before the
+# worker is exec'd. It refuses to exec the worker as root. See entrypoint.py.
 WORKDIR /app
 EXPOSE 8444/tcp
 
@@ -76,4 +79,4 @@ LABEL org.opencontainers.image.title="governed-runtime-worker" \
       org.opencontainers.image.source="https://github.com/rasaha/symbolu" \
       org.opencontainers.image.licenses="UNLICENSED"
 
-ENTRYPOINT ["python", "-m", "governed_runtime_worker"]
+ENTRYPOINT ["python", "/app/entrypoint.py"]

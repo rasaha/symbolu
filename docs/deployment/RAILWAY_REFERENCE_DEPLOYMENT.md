@@ -520,7 +520,6 @@ UGENCE_REVIEW_DATA_DIR=/var/lib/ugence-review
 UGENCE_REVIEW_TENANT_ID=tenant-demo
 UGENCE_REVIEW_REQUIRED_ROLE=approver
 UGENCE_REVIEW_DEFINITION_DIGEST=shadow-v1
-RAILWAY_RUN_UID=0
 ```
 
 Then the two DSNs, from **Postgres → Variables → `DATABASE_PRIVATE_URL`** (the private
@@ -542,13 +541,25 @@ credential rotation no longer propagates — update both DSNs by hand when Postg
 Never paste a resolved DSN into a screenshot, ticket or chat: it carries the password.
 The worker's own startup line prints it as `postgresql://<redacted>@…` `[V]`.
 
-`RAILWAY_RUN_UID=0` is required and is not cosmetic. Railway mounts the volume owned by
-root; the image runs as `USER 10001:10001`, so without it the worker composes nothing and
-dies on `sqlite3.OperationalError: unable to open database file` `[V]`. It runs the worker
-as root, discarding the image's non-root posture — acceptable for a `test`-mode reference
-deployment, and a production follow-up: an entrypoint that fixes ownership as root and
-drops privileges before starting. That is a reviewed repository change, not a deployment
-improvisation `[G]`.
+**Do not set `RAILWAY_RUN_UID=0`.** Railway mounts the volume owned by root, and the
+image's build-time `chown` is discarded by the mount, so a container that has already
+dropped to uid 10001 dies on `sqlite3.OperationalError: unable to open database file`
+`[V]`. The platform's escape hatch is to run the whole worker as root, which fixes the
+write and discards the non-root posture with it.
+
+The image handles it instead: it carries no `USER` instruction, starts as root, and
+`entrypoint.py` chowns the data directory, drops groups, gid and uid to `10001:10001`,
+verifies that root is unreachable, and only then exec's the worker. A drop that does not
+verify, or a directory root cannot prepare, exits non-zero rather than running the worker
+as root `[V]`. Started unprivileged, it changes nothing and exec's directly.
+
+If you set `RAILWAY_RUN_UID=0` during an earlier deployment, remove it: the worker no
+longer needs it and it would keep the process as root for no benefit. Confirm the drop in
+the deploy log, immediately before the startup line:
+
+```
+entrypoint: prepared /var/lib/ugence-review and dropped to uid 10001
+```
 
 Check the spelling of `UGENCE_REVIEW_DEFINITION_DIGEST` before deploying; a typo surfaces
 only as `WORKER_CONFIG_INVALID` on the next boot.
@@ -647,6 +658,49 @@ unrun and its record still carries the `[G]`; this walkthrough is not that recor
 
 ---
 
+## Part 8 — Once it is running
+
+Four properties of the running deployment that no step above establishes, and that are
+easier to learn here than from an outage.
+
+**8.1 Every service redeploys when the default branch moves.** Each service tracks a
+branch, so merging *anything* — a documentation-only pull request included — triggers a
+rebuild of every service whose Watch Paths match, and of every service with none set. The
+parts above set Watch Paths for exactly this reason; a service without them rebuilds on
+every merge `[V]`, observed repeatedly on 2026-09-09. The consequences are worth stating:
+a merge is a deploy, a red build on an unrelated service will follow a docs merge, and two
+merges in quick succession can leave a service building the older commit. Check the
+Deployments tab after merging, not only the pull request.
+
+**8.2 Prove the volume actually persists, once.** The worker's three SQLite stores are the
+only state the platform does not manage for you, and nothing above has restarted the
+service. Do it deliberately while nothing depends on it: note what a read returns, use
+**Redeploy** on the worker, and read again. If the answer changed, the volume is not
+mounted where `UGENCE_REVIEW_DATA_DIR` points and the stores are being written to the
+container filesystem — the failure 7.3 warns about, which is silent until exactly this
+moment `[G]`. This has not been exercised on any deployment.
+
+**8.3 Back up the two stores that matter, and know they differ.** Postgres has a
+**Backups** tab; the volume is snapshotted separately, if at all. The audit ledger and the
+authority directory live on the volume, not in Postgres, so a Postgres backup does not
+capture them. Under RW-6 this deployment is single-instance and reference-grade: it has no
+replication, and a lost volume is a lost decision record. Do not present it as durable
+governance evidence.
+
+**8.4 Literal DSNs do not follow a credential rotation.** 7.4 enters both database URLs as
+literals because references resolve as one whole value. If Railway rotates the Postgres
+credentials, the worker keeps the old ones and fails at connect — with a message that
+looks nothing like a rotation. Update both variables by hand, keeping `/railway` and
+`/sysdb` distinct.
+
+> **Turning it off.** Deleting a service does not delete its volume, and deleting a
+> Postgres service does not delete its backups; both continue to be billed. Remove the
+> volume from the canvas explicitly. Removing only the public domain of `studio-web`,
+> `console-web` or `authority-plane` stops the demo being reachable while leaving the
+> services and their state intact — the cheaper reversible step when a demo is over.
+
+---
+
 ## The four variables, in one place
 
 | Variable | Set on | Value | When it takes effect |
@@ -679,7 +733,8 @@ environment.
 | Worker exits at boot printing a list | It reports every reason at once; usually the two DSNs are identical | 7.4 |
 | `WORKER_CONFIG_INVALID: … APP_DATABASE_URL is required` with the variable visibly set | A `${{Postgres.…}}` reference resolved empty at runtime | 7.4 — use literals |
 | `WORKER_CONFIG_INVALID: … DEFINITION_DIGEST is required` | The variable name is misspelled | 7.4 |
-| `sqlite3.OperationalError: unable to open database file` | Railway mounts the volume as root; the image runs as uid 10001 | 7.4 — `RAILWAY_RUN_UID=0` |
+| `sqlite3.OperationalError: unable to open database file` | The entrypoint did not run, or `UGENCE_REVIEW_DATA_DIR` is not the mounted path | 7.4 — expect the `dropped to uid 10001` line |
+| `ENTRYPOINT_REFUSED: …` and the container exits 1 | Root could not prepare the data directory, or the privilege drop did not verify | 7.4 — the worker is never run as root |
 | Build fails: `docker VOLUME … is not supported, use Railway Volumes` | A `VOLUME` instruction reached the Dockerfile again | it was removed in `bba9d118`; do not restore it |
 | No Volumes control in the worker's Settings | Volumes are attached from the project canvas | 7.3 |
 | `CREATE DATABASE sysdb;` only filters a table list | The Data tab browses tables and runs no SQL | 7.1 — `railway connect Postgres` |
@@ -777,8 +832,10 @@ so what remains unproven is narrower and worth naming precisely:
 - **The container gate set.** An image now exists, but `CONTAINER_GATE_SET.json` still
   reads `execution_state: NOT_EXECUTED`: the gates run against a mirrored base image whose
   coordinates are null. A Railway build is not that pipeline (RW-2).
-- **The non-root posture.** `RAILWAY_RUN_UID=0` runs the worker as root. The image's
-  `USER 10001:10001` is presently decorative on Railway.
+- **The entrypoint on Railway.** The privilege drop is verified in this repository — a
+  root-owned directory is chowned, the process reaches uid 10001, and a SQLite store opens
+  there `[V]` — but the image carrying it has not yet been deployed. The
+  2026-09-09 deployment ran under `RAILWAY_RUN_UID=0` `[V]`.
 - **Durability.** No restart, redeploy or volume-detach has been exercised against the
   three SQLite stores; that they survive is designed, not observed.
 
