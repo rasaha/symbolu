@@ -27,6 +27,13 @@ REPO = pathlib.Path(__file__).resolve().parents[1]
 BOUNDARIES = REPO / "docs" / "architecture" / "agent_workforce_composer_boundaries.json"
 ADR = REPO / "docs" / "architecture" / "ADR_AGENT_WORKFORCE_COMPOSER_H16_CANONICALIZATION.md"
 
+# The seven documents sat at the repository root when this script was written. The
+# Stage-1 documentation migration (bef262e5a, 2026-08-10) moved them here along with
+# 1740 others, and the lookup below was never repointed — so every run since has
+# failed on "document not found" before reaching the stale-terminology scan that is
+# the point of checks 4 and 5. Resolve them where they actually live.
+AWC_DOC_ROOT = REPO / "Project_documentation" / "governance" / "workforce_composer"
+
 AWC_DOCS = (
     "AGENT_WORKFORCE_COMPOSER_DESIGN_SPEC.md",
     "AGENT_WORKFORCE_COMPOSER_ARCHITECTURE.md",
@@ -130,9 +137,9 @@ def main() -> int:
     # The dated "Implementation-Status Correction" blockquote intentionally quotes
     # the old phrasing; skip that whole block, then scan the live body.
     for name in AWC_DOCS:
-        path = REPO / name
+        path = AWC_DOC_ROOT / name
         if not path.exists():
-            _fail(problems, f"AWC document not found: {name}")
+            _fail(problems, f"AWC document not found: {path.relative_to(REPO)}")
             continue
         in_correction_note = False
         for i, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
