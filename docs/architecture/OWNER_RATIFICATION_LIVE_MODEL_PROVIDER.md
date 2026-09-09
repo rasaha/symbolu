@@ -110,6 +110,64 @@ procurement scenario is non-greedy team selection under provider concentration l
 | `LIMITS_BIND_AT_EXECUTION` | The vendor mix a plan promised is the mix that runs. Closes the gap between planned and actual governance. |
 | `PLANNING_ONLY` | Concentration limits stay advisory. A plan may promise a mix the runtime does not honour, which is a gap worth stating plainly rather than discovering. |
 
+## 4a — A proposed execution sequence, and what it costs
+
+A seven-step sequence has been put forward: *runtime invokes the model → the model
+produces a candidate action → the runtime converts it to a typed proposal → the control
+plane verifies policy, evidence, authority and risk → the worker persists and evaluates →
+ActionGate returns permit, deny or escalate → an authorized executor acts.*
+
+The spine matches the seams that exist. Four things in it are decisions rather than
+details, and each attaches to a ballot item above.
+
+**ActionGate is not the last gate, and the sequence makes it one.** The deployed loop runs
+`CLEAR` after `AUTHORIZE` — Context Minimization, then Truth & Evidence, then ActionGate,
+then the Autonomous Control Plane `[V]`. Both refusals in the shipped console scenarios
+turn on precisely this: ActionGate returns `AUTHORIZED` with `reasons: ['policy_allow']`
+and the action is stopped anyway, once by operational clearance and once by the evidence
+gate. Placing ActionGate immediately before the executor leaves an operational HOLD —
+change freeze, exhausted error budget — with nowhere to live. Authorization and
+operational safety are separate questions asked in that order, and collapsing them
+forfeits the strongest property the loop currently demonstrates.
+
+**Step 1 answers D-2 without ratifying it.** "The runtime invokes the model" places model
+egress inside the worker, whose only permitted egress is the JWKS host (CR-5). That is a
+defensible answer — it is `AMEND_CR_5_ALLOWLIST_VENDOR` — but it must be chosen, not
+inherited from a diagram.
+
+**The conversion step carries the risk the sequence gives it no weight for.** Free model
+output becoming a typed proposal is where prompt injection and misrepresentation land, and
+in this ordering the converter sits downstream of untrusted output with no independent
+check. Two properties belong in whatever D-1 ratifies: the model emits through a
+**constrained tool schema** rather than free text parsed afterwards, and **"this output
+maps to no proposable action" is a first-class typed refusal**, not an exception. A
+converter that always yields a proposal is the same defect as a planner that always yields
+a team — and the studio already refuses to be that (`NO_FEASIBLE_TEAM`) `[V]`.
+
+**Two steps are absent.**
+
+- *Record before act.* Nothing in the sequence persists the decision before the executor
+  runs. Today every disposition carries a correlation id and a clearance id and the ledger
+  appends `[V]`; left implicit, the audit becomes a side effect of execution rather than a
+  precondition for it. This is D-4's subject, and D-4 governs only *what* is recorded —
+  *when* is a separate property and should be stated with it.
+- *The destination of an escalation.* "Permit, deny or escalate" names no recipient. The
+  approval workflow and approver identity adapter already exist for this, behind AP-3's
+  validation. Without a step, escalate is a status with no consumer.
+
+**Step 7 is a convention unless the executor checks.** "Only an authorized executor
+performs the action" holds only if the executor **verifies the clearance receipt itself**
+rather than trusting its caller. The `cer-…` clearance ids exist and are already carried on
+every disposition `[V]`; making the executor verify one turns the sentence into a control.
+Otherwise anything that can reach the executor can act, whatever the diagram says.
+
+**The sequence with these applied:** invoke → constrained output → typed proposal **or
+typed refusal** → policy, evidence, authority → **record** → authorize → **clear** →
+permit, deny or **escalate to a named human** → executor **verifies the receipt** → act.
+
+This section proposes; it ratifies nothing. Whether the loop is arranged this way is part
+of D-1, and where the first step runs is D-2.
+
 ## 5 — What this document does not do
 
 It specifies nothing. No interface, no package layout, no configuration surface, no
