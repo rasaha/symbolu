@@ -577,8 +577,10 @@ field. A fully self-consistent binding a caller fabricated passes every check an
 is still only structural; every outcome carries the standing, permanently
 `OUT_OF_SCOPE` `SYSTEM_BINDING_AUTHENTICITY_NOT_VERIFIED` disposition saying so.
 
-`SystemManifest` **remains unresolved and unimplemented** — its home is an open
-owner decision (ADR §26.3), so no such type is minted in either package. The
+`SystemManifest` is now **owned by `ugence-governance-contracts`** (ADR §26.3,
+ruled 2026-09-09), beside `AssessedSystemBinding`. **This package still mints
+none**: it references one only through the opaque `system_manifest_ref` +
+`system_manifest_digest` pair, and nothing here resolves it. The
 RA-owned subject binding **remains additive and is not forked**: it is
 represented here **only** through the opaque `canonical_subject_context_ref`
 token, so the contract can be pointed at with no shape change and no version

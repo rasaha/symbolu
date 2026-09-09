@@ -28,7 +28,7 @@ Import the curated surface from :mod:`ugence_uvi_policy_contracts.api`.
 
 from __future__ import annotations
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 
 from .contracts import (  # noqa: E402
     AssessmentContext,

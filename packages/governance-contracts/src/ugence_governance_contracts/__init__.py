@@ -16,7 +16,7 @@ Import the curated surface from :mod:`ugence_governance_contracts.api`.
 
 from __future__ import annotations
 
-__version__ = "0.8.0"
+__version__ = "0.9.0"
 
 #: The provider-contract version this package publishes (unchanged from the
 #: pre-migration ``governance_providers`` framework value). The GV-2E-a evidence
@@ -24,7 +24,10 @@ __version__ = "0.8.0"
 #: additive, backward-compatible neutral families; neither changes the provider
 #: contract surface, so this value is deliberately unchanged. The G7 idempotency
 #: and G8 validity families (0.4.0) are likewise additive neutral families: no
-#: provider dataclass, protocol, enum or default moved.
+#: provider dataclass, protocol, enum or default moved. The SystemManifest family
+#: (0.9.0, UVI ADR §26.3) is additive in the same way and by the same test the
+#: 2026-09-09 §26.9 ruling used to close that item: no provider module imports it,
+#: and no pinned provider constructor signature moved.
 CONTRACT_VERSION = "1.0.0"
 
 from .errors import (  # noqa: E402
@@ -61,6 +64,7 @@ from .contracts import (  # noqa: E402
     AssertionGovernanceRequest,
     AssertionGovernanceResult,
     AssessedSystemBinding,
+    ComponentBinding,
     AssessmentWindow,
     AssuranceFindingContractError,
     AssuranceFindingLabel,
@@ -88,8 +92,10 @@ from .contracts import (  # noqa: E402
     PopulationSlice,
     Provider,
     SourceBasis,
+    SYSTEM_MANIFEST_COMPONENT_FAMILIES,
     SystemBindingAuthenticityStatus,
     SystemIdentityContractError,
+    SystemManifest,
     IdempotencyContractError,
     IdempotencyDisposition,
     IdempotencyKey,
@@ -135,6 +141,7 @@ __all__ = [
     "MetricClaim", "MetricObservation",
     # M-3R.3 neutral assessed-system identity (additive)
     "AssessedSystemBinding", "SystemBindingAuthenticityStatus",
+    "ComponentBinding", "SystemManifest", "SYSTEM_MANIFEST_COMPONENT_FAMILIES",
     "SystemIdentityContractError",
     # DE-5 neutral data-classification label (additive)
     "DataClassificationLabel", "DataClassificationContractError",

@@ -1,5 +1,47 @@
 # Changelog — ugence-governance-contracts
 
+## [0.9.0] — SM-1: the neutral assessed-system composition (§26.3 ruling)
+
+**Additive neutral family.** No provider dataclass gained a field; no default,
+signature, enum value or serialized form moved. `CONTRACT_VERSION` stays **1.0.0**
+by the same structural test the 2026-09-09 §26.9 ruling used to close that item.
+
+### Added — `SystemManifest`, `ComponentBinding`, `SYSTEM_MANIFEST_COMPONENT_FAMILIES`
+`AssessedSystemBinding` names *which* system and configuration an assessment is
+about; `SystemManifest` names *what that configuration was made of* — models,
+prompts/configurations, tools/capability sets, workflows and policies — as tuples
+of `ComponentBinding`, each an opaque `(ref, digest)` pair of plain strings.
+
+### Why it is here and not in `uvi-policy-contracts`
+Because its workflow and policy bindings are **opaque**, never
+`uvi_policy_contracts.PolicyReference`. That is the whole placement argument: this
+repository already separates the two cases — `AssessedSystemBinding` sits in the
+neutral leaf because every field is a platform-neutral primitive, while
+`AssessmentContext` sits in UVI *because* it references `PolicyReference`. The
+precedent for opaque policy references in this leaf is `MetricClaim.policy_refs`,
+already a plain `tuple[str, ...]`. `tests/packaging/test_leaf_dependency.py` asserts
+the module by name, and a typed `PolicyReference` import fails it — confirmed by
+negative control, not by inspection.
+
+### Component bindings carry no datetime, deliberately
+`_canonical_payload` normalizes instants in a **single top-level pass** over
+`dataclasses.asdict`, sound only because every `AssessedSystemBinding` field is a
+scalar. An instant nested inside a component would escape UTC normalization and
+quietly destabilize the manifest digest, so components are string-only.
+
+### A nominal manifest is refused
+At least one component binding must be present, enforced at construction. A
+manifest that binds nothing describes no composition and would let an assessment
+claim one it never recorded.
+
+### What does not move
+`AssessedSystemBinding` gains **no** typed field pointing at the manifest — the
+link stays the opaque `system_manifest_ref` + `system_manifest_digest` pair — so
+its canonical projection and digest are unchanged, and every frozen expectation
+about it still holds. `SystemManifest` proves internal consistency and
+digest-bound composition; it proves no component was deployed, no digest was taken
+over a real artifact, and no authority attested anything.
+
 ## [0.8.0] — neutral assurance-finding label (AE-5) (additive)
 
 **Additive, backward-compatible.** No existing public symbol, field, enum value,
@@ -299,7 +341,10 @@ RA-owned `SubjectContext` is unmerged (D-14, §26.2).
 #1432, and D-14 was ratified 2026-09-09: UVI **permanently does not adopt it**,
 closing §26.2. The token stays opaque — by decision now, not by absence — so
 nothing about this entry's shape or reasoning changes. `SystemManifest` §26.3
-remains open.)*
+was subsequently ruled on 2026-09-09: the manifest is owned by this package as of
+0.9.0 above, with opaque ref+digest workflow/policy bindings. This entry's shape is
+unchanged — `AssessedSystemBinding` still carries only the opaque token pair and
+gained no typed field.)*
 Neither is defined here:
 both are carried as **opaque, co-required ref + digest tokens**, so a ratified
 contract can be pointed at later with no shape change. No environment

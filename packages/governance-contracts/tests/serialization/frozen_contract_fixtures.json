@@ -217,7 +217,6 @@
       "COMPATIBILITY": "COMPATIBILITY"
     }
   },
-  "api_snapshot_hash": null,
   "error_failure_classes": {
     "ProviderError": "TERMINAL",
     "ProviderRegistrationError": "CONFIGURATION",
