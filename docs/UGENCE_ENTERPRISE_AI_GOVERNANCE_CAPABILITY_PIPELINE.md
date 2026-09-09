@@ -608,8 +608,12 @@ the consumer is **intended, not existing**, and no workstream owns the wiring.
 Two further things gate any end-to-end use and are not scheduled: `assess_readiness`
 ships only deny-all verifiers, so with a working policy resolver any policy carrying
 an applicable gate cannot reach a headline classification (UVI ADR §26.10); and
-metric-to-threshold evaluation is assigned to no package. **Assigning the wiring
-workstream is an open owner ruling.**
+metric-to-threshold evaluation is assigned to no package. **The wiring is therefore
+deferred until §26.10 resolves** (recorded 2026-09-09): wiring it sooner would
+surface a screen that can only ever render `NOT_EVALUATED`, which is worse than
+the honest BLOCK the screen shows today. That is a sequencing consequence of
+§26.10, not a resourcing decision — **assigning the workstream remains an open
+owner ruling**, and the question reopens on its own when §26.10 closes.
 
 ### 45. Governed Value
 

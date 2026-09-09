@@ -349,7 +349,7 @@ Each milestone is independently reviewable, fails closed by default, and mints n
 2. ~~**RA-owned `SubjectContext` dependency**~~ — **RESOLVED (2026-09-09)** by owner ratification of D-14: the contract merged (design PR #1425, 2026-08-13; implementation PR #1432, 2026-08-17, in `risk_authority.integrations.evaluation_contracts`) and **UVI does not adopt it**. `canonical_subject_context_ref` stays a permanently opaque token. Grounds are recorded at D-14: the RA fact set is capacity-shaped and carries no model/prompt/tool identity; §21 forbids a UVI arrow at an authority package; and PR #1432 left the D-4 identifier strings unfrozen. This is no longer an open issue and needs no owner action. A future need for those facts would be met by a **neutral** contract in `governance-contracts` — a new decision, not this one.
 3. **`SystemManifest` home** — `governance-contracts` vs `uvi-policy-contracts` vs an assessed-system contract, and confirmation it is a non-competing additive artifact (D-14, §20).
 4. **Producers of `AttributionAssessment` / `VerificationAssessment`** — a new attribution capability / DA extension, and a Runtime-Assurance extension vs new; whether `PARTIALLY_ATTRIBUTED` needs a DA reconciliation-contract extension (D-10).
-5. **Benchmark registry home** — **RESOLVED (2026-08-17)** by
+5. ~~**Benchmark registry home**~~ — **RESOLVED (2026-08-17)** by
    [`ADR_UGENCE_TRUSTED_EVIDENCE_AND_BENCHMARK_REGISTRY.md`](ADR_UGENCE_TRUSTED_EVIDENCE_AND_BENCHMARK_REGISTRY.md):
    **one shared, platform-wide Ugence Benchmark Registry** (internal platform
    infrastructure, not a UVI-owned leaf and not a fourth UVI engine), with **UVI as its
