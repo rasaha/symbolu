@@ -53,12 +53,59 @@ from .contracts import (
 )
 from .effective_scope import effective_scope_violations
 from .restrictions import apply_restrictions
+from .verified import VerifiedRiskAuthorityResult
 
-__all__ = ["RiskAuthorityCompositionEngine"]
+__all__ = ["RiskAuthorityCompositionEngine", "ProductionCompositionError"]
+
+
+class ProductionCompositionError(Exception):
+    """The production composition path was handed something it may not treat as authority.
+
+    Raised when :meth:`RiskAuthorityCompositionEngine.compose_verified` receives a raw
+    :class:`RiskAuthorityMachineResult`, a look-alike, or a verified result that a
+    reference enforcer produced (ADR §2, §8/D-B, §8/D-E).
+    """
 
 
 class RiskAuthorityCompositionEngine:
     """Compose RA authority with additive governance vetoes, fail-closed."""
+
+    def compose_verified(
+        self,
+        *,
+        risk_authority: VerifiedRiskAuthorityResult,
+        decision_authority: GovernanceVetoResult,
+        actiongate: GovernanceVetoResult,
+        correlation_id: str = "",
+    ) -> GovernedExecutionDecision:
+        """Compose from a verified, envelope-bound RA result — the production path.
+
+        This is the only composition entry point a production deployment may use. It
+        refuses anything that is not exactly a :class:`VerifiedRiskAuthorityResult` minted
+        by the runtime's own derivation, and refuses one a reference enforcer produced.
+
+        The refusal is deliberately a raised error rather than a DENY: a caller that hands
+        the production path an unverified verdict has a wiring defect, and returning a
+        composed decision — even a denying one — would let that defect look like a normal
+        governance outcome.
+        """
+
+        if type(risk_authority) is not VerifiedRiskAuthorityResult:
+            raise ProductionCompositionError(
+                "production composition requires a VerifiedRiskAuthorityResult derived from "
+                f"a verified envelope; received {type(risk_authority).__name__}. A "
+                "deployment-supplied RiskAuthorityMachineResult is not authority (ADR §2).")
+        if risk_authority.production is not True:
+            raise ProductionCompositionError(
+                "this VerifiedRiskAuthorityResult was produced by a reference enforcer and "
+                "is structurally ineligible for production composition (ADR §8/D-E)")
+        return self.compose(
+            risk_authority=risk_authority.result,
+            decision_authority=decision_authority,
+            actiongate=actiongate,
+            action=risk_authority.result.action,
+            correlation_id=correlation_id,
+        )
 
     def compose(
         self,

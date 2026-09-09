@@ -90,6 +90,7 @@ def build_authority_recheck(
     key_ring: Any,
     clock: Callable[[], Any],
     sync: Optional[Callable[[], None]] = None,
+    applicability: Any = None,
 ) -> Callable[[object, object, float], Tuple[bool, Tuple[str, ...]]]:
     """Build the ``authority_recheck`` callable for ``AgentRuntimeConfig``.
 
@@ -113,5 +114,9 @@ def build_authority_recheck(
         key_ring=key_ring,
         clock=clock,
         resolve=hook_envelope_resolver(hook),
+        # ADR §8/D-D: Policy Authority owns whether an action class is authority-bound.
+        # This package resolves nothing itself and grants no exemption; it passes the
+        # deployment's resolver straight through. Omitting it means authority required.
+        applicability=applicability,
         sync=sync,
     )

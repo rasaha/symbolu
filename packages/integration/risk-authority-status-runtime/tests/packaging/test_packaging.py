@@ -26,7 +26,7 @@ def test_package_name_and_version():
     assert data["project"]["name"] == "ugence-risk-authority-status-runtime"
     from ugence_risk_authority_status_runtime import __version__
 
-    assert __version__ == "0.1.0"
+    assert __version__ == "0.2.0"
 
 
 def test_declares_only_risk_authority_dependency():

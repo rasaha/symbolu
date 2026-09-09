@@ -56,6 +56,9 @@ from .case_lifecycle import (
 from .enforcement import (
     PreEffectContext,
     StatusAwareActionGate,
+    StatusGateConfigurationError,
+    AuthorityApplicability,
+    ApplicabilityPort,
     StatusAwareGateResult,
     make_pre_effect_recheck,
 )
@@ -106,6 +109,9 @@ __all__ = [
     "supersede_case",
     # enforcement
     "StatusAwareActionGate",
+    "StatusGateConfigurationError",
+    "AuthorityApplicability",
+    "ApplicabilityPort",
     "StatusAwareGateResult",
     "PreEffectContext",
     "make_pre_effect_recheck",

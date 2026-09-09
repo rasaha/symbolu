@@ -5,8 +5,51 @@
 (`ugence-decision-authority`, `ugence-actiongate-provider`) into a single,
 fail-closed execution-eligibility decision.
 
-> Status: **RA-4.5 governance composition implemented and CI-verified; production
-> deployment validation remains pending.**
+> Status: **RA-4.5 ratified as the production composition layer above the RA-1→RA-4
+> spine** (`ADR_RISK_AUTHORITY_RA45_PRODUCTION_POSTURE_RATIFICATION.md`). It predates and
+> does not adopt RA 0.8's `ActionAdmissionSeam`. Production eligibility depends on
+> authenticated inputs — see *Verified composition* below. Deployment validation against
+> real ActionGate deployments, live revocation stores and HSM/KMS custody remains pending.
+
+## Verified composition — breaking changes at 0.2.0
+
+A deployment-supplied `RiskAuthorityMachineResult` is **not** machine authority, whatever
+its Python type and whatever posture field it carries (ADR §2). Only a verified, signed
+`RiskAuthorizationEnvelope` is. The production path therefore derives its own result:
+
+```
+verified envelope → ActionAuthorization binding → VerifiedRiskAuthorityResult → composition
+```
+
+```python
+enforcer = RiskAuthorityEnforcer.production(gate=my_production_gate)
+verified = enforcer.derive(authorization_id=..., envelope=..., action=..., identity=...,
+                           key_ring=..., revocation_state=..., now=trusted_clock())
+decision = RiskAuthorityCompositionEngine().compose_verified(
+    risk_authority=verified, decision_authority=da_veto, actiongate=ag_veto)
+```
+
+Nothing new is signed or attested. `ActionAuthorization` — which Risk Authority's own
+`ActionGatePort.authorize` already returns — is the envelope's action-specific binding, and
+this package simply stops discarding it. `VerifiedRiskAuthorityResult` is an internal
+verified-flow marker, **not** proof: it prevents reference and production flows from being
+mixed by accident; the envelope and the binding checks are what establish trust.
+
+Three changes break callers at 0.2.0:
+
+| Was | Now | Why |
+|---|---|---|
+| `RiskAuthorityEnforcer()` built a `ReferenceActionGate` implicitly | typed `EnforcerConfigurationError`; use `.production(gate=...)` or `.reference()` | a reference enforcer was reachable without anyone saying so (ADR §8/D-E) |
+| `StatusAwareActionGate(reader, policy=...)` likewise | same, via `.production(...)` / `.reference(...)` | the same default at the commit point |
+| `compose(risk_authority=<caller-built result>)` was the only entry point | `compose` remains for reference/non-authoritative use; production must call `compose_verified` | ADR §2 |
+
+A warning-only transition was rejected: it would have preserved the ambiguity it warns
+about. `compose` itself is unchanged, so reference and test callers keep working.
+
+`resolve(...) → None` in the RA-6 pre-effect recheck no longer passes through on caller
+omission. Only an authenticated Policy Authority rule, supplied through the new
+`applicability` port, can place an action outside Risk Authority scope; absence, lookup
+failure, ambiguity and malformed answers all mean authority required (ADR §8/D-D).
 
 ## The corrected authority model
 

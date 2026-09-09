@@ -240,7 +240,7 @@ def _make_harness(
         revocation=app.revocation,
         envelope=envelope,
         now=now,
-        enforcer=RiskAuthorityEnforcer(),
+        enforcer=RiskAuthorityEnforcer.reference(),
         _seq=[],
     )
 

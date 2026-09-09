@@ -34,7 +34,7 @@ import importlib.util, sys
 from datetime import datetime, timezone
 
 import risk_authority as ra
-assert ra.__version__ == "0.8.0", ra.__version__
+assert ra.__version__ == "0.9.0", ra.__version__
 assert "site-packages" in ra.__file__, ra.__file__
 assert not any("/symbolu" in p for p in sys.path), sys.path
 
