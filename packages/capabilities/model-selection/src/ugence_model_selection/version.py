@@ -20,7 +20,7 @@ Platform v1.0 freeze; this package is its first canonical distribution.
 """
 from __future__ import annotations
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 
 VERSION = __version__
 VERSION_INFO: tuple[int, int, int] = tuple(int(p) for p in __version__.split("."))  # type: ignore[assignment]

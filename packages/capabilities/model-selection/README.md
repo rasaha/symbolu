@@ -141,13 +141,40 @@ resolve to the *same objects* in this package (identity preserved). Its `harness
 `baselines`, and `scenarios` modules and its `frozen/replay_v1` tree are the capability's
 local research/evaluation harness and remain there as consumers of this core.
 
+## The capability floor (0.2.0)
+
+`GateConfig.quality_floor` is a **hard, non-compensatory** minimum capability prior,
+evaluated in `gate.py` as the `quality_within_floor` condition against a `quality` signal
+with its own evidence and TTL. Below the floor — or missing, stale, or not a real number
+in `[0, 1]` — the candidate is INELIGIBLE, and no ranking weight can restore it, because
+ranking only ever sees the eligible set.
+
+It is **off unless configured**: with `quality_floor` unset the condition is not evaluated
+at all, so decision records stay byte-identical to `0.1.0`. It **narrows only** — a perfect
+score approves no provider and rescues no other failing condition. See
+[`docs/QUALITY_FLOOR.md`](docs/QUALITY_FLOOR.md) for why this is a gate and not a weight.
+
 ## Evidence & scope (honest status)
 
-This is a **behavior-preserving structural migration**. It does not validate any
-commercial model-quality claim; the capability's demonstrated evidence remains primarily
-**synthetic**; the soft-by-default quality-floor gap identified by the audit is unchanged;
-no real provider-reliability claim is established; and no routing or execution capability
-was added. See `docs/migrations/model_selection/` and `docs/audits/model_selection/`.
+The core is a **behavior-preserving structural migration**; `0.2.0` adds the capability
+floor and the standard artifact set without changing any decision a caller does not
+configure. It does not validate any commercial model-quality claim; the capability's
+demonstrated evidence remains primarily **synthetic**; the capability prior is a
+caller-supplied number this package neither computes, validates nor benchmarks; no real
+provider-reliability claim is established; and no routing or execution capability was
+added. Not pilot-validated, not production-certified. See
+[`docs/LIMITATIONS.md`](docs/LIMITATIONS.md), plus `docs/migrations/model_selection/` and
+`docs/audits/model_selection/` at the repository root.
+
+## Documentation
+
+| Document | Covers |
+|---|---|
+| [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | The three stages, the modules, criticality classes, evidence and time, determinism. |
+| [`docs/AUTHORITY_BOUNDARY.md`](docs/AUTHORITY_BOUNDARY.md) | What it may and may not do; why it can approve no provider and override no policy. |
+| [`docs/QUALITY_FLOOR.md`](docs/QUALITY_FLOOR.md) | The floor, its fail-closed table, and the three design decisions behind it. |
+| [`docs/LIMITATIONS.md`](docs/LIMITATIONS.md) | Evidence tiers and what is explicitly not established. |
+| [`CHANGELOG.md`](CHANGELOG.md) | Release history. |
 
 ## Build & verify
 

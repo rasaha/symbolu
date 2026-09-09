@@ -45,7 +45,11 @@ def _fresh_candidate(provider: str = "anthropic", region: str = "us", latency: f
 
 
 def test_version_and_policy_version():
-    assert ms.__version__ == "0.1.0"
+    assert ms.__version__ == "0.2.0"
+    # The policy version is deliberately NOT bumped with the distribution: 0.2.0 changes
+    # no decision unless a caller configures a floor, so a record stamped exec_gate_v1
+    # still means what it meant. Bumping it would invalidate stored decisions to announce
+    # a change they did not experience.
     assert api.POLICY_VERSION == "exec_gate_v1"  # preserved from the legacy default
 
 

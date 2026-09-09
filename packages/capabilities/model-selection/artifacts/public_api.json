@@ -1,0 +1,358 @@
+{
+  "count": 33,
+  "fingerprints": {
+    "AuthorityReasonCode": {
+      "kind": "enum",
+      "members": [
+        "AUTHORIZED",
+        "EVIDENCE_INDETERMINATE",
+        "EXECUTION_WITHHELD",
+        "FALLBACK_AUTHORIZED",
+        "HUMAN_REVIEW_REQUIRED",
+        "NO_ELIGIBLE_MODEL"
+      ],
+      "values": [
+        "AUTHORIZED",
+        "EVIDENCE_INDETERMINATE",
+        "EXECUTION_WITHHELD",
+        "FALLBACK_AUTHORIZED",
+        "HUMAN_REVIEW_REQUIRED",
+        "NO_ELIGIBLE_MODEL"
+      ]
+    },
+    "Candidate": {
+      "kind": "class",
+      "members": [
+        "context_limit",
+        "developer",
+        "price_in_per_mtok",
+        "price_out_per_mtok",
+        "region",
+        "structured_output",
+        "tool_use"
+      ]
+    },
+    "ConditionResult": {
+      "kind": "class",
+      "members": [
+        "detail"
+      ]
+    },
+    "Criticality": {
+      "kind": "enum",
+      "members": [
+        "CRITICAL_GOV",
+        "CRITICAL_OP",
+        "OPERATIONAL"
+      ],
+      "values": [
+        "CRITICAL_GOV",
+        "CRITICAL_OP",
+        "OPERATIONAL"
+      ]
+    },
+    "EligibilityDecision": {
+      "kind": "class",
+      "members": [
+        "evaluated_at",
+        "policy_version",
+        "selectable",
+        "to_dict",
+        "ttl_seconds"
+      ]
+    },
+    "EligibilityState": {
+      "kind": "enum",
+      "members": [
+        "CONDITIONALLY_ELIGIBLE",
+        "ELIGIBLE",
+        "INDETERMINATE",
+        "INELIGIBLE"
+      ],
+      "values": [
+        "CONDITIONALLY_ELIGIBLE",
+        "ELIGIBLE",
+        "INDETERMINATE",
+        "INELIGIBLE"
+      ]
+    },
+    "Evidence": {
+      "kind": "class",
+      "members": [
+        "is_stale",
+        "raw_signal"
+      ]
+    },
+    "EvidenceSource": {
+      "kind": "enum",
+      "members": [
+        "CACHE",
+        "CONFIG",
+        "LIVE_PROBE",
+        "PROVIDER_DECLARED",
+        "TELEMETRY"
+      ],
+      "values": [
+        "cache",
+        "config",
+        "live_probe",
+        "provider_declared",
+        "telemetry"
+      ]
+    },
+    "ExecStatus": {
+      "kind": "enum",
+      "members": [
+        "AUTHENTICATED",
+        "DECLARED",
+        "DISABLED",
+        "ENUMERATED",
+        "EXECUTION_VERIFIED"
+      ],
+      "values": [
+        "authenticated",
+        "declared",
+        "disabled",
+        "enumerated",
+        "execution_verified"
+      ]
+    },
+    "ExecutableRegistry": {
+      "kind": "class",
+      "members": [
+        "evaluate",
+        "upsert"
+      ]
+    },
+    "ExecutionGate": {
+      "kind": "class",
+      "members": [
+        "evaluate"
+      ]
+    },
+    "GateConfig": {
+      "kind": "class",
+      "members": [
+        "allow_conditional",
+        "default_latency_limit_ms",
+        "policy_version",
+        "quality_floor",
+        "reliability_floor",
+        "require_billing"
+      ]
+    },
+    "ModelAuthority": {
+      "kind": "class",
+      "members": [
+        "authorize"
+      ]
+    },
+    "ModelAuthorityService": {
+      "kind": "class",
+      "members": [
+        "authorize"
+      ]
+    },
+    "ModelAuthorizationDecision": {
+      "kind": "class",
+      "members": [
+        "expires_at",
+        "fallback_model_ids",
+        "is_authorized",
+        "policy_version",
+        "to_dict"
+      ]
+    },
+    "ModelAuthorizationDisposition": {
+      "kind": "enum",
+      "members": [
+        "ALLOW",
+        "DENY",
+        "ESCALATE",
+        "HOLD"
+      ],
+      "values": [
+        "ALLOW",
+        "DENY",
+        "ESCALATE",
+        "HOLD"
+      ]
+    },
+    "ModelAuthorizationPolicy": {
+      "kind": "class",
+      "members": [
+        "conditional_penalty",
+        "cost",
+        "latency",
+        "quality"
+      ]
+    },
+    "ModelRecord": {
+      "kind": "class",
+      "members": [
+        "billing_tier",
+        "enabled",
+        "evidence_ttl_s",
+        "exec_status",
+        "last_failure_reason",
+        "last_failure_ts",
+        "last_success_ts",
+        "mark_failure",
+        "mark_verified",
+        "observed_latency_ms",
+        "observed_reliability",
+        "quota_state"
+      ]
+    },
+    "ModelSelectionService": {
+      "kind": "class",
+      "members": [
+        "authorize"
+      ]
+    },
+    "ModelSelector": {
+      "kind": "class",
+      "members": [
+        "authorize"
+      ]
+    },
+    "POLICY_VERSION": {
+      "kind": "constant",
+      "type": "str"
+    },
+    "PolicyWeights": {
+      "kind": "class",
+      "members": [
+        "conditional_penalty",
+        "cost",
+        "latency",
+        "quality"
+      ]
+    },
+    "ReasonCode": {
+      "kind": "enum",
+      "members": [
+        "AUTH_EXPIRED",
+        "AUTH_INVALID",
+        "AUTH_MISSING",
+        "BILLING_INACTIVE",
+        "CONTEXT_TOO_SMALL",
+        "COST_LIMIT_EXCEEDED",
+        "DATA_RESIDENCY_VIOLATION",
+        "DNS_FAILURE",
+        "FEATURE_UNSUPPORTED",
+        "FREE_TIER_ONLY",
+        "LATENCY_LIMIT_EXCEEDED",
+        "MODEL_DISABLED",
+        "MODEL_NOT_FOUND",
+        "NETWORK_BLOCKED",
+        "OK",
+        "POLICY_STATE_UNKNOWN",
+        "PROVIDER_DEGRADED",
+        "PROVIDER_NOT_APPROVED",
+        "QUALITY_BELOW_FLOOR",
+        "QUOTA_EXHAUSTED",
+        "RATE_LIMITED",
+        "REGION_UNAVAILABLE",
+        "RELIABILITY_BELOW_THRESHOLD",
+        "TELEMETRY_STALE",
+        "TLS_FAILURE"
+      ],
+      "values": [
+        "AUTH_EXPIRED",
+        "AUTH_INVALID",
+        "AUTH_MISSING",
+        "BILLING_INACTIVE",
+        "CONTEXT_TOO_SMALL",
+        "COST_LIMIT_EXCEEDED",
+        "DATA_RESIDENCY_VIOLATION",
+        "DNS_FAILURE",
+        "FEATURE_UNSUPPORTED",
+        "FREE_TIER_ONLY",
+        "LATENCY_LIMIT_EXCEEDED",
+        "MODEL_DISABLED",
+        "MODEL_NOT_FOUND",
+        "NETWORK_BLOCKED",
+        "OK",
+        "POLICY_STATE_UNKNOWN",
+        "PROVIDER_DEGRADED",
+        "PROVIDER_NOT_APPROVED",
+        "QUALITY_BELOW_FLOOR",
+        "QUOTA_EXHAUSTED",
+        "RATE_LIMITED",
+        "REGION_UNAVAILABLE",
+        "RELIABILITY_BELOW_THRESHOLD",
+        "TELEMETRY_STALE",
+        "TLS_FAILURE"
+      ]
+    },
+    "Request": {
+      "kind": "class",
+      "members": [
+        "approved_providers",
+        "context_tokens",
+        "cost_cap_usd",
+        "est_output_tokens",
+        "latency_limit_ms",
+        "region_allowed",
+        "residency_required"
+      ]
+    },
+    "SOURCE_PRECEDENCE": {
+      "kind": "object",
+      "type": "dict"
+    },
+    "Selection": {
+      "kind": "class",
+      "members": []
+    },
+    "Signal": {
+      "kind": "class",
+      "members": [
+        "reason_hint"
+      ]
+    },
+    "VERSION": {
+      "kind": "constant",
+      "type": "str"
+    },
+    "Verdict": {
+      "kind": "enum",
+      "members": [
+        "FAIL",
+        "PASS",
+        "UNKNOWN"
+      ],
+      "values": [
+        "FAIL",
+        "PASS",
+        "UNKNOWN"
+      ]
+    },
+    "__version__": {
+      "kind": "constant",
+      "type": "str"
+    },
+    "fingerprint": {
+      "kind": "function",
+      "parameters": [
+        "payload"
+      ]
+    },
+    "normalize_raw": {
+      "kind": "function",
+      "parameters": [
+        "signal"
+      ]
+    },
+    "select": {
+      "kind": "function",
+      "parameters": [
+        "selectable",
+        "req",
+        "quality_of",
+        "weights"
+      ]
+    }
+  }
+}

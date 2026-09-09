@@ -52,7 +52,29 @@ class GateConfig:
     require_billing: bool = False           # True => unknown billing is INELIGIBLE, not INDETERMINATE
     reliability_floor: float = 0.90
     default_latency_limit_ms: float = 60000.0
+    #: Hard, non-compensatory minimum capability prior, in [0, 1]. ``None`` (the
+    #: default) leaves the ``quality_within_floor`` condition unevaluated entirely, so
+    #: a configuration that does not set it produces byte-identical decisions to one
+    #: from before the floor existed.
+    #:
+    #: When set, a candidate whose ``quality`` signal is below the floor — or missing,
+    #: stale, or not a real number in [0, 1] — is INELIGIBLE, and no ranking score can
+    #: restore it, because ranking only ever sees the eligible set. The floor is a
+    #: *narrowing* control: it can disqualify an otherwise-eligible candidate and can
+    #: never qualify one that any other condition disqualified.
+    quality_floor: Optional[float] = None
     # CRITICAL-OP conditions whose UNKNOWN is INDETERMINATE rather than fail-closed:
     indeterminate_on_unknown: Set[str] = field(
         default_factory=lambda: {"billing_active", "credential_expiry_valid"})
     policy_version: str = "exec_gate_v1"
+
+    def __post_init__(self) -> None:
+        floor = self.quality_floor
+        if floor is None:
+            return
+        # bool is an int subclass; True would otherwise pass as the float 1.0 and
+        # configure a floor nobody wrote.
+        if isinstance(floor, bool) or not isinstance(floor, (int, float)):
+            raise TypeError("quality_floor must be a real number in [0, 1] or None")
+        if floor != floor or not (0.0 <= floor <= 1.0):   # NaN fails both comparisons
+            raise ValueError(f"quality_floor must be within [0, 1]; got {floor!r}")
