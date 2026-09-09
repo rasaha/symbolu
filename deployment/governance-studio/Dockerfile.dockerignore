@@ -1,0 +1,27 @@
+# BuildKit reads `<dockerfile>.dockerignore` beside the Dockerfile in preference to the
+# context root's `.dockerignore`. Both CI (`-f deployment/governance-studio/Dockerfile .`)
+# and a managed host build this image with the REPOSITORY ROOT as the context, where the root
+# `.dockerignore` (`*` plus a re-include of `symbolu/` only, written for the GKE controller
+# image) excludes every path this Dockerfile COPYs. This file is that same exclusion set, in
+# the one place the build actually reads it. Keep it identical to `.dockerignore` beside it.
+# Keep secrets, VCS metadata, test/build cruft and node_modules out of the image.
+.git
+.gitignore
+**/.git
+**/node_modules
+**/dist
+**/.vite
+**/coverage
+**/playwright-report
+**/test-results
+**/__pycache__
+**/*.pyc
+**/.pytest_cache
+**/.mypy_cache
+**/.env
+**/*.env
+**/.env.*
+deployment/governance-studio/tests/certs
+**/artifacts/dependency-audit-report.json
+*.key
+*.pem

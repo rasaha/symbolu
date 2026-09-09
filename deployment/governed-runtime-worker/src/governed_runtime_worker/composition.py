@@ -59,6 +59,7 @@ __all__ = [
     "WallClock",
     "Worker",
     "STORE_FILES",
+    "sqlalchemy_url",
     "preflight",
     "build_identity_port",
     "compose",
@@ -70,6 +71,25 @@ STORE_FILES = {
     "approvals": "approvals.sqlite3",
     "audit": "audit-ledger.sqlite3",
 }
+
+
+def sqlalchemy_url(database_url: str) -> Any:
+    """The deployment's DSN bound to the psycopg 3 driver this image actually ships.
+
+    SQLAlchemy resolves a bare ``postgresql://`` to the psycopg2 dialect and imports
+    ``psycopg2`` at ``create_engine`` time. This distribution pins ``psycopg[binary]>=3.1``
+    and nothing installs psycopg2, so the bare form raises ``ModuleNotFoundError`` before a
+    connection is ever attempted. DBOS reaches the same database because
+    ``SQLAlchemyDatasource`` normalises the driver itself; the one direct ``create_engine``
+    below does not, which is why this deployment composed its stores, migrated, and then
+    failed on the schema step.
+
+    A URL that already names a driver is returned unchanged, so an operator can pin a
+    different one. The URL object is returned rather than a string: ``str(URL)`` masks the
+    password, and no DSN is ever rendered here.
+    """
+    url = sa.engine.make_url(database_url)
+    return url.set(drivername="postgresql+psycopg") if url.drivername == "postgresql" else url
 
 
 class PostureRefused(Exception):
@@ -257,7 +277,7 @@ def compose(config: WorkerConfig, *, clock: WorkerClock, workload: Workload,
         datasource=datasource, host=host, bundle=bundle, worker_id=config.worker_id,
         definition_digest=config.definition_digest, production_mode=production,
     )
-    engine = sa.create_engine(config.app_database_url)
+    engine = sa.create_engine(sqlalchemy_url(config.app_database_url))
     try:
         adapter.create_schema(engine)
     finally:

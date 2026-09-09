@@ -179,6 +179,20 @@ jobs:
         # BLOCKING, first, offline: the worker builds only from the ratified python digest.
         run: python deployment/governed-runtime-worker/ci/verify_ratified_pins.py
 
+      - name: build-context-conformance
+        # BLOCKING, offline, and ahead of every step that needs a registry: each COPY
+        # source of the deployment Dockerfile(s) must survive the .dockerignore the build
+        # actually reads — the sibling <dockerfile>.dockerignore where one exists, the
+        # context root's otherwise. Until 2026-09-08 neither image could be built at all:
+        # both are built with the repository root as context, where the root file ("*"
+        # plus re-includes for symbolu/) excluded all 29 and all 19 COPY sources. No gate
+        # saw it: every check that could have seen it sat behind the registry blocker.
+        # Reachability only: this builds nothing and satisfies no ratified gate identifier
+        # of P3E-CTR or GRW-CTR (BUILD_CONTEXT_EXCLUSION_DEFECT.json).
+        run: |
+          python deployment/governance-studio/ci/verify_build_context.py \
+            deployment/governed-runtime-worker/Dockerfile
+
       - name: mirror-digest-conformance
         id: mirror
         # Shared verifier, worker pins. The credential VALUE, once the owner names its

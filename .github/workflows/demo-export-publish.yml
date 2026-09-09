@@ -1,0 +1,155 @@
+# Publish the customer-demo export to rasaha/demo.
+#
+# MANUAL ONLY. There is no push trigger and there will not be one: publishing to another
+# repository is an act someone takes deliberately, not something a merge does on its way
+# past.
+#
+# THE EXPORT IS ONE WAY. This workflow replaces the destination's entire tracked content
+# with what tools/export_demo.py produced. Anything committed to rasaha/demo by hand — a
+# fixed typo, a tweaked label, a new file — is DISCARDED on the next run without warning.
+# A change belongs in this repository, and reaches the demo by being exported.
+#
+# NOTHING IS PUBLISHED FROM AN UNVERIFIED TREE. tools/export_demo.py runs the authority
+# plane's boundary verifier and the studio's verify scripts HERE, before it writes
+# anything, and exits non-zero with an empty output directory if any of them fails or if a
+# governance record reaches the output. The export step therefore fails the job before the
+# destination is touched, and the step below re-checks the same two properties rather than
+# trusting that ordering.
+#
+# THE CREDENTIAL IS NAMED, NEVER WRITTEN. The `token_secret_name` input names a repository
+# secret; the workflow reads `secrets[...]` by that name and hands it to actions/checkout,
+# which keeps it in the destination clone's local git config and removes it afterwards. No
+# secret name is hard-coded here, no token is echoed, and no token reaches a commit.
+
+name: demo-export-publish
+
+on:
+  workflow_dispatch:
+    inputs:
+      token_secret_name:
+        description: >-
+          Name of the repository secret holding a token with push access to rasaha/demo.
+          The name, not the token.
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  # One publisher at a time: two runs replacing the same content would race.
+  group: demo-export-publish
+  cancel-in-progress: false
+
+env:
+  DESTINATION: rasaha/demo
+  EXPORT_DIR: /tmp/demo-export
+
+jobs:
+  publish:
+    name: Export and publish to rasaha/demo
+    runs-on: ubuntu-latest
+    steps:
+      - name: checkout-source
+        uses: actions/checkout@v4
+        with:
+          path: source
+
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.11" }
+
+      - uses: actions/setup-node@v4
+        with: { node-version: "22" }
+
+      - name: install-verifier-dependencies
+        # Four of the five verifiers are stdlib-Node and need nothing installed. The fifth
+        # is not: verify-openapi.mjs imports generate-api.mjs, which imports
+        # openapi-typescript — a devDependency of the studio frontend. Without this, the
+        # export step below fails on every clean runner with ERR_MODULE_NOT_FOUND, and
+        # nothing is ever published.
+        #
+        # --ignore-scripts: no verifier needs a package's install hooks, and publishing to
+        # another repository must not turn on third-party lifecycle scripts to do it.
+        working-directory: source/apps/ugence-governance-studio/frontend
+        run: npm ci --ignore-scripts
+
+      - name: export
+        # Runs the five verifiers in the source repository first. A failure exits 1 with
+        # nothing written, and this step fails the job before the destination is cloned.
+        working-directory: source
+        run: python tools/export_demo.py --out "$EXPORT_DIR"
+
+      - name: export-conformance
+        # The same two properties, re-checked rather than assumed: the provenance records
+        # that every verifier passed and was not skipped, and no governance record reached
+        # the output. Cheap, and the alternative is trusting one script's exit code with
+        # another repository's content on the line.
+        working-directory: source
+        run: |
+          python - <<'PY'
+          import importlib.util, json, os, sys
+          out = os.environ["EXPORT_DIR"]
+          spec = importlib.util.spec_from_file_location("ed", "tools/export_demo.py")
+          ed = importlib.util.module_from_spec(spec); spec.loader.exec_module(ed)
+
+          denied = ed.denied_files(out)
+          if denied:
+              sys.exit(f"REFUSED: {len(denied)} governance record(s) in the export: {denied[:5]}")
+
+          record = json.load(open(os.path.join(out, "EXPORT_PROVENANCE.json")))
+          if record["verifiers_skipped"]:
+              sys.exit("REFUSED: the export skipped its verifiers")
+          results = record["verifiers_run_in_the_source_repository"]
+          if not results or not all(r["passed"] for r in results):
+              sys.exit("REFUSED: a verifier did not pass")
+          print(f"{len(results)} verifiers passed; {record['file_count']} files; "
+                f"source commit {record['source_commit']}")
+          PY
+
+      - name: checkout-destination
+        # The destination must already exist and hold at least one commit; this workflow
+        # never creates it, and this step fails if it is absent. The token is read from the
+        # secret the input names and handled by the action, which keeps it in this clone's
+        # git config and removes it when the job ends.
+        uses: actions/checkout@v4
+        with:
+          repository: rasaha/demo
+          token: ${{ secrets[inputs.token_secret_name] }}
+          path: destination
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: replace-destination-content
+        # Every tracked file is removed before the export is copied in, so a file that has
+        # left the export leaves the demo too, and a hand edit does not survive. .git is
+        # the only thing kept.
+        run: |
+          set -euo pipefail
+          cd destination
+          find . -mindepth 1 -maxdepth 1 ! -name .git -exec rm -rf {} +
+          cp -a "$EXPORT_DIR"/. .
+          test -f EXPORT_PROVENANCE.json
+          test -f README.md
+
+      - name: commit-and-push
+        # One commit per export, naming the source commit it was generated from, force
+        # pushed so the destination's content matches this export exactly whatever state it
+        # was left in.
+        working-directory: destination
+        run: |
+          set -euo pipefail
+          SOURCE_SHA="$(git -C "$GITHUB_WORKSPACE/source" rev-parse HEAD)"
+          git config user.name "ugence-demo-export"
+          git config user.email "noreply@github.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "the destination already matches this export; nothing to publish"
+            exit 0
+          fi
+          BODY="Generated by tools/export_demo.py. This content is one way: the next export"
+          BODY="$BODY replaces it in full, and anything committed here by hand is discarded."
+          BODY="$BODY EXPORT_PROVENANCE.json records the verifiers that passed in the source"
+          BODY="$BODY repository before this content was written."
+          git commit -q -m "Export from ${GITHUB_REPOSITORY}@${SOURCE_SHA}" -m "$BODY"
+          git push --force origin HEAD
+          echo "published ${GITHUB_REPOSITORY}@${SOURCE_SHA} to ${DESTINATION}"
