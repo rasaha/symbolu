@@ -44,6 +44,13 @@ name: trusted-evidence-authority-ci
 # cryptographic key material it touches is fixed, hard-coded, unmistakably
 # non-production test material (see tests/_authority_builders.py).
 
+concurrency:
+  # A superseded run proves nothing about the commit that replaced it. Cancel
+  # in-flight runs for the same ref on pull requests; never on a branch push,
+  # where each commit's run is the evidence that commit was green.
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 on:
   pull_request:
     paths:
@@ -92,6 +99,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "${{ matrix.python-version }}"
+          cache: pip
+          cache-dependency-path: requirements.txt
       - name: Install dependencies
         # The two declared cryptographic backends, plus pytest. The package is
         # not zero-dependency: it calls `cryptography` and `PyNaCl` and
@@ -181,6 +190,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "${{ matrix.python-version }}"
+          cache: pip
+          cache-dependency-path: requirements.txt
       - name: Install the declared cryptographic backends
         run: |
           python -m pip install --upgrade pip
@@ -206,6 +217,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+          cache: pip
+          cache-dependency-path: requirements.txt
       - name: Install the declared cryptographic backends
         # The probes install nothing else and import no test module, helper, fixture or
         # conftest of the package: each puts the checkout's src/ on sys.path itself and
@@ -239,6 +252,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+          cache: pip
+          cache-dependency-path: requirements.txt
       - name: Install build tooling
         run: |
           python -m pip install --upgrade pip
@@ -261,6 +276,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+          cache: pip
+          cache-dependency-path: requirements.txt
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
@@ -283,6 +300,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+          cache: pip
+          cache-dependency-path: requirements.txt
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip

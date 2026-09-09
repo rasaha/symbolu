@@ -3,6 +3,13 @@ name: governance-studio-p3b-api-ci
 # Path-scoped: only run when the Governance Studio backend, its contracts, the
 # AWC capability, the compiler, or this workflow change. No secrets; no external
 # model APIs; no deployment; no frontend.
+concurrency:
+  # A superseded run proves nothing about the commit that replaced it. Cancel
+  # in-flight runs for the same ref on pull requests; never on a branch push,
+  # where each commit's run is the evidence that commit was green.
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 on:
   push:
     paths:
@@ -44,6 +51,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+          cache: pip
+          cache-dependency-path: requirements.txt
       - name: Install deps (no secrets, no model APIs)
         run: pip install "pydantic>=2" "fastapi>=0.110" "uvicorn>=0.27" "starlette>=0.36" httpx pytest build
 
