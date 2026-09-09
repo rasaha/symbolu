@@ -11,8 +11,18 @@ while three are neutral contract types, an asymmetry no decision explains; and n
 package owns the interpreting layer.** This ballot rules on those three things and
 does not disturb `D-2`, `DE-3`, `VR-3` or `AE-3`.
 
-**Status:** scoping/ratification ballot — documentation only. Nothing here is
-implemented, and no implementation is authorized by this ballot. **Date:** 2026-09-08.
+**Status: RATIFIED** on `LV-A` to `LV-E`, 2026-09-09, on the repository owner's
+instruction to rule all five and record each with its ground. The owner named the
+options for each decision and directed the ruling; each was resolved to the
+recommendation §3 and §5 already argued for, and §5 now records the ruling rather
+than the recommendation. No decision was carried by anything other than the grounds
+written beside it, and any of the five can be overturned by the owner before this
+ballot merges.
+
+**Documentation only.** Ratification settles *what the vocabularies are and who owns
+them*. It authorizes **no implementation**: no enum, no new neutral type, no package
+change, no field. §6's follow-ups each need their own authorization. **Date:**
+ballot drafted 2026-09-08, ratified 2026-09-09.
 
 **Correction this ballot records.** The package READMEs say each vocabulary "is
 unratified, so the label stays uninterpreted until an owner fixes a taxonomy", and a
@@ -101,9 +111,10 @@ temporary one.
 
 ## 3. The five vocabularies
 
-Each set below is a **proposal for owner ratification**, not a finding. Member
-counts are kept small deliberately: a set nobody can apply consistently is worse
-than an opaque string, because it looks decidable.
+Each set below is **ratified** by §5, except where a line still carries `[R]`.
+Member counts are kept small deliberately: a set nobody can apply consistently is
+worse than an opaque string, because it looks decidable. Placement — which type
+carries a label — is *not* settled here for three of the five; see §4.
 
 ### 3.1 System classification — `ai-system-registry`
 
@@ -117,9 +128,10 @@ Placement `[R]`: **stays capability-local as `str` for now** — see §4, blocke
 | `MINIMAL_RISK` | No obligation beyond ordinary engineering governance. |
 | `UNCLASSIFIED` | Registered before classification was assessed. Not a judgment that risk is low. |
 
-`[R]` The four risk tiers deliberately track the EU AI Act's structure, because a
-tier set that maps onto no external regime creates a second mapping to maintain.
-**This is an owner decision, not a technical one** — a different regime, or an
+**Ratified by `LV-B` (`TRACK_THE_REGIME`).** The four risk tiers track the EU AI
+Act's structure, because a tier set that maps onto no external regime creates a
+second mapping to maintain. **This remains a legal and product judgment rather than
+a technical one, and is the ruling most open to owner override** — a different regime, or an
 organization-internal set, is equally implementable. `UNCLASSIFIED` is proposed
 because without it the first registration of an unassessed system forces a false
 claim, and `D-2` guarantees no refusal for an unrecognized label anyway.
@@ -137,7 +149,8 @@ under `DE-5` `[V]`. No move proposed.
 | `RESTRICTED` | Disclosure causes serious harm to a person or the organization; access is individually granted. |
 | `REGULATED` | Carries a statutory handling regime (personal data, health, payment, export-controlled) that overrides the tiers above. |
 
-`[R]` `REGULATED` is proposed as an orthogonal member rather than a fifth rung
+`[R]` **Not covered by any `LV` letter, so it stays open.** `REGULATED` is proposed
+as an orthogonal member rather than a fifth rung
 because regulation is a different axis from sensitivity — regulated data can be
 low-sensitivity. If the owner prefers strict rungs, `REGULATED` should instead
 become a separate flag on the declaration, which is a contract change and out of
@@ -154,7 +167,7 @@ intents are generative. Every closed purpose list in practice grows a member nam
 here would also collide with the lawful-basis and purpose-limitation vocabularies a
 privacy regime already imposes, which this repository does not own.
 
-`[R]` **Recommended instead:** ratify a *shape* rather than a set — a purpose label
+**Ratified by `LV-E` (`OPEN_SHAPE`):** a *shape* rather than a set — a purpose label
 must name an activity and its beneficiary, and a governance document lists
 worked examples without closing the set. If the owner wants a closed set anyway,
 that is a decision this ballot flags rather than pre-empts.
@@ -172,8 +185,8 @@ Placement: **already correct.** `VendorRiskLabel` in `governance-contracts` unde
 | `ASSESSMENT_LAPSED` | An exercise completed once, and the interval the organization set has since passed. |
 | `ASSESSMENT_REFUSED` | The vendor declined to be assessed, or the exercise could not complete. |
 
-`[R]` **These names deliberately avoid `APPROVED`, `CONDITIONAL` and `BLOCKED`,
-and the owner should decide whether that restraint is wanted.** The obvious posture
+**Ratified by `LV-C` (`ASSESSMENT_STATE_SET`). These names deliberately avoid
+`APPROVED`, `CONDITIONAL` and `BLOCKED`, and that restraint is the point.** The obvious posture
 vocabulary is a permission ladder, and `VR-3` forbids exactly that: "no implied
 eligibility". A label reading `APPROVED` would be read as a permission by every
 human who saw it, whatever the type says, and `vendor-dependency` "confers no
@@ -193,8 +206,9 @@ Placement `[R]`: **stays capability-local as `str` for now** — see §4, blocke
 | `SEV3` | Contained or bounded; correctness or control is degraded without ongoing harm. |
 | `SEV4` | Noted for the record; no containment expected. |
 
-`[R]` **Severity is the one vocabulary whose natural form conflicts with the
-existing rulings, and the owner must resolve it.** Every other label is a name;
+**Ratified by `LV-D`: (a) now, (b) when an operational surface needs the query,
+(c) refused. Severity is the one vocabulary whose natural form conflicts with the
+existing rulings.** Every other label is a name;
 severity is a *rank* — `SEV1` is worse than `SEV2`, and that is the point of having
 it. `DE-3` and `VR-3` forbid ordering, and `incident-response` follows the same
 posture by its README. Three options:
@@ -244,15 +258,20 @@ the member set is written.
 
 ---
 
-## 5. Owner decisions
+## 5. Ratified decisions
 
-| # | Decision | Recommendation |
-|---|---|---|
-| `LV-A` | Adopt `LV-1` — vocabularies ratified as Policy-Authority-owned documentation, never as enums in the recording packages or `governance-contracts`? | **Adopt.** It closes the gap without disturbing `D-2`, `DE-3`, `VR-3` or `AE-3`. |
-| `LV-B` | Do the system-classification tiers track the EU AI Act, or an organization-internal set? | Track the regime. An internal set creates a mapping to maintain forever. |
-| `LV-C` | Vendor posture: the assessment-state set proposed in §3.4, or a permission ladder (`APPROVED` / `CONDITIONAL` / `BLOCKED`)? | The assessment-state set. The ladder reads as a permission `VR-3` forbids, whatever the type says. |
-| `LV-D` | Incident severity: (a) opaque and unordered, (b) a distinct ordered kind, or (c) an explicit rank field? | (a) now, (b) when an operational surface needs the query. Not (c). |
-| `LV-E` | Purpose: open shape as recommended, or closed set? | Open shape. Every closed purpose set grows an `OTHER`. |
+| # | Decision | Ruling | Ground |
+|---|---|---|---|
+| `LV-A` | Adopt `LV-1` — vocabularies ratified as Policy-Authority-owned documentation, never as enums in the recording packages or `governance-contracts`? | **`ADOPT_LV_1`.** | It closes the real gap — no member set written down anywhere — without disturbing `D-2`, `DE-3`, `VR-3` or `AE-3`. No type surface moves and no `CONTRACT_VERSION` moves, so no recording package becomes a classifier, which is the single ground all four existing rulings gave. The alternative — enums in the packages — would overturn four rulings to solve a documentation problem. |
+| `LV-B` | Do the system-classification tiers track the EU AI Act, or an organization-internal set? | **`TRACK_THE_REGIME`.** The four tiers of §3.1 plus `UNCLASSIFIED`. | An internal set creates a mapping to an external regime that must be maintained forever and re-argued at every audit; tracking the regime makes the mapping the identity. `UNCLASSIFIED` is ratified with them because `D-2` guarantees no refusal for an unrecognized label, so without it the first registration of an unassessed system would force a false claim. **This is the ruling most open to owner override**: it is a legal and product judgment, not a technical one, and a different regime is equally implementable. |
+| `LV-C` | Vendor posture: the assessment-state set proposed in §3.4, or a permission ladder (`APPROVED` / `CONDITIONAL` / `BLOCKED`)? | **`ASSESSMENT_STATE_SET`.** `NOT_ASSESSED`, `ASSESSED_NO_FINDINGS`, `ASSESSED_WITH_FINDINGS`, `ASSESSMENT_LAPSED`, `ASSESSMENT_REFUSED`. | `VR-3` rules the label carries "no implied eligibility". A member reading `APPROVED` would be read as a permission by every human who saw it, whatever the type says, and `vendor-dependency` "confers no approval and no onboarding status". The assessment-state set records what was *done* and leaves what it *permits* to Policy Authority. It is harder to read; that is the cost of not conflating a record with a permission. |
+| `LV-D` | Incident severity: (a) opaque and unordered, (b) a distinct ordered kind, or (c) an explicit rank field? | **`(a)_OPAQUE_AND_UNORDERED` now; `(b)` when an operational surface needs the query. `(c)` is refused.** | (a) is consistent with every existing ruling and costs only that "all incidents at or above SEV2" is unanswerable in this repository — a query nothing today asks. (b) stays available because severity genuinely *is* ranked, and when a surface needs that it deserves its own ruling rather than an extension of `DE-3`. (c) is refused as the false compromise: it makes the package carry an ordering it must not interpret, and creates two sources of truth about one incident. |
+| `LV-E` | Purpose: open shape as recommended, or closed set? | **`OPEN_SHAPE`.** A purpose label names an activity and its beneficiary; a governance document lists worked examples without closing the set. | Purpose describes an intent, and intents are generative. Every closed purpose set in practice grows a member named `OTHER`, which is the set admitting it should not have been closed. A closed set here would also collide with the lawful-basis and purpose-limitation vocabularies a privacy regime already imposes, which this repository does not own. |
+
+**What ratification did not decide.** Placement for system classification, purpose
+and severity stays deferred to wave 5 with `LP-5` (§4) — these five rulings fix
+*which names exist and who owns them*, never *what type carries them*. The three
+fields stay bare `str`, and nothing in §6 is authorized.
 
 ---
 
