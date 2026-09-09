@@ -1,7 +1,13 @@
 # ADR — Cloud Scaling: Dependency- and Cost-aware Capacity Recommendations (Phase 3)
 
-**Status:** **PROPOSED** (draft PR; not merged).
-**Date:** 2026-08-12
+**Status:** **PROPOSED — implemented and merged, ratification not recorded.** The
+"draft PR; not merged" this line carried until now was contradicted by the repository:
+this ADR and the `planning/` implementation it describes entered the default branch
+together in PR #1652 (`5d602fdb`), and the package has shipped at v0.4.0 since. Only
+the merge fact is corrected here. **No owner ratification is recorded for Phase 3**,
+unlike Phase 1 and Phase 2 (both `ACCEPTED`), and this edit does not supply one —
+promoting this status is an owner decision, not a documentation fix.
+**Date:** 2026-08-12 (proposed) · merge fact corrected 2026-09-09
 **Package:** `packages/capabilities/cloud-scaling-controller` (`ugence-cloud-scaling-controller`), v0.3.0 → **v0.4.0**.
 **Scope:** Additive, deterministic, provider-neutral, **shadow/advisory-only** capacity-action
 recommendation layer built *around* the Phase-2 forecast and supplied dependency/cost/constraint

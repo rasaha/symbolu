@@ -9,7 +9,7 @@ claims.
 | Tier | Status | Evidence |
 |------|--------|----------|
 | Implemented | ✅ | The control algorithm, contracts, facade, CLI, and packaging exist in `src/ugence_cloud_scaling_controller`. |
-| Unit-tested | ✅ | Package-local suite (`tests/`, 61 tests) + the pre-existing regression suite (`tests/cloud_controller`, 760 passed / 4 skipped). |
+| Unit-tested | ✅ | Package-local suite (`tests/`, 807 passed / 6 skipped) + the pre-existing regression suite (`tests/cloud_controller`, 757 passed / 4 skipped; the `prometheus` extra must be installed or 84 signal tests fail on a missing `requests`). |
 | Simulation-tested | ✅ | Synthetic scenario/benchmark/edge-case harnesses (`observability/benchmark.py`, `observability/edge_cases.py`) exercised by the regression suite (seeded). |
 | Trace-replay tested | ✅ | Replay harness + adapters (`replay/`) exercised by `tests/cloud_controller/test_replay.py` and `test_tier_a.py` on synthetic/recorded traces. |
 | Shadow-mode capable | ✅ (capability) | Read-only shadow primitives (`shadow/` divergence tracker, HPA/state watcher, reporter) exist and are unit-tested with mocks; the HPA watcher reads via the Prometheus client, not the Kubernetes SDK. Live shadow runs are **not** part of this package's evidence (the live runners are monorepo-only operations code). |
@@ -59,6 +59,44 @@ floors, cooldowns) were tuned. No benchmark numbers were altered. The IdentityEM
 randomness was not seeded. The change set is: moving execution/operations code OUT of
 the wheel, adding the determinism disclosure + build provenance, and correcting
 metadata/docs — verified by exact decision-baseline parity.
+
+## Dependency- and Cost-aware Capacity Planning (Phase 3) — evidence & maturity
+
+**Implementation maturity: IMPLEMENTED_AND_CI_VERIFIED.** New in v0.4.0.
+**Recommendation quality: BASELINE_RECOMMENDATION_POLICY_IMPLEMENTED ·
+ECONOMIC_OPTIMALITY_NOT_ESTABLISHED · PRODUCTION_EFFECTIVENESS_NOT_ESTABLISHED ·
+NOT_AUTHORIZED_FOR_EXECUTION.**
+
+The `planning` subpackage is a deterministic, provider-neutral, **shadow/advisory-only**
+capacity-action recommendation layer built *around* the Phase-2 forecast
+(`CapacityForecastEvidence` + `DependencyTopology` + `CostBook` + `OperatingConstraints`
++ `RecommendationPolicy` → `CapacityActionRecommendation` or `RecommendationAbstention`).
+It is clock-free, adds no dependency, performs no actuation/network/subprocess/credential/
+LLM activity, and **never** feeds the controller.
+
+| Concern | Status | Evidence |
+|---------|--------|----------|
+| Implemented | ✅ | `src/ugence_cloud_scaling_controller/planning/` — candidates, constraints, topology, cost, scoring, policy, recommendation, abstention, pipeline. |
+| Unit-tested | ✅ | `tests/planning/` (330 tests): candidate generation, hard-constraint filtering, dependency topology, cost evaluation, policy scoring, feasibility, abstentions, recommendation integrity, serialization, guard coverage, audit regressions, boundary. |
+| CI-verified | ✅ | `.github/workflows/cloud-scaling-controller-phase3-ci.yml` — the planning suite, the Phase 1 + Phase 2 regression, the full package suite in isolation, the legacy controller parity regression, and the advisory-boundary + side-effect gates. |
+| Hard constraints non-compensatory | ✅ | Limits (min/max, step, quota, cooldown, SLO/error-budget, dependency ceiling, prohibited actions, max cost increase) filter candidates **before** scoring; no preference weight restores a filtered candidate. |
+| Self-revalidating identity | ✅ | `CapacityActionRecommendation` embeds its authoritative inputs and recomputes every feasibility/cost/score at construction and at `from_dict`; a forged score/cost/digest or an unevaluated/non-winning selection is rejected. `sha256:` content identity. |
+| Additive / non-regressive | ✅ | The controller decision kernel is unchanged; the behavior-baseline parity suite still passes. |
+| **Economic optimality** | ❌ **NOT established** | Cost is an exact, disclosed optimization input, never an authorizer. No claim that a selected plan minimizes real spend is made or measured. |
+| **Production effectiveness** | ❌ **NOT established** | Passing tests and CI prove implementation correctness, **not** recommendation quality. |
+| Live-cluster validated | ❌ | Not performed. |
+| Production-certified | ❌ | Not performed. |
+
+A RECOMMENDATION is descriptive capacity intelligence: it is not an authorization, a risk
+evaluation, an ActionGate decision, or an execution instruction. Risk Authority (Phase 4),
+ActionGate/provider execution (Phase 5), and effect verification/learning (Phase 6) are out
+of scope for this package.
+
+**Owner-ratification status.** The Phase-3 ADR
+(`docs/architecture/ADR_CLOUD_SCALING_DEPENDENCY_COST_AWARE_RECOMMENDATION_PHASE3.md`)
+carries no recorded owner ratification, unlike the Phase 1 and Phase 2 ADRs (both
+`ACCEPTED`). The code merged in PR #1652. This row records the discrepancy; it does not
+resolve it.
 
 ## Predictive Capacity Intelligence (Phase 2) — evidence & maturity
 

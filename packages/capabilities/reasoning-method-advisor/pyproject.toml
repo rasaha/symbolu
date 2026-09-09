@@ -20,7 +20,10 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ugence-reasoning-method-advisor"
-# Static: tests/test_public_api.py pins this to ugence_reasoning_method_advisor.__version__.
+# Static, and deliberately so: tests/test_refusals.py reads this literal back out of
+# pyproject.toml and asserts it equals ugence_reasoning_method_advisor.__version__, so the
+# two cannot drift. (Every sibling package uses `version = { attr = ... }` instead; this one
+# is the exception, guarded rather than derived.)
 version = "0.3.0"
 description = "Ugence Reasoning Method Advisor — research-only, deterministic, rule-derived design-time advisor over the slice 1 reasoning-method contracts."
 readme = "README.md"
