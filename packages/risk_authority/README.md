@@ -146,10 +146,13 @@ every authority flag is fixed `False`.
 `validate_subject_binding` proves **internal canonical consistency** between the supplied
 context, the outer binding fields and the carried digests. It does **not** prove that those
 caller-supplied facts or `recommendation_digest` originate from an authentic Cloud Scaling
-recommendation. Source authenticity must be established by the future Cloud Scaling adapter,
-by reconstructing the actual `CapacityActionRecommendation`, recomputing `rec.digest()` and
-requiring equality **before** the request may enter trusted evaluation. RA-5 and the
-evaluation seam provide their own, separate evidence-admission and tenant/scope checks.
+recommendation. Source authenticity is established **outside this package**, by the Cloud
+Scaling adapter (`ugence-cloud-scaling-risk-integration`, Phase 4C), which reconstructs the
+actual `CapacityActionRecommendation`, recomputes `rec.digest()` and requires equality
+**before** the request may enter trusted evaluation. Risk Authority neither performs nor
+verifies that check — admitting a v2 request here still proves nothing about source. RA-5
+and the evaluation seam provide their own, separate evidence-admission and tenant/scope
+checks.
 
 It detects **inconsistent or partial tampering** — an altered field left paired with a stale
 digest. It does **not** detect a *fully self-consistent fabricated request*: a caller who
@@ -159,21 +162,40 @@ by an explicit test). This layer therefore does **not** provide recommendation a
 provenance verification, cross-tenant authorization, trusted evidence admission, or replay
 prevention against a caller capable of recomputing every digest.
 
-### Ordering — what exists where, as of v0.4.0
+### Ordering — what exists where
 
 | # | Step | Where |
 |---|---|---|
-| 1 | reconstruct the real `CapacityActionRecommendation` | Cloud Scaling adapter — **not built** |
-| 2 | independently recompute `rec.digest()` | Cloud Scaling adapter — **not built** |
-| 3 | require equality with the outer `recommendation_digest` | Cloud Scaling adapter — **not built** |
+| 1 | reconstruct the real `CapacityActionRecommendation` | Cloud Scaling adapter — **built** (Phase 4C, `ugence-cloud-scaling-risk-integration`) |
+| 2 | independently recompute `rec.digest()` | Cloud Scaling adapter — **built** (Phase 4C) |
+| 3 | require equality with the outer `recommendation_digest` | Cloud Scaling adapter — **built** (Phase 4C) |
 | 4 | run `validate_subject_binding` | Phase 4A contract layer, **wired into the seam** in Phase 4B |
 | 5 | subject-aware policy resolution over the validated context | Phase 4B seam |
 | 6 | trusted evidence (RA-5) + the existing RA evaluation path | Phase 4B seam |
 | 7 | widen `SUPPORTED_REQUEST_SCHEMA_VERSIONS` to admit v2 | Phase 4B, same atomic change as step 4 |
 
-**Steps 1–3 remain absent.** No placeholder authenticator and no permissive resolver was
-introduced — an absent check stays visibly absent. Admitting a v2 request therefore still
-does **not** establish that a recommendation is authentic.
+**Steps 1–3 now exist, and they are not in this package.** They are the Cloud Scaling
+adapter's `authenticity` module: exact-type admission, strict reconstruction through the
+controller's own `from_dict`, an independent `rec.digest()` recomputation, and comparison
+against the independently carried `evidence_digest`. No placeholder authenticator was ever
+introduced here in the interim — an absent check stayed visibly absent until the real one
+was built elsewhere.
+
+**What that does and does not buy — unchanged for Risk Authority.** Steps 1–3 run in the
+adapter, on the adapter's inputs, before a request reaches this package. Risk Authority
+performs no part of them and cannot tell whether they ran. Admitting a v2 request here
+therefore still does **not** establish that a recommendation is authentic. Phase 4C's own
+residual limits are stated in its module documentation and are not narrowed by this note:
+its digest is an unkeyed content identity, not a signature; on the in-process object path
+the provenance of the caller-supplied `expected_recommendation_digest` is assumed rather
+than verified; and a fully self-consistent forgery still passes *Phase 4C*.
+
+Producer authenticity — **who** produced a recommendation — is closed separately, by
+`ugence-cloud-scaling-producer-attestation` (Phase 5B-0A): a signed, trust-anchored
+`ProducerAttestationV2` verified against the Trusted Evidence Authority's key store. It is
+not part of this package's path either: Risk Authority never mints, carries or verifies a
+producer attestation, and a verified one grants nothing on its own. Policy authenticity
+(that the policy a candidate binds is genuine and in force) remains open as Phase 5B-0B.
 
 **Schema-tagged canonical hashing (honest description).** Digests use the existing
 `crypto.canonical.to_canonical_obj` / `canonical_bytes` and `crypto.hashing.digest` — a
@@ -330,10 +352,12 @@ overstate the guarantee.
 
 **Phase 4B validates structural and binding integrity. Phase 4B does not authenticate a
 fully self-consistent request or recommendation.** Neither `subject_digest` nor
-`rec.digest()` authenticates the whole request. Recommendation authenticity remains a
-**deferred adapter responsibility**: reconstruct the real `CapacityActionRecommendation`,
-independently recompute `rec.digest()`, and require equality before the request may enter
-the trusted evaluation path. That check is not implemented anywhere today.
+`rec.digest()` authenticates the whole request. Recommendation authenticity is an
+**adapter responsibility, and it stays one**: reconstruct the real
+`CapacityActionRecommendation`, independently recompute `rec.digest()`, and require
+equality before the request may enter the trusted evaluation path. That check is now
+implemented — in the Cloud Scaling adapter (Phase 4C), never here — so nothing in this
+package's behavior changed and nothing in this section is relaxed.
 
 These claims are pinned by executable tests
 (`tests/adversarial/test_phase4b_digest_coverage.py`), which substitute each uncovered
@@ -349,16 +373,23 @@ by name in the adversarial suite rather than glossed over.
 
 What still holds for such a request is containment: it terminates at a **non-executable**
 `SubjectRiskDecision` with every execution flag structurally `False`, no envelope, no
-ActionGate, no credential, no actuation. Establishing authenticity remains the future Cloud
-Scaling adapter's responsibility (steps 1–3 above).
+ActionGate, no credential, no actuation. Establishing authenticity is the Cloud Scaling
+adapter's responsibility (steps 1–3 above), and it is discharged there, before a request
+reaches this seam — not by anything described in this section.
 
-### Not in this release
+### Not in Phase 4B
 
-No Cloud Scaling adapter, no execution envelope, no ActionGate call, no provider or
-Kubernetes invocation, no credential issuance, no effect verification, and no Phase 5/6
-behavior. The ADR's **D-4** purpose/domain identifiers remain **proposed, not owner-ratified**,
-so none are frozen into Risk Authority; Phase 4B is entirely domain-neutral and D-4 stays an
-explicit blocker for the adapter.
+Phase 4B itself added no Cloud Scaling adapter, no execution envelope, no ActionGate call,
+no provider or Kubernetes invocation, no credential issuance, no effect verification, and no
+Phase 5/6 behavior. Several of those have since landed — envelope issuance in v0.6.0 and
+action admission in v0.8.0 (below), and the Cloud Scaling adapter in its own packages — so
+read this list as the boundary of the v0.4.0 change, not as the current state of the system.
+
+The ADR's **D-4** purpose/domain identifiers have since been ratified and frozen, in the
+Cloud Scaling contracts packages (`PURPOSE_CAPACITY_ACTION`, `CANONICAL_ACTION_TYPES`). The
+part that still holds unchanged is the one that matters here: **none of them are frozen into
+Risk Authority.** This package hardcodes no cloud-scaling identifier and imports no Cloud
+Scaling type; the seam remains entirely domain-neutral.
 
 ## Phase 5 envelope issuance seam (v0.6.0)
 
@@ -428,7 +459,9 @@ so an envelope signed under a rotated key is unverifiable after restart).
 `ADR_CLOUD_SCALING_PHASE5C_ACTION_ADMISSION_SCOPING.md` ratified five decisions; this
 release implements the Risk Authority half (D-1, D-3, D-4, D-5). The D-2 mapping from a
 capacity action to a `CanonicalAction` belongs to the `cloud-scaling-action-admission`
-composition package, which is not part of this release.
+composition package — it is **built**, and it is deliberately not part of this
+distribution: keeping the mapping out of Risk Authority is what leaves this package
+domain-neutral.
 
 | Decision | What ships |
 |---|---|
@@ -446,8 +479,9 @@ outcome.replayed      # True iff a stored verdict was returned
 outcome.executable    # always False
 ```
 
-**Not in this release:** the `cloud-scaling-action-admission` package (D-2), ACP and
-trajectory hooks, and the F-D scope dimensions the reference gate leaves unenforced.
+**Not in this distribution:** the `cloud-scaling-action-admission` package (D-2) — since
+built, and outside this package by design — plus ACP and trajectory hooks, and the F-D
+scope dimensions the reference gate leaves unenforced (still open as issue #1397).
 
 ## Verify the distribution
 
