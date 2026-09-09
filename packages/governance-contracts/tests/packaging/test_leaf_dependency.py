@@ -74,3 +74,34 @@ def test_only_stdlib_and_self():
             if r not in allowed:
                 strays.setdefault(str(p.relative_to(PKG_ROOT)), set()).add(r)
     assert not strays, strays
+
+
+def test_the_system_manifest_module_imports_no_uvi_authority_or_engine_package():
+    """SM-1 (§26.3, ruled 2026-09-09) — asserted by name, not by coincidence.
+
+    The two guards above already ``rglob`` the whole package, so this module is
+    covered by them today. That coverage is incidental: it would survive a rename
+    or a move that quietly took the manifest out of the scanned tree, and a guard
+    that passes because it looked nowhere is the failure mode this repository has
+    already been bitten by once. So the ruling's requirement is asserted directly —
+    the file must exist, and it must import nothing outside the standard library.
+
+    The placement argument depends on exactly this: ``SystemManifest`` may live in
+    the neutral leaf **only because** its workflow and policy bindings are opaque
+    ref-and-digest strings. The day one of them becomes a typed ``PolicyReference``,
+    this test is what fails.
+    """
+
+    module = PKG_ROOT / "contracts" / "system_identity.py"
+    assert module.is_file(), "system_identity.py is missing; this check would pass vacuously"
+
+    roots = _roots(module)
+    assert not (roots & PROHIBITED), sorted(roots & PROHIBITED)
+    assert not (roots - (_STDLIB | {SELF, "__future__"})), sorted(
+        roots - (_STDLIB | {SELF, "__future__"})
+    )
+
+    # The manifest really is defined here, so the assertions above are about it.
+    from ugence_governance_contracts.api import SystemManifest
+
+    assert SystemManifest.__module__.endswith("contracts.system_identity")

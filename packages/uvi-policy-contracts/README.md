@@ -7,7 +7,7 @@ It is **not** a customer-facing module (D-2, D-18).
 
 - **Distribution:** `ugence-uvi-policy-contracts`
 - **Namespace:** `ugence_uvi_policy_contracts`
-- **Version:** 0.1.0
+- **Version:** 0.2.0
 - **Depends on:** Python standard library **+ `ugence-governance-contracts>=0.2.0`** (the neutral leaf) — nothing else
 - **Typing:** fully type-annotated; ships a PEP 561 `py.typed` marker
 - **Public API snapshot:** `public_api.json` (asserted equal to the installed package by `tests/packaging/test_public_api.py`)

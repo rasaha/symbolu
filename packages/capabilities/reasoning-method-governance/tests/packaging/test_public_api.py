@@ -39,7 +39,11 @@ def test_schema_version_literals():
     assert api.RECORD_SCHEMA_VERSION == "reasoning_method.execution_record.v1"
     assert api.FIT_SCHEMA_VERSION == "reasoning_method.fit_assessment.v1"
     assert api.COMPARISON_REQUEST_SCHEMA_VERSION == "readiness_comparison.request.v1"
-    assert api.COMPARISON_RESULT_SCHEMA_VERSION == "readiness_comparison.result.v1"
+    # v2 since the §26.8 ruling added usage_scope to EvidenceStatusView, which sits
+    # inside this result's digested body. RECORD_SCHEMA_VERSION above deliberately
+    # stays v1: the record's new usage_scope is a ClassVar, and ClassVars are not
+    # dataclass fields, so the record's projection and digest did not move.
+    assert api.COMPARISON_RESULT_SCHEMA_VERSION == "readiness_comparison.result.v2"
     assert api.RESEARCH_PLAN_SCHEMA_VERSION == "reasoning_method.research_plan.v1"
 
 

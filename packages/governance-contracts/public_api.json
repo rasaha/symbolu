@@ -1,10 +1,10 @@
 {
-  "distribution": "ugence-governance-contracts",
-  "namespace": "ugence_governance_contracts",
-  "package_version": "0.8.0",
   "contract_version": "1.0.0",
   "curated_api_module": "ugence_governance_contracts.api",
-  "note": "Machine-readable snapshot of the curated public API (ugence_governance_contracts.api.__all__). Generated from the installed package; tests/packaging/test_public_api.py asserts this file equals the actual package surface. Regenerate when the curated API changes (a contract/version transition). CONTRACT_VERSION is the PROVIDER-contract surface and stays 1.0.0: the GV-2E-a evidence family and the M-3R.3 neutral assessed-system identity family (AssessedSystemBinding, SystemBindingAuthenticityStatus, SystemIdentityContractError) are additive neutral families that do not change the provider contract. AssessedSystemBinding is the SINGLE canonical assessed-system identity contract for the platform (UVI ADR \u00a720); ugence-agent-value-readiness re-exports these exact objects and defines no copy, subclass or parallel schema, so 'is' identity holds across both public APIs. Every binding field is a platform-neutral primitive (str/datetime): this leaf imports no UVI, readiness, authority or risk package, so no dependency cycle is possible. authenticity_status is a permanently STRUCTURAL_UNVERIFIED property and authenticity_verified a permanently-False property \u2014 no ratified system-binding verifier exists. SystemManifest and the RA-owned SubjectContext are NOT minted here; they are referenced by opaque, co-required ref+digest tokens. G7 (0.4.0) adds the neutral idempotency family (IdempotencyScope, IdempotencyKey, IdempotencyDisposition, IdempotencyResolution, IdempotencyContractError) and G8 adds the neutral validity family (ValidityStatus, Validity, ValidityContractError) from the governance-contracts evolution plan. Both are additive neutral families: NO provider dataclass gained a field, no default, signature, enum value or serialized form moved, so CONTRACT_VERSION stays 1.0.0. An IdempotencyKey is the identity of one logical action (key + the coordinates its scope names + an opaque partition token reserved for G1/G2); a producer that adopts it places IdempotencyKey.canonical_digest() in the existing free-string idempotency_key field. IdempotencyResolution.duplicate_of is required iff the disposition is DUPLICATE; UNKNOWN is never first and never determinate. Validity is a half-open [issued_at, expires_at) window with an optional stale_after soft bound; staleness is derived at an explicit caller-supplied as_of, never stored and never read from a clock. Neither family is a store, ledger, clock, verifier or authority. G4 (0.5.0) adds the neutral audit reference (AuditReference, AuditContractError): a digest-bound pointer to one entry in one audit store, so entries can be correlated ACROSS the platform's separate audit stores without any store changing, merging or moving. It is additive in the same way: no provider dataclass gained a field and no default, signature, enum value or serialized form moved, so CONTRACT_VERSION stays 1.0.0. It carries no entry body, no event-type vocabulary (Decision Authority's frozen AuditEventType owns those names) and no chain head or previous-entry hash (hash-linking is each store's own property). It is not an audit log, sink, hash chain, verifier or authority. EvidenceReference already covers the evidence half of G4 and no second evidence reference is minted. DE-5 (0.6.0) adds the neutral data-classification label (DataClassificationLabel, DataClassificationContractError), ruled by ADR_UGENCE_DATA_EGRESS_AUTHORITY_SCOPING.md: an immutable, non-empty, UNINTERPRETED label with structural validation only (string, non-blank after stripping, no control characters). No enum, taxonomy, lattice, hierarchy, severity, ordering, dominance or implied compatibility ships with it; order=False and no rich comparison, so sorting labels raises. It is additive in the same way: no provider dataclass gained a field and no default, signature, enum value or serialized form moved, so CONTRACT_VERSION stays 1.0.0. It classifies nothing, decides nothing and grants no authority. VR-5 (0.7.0) adds the neutral vendor-risk label (VendorRiskLabel, VendorRiskContractError), ruled by ADR_UGENCE_VENDOR_RISK_SCOPING.md: an immutable, non-empty, UNINTERPRETED posture label with structural validation only, a SEPARATE dimension from DataClassificationLabel (distinct class, never interchangeable). No grade, enum, taxonomy, ordering, severity, score, dominance or implied eligibility; order=False and no rich comparison, so sorting labels raises. Additive in the same way: no provider dataclass gained a field and no default, signature, enum value or serialized form moved, so CONTRACT_VERSION stays 1.0.0. It makes no risk judgment and grants no authority. AE-5 (0.8.0) adds the neutral assurance-finding label (AssuranceFindingLabel, AssuranceFindingContractError), ruled by ADR_UGENCE_AGENT_ASSURANCE_EVIDENCE_SCOPING.md: an immutable, non-empty, UNINTERPRETED label for what an exercise found, with structural validation only. NOT VerificationStatus, which stays an independent statement about whether a claim was checked; not DataClassificationLabel or VendorRiskLabel; never interchangeable with any of them. No taxonomy, severity, score, ordering or implied verification; order=False and no rich comparison. Additive in the same way: no provider dataclass gained a field and no default, signature, enum value or serialized form moved, so CONTRACT_VERSION stays 1.0.0. It verifies nothing, interprets no risk and grants no authority.",
+  "distribution": "ugence-governance-contracts",
+  "namespace": "ugence_governance_contracts",
+  "note": "Machine-readable snapshot of the curated public API (ugence_governance_contracts.api.__all__). Generated from the installed package; tests/packaging/test_public_api.py asserts this file equals the actual package surface. Regenerate when the curated API changes (a contract/version transition). CONTRACT_VERSION is the PROVIDER-contract surface and stays 1.0.0: the GV-2E-a evidence family and the M-3R.3 neutral assessed-system identity family (AssessedSystemBinding, SystemBindingAuthenticityStatus, SystemIdentityContractError) are additive neutral families that do not change the provider contract. AssessedSystemBinding is the SINGLE canonical assessed-system identity contract for the platform (UVI ADR \u00a720); ugence-agent-value-readiness re-exports these exact objects and defines no copy, subclass or parallel schema, so 'is' identity holds across both public APIs. Every binding field is a platform-neutral primitive (str/datetime): this leaf imports no UVI, readiness, authority or risk package, so no dependency cycle is possible. authenticity_status is a permanently STRUCTURAL_UNVERIFIED property and authenticity_verified a permanently-False property \u2014 no ratified system-binding verifier exists. SystemManifest and the RA-owned SubjectContext are NOT minted here; they are referenced by opaque, co-required ref+digest tokens. G7 (0.4.0) adds the neutral idempotency family (IdempotencyScope, IdempotencyKey, IdempotencyDisposition, IdempotencyResolution, IdempotencyContractError) and G8 adds the neutral validity family (ValidityStatus, Validity, ValidityContractError) from the governance-contracts evolution plan. Both are additive neutral families: NO provider dataclass gained a field, no default, signature, enum value or serialized form moved, so CONTRACT_VERSION stays 1.0.0. An IdempotencyKey is the identity of one logical action (key + the coordinates its scope names + an opaque partition token reserved for G1/G2); a producer that adopts it places IdempotencyKey.canonical_digest() in the existing free-string idempotency_key field. IdempotencyResolution.duplicate_of is required iff the disposition is DUPLICATE; UNKNOWN is never first and never determinate. Validity is a half-open [issued_at, expires_at) window with an optional stale_after soft bound; staleness is derived at an explicit caller-supplied as_of, never stored and never read from a clock. Neither family is a store, ledger, clock, verifier or authority. G4 (0.5.0) adds the neutral audit reference (AuditReference, AuditContractError): a digest-bound pointer to one entry in one audit store, so entries can be correlated ACROSS the platform's separate audit stores without any store changing, merging or moving. It is additive in the same way: no provider dataclass gained a field and no default, signature, enum value or serialized form moved, so CONTRACT_VERSION stays 1.0.0. It carries no entry body, no event-type vocabulary (Decision Authority's frozen AuditEventType owns those names) and no chain head or previous-entry hash (hash-linking is each store's own property). It is not an audit log, sink, hash chain, verifier or authority. EvidenceReference already covers the evidence half of G4 and no second evidence reference is minted. DE-5 (0.6.0) adds the neutral data-classification label (DataClassificationLabel, DataClassificationContractError), ruled by ADR_UGENCE_DATA_EGRESS_AUTHORITY_SCOPING.md: an immutable, non-empty, UNINTERPRETED label with structural validation only (string, non-blank after stripping, no control characters). No enum, taxonomy, lattice, hierarchy, severity, ordering, dominance or implied compatibility ships with it; order=False and no rich comparison, so sorting labels raises. It is additive in the same way: no provider dataclass gained a field and no default, signature, enum value or serialized form moved, so CONTRACT_VERSION stays 1.0.0. It classifies nothing, decides nothing and grants no authority. VR-5 (0.7.0) adds the neutral vendor-risk label (VendorRiskLabel, VendorRiskContractError), ruled by ADR_UGENCE_VENDOR_RISK_SCOPING.md: an immutable, non-empty, UNINTERPRETED posture label with structural validation only, a SEPARATE dimension from DataClassificationLabel (distinct class, never interchangeable). No grade, enum, taxonomy, ordering, severity, score, dominance or implied eligibility; order=False and no rich comparison, so sorting labels raises. Additive in the same way: no provider dataclass gained a field and no default, signature, enum value or serialized form moved, so CONTRACT_VERSION stays 1.0.0. It makes no risk judgment and grants no authority. AE-5 (0.8.0) adds the neutral assurance-finding label (AssuranceFindingLabel, AssuranceFindingContractError), ruled by ADR_UGENCE_AGENT_ASSURANCE_EVIDENCE_SCOPING.md: an immutable, non-empty, UNINTERPRETED label for what an exercise found, with structural validation only. NOT VerificationStatus, which stays an independent statement about whether a claim was checked; not DataClassificationLabel or VendorRiskLabel; never interchangeable with any of them. No taxonomy, severity, score, ordering or implied verification; order=False and no rich comparison. Additive in the same way: no provider dataclass gained a field and no default, signature, enum value or serialized form moved, so CONTRACT_VERSION stays 1.0.0. It verifies nothing, interprets no risk and grants no authority. SM-1 (0.9.0) adds the neutral assessed-system composition family (ComponentBinding, SystemManifest, SYSTEM_MANIFEST_COMPONENT_FAMILIES), placed here by the UVI ADR \u00a726.3 ruling of 2026-09-09. Its workflow and policy bindings are platform-neutral OPAQUE reference-and-digest pairs \u2014 plain strings \u2014 never uvi-policy-contracts.PolicyReference, which is precisely what keeps the manifest in this neutral leaf rather than in UVI: the same reason AssessedSystemBinding is here and AssessmentContext is not. Component bindings carry no datetime and no nested collection, because _canonical_payload normalizes instants in a single top-level pass and a nested instant would escape it. A manifest must bind at least one component; a nominal manifest is refused at construction. AssessedSystemBinding gains NO typed field pointing at it \u2014 the link stays the opaque system_manifest_ref + system_manifest_digest pair \u2014 so the binding's canonical projection and digest are unchanged. Additive in the same way as every family above: no provider dataclass gained a field and no default, signature, enum value or serialized form moved, so CONTRACT_VERSION stays 1.0.0. It resolves nothing, attests nothing and grants no authority.",
+  "package_version": "0.9.0",
   "symbols": {
     "ActionGovernanceOutcome": {
       "kind": "enum",
@@ -20,7 +20,6 @@
       "kind": "protocol"
     },
     "ActionGovernanceRequest": {
-      "kind": "dataclass",
       "fields": [
         "action_type",
         "requested_parameters",
@@ -34,10 +33,10 @@
         "idempotency_key",
         "correlation_id",
         "authorization_expired"
-      ]
+      ],
+      "kind": "dataclass"
     },
     "ActionGovernanceResult": {
-      "kind": "dataclass",
       "fields": [
         "outcome",
         "constraints",
@@ -47,7 +46,8 @@
         "reason_codes",
         "provider_trace_id",
         "fingerprint"
-      ]
+      ],
+      "kind": "dataclass"
     },
     "AssertionCoverage": {
       "kind": "enum",
@@ -62,7 +62,6 @@
       "kind": "protocol"
     },
     "AssertionGovernanceRequest": {
-      "kind": "dataclass",
       "fields": [
         "assertion",
         "assertion_type",
@@ -71,10 +70,10 @@
         "policy_refs",
         "context",
         "correlation_id"
-      ]
+      ],
+      "kind": "dataclass"
     },
     "AssertionGovernanceResult": {
-      "kind": "dataclass",
       "fields": [
         "coverage",
         "evidence_coverage",
@@ -86,10 +85,10 @@
         "explanation_refs",
         "provider_trace_id",
         "fingerprint"
-      ]
+      ],
+      "kind": "dataclass"
     },
     "AssessedSystemBinding": {
-      "kind": "dataclass",
       "fields": [
         "binding_id",
         "tenant_id",
@@ -106,24 +105,25 @@
         "deployment_environment_ref",
         "effective_from",
         "effective_to"
-      ]
+      ],
+      "kind": "dataclass"
     },
     "AssessmentWindow": {
-      "kind": "dataclass",
       "fields": [
         "start",
         "end"
-      ]
+      ],
+      "kind": "dataclass"
     },
     "AssuranceFindingContractError": {
-      "kind": "exception",
-      "failure_class": null
+      "failure_class": null,
+      "kind": "exception"
     },
     "AssuranceFindingLabel": {
-      "kind": "dataclass",
       "fields": [
         "label"
-      ]
+      ],
+      "kind": "dataclass"
     },
     "AttestationStatus": {
       "kind": "enum",
@@ -142,11 +142,10 @@
       ]
     },
     "AuditContractError": {
-      "kind": "exception",
-      "failure_class": null
+      "failure_class": null,
+      "kind": "exception"
     },
     "AuditReference": {
-      "kind": "dataclass",
       "fields": [
         "tenant_id",
         "store_ref",
@@ -154,13 +153,13 @@
         "entry_digest",
         "correlation_id",
         "recorded_at"
-      ]
+      ],
+      "kind": "dataclass"
     },
     "BaseProvider": {
       "kind": "class"
     },
     "BenchmarkReference": {
-      "kind": "dataclass",
       "fields": [
         "benchmark_id",
         "version",
@@ -168,36 +167,43 @@
         "issuer_ref",
         "effective_from",
         "effective_to"
-      ]
+      ],
+      "kind": "dataclass"
     },
     "CONTRACT_VERSION": {
       "kind": "str"
     },
+    "ComponentBinding": {
+      "fields": [
+        "ref",
+        "digest"
+      ],
+      "kind": "dataclass"
+    },
     "ConfidenceBasis": {
-      "kind": "dataclass",
       "fields": [
         "method",
         "interval_or_class",
         "sample_size",
         "caveats"
-      ]
+      ],
+      "kind": "dataclass"
     },
     "DataClassificationContractError": {
-      "kind": "exception",
-      "failure_class": null
+      "failure_class": null,
+      "kind": "exception"
     },
     "DataClassificationLabel": {
-      "kind": "dataclass",
       "fields": [
         "label"
-      ]
+      ],
+      "kind": "dataclass"
     },
     "EvidenceContractError": {
-      "kind": "exception",
-      "failure_class": null
+      "failure_class": null,
+      "kind": "exception"
     },
     "EvidenceProvenance": {
-      "kind": "dataclass",
       "fields": [
         "source_identity",
         "source_type",
@@ -208,10 +214,10 @@
         "window",
         "population_ref",
         "freshness"
-      ]
+      ],
+      "kind": "dataclass"
     },
     "EvidenceReference": {
-      "kind": "dataclass",
       "fields": [
         "evidence_id",
         "tenant_id",
@@ -221,7 +227,8 @@
         "provenance_ref",
         "created_at",
         "supersedes_ref"
-      ]
+      ],
+      "kind": "dataclass"
     },
     "EvidenceUsageScope": {
       "kind": "enum",
@@ -242,16 +249,15 @@
       ]
     },
     "ExecutionDispatchRequest": {
-      "kind": "dataclass",
       "fields": [
         "action_type",
         "parameters",
         "idempotency_key",
         "correlation_id"
-      ]
+      ],
+      "kind": "dataclass"
     },
     "ExecutionDispatchResult": {
-      "kind": "dataclass",
       "fields": [
         "accepted",
         "external_request_id",
@@ -260,10 +266,10 @@
         "timed_out",
         "transport_error",
         "retryable"
-      ]
+      ],
+      "kind": "dataclass"
     },
     "ExecutionObservation": {
-      "kind": "dataclass",
       "fields": [
         "business_outcome",
         "observed_parameters",
@@ -271,7 +277,8 @@
         "reason",
         "provider_trace_id",
         "fingerprint"
-      ]
+      ],
+      "kind": "dataclass"
     },
     "ExternalExecutionProvider": {
       "kind": "protocol"
@@ -287,15 +294,15 @@
       ]
     },
     "ForecastHorizon": {
-      "kind": "dataclass",
       "fields": [
         "as_of",
         "horizon_end"
-      ]
+      ],
+      "kind": "dataclass"
     },
     "IdempotencyContractError": {
-      "kind": "exception",
-      "failure_class": null
+      "failure_class": null,
+      "kind": "exception"
     },
     "IdempotencyDisposition": {
       "kind": "enum",
@@ -306,22 +313,22 @@
       ]
     },
     "IdempotencyKey": {
-      "kind": "dataclass",
       "fields": [
         "key",
         "scope",
         "actor",
         "target_resource",
         "partition"
-      ]
+      ],
+      "kind": "dataclass"
     },
     "IdempotencyResolution": {
-      "kind": "dataclass",
       "fields": [
         "key",
         "disposition",
         "duplicate_of"
-      ]
+      ],
+      "kind": "dataclass"
     },
     "IdempotencyScope": {
       "kind": "enum",
@@ -333,7 +340,6 @@
       ]
     },
     "MetricClaim": {
-      "kind": "dataclass",
       "fields": [
         "claim_id",
         "tenant_id",
@@ -367,10 +373,10 @@
         "policy_refs",
         "benchmark_refs",
         "content_digest"
-      ]
+      ],
+      "kind": "dataclass"
     },
     "MetricObservation": {
-      "kind": "dataclass",
       "fields": [
         "observation_id",
         "tenant_id",
@@ -386,47 +392,47 @@
         "population_ref",
         "confidence_ref",
         "content_digest"
-      ]
+      ],
+      "kind": "dataclass"
     },
     "PopulationSlice": {
-      "kind": "dataclass",
       "fields": [
         "population_id",
         "geography",
         "language",
         "cohort",
         "size"
-      ]
+      ],
+      "kind": "dataclass"
     },
     "Provider": {
       "kind": "protocol"
     },
     "ProviderCapabilities": {
-      "kind": "dataclass",
       "fields": [
         "kind",
         "features",
         "deterministic"
-      ]
+      ],
+      "kind": "dataclass"
     },
     "ProviderCompatibility": {
-      "kind": "dataclass",
       "fields": [
         "contract_version",
         "compatible_kernel_majors",
         "config_schema_version"
-      ]
+      ],
+      "kind": "dataclass"
     },
     "ProviderCompatibilityError": {
-      "kind": "exception",
-      "failure_class": "COMPATIBILITY"
+      "failure_class": "COMPATIBILITY",
+      "kind": "exception"
     },
     "ProviderConfigurationError": {
-      "kind": "exception",
-      "failure_class": "CONFIGURATION"
+      "failure_class": "CONFIGURATION",
+      "kind": "exception"
     },
     "ProviderDescriptor": {
-      "kind": "dataclass",
       "fields": [
         "provider_id",
         "kind",
@@ -437,19 +443,20 @@
         "vendor",
         "default",
         "metadata"
-      ]
+      ],
+      "kind": "dataclass"
     },
     "ProviderError": {
-      "kind": "exception",
-      "failure_class": "TERMINAL"
+      "failure_class": "TERMINAL",
+      "kind": "exception"
     },
     "ProviderHealth": {
-      "kind": "dataclass",
       "fields": [
         "state",
         "healthy",
         "detail"
-      ]
+      ],
+      "kind": "dataclass"
     },
     "ProviderKind": {
       "kind": "enum",
@@ -472,28 +479,31 @@
       ]
     },
     "ProviderProtocolError": {
-      "kind": "exception",
-      "failure_class": "TERMINAL"
+      "failure_class": "TERMINAL",
+      "kind": "exception"
     },
     "ProviderRegistrationError": {
-      "kind": "exception",
-      "failure_class": "CONFIGURATION"
+      "failure_class": "CONFIGURATION",
+      "kind": "exception"
     },
     "ProviderResolutionError": {
-      "kind": "exception",
-      "failure_class": "CONFIGURATION"
+      "failure_class": "CONFIGURATION",
+      "kind": "exception"
     },
     "ProviderResultValidationError": {
-      "kind": "exception",
-      "failure_class": "TERMINAL"
+      "failure_class": "TERMINAL",
+      "kind": "exception"
     },
     "ProviderTimeoutError": {
-      "kind": "exception",
-      "failure_class": "RETRYABLE"
+      "failure_class": "RETRYABLE",
+      "kind": "exception"
     },
     "ProviderUnavailableError": {
-      "kind": "exception",
-      "failure_class": "RETRYABLE"
+      "failure_class": "RETRYABLE",
+      "kind": "exception"
+    },
+    "SYSTEM_MANIFEST_COMPONENT_FAMILIES": {
+      "kind": "tuple"
     },
     "SourceBasis": {
       "kind": "enum",
@@ -511,8 +521,22 @@
       ]
     },
     "SystemIdentityContractError": {
-      "kind": "exception",
-      "failure_class": null
+      "failure_class": null,
+      "kind": "exception"
+    },
+    "SystemManifest": {
+      "fields": [
+        "manifest_id",
+        "tenant_id",
+        "system_id",
+        "system_version",
+        "model_bindings",
+        "prompt_bindings",
+        "tool_bindings",
+        "workflow_bindings",
+        "policy_bindings"
+      ],
+      "kind": "dataclass"
     },
     "TransformationMethod": {
       "kind": "enum",
@@ -523,16 +547,16 @@
       ]
     },
     "Validity": {
-      "kind": "dataclass",
       "fields": [
         "issued_at",
         "expires_at",
         "stale_after"
-      ]
+      ],
+      "kind": "dataclass"
     },
     "ValidityContractError": {
-      "kind": "exception",
-      "failure_class": null
+      "failure_class": null,
+      "kind": "exception"
     },
     "ValidityStatus": {
       "kind": "enum",
@@ -544,14 +568,14 @@
       ]
     },
     "VendorRiskContractError": {
-      "kind": "exception",
-      "failure_class": null
+      "failure_class": null,
+      "kind": "exception"
     },
     "VendorRiskLabel": {
-      "kind": "dataclass",
       "fields": [
         "label"
-      ]
+      ],
+      "kind": "dataclass"
     },
     "VerificationStatus": {
       "kind": "enum",

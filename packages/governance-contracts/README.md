@@ -6,7 +6,7 @@ never have to depend on each other.
 
 - **Distribution:** `ugence-governance-contracts`
 - **Namespace:** `ugence_governance_contracts`
-- **Version:** 0.8.0 · **Contract version:** 1.0.0
+- **Version:** 0.9.0 · **Contract version:** 1.0.0
 - **Dependencies:** Python standard library only (no third-party, no other Ugence package)
 - **Typing:** fully type-annotated; ships a PEP 561 `py.typed` marker
 - **Ownership / maturity:** extracted verbatim from the frozen `governance_providers`

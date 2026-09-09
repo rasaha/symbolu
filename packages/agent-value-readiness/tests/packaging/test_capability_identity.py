@@ -258,9 +258,14 @@ def test_the_two_m3r3_deliverables_are_on_the_public_surface():
 
 
 def test_no_system_manifest_was_invented():
-    """`SystemManifest`'s home is an open owner decision (ADR §26.3).
+    """Readiness mints no `SystemManifest` — still true, for a new reason.
 
-    The binding references it by opaque ref + digest and mints no such type.
+    §26.3 was ruled on 2026-09-09: the manifest is owned by
+    ``ugence-governance-contracts``, beside ``AssessedSystemBinding``. Readiness
+    still mints none of its own and references one only by opaque ref + digest, so
+    every assertion below is unchanged; what changed is that a second definition
+    here would now be a fork of a type that exists, not the invention of one that
+    does not.
     """
 
     for name in api.__all__:
