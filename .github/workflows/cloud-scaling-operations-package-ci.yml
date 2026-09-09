@@ -5,6 +5,13 @@ name: cloud-scaling-operations-package-ci
 # No real cluster credentials are used and no external infrastructure is mutated: all
 # execution tests use local fakes.
 
+concurrency:
+  # A superseded run proves nothing about the commit that replaced it. Cancel
+  # in-flight runs for the same ref on pull requests; never on a branch push,
+  # where each commit's run is the evidence that commit was green.
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 on:
   push:
     paths:
@@ -46,6 +53,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+          cache: pip
+          cache-dependency-path: requirements.txt
 
       - name: Install tooling
         run: python -m pip install --upgrade pip build pytest pip-audit numpy
@@ -142,6 +151,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+          cache: pip
+          cache-dependency-path: requirements.txt
       - name: Install tooling
         # The suite runs from a bare checkout — the tests' conftest resolves this
         # package's src and the advisory controller through the checkout. Nothing is
@@ -200,6 +211,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+          cache: pip
+          cache-dependency-path: requirements.txt
       - uses: actions/download-artifact@v4
         with:
           pattern: operations-guard-sweep-shard-*

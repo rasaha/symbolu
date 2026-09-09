@@ -3,6 +3,13 @@ name: governance-studio-p3d-frontend-ci
 # Path-scoped: frontend, the frozen contract, the backend it consumes, the
 # canonical + v2 fixtures, the P3D audits and this workflow. No deploy, no
 # secrets, no external model APIs.
+concurrency:
+  # A superseded run proves nothing about the commit that replaced it. Cancel
+  # in-flight runs for the same ref on pull requests; never on a branch push,
+  # where each commit's run is the evidence that commit was green.
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 on:
   push:
     paths:
@@ -152,6 +159,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+          cache: pip
+          cache-dependency-path: requirements.txt
       - uses: actions/setup-node@v4
         with:
           node-version: "22"

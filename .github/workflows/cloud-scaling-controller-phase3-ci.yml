@@ -5,6 +5,13 @@ name: cloud-scaling-controller-phase3-ci
 # offline: no live cluster, no cloud credentials, no network actuation. Phase 3 recommends;
 # it never executes, authorizes, or verifies an effect.
 
+concurrency:
+  # A superseded run proves nothing about the commit that replaced it. Cancel
+  # in-flight runs for the same ref on pull requests; never on a branch push,
+  # where each commit's run is the evidence that commit was green.
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 on:
   push:
     paths:
@@ -33,6 +40,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+          cache: pip
+          cache-dependency-path: requirements.txt
 
       - name: Install tooling
         # `requests` is required by the legacy Prometheus signal tests exercised in the
@@ -169,6 +178,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+          cache: pip
+          cache-dependency-path: requirements.txt
       - name: Install tooling
         # The suite runs from a bare checkout — the package's own conftest puts its
         # `src` first on sys.path unconditionally. Nothing first-party is pip-installed
@@ -219,6 +230,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+          cache: pip
+          cache-dependency-path: requirements.txt
       - uses: actions/download-artifact@v4
         with:
           pattern: controller-evidence-planning-guard-sweep-shard-*
