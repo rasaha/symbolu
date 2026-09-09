@@ -600,6 +600,17 @@ These packages do not represent a single business step. They provide the common 
 2. Keeps readiness multidimensional so strength in one area cannot automatically compensate for a mandatory weakness elsewhere.
 3. Separates advisory readiness from deployment authorization, preserving accountability for the actual deployment decision.
 
+**Consumers (recorded 2026-09-09).** Nothing in the repository imports
+`ugence_agent_value_readiness`. `ADR_UGENCE_STUDIO_FRONT_DOOR_SCOPING.md` row 7
+names this package as the readiness artifact behind the Simulate screen, but that
+screen BLOCKs by design in P3E and `console-api` does not import the package, so
+the consumer is **intended, not existing**, and no workstream owns the wiring.
+Two further things gate any end-to-end use and are not scheduled: `assess_readiness`
+ships only deny-all verifiers, so with a working policy resolver any policy carrying
+an applicable gate cannot reach a headline classification (UVI ADR §26.10); and
+metric-to-threshold evaluation is assigned to no package. **Assigning the wiring
+workstream is an open owner ruling.**
+
 ### 45. Governed Value
 
 **Package:** `packages/governed-value`  
@@ -611,6 +622,16 @@ These packages do not represent a single business step. They provide the common 
 1. Connects governance controls to measurable business value instead of presenting governance only as compliance overhead.
 2. Distinguishes reported, forecast and observed outcomes so weak evidence is not promoted into financial truth.
 3. Feeds cost, loss, benefit and authorization outcomes back into policy revision and future investment decisions.
+
+**Consumers (recorded 2026-09-09).** Nothing in the repository imports
+`governed_value`, and unlike Agent Value Readiness it is named by **no** screen row
+in `ADR_UGENCE_STUDIO_FRONT_DOOR_SCOPING.md`. It is a **terminal leaf today**: a
+kernel that computes correctly, is verified end to end from an isolated wheel, and
+that no product calls. That is a deliberate stopping point rather than an
+oversight — the kernel scores caller-reported inputs and pins every result at
+`REPORTED` / `UNVERIFIED`, so wiring it into a product surface would put unverified
+figures in front of users under a governance banner. **Whether to name a consuming
+workstream is an open owner ruling.**
 
 ## 14. End-to-end interpretation
 

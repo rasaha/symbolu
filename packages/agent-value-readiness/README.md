@@ -625,6 +625,28 @@ separate. **Structured policy successor/supersession references** remain
 separate. Agent Value Readiness contracts being structurally complete does
 **not** mean the UVI/ROI roadmap is complete.
 
+### What the deny-all default means for end-to-end use (UVI ADR §26.10)
+
+`GateResultVerifier` makes one implementation responsible for the claimed
+`GateStatus` **and** for the supporting evidence, benchmark resolution and
+threshold evaluation behind it. Only the first has an authoritative owner today
+(`ugence-trusted-evidence-authority` 0.6.0 — and a verified receipt establishes
+"not policy sufficiency", so a receipt is not a gate status). Benchmark
+resolution waits on `ugence-benchmark-registry-authority` reaching `0.3.0`, still
+a candidate at `0.3.0rc1`. Metric-to-threshold evaluation is assigned to **no
+package** in UVI ADR §20; the one implementation in the repository,
+`ugence-readiness-comparison`, is `RESEARCH_ONLY` / `REQUESTER_ASSERTED` and
+approval-bearing for nothing.
+
+So no conforming verifier can be written yet, and none is being written
+(recorded 2026-09-09, §26.10). **The practical consequence:** with a working
+policy resolver and the shipped `DenyAllGateResultVerifier`, every supplied gate
+result is refused, so **any policy carrying at least one applicable gate cannot
+reach a headline readiness classification**. `assess_readiness` is complete and
+correct as a fail-closed boundary; it is not usable end-to-end in production
+until those two owners exist. Read the precedence table and the orchestration
+guarantees above with that in mind.
+
 Also deferred: deployment authorization; policy signing, approval, issuance and revocation
 (owned by the shared Ugence Policy Authority, consumed here through its public
 resolution service only); the **benchmark registry** and benchmark-value
