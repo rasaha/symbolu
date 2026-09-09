@@ -21,6 +21,11 @@ but the check that *proves* it cannot write is not in the export. This script th
 runs those verifiers in **this** repository and refuses to export if any of them fails,
 and records the result in ``EXPORT_PROVENANCE.json`` beside the source commit.
 
+``verify:openapi`` reaches ``openapi-typescript`` through ``generate-api.mjs``, so the
+studio frontend's devDependencies must be installed before this runs, or that verifier
+fails with ``ERR_MODULE_NOT_FOUND`` and the export refuses:
+
+    ( cd apps/ugence-governance-studio/frontend && npm ci --ignore-scripts )
     python tools/export_demo.py --out /tmp/demo
     python tools/export_demo.py --out /tmp/demo --skip-verify   # never for a real export
 
@@ -89,8 +94,12 @@ DENY: Tuple[Tuple[str, str], ...] = (
 )
 DENY_DIRS = ("docs/audits", "docs/architecture")
 
-#: Run in THIS repository, before anything is written. All are stdlib-Node scripts: they
-#: need no npm install, and they open no socket.
+#: Run in THIS repository, before anything is written. None opens a socket. Four are
+#: stdlib-Node and need nothing installed; ``verify:openapi`` is the exception — it
+#: imports ``generate-api.mjs``, which imports ``openapi-typescript`` — so the studio
+#: frontend's devDependencies must be installed before this runs. The publish workflow
+#: does that in its ``install-verifier-dependencies`` step; by hand it is
+#: ``npm ci --ignore-scripts`` in ``apps/ugence-governance-studio/frontend``.
 VERIFIERS: Tuple[Tuple[str, Tuple[str, ...]], ...] = (
     ("authority-plane verify:boundary",
      ("node", "apps/authority-plane/scripts/verify-boundary.mjs")),
