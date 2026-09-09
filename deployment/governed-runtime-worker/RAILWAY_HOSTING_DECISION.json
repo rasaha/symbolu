@@ -84,9 +84,9 @@
       "subject": "the three SQLite stores and the attached volume",
       "ruling": "CR-1",
       "answer": "The three SQLite stores and attached volume are accepted only for a single-instance reference-grade pilot. This does not authorize a highly available or enterprise-production claim. Production authorization requires PostgreSQL-backed or otherwise durable shared implementations, or a separate explicit acceptance of single-writer availability, backup, recovery and deployment-downtime limitations.",
-      "repository_today": "composition.py:205-217 opens the authority directory, the approval ledger and the audit ledger as three SQLite files under data_dir; Dockerfile:68 declares that path a volume. A platform volume attaches to one instance and is not shared with replicas.",
+      "repository_today": "composition.py:205-217 opens the authority directory, the approval ledger and the audit ledger as three SQLite files under data_dir. The image declared that path a volume until 2026-09-09; the VOLUME instruction was removed because Railway rejects it and the image could not otherwise be built there. A platform volume attaches to one instance and is not shared with replicas, so the single-instance property holds only for a deployment whose operator attaches one; the image no longer requires it.",
       "contradicts_repository_today": false,
-      "gap": "No test pins the single-instance constraint, and no record states the backup, recovery and downtime expectations the alternative acceptance would need.",
+      "gap": "No test pins the single-instance constraint, and no record states the backup, recovery and downtime expectations the alternative acceptance would need. Since the VOLUME instruction was removed, nothing in the image declares that data_dir must be a mounted volume either: a deployment without one starts cleanly, writes the three stores to the container filesystem and loses them on restart, with no error at any point.",
       "production_authorization_requires_one_of": [
         "PostgreSQL-backed or otherwise durable shared implementations of the three stores",
         "a separate explicit owner acceptance of single-writer availability, backup, recovery and deployment-downtime limitations"

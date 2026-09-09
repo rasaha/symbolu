@@ -269,7 +269,7 @@ The ruling, in the owner's terms:
 | RW-3 | `config.py:163-170` requires a readable certificate and key in production and refuses a plain listener. Nothing verifies that certificate. | `[V]` |
 | RW-4 | `config.py:172-181` requires issuer, audience and an `https` JWKS URL in production; `composition.py:149-150` refuses composition without an identity port; every authority read carries `PRESENTED_UNPROVEN` and `IN_PROCESS_ISSUER_ONLY` until AP-3's validation is recorded. | `[V]` |
 | RW-5 | `config.py:139-147` requires both DSNs, requires the `postgresql` prefix and requires them to differ; `composition.py:221-229` hands them to DBOS as the system and application databases. | `[V]` |
-| RW-6 | `composition.py:205-217` opens the authority directory, the approval ledger and the audit ledger as three SQLite files under `data_dir`; `Dockerfile:68` declares that path a volume, which attaches to one instance. | `[V]` |
+| RW-6 | `composition.py:205-217` opens the authority directory, the approval ledger and the audit ledger as three SQLite files under `data_dir`. The image declared that path a volume until 2026-09-09; the `VOLUME` instruction was removed because Railway rejects it, so the single-instance property now rests on the platform-managed volume an operator attaches, which the image does not require and no test pins. | `[V]` for the three stores; `[G]` for the constraint |
 
 ### 8.2 — Where a ruling asks for behaviour the repository does not implement
 
