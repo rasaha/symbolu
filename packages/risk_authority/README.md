@@ -454,6 +454,41 @@ orders by sequence.
 custody, and key rotation across restarts (the key ring is built from the one injected key,
 so an envelope signed under a rotated key is unverifiable after restart).
 
+## Signing-key validity windows (v0.9.0)
+
+Closes issue #1398 (F-G) item 2. `SigningKeyRecord` had carried `not_before` / `not_after`
+since RA-1 and **nothing read them**: `KeyRing.from_records` built `{kid: verify_key}`, so
+the window was discarded before any verification path could see it. An expired or
+not-yet-valid key could both sign and verify.
+
+| Where | What it does now |
+|---|---|
+| `KeyRing` | holds `VerificationKeyRecord` (key + window). `from_records` retains the window; a bare `VerifyKey` entry stays unbounded. |
+| `KeyRing.resolve_record(kid)` | the verification-side entry point — resolves the key **with** its window. |
+| `KeyRing.resolve(kid)` | retained, explicitly **raw and non-validating**: it takes no instant and so cannot enforce a window. No trust decision may use it, and a boundary test pins that nothing in the package does. |
+| `EnvelopeVerifier.verify` | refuses an out-of-window key at the injected `now`, **before** checking the signature. |
+| `EnvelopeIssuer.issue` | independently refuses to sign outside the window — the issuer is where the key is actually held, so it does not defer to a later check. |
+| `WindowedEnvelopeSignerPort` | additive capability letting an external signer declare a window; a signer that declares none is unbounded, so no existing implementation changes. |
+
+**The interval is half-open — `[not_before, not_after)`.** Valid at exactly `not_before`,
+invalid at exactly `not_after`, so two adjacent rotation windows are never both live at the
+instant they meet. An absent bound is unbounded on that side, which is why every existing
+windowless key and signer in the repository behaves exactly as before.
+
+**This deliberately differs from the envelope's boundary, and neither should be
+"harmonized" into the other.** `RiskAuthorizationEnvelope.is_temporally_valid` is inclusive
+at both ends and is **unchanged** by this work: at exactly `expires_at` an envelope is still
+valid, while at exactly `not_after` a key is not. An envelope is a *grant* with a separately
+ratified boundary; a key is a *credential*. The difference is asserted by an executable test
+rather than left to a reader's assumption.
+
+A malformed window (`not_before >= not_after`, or a non-datetime bound) raises
+`KeyWindowError` at construction rather than becoming a silently always-invalid key — a
+configuration error must not hide behind a plausible-looking refusal. Note that this
+release closes item 2 only; #1398's caller-supplied-clock item is separate, and the HSM/KMS
+gap above is unchanged — `WindowedEnvelopeSignerPort` is a metadata and validation contract,
+not an integration.
+
 ## Phase 5C action admission seam (v0.8.0)
 
 `ADR_CLOUD_SCALING_PHASE5C_ACTION_ADMISSION_SCOPING.md` ratified five decisions; this
