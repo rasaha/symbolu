@@ -467,9 +467,16 @@ Rename it `worker` — the name must match `WORKER_URL` from 6.3, and that match
 means anything within one project and environment.
 
 **7.3** Settings → Volumes → Add Volume, mount path `/var/lib/ugence-review`. The three
-SQLite stores live there (`composition.py:205-217`; `Dockerfile:68` declares the volume)
-`[V]`. A volume attaches to one instance, which is what makes this deployment
-single-replica by construction `[I]`.
+SQLite stores live there (`composition.py:205-217`) `[V]`. A volume attaches to one
+instance, which is what makes this deployment single-replica by construction `[I]`.
+
+**This step is load-bearing and nothing enforces it `[G]`.** The Dockerfile declared that
+path a volume until 2026-09-09; the declaration was removed because Railway rejects a
+`VOLUME` instruction and the image could not be built with it. The image therefore no
+longer states the requirement anywhere. A service deployed without this volume starts
+cleanly, writes the authority directory and the two ledgers to the container filesystem,
+and loses them on the next restart — with no error at any point. Attach the volume before
+the first deploy, not after.
 
 **7.4** Variables:
 
