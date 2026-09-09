@@ -225,16 +225,37 @@ def test_no_dependency_cycle_exists_between_the_two_packages():
 # --------------------------------------------------------------------------- #
 # 7-8. Nothing unratified was pulled in by the move
 # --------------------------------------------------------------------------- #
-def test_no_system_manifest_was_added_to_either_package():
-    for root in (GOVERNANCE_ROOT, READINESS_ROOT):
-        for path in _sources(root):
-            tree = ast.parse(path.read_text(), filename=str(path))
-            for node in ast.walk(tree):
-                if isinstance(node, ast.ClassDef):
-                    assert "systemmanifest" not in node.name.lower(), (path.name, node.name)
-    for surface in (governance_api.__all__, readiness_api.__all__):
-        for name in surface:
-            assert "systemmanifest" not in name.lower().replace("_", ""), name
+def test_readiness_mints_no_system_manifest_and_governance_owns_the_only_one():
+    """Split by the §26.3 ruling of 2026-09-09, and sharper for it.
+
+    This guard was written while §26.3 was open, when the ADR said no such type was
+    minted in *either* package. The ruling placed ``SystemManifest`` in
+    ``governance-contracts``, so half the assertion is now wrong — but the half that
+    carried the weight is unchanged and is what stays enforced here: **readiness
+    mints no manifest**. It references one only through the opaque
+    ``system_manifest_ref`` + ``system_manifest_digest`` pair, and a competing
+    manifest defined in this package would be exactly the fork the ruling forbids.
+    """
+
+    # Readiness: still none, by class definition or by exported name.
+    for path in _sources(READINESS_ROOT):
+        tree = ast.parse(path.read_text(), filename=str(path))
+        for node in ast.walk(tree):
+            if isinstance(node, ast.ClassDef):
+                assert "systemmanifest" not in node.name.lower(), (path.name, node.name)
+    for name in readiness_api.__all__:
+        assert "systemmanifest" not in name.lower().replace("_", ""), name
+
+    # Governance: exactly one, and it is the ruled one.
+    assert "SystemManifest" in governance_api.__all__
+    assert governance_api.SystemManifest.__module__.endswith("contracts.system_identity")
+    defined = [
+        node.name
+        for path in _sources(GOVERNANCE_ROOT)
+        for node in ast.walk(ast.parse(path.read_text(), filename=str(path)))
+        if isinstance(node, ast.ClassDef) and "systemmanifest" in node.name.lower()
+    ]
+    assert defined == ["SystemManifest"], defined
 
 
 def test_no_risk_authority_or_pr1432_contract_is_imported_by_either_package():

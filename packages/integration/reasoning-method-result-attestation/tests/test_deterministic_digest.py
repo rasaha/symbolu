@@ -4,6 +4,16 @@ Every literal below was produced once from the pinned fixtures and is asserted
 byte for byte thereafter. A moved frame element, a moved canonical rule, a moved
 fixture or a moved domain tag fails here before it fails anywhere subtler.
 Ed25519 signing is deterministic, so the reference signature is pinned too.
+
+Re-pinned 2026-09-09 for the §26.8 ruling. ``COMPARISON_RESULT_SCHEMA_VERSION``
+moved ``readiness_comparison.result.v1`` -> ``.v2`` because ``EvidenceStatusView``
+gained ``usage_scope``, and that string is inside the signed projection. Only the
+three digests and the signature moved with it: the fixture carries no
+``evidence_status`` entries, the public key and anchor digest are key material and
+unchanged, and the frame length is identical because ``.v1`` and ``.v2`` are the
+same byte length. The hand-recomputation below re-derives the new values from
+plain ``json``/``hashlib`` without importing the package, so these literals are
+independently confirmed rather than copied from the code they check.
 """
 
 from __future__ import annotations
@@ -17,12 +27,12 @@ import pytest
 import ugence_reasoning_method_result_attestation as ra
 from _fixtures import PRODUCED_AT, SIGNED_AT, anchor_of, assessment, engine_signer, result, signed
 
-PINNED_RESULT_DIGEST = "56f7174da2768f9c37bd816c8b91593b750be9638f0207ab7dae3f23bdb84db4"
-PINNED_PROJECTION_DIGEST = "sha256:4bedf596bb66e4a7d7494cb833773e6fee95786676c6c2fa32f0545dcd43b27d"
-PINNED_PAYLOAD_DIGEST = "sha256:3e5add9d75912a6879e4f082392b77f4277a737ad85fe3b764b457e014b25053"
+PINNED_RESULT_DIGEST = "248b60571017af0469da6e66a54aef882320e765349c7abd850e1d897cb3f930"
+PINNED_PROJECTION_DIGEST = "sha256:5e4fda256ddacd50f33c06d38b1a8c3fd5a46ab24ea9251d48697722c3b400ec"
+PINNED_PAYLOAD_DIGEST = "sha256:a6f69c1a5be6278e7e01e2d014a2ca43f36d324068caa70c2922a52d0827099a"
 PINNED_SIGNATURE = (
-    "ab769d262ffb8d557fb765233d3b3c63ceb3510ed83a5953a0c5d64d253128e1"
-    "bd19967e672d1def6d301b405b2576c30d18f1c16b5dd9d2b91e44c814411900"
+    "bd4803e5a61d50c67ad07c35fb3043c9f731f4a58a8aa0bb1ce3f5f61bdfa1b9"
+    "3580d88cd3a40171b3d0699d8ef8ae2d27878f84e95c09b667eb2f0a71c6ed0f"
 )
 PINNED_ENGINE_PUBLIC_KEY = "8a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c"
 PINNED_ANCHOR_DIGEST = "sha256:acfa67e547a91c7a263d0e5fccb7bd1361cd5e1e8014ff3f1b916dcf8b9c4abe"
@@ -58,7 +68,7 @@ def test_the_digest_recomputes_with_plain_json_and_hashlib_importing_nothing_fro
         "request_digest": "a" * 64,
         "request_id": "cmp.synthetic",
         "result_digest": PINNED_RESULT_DIGEST,
-        "schema_version": "readiness_comparison.result.v1",
+        "schema_version": "readiness_comparison.result.v2",
     }
     payload = {
         "result": projection,

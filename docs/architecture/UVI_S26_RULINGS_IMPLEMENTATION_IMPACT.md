@@ -194,20 +194,85 @@ prose). The new module must not change that, and
 
 ---
 
-## 4. What this record does not settle
+## 4. The five open questions — SETTLED (2026-09-09)
 
-Five items are implementation decisions, deliberately left open:
+Each was settled against the repository, not by preference. Two were decided *for*
+us by existing helpers; one dissolved on inspection.
 
-1. Whether an unset scope field is omitted from or included in `ValuationPolicy`'s
-   canonical projection (decision 2).
-2. The successor value for `COMPARISON_RESULT_SCHEMA_VERSION`, and whether v1 stays
-   readable (decision 3).
-3. Where `EvidenceStatusView.usage_scope` originates, given its producing record has
-   no scope axis — possibly requiring a second contract movement (decision 3).
-4. Whether stored policy artifacts digested under the old projection are re-derived
-   or grandfathered (decision 2).
-5. The exact field shape of `SystemManifest`'s component bindings, subject to the
-   ruling's prohibition on a nominal manifest (decision 4).
+### Q1 — where does `EvidenceStatusView.usage_scope` originate? **No second contract movement.**
 
-Item 3 is the one most likely to widen beyond what the ruling anticipated, and should
-be settled before code is written rather than during.
+`ReasoningMethodExecutionRecord` already declares its three evidence axes as
+**read-only v1 `ClassVar` constants** (`record.py:38-41`, `:191-193`), guarded by
+`guard_kwargs(...)` so no producer can set them and by an assertion that they never
+become instance fields (`record.py:244-247`). `usage_scope` joins them as a fourth:
+`RECORD_V1_USAGE_SCOPE = EvidenceUsageScope.GENERAL`, added to
+`EVIDENCE_AXIS_FIELD_NAMES`.
+
+This is **not** a silent default — it is an explicit schema constant, exactly as
+`source_basis = OBSERVED` already is, and an `OBSERVED` record is by construction
+never `SYNTHETIC`. Crucially it is **free of digest impact**: `payload()` iterates
+`dataclasses.fields()` (`contracts/_util.py:95-100`), and `ClassVar`s are not
+fields, so the record's canonical projection and `record_digest` do not move and
+`RECORD_SCHEMA_VERSION` stays `reasoning_method.execution_record.v1`.
+`engine.py:274` then forwards `r.usage_scope` explicitly, mirroring how it already
+forwards `r.source_basis`.
+
+### Q2 — successor for `COMPARISON_RESULT_SCHEMA_VERSION`; is v1 still readable?
+
+`readiness_comparison.result.v1` → **`readiness_comparison.result.v2`**. v1 is **not**
+retained: the package is `RESEARCH_ONLY` / `REQUESTER_ASSERTED`, approval-bearing for
+nothing, and no store replays a v1 result, so there is no reader to keep compatible.
+
+**One downstream coupling, and it is a signed one.**
+`packages/integration/reasoning-method-result-attestation` signs a projection
+containing `schema_version` and `result_digest`
+(`tests/test_deterministic_digest.py:50-75`). The *shape* of that projection does not
+change — it carries `result_digest` opaquely and never `evidence_status` — but both
+its `schema_version` string and its pinned digest values move. Its
+`reasoning_method.signed_comparison_result.v1` envelope version does **not** move: the
+envelope is unchanged; only the value it signs over is.
+
+### Q3 — is an unset scope omitted from or included in the projection? **Included, and this is not a choice.**
+
+`uvi-policy-contracts` canonicalizes with `dataclasses.asdict(obj)`
+(`contracts/_util.py:101-110`), which emits **every** field including `None`
+Optionals. So `"required_usage_scope": null` enters the projection of every
+`ComponentEvidenceRequirement`, and `ValuationPolicy.canonical_digest()` moves for
+every policy carrying at least one requirement — set or unset.
+
+Omitting it would require changing the shared `canonical_digest` helper, which would
+move digests for `GeographyPolicy`, `DomainPolicy`, `IntendedOutcomePolicy`,
+`ReadinessPolicy` and `AssessmentContext` as well. **The helper is not touched.**
+
+### Q4 — re-derive or grandfather policy artifacts? **Neither: nothing is pinned.**
+
+Every digest assertion in `uvi-policy-contracts` is *relative* — `a.canonical_digest()
+== b.canonical_digest()`, or a value captured within the same test
+(`test_policy_contracts.py:437`, `test_hardening_immutability_temporal.py:146,172,184`).
+`policy-authority` computes its content digests rather than pinning them
+(`verify_policy_authority_distribution.py:117`); a grep for 64-hex literals in its
+fixtures and verifier returns nothing. No stored artifact needs re-derivation and no
+grandfathering clause is required.
+
+### Q5 — `SystemManifest` component-binding shape
+
+Component bindings are tuples of frozen `(ref, digest)` pairs — **pure strings, no
+datetimes, no nested collections**.
+
+That is a hard constraint discovered in the target module, not a stylistic
+preference: `_canonical_payload` (`system_identity.py:181-196`) normalizes instants in
+a **single top-level pass** over `dataclasses.asdict`, and its own docstring says this
+is sound only because "every field of `AssessedSystemBinding` is a scalar". A datetime
+nested inside a component binding would silently escape UTC normalization and break
+digest stability. String-only pairs keep the existing helper correct as written.
+
+The manifest binds five families — models, prompts/configurations, tools/capability
+sets, workflows and policies. The ruling forbids a nominal manifest, so **at least one
+component binding must be present**, enforced at construction rather than documented.
+
+---
+
+## 5. Implementation status
+
+All four rulings are **implemented** in the commit carrying this record. See that
+commit message for the verification matrix. Nothing in §4 was left for later.

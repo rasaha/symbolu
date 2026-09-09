@@ -18,7 +18,12 @@ from datetime import datetime
 from enum import Enum
 from typing import ClassVar, Optional, Tuple
 
-from ugence_governance_contracts.api import AttestationStatus, SourceBasis, VerificationStatus
+from ugence_governance_contracts.api import (
+    AttestationStatus,
+    EvidenceUsageScope,
+    SourceBasis,
+    VerificationStatus,
+)
 
 from ..errors import ContractError, ContractErrorCode
 from ._util import (
@@ -38,8 +43,17 @@ RECORD_SCHEMA_VERSION = "reasoning_method.execution_record.v1"
 RECORD_V1_SOURCE_BASIS = SourceBasis.OBSERVED
 RECORD_V1_ATTESTATION_STATUS = AttestationStatus.UNATTESTED
 RECORD_V1_VERIFICATION_STATUS = VerificationStatus.UNVERIFIED
+#: A v1 record is OBSERVED, so its permitted use is GENERAL. Declared explicitly
+#: rather than left implicit: the §26.8 ruling forbids a silently-defaulted scope,
+#: and a downstream view cannot forward an axis its producer never states.
+RECORD_V1_USAGE_SCOPE = EvidenceUsageScope.GENERAL
 
-EVIDENCE_AXIS_FIELD_NAMES = ("source_basis", "attestation_status", "verification_status")
+EVIDENCE_AXIS_FIELD_NAMES = (
+    "source_basis",
+    "attestation_status",
+    "verification_status",
+    "usage_scope",
+)
 
 
 class ArtifactKind(str, Enum):
@@ -191,6 +205,7 @@ class ReasoningMethodExecutionRecord:
     source_basis: ClassVar[SourceBasis] = RECORD_V1_SOURCE_BASIS
     attestation_status: ClassVar[AttestationStatus] = RECORD_V1_ATTESTATION_STATUS
     verification_status: ClassVar[VerificationStatus] = RECORD_V1_VERIFICATION_STATUS
+    usage_scope: ClassVar[EvidenceUsageScope] = RECORD_V1_USAGE_SCOPE
 
     def __post_init__(self) -> None:
         require_nonblank(self.schema_version, "ReasoningMethodExecutionRecord.schema_version")
@@ -252,6 +267,7 @@ __all__ = [
     "RECORD_V1_SOURCE_BASIS",
     "RECORD_V1_ATTESTATION_STATUS",
     "RECORD_V1_VERIFICATION_STATUS",
+    "RECORD_V1_USAGE_SCOPE",
     "EVIDENCE_AXIS_FIELD_NAMES",
     "ArtifactKind",
     "ArtifactRef",

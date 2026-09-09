@@ -44,6 +44,7 @@ from .contracts import (
     AssertionGovernanceRequest,
     AssertionGovernanceResult,
     AssessedSystemBinding,
+    ComponentBinding,
     AssessmentWindow,
     AssuranceFindingContractError,
     AssuranceFindingLabel,
@@ -76,8 +77,10 @@ from .contracts import (
     PopulationSlice,
     Provider,
     SourceBasis,
+    SYSTEM_MANIFEST_COMPONENT_FAMILIES,
     SystemBindingAuthenticityStatus,
     SystemIdentityContractError,
+    SystemManifest,
     TransformationMethod,
     Validity,
     ValidityContractError,
@@ -112,6 +115,7 @@ __all__ = [
     "MetricClaim", "MetricObservation",
     # M-3R.3 neutral assessed-system identity (additive)
     "AssessedSystemBinding", "SystemBindingAuthenticityStatus",
+    "ComponentBinding", "SystemManifest", "SYSTEM_MANIFEST_COMPONENT_FAMILIES",
     "SystemIdentityContractError",
     # G7 neutral idempotency contract (additive)
     "IdempotencyScope", "IdempotencyKey", "IdempotencyDisposition",

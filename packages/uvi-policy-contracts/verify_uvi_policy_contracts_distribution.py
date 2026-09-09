@@ -48,7 +48,7 @@ import dataclasses, hashlib, importlib.util, sys
 from datetime import datetime, timezone
 
 import ugence_uvi_policy_contracts as u
-assert u.__version__ == "0.1.0", u.__version__
+assert u.__version__ == "0.2.0", u.__version__
 assert "site-packages" in u.__file__, u.__file__
 assert not any("/symbolu" in p for p in sys.path), sys.path
 

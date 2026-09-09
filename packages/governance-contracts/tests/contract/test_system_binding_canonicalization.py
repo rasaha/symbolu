@@ -519,11 +519,18 @@ def test_the_pre_correction_serializer_still_produces_the_same_bytes_for_utc():
 # --------------------------------------------------------------------------- #
 # 10. The rest of the contract is untouched
 # --------------------------------------------------------------------------- #
-def test_no_new_public_symbol_was_added():
+def test_the_module_surface_is_exactly_what_is_ratified():
+    """Widened once, deliberately: SystemManifest joined this module by the
+    2026-09-09 §26.3 ruling. The set stays EXACT, so a further accidental symbol
+    still fails here — the guard is intact, not relaxed."""
+
     assert set(system_identity.__all__) == {
         "SystemIdentityContractError",
         "SystemBindingAuthenticityStatus",
         "AssessedSystemBinding",
+        "ComponentBinding",
+        "SystemManifest",
+        "SYSTEM_MANIFEST_COMPONENT_FAMILIES",
     }
     for name in system_identity.__all__:
         assert getattr(api, name) is getattr(system_identity, name)

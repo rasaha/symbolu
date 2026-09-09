@@ -109,6 +109,9 @@ __all__ = [
     "SystemIdentityContractError",
     "SystemBindingAuthenticityStatus",
     "AssessedSystemBinding",
+    "ComponentBinding",
+    "SystemManifest",
+    "SYSTEM_MANIFEST_COMPONENT_FAMILIES",
 ]
 
 
@@ -407,6 +410,120 @@ class AssessedSystemBinding:
         produce different digests, and two bindings that are equal produce the
         same one. It is an identity fingerprint, not evidence, not a signature
         and not an authenticity proof.
+        """
+
+        return _canonical_digest(self)
+
+
+# --------------------------------------------------------------------------- #
+# SystemManifest (UVI ADR §26.3, ruled 2026-09-09)
+# --------------------------------------------------------------------------- #
+#: The component families a manifest binds. Closed: a family cannot be added at
+#: runtime, so two manifests can never disagree about what "the composition" means.
+SYSTEM_MANIFEST_COMPONENT_FAMILIES = (
+    "model_bindings",
+    "prompt_bindings",
+    "tool_bindings",
+    "workflow_bindings",
+    "policy_bindings",
+)
+
+
+@dataclass(frozen=True)
+class ComponentBinding:
+    """One assessed component, named opaquely and bound by digest.
+
+    ``ref`` identifies the external artifact; ``digest`` immutably binds the exact
+    artifact assessed. **Both are plain strings and nothing here resolves either.**
+    Resolution and semantic interpretation live outside this neutral contract, which
+    is what lets a workflow or policy be bound without importing the package that
+    owns it — the same discipline ``MetricClaim.policy_refs`` already uses.
+
+    Two strings, deliberately: no datetime, no nested collection, no typed
+    reference. :func:`_canonical_payload` normalizes instants in a single pass over
+    the top-level payload, so an instant nested inside a component would escape UTC
+    normalization and quietly destabilize the manifest digest. Keeping components
+    string-only keeps that helper correct as written.
+    """
+
+    ref: str
+    digest: str
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "ref", _require_nonempty(self.ref, "ComponentBinding.ref").strip())
+        _validate_digest(self.digest, "ComponentBinding.digest", required=True)
+        object.__setattr__(self, "digest", self.digest.strip().lower())
+
+
+@dataclass(frozen=True)
+class SystemManifest:
+    """The composition of the system one assessment is about.
+
+    :class:`AssessedSystemBinding` names *which* system and configuration was
+    assessed; this names *what that configuration was made of* — the models,
+    prompts, tools, workflows and policies underneath it. The binding references a
+    manifest by the opaque ``system_manifest_ref`` + ``system_manifest_digest``
+    pair and **gains no typed field pointing here**: the neutral leaf must not
+    acquire an internal coupling the opaque-token discipline exists to prevent, and
+    the binding's canonical projection is unchanged by this type's existence.
+
+    **A nominal manifest is not permitted.** At least one component binding must be
+    present, enforced at construction — a manifest that binds nothing describes
+    nothing, and would let an assessment claim a composition it never recorded.
+
+    What it proves is **internal consistency and digest-bound composition**: two
+    different compositions cannot share a :meth:`canonical_digest`. What it does not
+    prove is that any named component was ever really deployed, that a digest was
+    computed over the real artifact, or that any authority attested any of it. Like
+    the binding beside it, this is structural identity, never evidence.
+    """
+
+    manifest_id: str
+    tenant_id: str
+    system_id: str
+    system_version: str
+    model_bindings: tuple = ()
+    prompt_bindings: tuple = ()
+    tool_bindings: tuple = ()
+    workflow_bindings: tuple = ()
+    policy_bindings: tuple = ()
+
+    def __post_init__(self) -> None:
+        for name in ("manifest_id", "tenant_id", "system_id", "system_version"):
+            value = _require_nonempty(getattr(self, name), f"SystemManifest.{name}")
+            object.__setattr__(self, name, value.strip())
+
+        total = 0
+        for family in SYSTEM_MANIFEST_COMPONENT_FAMILIES:
+            value = getattr(self, family)
+            if not isinstance(value, tuple):
+                raise SystemIdentityContractError(
+                    f"SystemManifest.{family} must be a tuple of ComponentBinding"
+                )
+            for item in value:
+                if not isinstance(item, ComponentBinding):
+                    raise SystemIdentityContractError(
+                        f"SystemManifest.{family} entries must be ComponentBinding"
+                    )
+            total += len(value)
+
+        if total == 0:
+            raise SystemIdentityContractError(
+                "SystemManifest must bind at least one component: a manifest that binds "
+                "nothing describes no composition (UVI ADR §26.3, ruled 2026-09-09)"
+            )
+
+    def canonical_bytes(self) -> bytes:
+        """The exact bytes :meth:`canonical_digest` is computed over."""
+
+        return _canonical_bytes(self)
+
+    def canonical_digest(self) -> str:
+        """A stable fingerprint of the whole composition.
+
+        Every field participates, so a changed model version, prompt digest, tool
+        set, workflow or policy binding yields a different manifest. It is an
+        identity fingerprint, not evidence and not an authenticity proof.
         """
 
         return _canonical_digest(self)

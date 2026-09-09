@@ -1,5 +1,38 @@
 # Changelog — ugence-uvi-policy-contracts
 
+## [0.2.0] — D-9 pairing on `ComponentEvidenceRequirement` (§26.8 ruling)
+
+**Additive.** One optional field; no existing field, default, enum value or
+signature moved, and every existing construction still type-checks.
+
+### Added — `required_usage_scope`
+`ComponentEvidenceRequirement` gains `required_usage_scope: Optional[EvidenceUsageScope]`,
+reusing the neutral GV-2E-a axis rather than minting a scope type here.
+
+### Changed — a synthetic requirement must say it is evaluation-scoped
+Per the owner ruling of 2026-09-09 closing UVI ADR §26.8 (recorded as an amendment
+to D-9), a requirement may name `SourceBasis.SYNTHETIC` **only** when it also
+requires `EvidenceUsageScope.EVALUATION_ONLY`. An unpaired synthetic requirement is
+refused **at construction**, not by a later validation pass a caller could skip, and
+the scope is never inferred from package location, caller identity or downstream
+behaviour.
+
+**Nothing existing breaks.** No `SYNTHETIC` requirement existed anywhere in the
+repository — the only construction outside `src/` used `OBSERVED` — so the refusal
+has no incumbent caller to invalidate.
+
+### Digest impact, stated plainly
+`canonical_digest` serializes with `dataclasses.asdict`, which emits `None`
+Optionals, so `"required_usage_scope": null` now appears in the projection of every
+`ComponentEvidenceRequirement`. **`ValuationPolicy.canonical_digest()` therefore
+moves for any policy carrying at least one component requirement**, whether or not
+the new field is set. Omitting unset Optionals instead would have meant changing the
+shared `canonical_digest` helper, moving digests for `GeographyPolicy`,
+`DomainPolicy`, `IntendedOutcomePolicy`, `ReadinessPolicy` and `AssessmentContext`
+as well; the helper is deliberately untouched. No stored artifact needs re-deriving:
+every digest assertion in this package and in `policy-authority` is relative or
+computed, never a pinned constant.
+
 ## [0.1.0] — GV-2C-a: UVI policy & assessment-context contract shapes
 
 ### Pre-merge hardening (independent-audit corrections; still 0.1.0, unreleased)

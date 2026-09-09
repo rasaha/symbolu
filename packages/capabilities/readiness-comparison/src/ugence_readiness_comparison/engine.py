@@ -274,6 +274,11 @@ class _Context:
             self.views[r.record_digest] = EvidenceStatusView(
                 record_digest=r.record_digest,
                 source_basis=r.source_basis,
+                # Forwarded explicitly from the record's own v1 axis constant, the
+                # same way source_basis above is. Never defaulted here: the record
+                # states its permitted use, and this projection carries what the
+                # record says rather than assuming what it probably meant.
+                usage_scope=r.usage_scope,
                 attestation_status=AttestationStatus.ATTESTED if a_fields else AttestationStatus.UNATTESTED,
                 verification_status=VerificationStatus.VERIFIED if v_fields else VerificationStatus.UNVERIFIED,
                 attested_fields=a_fields,

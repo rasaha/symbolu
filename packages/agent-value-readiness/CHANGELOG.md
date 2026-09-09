@@ -156,6 +156,11 @@ imports no UVI, readiness, authority or risk package, so no cycle is possible.
   `system_manifest_digest` as a **co-required opaque pair** — the
   reference/digest discipline ADR §16 names — and **neither package** defines a
   manifest type.
+  *(Historical. §26.3 was ruled 2026-09-09: `SystemManifest` is owned by
+  `ugence-governance-contracts`, beside `AssessedSystemBinding`, with opaque
+  ref+digest workflow/policy bindings. This package still mints none and still
+  references one only through the opaque token, so the shape recorded here is
+  unchanged — only the reason for it is.)*
 - **PR #1432's RA-owned subject binding remains additive and is not forked.** It
   is draft-only and unmerged (ADR D-14, §26.2), so it is represented **only**
   through the opaque `canonical_subject_context_ref` token. When that contract is
