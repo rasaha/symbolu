@@ -1,6 +1,6 @@
 # Client demo — the three governance surfaces
 
-Twelve minutes across three URLs. The claim being demonstrated is narrow and should stay
+Thirteen minutes across three URLs. The claim being demonstrated is narrow and should stay
 narrow: **this deployment decides, records and refuses; it does not execute.** Everything
 below is reachable on the live deployment today; nothing needs seeding.
 
@@ -18,7 +18,7 @@ closes well and opens badly.
 | | Surface | Minutes | What it actually proves |
 |---|---|---|---|
 | 1 | Console | 5 | The loop runs, and two independent gates each refuse alone |
-| 2 | Studio | 3 | Planning refuses too: no feasible team is an answer |
+| 2 | Studio | 4 | Planning refuses too — and the client's own workflow can go in |
 | 3 | Authority Plane | 4 | The read-only boundary, and identity stated honestly |
 
 Open only the three client-facing URLs. Do not open Railway, and never show or name the
@@ -51,7 +51,7 @@ Expect a `CONSOLE_ROUTE_WITHHELD` panel on the Governed Loop screen. Do not apol
 it — it names two routes the packaged service deliberately does not serve (CP-3), and the
 console shows a typed gap rather than an empty list.
 
-## 2 — Governance Studio (3 min)
+## 2 — Governance Studio (4 min)
 
 Four scenarios load. Open **Cybersecurity Incident Response (No Feasible Team)** and let
 the expected state do the work: `NO_FEASIBLE_TEAM`, because only one approved provider
@@ -64,6 +64,32 @@ Then open the recommended demo, **Procurement Sourcing Workforce**, to show a cl
 
 Leave the synthetic-data banner visible and read it aloud once. If asked what the product
 does: it plans and records, and declares that it does not execute or grant.
+
+### Close the Studio segment with their workflow
+
+**Bring Your Workflow**, top right of the header, route `/bring-your-workflow`. This is the
+strongest answer to "but our workflows aren't your four scenarios", and it is live today —
+no configuration, no seeding `[V]`.
+
+If the client brings a `workflow_ir` JSON document, paste it or pick the file. If they
+bring nothing, press **Load the guided example** — the procurement compiled workflow,
+bundled with the screen.
+
+Then walk one line of the *what the document declares* table, because it is doing the
+work: declared version, node and edge counts, node kinds, declared dispositions, human
+review and human authority requirements, referenced capabilities. Press **Validate**, then
+**Adapt**, and if it is a technical audience **Compare adaptations** to show the same
+workflow under `workflow_ir.v1` and `.v2`.
+
+> "This reads a workflow you already have and tells you what it declares, whether it
+> validates, and what governance it would need. It does not execute it, publish it or
+> store it — the screen says so, and there is no server write behind it to do otherwise."
+
+**Two things to be straight about, unprompted.** The document must already be Ugence
+Workflow IR: there is no importer from LangChain, Langflow, CrewAI or similar, and
+`/version` reports `langflow_import_implemented: false` `[V]`. And a submitted workflow does
+not become a fifth scenario card — the catalog is four fixed ids `[V]`. Getting a client's
+workflow into that form is scoping work, not a button.
 
 ## 3 — Authority Plane (4 min)
 
@@ -104,8 +130,9 @@ one only if refusal typing is the topic, and say plainly that it is empty:
 ## Close, and the boundary to state
 
 > "You have seen a governance boundary running in shadow mode: a loop that refuses on two
-> independent grounds, a planner that declines to staff an infeasible team, and an
-> administrative surface that cannot write. What it does not yet have is your identity
+> independent grounds, a planner that declines to staff an infeasible team, a screen that
+> reads a workflow you already have without running it, and an administrative surface that
+> cannot write. What it does not yet have is your identity
 > provider. Until that is validated end to end, no write or execution capability is served
 > — and that is a property of the build, not a setting."
 
@@ -119,6 +146,7 @@ one only if refusal typing is the topic, and say plainly that it is empty:
 | Is the audit trail durable? | No. In-memory, lost on restart. The shape is real; the durability is not. |
 | Is identity verified? | No. Presented and unproven. That is why it says so on every read. |
 | What would a pilot need? | The enterprise issuer validated end to end, then real authority records loaded. Writes come after that, not before. |
+| Can it take our workflows? | Yes, on Bring Your Workflow — once expressed as Ugence Workflow IR. There is no converter from agent-framework code, and that conversion is scoping work. |
 
 ## Do not claim
 
