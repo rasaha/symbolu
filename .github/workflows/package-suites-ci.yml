@@ -13,6 +13,11 @@ name: package-suites-ci
 # named by no workflow at all, so the next package cannot drift the same way.
 # tests/boundaries/test_package_ci_coverage.py asserts the same in the local suite.
 #
+# scripts/check_package_license.py is the second gate, on the same pattern and for the
+# same reason: thirty-two of seventy-two packages shipped with no LICENSE while all
+# seventy-two declared one in pyproject.toml. Its local twin is
+# tests/boundaries/test_package_license.py.
+#
 # Each package runs from its own directory, because several rely on their own
 # conftest.py to put src/ and their first-party dependencies on sys.path and cannot
 # be collected from the repository root.
@@ -33,7 +38,9 @@ on:
     paths:
       - "packages/**"
       - "scripts/check_package_ci_coverage.py"
+      - "scripts/check_package_license.py"
       - "tests/boundaries/test_package_ci_coverage.py"
+      - "tests/boundaries/test_package_license.py"
       - ".github/workflows/package-suites-ci.yml"
   push:
     branches:
@@ -42,7 +49,9 @@ on:
     paths:
       - "packages/**"
       - "scripts/check_package_ci_coverage.py"
+      - "scripts/check_package_license.py"
       - "tests/boundaries/test_package_ci_coverage.py"
+      - "tests/boundaries/test_package_license.py"
       - ".github/workflows/package-suites-ci.yml"
 
 defaults:
@@ -60,6 +69,24 @@ jobs:
           python-version: "3.11"
       - name: No package may ship a suite nothing runs
         run: python scripts/check_package_ci_coverage.py
+
+  license-gate:
+    name: Every package ships a LICENSE its metadata agrees with
+    runs-on: ubuntu-latest
+    # Thirty-two of seventy-two packages had no LICENSE while all seventy-two
+    # declared one in pyproject.toml, so the file's presence recorded nothing. The
+    # thirty-two were normalized before this gate landed — a gate introduced midway
+    # through a migration fails on work nobody has done yet, and teaches everyone to
+    # ignore it. It checks agreement, not byte-equality: five distinct proprietary
+    # texts exist, all naming the same license, and a package may say more about it
+    # than the bare word so long as it does not say something else.
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: No package may ship without a LICENSE, or with one it contradicts
+        run: python scripts/check_package_license.py
 
   package-suite:
     name: ${{ matrix.package }} (py${{ matrix.python-version }})

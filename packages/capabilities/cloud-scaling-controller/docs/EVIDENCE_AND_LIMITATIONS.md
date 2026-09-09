@@ -92,11 +92,14 @@ evaluation, an ActionGate decision, or an execution instruction. Risk Authority 
 ActionGate/provider execution (Phase 5), and effect verification/learning (Phase 6) are out
 of scope for this package.
 
-**Owner-ratification status.** The Phase-3 ADR
-(`docs/architecture/ADR_CLOUD_SCALING_DEPENDENCY_COST_AWARE_RECOMMENDATION_PHASE3.md`)
-carries no recorded owner ratification, unlike the Phase 1 and Phase 2 ADRs (both
-`ACCEPTED`). The code merged in PR #1652. This row records the discrepancy; it does not
-resolve it.
+**Owner-ratification status.** `ACCEPTED`, ratified retrospectively on 2026-09-09 —
+the code merged in PR #1652 (`5d602fdb`) and shipped at v0.4.0 before any owner decision
+was recorded. Ratification followed a claim-by-claim verification of the implementation
+against the Phase-3 boundary and changed no code; the verification table, test and CI
+evidence, and the exclusions that remain unratified are in
+`docs/architecture/ADR_CLOUD_SCALING_DEPENDENCY_COST_AWARE_RECOMMENDATION_PHASE3_RATIFICATION.md`.
+Ratifying the boundary ratified nothing about quality: the four maturity labels above are
+unchanged by it.
 
 ## Predictive Capacity Intelligence (Phase 2) — evidence & maturity
 
