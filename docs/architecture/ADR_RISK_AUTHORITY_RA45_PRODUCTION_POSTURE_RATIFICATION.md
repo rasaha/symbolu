@@ -1,6 +1,6 @@
 # ADR — Risk Authority RA-4.5: Production Posture and Attested Composition Inputs
 
-**Status:** Accepted (rulings recorded; implementation gated on the schema decisions in §6)
+**Status:** Accepted — §2–§5 ratified, §6 schema decisions ratified in §8 (Amendment 1)
 **Date:** 2026-09-09
 **Owners:** Ugence platform architecture
 **Related:**
@@ -178,6 +178,65 @@ explicit is a breaking change to two packages at 0.1.0. Decide the deprecation s
 (warning vs. typed refusal) and the version boundary for removal.
 
 ---
+
+## 8. Amendment 1 — the §6 decisions, ratified
+
+§6's five decisions are ruled as follows. The chain they produce:
+
+```
+verified envelope → ActionAuthorization binding → internal verified result → RA-4.5 composition
+```
+
+No caller-created verdict, posture flag or Python object becomes authority.
+
+**D-A — runtime derivation (option (a)).** `risk-authority-runtime` owns verification and
+derivation. It verifies the signed `RiskAuthorizationEnvelope`, binds it to the returned
+`ActionAuthorization`, and derives the composition input internally.
+`GovernanceInputSource` may supply canonical action/proposal context and the envelope or a
+resolvable reference to it, but **may no longer supply an authoritative RA verdict**.
+`agent-runtime-governance` stays a transport/pass-through consumer and acquires no
+authority logic.
+
+The binding must verify: `ActionAuthorization.envelope_id` matches the verified envelope;
+`action_digest` matches the canonical action; `decision` matches the effective authorized
+verdict; tenant and scope agree; temporal validity holds under the injected trusted clock;
+and signature, issuer, key, revocation and policy bindings are valid.
+
+**D-B — distinct verified-flow type.** `RiskAuthorityMachineResult` is left unchanged for
+reference, test and non-authoritative composition use. A distinct exact type is introduced
+for the verified production path, produced only inside the runtime after the D-A checks.
+It is **not exposed through `GovernanceInputSource`**. Its constructor and exact-type
+identity are **not** cryptographic proof — the verified envelope and the binding checks
+establish trust; the type exists to prevent accidental mixing of verified and reference
+flows. Production composition must not accept a raw `RiskAuthorityMachineResult`.
+
+**D-C — envelope digest at the binding site.** Computed from the exact canonical
+`signing_payload()` bytes using the repository's established algorithm and identifier
+(`crypto.hashing.sha256_hex`, `sha256:<hex>`). No second signature format; no digest logic
+moved into the stdlib-only RA leaf. `envelope_id` is **not** content-addressed to that
+payload — it is a caller-supplied parameter of `EnvelopeIssuer.issue` — so the computed
+digest is retained in the internal verified binding. No new public envelope field is added
+absent a separately demonstrated consumer need.
+
+**D-D — authority-bound applicability.** Policy Authority owns the authoritative rule
+declaring whether an action class is subject to Risk Authority. Policy Workflow Compiler
+may compile that issued rule into deterministic applicability metadata; it grants no
+exemptions and makes no runtime authorization decisions. The runtime resolves and enforces
+the issued rule. **Absence, lookup failure, ambiguity or caller omission defaults to
+authority required and fails closed.** `resolve(...) → None` may pass through only when an
+authenticated, applicable policy explicitly declares the action outside Risk Authority
+scope. Deployment configuration alone cannot create that exemption.
+
+**D-E — implicit reference fallback removed at 0.2.0.** Both public classes are retained,
+but zero-argument implicit `ReferenceActionGate` construction is eliminated in the next
+0.2.0 release, replaced by a stable typed refusal. An explicitly named reference/test
+factory and a separate fail-closed production factory are provided. A warning-only
+transition is rejected: it would preserve the unsafe ambiguity. The pre-1.0 breaking change
+is documented, all in-repository tests and consumers are migrated, and reference-produced
+results are proven unable to enter the verified production composition path.
+
+`RiskAuthorizationEnvelope` remains the sole signed machine-authority artifact.
+`ActionAuthorization` is its action-specific binding, **not** a second authority artifact.
 
 ## 7. Invariants this ADR does not touch
 

@@ -99,7 +99,7 @@ envelope = app.issue_envelope(TENANT, "c", IssueEnvelopeRequest(
 store = ReferenceAuthorityStore(); store.seed_tenant(TENANT)
 writer = AuthorityLifecycleService(store, ReferenceWriterAuthorizer(), clock=lambda: NOW)
 cache = AuthorityStatusCache(store, clock=lambda: NOW); cache.sync()
-gate = StatusAwareActionGate(cache, policy=StalenessPolicy.fail_closed_defaults())
+gate = StatusAwareActionGate.reference(cache, policy=StalenessPolicy.fail_closed_defaults())
 admin = WriterPrincipal(principal_id="adm", tenant_id=TENANT,
                         capabilities=frozenset({LIFECYCLE_WRITE_CAPABILITY}))
 
@@ -127,14 +127,14 @@ writer2 = AuthorityLifecycleService(store2, ReferenceWriterAuthorizer(), clock=l
 cache2 = AuthorityStatusCache(store2, clock=lambda: NOW); cache2.sync()
 writer2.advance_epoch(principal=admin, tenant_id=TENANT, change_id="c1", reason="r", correlation_id="x")
 cache2.sync()
-gate2 = StatusAwareActionGate(cache2, policy=StalenessPolicy.fail_closed_defaults())
+gate2 = StatusAwareActionGate.reference(cache2, policy=StalenessPolicy.fail_closed_defaults())
 r2 = gate2.authorize(authorization_id="a", envelope=envelope, action=act(), identity=ident(),
                      key_ring=key_ring, tier=RiskClass.LOW, now=NOW)
 assert r2.decision is ActionGateDecision.DENIED
 
 # uninitialized cache -> DENY (all tiers)
 cache3 = AuthorityStatusCache(ReferenceAuthorityStore(), clock=lambda: NOW)  # never synced
-gate3 = StatusAwareActionGate(cache3, policy=StalenessPolicy.fail_closed_defaults())
+gate3 = StatusAwareActionGate.reference(cache3, policy=StalenessPolicy.fail_closed_defaults())
 r3 = gate3.authorize(authorization_id="a", envelope=envelope, action=act(), identity=ident(),
                      key_ring=key_ring, tier=RiskClass.LOW, now=NOW)
 assert r3.decision is ActionGateDecision.DENIED and any("uninitialized" in c for c in r3.reason_codes)

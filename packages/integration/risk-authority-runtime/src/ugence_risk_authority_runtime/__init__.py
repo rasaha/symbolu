@@ -53,13 +53,18 @@ from .decision_authority_adapter import (
     DecisionAuthorityGovernanceAdapter,
     DecisionAuthorityUnavailable,
 )
-from .composition import RiskAuthorityCompositionEngine
+from .composition import RiskAuthorityCompositionEngine, ProductionCompositionError
 from .restrictions import apply_restrictions
 from .effective_scope import (
     effective_scope_authorizes,
     effective_scope_violations,
 )
-from .risk_authority_enforcer import RiskAuthorityEnforcer
+from .risk_authority_enforcer import RiskAuthorityEnforcer, EnforcerConfigurationError
+from .verified import (
+    BindingViolation,
+    VerifiedRiskAuthorityResult,
+    verify_and_bind,
+)
 
 __all__ = [
     "__version__",
@@ -79,6 +84,11 @@ __all__ = [
     "ActionGatePolicyAdapter",
     # Enforcement + composition
     "RiskAuthorityEnforcer",
+    "EnforcerConfigurationError",
+    "ProductionCompositionError",
+    "VerifiedRiskAuthorityResult",
+    "BindingViolation",
+    "verify_and_bind",
     "RiskAuthorityCompositionEngine",
     "apply_restrictions",
     "effective_scope_violations",

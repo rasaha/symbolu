@@ -203,7 +203,9 @@ class RA6Harness:
         return RuntimeIdentity(**base)
 
     def gate(self, *, policy: Optional[StalenessPolicy] = None) -> StatusAwareActionGate:
-        return StatusAwareActionGate(
+        # Explicit reference construction (ADR §8/D-E): the implicit ReferenceActionGate
+        # default was removed at 0.2.0, so conformance use now says so by name.
+        return StatusAwareActionGate.reference(
             self.cache, policy=policy or StalenessPolicy.fail_closed_defaults()
         )
 
