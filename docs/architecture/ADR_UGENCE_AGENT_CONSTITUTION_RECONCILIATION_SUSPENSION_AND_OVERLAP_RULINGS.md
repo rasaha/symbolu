@@ -25,7 +25,7 @@ tree, all scoped gates green at ruling time `[V]`.
 
 **Numbering.** `[R]` Four ADR-scoped registers on the standing precedent:
 **`ACC-DR`**, **`ACC-SUSP-IA-1`** – **`ACC-SUSP-IA-6`**, **`ACC-OVL-1`** –
-**`ACC-OVL-5`**, and **`ACC-PWP-1`**. No `OD`, `ACC-S1`, `ACC-AM`, `ACC-FC`,
+**`ACC-OVL-6`**, and **`ACC-PWP-1`**. No `OD`, `ACC-S1`, `ACC-AM`, `ACC-FC`,
 `ACC-FC5R`, `ACC-IA`, `ACC-PR`, `ACC-LC`, `ACC-SU`, `ACC-SUSP` or `CV2` number is
 assigned, moved or reopened.
 
@@ -126,7 +126,9 @@ member(s) **and** the consumer outcome members required by
 surface is bounded. Enumerated from the repository at the baseline commit:
 
 **Producer — `ugence_policy_authority.core.statuses.PolicyResolutionReason`**
-(currently 20 members). Two members are added, on the exact
+(`[V]` 22 members at the baseline; the consumer mapping carries the 21
+non-`RESOLVED` ones, against 47 `PolicyAuthenticityOutcome` members). Two
+members are added, on the exact
 revocation/supersession precedent — a member for the applied state, and a member
 for a record that exists but does not verify:
 
@@ -237,6 +239,45 @@ member, so `ACC-SU-4`'s standing obligation — the same one `ACC-SUSP-4` impose
 `cloud-scaling-policy-authenticity` counterparts must be enumerated before the
 overlap surface is bounded.
 
+### `ACC-OVL-6` — the enumeration attempted, and the two blockers it found `[G]`
+
+Discharging `ACC-OVL-5` before writing anything surfaced two obstacles that are
+**owner questions, not implementation details**. Recorded here rather than
+resolved, and no overlap enforcement is implemented under this ADR.
+
+**Blocker 1 — the authority cannot see a governed role, by design.** `[V]` The
+adapter seam exists precisely so that *"the generic core knows nothing about any
+policy family: it never imports a family type, never branches on one"*
+(`core/adapters.py` module docstring), and the core reads **only**
+`PolicyArtifactDescriptor` fields — which carry no governed-role or exclusivity
+concept. `governed_role_refs` lives inside the constitution artifact, where the
+authority is structurally forbidden to look. So `ACC-OVL-2`'s "Policy Authority
+owns enforcement" cannot be implemented by teaching the authority about
+constitutions. It requires a **new family-neutral seam**: the adapter declares
+opaque exclusivity claims on the descriptor, and the core enforces uniqueness
+over `(tenant, scope, claim)` among simultaneously effective versions. `[R]`
+That is a **public API change to Policy Authority affecting every family**, plus
+its `public_api.json` enum-and-shape snapshot and an additive minor version —
+materially larger than the constitution-local change the ruling's wording
+implies, and not obviously inside what was authorized.
+
+**Blocker 2 — the delegation carve-out names something that does not exist.**
+`[V]` `ACC-OVL-1` permits an overlap where *"an explicitly ratified supersession
+or delegation relationship permits it"*. Supersession exists and is implemented.
+**Delegation does not exist anywhere**: the substring appears in no source file
+of Policy Authority, of the three constitution distributions, or of
+`governance-contracts`. There is no delegation contract, no record type, no
+ratification. `[R]` Implementing the invariant **without** the carve-out would
+enforce something **stricter** than was ruled; implementing the carve-out would
+mean inventing a governance relationship, which is a ratification act and not
+available to an implementer.
+
+`[R]` **Consequence:** `ACC-OVL-1` – `ACC-OVL-4` stand as ratified, and
+`ACC-OVL-4`'s sequencing constraint — no second constitution before the
+invariant is implemented and verified — **binds now**, whether or not the
+implementation has landed. It is the constraint, not the code, that keeps the
+gap harmless in the meantime, exactly as it has been.
+
 ---
 
 ## 4. `ACC-PWP-1` — `AGENT_CONSTITUTION_PENDING_WORK_PRIORITY.md`: **retired**
@@ -287,8 +328,24 @@ offered as recommendations only and are **not** ruled here:
 3. **Reinstate with no prior suspend** — refuse at append time; nothing is
    paused, so nothing can be unpaused.
 
-`[G]` **`ACC-OVL` is authorized but unimplemented** at the close of this record;
-its `ACC-OVL-5` enumeration is the next step for that round.
+`[G]` **`ACC-OVL` is ratified but unimplemented**, blocked on two owner
+questions recorded at `ACC-OVL-6` and put here:
+
+**And the two `ACC-OVL-6` questions:**
+
+4. **The exclusivity seam.** Enforcement in a family-agnostic authority means a
+   new generic descriptor/adapter surface affecting every policy family, its
+   `public_api.json` snapshot and an additive minor version. Is that in scope,
+   or should enforcement instead sit in the constitution family's own adapter
+   and in conformance, with the authority enforcing nothing new?
+5. **Delegation.** The carve-out names a relationship that does not exist in
+   this repository. Should the invariant ship with the supersession carve-out
+   only — strictly narrower than ruled, and stated as such — or does delegation
+   need its own round first?
+
+`[R]` Until these are answered, `ACC-OVL-4` alone holds the line, and it holds
+it adequately: no second constitution may issue, and none can, since no
+constitution has been issued at all.
 
 `[G]` **The residual documentation item** carried from the retired ledger:
 `packages/capabilities/agentic-proposer/README.md` describes the surface only
@@ -343,4 +400,6 @@ Agentic Proposer at `0.6.0`; `agent-constitution-policy` at `0.2.0`;
 `agentic-proposer-strategy-permission-runtime` at `0.1.0`.
 
 **Next step:** rule the three `ACC-SUSP-IA-6` ordering cases, which unblocks the
-suspension change set; the `ACC-OVL-5` enumeration may proceed in parallel.
+suspension change set, and the two `ACC-OVL-6` questions, which unblock the
+overlap round. Both are put in §5. Nothing else in either round is waiting on
+anything but these.
