@@ -493,6 +493,41 @@ therefore still auditable as *having happened, with this identity and this outco
 gone is what was said. A row that simply vanished would make the exchange's own history
 unverifiable.
 
+**What a purged `OUTCOME_UNKNOWN` needs in order to stay reconcilable.** D-5 counts such a
+request as consumed "until an independently authorized reconciliation proves otherwise"
+`[V]`, so the tombstone has to leave that reconciliation possible. Reconciling means asking a
+vendor whether a call was billed, which needs the vendor, the model, the approximate dispatch
+time, and any provider-side identifier — **none of which a digest yields**, since a digest
+binds those values without revealing them. Two existing records already hold them, and the
+requirement is that the tombstone keep the path to both rather than carry the data itself:
+
+| Where the answer lives | What it holds |
+|---|---|
+| The **audit ledger**, permanently | `provenance` — which adapter, which model, when, and whether the call was genuine or a fake (§4.2) — and `metering`. This is the durable holder of the vendor and the timing; it is append-only, so it survives every purge `[V]` |
+| The **authorization**, through `clearance_ref` | Under D-5 the authorization binds tenant, selected vendor, selected model, policy identity and reservation identity (§4.1) — which is what releases a reservation if reconciliation shows no call was billed |
+
+So the tombstone must retain `correlation_id` and `clearance_ref` alongside the identity and
+digests it already carries — the two references that reach those records. This is a statement
+of what must survive, not a schema: it names existing fields and adds none.
+
+**`[G]` — one link in that chain is not established.** An `OUTCOME_UNKNOWN` is precisely the
+case where no provider answered, so it is unclear whether a `provenance` record naming the
+vendor and the attempt time is written at all; §4.2 describes provenance as reporting a call
+that happened. If it is not written for an ambiguous dispatch, then after purge **nothing
+durable names the vendor**, the reconciliation D-5 relies on cannot be performed, and a
+reservation is held indefinitely on a call that may never have occurred. Whether provenance is
+written on `OUTCOME_UNKNOWN` — and what it may claim, given §5.4's rule that a provenance
+record must never be mistakable for evidence of a provider having answered — is unresolved
+here and is not settled by the retention durations.
+
+**The grace period and the maximum retention duration remain unset `[R]`**, and engineering
+may not choose them. Until they are set, no content may be held. Two considerations bear on
+the choice without deciding it: the grace period runs from the worker's durable consumption
+acknowledgement, so it protects against a worker that consumed a result and then failed before
+acting on it — its floor is however long recovering such a worker takes. And an
+`OUTCOME_UNKNOWN` request may warrant a different horizon from an answered one, because the
+reconciliation D-5 permits has not happened yet and the gap above may mean it cannot.
+
 **No encryption is commissioned.** There is no encryption capability in the repository to
 begin with: `cryptography` and `nacl` appear only in `trusted-evidence-authority`, for Ed25519
 signature verification `[V]`. An application-level encrypted object would also buy little
@@ -510,7 +545,7 @@ reading of this document licenses a first exception:
 |---|---|
 | Exchange tenancy | **Ruled** 2026-09-10 (`OWNER_RATIFICATION_MEU_EXCHANGE_TENANCY.md` §4): every row carries a non-empty tenant, no wildcard or implicit tenant, credentials bound to the configured tenant. `[G]` Unimplemented, and tenant-bound database identities do not exist |
 | Least-privilege database grants | **Ruled** 2026-09-10: three logical roles, RLS enabled and forced, no runtime identity owning the tables. `[G]` No `CREATE ROLE`, `GRANT` or RLS statement exists anywhere in the repository, and provisioning is itself an unimplemented prerequisite — a runbook step is refused as a substitute |
-| Retention and deletion policy | `[R]` The grace period and maximum retention duration are **owner decisions engineering may not make**, and neither is set. Until they are, nothing may hold content at all |
+| Retention and deletion policy | `[R]` The grace period and maximum retention duration are **owner decisions engineering may not make**, and neither is set. Until they are, nothing may hold content at all. A purged `OUTCOME_UNKNOWN` additionally depends on the provenance gap below |
 | Transport protection | `[G]` No `sslmode` is set on either database DSN anywhere in the repository or the runbook `[V]`, and the worker's own listener runs `test` mode over plain HTTP inside the private network because RW-3's certificate authority does not exist `[V]`. The exchange would inherit both conditions |
 | Production credential custody | `[G]` None exists; D-3 keeps it out of this deployment and rejects `PLATFORM_ENVIRONMENT_VARIABLE` as a production mechanism `[V]` |
 
@@ -688,7 +723,8 @@ they left behind is work, and one decision engineering may not make.
 | **Role provisioning** `[G]` | §5.2. Three logical roles with the ruled grants. No mechanism exists, and an unenforced runbook step is refused as a substitute `[V]` |
 | **Controlled migrations** `[G]` | §5.2. A separately controlled migration identity assuming the non-login owner role during reviewed migrations only, never at startup. No migration mechanism exists |
 | **Tenant-bound database identities** `[G]` | §5.2. Required before multi-tenancy, absent a separate ruling accepting the MEU as a trusted cross-tenant processor. Nothing binds a database identity to a tenant today |
-| **Grace period and maximum retention** `[R]` | §4.4's purge horizon. An owner decision explicitly withheld from engineering; until it is set, nothing may hold content |
+| **Grace period and maximum retention** `[R]` | §4.4's purge horizon. An owner decision explicitly withheld from engineering; until it is set, nothing may hold content. §4.4 records the two considerations that bear on it, including whether `OUTCOME_UNKNOWN` warrants a longer horizon |
+| **Provenance on `OUTCOME_UNKNOWN`** `[G]` | §4.4. If no `provenance` record is written when no provider answered, then after purge nothing durable names the vendor, D-5's reconciliation cannot be performed, and a reservation is held indefinitely on a call that may never have occurred |
 | **Transport protection** `[G]` | §4.4. No `sslmode` on either DSN `[V]`; the worker's listener is plain HTTP in `test` mode because RW-3's CA does not exist `[V]` |
 | **Credential custody** `[G]` | §4.4, §5.2. None exists — for the provider credential D-3 keeps out, nor for the runtime and migration identities the tenancy ruling requires `[V]` |
 | **The MEU ledger-kind schema** `[G]` | §4.4's ledger rule has no enforcement: `LedgerEntry.payload` accepts any canonical dict (`entry.py:52-61`). Unbuilt, and not built here |
