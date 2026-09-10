@@ -1,8 +1,9 @@
 # Owner ratification — a live model-calling provider
 
-**Status:** ballot, not a decision. Nothing here is implemented, scheduled or authorized.
-No gate identifier is marked satisfied and no ratified pin, gate record or evidence
-manifest is modified by this document.
+**Status:** D-1 and D-2 **RATIFIED 2026-09-10**; D-3, D-4 and D-5 open. Nothing is
+implemented. No gate identifier is marked satisfied and no ratified pin, gate record or
+evidence manifest is modified by this document. The implementation specification opened by
+these two rulings is `SPEC_MODEL_EGRESS_UNIT.md`.
 
 **The question:** may the agent runtime gain a provider that calls a model vendor's API,
 and under what constraints?
@@ -58,7 +59,18 @@ the largest in the product, because *does not execute* is the claim every screen
 Five decisions. Each changes the specification materially; the first changes whether the
 others are asked at all.
 
-### D-1 — Is inference an action?
+### D-1 — Is inference an action? — **RATIFIED: `INFERENCE_IS_AN_ACTION`**
+
+> **D-1 — INFERENCE_IS_AN_ACTION.** An inference invocation is a governed external action
+> because it may create data-egress, vendor, cost and compliance effects. The resulting
+> model output carries no decision or execution authority.
+> — owner, 2026-09-10
+
+The qualification is the substance of the ruling and must not be lost in implementation:
+what is governed is the **request**, because it transmits data outward, incurs cost,
+invokes a vendor and creates compliance exposure. The **response** is thereby granted
+nothing. It returns as an untrusted proposal or as evidence, and stays untrusted until
+independently verified and separately authorized for any consequential use.
 
 Does a model call pass through the governed execution hook and require clearance, or is
 reasoning exempt from it?
@@ -71,11 +83,19 @@ reasoning exempt from it?
 
 *Everything below assumes this is not `DEFER`.*
 
-### D-2 — Where does the provider run, and what happens to CR-5?
+### D-2 — Where does the provider run, and what happens to CR-5? — **RATIFIED: `SEPARATE_EGRESS_UNIT`**
 
-**Owner's stated preference: `SEPARATE_EGRESS_UNIT`** — keep the worker private and
-preserve CR-5 rather than allow it to call vendors. Recorded as a preference; the decision
-is open, and §4b states what each option costs.
+> **D-2 — SEPARATE_EGRESS_UNIT.** Preserve CR-5 and keep all model-provider network
+> access, SDKs and credentials outside Agent Runtime. Commission a separately deployed
+> Model Egress Unit with a narrow authorized interface. It may perform approved inference
+> calls but may not approve requests, interpret provider output as trusted evidence or
+> execute resulting actions.
+> — owner, 2026-09-10
+
+CR-5 is **not amended**. The worker's egress claim stands as written, and the vendor call
+moves outside it. §4b's cost is accepted with the ruling: a deployment unit, a trust
+boundary, and a new CR-family ruling for what may cross it — which is an owner act still
+outstanding `[R]`.
 
 | Option | Consequence |
 |---|---|
