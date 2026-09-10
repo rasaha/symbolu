@@ -99,10 +99,14 @@ reasoning exempt from it?
 > execute resulting actions.
 > — owner, 2026-09-10
 
-CR-5 is **not amended**. The worker's egress claim stands as written, and the vendor call
-moves outside it. §4b's cost is accepted with the ruling: a deployment unit, a trust
-boundary, and a new CR-family ruling for what may cross it — which is an owner act still
-outstanding `[R]`.
+CR-5's **worker clause** is not amended. The worker's egress claim stands as written, and the
+vendor call moves outside it. §4b's cost is accepted with the ruling: a deployment unit, a
+trust boundary, and a new CR-family ruling for what may cross it — **ratified 2026-09-10** as
+the CR-4 and CR-5 amendments recorded in
+`ADR_UGENCE_REVIEW_SERVICE_COMPOSITION_ROOT_SCOPING.md` §5 `[V]`. The MEU now carries its own
+egress record with two permitted destinations; the worker's three are untouched. **CR-1 is
+not amended `[G]`** — it admits one companion unit, and the MEU is a second, so the boundary
+is specified while the unit's existence is not.
 
 | Option | Consequence |
 |---|---|
@@ -438,7 +442,9 @@ It also marks no gate identifier satisfied, admits nothing to the P3E-CTR or GRW
 families, and changes no ratified pin.
 
 **The implementation specification opened by these rulings is
-`SPEC_MODEL_EGRESS_UNIT.md`,** written against D-1 through D-4 and stating plainly which
-sections D-5 still blocks. The amendments D-2 requires to CR-5 and CR-4 remain outstanding
-and are owner acts, not consequences of the spec. Nothing is implemented: no exchange
-table is designed, no exchange exists, and no genuine provider call is authorized.
+`SPEC_MODEL_EGRESS_UNIT.md`,** written against D-1 through D-5. The amendments D-2 required
+to CR-5 and CR-4 were ratified on 2026-09-10 and are recorded in
+`ADR_UGENCE_REVIEW_SERVICE_COMPOSITION_ROOT_SCOPING.md` §5; **CR-1 remains unamended `[G]`**,
+so no deployment may read the CR-5 amendment as authorization to run a second unit. Nothing
+is implemented: no exchange table is designed by these documents, and no genuine provider
+call is authorized.
