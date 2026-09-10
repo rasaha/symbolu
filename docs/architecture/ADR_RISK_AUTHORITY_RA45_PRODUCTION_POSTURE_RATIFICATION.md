@@ -452,34 +452,43 @@ bound field, so there is no `valid_from` half to make inclusive.
 `RiskDecision.expires_at` is the earliest of `now + ttl`, `grant.expires_at`, and the
 control-freshness horizon.
 
-`[G]` **The subject bullet of T-2 is BLOCKED and was not taken.** Wiring
-`SubjectContext.subject_valid_until` into the cap is implemented and verified to work — a
-mid-window decision capped at the subject bound instead of the TTL, and a terminal-instant
-assertion minted nothing — but `expires_at` is inside `decision_digest` and every v2-seam
-decision carries a subject bound, so it moves **ten frozen digests** across
-`cloud-scaling-authorization-contracts` (`test_frozen_digests.py`, 5 tests) and
-`cloud-scaling-policy-authenticity` (`test_phase5a_untouched.py`, plus a candidate-validity
-ordering test). Measured: `FROZEN_DECISION_DIGEST` moves from `sha256:6aba137d…` to
-`sha256:4636dee2…`. Those fixtures declare themselves *"regression anchors: if any
-canonicalization, field set or binding rule moves, these fail rather than silently
-re-baselining"*, so re-freezing them requires ratification. Reported, not taken.
+`SubjectContext.subject_valid_until` joins the cap at 0.14.0, through the additive
+`DecisionRequest.subject_valid_until` populated by the v2 seam from the re-validated
+context — never from the raw caller object.
 
-Prerequisites are now passed as a **named mapping** (`prerequisite_horizons`), superseding
-Amendment 4's scalar `freshness_horizon` keyword, because the ruling requires the
-implementation to identify which prerequisites contributed — and the refusal names the one
-that bound.
+`[V]` **The re-freeze it required, ratified and recorded.** Exactly one semantic field
+moved: `decision_expires_at_fact`, 01:05:00 → 00:08:10, the decision now bound by the
+subject assertion instead of its own TTL. Three digests followed it:
 
-`[V]` **Only contributing prerequisites cap.** The control horizon is computed over the
-*authoritative* required set that was actually satisfied, from the case's own persisted
-state — never over every result that happened to appear in the request. `[V]` **Evidence
-is covered transitively and by construction**, not by omission:
-`binding._freshness_is_monotonic` refuses any trusted control result whose `valid_until`
-outlives the earliest `valid_until` of its admitted backing evidence, so the control
-horizon is already no later than the evidence floor. Asserted directly rather than assumed.
+| Anchor | Was | Now |
+|---|---|---|
+| decision | `sha256:6aba137d…` | `sha256:4636dee2…` |
+| candidate | `sha256:357bb3d4…` | `sha256:7ffeefce…` |
+| verified artifact (transitive) | `sha256:fefe4884…` | `sha256:596b4631…` |
 
-`[V]` **Reach is zero at every hop.** `EnvelopeIssuer.issue` caps the envelope by its
-decision (Amendment 4), and `ActionAuthorization` copies the envelope's expiry — asserted
-end to end for decision, envelope and authorization against a short-lived grant.
+No canonicalization, field set or signature format changed, and nothing was re-signed —
+the producer attestation signs the recommendation, not the candidate. The fixture was
+regenerated with the package's own `scripts/generate_frozen_candidate.py` rather than
+hand-edited, and the superseded values are pinned as `SUPERSEDED_PRE_T2_*` negative anchors
+in the repo's established style, so dropping the cap is a failure rather than a silent
+re-baseline.
+
+`[G]` **A guard this exposed.** `test_no_phase_5a_source_file_was_modified` (P-11) asserts
+the Phase 5A tree is unmodified by running `git status --porcelain` — a *working-tree*
+check, so it passes once a change is committed. It caught this edit before commit and
+cannot catch it after. The guard was not weakened or whitelisted; the limitation is
+recorded here instead.
+
+### The reason code T-3 needed
+
+`[V]` `NoRemainingValidityError`, a subclass of `AuthorityDeniedError` so every existing
+handler keeps working, carries the name of the prerequisite that bound. The seam maps it by
+type and field, never by parsing a reason string, into the new
+`SubjectRiskNonDecisionReason.NO_REMAINING_SUBJECT_VALIDITY`. Neither existing member fit:
+`EXPIRED_SUBJECT` asserts the opposite of what is true at that instant, and
+`AUTHORITY_UNAVAILABLE` blames the evaluator principal for a subject-window cause — the
+same misattribution reasoning that added `CALLER_SUPPLIED_EVALUATION_TIME` rather than
+reusing `INVALID_SUBJECT`.
 
 ### T-3 — `SubjectContext` stays inclusive, as a deliberate point-in-time contract
 

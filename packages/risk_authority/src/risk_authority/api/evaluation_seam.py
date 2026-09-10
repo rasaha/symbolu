@@ -30,7 +30,7 @@ from typing import Callable, Optional, Any
 
 from ..domain.authority import AuthorityGrant
 from ..domain.enums import AuthorityType, RiskClass, RiskOutcome, RiskRecommendation
-from ..domain.errors import AuthorityDeniedError, RiskAuthorityError
+from ..domain.errors import AuthorityDeniedError, NoRemainingValidityError, RiskAuthorityError
 from ..domain.evidence import ControlEvidenceRecord
 from ..integrations.evaluation_contracts import (
     EVALUATION_REQUEST_SCHEMA_VERSION,
@@ -508,8 +508,36 @@ class RiskEvaluationSeam:
                     # puts it inside the digest-bound decision snapshot, so the two can no
                     # longer be made to disagree (R-12b).
                     evaluated_at=now,
+                    # The subject window stays inclusive at both ends — a validated
+                    # assertion may be valid at exactly one instant, and that
+                    # point-in-time contract is ratified and deliberate. What it may not
+                    # do is mint authority that outlives it, so its upper bound caps the
+                    # decision. At the terminal instant the cap equals ``now``, no
+                    # positive window remains, and the authority refuses rather than
+                    # minting a decision that is already expired.
+                    #
+                    # ``None`` on the v1 path, which carries no subject context and is
+                    # deliberately unchanged: an absent bound imposes no cap.
+                    subject_valid_until=(
+                        validation.context.subject_valid_until
+                        if validation is not None and validation.context is not None
+                        else None
+                    ),
                 ),
             )
+        except NoRemainingValidityError as exc:
+            # Every prerequisite held, but none leaves a forward window to grant. This is
+            # not an authority-configuration gap, and the subject is not expired — at
+            # exactly ``subject_valid_until`` it is still valid, which is the ratified
+            # point-in-time contract. Reporting it as either would misattribute the cause
+            # in the audit record, so it gets its own typed reason when the subject is
+            # what bound.
+            if exc.prerequisite == "subject_assertion":
+                return _not_evaluated(
+                    SubjectRiskNonDecisionReason.NO_REMAINING_SUBJECT_VALIDITY,
+                    "subject_validity:no_remaining_window")
+            return _not_evaluated(SubjectRiskNonDecisionReason.AUTHORITY_UNAVAILABLE,
+                                  f"no_remaining_validity:{exc.prerequisite}")
         except AuthorityDeniedError as exc:
             # The risk evaluation passed but the configured evaluator principal is not
             # entitled to bind it — a composition/authority configuration gap.

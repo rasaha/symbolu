@@ -559,15 +559,13 @@ result outliving its backing evidence, so the control horizon is already no late
 evidence floor beneath it. Prerequisites are passed as a named mapping, so the refusal can
 say which one bound.
 
-**`[G]` `SubjectContext.subject_valid_until` is a ratified member of this cap and is NOT
-yet wired.** It works — a mid-window decision correctly capped at the subject bound rather
-than the TTL, and a terminal-instant assertion minted nothing — but `expires_at` is inside
-`decision_digest`, and every v2-seam decision carries a subject bound, so enabling it moves
-**ten frozen digests** across `cloud-scaling-authorization-contracts` and
-`cloud-scaling-policy-authenticity`. Those fixtures state their own purpose: *"regression
-anchors: if any canonicalization, field set or binding rule moves, these fail rather than
-silently re-baselining."* Re-freezing them is an owner decision, so it is reported rather
-than taken.
+`SubjectContext.subject_valid_until` joins them at 0.14.0, through the additive
+`DecisionRequest.subject_valid_until` that the v2 seam populates from the re-validated
+context. Enabling it moved three ratified digests — one semantic field,
+`decision_expires_at_fact` (01:05:00 → 00:08:10), with the decision, candidate and
+verified-artifact digests following. That re-freeze was ratified, and the superseded values
+are pinned as negative anchors rather than replaced silently. No canonicalization, field
+set or signature format changed; nothing was re-signed.
 
 Each hop then inherits: `EnvelopeIssuer.issue` caps the envelope by its decision — at the
 service, not only at the seam — and `ActionAuthorization` copies the envelope's expiry.
@@ -579,12 +577,13 @@ than minting a decision that is already expired. This is precisely how the two c
 meet: a subject assertion evaluated at its terminal instant is still valid (category 2) and
 still mints nothing (category 4).
 
-**`[G]` One known misattribution.** That refusal surfaces through the subject seam as
-`AUTHORITY_UNAVAILABLE`, which says the evaluator principal is not entitled — wrong.
-`EXPIRED_SUBJECT` would be equally wrong, since the subject is *not* expired at that
-instant. A new `SubjectRiskNonDecisionReason` member is required; it is deliberately not
-invented here, and `test_a_terminal_instant_subject_mints_no_executable_decision` pins the
-current behavior so the gap stays visible rather than silently settling.
+The refusal names its own cause. `NoRemainingValidityError` — a subclass of
+`AuthorityDeniedError`, so every existing handler keeps working — carries which prerequisite
+bound, and the seam maps it by type and field rather than by parsing a reason string. When
+the subject bound, that becomes `SubjectRiskNonDecisionReason.NO_REMAINING_SUBJECT_VALIDITY`.
+Neither pre-existing member fit: `EXPIRED_SUBJECT` asserts the opposite of what is true at
+that instant, and `AUTHORITY_UNAVAILABLE` blames the evaluator principal for a
+subject-window cause.
 
 ### Verification
 

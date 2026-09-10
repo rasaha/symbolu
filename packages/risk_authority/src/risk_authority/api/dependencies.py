@@ -730,14 +730,14 @@ class RiskAuthorityApplication:
             # re-derived above; that is also what keeps unrelated or rejected results
             # from capping a decision they did not contribute to.
             #
-            # ``subject_assertion`` is a ratified prerequisite of this cap and is
-            # deliberately ABSENT pending an owner ruling: adding it moves ten frozen
-            # digests in cloud-scaling, which exist to fail rather than silently
-            # re-baseline. See the README's temporal-rules section.
+            # ``subject_assertion`` is the caller's, because only the subject-binding seam
+            # holds the validated ``SubjectContext``. It is a bound on the caller's own
+            # assertion, so honouring it can only shorten the decision, never widen it.
             prerequisite_horizons={
                 "control_freshness": freshness_horizon(
                     authoritative.required_controls, controls
                 ),
+                "subject_assertion": req.subject_valid_until,
             },
         )
         self.decisions.save(decision)

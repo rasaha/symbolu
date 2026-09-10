@@ -87,16 +87,25 @@ from __future__ import annotations
 #: ``binding._freshness_is_monotonic`` refuses a trusted result outliving its backing
 #: evidence, so the control horizon is already no later than the evidence floor. A
 #: zero-width subject context stays ratified and constructible.
-#: **BLOCKED, reported not taken:** ``SubjectContext.subject_valid_until`` is a ratified
-#: member of this cap and is NOT wired. It works — verified — but ``expires_at`` is inside
-#: ``decision_digest`` and every v2-seam decision carries a subject bound, so enabling it
-#: moves ten frozen digests across ``cloud-scaling-authorization-contracts`` and
-#: ``cloud-scaling-policy-authenticity`` (``FROZEN_DECISION_DIGEST`` sha256:6aba137d… ->
-#: sha256:4636dee2…). Those fixtures exist to fail rather than silently re-baseline, so
-#: re-freezing them requires a ruling. A second gap rides on it: at a terminal-instant
-#: subject the refusal surfaces as ``AUTHORITY_UNAVAILABLE``, which misattributes the
-#: cause; ``EXPIRED_SUBJECT`` would be wrong in the other direction, so a new
-#: ``SubjectRiskNonDecisionReason`` member is required and deliberately not invented.
-#: No canonical serialization, digest or signature format is touched, and no committed
-#: digest fixture moves.
-__version__ = "0.13.0"
+#: **The subject bullet was blocked at 0.13.0 and is completed at 0.14.0** — see below.
+#: ``0.14.0`` completes T-2 and adds the reason code T-3 needed.
+#: ``SubjectContext.subject_valid_until`` now caps the decision, through the additive
+#: ``DecisionRequest.subject_valid_until`` that the v2 evaluation seam populates from the
+#: re-validated context. The subject window itself is untouched and still inclusive at both
+#: ends: a zero-width ``SubjectContext`` stays ratified and constructible, and at its
+#: terminal instant it is still valid — it simply mints nothing, because no positive window
+#: remains for a decision to occupy.
+#: ``NoRemainingValidityError`` (a subclass of ``AuthorityDeniedError``, so every existing
+#: handler keeps working) carries the name of the prerequisite that bound, and the seam maps
+#: it by type and field rather than by parsing a reason string. That feeds the new
+#: ``SubjectRiskNonDecisionReason.NO_REMAINING_SUBJECT_VALIDITY``, which replaces the
+#: misattributing ``AUTHORITY_UNAVAILABLE`` on this path: the subject is not expired and the
+#: evaluator principal is entitled, so neither pre-existing member described the condition.
+#: **This moves three ratified digests, under an explicit re-freeze ruling.** One semantic
+#: field moved — the capped ``decision_expires_at_fact``, 01:05:00 -> 00:08:10 — and the
+#: digests over it followed: decision sha256:6aba137d… -> sha256:4636dee2…, candidate
+#: sha256:357bb3d4… -> sha256:7ffeefce…, and the transitive verified-artifact digest
+#: sha256:fefe4884… -> sha256:596b4631…. No canonicalization, field set or signature format
+#: changed and nothing was re-signed; the superseded values are pinned as negative anchors
+#: so a silent revert is a failure rather than a re-baseline.
+__version__ = "0.14.0"

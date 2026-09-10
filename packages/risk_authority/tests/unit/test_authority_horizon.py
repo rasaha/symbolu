@@ -309,13 +309,87 @@ def test_downstream_execution_authority_inherits_the_cap():
 
 
 # ------------------------------------------------- the subject assertion as a bound
-#
-# NOT IMPLEMENTED, deliberately. ``SubjectContext.subject_valid_until`` is a ratified
-# prerequisite of the decision cap, and wiring it works — but it moves ten frozen digests
-# in ``cloud-scaling-authorization-contracts`` and ``cloud-scaling-policy-authenticity``,
-# because ``expires_at`` is inside ``decision_digest`` and every v2-seam decision carries a
-# subject bound. Those fixtures exist to "fail rather than silently re-baseline", so
-# re-freezing them is an owner decision. Reported, not taken.
+def _seam_at(now):
+    from ..adversarial.test_phase4b_admission_adversarial import (
+        CallLog, SpyClock, production_seam, v2_request)
+
+    log = CallLog()
+    seam, _ = production_seam(log=log, clock=SpyClock(log, now))
+    return seam.evaluate(v2_request())
+
+
+def _subject_bound():
+    from ..adversarial.test_phase4b_admission_adversarial import adr_context
+
+    return adr_context().subject_valid_until
+
+
+def test_a_decision_never_outlives_the_subject_assertion_that_authorized_it():
+    """Mid-window the subject bound, not the decision TTL, is what decides.
+
+    The default TTL would put this decision an hour past the subject's own upper bound.
+    """
+
+    bound = _subject_bound()
+    result = _seam_at(bound - timedelta(minutes=5))
+
+    assert result.non_decision_reason is None, result.non_decision_reason
+    assert result.decision_snapshot["expires_at"].startswith(
+        bound.isoformat().replace("+00:00", "")), (
+        f"decision expires {result.decision_snapshot['expires_at']}, not capped at the "
+        f"subject bound {bound.isoformat()}")
+
+
+def test_the_subject_window_itself_is_still_inclusive_at_its_terminal_instant():
+    """T-3: the point-in-time contract is preserved, not quietly narrowed.
+
+    At exactly ``subject_valid_until`` the subject is *not* reported expired. That is the
+    ratified inclusive endpoint, and it must survive the capping work.
+    """
+
+    from risk_authority.integrations.evaluation_contracts import (
+        SubjectRiskNonDecisionReason)
+
+    result = _seam_at(_subject_bound())
+
+    assert result.non_decision_reason is not SubjectRiskNonDecisionReason.EXPIRED_SUBJECT
+
+
+def test_a_terminal_instant_subject_mints_no_executable_decision_and_names_why():
+    """T-3's consequence, with a reason that attributes the cause correctly.
+
+    The subject holds at exactly its upper bound, so the cap lands on ``now`` and no
+    positive validity window remains. The authority refuses rather than minting a decision
+    that is already expired.
+
+    The reason must be neither ``EXPIRED_SUBJECT`` — the subject is *not* expired here,
+    which is the whole point of T-3 — nor ``AUTHORITY_UNAVAILABLE``, which blames the
+    evaluator principal for a subject-window cause. Both were the status quo at some point
+    in this work and both misattributed it in the audit record.
+    """
+
+    from risk_authority.integrations.evaluation_contracts import (
+        SubjectRiskNonDecisionReason)
+
+    result = _seam_at(_subject_bound())
+
+    assert result.decision_snapshot is None, "no decision may be minted at this instant"
+    assert result.non_decision_reason is (
+        SubjectRiskNonDecisionReason.NO_REMAINING_SUBJECT_VALIDITY), result.non_decision_reason
+    assert "subject_validity:no_remaining_window" in result.reason_codes
+
+
+def test_the_typed_error_names_which_prerequisite_bound():
+    """The seam maps by type and field, never by parsing a reason string."""
+
+    from risk_authority.domain.errors import (
+        AuthorityDeniedError, NoRemainingValidityError)
+
+    err = NoRemainingValidityError(["bound"], prerequisite="subject_assertion")
+
+    assert err.prerequisite == "subject_assertion"
+    assert isinstance(err, AuthorityDeniedError), (
+        "must stay catchable by every existing AuthorityDeniedError handler")
 
 
 def test_the_freshness_horizon_is_the_earliest_backing_bound():

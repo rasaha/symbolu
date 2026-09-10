@@ -27,7 +27,7 @@ from typing import Mapping, Optional, Protocol, runtime_checkable
 from ..domain.authority import AuthorityGrant, authority_violations
 from ..domain.decision import RiskDecision
 from ..domain.enums import RiskClass, RiskOutcome, RiskRecommendation
-from ..domain.errors import AuthorityDeniedError
+from ..domain.errors import AuthorityDeniedError, NoRemainingValidityError
 from ..domain.risk_case import RiskDecisionCase
 from ..domain.scope import Scope
 from .risk_engine import RiskEvaluation
@@ -169,15 +169,17 @@ class ReferenceDecisionAuthority:
             # create authority that survives beyond that instant, and returning a
             # zero-width decision would push the failure to a later, less obvious refusal.
             if expires_at <= now:
-                raise AuthorityDeniedError(
+                bound_by = binding_prerequisite or "decision_ttl"
+                raise NoRemainingValidityError(
                     [
-                        "no validity remains for a decision at this instant "
-                        f"(bound by {binding_prerequisite or 'decision ttl'}): "
+                        f"no validity remains for a decision at this instant "
+                        f"(bound by {bound_by}): "
                         + ", ".join(
                             f"{name}={bound.isoformat() if bound else None}"
                             for name, bound in horizons.items()
                         )
-                    ]
+                    ],
+                    prerequisite=bound_by,
                 )
         else:
             # A refusal grants nothing, so neither cap applies: the decision conveys no

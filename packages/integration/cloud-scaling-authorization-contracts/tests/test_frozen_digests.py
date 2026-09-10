@@ -48,10 +48,24 @@ FROZEN_REQUEST_DIGEST = (
 FROZEN_IDEMPOTENCY_KEY = (
     "sha256:031179d6a8b9b1d77ec851e73b7a01f281ff88cf231677628c8012a170b4f41b"
 )
+#: **Moved again by T-2 (RA 0.13.0).** Not a field-set change this time: the decision's
+#: ``expires_at`` is now capped by every prerequisite that authorized it, and this chain's
+#: ``SubjectContext.subject_valid_until`` (00:08:10) binds earlier than the decision TTL
+#: (01:05:00) did. One semantic field moved — ``decision_expires_at_fact`` — and the digests
+#: over it followed. No canonicalization, field set or signature changed, and no signature
+#: was re-computed. The superseded value is pinned below.
+#:
 #: **Moved by R-12b.** ``RiskDecision`` gained ``evaluated_at``, so the digest-bound decision
 #: snapshot gained a key — the first time in this ADR's history that a Phase 5A change moved a
 #: digest *upstream* of the candidate. The superseded value is pinned below.
 FROZEN_DECISION_DIGEST = (
+    "sha256:4636dee22546d8f801f1da9482fc85c78c991e44368ea6207ea3f0fb012e1ed6"
+)
+#: Superseded by T-2. The pre-cap decision carried ``expires_at = issued_at + 1h``, unbounded
+#: by the subject assertion that authorized it — so a decision, and every envelope minted from
+#: it, could outlive the assertion it rested on. Pinned as a negative anchor so removing the
+#: cap is a failure rather than a silent re-baseline.
+SUPERSEDED_PRE_T2_DECISION_DIGEST = (
     "sha256:6aba137d8d2c057d768b1243469636e4c1137037883adfb9a078c9a3fbbf0ca2"
 )
 #: Superseded by R-12b. The pre-R-12b snapshot carried ``issued_at`` and ``expires_at`` but no
@@ -85,6 +99,12 @@ FROZEN_POLICY_COORDINATE_BINDING_DIGEST = (
 #: field set is untouched — but because ``decision_snapshot_digest`` and ``decision_digest``,
 #: which the payload has always covered, moved beneath it. The superseded value is pinned below.
 FROZEN_CANDIDATE_DIGEST = (
+    "sha256:7ffeefce768d3fbfb23a0d3ed0be2a028e222b26d84767d392455b9f76d1e930"
+)
+#: Superseded by T-2, for the same reason as the decision digest above and by the same
+#: mechanism as R-12b: the candidate's own field set is untouched, but
+#: ``decision_snapshot_digest`` and ``decision_digest`` moved beneath it.
+SUPERSEDED_PRE_T2_CANDIDATE_DIGEST = (
     "sha256:357bb3d4d660034c9abe50000986808a1e9c15fce05b4a22b6cb82836cc50e79"
 )
 #: Superseded by R-12b — the 5B-1 value, correct until the decision snapshot gained

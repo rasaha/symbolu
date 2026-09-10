@@ -6,6 +6,7 @@ __all__ = [
     "RiskAuthorityError",
     "IllegalTransitionError",
     "AuthorityDeniedError",
+    "NoRemainingValidityError",
     "MonotonicityViolationError",
     "ProductionContainmentError",
     "SnapshotIntegrityError",
@@ -38,6 +39,25 @@ class AuthorityDeniedError(RiskAuthorityError):
     def __init__(self, reasons: "list[str]") -> None:
         self.reasons = list(reasons)
         super().__init__("; ".join(self.reasons) or "authority denied")
+
+
+class NoRemainingValidityError(AuthorityDeniedError):
+    """Every prerequisite held, but none of them leaves a forward window to grant.
+
+    Raised when the decision's capped ``expires_at`` lands at or before ``now``. The
+    prerequisites are *satisfied* — this is not "the principal is not entitled" — there is
+    simply no positive validity remaining to bind, and a decision valid over an empty
+    interval authorizes nothing at any instant.
+
+    A subclass of :class:`AuthorityDeniedError` so every existing handler keeps working
+    unchanged, and a distinct type so a caller that cares can tell the two apart without
+    parsing a reason string. ``prerequisite`` names which bound decided, so a seam can map
+    it to the right typed outcome rather than reporting a generic authority failure.
+    """
+
+    def __init__(self, reasons: "list[str]", *, prerequisite: str = "") -> None:
+        self.prerequisite = prerequisite
+        super().__init__(reasons)
 
 
 class MonotonicityViolationError(RiskAuthorityError):
