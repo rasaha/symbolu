@@ -37,6 +37,20 @@ has one.
 **What did change is recorded below**, because a reader comparing this package to
 the spec deserves to know which parts were convergent and which were corrections.
 
+**CR-4 and CR-5 were amended on 2026-09-10** (`ADR_UGENCE_REVIEW_SERVICE_COMPOSITION_ROOT_SCOPING.md`
+§5, merged as #1747) `[V]`. Two consequences for this package. The MEU's egress is
+now **declared rather than inherited**: the unit carries its own
+`EXTERNAL_DEPLOYMENT_EVIDENCE` naming two permitted destinations — the exchange
+schema under its own role, and approved provider endpoints only where a credential
+has been commissioned. This package reaches the first and *cannot* reach the second,
+having no provider egress at all. And `production` is pinned as a composition switch,
+never a deployment-wide LIVE switch, which is the reading this package already
+assumed when it made the reference adapter refuse a production posture outright.
+
+CR-5's worker clause was never contradicted here in any case: it scopes *the
+worker's* egress, and this is a different unit — which is what `SEPARATE_EGRESS_UNIT`
+means in D-2 and why that option preserved CR-5 rather than amending it.
+
 ## Conformance, item by item
 
 | Ruling | How it is met |
@@ -113,7 +127,7 @@ provisioning mechanism, so these stay visible:
 | **Transport protection** `[G]` | `sslmode` is set nowhere. RLS over an unencrypted connection controls who may read a row, not who may observe it in flight |
 | **Tenant-bound database identities** `[G]` | Required before multi-tenancy. This package takes the tenant as a caller argument, which is single-tenant-safe and is **not** an approved multi-tenant design |
 | **Vendor-mix reservation counter** `[G]` | Out of scope by instruction. The binding carries a `reservation_id`; nothing here defines, counts or releases it |
-| **CR-1** `[R]` | Admits one companion deployment unit, named. The MEU is a second, so its boundary is specified and its **existence** is not. This package ships no deployment unit, so it does not depend on the amendment — but nothing here may be read as authorizing one to run |
+| **CR-1** `[G]` | Amended nowhere. It admits one companion deployment unit, named, and the MEU is a second — so after the CR-4/CR-5 amendments the MEU's boundary is specified and the unit's **existence** is not. This package ships no deployment unit, so it does not depend on that further amendment; nothing here may be read as authorizing one to run |
 
 ## What this does not do
 
