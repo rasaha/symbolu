@@ -122,9 +122,62 @@ def _disable(path: pathlib.Path, line: int, col: int, end, kind: str) -> str:
     return original
 
 
+#: Survivors that are redundant *by design*, keyed by the function that holds them
+#: rather than by line — a drifted line citation reads as rigor it no longer has,
+#: and `tests/test_records.py` names these same four by function for that reason.
+#: Each is shadowed by a twin that runs downstream on the same call, so it cannot
+#: be killed alone; each is kept as defence in depth, becoming load-bearing the
+#: moment its twin's inputs change. What is asserted instead of a kill is that the
+#: twins cannot diverge silently — see
+#: `test_the_redundant_containment_guards_have_a_twin_that_agrees` and
+#: `test_the_transition_tables_agree_with_the_forward_only_rule`.
+#:
+#: Classified, never designed away: an entry here is a claim a reader can check,
+#: not a suppression. A survivor absent from this map fails the sweep.
+CLASSIFIED_SURVIVORS: dict[tuple[str, str], str] = {
+    ("records.py", "containment_requested"):
+        "SHADOWED by the same cross-incident rule re-running in "
+        "_require_containment_evidence via replace()",
+    ("records.py", "containment_lifted"):
+        "SHADOWED by the same lift_refusals check re-running on construction",
+    ("states.py", "require_transition"):
+        "EQUIVALENT: the legality and forward-only checks are mutually redundant "
+        "for every state pair LEGAL_TRANSITIONS defines today",
+}
+
+
+def _enclosing_function(path: pathlib.Path, line: int) -> str:
+    """The innermost function holding ``line``, or ``"<module>"``."""
+
+    best = None
+    for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            if node.lineno <= line <= (node.end_lineno or node.lineno):
+                if best is None or node.lineno > best.lineno:
+                    best = node
+    return best.name if best is not None else "<module>"
+
+
+def _suite_passes() -> bool:
+    return subprocess.run(
+        [sys.executable, "-m", "pytest", "-q", "--no-header"],
+        cwd=PKG, capture_output=True, text=True).returncode == 0
+
+
 def main() -> int:
+    # The baseline, before anything is mutated. Every verdict below is read from a
+    # *failing* suite meaning "caught" — so an interpreter with no pytest, or a
+    # suite already red, makes every mutant look caught and reports flawless
+    # coverage. That false green is exactly how this sweep was once believed.
+    if not _suite_passes():
+        print("BASELINE FAILED: the unmutated suite does not pass under "
+              f"{sys.executable}. No sweep was run and nothing is proved — "
+              "install pytest into this interpreter, or fix the suite, and re-run.")
+        return 2
+
     sites = _sites()
-    survivors = []
+    unclassified: list[str] = []
+    classified: list[str] = []
     for path, line, col, end, kind in sites:
         original = _disable(path, line, col, end, kind)
         try:
@@ -133,16 +186,28 @@ def main() -> int:
                 cwd=PKG, capture_output=True, text=True)
         finally:
             path.write_text(original, encoding="utf-8")
-        if result.returncode == 0:
-            survivors.append(f"{path.name}:{line}:{col} ({kind})")
-            print(f"SURVIVED  {path.name}:{line}:{col} ({kind})")
-        else:
+        if result.returncode != 0:
             print(f"caught    {path.name}:{line}:{col} ({kind})")
+            continue
+        where = f"{path.name}:{line}:{col} ({kind})"
+        reason = CLASSIFIED_SURVIVORS.get((path.name, _enclosing_function(path, line)))
+        if reason is None:
+            unclassified.append(where)
+            print(f"SURVIVED  {where}")
+        else:
+            classified.append(f"{where} — {reason}")
+            print(f"classified {where}\n           {reason}")
 
-    print(f"\n{len(sites)} refusal sites; {len(survivors)} survived")
-    for entry in survivors:
-        print(f"  {entry}")
-    return 0
+    print(f"\n{len(sites)} refusal sites; {len(unclassified)} unclassified survivors, "
+          f"{len(classified)} classified")
+    for entry in classified:
+        print(f"  ok  {entry}")
+    for entry in unclassified:
+        print(f"  !!  {entry}")
+    # An unclassified survivor is a refusal no test observes and nobody has
+    # explained. Printing it and exiting zero would let CI call that green, which
+    # is the one thing a coverage proof must not do.
+    return 1 if unclassified else 0
 
 
 if __name__ == "__main__":

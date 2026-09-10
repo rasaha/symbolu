@@ -18,6 +18,7 @@ from ..contracts.requests import (
 from ..errors import ApiException
 from ..scenarios.catalog import LOGICAL_TIME
 from ..serialization.canonical import canonical_digest, to_jsonable
+from ..workflow_limits import enforce_workflow_limits
 from .deps import build_response, get_context, require_scenario
 
 router = APIRouter(prefix="/api/v1/workflows", tags=["workflows"])
@@ -29,6 +30,7 @@ def _normalize_contract(document, contract_version) -> str:
 
 @router.post("/validate", operation_id="validate_workflow")
 def validate_workflow(request: Request, req: ValidateWorkflowRequest):
+    enforce_workflow_limits(req.workflow, "workflow")
     declared = _normalize_contract(req.workflow, req.contract_version)
     supported = declared in awc.SUPPORTED_COMPILER_CONTRACTS
     integrity = {"checked": req.source_digest is not None}
@@ -62,6 +64,9 @@ def validate_workflow(request: Request, req: ValidateWorkflowRequest):
 
 @router.post("/adapt", operation_id="adapt_workflow")
 def adapt_workflow(request: Request, req: AdaptWorkflowRequest):
+    enforce_workflow_limits(req.workflow, "workflow")
+    if req.overlay is not None:
+        enforce_workflow_limits(req.overlay, "overlay")
     declared = _normalize_contract(req.workflow, req.contract_version)
     if declared not in awc.SUPPORTED_COMPILER_CONTRACTS:
         raise ApiException(
@@ -104,6 +109,10 @@ def compare_adaptations(request: Request, req: CompareAdaptationsRequest):
         out = orch.run_v1v2_comparison(v2s, LOGICAL_TIME)
         scenario_id = req.scenario_id
     else:
+        for name in ("v1_workflow", "v2_workflow", "v1_overlay", "v2_overlay"):
+            document = getattr(req, name)
+            if document is not None:
+                enforce_workflow_limits(document, name)
         v1_env = awc.adapt_workflow(
             req.v1_workflow, contract_version="workflow_ir.v1", role_overlay=req.v1_overlay)
         v2_env = awc.adapt_workflow(

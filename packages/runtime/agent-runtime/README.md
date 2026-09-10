@@ -32,8 +32,21 @@ A **domain-neutral execution-coordination kernel** for agent and workflow execut
 > concurrently; it never authorizes the consequential action inside a quantum** (that stays below
 > H22-A, with fresh governance per quantum), never preempts the indivisible
 > governance→exact-action→provider chain, never runs two quanta for one workflow at once, and
-> preserves the H22-C torn-state fail-closed contract. Not live-verified, pilot-validated,
-> distributed-safe, cluster-safe, exactly-once, enforcement-ready, or production-ready.
+> preserves the H22-C torn-state fail-closed contract. The additive `0.7.0` **CM-TA1 neutral
+> provider-attempt telemetry** layer (an opt-in `AttemptObserver` seam that records every actual
+> `provider.execute` invocation with the runtime-authoritative attempt number, so retried and
+> failed attempts are never collapsed into the final count, plus the F2 observation-failure
+> reporter and the N2 bounded failure classification) is `IMPLEMENTED_AND_CI_VERIFIED` — the
+> scoped `agent-runtime-ci` workflow was observed green on the default branch at `26da5f3c`
+> ([run 34040504074](https://github.com/rasaha/symbolu/actions/runs/34040504074), 2026-09-06):
+> package suite, import-boundary checks, wheel build + isolated installation verification and
+> platform-freeze, all three jobs success, on a head carrying `0.7.0`. The seam is strictly
+> additive: `attempt_observer` defaults to `None` (a strict no-op), the runtime imports no
+> provider SDK and interprets no provider token field, a governance HOLD/BLOCK/ESCALATE or an
+> exact-action rejection produces no attempt because the provider was never invoked, and a raising
+> observer is contained and never changes the provider result or retry behaviour. Not
+> live-verified, pilot-validated, distributed-safe, cluster-safe, exactly-once,
+> enforcement-ready, or production-ready.
 
 The kernel drives task and workflow lifecycle, invokes providers/tools, and applies
 retry, timeout, cancellation, checkpointing, and durable recovery. Before any

@@ -1,0 +1,241 @@
+{
+  "curated_api_module": "governed_value.api",
+  "distribution": "ugence-governed-value",
+  "namespace": "governed_value",
+  "note": "Machine-readable snapshot of the curated public API (governed_value.api.__all__). tests/packaging/test_public_api.py asserts this file equals the live package surface; regenerate with scripts/generate_public_api.py when the curated API changes deliberately. This surface is the POST_DEPLOYMENT_VALUE reported-value calculation only. It operates on caller-reported, unverified inputs: every result is EvidenceStatus.REPORTED and AuthorityStatus.UNVERIFIED, and no symbol here can lift either axis. MetricObservation is NOT exported \u2014 it is owned by ugence-governance-contracts and consumed through admit_observations; what this package owns is ObservedMetric, the record of what was admitted, carried outside every monetary term and outside the scorability verdict.",
+  "package_version": "0.3.0",
+  "symbols": {
+    "AgentValueCase": {
+      "fields": [
+        "tenant_id",
+        "agent_id",
+        "domain",
+        "geography",
+        "outcome",
+        "benefit",
+        "actual_losses",
+        "residual_expected_loss",
+        "cost",
+        "investment",
+        "attribution",
+        "reported_confidence",
+        "reported_net_per_period",
+        "period_label"
+      ],
+      "kind": "dataclass"
+    },
+    "AssessmentStage": {
+      "kind": "enum",
+      "values": [
+        "pre_roi_readiness",
+        "forecast",
+        "post_deployment_value"
+      ]
+    },
+    "AttributionEvidence": {
+      "fields": [
+        "baseline_captured",
+        "holdout_or_staged",
+        "concurrent_changes"
+      ],
+      "kind": "dataclass"
+    },
+    "AuthorityStatus": {
+      "kind": "enum",
+      "values": [
+        "unverified",
+        "attested",
+        "verified"
+      ]
+    },
+    "ConfidenceClass": {
+      "kind": "enum",
+      "values": [
+        "unclassified",
+        "low",
+        "medium",
+        "high"
+      ]
+    },
+    "CostToServe": {
+      "fields": [
+        "currency",
+        "inference",
+        "retries",
+        "evals",
+        "monitoring",
+        "human_in_loop_review",
+        "incident_remediation",
+        "model_migration"
+      ],
+      "kind": "dataclass"
+    },
+    "DomainKind": {
+      "kind": "enum",
+      "values": [
+        "support",
+        "software",
+        "finance_ops",
+        "regulated",
+        "sales_marketing",
+        "generic"
+      ]
+    },
+    "DomainProfile": {
+      "fields": [
+        "kind",
+        "natural_unit",
+        "dominant_source"
+      ],
+      "kind": "dataclass"
+    },
+    "EvidenceStatus": {
+      "kind": "enum",
+      "values": [
+        "reported",
+        "modeled",
+        "observed",
+        "attributed",
+        "verified"
+      ]
+    },
+    "ExpectedLoss": {
+      "fields": [
+        "currency",
+        "items"
+      ],
+      "kind": "dataclass"
+    },
+    "ExpectedLossItem": {
+      "fields": [
+        "label",
+        "probability",
+        "loss_magnitude"
+      ],
+      "kind": "dataclass"
+    },
+    "GeographyProfile": {
+      "fields": [
+        "label",
+        "currency"
+      ],
+      "kind": "dataclass"
+    },
+    "GovernedValueApplication": {
+      "kind": "class",
+      "methods": [
+        "score"
+      ]
+    },
+    "GovernedValueResult": {
+      "fields": [
+        "tenant_id",
+        "agent_id",
+        "currency",
+        "stage",
+        "evidence_status",
+        "authority_status",
+        "scorability",
+        "reported_confidence",
+        "measurement_method",
+        "total_benefit",
+        "reported_avoided_loss",
+        "actual_losses",
+        "residual_expected_loss",
+        "cost_to_serve",
+        "total_investment",
+        "reported_net_governed_value",
+        "risk_adjusted_net_governed_value",
+        "reported_roi",
+        "risk_adjusted_roi",
+        "payback_periods",
+        "reasons",
+        "advisories",
+        "observed_metrics"
+      ],
+      "kind": "dataclass"
+    },
+    "MeasurementMethod": {
+      "kind": "enum",
+      "values": [
+        "before_after_baseline",
+        "holdout_or_staged",
+        "option_value",
+        "actuarial_baseline"
+      ]
+    },
+    "Money": {
+      "fields": [
+        "minor_units",
+        "currency"
+      ],
+      "kind": "dataclass"
+    },
+    "ObservationBindingError": {
+      "kind": "exception",
+      "methods": []
+    },
+    "ObservedMetric": {
+      "fields": [
+        "observation_id",
+        "metric_id",
+        "governed_unit",
+        "window_start",
+        "window_end",
+        "evidence_reference_count",
+        "content_digest"
+      ],
+      "kind": "dataclass"
+    },
+    "OutcomeClass": {
+      "kind": "enum",
+      "values": [
+        "deterministic_automation",
+        "judgment_support",
+        "discovery_insight",
+        "risk_containment"
+      ]
+    },
+    "ReportedValue": {
+      "fields": [
+        "labor_displaced",
+        "throughput_gained",
+        "loss_avoided"
+      ],
+      "kind": "dataclass"
+    },
+    "Scorability": {
+      "kind": "enum",
+      "values": [
+        "scorable",
+        "degraded",
+        "not_scorable"
+      ]
+    },
+    "TotalInvestment": {
+      "fields": [
+        "currency",
+        "capital_expenditure",
+        "one_time_build",
+        "integration",
+        "amortized_cost_to_serve"
+      ],
+      "kind": "dataclass"
+    },
+    "ValueSource": {
+      "kind": "enum",
+      "values": [
+        "labor_displaced",
+        "throughput_gained",
+        "loss_avoided"
+      ]
+    },
+    "admit_observations": {
+      "kind": "function",
+      "parameters": [
+        "case",
+        "observations"
+      ]
+    }
+  }
+}

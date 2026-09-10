@@ -1,5 +1,29 @@
 # Changelog
 
+## [Unreleased] — the suite runs on Python 3.10, which this package already declared
+
+No source change and no API change: `src/` is untouched and nothing about the package's
+behaviour moves. The packaging/boundary test read `pyproject.toml` with a bare
+`import tomllib`, stdlib only from 3.11 — so the whole module failed to import on 3.10
+and, with every CI job pinned to 3.11, nothing ever noticed that
+`requires-python >= 3.10` was a claim no job checked. The import now falls back to the
+`tomli` backport, and the workflow's suite job runs the full matrix 3.10, 3.11, 3.12.
+The fallback is a hard import rather than `pytest.importorskip`: a missing backport must
+fail the run loudly, not quietly drop the packaging assertions from the 3.10 leg.
+
+## 0.6.1 — 2026-09-08 — declared floors corrected
+
+Metadata only: contract stays `governed_review_service.v6`; no source or behaviour
+change.
+
+- `ugence-approval-workflow` floor raised `>=0.1.0` -> `>=0.2.0`: the service passes
+  `authentication_reference` to the ledger's `decide()`, which 0.2.0 added (AI-D).
+- `ugence-governed-review` floor raised `>=0.2.0` -> `>=0.3.1`: the service emits
+  `governed_review.linkage.v2`, whose shape is governed-review 0.3.0, and 0.3.1 is the
+  first governed-review release whose own floors resolve an approval-workflow that has
+  the field.
+- `tests/test_boundaries.py` now pins both floors, so lowering either fails the suite.
+
 ## 0.6.0 — 2026-09-06 — front-door seam 7 (FD-11)
 
 Contract `governed_review_service.v6`: the six routes plus one ledger read.
@@ -43,6 +67,32 @@ linkage view carry `authentication_reference`.
 - Linkages are appended as `governed_review.linkage.v2` (`LINKAGE_KIND`).
 - `verify_authentication_reference(claims, recorded)`: identity-ADR row 9's recompute
   check, constant-time.
+
+## 0.3.0 — 2026-09-05 — AI-A (approver identity port and proof shape)
+
+Contract `governed_review_service.v3`: the same five routes; the decision route reads
+one opaque proof header. Implements step AI-A of
+`ADR_UGENCE_APPROVER_IDENTITY_SCOPING.md` under rulings ID-2 to ID-5.
+
+- `identity.py`: the service-local `ApproverIdentityPort` (ID-3), structurally
+  compatible with Decision Authority's seam and importing nothing from it, with
+  `VerifiedClaims`, `ApproverIdentity`, `ActorKind`, `TenantMode` and
+  `RecordedAssurance`. `subject_reference` is issuer-qualified and percent-encoded;
+  `authentication_reference` is a sha256 over the canonical verified claims and never
+  over the proof (ID-2). `StaticApproverIdentityAdapter` is a fixture: it labels every
+  answer `PRESENTED_UNPROVEN` and is refused in production mode.
+- `service.py`: with a port configured, a proof is resolved and bound to the presented
+  approver before any record is read or changed (identity-ADR rows 1, 2, 5, 6, 7); the
+  tenant comes from the proof under an explicit tenant mode with the labelled
+  `SINGLE_TENANT` fallback (ID-4, rows 4, 11, 12); `acr`/`amr` are recorded and never
+  enforced (ID-5, row 10); replay is per proven subject (row 8).
+  `authentication_reference`, `tenant_source` and `assurance` are carried on the
+  outcome and on the durable `EXTERNAL_SIGNAL:review_decision` payload. Without a port
+  nothing changes.
+- `http.py`: the decision route reads one opaque proof header
+  (`X-Ugence-Approver-Proof`), never echoed, logged or stored.
+- `IDENTITY_PROOF` stays `PRESENTED_UNPROVEN`: no real adapter exists yet (AI-C), and
+  the approval record and the linkage carry no reference yet (AI-D).
 
 ## 0.2.0 — 2026-09-05 — HE-1, HE-5
 

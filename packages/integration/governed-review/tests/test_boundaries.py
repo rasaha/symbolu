@@ -10,8 +10,13 @@ from __future__ import annotations
 
 import ast
 import pathlib
+import re
 import sys
-import tomllib
+
+try:  # Python 3.11+ ships tomllib; 3.10 resolves the same parser from tomli.
+    import tomllib
+except ModuleNotFoundError:  # pragma: no cover - only a <3.11 run takes this branch
+    import tomli as tomllib  # type: ignore[no-redef]
 
 import pytest
 
@@ -85,12 +90,17 @@ def test_pyproject_declares_the_ratified_dependency_set():
         "ugence-agent-runtime-governance", "ugence-risk-authority-runtime",
         "ugence-governance-contracts",
     }
+    # The floor is part of the declaration: linkage.py copies
+    # ApprovalRecord.authentication_reference, which arrived in approval-workflow 0.2.0
+    # (AI-D, ruling ID-2). A lower floor would resolve a wheel that has no such field.
+    floors = {re.split(r"[><=]", d)[0]: d for d in data["project"]["dependencies"]}
+    assert floors["ugence-approval-workflow"] == "ugence-approval-workflow>=0.2.0"
     joined = " ".join(data["project"]["dependencies"]).lower()
     for forbidden in ("durable-execution", "dbos", "pydantic", "decision-authority",
                       "sqlalchemy", "psycopg", "boto3", "kubernetes", "redis",
                       "control-plane-root"):
         assert forbidden not in joined
-    assert pkg.__version__ == "0.3.0"
+    assert pkg.__version__ == "0.3.1"
 
 
 def test_no_clock_is_read_anywhere():

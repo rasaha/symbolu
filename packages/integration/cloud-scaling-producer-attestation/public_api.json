@@ -17,10 +17,7 @@
     },
     "CloudScalingProducerAttestationError": {
       "kind": "class",
-      "methods": [
-        "add_note",
-        "with_traceback"
-      ]
+      "methods": []
     },
     "DIGEST_PREFIX": {
       "kind": "constant",
@@ -85,31 +82,19 @@
     },
     "ProducerAttestationCanonicalFieldError": {
       "kind": "class",
-      "methods": [
-        "add_note",
-        "with_traceback"
-      ]
+      "methods": []
     },
     "ProducerAttestationConfigurationError": {
       "kind": "class",
-      "methods": [
-        "add_note",
-        "with_traceback"
-      ]
+      "methods": []
     },
     "ProducerAttestationContractError": {
       "kind": "class",
-      "methods": [
-        "add_note",
-        "with_traceback"
-      ]
+      "methods": []
     },
     "ProducerAttestationExactTypeError": {
       "kind": "class",
-      "methods": [
-        "add_note",
-        "with_traceback"
-      ]
+      "methods": []
     },
     "ProducerAttestationRefusal": {
       "fields": [
@@ -126,10 +111,7 @@
     },
     "ProducerAttestationSigningBoundaryError": {
       "kind": "class",
-      "methods": [
-        "add_note",
-        "with_traceback"
-      ]
+      "methods": []
     },
     "ProducerAttestationSigningInput": {
       "fields": [
@@ -342,10 +324,7 @@
     },
     "VerifiedArtifactIntegrityError": {
       "kind": "class",
-      "methods": [
-        "add_note",
-        "with_traceback"
-      ]
+      "methods": []
     },
     "VerifiedProducerAttestation": {
       "fields": [

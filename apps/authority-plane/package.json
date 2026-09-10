@@ -8,6 +8,7 @@
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview --host 127.0.0.1 --port 4200",
+    "start": "node server.mjs",
     "type-check": "tsc --noEmit",
     "test": "vitest run",
     "verify:boundary": "node scripts/verify-boundary.mjs"

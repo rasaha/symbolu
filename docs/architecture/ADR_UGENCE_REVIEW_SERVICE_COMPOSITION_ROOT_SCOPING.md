@@ -204,3 +204,96 @@ names the seventh route over the same destination. The
 worker gate set executes, and the mirror configuration may be recorded, only when the
 owner supplies the mirror host, repository prefix and secret name. Real approver
 identity waits on an enterprise issuer (AI-E).
+
+## 8 — Owner ruling RW-1 to RW-6: hosting the worker on Railway (owner, 2026-09-08)
+
+Asked what deploying `deployment/governed-runtime-worker` on a managed cloud host
+(Railway) would require given CR-3, the owner ruled on six questions. Nothing here is
+implemented: this section records the answers and where each stands against what the
+repository enforces today. `RAILWAY_HOSTING_DECISION.json` beside the deployment is the
+machine-read rendering. No ruling of CR-1 to CR-5 is reopened and no code changed.
+
+Evidence labels as §1: `[V]` verified against this repository, `[I]` inferred,
+`[R]` requires ratification, `[G]` gap.
+
+The ruling, in the owner's terms:
+
+> **1. BINDING = `DEFER_PENDING_NETWORK_PROOF`.** Do not ratify bind-by-discovery yet
+> and do not permit `"::"` merely because the deployment is on Railway. Preserve the
+> current `is_private_bind` enforcement. Require a Railway deployment proof establishing
+> the locally bindable address, routing behaviour, redeployment behaviour and absence of
+> public ingress. This answer authorizes investigation only, not implementation.
+>
+> **2. CONTAINER_SUPPLY_CHAIN = `EXTERNALLY_GATED_DIGEST_PINNED_IMAGE_ONLY`.** Railway is
+> admissible as a runtime host, but Railway native source or Dockerfile builds are not
+> admissible for production. The image must be built, inspected, SBOM-produced,
+> vulnerability-scanned, secret-scanned and verified by the ratified external gate
+> pipeline, pushed to the approved private registry and deployed by immutable digest. No
+> production deployment is authorized until the base-image mirror coordinates and all
+> required gates are satisfied.
+>
+> **3. PRIVATE_LISTENER_TLS = `OWNER_CA_ISSUED_AND_CLIENT_VERIFIED`.** CR-3 requires
+> authenticated TLS identity on the private listener. Refuse unverified self-signed TLS,
+> generated keys persisted on the application volume, `ssl.CERT_NONE` and
+> `rejectUnauthorized:false`. Use an owner-controlled CA, externally provisioned key
+> custody and certificate verification by every client. This answer does not require
+> mutual TLS unless separately ratified.
+>
+> **4. IDENTITY = `REAL_AP3_HTTPS_JWKS_ISSUER_REQUIRED_FOR_PRODUCTION`.** Production
+> requires validation against a genuine HTTPS JWKS issuer, including issuer, audience,
+> signature/key rotation, tenant and actor-type claims, with fail-closed behaviour. No
+> Railway-specific identity exception is authorized. Test mode is permitted only for
+> controlled demonstrations using synthetic data and must remain labelled
+> `PRESENTED_UNPROVEN`.
+>
+> **5. DATABASE = `ONE_POSTGRES_SERVICE_TWO_LOGICAL_DATABASES`.** For the reference
+> pilot, use one PostgreSQL 16 service containing separate DBOS system and application
+> databases, with distinct DSNs, database names, roles and credentials. Disable public
+> database exposure. Require encrypted, certificate-verified connections; record that
+> repository DSN enforcement does not yet implement this requirement. Separate PostgreSQL
+> services remain an optional future isolation or resilience enhancement.
+>
+> **6. SQLITE_STATE = `SINGLE_INSTANCE_REFERENCE_DEPLOYMENT_ONLY`.** The three SQLite
+> stores and attached volume are accepted only for a single-instance reference-grade
+> pilot. This does not authorize a highly available or enterprise-production claim.
+> Production authorization requires PostgreSQL-backed or otherwise durable shared
+> implementations, or a separate explicit acceptance of single-writer availability,
+> backup, recovery and deployment-downtime limitations.
+
+### 8.1 — What each ruling stands on
+
+| Ruling | What the repository enforces today | Label |
+|---|---|---|
+| RW-1 | `config.py:36-55` tests `is_unspecified` before `is_private`, so `::` is refused and a unique-local address passes; a hostname is refused outright, so no `*.internal` name is a bind value. `config.py:158-162` raises the CR-3 refusal in production. `config.py:1-6` states that nothing is discovered, which is why bind-by-discovery would be a change and not a configuration. | `[V]` |
+| RW-2 | `CONTAINER_GATE_SET.json` is `DEFINED_NOT_RATIFIED` and `NOT_EXECUTED`; eight of ten gates halt at `RESOURCE_BLOCKER_MIRROR_UNCONFIGURED`. `BASE_IMAGE_MIRROR_DECISION.json` carries `registry_host`, `repository_prefix` and `secret_name` as `null`. A host that builds from the `Dockerfile` pulls the base from docker.io, the first entry of this gate set's `never` list. | `[V]` |
+| RW-3 | `config.py:163-170` requires a readable certificate and key in production and refuses a plain listener. Nothing verifies that certificate. | `[V]` |
+| RW-4 | `config.py:172-181` requires issuer, audience and an `https` JWKS URL in production; `composition.py:149-150` refuses composition without an identity port; every authority read carries `PRESENTED_UNPROVEN` and `IN_PROCESS_ISSUER_ONLY` until AP-3's validation is recorded. | `[V]` |
+| RW-5 | `config.py:139-147` requires both DSNs, requires the `postgresql` prefix and requires them to differ; `composition.py:221-229` hands them to DBOS as the system and application databases. | `[V]` |
+| RW-6 | `composition.py:205-217` opens the authority directory, the approval ledger and the audit ledger as three SQLite files under `data_dir`. The image declared that path a volume until 2026-09-09; the `VOLUME` instruction was removed because Railway rejects it, so the single-instance property now rests on the platform-managed volume an operator attaches, which the image does not require and no test pins. | `[V]` for the three stores; `[G]` for the constraint |
+
+### 8.2 — Where a ruling asks for behaviour the repository does not implement
+
+Recorded rather than implemented; no code, validation rule or client was changed to
+match, and no gate or check is marked satisfied on account of a ruling.
+
+| Ruling | The gap | Label |
+|---|---|---|
+| RW-3 | Two committed clients disable certificate verification, which the ruling refuses: `container-healthcheck.py:27` sets `ssl.CERT_NONE`, and `apps/authority-plane/server.mjs:139` sets `rejectUnauthorized: false`. Until both verify an owner-controlled CA, a deployment does not satisfy RW-3 and must not be described as satisfying CR-3's TLS identity requirement. | `[G]` |
+| RW-3 | No certificate authority and no key custody mechanism exists in this repository. | `[G]` |
+| RW-5 | The DSN check is a prefix test; a plaintext DSN passes `validate()`. The ruling's "encrypted, certificate-verified connections" is therefore a policy ahead of the code, as the owner's own wording records. | `[G]` |
+| RW-2 | No workflow implements a registry credential mechanism, and the container job has no publish step; both are prerequisites of the gated-image path the ruling requires. | `[G]` |
+| RW-6 | No test pins the single-instance constraint, and no record states the backup, recovery and downtime expectations the alternative acceptance would need. | `[G]` |
+
+### 8.3 — What this ruling authorizes
+
+Investigation of RW-1 on a throwaway deployment, and a single-instance test-mode
+deployment over synthetic data as demonstration evidence, labelled `PRESENTED_UNPROVEN`.
+
+It authorizes no production-mode deployment, no host-built production image, no
+enterprise-production or high-availability claim, and no code change: implementation is
+entered only by its own prompt. RW-1, RW-2, RW-3, RW-4 and RW-6 each independently block
+production authorization `[R]`.
+
+The host's own private network is not ruled to be CR-3's private segment; RW-1's proof
+is what would put that question on the record `[R]`. Nothing in this deployment or in
+this record requires on-premises or customer-managed hosting `[V]`.

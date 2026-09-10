@@ -1,5 +1,28 @@
 # Changelog
 
+## [Unreleased] — the suite runs on Python 3.10, which this package already declared
+
+No source change and no API change: `src/` is untouched and nothing about the package's
+behaviour moves. The packaging/boundary test read `pyproject.toml` with a bare
+`import tomllib`, stdlib only from 3.11 — so the whole module failed to import on 3.10
+and, with every CI job pinned to 3.11, nothing ever noticed that
+`requires-python >= 3.10` was a claim no job checked. The import now falls back to the
+`tomli` backport, and the workflow's suite job runs the full matrix 3.10, 3.11, 3.12.
+The fallback is a hard import rather than `pytest.importorskip`: a missing backport must
+fail the run loudly, not quietly drop the packaging assertions from the 3.10 leg.
+
+## 0.3.1 — 2026-09-08 — declared floor corrected
+
+Metadata only: no source, contract or behaviour change.
+
+- `ugence-approval-workflow` floor raised `>=0.1.0` -> `>=0.2.0`. `linkage.py` copies
+  `ApprovalRecord.authentication_reference`, which arrived in approval-workflow 0.2.0
+  (AI-D, ruling ID-2); the old floor could resolve a ledger with no such field. The
+  source tree puts siblings on `PYTHONPATH`, so this was invisible to CI and would
+  only have failed on a wheel install.
+- `tests/test_boundaries.py` now pins the floor itself, not just the dependency name,
+  so lowering it fails the suite.
+
 ## 0.3.0 — 2026-09-05 — AI-D (approver-identity ruling ID-2)
 
 - `ReviewLinkage.authentication_reference`, copied from the approval record by

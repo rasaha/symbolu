@@ -33,7 +33,7 @@ _CHECK = r'''
 import dataclasses, importlib.util, json, sys
 
 import ugence_governance_contracts as g
-assert g.__version__ == "0.8.0", g.__version__
+assert g.__version__ == "0.9.0", g.__version__
 assert g.CONTRACT_VERSION == "1.0.0", g.CONTRACT_VERSION
 assert "site-packages" in g.__file__, g.__file__
 assert not any("/symbolu" in p or "governance_providers" in p for p in sys.path), sys.path
@@ -145,9 +145,33 @@ try:
     raise SystemExit("a naive datetime was accepted")
 except SystemIdentityContractError:
     pass
-# No SystemManifest was minted.
+# SM-1: the manifest is minted HERE (UVI ADR §26.3, ruled 2026-09-09) and behaves
+# as ruled — from the installed wheel, not from source.
 from ugence_governance_contracts import api as _api
-assert not any("systemmanifest" in _n.lower().replace("_", "") for _n in _api.__all__)
+from ugence_governance_contracts.api import ComponentBinding, SystemManifest
+assert SystemManifest.__module__ == "ugence_governance_contracts.contracts.system_identity"
+_cb = ComponentBinding(ref="model://m", digest=_d)
+_mf = SystemManifest(manifest_id="m", tenant_id="t", system_id="sys",
+                     system_version="1", model_bindings=(_cb,))
+assert len(_mf.canonical_digest()) == 64
+assert _hl.sha256(_mf.canonical_bytes()).hexdigest() == _mf.canonical_digest()
+# A different composition is a different manifest.
+assert _mf.canonical_digest() != SystemManifest(
+    manifest_id="m", tenant_id="t", system_id="sys", system_version="1",
+    model_bindings=(ComponentBinding(ref="model://other", digest=_d),)).canonical_digest()
+# A nominal manifest binding nothing is refused.
+try:
+    SystemManifest(manifest_id="m", tenant_id="t", system_id="sys", system_version="1")
+    raise SystemExit("a nominal SystemManifest was accepted")
+except SystemIdentityContractError:
+    pass
+# Component bindings are opaque strings only: no typed reference can enter here,
+# which is the whole reason this type may live in the neutral leaf.
+for _f in _dc.fields(ComponentBinding):
+    assert isinstance(getattr(_cb, _f.name), str), _f.name
+# The binding gained NO typed field pointing at the manifest.
+assert "system_manifest_ref" in _names and not any(
+    _f.name == "system_manifest" for _f in _dc.fields(AssessedSystemBinding))
 
 # G7 / G8 neutral idempotency and validity families ship and enforce structure
 from ugence_governance_contracts.api import (

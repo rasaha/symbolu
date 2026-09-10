@@ -172,8 +172,13 @@ and applications may import this package; no capability package may — enforced
 
 ## Gaps that survive this release
 
-- No organizational authority directory exists, so `ApproverEligibilityPort` has no
-  production adapter and eligibility is composition-supplied.
+- `ApproverEligibilityPort` now has a production adapter:
+  `ugence-authority-directory` 0.1.0 satisfies it structurally as
+  `DirectoryApproverEligibility`
+  (`packages/integration/authority-directory/src/ugence_authority_directory/eligibility_adapter.py:91`),
+  without importing this package. Eligibility is still composition-supplied — this
+  package names no adapter and the seam is wired by a composition root
+  (`packages/integration/authority-directory/tests/integration/test_approval_workflow_seam.py`).
 - The package signs nothing; `signature_reference` stays a non-secret reference, and
   the platform trust-anchor and custody posture is unresolved.
 - The float-clock `ApprovalManager` in cloud-scaling-operations remains in place;

@@ -172,16 +172,16 @@ def fig_scenario():
 
 def fig_minimum_path():
     rows = [
-        ("Policy Authority + Capacity Policy", "Define bounded scaling rules", C_VIOLET),
+        ("Policy Authority + Capacity Policy + Authoritative Compilation", "Define bounded scaling rules", C_VIOLET),
         ("Scaling Controller + Agentic Proposer", "Prepare exact recommendation", C_BLUE),
-        ("TAP + Trusted Evidence + Authenticity", "Verify claims, producer and policy", C_TEAL),
-        ("Decision Authority + Risk Authority", "Approve and mint bounded authority", C_VIOLET),
-        ("ActionGate + Action Clearance", "Authorize exact action and recheck now", C_GREEN),
-        ("Agent Runtime + Scaling Operations", "Execute controlled mutation", C_BLUE),
-        ("Status + Runtime + Execution Assurance", "Revoke, observe and reconcile effect", C_TEAL),
+        ("TAP + Trusted Evidence + Producer and Policy Authenticity", "Verify claims, producer and policy", C_TEAL),
+        ("Directory + Approval + Decision Authority + Risk Authority", "Approve once and mint bounded authority (5B-4)", C_VIOLET),
+        ("Action Admission + ActionGate + Clearance + Reservation", "Authorize exact action, recheck now, reserve once", C_GREEN),
+        ("Durable Execution + Runtime Hook + Credential Broker + Bounded Execution", "Execute one controlled mutation (5X, 5D)", C_BLUE),
+        ("Status + Runtime + Execution Assurance + Effect Attestation + Ledger", "Revoke, observe, reconcile and record", C_TEAL),
     ]
-    bw, bh, gy = 400, 58, 26
-    W = 480
+    bw, bh, gy = 520, 58, 24
+    W = 600
     s = SVG(W, 20 + len(rows) * bh + (len(rows) - 1) * gy + 20)
     x = (W - bw) / 2
     for i, (t, sub, cat) in enumerate(rows):
@@ -192,23 +192,25 @@ def fig_minimum_path():
     return s.render(), s.w, s.h
 
 
-def fig_pipeline():
+def fig_pipeline(counts=None):
     """Five development bands stacked vertically, with the research lane and frozen state at the side."""
+    stage_counts = counts or {}
+    cnt = lambda k, default: stage_counts.get(k, default)
     W, H = 680, 640
     s = SVG(W, H)
     bx, bw = 20, 430
     bands = [
-        ("1 · Define contracts", [("Contract-only", 3, C_VIOLET)]),
+        ("1 · Define contracts", [("Contract-only", cnt("Contract-only", 3), C_VIOLET)]),
         (
             "2 · Build the kernel",
             [
-                ("Core implemented", 19, C_BLUE),
-                ("Phase in progress", 6, C_BLUE),
-                ("Last phase done", 3, C_BLUE),
-                ("Experimental kernel", 2, C_AMBER),
+                ("Core implemented", cnt("Core implemented", 19), C_BLUE),
+                ("Phase in progress", cnt("Phase in progress", 6), C_BLUE),
+                ("Last phase done", cnt("Last phase done", 3), C_BLUE),
+                ("Experimental kernel", cnt("Experimental kernel", 2), C_AMBER),
             ],
         ),
-        ("3 · Harden for deployment", [("Reference-grade", 4, C_TEAL), ("CI-verified, pilot pending", 2, C_TEAL)]),
+        ("3 · Harden for deployment", [("Reference-grade", cnt("Reference-grade", 4), C_TEAL), ("CI-verified, pilot pending", cnt("CI-verified, pilot pending", 2), C_TEAL)]),
         ("4 · Client pilot", [("Pilot-ready", 0, C_GREY), ("Pilot-validated", 0, C_GREY)]),
         ("5 · Production", [("Production-certified", 0, C_GREY)]),
     ]
@@ -247,7 +249,7 @@ def fig_pipeline():
     s.rect(rx, ry, rw, rh, ("#FFFDF5", "#B7791F", C_AMBER[2]), r=8, sw=1.2, dash="6,4")
     s.text(rx + rw / 2, ry + 20, ["Research track", "(parallel lane)"], C_AMBER[2], 11, "700")
     s.rect(rx + 12, ry + 58, rw - 24, 26, C_AMBER, r=13)
-    s.text(rx + rw / 2, ry + 75, ["Research-only · 4"], C_AMBER[2], 10, "600")
+    s.text(rx + rw / 2, ry + 75, [f"Research-only · {cnt('Research-only', 4)}"], C_AMBER[2], 10, "600")
     s.text(rx + rw / 2, ry + 112, wrap("Feeds evidence into contract and policy revision; never enters the pilot band.", 26), MUTED, 9)
     s.line([(rx, ry + 71), (bx + bw, y1 + h1 / 2)], dash="5,4", color=MUTED)
     s.label((rx + bx + bw) / 2 + 4, (ry + 71 + y1 + h1 / 2) / 2 - 6, "evidence only", fs=9)
@@ -255,12 +257,13 @@ def fig_pipeline():
     _, y3, _, h3 = band_pos[2]
     fy = y3 - 6
     s.rect(rx, fy, rw, 54, C_GREEN, r=27, sw=1.2)
-    s.text(rx + rw / 2, fy + 23, ["Frozen API · 2"], C_GREEN[2], 11, "700")
+    s.text(rx + rw / 2, fy + 23, [f"Frozen API · {cnt('Frozen', 2)}"], C_GREEN[2], 11, "700")
     s.text(rx + rw / 2, fy + 40, ["side state from band 2 onward"], MUTED, 8.6)
     s.line([(bx + bw, y2 + h2 - 18), (rx, fy + 27)], dash="5,4", color=MUTED)
     s.label((rx + bx + bw) / 2 + 4, (y2 + h2 - 18 + fy + 27) / 2 - 6, "API freeze", fs=9)
     # note
-    s.text(bx, H - 14, ["All 45 capabilities sit in bands 1–3. Bands 4 and 5 are empty by each package's own declaration."], MUTED, 9.5, anchor="start")
+    total = sum(stage_counts.values()) if stage_counts else 45
+    s.text(bx, H - 14, [f"All {total} capabilities sit in bands 1–3. Bands 4 and 5 are empty by each package's own declaration."], MUTED, 9.5, anchor="start")
     return s.render(), s.w, s.h
 
 

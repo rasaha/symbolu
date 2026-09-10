@@ -142,13 +142,26 @@ distributed transaction is claimed. Maturity `IMPLEMENTED_AND_CI_VERIFIED` — s
 API-stability registry, and safety-case observed green on the corrected head after the final
 correctness corrections. See [`AGENT_RUNTIME_H22C_DURABILITY.md`](AGENT_RUNTIME_H22C_DURABILITY.md).
 
-## What the later H22 phase builds on this base (not now)
+## What is still not built
 
-- **H22-D:** true bounded concurrency, resource coordination/ledger, shared budget
-  coordination, and compensation coordination; and richer dependency types
-  (output/milestone/review) once the runtime exposes a durable public representation for them.
+**Corrected 2026-09-08.** This section previously listed H22-D — bounded concurrency,
+resource coordination/ledger, shared budget coordination and compensation coordination —
+as a later phase and closed with "**None of the above is implemented in these phases.**"
+That contradicted the ladder above in this same document: H22-D **is delivered** in
+`0.6.0`. One item from that list survives, and it is the only one:
 
-**None of the above is implemented in these phases.**
+- **Richer dependency types.** `REQUIRES_OUTPUT`, `REQUIRES_MILESTONE` and
+  `REQUIRES_REVIEW_DECISION` are not implemented. `DependencyType` offers only
+  `REQUIRES_COMPLETION` and `REQUIRES_SUCCESS` — the two the packaged runtime can
+  represent durably and cleanly from committed state, namely a workflow's terminal
+  status. The richer types need a durable public representation of workflow outputs,
+  milestones and review decisions that the runtime does not expose, and they are recorded
+  as a later extension rather than invented against a representation that does not exist.
+
+Beyond that, the exclusions in
+[`AGENT_RUNTIME_LIMITATIONS.md`](AGENT_RUNTIME_LIMITATIONS.md) stand: no distributed
+cluster scheduling, no distributed locking, no cross-process or cross-machine execution,
+no exactly-once external effects, and no Runtime Assurance.
 
 ## Why the base is ready
 

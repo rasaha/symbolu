@@ -1,5 +1,37 @@
 # Changelog — `ugence-agent-constitution-policy`
 
+## 0.3.0 — projecting governed roles as exclusivity claims (the `ACC-OVL` round)
+
+Authorized by `ACC-OVL-7`. Additive: one new public name, no behaviour removed,
+**no digest moved** — the projection is a descriptor field, and the descriptor is
+outside the canonical body every digest is computed over.
+
+### Added
+
+- **`GOVERNED_ROLE_EXCLUSIVITY_NAMESPACE`** —
+  `ugence.agent-constitution/governed-role`, the namespace this family's claims
+  are projected under. Namespacing is what lets a second family adopt exclusivity
+  semantics later without colliding with this one, and without either family
+  appearing in Policy Authority's core.
+- **One claim per `governed_role_refs` entry**, projected by the adapter, so the
+  authority can refuse a second constitution governing a role this one already
+  governs — the gap that was carried as a known hazard until now.
+
+### Fails closed, and why it must
+
+`[R]` The adapter **refuses** at `describe` time when `governed_role_refs` is
+absent, empty, malformed or duplicated. The reason is structural rather than
+cautious: the authority's core cannot distinguish *"this family has nothing to
+claim"* from *"this family failed to project what it should have claimed"* —
+both arrive as an empty tuple, and the first is the correct, ruled behaviour for
+every family without exclusivity semantics. So the distinction has to be drawn
+here, in the family that knows its claims are load-bearing.
+
+`[G]` No constitution is issued or activated by this release, and no `ACC-FC-5`
+gate is closed. `ACC-OVL-4` stands: no second constitution until the invariant is
+implemented and verified — which this release, with Policy Authority `0.5.0`,
+is what satisfies.
+
 ## 0.2.0 — the family declares what it supersedes (the `ACC-SU` round)
 
 The change set authorized as `ACC-SU-IA-5` (see
@@ -69,6 +101,14 @@ conformance distribution's concrete resolver and structural verifier, which are
 a separate distribution and a separate change set; first release of the slice
 additionally awaits the separately balloted `OD-C1=B` contract-amendment round.
 Until those land the capability cannot replay end to end.
+
+> **Superseded as a statement of current fact (2026-09-09, `ACC-DR`).**
+> The paragraph above is retained verbatim as the record of what was true at
+> this release. `[V]` It is **no longer current**: the conformance distribution landed as the second `ACC-S1-Q2`
+> change set, and the `OD-C1=B` contract-amendment round was ratified
+> (`ACC-AM-IMPL=YES`) and implemented. Neither condition is outstanding. `[R]` This note
+> records a fact, ratifies nothing, and reopens no ruling. No constitution has
+> been issued or activated, and no `ACC-FC-5` gate is closed.
 
 ### Added
 

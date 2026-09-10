@@ -15,7 +15,7 @@ change in package behaviour.
 Every failure names the document line that has gone stale.
 
 The Stage 1 gate and condition verifiers are the test-only stubs from
-``packages/capabilities/agent-value-readiness/tests/orchestration/``. That is
+``packages/agent-value-readiness/tests/orchestration/``. That is
 deliberate and is what the document itself says: the distribution ships no gate
 or condition verifier, and the absence of any allow-all verifier is the trust
 boundary. This gate therefore pins the classification logic and the
@@ -36,7 +36,7 @@ DOC_REL = DOC_PATH.relative_to(REPO_ROOT)
 
 # The readiness orchestration fixtures are that package's own test helpers.
 _READINESS_TESTS = (
-    REPO_ROOT / "packages" / "capabilities" / "agent-value-readiness" / "tests"
+    REPO_ROOT / "packages" / "agent-value-readiness" / "tests"
 )
 for _p in (_READINESS_TESTS, _READINESS_TESTS / "orchestration"):
     if str(_p) not in sys.path:
@@ -633,7 +633,7 @@ class ReadinessDocDriftTest(unittest.TestCase):
     def test_document_still_states_the_two_modules_are_unconnected(self):
         """The separation claim is the document's thesis; prove it structurally."""
         readiness_src = (
-            REPO_ROOT / "packages" / "capabilities" / "agent-value-readiness" / "src"
+            REPO_ROOT / "packages" / "agent-value-readiness" / "src"
         )
         value_src = REPO_ROOT / "packages" / "governed-value" / "src"
 

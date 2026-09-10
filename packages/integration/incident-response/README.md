@@ -138,6 +138,13 @@ products and applications may import it; no capability package may, enforced by
   noticed; there is no monitor, no rule engine, and no correlation across incidents.
 - No delivery: the signal payload is built, never sent.
 - No store, so nothing persists.
-- Severity stays an uninterpreted label until an owner ratifies a taxonomy.
+- The severity vocabulary **is** ratified — `SEV1` to `SEV4` (ballot `LV-D`,
+  `docs/architecture/GOVERNANCE_LABEL_VOCABULARY_BALLOT.md`) — and ratified as **unordered**. Severity
+  is the one vocabulary whose natural form is a rank, and every governing ruling
+  forbids ordering, so the four are four names: any ordering lives in a responder's
+  runbook, never in code. The cost is accepted and stated: "every incident at or
+  above SEV2" is a question this repository cannot answer. A distinct ordered kind
+  waits for an operational surface that needs it, and gets its own ruling then; a
+  rank field beside the label was considered and refused.
 - The control plane the wave 3 rows assume still does not exist, so nothing here
   composes into an operational surface.

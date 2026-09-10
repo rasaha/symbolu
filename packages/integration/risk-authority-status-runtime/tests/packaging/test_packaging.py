@@ -7,7 +7,10 @@ second machine-authority artifact** (invariant I8).
 
 from __future__ import annotations
 
-import tomllib
+try:  # Python 3.11+ ships tomllib; 3.10 resolves the same parser from tomli.
+    import tomllib
+except ModuleNotFoundError:  # pragma: no cover - only a <3.11 run takes this branch
+    import tomli as tomllib  # type: ignore[no-redef]
 from pathlib import Path
 
 PKG = Path(__file__).resolve().parents[2]
@@ -23,7 +26,7 @@ def test_package_name_and_version():
     assert data["project"]["name"] == "ugence-risk-authority-status-runtime"
     from ugence_risk_authority_status_runtime import __version__
 
-    assert __version__ == "0.1.0"
+    assert __version__ == "0.2.0"
 
 
 def test_declares_only_risk_authority_dependency():

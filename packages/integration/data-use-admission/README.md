@@ -85,8 +85,9 @@ notes)`.
   the caller's own spelling. Never the data: there is no field that could carry a
   payload, and a test pins the field set.
 - **`classification`** and **`purpose_label`** are what the declarer said, and they
-  are **uninterpreted** (DE-3). A blank label is refused; an unrecognized one is not,
-  because there is no recognized set.
+  are **uninterpreted** (DE-3). A blank label is refused; an unrecognized one is not
+  — sets are now ratified, but as a Policy-Authority document under ballot `LV-1`,
+  never as an enum here, so nothing in this package can recognize a member.
 - **`residency_label`** is recorded and never evaluated (DE-2).
 - **`declaration_id`** is derived from the binding's digest, the data reference, the
   label's digest, the purpose and the window — no UUID, no clock — and the record
@@ -162,8 +163,15 @@ import it; no capability package may — enforced repository-wide by
 - No admission engine: the seam at `context-minimization/README.md:14` now has a
   record type, not a decision. Whether a context may be assembled is still nobody's
   answer.
-- The classification and purpose vocabularies are unratified, so both labels stay
-  uninterpreted until an owner fixes a taxonomy.
+- Both vocabularies **are** ratified (`docs/architecture/GOVERNANCE_LABEL_VOCABULARY_BALLOT.md`), and
+  differently. Data classification has a closed set — `PUBLIC`, `INTERNAL`,
+  `CONFIDENTIAL`, `RESTRICTED`, `REGULATED` — with one question still open, whether
+  `REGULATED` is an orthogonal member or a fifth rung. Purpose is ratified as an
+  **open shape** (`LV-E`): a label names an activity and its beneficiary, and the
+  set is deliberately not closed, because every closed purpose set grows an `OTHER`.
+  Both labels stay uninterpreted by ruling rather than by omission — `DE-3` makes
+  them opaque values, and `LV-1` keeps the vocabularies in a Policy-Authority
+  document rather than an enum here.
 - Result egress and residency consolidation stay out of scope until a further
   ruling.
 - A dynamic `importlib.import_module(name)` cannot be caught by any static checker;

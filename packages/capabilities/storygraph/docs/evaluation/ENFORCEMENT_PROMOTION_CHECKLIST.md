@@ -1,5 +1,12 @@
 # Enforcement-Promotion Checklist — Composite Sequence-Risk Analyzer
 
+> **Promotion is deferred by owner ruling, 2026-09-09.** No shadow pilot is funded
+> and no enforcement integration is undertaken while this checklist stands at 0 of
+> 10. StoryGraph is retained as an optional advisory capability — deferred, not
+> failed. The five conditions that would reopen this checklist are in
+> [`DEFERRAL_AND_REENTRY.md`](DEFERRAL_AND_REENTRY.md); meeting them opens the ten
+> criteria below rather than bypassing them.
+
 **Enforcement is prohibited** until every criterion below is demonstrated on a
 **frozen** workflow. There is **no global enforcement switch**: promotion is
 always scoped. In the current phase the analyzer runs advisory / shadow only, and

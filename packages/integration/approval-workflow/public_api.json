@@ -15,10 +15,7 @@
     },
     "ApprovalAlreadyExistsError": {
       "kind": "class",
-      "methods": [
-        "add_note",
-        "with_traceback"
-      ]
+      "methods": []
     },
     "ApprovalEvent": {
       "fields": [
@@ -34,10 +31,7 @@
     },
     "ApprovalNotFoundError": {
       "kind": "class",
-      "methods": [
-        "add_note",
-        "with_traceback"
-      ]
+      "methods": []
     },
     "ApprovalRecord": {
       "fields": [
@@ -96,10 +90,7 @@
     },
     "ApprovalWorkflowError": {
       "kind": "class",
-      "methods": [
-        "add_note",
-        "with_traceback"
-      ]
+      "methods": []
     },
     "ApprovalWorkflowPort": {
       "kind": "class",
@@ -145,10 +136,7 @@
     },
     "ArtifactIntegrityError": {
       "kind": "class",
-      "methods": [
-        "add_note",
-        "with_traceback"
-      ]
+      "methods": []
     },
     "CONSUMABLE_STATES": {
       "kind": "frozenset",
@@ -197,10 +185,7 @@
     },
     "ContractViolation": {
       "kind": "class",
-      "methods": [
-        "add_note",
-        "with_traceback"
-      ]
+      "methods": []
     },
     "ELIGIBLE_APPROVER_KINDS": {
       "kind": "frozenset",
@@ -232,17 +217,11 @@
     },
     "EligibilityRefused": {
       "kind": "class",
-      "methods": [
-        "add_note",
-        "with_traceback"
-      ]
+      "methods": []
     },
     "IllegalTransitionError": {
       "kind": "class",
-      "methods": [
-        "add_note",
-        "with_traceback"
-      ]
+      "methods": []
     },
     "InMemoryApprovalWorkflowStore": {
       "kind": "class",
@@ -291,10 +270,7 @@
     },
     "ProductionModeRefused": {
       "kind": "class",
-      "methods": [
-        "add_note",
-        "with_traceback"
-      ]
+      "methods": []
     },
     "ReviewDecision": {
       "kind": "enum",
@@ -352,10 +328,7 @@
     },
     "StoreUnavailableError": {
       "kind": "class",
-      "methods": [
-        "add_note",
-        "with_traceback"
-      ]
+      "methods": []
     },
     "TERMINAL_STATES": {
       "kind": "frozenset",

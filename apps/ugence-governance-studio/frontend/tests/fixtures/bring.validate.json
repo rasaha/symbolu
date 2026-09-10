@@ -1,0 +1,16 @@
+{
+  "declared_contract_version": "workflow_ir.v1",
+  "diagnostics": [],
+  "integrity": {
+    "checked": true,
+    "computed_digest": "sha256:07a010387450da9323d9612edb84527aa03519da8ea64a2f6bcbc2724bd1d86d",
+    "match": false,
+    "source_digest": "sha256:0000"
+  },
+  "supported_contracts": [
+    "workflow_ir.v1",
+    "workflow_ir.v2"
+  ],
+  "supported_version": true,
+  "validation_state": "VALID"
+}

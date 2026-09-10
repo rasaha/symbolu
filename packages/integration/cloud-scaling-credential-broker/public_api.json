@@ -11,31 +11,19 @@
     },
     "CloudScalingCredentialBrokerError": {
       "kind": "class",
-      "methods": [
-        "add_note",
-        "with_traceback"
-      ]
+      "methods": []
     },
     "CredentialBrokerConfigurationError": {
       "kind": "class",
-      "methods": [
-        "add_note",
-        "with_traceback"
-      ]
+      "methods": []
     },
     "CredentialBrokerContractError": {
       "kind": "class",
-      "methods": [
-        "add_note",
-        "with_traceback"
-      ]
+      "methods": []
     },
     "CredentialBrokerExactTypeError": {
       "kind": "class",
-      "methods": [
-        "add_note",
-        "with_traceback"
-      ]
+      "methods": []
     },
     "CredentialBrokerPort": {
       "kind": "class",
@@ -135,10 +123,7 @@
     },
     "CredentialRequestRefused": {
       "kind": "class",
-      "methods": [
-        "add_note",
-        "with_traceback"
-      ]
+      "methods": []
     },
     "DEFAULT_TTL_CAP": {
       "kind": "timedelta",

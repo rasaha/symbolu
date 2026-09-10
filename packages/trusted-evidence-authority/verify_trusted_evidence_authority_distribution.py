@@ -858,7 +858,10 @@ BACKEND_REQUIREMENTS = ("cryptography>=41.0.7,<47.0.0", "PyNaCl>=1.5.0,<2.0.0")
 def _declared_backend_requirements() -> list:
     """Read the declared runtime dependencies out of ``pyproject.toml``."""
 
-    import tomllib
+    try:  # Python 3.11+ ships tomllib; 3.10 resolves the same parser from tomli.
+        import tomllib
+    except ModuleNotFoundError:  # pragma: no cover - only a <3.11 run takes this branch
+        import tomli as tomllib  # type: ignore[no-redef]
 
     data = tomllib.loads((PKG / "pyproject.toml").read_text(encoding="utf-8"))
     return list(data["project"]["dependencies"])

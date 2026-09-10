@@ -16,13 +16,31 @@ widening of the dependency surface, and this test pins the new, exact shape:
 two named cryptographic distributions, one importing module, and every §23
 arrow still unbroken.
 
-The reverse direction is asserted too: no package in the monorepo imports this
-one, apart from the single consumer named in :data:`AUTHORIZED_CONSUMERS`. ADR
-§30's UVI-EV-1 — *readiness* consuming receipts and resolved definitions — is
-still DEFERRED, and an import driven by that milestone would still be scope
-expansion. What the allowlist records is a different, separately ratified
-integration; see :data:`AUTHORIZED_CONSUMERS` for exactly which, and why the
-blanket refusal is unchanged for everybody else.
+The reverse direction is asserted too, and the scan is **repository-wide**:
+nothing anywhere in this repository imports this package, apart from the trees
+named in :data:`AUTHORIZED_CONSUMERS`, :data:`AUTHORIZED_RESEARCH_CONSUMERS`
+and :data:`AUTHORIZED_AUDIT_TREES`.
+
+It globbed ``packages/**/*.py`` alone until the packages capability audit found
+what that missed: ``experiments/workflow_fit_study`` has imported this package
+since SCR-1 — the signed-snapshot resolver included — and the closure-audit
+probes under ``audit/`` have imported it since TEV-2, and neither could ever be
+reported by a scan that never looked outside ``packages/``. A closed allowlist
+policed over part of a repository is not a closed allowlist; it is a closed
+allowlist over ``packages/`` and silence everywhere else. The scan now walks the
+whole tree, skipping only version-control internals, compiled caches, build
+trees and this package's own source.
+
+The three tiers stay separate because they authorize different things and must
+fail separately: distributed package consumers under an exact trust-anchor
+symbol grant, a ratified research harness under its own different grant, and the
+independent closure audit, which is exempt from any symbol grant because a probe
+restricted to the granted surface could only re-confirm the boundary it exists
+to falsify. ADR §30's UVI-EV-1 — *readiness* consuming receipts and resolved
+definitions — is still DEFERRED, and an import driven by that milestone would
+still be scope expansion. What each allowlist records is a different, separately
+ratified integration; see each for exactly which, and why the blanket refusal is
+unchanged for everybody else.
 """
 
 from __future__ import annotations
@@ -192,7 +210,10 @@ def test_the_distribution_declares_exactly_the_two_backends():
     not name is a dependency that install would silently satisfy from the host.
     """
 
-    import tomllib
+    try:  # Python 3.11+ ships tomllib; 3.10 resolves the same parser from tomli.
+        import tomllib
+    except ModuleNotFoundError:  # pragma: no cover - only a <3.11 run takes this branch
+        import tomli as tomllib  # type: ignore[no-redef]
 
     pyproject = PKG_ROOT.parents[1] / "pyproject.toml"
     if not pyproject.is_file():  # running from an installed wheel
@@ -453,6 +474,73 @@ AUTHORIZED_CONSUMERS = (
     "packages/integration/reasoning-method-result-attestation",
 )
 
+#: Trees outside ``packages/`` that may import this package. They are kept in their own
+#: tiers, asserted separately from :data:`AUTHORIZED_CONSUMERS`, because they authorize
+#: something different: ``AUTHORIZED_CONSUMERS`` names *distributed* Ugence packages whose
+#: wheels declare a dependency on this one, under the ratified trust-anchor symbol grant.
+#: The trees below ship in no wheel, appear in no ``pyproject.toml`` dependency list and
+#: sit in no product's dependency graph — so they are not candidates for that tuple, and
+#: folding them into it would misdescribe both. Widening either tier must fail its own
+#: assertion first, exactly as widening ``AUTHORIZED_CONSUMERS`` does.
+#:
+#: Both tiers imported this package long before this file could see them. Naming them here
+#: is the first time either is recorded against *this* boundary; it ratifies nothing that
+#: was not already ratified elsewhere, and it grants nothing new.
+
+#: ``experiments/workflow_fit_study`` — the research composition root for the first signed
+#: workflow-fit study, authorized by owner rulings SR-0 to SR-5 under SCR-1
+#: (``docs/architecture/ADR_UGENCE_SIGNED_COMPARISON_RESULT_SCOPING.md`` §7). SR-1 fixes it
+#: as a research harness that **no capability package may hold**, which is exactly why it
+#: is not, and must not become, an entry in ``AUTHORIZED_CONSUMERS``. It publishes and then
+#: resolves an experiment-scoped trust-anchor set over committed research material; every
+#: key it uses is experiment-scoped, and its own module header records what a signed
+#: admission establishes there as self-attestation, never independent verification.
+AUTHORIZED_RESEARCH_CONSUMERS = ("experiments/workflow_fit_study",)
+
+#: The exact symbols the research harness may import: the trust-anchor **publication** and
+#: **resolution** surface, and nothing else. This is a different grant from the product
+#: one, not a superset of it — the harness needs the set-manifest, document-rendering and
+#: signed-snapshot-resolver names that no authorized package consumer is granted, and needs
+#: none of the reference-grade directory or contract-error names that they are.
+#: ``test_the_grant_admits_no_evidence_receipt_or_verification_surface`` holds over this
+#: grant too, so the research route can no more reach an evidence payload, a receipt or the
+#: verification engine than a product consumer can.
+AUTHORIZED_RESEARCH_SYMBOLS = frozenset(
+    {
+        # publishing the experiment-scoped anchor set (publish_research_trust_anchor_set.py)
+        "TRUST_ANCHOR_SET_MANIFEST_SCHEMA_V1",
+        "TrustAnchorSetManifest",
+        "TrustAnchorSetSnapshot",
+        "render_trust_anchor_set_document",
+        "trust_anchor_collection_digest",
+        "trust_anchor_set_signing_bytes",
+        "TrustedEvidenceSigningKey",
+        "encode_public_key",
+        "encode_signature",
+        # resolving it again at admission time (signed_admission.py)
+        "SignedSnapshotTrustAnchorResolver",
+        "TRUSTED_EVIDENCE_SIGNATURE_PROFILE_V1",
+        "TRUSTED_EVIDENCE_SIGNATURE_ENCODING_V1",
+    }
+)
+
+#: ``audit/tev2-1446-closure-reaudit`` — the independent TEV-2 closure re-audit. Its own
+#: README states its method: import the curated public API "or, where the API doesn't
+#: expose something (raw point bytes, the backend module), the smallest private surface
+#: needed". That is the one tier deliberately **exempt from any symbol grant**. A probe
+#: confined to the granted surface could only re-confirm the boundary it exists to falsify,
+#: and two of the six probes (``backend_differential``, ``key_hygiene``) reach
+#: ``authority.backend`` for precisely that reason. The exemption is from the symbol rule
+#: alone: the tree is still named here, still asserted below, and an audit directory that
+#: is not this one is still reported like any other unauthorized importer.
+AUTHORIZED_AUDIT_TREES = ("audit/tev2-1446-closure-reaudit",)
+
+#: Tier labels. A path resolves to exactly one of them, or to nothing at all — and nothing
+#: at all is what the reverse-dependency scan reports.
+_TIER_PACKAGE = "package consumer"
+_TIER_RESEARCH = "research harness"
+_TIER_AUDIT = "closure audit"
+
 
 def _authorized_prefixes(repo):
     """Allowlisted consumer paths as resolved path-component tuples.
@@ -470,9 +558,83 @@ def _is_authorized_path(resolved, authorized):
     return any(resolved.parts[: len(prefix)] == prefix for prefix in authorized)
 
 
-def _permitted_symbols(path) -> frozenset:
-    """Which symbols this particular file inside the authorized consumer may import."""
+def _named_tree_prefixes(repo):
+    """Every named tree as ``(tier, resolved path-component tuples)``.
 
+    One structure for all three tiers so the reverse-dependency scan and the symbol scan
+    agree by construction about which tree a file belongs to, instead of each keeping its
+    own idea of the allowlist.
+    """
+
+    return (
+        (_TIER_PACKAGE, _authorized_prefixes(repo)),
+        (
+            _TIER_RESEARCH,
+            tuple((repo / prefix).resolve().parts for prefix in AUTHORIZED_RESEARCH_CONSUMERS),
+        ),
+        (
+            _TIER_AUDIT,
+            tuple((repo / prefix).resolve().parts for prefix in AUTHORIZED_AUDIT_TREES),
+        ),
+    )
+
+
+def _tier_of(resolved, tiers):
+    """The tier a path belongs to, or ``None`` for a path no allowlist names."""
+
+    for tier, prefixes in tiers:
+        if _is_authorized_path(resolved, prefixes):
+            return tier
+    return None
+
+
+#: Directory names the repository-wide scan never walks: version-control internals,
+#: compiled caches and build trees. Nothing else is skipped — ``experiments/``, ``audit/``,
+#: ``tests/``, ``scripts/``, ``tools/`` and any directory added later are all walked —
+#: because a tree this scan does not enter is a tree in which an unauthorized import cannot
+#: be found.
+_UNSCANNED_DIRECTORIES = frozenset({".git", "__pycache__", "build"})
+
+
+def _iter_candidate_python_files(repo):
+    """Yield ``(path, resolved, source)`` for every ``.py`` file that could import this one.
+
+    Walks the whole repository, minus :data:`_UNSCANNED_DIRECTORIES` and this package's own
+    tree. The own-tree test is by path *containment*, not string prefix, for the same reason
+    :func:`_is_authorized_path` compares components: a sibling directory whose name merely
+    begins with ``trusted-evidence-authority`` is a different directory and is not exempt.
+
+    Files whose source does not contain the package name verbatim are skipped before
+    parsing. That is a filter, never a decision: every construct the detectors below match
+    — a static import, a dotted submodule, a dynamic ``import_module`` string constant —
+    embeds :data:`SELF` literally in the source, so a skipped file has nothing for the AST
+    to find. It admits files a comment or docstring mentions and lets the AST refuse them,
+    which is what keeps this from being a raw-text scan.
+    """
+
+    own_tree = (repo / "packages" / "trusted-evidence-authority").resolve()
+    for path in repo.rglob("*.py"):
+        resolved = path.resolve()
+        if _UNSCANNED_DIRECTORIES.intersection(resolved.parts):
+            continue
+        if resolved == own_tree or own_tree in resolved.parents:
+            continue
+        try:
+            source = path.read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError):
+            continue
+        if SELF not in source:
+            continue
+        yield path, resolved, source
+
+
+def _permitted_symbols(path, tier=_TIER_PACKAGE) -> frozenset:
+    """Which symbols this particular file, in this particular tier, may import."""
+
+    if tier == _TIER_RESEARCH:
+        # The research grant is flat: the harness has no tests of its own inside the tree,
+        # and no reference-grade or contract-error name is granted to it.
+        return AUTHORIZED_RESEARCH_SYMBOLS
     allowed = AUTHORIZED_PRODUCTION_SYMBOLS | AUTHORIZED_REFERENCE_GRADE_SYMBOLS
     if _is_test_file(path):
         allowed = allowed | AUTHORIZED_TEST_ONLY_SYMBOLS
@@ -488,27 +650,29 @@ def _is_test_file(path) -> bool:
 
 
 def authorized_consumer_symbol_violations(repo):
-    """Every way the authorized consumer could reach past its exact symbol grant.
+    """Every way a named consumer could reach past its exact symbol grant.
 
-    Returns a sorted list of human-readable violations; empty means the grant is exactly
+    Covers both granted tiers — the package consumers and the research harness — each
+    against its own grant. The closure-audit tree is skipped by design; see
+    :data:`AUTHORIZED_AUDIT_TREES`.
+
+    Returns a sorted list of human-readable violations; empty means every grant is exactly
     honoured. Semantic AST analysis throughout — never a raw-text scan — so a comment, a
     docstring, a ``# noqa`` or a filename can neither create nor excuse a violation.
     """
 
     violations = []
-    authorized = _authorized_prefixes(repo)
-    for path in repo.glob("packages/**/*.py"):
-        resolved = path.resolve()
-        if "__pycache__" in resolved.parts or "build" in resolved.parts:
-            continue
-        if not _is_authorized_path(resolved, authorized):
+    tiers = _named_tree_prefixes(repo)
+    for path, resolved, source in _iter_candidate_python_files(repo):
+        tier = _tier_of(resolved, tiers)
+        if tier is None or tier == _TIER_AUDIT:
             continue
         try:
-            tree = ast.parse(path.read_text(encoding="utf-8"))
-        except (OSError, UnicodeDecodeError, SyntaxError, ValueError):
+            tree = ast.parse(source)
+        except (SyntaxError, ValueError):
             continue
         rel = path.relative_to(repo).as_posix()
-        permitted = _permitted_symbols(path)
+        permitted = _permitted_symbols(path, tier)
         is_test = _is_test_file(path)
         dynamic = _dynamic_import_callables(tree)
 
@@ -525,7 +689,9 @@ def authorized_consumer_symbol_violations(repo):
                             + "; only the curated top-level API may be reached"
                         )
                     elif not (
-                        is_test and path.name in AUTHORIZED_MODULE_BINDING_TEST_MODULES
+                        tier == _TIER_PACKAGE
+                        and is_test
+                        and path.name in AUTHORIZED_MODULE_BINDING_TEST_MODULES
                     ):
                         why = (
                             " (permitted only in the named boundary-policing test modules)"
@@ -584,30 +750,25 @@ def authorized_consumer_symbol_violations(repo):
 
 
 def _consumer_importers(repo):
-    """Every module outside this package that imports it, minus the authorized consumers."""
+    """Every module in the repository that imports this package and is on no allowlist.
 
-    own_tree = (repo / "packages" / "trusted-evidence-authority").resolve()
-    authorized = _authorized_prefixes(repo)
+    Repository-wide, not ``packages/``-wide: a tree the scan never enters cannot report an
+    import, and for two trees — the research harness and the closure audit — that is
+    exactly what happened until the packages capability audit.
+    """
+
+    tiers = _named_tree_prefixes(repo)
     importers = []
-    for path in repo.glob("packages/**/*.py"):
-        resolved = path.resolve()
-        if str(resolved).startswith(str(own_tree)):
-            continue
-        if "__pycache__" in resolved.parts or "build" in resolved.parts:
-            continue
-        if _is_authorized_path(resolved, authorized):
+    for path, resolved, source in _iter_candidate_python_files(repo):
+        if _tier_of(resolved, tiers) is not None:
             continue
         try:
-            text = path.read_text(encoding="utf-8")
-        except (OSError, UnicodeDecodeError):
-            continue
-        try:
-            tree = ast.parse(text, filename=str(path))
+            tree = ast.parse(source, filename=str(path))
         except SyntaxError:
             continue  # not importable Python for this interpreter; nothing to import
         if _imports_self(tree):
-            importers.append(str(path.relative_to(repo)))
-    return importers
+            importers.append(path.relative_to(repo).as_posix())
+    return sorted(importers)
 
 
 def test_no_unauthorized_consumer_imports_this_package():
@@ -616,9 +777,11 @@ def test_no_unauthorized_consumer_imports_this_package():
         return  # running outside the monorepo (installed wheel); nothing to scan
     importers = _consumer_importers(repo)
     assert not importers, (
-        "TEV authorizes consumer integration only for the packages named in "
-        f"AUTHORIZED_CONSUMERS ({list(AUTHORIZED_CONSUMERS)}); ADR §30's UVI-EV-1 remains "
-        f"DEFERRED. Unexpected imports: {importers}"
+        "TEV authorizes integration only for the trees named in "
+        f"AUTHORIZED_CONSUMERS ({list(AUTHORIZED_CONSUMERS)}), "
+        f"AUTHORIZED_RESEARCH_CONSUMERS ({list(AUTHORIZED_RESEARCH_CONSUMERS)}) and "
+        f"AUTHORIZED_AUDIT_TREES ({list(AUTHORIZED_AUDIT_TREES)}); ADR §30's UVI-EV-1 "
+        f"remains DEFERRED. Unexpected imports: {importers}"
     )
 
 
@@ -635,6 +798,71 @@ def test_the_consumer_allowlist_is_exactly_the_ratified_set():
         "packages/integration/risk-authority-effect-attestation",
         "packages/integration/reasoning-method-result-attestation",
     )
+
+
+def test_the_non_package_allowlists_are_exactly_the_ratified_set():
+    """The two tiers outside ``packages/`` are closed lists too, and have not grown.
+
+    They exist because the scan was widened to the whole repository and found two trees
+    that had always imported this package unseen. A tier added to silence a finding is only
+    a boundary if adding the *next* entry has to fail here first.
+    """
+
+    assert AUTHORIZED_RESEARCH_CONSUMERS == ("experiments/workflow_fit_study",)
+    assert AUTHORIZED_AUDIT_TREES == ("audit/tev2-1446-closure-reaudit",)
+
+
+def test_no_named_non_package_tree_ships_in_any_wheel():
+    """The ground for the separate tiers, asserted rather than asserted-in-prose.
+
+    ``AUTHORIZED_CONSUMERS`` names distributed packages that declare a dependency on this
+    one. These trees are not packages: they live outside ``packages/``, and no
+    ``pyproject.toml`` anywhere in the repository declares a dependency on them. If one ever
+    becomes a distribution, it belongs in the product tier under the product grant, and this
+    fails until somebody moves it.
+    """
+
+    repo = _repo_root()
+    if repo is None:
+        return  # running outside the monorepo (installed wheel); nothing to scan
+    for tree in AUTHORIZED_RESEARCH_CONSUMERS + AUTHORIZED_AUDIT_TREES:
+        assert (repo / tree).is_dir(), f"named tree does not exist: {tree}"
+        assert not tree.startswith("packages/"), tree
+        assert not list((repo / tree).glob("**/pyproject.toml")), (
+            f"{tree} has become a distribution; it belongs in AUTHORIZED_CONSUMERS "
+            "under the product symbol grant, not in a non-package tier"
+        )
+
+
+def test_the_research_grant_is_exactly_the_ratified_set():
+    """The research grant is per-symbol too, and it is not the product grant.
+
+    Stated separately so that widening either grant cannot be mistaken for widening the
+    other, and so the two cannot silently converge into one permissive union.
+    """
+
+    assert AUTHORIZED_RESEARCH_SYMBOLS == frozenset(
+        {
+            "TRUST_ANCHOR_SET_MANIFEST_SCHEMA_V1",
+            "TrustAnchorSetManifest",
+            "TrustAnchorSetSnapshot",
+            "render_trust_anchor_set_document",
+            "trust_anchor_collection_digest",
+            "trust_anchor_set_signing_bytes",
+            "TrustedEvidenceSigningKey",
+            "encode_public_key",
+            "encode_signature",
+            "SignedSnapshotTrustAnchorResolver",
+            "TRUSTED_EVIDENCE_SIGNATURE_PROFILE_V1",
+            "TRUSTED_EVIDENCE_SIGNATURE_ENCODING_V1",
+        }
+    )
+    # Neither grant is a superset of the other: each authorizes a route the other may not
+    # take. A future edit that makes one contain the other has merged two boundaries into
+    # one, and must fail here rather than be discovered as a widening later.
+    product = AUTHORIZED_PRODUCTION_SYMBOLS | AUTHORIZED_REFERENCE_GRADE_SYMBOLS
+    assert not AUTHORIZED_RESEARCH_SYMBOLS <= product
+    assert not product <= AUTHORIZED_RESEARCH_SYMBOLS
 
 
 def test_the_symbol_grant_is_exactly_the_ratified_set():
@@ -681,6 +909,9 @@ def test_the_grant_admits_no_evidence_receipt_or_verification_surface():
         AUTHORIZED_PRODUCTION_SYMBOLS
         | AUTHORIZED_REFERENCE_GRADE_SYMBOLS
         | AUTHORIZED_TEST_ONLY_SYMBOLS
+        # The research harness is held to the same property: a different grant, never a
+        # laxer one. Its route may reach no evidence payload, receipt or verifier either.
+        | AUTHORIZED_RESEARCH_SYMBOLS
     )
     evidence_domain = {
         name
@@ -884,6 +1115,198 @@ def test_the_authorized_consumer_is_exempt_from_the_same_scan(tmp_path):
     (tmp_path / "packages" / "trusted-evidence-authority").mkdir(parents=True)
 
     assert _consumer_importers(tmp_path) == []
+
+
+# --- the widening: what a ``packages/**`` glob could never report -----------------------
+
+_OUTSIDE_PACKAGES = (
+    "experiments/rogue_study/harness.py",
+    "audit/some-other-audit/probe.py",
+    "tools/handy.py",
+    "scripts/one_off.py",
+    "sdk/client.py",
+    "conftest.py",
+)
+
+
+@pytest.mark.parametrize("relative", _OUTSIDE_PACKAGES)
+def test_an_importer_outside_packages_is_reported(tmp_path, relative):
+    """The regression test for the hole this scan had until the packages capability audit.
+
+    Each of these paths imports the package from outside ``packages/``. Under the previous
+    ``repo.glob("packages/**/*.py")`` every one of them was invisible — not allowed, not
+    refused, simply never looked at — which is how two real importers went unrecorded for
+    two milestones. A boundary that reports nothing about a tree is not enforcing anything
+    there.
+    """
+
+    planted = tmp_path / relative
+    planted.parent.mkdir(parents=True, exist_ok=True)
+    planted.write_text(f"import {SELF}\n", encoding="utf-8")
+    (tmp_path / "packages" / "trusted-evidence-authority").mkdir(parents=True)
+
+    assert _consumer_importers(tmp_path) == [relative]
+
+
+@pytest.mark.parametrize("tree", AUTHORIZED_RESEARCH_CONSUMERS + AUTHORIZED_AUDIT_TREES)
+def test_a_named_non_package_tree_is_exempt_from_the_scan(tmp_path, tree):
+    """...and the two named tiers are genuinely exempt, or the widening broke them."""
+
+    planted = tmp_path / tree / "mod.py"
+    planted.parent.mkdir(parents=True)
+    planted.write_text(f"import {SELF}\n", encoding="utf-8")
+    (tmp_path / "packages" / "trusted-evidence-authority").mkdir(parents=True)
+
+    assert _consumer_importers(tmp_path) == []
+
+
+def test_a_sibling_of_this_packages_own_tree_is_not_exempt(tmp_path):
+    """The own-tree skip matches path containment, never a string prefix.
+
+    ``packages/trusted-evidence-authority-evil`` starts with this package's own path as a
+    *string*. It is a different directory, nothing authorizes it, and it must be reported —
+    the same hole :func:`_is_authorized_path` was already written to avoid on the allowlist
+    side, closed on the exclusion side too.
+    """
+
+    planted = tmp_path / "packages" / "trusted-evidence-authority-evil" / "mod.py"
+    planted.parent.mkdir(parents=True)
+    planted.write_text(f"import {SELF}\n", encoding="utf-8")
+    (tmp_path / "packages" / "trusted-evidence-authority").mkdir(parents=True)
+
+    assert _consumer_importers(tmp_path) == [
+        "packages/trusted-evidence-authority-evil/mod.py"
+    ]
+
+
+# --- the research tier is held to a grant, exactly like the product tier ---------------
+
+
+def test_the_research_consumer_honours_its_exact_symbol_grant():
+    """The live research harness imports exactly what it is granted, and nothing more."""
+
+    repo = _repo_root()
+    if repo is None:
+        return  # running outside the monorepo (installed wheel); nothing to scan
+    tiers = _named_tree_prefixes(repo)
+    research = [
+        path.relative_to(repo).as_posix()
+        for path, resolved, _ in _iter_candidate_python_files(repo)
+        if _tier_of(resolved, tiers) == _TIER_RESEARCH
+    ]
+    # A grant asserted over an empty set asserts nothing: the harness must still be there.
+    assert research, "the research tier names a tree that imports nothing"
+    assert authorized_consumer_symbol_violations(repo) == []
+
+
+RESEARCH_FORBIDDEN_INJECTIONS = [
+    ("from {} import EvidenceObservation", "outside the exact authorized"),
+    ("from {} import SignedEvidenceVerificationReceipt", "outside the exact authorized"),
+    ("from {} import EvidenceVerificationRequest", "outside the exact authorized"),
+    # granted to the product tier, and to the research tier not at all
+    ("from {} import StaticTrustAnchorDirectory", "outside the exact authorized"),
+    ("from {} import TrustedEvidenceContractError", "outside the exact authorized"),
+    ("from {}.authority.trust import TrustAnchorRecord", "internal module"),
+    ("import {}", "module object"),
+    ("from {} import *", "star-imports"),
+]
+
+
+@pytest.mark.parametrize("template, expected_fragment", RESEARCH_FORBIDDEN_INJECTIONS)
+def test_an_injected_forbidden_import_fails_the_research_boundary(
+    tmp_path, template, expected_fragment
+):
+    """The research tier is an allowlist entry, not an amnesty.
+
+    Two of these are the point of keeping the grants separate: a name the *product* tier is
+    granted is still refused here, because the two routes are authorized by different
+    rulings and neither inherits the other's surface.
+    """
+
+    planted = tmp_path / AUTHORIZED_RESEARCH_CONSUMERS[0] / "harness.py"
+    planted.parent.mkdir(parents=True)
+    planted.write_text(template.format(SELF) + chr(10), encoding="utf-8")
+    (tmp_path / "packages" / "trusted-evidence-authority").mkdir(parents=True)
+
+    violations = authorized_consumer_symbol_violations(tmp_path)
+    assert violations, "not reported: " + repr(template.format(SELF))
+    assert any(expected_fragment in v for v in violations), violations
+
+
+@pytest.mark.parametrize("symbol", sorted(AUTHORIZED_RESEARCH_SYMBOLS))
+def test_every_granted_research_symbol_remains_importable(tmp_path, symbol):
+    """Positive control for the research grant: a narrowing, not a break."""
+
+    planted = tmp_path / AUTHORIZED_RESEARCH_CONSUMERS[0] / "harness.py"
+    planted.parent.mkdir(parents=True)
+    planted.write_text("from " + SELF + " import " + symbol + chr(10), encoding="utf-8")
+    (tmp_path / "packages" / "trusted-evidence-authority").mkdir(parents=True)
+
+    assert authorized_consumer_symbol_violations(tmp_path) == []
+
+
+def test_a_research_only_symbol_is_refused_in_the_product_tier(tmp_path):
+    """The separation holds in the other direction too.
+
+    ``SignedSnapshotTrustAnchorResolver`` is granted to the research harness and to no
+    package consumer. Without this, "two grants" would mean one grant with two names.
+    """
+
+    planted = tmp_path / AUTHORIZED_CONSUMERS[0] / "src" / "mod.py"
+    planted.parent.mkdir(parents=True)
+    planted.write_text(
+        "from " + SELF + " import SignedSnapshotTrustAnchorResolver" + chr(10),
+        encoding="utf-8",
+    )
+    (tmp_path / "packages" / "trusted-evidence-authority").mkdir(parents=True)
+
+    assert authorized_consumer_symbol_violations(tmp_path) != []
+
+
+# --- the audit tier is exempt from the symbol grant, and the exemption is load-bearing --
+
+
+def test_the_audit_tree_is_exempt_from_the_symbol_grant(tmp_path):
+    """A closure-audit probe may reach the private surface its findings are about."""
+
+    planted = tmp_path / AUTHORIZED_AUDIT_TREES[0] / "probe.py"
+    planted.parent.mkdir(parents=True)
+    planted.write_text(
+        "from " + SELF + ".authority.backend import require_valid_ed25519_point" + chr(10),
+        encoding="utf-8",
+    )
+    (tmp_path / "packages" / "trusted-evidence-authority").mkdir(parents=True)
+
+    assert authorized_consumer_symbol_violations(tmp_path) == []
+
+
+def test_the_audit_exemption_is_not_idle():
+    """...and it is exempt because it must be, not as a convenience.
+
+    If every committed probe could live inside the product grant, the exemption would be
+    unnecessary and should be deleted rather than kept. It cannot: the differential and
+    key-hygiene probes reach ``authority.backend`` precisely because that is the module
+    whose behaviour findings F-02 and F-08 are about.
+    """
+
+    repo = _repo_root()
+    if repo is None:
+        return  # running outside the monorepo (installed wheel); nothing to scan
+    internal = []
+    for path in sorted((repo / AUTHORIZED_AUDIT_TREES[0]).rglob("*.py")):
+        try:
+            tree = ast.parse(path.read_text(encoding="utf-8"))
+        except (OSError, UnicodeDecodeError, SyntaxError, ValueError):
+            continue
+        for node in ast.walk(tree):
+            if isinstance(node, ast.ImportFrom) and node.module:
+                if _names_an_import_of_self(node.module) and node.module != SELF:
+                    internal.append(path.relative_to(repo).as_posix())
+    assert internal, (
+        "no committed probe reaches a private module any more; the audit tier's exemption "
+        "from the symbol grant is no longer load-bearing and should be removed rather than "
+        "left as a standing hole"
+    )
 
 
 # --- the detector itself is tested, because a boundary test that cannot fail is not a

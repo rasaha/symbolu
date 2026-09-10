@@ -31,7 +31,14 @@ import threading
 from typing import Any, List
 
 import pytest
-import sqlalchemy as sa
+
+sa = pytest.importorskip(
+    "sqlalchemy",
+    reason=(
+        "SQLAlchemy is required for the matrix. A skipped row is not a passing row: "
+        "CI installs the engine dependencies and fails the job if any row skipped."
+    ),
+)
 
 pytest.importorskip(
     "ugence_agent_runtime_governance",
@@ -92,6 +99,7 @@ def _fingerprints(app: str, instance_id: str) -> List[str]:
 
 
 # --------------------------------------------------------------------------- #
+@requires_postgres
 def test_the_production_hook_clears_through_real_composition(wired_production):
     """Baseline: the hook actually reaches CLEAR, so the rows below mean something.
 

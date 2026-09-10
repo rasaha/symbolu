@@ -7,10 +7,7 @@
   "symbols": {
     "BarePolicyRollbackRefused": {
       "kind": "class",
-      "methods": [
-        "add_note",
-        "with_traceback"
-      ]
+      "methods": []
     },
     "BoundedDispatch": {
       "fields": [
@@ -37,24 +34,15 @@
     },
     "BoundedExecutionConfigurationError": {
       "kind": "class",
-      "methods": [
-        "add_note",
-        "with_traceback"
-      ]
+      "methods": []
     },
     "BoundedExecutionContractError": {
       "kind": "class",
-      "methods": [
-        "add_note",
-        "with_traceback"
-      ]
+      "methods": []
     },
     "BoundedExecutionExactTypeError": {
       "kind": "class",
-      "methods": [
-        "add_note",
-        "with_traceback"
-      ]
+      "methods": []
     },
     "BoundedExecutionRecord": {
       "fields": [
@@ -107,10 +95,7 @@
     },
     "CloudScalingBoundedExecutionError": {
       "kind": "class",
-      "methods": [
-        "add_note",
-        "with_traceback"
-      ]
+      "methods": []
     },
     "DEFAULT_DISPATCH_DEADLINE": {
       "kind": "timedelta",

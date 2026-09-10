@@ -7,6 +7,14 @@ is the only thing rows 1-3 and 7 are actually about.
 Point ``UGENCE_DE_TEST_PG`` at a server (default:
 ``postgresql://postgres@127.0.0.1:5432/postgres``). Each test module gets freshly
 created application and system databases, so no test can see another's rows.
+
+SQLAlchemy is imported lazily rather than through a module-level ``importorskip``. A
+module-level skip here is collected as a *directory* skip, which took the boundary and
+ADR-conformance tests down with the matrix — and those assert the one-way dependency on
+Agent Runtime and the pinned ADR section 4 Protocol surface, neither of which needs a
+database. A contributor without Postgres now still gets that signal. Nothing about the
+matrix is relaxed: a row that cannot reach a real server still skips, and CI still fails
+the job if any matrix row skipped.
 """
 from __future__ import annotations
 
@@ -15,7 +23,10 @@ import uuid
 
 import pytest
 
-sa = pytest.importorskip("sqlalchemy", reason="SQLAlchemy is required for the matrix")
+try:  # the matrix needs it; the boundary and ADR-conformance tests do not
+    import sqlalchemy as sa
+except ImportError:  # pragma: no cover - exercised by running without the extra
+    sa = None
 
 ADMIN_URL = os.environ.get(
     "UGENCE_DE_TEST_PG", "postgresql+psycopg://postgres@127.0.0.1:5432/postgres"
@@ -31,6 +42,8 @@ def _admin_engine():
 
 
 def postgres_available() -> bool:
+    if sa is None:
+        return False
     try:
         with _admin_engine().connect() as c:
             c.execute(sa.text("SELECT 1"))
@@ -38,6 +51,14 @@ def postgres_available() -> bool:
     except Exception:
         return False
 
+
+requires_engine_deps = pytest.mark.skipif(
+    sa is None,
+    reason=(
+        "SQLAlchemy is not installed, so the concrete DBOS adapter cannot be imported. "
+        "Install the package's engine dependencies to exercise it."
+    ),
+)
 
 requires_postgres = pytest.mark.skipif(
     not postgres_available(),
@@ -55,6 +76,8 @@ def _url_for(dbname: str) -> str:
 @pytest.fixture()
 def pg_databases():
     """Create a fresh (application, system) database pair; drop them afterwards."""
+    if sa is None:
+        pytest.skip("SQLAlchemy is not installed; the matrix needs a real server.")
     tag = uuid.uuid4().hex[:10]
     app_db, sys_db = f"ude_app_{tag}", f"ude_sys_{tag}"
     admin = _admin_engine()

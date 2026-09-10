@@ -16,6 +16,12 @@ export function AppShell({ children }: { children: ReactNode }) {
           </Link>
           <nav aria-label="sections" className="flex items-center gap-2">
             <Link
+              to="/bring-your-workflow"
+              className="rounded border border-surface-border bg-surface-2 px-2 py-0.5 text-[11px] font-medium text-ink-1 hover:bg-surface-3"
+            >
+              Bring Your Workflow
+            </Link>
+            <Link
               to="/studio"
               className="rounded border border-surface-border bg-surface-2 px-2 py-0.5 text-[11px] font-medium text-ink-1 hover:bg-surface-3"
             >

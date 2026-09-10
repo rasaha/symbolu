@@ -25,6 +25,7 @@ P3C (eligibility) plus the P3D planning explorer:
 - **Replay** — plan fingerprint match + deterministic export (not agent re-execution)
 - **Comparison** — the backend's plan diff
 - **Controlled What-If** — nine allowlisted bounded perturbations on a temporary copy
+- **Bring Your Workflow** — validate, adapt and compare an operator-supplied Ugence Workflow IR document (`workflow_ir.v1` / `workflow_ir.v2` JSON, pasted or a local file), ephemeral, with a local download of the report; owner ruling BW-1 to BW-5, ADR §22
 
 It consistently distinguishes **Eligible ≠ Ranked ≠ Selected ≠ Assigned ≠
 Proposed ≠ Granted ≠ Executed**.
@@ -82,9 +83,15 @@ npm run e2e                  # Playwright: all scenarios + nine-operation what-i
 
 The Studio **proposes** permission scopes and displays permission requirements; it
 never grants, provisions, activates or authorizes anything, holds no secrets, and
-accepts no arbitrary JSON / policy / URL / code / fixture-upload input. The only
-mutating-looking control is what-if, restricted to nine allowlisted operations with
-validated parameters applied to a server-side temporary copy. Every response is
+accepts no policy, URL, code, YAML, archive, credential or fixture-upload input. The
+one operator-supplied document it accepts is Ugence Workflow IR JSON on the Bring
+Your Workflow screen (owner ruling BW-1 to BW-5, ADR §22, which superseded the
+earlier "no arbitrary JSON" sentence here): gated in the browser and again on the
+server (1 MiB, depth 32, 200 nodes, 400 edges), sent only to validate, adapt and
+compare-adaptations, stored nowhere, never executed, and never written to the
+scenario catalog. The only mutating-looking control is what-if, restricted to nine
+allowlisted operations with validated parameters applied to a server-side temporary
+copy. Every response is
 validated by a fail-closed decoder; `NO_FEASIBLE_TEAM` is a domain state, not an
 error. The frozen OpenAPI contract and the platform-freeze digest are unchanged by
 this frontend.

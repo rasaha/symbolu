@@ -45,8 +45,14 @@ def _fresh_candidate(provider: str = "anthropic", region: str = "us", latency: f
 
 
 def test_version_and_policy_version():
-    assert ms.__version__ == "0.1.0"
-    assert api.POLICY_VERSION == "exec_gate_v1"  # preserved from the legacy default
+    assert ms.__version__ == "0.2.0"
+    # The policy version identifies decision semantics, not record shape. 0.2.0 can reach
+    # a different outcome from 0.1.0 on identical inputs when a capability floor is
+    # configured, so it may not answer to the same name — two implementations that can
+    # disagree must not both claim exec_gate_v1. Stored v1 records are untouched and stay
+    # readable; see test_policy_version.py.
+    assert api.POLICY_VERSION == "exec_gate_v2"
+    assert api.SUPPORTED_POLICY_VERSIONS == ("exec_gate_v1", "exec_gate_v2")
 
 
 def test_public_api_surface_complete():

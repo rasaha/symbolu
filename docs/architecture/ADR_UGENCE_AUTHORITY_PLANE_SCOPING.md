@@ -749,3 +749,231 @@ change, each of which needs its own scoping and ballot; LIVE execution.
 Unchanged: §20.5 in full, then, after AX-1's composition, the propagation seams of
 EN-2; and, after the first authority-plane write is served with its own record, the
 first guided-configuration screen of EN-1, each screen its own slice.
+
+---
+
+## 22 — Owner ruling BW-1 to BW-5: Bring Your Workflow, a read-only Workflow IR inspector (owner, 2026-09-07)
+
+**Status:** ratified by the owner in their own words on 2026-09-07 ("Ratify BW-1
+through BW-5 as recommended ... confirm the BW-2 figures, and confirm that the
+ratification supersedes the 'no arbitrary JSON / fixture-upload input' sentences in
+the studio frontend README and P3D_SECURITY.md"), and implemented in the same slice.
+
+### 22.1 — The question, and what the repository settled before the ballot
+
+The Studio had no way for an operator to bring a workflow of their own: the scenario
+catalog is a fixed tuple, the Simulate screen sends one hard-coded sample, and the
+front end's README and `P3D_SECURITY.md` said "no arbitrary JSON / fixture-upload
+input". The owner's direction was to add the second customer entry path ("bring an
+existing workflow to Ugence for governance") in a tightly bounded first form: a
+read-only Workflow IR inspector, not an agent uploader.
+
+Settled by the repository before the ballot `[V]`:
+
+- The frozen `governance_studio.api.v1` OpenAPI document already carried
+  `validate_workflow`, `adapt_workflow` and `compare_adaptations`
+  (`apps/ugence-governance-studio/backend/src/ugence_governance_studio_api/api/workflows.py`),
+  each accepting a workflow document in the request body and failing closed on any
+  declared version outside `workflow_ir.v1` / `workflow_ir.v2`. The front end's
+  manifest listed the three by name as forbidden.
+- The only limit on such a document was the 2 MiB body middleware; nothing bounded
+  its structure.
+- Workflow IR is the policy compiler's output (nodes, edges, dispositions, human
+  review and authority requirements, capability and tool refs, provenance,
+  fingerprint); it has no agents or tasks, and no customer can produce it today
+  except through Ugence's own compiler. Phase 1 therefore proves the surface;
+  converters make the path real, and they are a later phase `[G]`.
+- The "no arbitrary input" boundary was prose in two documents, not a numbered
+  ruling.
+
+### 22.2 — The ruling
+
+| # | Question | Ruling |
+|---|---|---|
+| **BW-1** | The surface | **`READ_ONLY_WORKFLOW_IR_INSPECTOR`** at `/bring-your-workflow` on the v1 contract, a sibling of the scenario catalog, named "Bring Your Workflow", tagline "Validate and adapt an existing agentic workflow for Ugence governance." A general agent uploader is refused; "Import Agent" is not a name this surface may carry. |
+| **BW-2** | Input and limits | **`PASTE_OR_LOCAL_FILE_BODY_ONLY`**: Workflow IR JSON pasted into the screen or read from a local file in the browser. Figures confirmed by the owner: 1 MiB, nesting depth 32, 200 nodes, 400 edges (and 50 000 values to bound the walk). The browser gate and the server enforce the same figures; the server's refusal is the typed 422 `workflow_too_complex`. The gate also refuses YAML, code, archives, a JSON value that is not an object, an undeclared or unsupported version (never guessed from field presence), a credential-shaped key or value, and a remote reference. |
+| **BW-3** | Backend operations | **`VALIDATE_ADAPT_COMPARE_ONLY`**. The three operations move from the front end's forbidden list to its approved list; no route, schema or status code is added to the frozen OpenAPI document, whose hash is unchanged; one contract-neutral structural guard (`workflow_limits.py`) runs before any adapter. |
+| **BW-4** | Persistence and output | **`EPHEMERAL_NO_SERVER_STORAGE`**. No server write exists for the document and no browser storage is touched; results live in component state, are cleared by any edit, and leave only as a local download of the report (the server's own envelopes, request ids included) and of the adapted envelope. Provenance shown: the client's canonical digest, computed by the backend's own encoding rule, and the server's computed digest, with match or mismatch stated. |
+| **BW-5** | Name and maturity | **"Bring Your Workflow"**, `REFERENCE_GRADE`, with the disclaimer verbatim on the screen: "Accepts Ugence Workflow IR JSON. It does not execute, publish or persist the submitted workflow." LangGraph, CrewAI, AutoGen, n8n and BPMN conversion is deferred to a separately scoped phase. |
+
+Execution, scenario-catalog mutation and remote fetch are forbidden under every
+option and were not balloted.
+
+### 22.3 — What this ruling supersedes, and what it does not authorize
+
+**Supersedes**, for this one surface, the sentences "accepts no arbitrary JSON /
+policy / URL / code / fixture-upload input" in
+`apps/ugence-governance-studio/frontend/README.md` and "no arbitrary JSON/policy/URL/
+code ... no plan or replay-record upload from local files" in
+`apps/ugence-governance-studio/docs/P3D_SECURITY.md`; both documents now say so in
+place. The original boundary was correct for the synthetic Studio and is not a
+permanent product principle; changing it through a versioned, fail-closed feature
+with its own tests is the intended way to move it. The GAS-4/5 "v1 surface
+byte-identical" check is not weakened: the OpenAPI document, the generated client
+and its hash are unchanged; only the manifest moved, and by this ruling.
+
+**Does not authorize:** any framework converter (phase 2, its own scoping); saving an
+uploaded workflow as a draft, assigning an owner or tenant, versioning, linking a
+policy or constitution, or submitting for approval (phase 3, only after tenant
+identity, IAM and the Portfolio Registry exist, each its own ballot); compiling,
+simulating, approving, publishing, issuing clearance or exporting an uploaded
+workflow to a runtime (phase 4, only after the authority plane serves writes under
+AP-3 `MET`); any overlay, scenario id or URL on the screen's requests; any change to
+the v2 contract; LIVE execution.
+
+### 22.4 — Verification recorded with the slice `[V]`
+
+- Backend: `tests/test_workflow_limits.py` (nine tests: figures, measures, refusal
+  by measure on each route, acceptance at the limit, the byte cap answering below
+  the middleware, the element cap ending the walk); the whole studio backend suite
+  passes with the guard in place and the OpenAPI freeze test unchanged.
+- Front end: `tests/bring-gate.test.ts` (twenty-six: every refusal code, both real
+  documents pass, the declared-version rule, and the client's canonical digest of
+  the guided example equal to the digest the real backend computed for it);
+  `tests/bring-screen.test.tsx` (fifteen: disclaimer verbatim, axe clean empty and
+  loaded, refusals with no request sent, local file read in the browser, the exact
+  bodies of the three requests, the server's typed refusal shown, only the three
+  operations ever reached, results cleared on edit, the report and envelope
+  downloads equal to the server's records, and a source scan for browser storage,
+  raw connections and forbidden operations); the allowlist verifier reports twenty
+  consumed operations equal to the manifest; every CI verifier, the full vitest
+  suite and the production build pass.
+
+### 22.5 — Sequence
+
+This slice ships phase 1. Phase 2 (converters) needs its own read-only scoping
+audit and ballot before any code. Phases 3 and 4 wait, in that order, on the
+prerequisites named in §22.3 and on §20.5 as it stands. Nothing in §18 to §21
+moves.
+
+---
+
+## 23 — Owner ruling CV-1 to CV-5: Bring Your Workflow phase 2, offline converters (owner, 2026-09-07)
+
+**Status:** ratified by the owner in their own words on 2026-09-07 ("Ratify CV-1
+through CV-5 as recommended ... confirm n8n JSON as the first source format and BPMN
+2.0 as the second, and confirm that LangGraph, CrewAI and AutoGen stay deferred until
+a declarative export exists"), and implemented in the same slice for the first
+format.
+
+### 23.1 — What the repository settled before the ballot `[V]`
+
+- Workflow IR is compiled from a `PolicyPack` plus a `HumanApprovalRecord`. A
+  converter that wrote IR directly would forge compiler provenance and bypass
+  approval; the honest target is the compiler's input, a DRAFT pack.
+- The compiler refuses to compile a DRAFT pack: `DRAFT -> COMPILED` is an illegal
+  lifecycle transition (`models/policy_pack.py`), and `require_approval=False` does
+  not change that. The "preview compile" the audit named is therefore not a compile
+  at all: it is the compiler's public `WorkflowSynthesizer` run over the validated
+  draft, which yields the stage-3 IR with no manifest, release metadata or approval.
+- The composer's v1 adapter identifies its source by a digest, so the preview
+  carries a `structural_digest` that is the digest of the preview's own content, and
+  a `preview` block naming it `PREVIEW_UNAPPROVED`. The adapter accepts it; the
+  Bring Your Workflow gate accepts it (no credential-shaped key with a value, no
+  remote reference, under every limit).
+- IR node kinds are governance constructs; n8n nodes are execution steps. A
+  minority map, none completely; the converter's main output is the list of what did
+  not map, which is the product claim "what must change before enterprise
+  execution".
+- `SEMANTICALLY_EQUIVALENT` is the composer's reserved vocabulary; `MISSING_PROVENANCE`
+  is blocking in the compiler's validator, so every emitted object must cite the
+  export, registered as the pack's `SourceDocument` with the input digest, which is
+  the one provenance the converter truly has; an `ActionConstraint` without an
+  applicable authority fails validation, so none is fabricated for a write.
+- No export of any of the five formats existed in the repository `[G, now closed]`:
+  four synthetic n8n exports are authored under the package's `tests/fixtures`.
+
+### 23.2 — The ruling
+
+| # | Question | Ruling |
+|---|---|---|
+| **CV-1** | Packaging and where converters run | **`NEW_TOOLING_PACKAGE_CLI_OFFLINE`.** `packages/tooling/workflow-converters`, one module per source format, CLI only, no network, never on the SD-1 allowlist, never imported by the studio; the operator brings its output to the screen. Its only first-party dependency is the compiler. |
+| **CV-2** | Target and first format | **`EMIT_DRAFT_POLICY_PACK_THEN_PREVIEW_SYNTHESIS`** (the audit's "preview compile", corrected by §23.1). n8n workflow JSON first, BPMN 2.0 second. LangGraph, CrewAI and AutoGen are deferred until a declarative export exists; a request to convert them is refused by code, `DEFERRED_FORMAT`. |
+| **CV-3** | Report and provenance | **`CONTENT_ADDRESSED_CONVERSION_REPORT`** (`ugence.workflow-converters.conversion-report.v1`): converter identity, source format and detail, input digest and size, a mapping table with one row per construct (`MAPPED`, `UNMAPPED` or `UNSUPPORTED`, with reason code, target object ids and loss codes), unsupported constructs, semantic-loss warnings, governance gaps, tool requirements, credential requirements as handles only, the pack's id, `DRAFT` status, digest and object counts, the compiler's validation summary, the preview's status, version, digest and counts, and `report_digest` computed over everything else. |
+| **CV-4** | Loss and unsupported constructs | **`FAIL_CLOSED_ON_UNKNOWN_EXPLICIT_ON_LOSS`.** Unknown node types and code, command or sub-workflow nodes are `UNSUPPORTED` and the state is `PARTIAL`; every translation loss is a named warning; a secret-shaped key or value anywhere in the export refuses the whole conversion with no output; not JSON, not an object, not an export of the format, over 1 MiB, deeper than 32 levels or more than 200 nodes refuse likewise; nothing is defaulted silently. |
+| **CV-5** | The claim | **`STRUCTURALLY_TRANSLATED_ONLY`.** A conversion ends `STRUCTURALLY_TRANSLATED` or `PARTIAL` and states, verbatim: "Constructs were translated per the mapping table and nothing more. This report makes no claim of semantic equivalence, governance, approval, validation or executability. The emitted pack is a DRAFT for human review; the preview Workflow IR is unapproved." No output text may say equivalent, governed, approved or validated except in negation; `SEMANTICALLY_EQUIVALENT` never appears. |
+
+### 23.3 — What this ruling supersedes, and what it does not authorize
+
+**Supersedes** the sentence "no converter exists yet" in §22's explainer entry and on
+the Bring Your Workflow screen, both amended in place. §22's "Does not authorize:
+framework converters (phase 2, its own scoping)" is discharged by this section for
+n8n only.
+
+**Does not authorize:** the BPMN 2.0 converter before its own fixtures and tests
+land under this ruling's terms (no new ballot is needed; the format is ruled);
+LangGraph, CrewAI or AutoGen converters before a declarative export exists, and then
+only after their own read-only scoping of that export; any conversion that moves a
+pack past `DRAFT`, fabricates an authority requirement, action constraint, approval
+or provenance, evaluates an n8n expression, or reads a node's code; any studio route
+or screen that runs a converter; any persistence of an export, pack or report by the
+studio (phase 3 stands as §22.3 left it); LIVE execution.
+
+### 23.4 — Verification recorded with the slice `[V]`
+
+`packages/tooling/workflow-converters/tests`: the n8n conversion over four synthetic
+fixtures (one row per node; the branch's translated and untranslated predicates; read
+and write nodes; model, trigger, human and data-shaping nodes; code unsupported and
+never inspected; credentials as handles; workflow-level losses; provenance on every
+object; the legacy IF shape; an unknown node; refusal by typed code for a secret,
+YAML, a non-object, a non-export, the three limits, deferred and unknown formats;
+determinism and content addressing), the boundary and claim tests (no network,
+process, dynamic-import, YAML or archive module imported; the compiler alone as
+first-party dependency; the DRAFT pack refused by the compiler with
+`IllegalLifecycleTransition` and `APPROVAL_REQUIRED`; no forbidden claim word outside
+negation in any output; honest `version_info`; the preview passing the Bring Your
+Workflow gate's rules and adapted by the composer with `ok`), and the CLI tests
+(three files and nothing else, two without preview, nothing on refusal with exit 2,
+byte-stable outputs). The package is named by the package-suites CI matrix, and the
+repository's import-boundary and CI-coverage checkers pass with it present.
+
+### 23.5 — Sequence
+
+BPMN 2.0 landed under this ruling's terms (§23.6). Then, and only after an owner-provided or
+synthetic declarative export exists for one of the three deferred frameworks, a
+read-only scoping of that export. Phases 3 and 4 of §22 are unchanged.
+
+### 23.6 — BPMN 2.0 converter: verification recorded with its slice (2026-09-07) `[V]`
+
+The second ruled format, in the same package under the same terms, with no new
+ballot. What it added and what was proven:
+
+- **Intake.** A stdlib XML path with the same figures (1 MiB, depth 32, 200 flow
+  nodes, 50 000 elements). The stdlib parser expands internal entities, so a document
+  type or entity declaration is refused by byte scan before the parser sees the
+  export, as `NOT_AN_EXPORT_OF_THIS_FORMAT`; a fixture proves it. The secret scan
+  covers attribute names, name/value attribute pairs, attribute values and text.
+- **Mapping.** Exclusive and inclusive gateways become one `DecisionRule` per
+  conditioned outgoing flow, with a condition translator over `${}`, `#{}` and
+  `=` expressions that carries `variable <op> literal`, `variable` and `!variable`
+  conjunctions and names every loss (disjunction, non-literal right-hand side,
+  non-integer literal, unknown clause shape, default-flow condition). Business rule
+  tasks become predicate-free rules with `DMN_NOT_TRANSLATED`. Receive tasks become
+  connector mapping plus evidence; send tasks and outward throws become connector
+  mappings with `CONSEQUENTIAL_ACTION_WITHOUT_AUTHORITY`; service tasks become
+  connector mappings with `SERVICE_EFFECT_UNDECLARED`, since BPMN does not say
+  whether a service reads or writes. Human tasks, start and end events, waits,
+  parallel and event-based gateways, boundary events, abstract tasks, lanes and
+  pools are `UNMAPPED` with their reasons; scripts, called processes and complex
+  gateways are `UNSUPPORTED`; any other BPMN element under a process is
+  `UNSUPPORTED` and the conversion `PARTIAL`. No authority requirement, action
+  constraint, exception rule or credential is fabricated; BPMN names no credential,
+  so a BPMN report's credential requirements are always empty.
+- **Fixtures.** Five synthetic BPMN exports: a two-lane, two-pool purchase approval
+  covering every mapped and unmapped kind; a minimal process; an unknown element;
+  an embedded secret in an extension property; a document type declaration.
+- **Tests.** `tests/test_bpmn_conversion.py` (one row per construct; the gateway's
+  rules and losses; the business rule task; connector derivations by task kind;
+  every unmapped reason; scripts never inspected; workflow-level losses and empty
+  credentials; provenance on every object; the minimal process; the unknown
+  element; refusal by typed code for the secret, the doctype, non-XML, non-BPMN,
+  an empty definitions, an entity declaration, a secret-shaped attribute and a
+  secret-shaped text; the three limits; a nine-row condition translation table;
+  determinism). The boundary and claim tests, the compiler's refusal to compile the
+  draft, the Bring Your Workflow gate rules and the composer's adaptation of the
+  preview now run over both formats. The CLI converts BPMN to the same three files
+  and refuses the doctype fixture with nothing written. `version_info` reports both
+  formats implemented, no next format, and the three deferred.
+
+The screen's sentence and the explainer's entry now name both converters. §23.3's
+non-authorizations stand: the deferred three wait for a declarative export.

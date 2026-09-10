@@ -20,6 +20,7 @@ from typing import Optional
 from ugence_governance_contracts.api import (
     AttributionStatus,
     BenchmarkReference,
+    EvidenceUsageScope,
     SourceBasis,
     VerificationStatus,
 )
@@ -257,6 +258,15 @@ class ComponentEvidenceRequirement:
     reusing the neutral GV-2E-a axes (``SourceBasis`` / ``AttributionStatus`` /
     ``VerificationStatus``). This is a **policy requirement**, not a metric
     claim; it carries no measured value.
+
+    **Synthetic evidence is evaluation-scoped wherever it is required** (UVI ADR
+    D-9, as amended 2026-09-09 closing §26.8). A requirement may name
+    ``SourceBasis.SYNTHETIC`` **only** when it also explicitly requires
+    ``EvidenceUsageScope.EVALUATION_ONLY``; an unpaired synthetic requirement is
+    refused here, at construction. The scope is never inferred from the package
+    this requirement was built in, from the caller's identity, or from what a
+    later consumer does with it — a requirement that does not say
+    ``EVALUATION_ONLY`` does not mean it.
     """
 
     component: ValueComponent
@@ -264,6 +274,9 @@ class ComponentEvidenceRequirement:
     required_source_basis: Optional[SourceBasis] = None
     required_attribution: Optional[AttributionStatus] = None
     required_verification: Optional[VerificationStatus] = None
+    #: The permitted-use bar this requirement imposes. Unset means the
+    #: requirement states no scope, which is why it cannot carry SYNTHETIC.
+    required_usage_scope: Optional[EvidenceUsageScope] = None
 
     def __post_init__(self) -> None:
         if not isinstance(self.component, ValueComponent):
@@ -281,6 +294,23 @@ class ComponentEvidenceRequirement:
         if self.required_verification is not None and not isinstance(self.required_verification, VerificationStatus):
             raise PolicyContractError(
                 "ComponentEvidenceRequirement.required_verification must be a VerificationStatus"
+            )
+        if self.required_usage_scope is not None and not isinstance(
+            self.required_usage_scope, EvidenceUsageScope
+        ):
+            raise PolicyContractError(
+                "ComponentEvidenceRequirement.required_usage_scope must be an EvidenceUsageScope"
+            )
+        # D-9: synthetic evidence is permitted only for pre-deployment evaluation,
+        # so a requirement that names it must say so itself. Refused at
+        # construction, never deferred to a validation pass a caller might skip.
+        if (
+            self.required_source_basis is SourceBasis.SYNTHETIC
+            and self.required_usage_scope is not EvidenceUsageScope.EVALUATION_ONLY
+        ):
+            raise PolicyContractError(
+                "ComponentEvidenceRequirement may require SourceBasis.SYNTHETIC only when it "
+                "also requires EvidenceUsageScope.EVALUATION_ONLY (UVI ADR D-9, §26.8)"
             )
 
     def canonical_digest(self) -> str:

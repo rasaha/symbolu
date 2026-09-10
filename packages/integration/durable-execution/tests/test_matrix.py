@@ -19,7 +19,14 @@ import time
 from typing import Any, List, Optional
 
 import pytest
-import sqlalchemy as sa
+
+sa = pytest.importorskip(
+    "sqlalchemy",
+    reason=(
+        "SQLAlchemy is required for the matrix. A skipped row is not a passing row: "
+        "CI installs the engine dependencies and fails the job if any row skipped."
+    ),
+)
 
 import _hooks
 from _dbos_harness import DEFINITION_DIGEST, WORKFLOW_ID, RecordingProvider, wire

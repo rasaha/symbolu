@@ -44,6 +44,33 @@ for _path in (
 import ugence_cloud_scaling_bounded_execution as pkg  # noqa: E402
 
 
+#: Public methods every exception inherits from ``BaseException``. They are not this
+#: package's API, and they are not even stable across interpreters: ``add_note`` exists
+#: from Python 3.11 and not before. Recording them made ``public_api.json`` a statement
+#: about the interpreter that generated the file, so a 3.10 run could never reproduce a
+#: manifest generated on 3.11 whatever the package itself declared. Excluded here rather
+#: than normalised at the comparison, so the committed artifact describes only what the
+#: class itself contributes and stays reproducible on every supported interpreter. The
+#: set is derived from ``BaseException`` rather than hard-coded, so a method a future
+#: interpreter adds is excluded on both sides of the comparison too.
+_INHERITED_EXCEPTION_METHODS = frozenset(
+    name for name, _ in inspect.getmembers(BaseException, callable)
+    if not name.startswith("_")
+)
+
+
+def own_methods(value: type) -> list:
+    """The class's own public callables, minus what every exception inherits."""
+
+    inherited = (
+        _INHERITED_EXCEPTION_METHODS if issubclass(value, BaseException) else frozenset()
+    )
+    return sorted(
+        name for name, _ in inspect.getmembers(value, callable)
+        if not name.startswith("_") and name not in inherited
+    )
+
+
 def describe(name: str) -> dict:
     value = getattr(pkg, name)
     if isinstance(value, type) and issubclass(value, enum.Enum):
@@ -51,8 +78,7 @@ def describe(name: str) -> dict:
     if dataclasses.is_dataclass(value) and isinstance(value, type):
         return {"kind": "dataclass", "fields": [f.name for f in dataclasses.fields(value)]}
     if isinstance(value, type):
-        return {"kind": "class", "methods": sorted(
-            n for n, _ in inspect.getmembers(value, callable) if not n.startswith("_"))}
+        return {"kind": "class", "methods": own_methods(value)}
     if inspect.isfunction(value):
         return {"kind": "function", "parameters": list(inspect.signature(value).parameters)}
     if isinstance(value, frozenset):

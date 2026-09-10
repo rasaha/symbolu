@@ -23,6 +23,7 @@ __all__ = [
     "PolicyResolutionStatus",
     "PolicyResolutionReason",
     "PolicyRevocationReasonCode",
+    "PolicySuspensionAction",
     "HistoricalResolutionRule",
 ]
 
@@ -71,6 +72,19 @@ class KeyEntitlement(str, Enum):
 
     ISSUE_POLICY = "ISSUE_POLICY"
     REVOKE_POLICY = "REVOKE_POLICY"
+    #: `ACC-SUSP-3` / `ACC-SUSP-IA-7`. One entitlement covers **both** suspension
+    #: acts: an authority that may pause may unpause. Splitting them would create
+    #: a state only a second party can exit, which is an availability hazard
+    #: dressed as a control.
+    #:
+    #: Deliberately **not** ``REVOKE_POLICY``. Reusing it would silently widen
+    #: every already-registered revoker's authority to include pausing — a
+    #: privilege change to existing trust anchors, made by a library upgrade. A
+    #: new member means no existing key gains a new power; a key that should be
+    #: able to suspend is granted this explicitly. Suspension is also not weaker
+    #: than revocation in every direction: revocation is terminal and visible,
+    #: while a pause can be applied and lifted repeatedly.
+    SUSPEND_POLICY = "SUSPEND_POLICY"
 
 
 class KeyVerificationStatus(str, Enum):
@@ -136,6 +150,43 @@ class PolicyResolutionReason(str, Enum):
     #: unsigned, wrong key, unauthorized signer, or tampered. Like its revocation
     #: counterpart it fails closed rather than being ignored.
     SUPERSESSION_INTEGRITY_INVALID = "SUPERSESSION_INTEGRITY_INVALID"
+    #: `ACC-SUSP-IA-7`. The latest accepted lifecycle record for this version, at
+    #: or before ``as_of``, is a verified suspension. The version is **paused**,
+    #: not withdrawn and not replaced: its record stays readable, and a later
+    #: reinstatement can make it resolve again. Distinct from ``REVOKED``, which
+    #: is terminal, and from ``SUPERSEDED``, which means replaced.
+    SUSPENDED = "SUSPENDED"
+    #: `ACC-SUSP-IA-7`. A suspension-store record targeting this version exists
+    #: but the stored history cannot be trusted — a record does not verify, two
+    #: distinct records share one signed instant, the sequence is not strictly
+    #: monotonic, or a stored transition is invalid (a reinstatement with no
+    #: effective prior suspension). On ``REVOCATION_INTEGRITY_INVALID``'s exact
+    #: precedent: neither honoured nor ignored, it fails closed.
+    SUSPENSION_INTEGRITY_INVALID = "SUSPENSION_INTEGRITY_INVALID"
+    #: `ACC-OVL-1`..`ACC-OVL-3`. Another simultaneously effective version, in the
+    #: same tenant and scope, holds an equal exclusivity claim, and no verified
+    #: supersession relationship permits the overlap. The overlap is
+    #: **unresolved**, so resolution refuses rather than choosing between them —
+    #: registration, mapping and arrival order are all barred as tie-breakers.
+    EXCLUSIVITY_CONFLICT = "EXCLUSIVITY_CONFLICT"
+
+
+class PolicySuspensionAction(str, Enum):
+    """The two acts a suspension lifecycle record may carry (`ACC-SUSP-2`).
+
+    Both are **signed records in one append-only store**, never a mutable flag:
+    resolution reads the latest accepted record at ``as_of`` and denies only if
+    it is a ``SUSPEND``. Nothing is ever deleted or rewritten, so the history of
+    pauses stays legible.
+
+    `ACC-SUSP-1`: neither act writes ``lifecycle_state``.
+    ``ADMITTED_LIFECYCLE_STATES`` stays closed exactly as ratified — a suspended
+    version's signed artifact still reads its issued lifecycle label, and only
+    the store stops it resolving, exactly as a superseded one does.
+    """
+
+    SUSPEND = "SUSPEND"
+    REINSTATE = "REINSTATE"
 
 
 class PolicyRevocationReasonCode(str, Enum):

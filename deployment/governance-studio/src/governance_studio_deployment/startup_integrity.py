@@ -15,6 +15,7 @@ from typing import List, Optional
 
 from . import (
     API_CONTRACT,
+    APPROVED_OPERATION_COUNT,
     BACKEND_API_VERSION,
     DEPLOYMENT_NAME,
     DEPLOYMENT_VERSION,
@@ -172,14 +173,18 @@ def run_startup_integrity(inputs: IntegrityInputs) -> IntegrityResult:
     openapi_hash = _sha256_file(inputs.openapi_path) if os.path.isfile(inputs.openapi_path) else None
     check("openapi_hash_unchanged", openapi_hash == OPENAPI_SHA256, f"got={openapi_hash}")
 
-    # approved-operation manifest valid (hash matches frozen contract, has 17 approved)
+    # approved-operation manifest valid (hash matches frozen contract, has exactly the
+    # approved count). Seventeen through P3E; twenty since owner ruling BW-3
+    # (ADR_UGENCE_AUTHORITY_PLANE_SCOPING.md section 22) moved validate_workflow,
+    # adapt_workflow and compare_adaptations from forbidden to approved for the Bring
+    # Your Workflow screen. The OpenAPI document and its hash did not move.
     approved_ok = False
     approved_count = 0
     if os.path.isfile(inputs.approved_ops_path):
         try:
             am = json.load(open(inputs.approved_ops_path, encoding="utf-8"))
             approved_count = len(am.get("approved_operation_ids", []))
-            approved_ok = am.get("openapi_sha256") == OPENAPI_SHA256 and approved_count == 17 and am.get("contract") == API_CONTRACT
+            approved_ok = am.get("openapi_sha256") == OPENAPI_SHA256 and approved_count == APPROVED_OPERATION_COUNT and am.get("contract") == API_CONTRACT
         except (OSError, ValueError):
             approved_ok = False
     check("approved_operation_manifest_valid", approved_ok, f"count={approved_count}")

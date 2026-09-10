@@ -187,10 +187,10 @@ def main() -> int:
         step("phase D: version and maturity match", out["version"] == manifest["package_version"]
              and out["maturity"] == "REFERENCE_GRADE_NOT_PRODUCTION_READY")
         step("phase D: the pinned vectors reproduce inside the installed wheel",
-             out["result_digest"] == "56f7174da2768f9c37bd816c8b91593b750be9638f0207ab7dae3f23bdb84db4"
-             and out["projection_digest"] == "sha256:4bedf596bb66e4a7d7494cb833773e6fee95786676c6c2fa32f0545dcd43b27d"
-             and out["payload_digest"] == "sha256:3e5add9d75912a6879e4f082392b77f4277a737ad85fe3b764b457e014b25053"
-             and out["signature"].startswith("ab769d262ffb8d557fb765233d3b3c63"), json.dumps(out)[:200])
+             out["result_digest"] == "248b60571017af0469da6e66a54aef882320e765349c7abd850e1d897cb3f930"
+             and out["projection_digest"] == "sha256:5e4fda256ddacd50f33c06d38b1a8c3fd5a46ab24ea9251d48697722c3b400ec"
+             and out["payload_digest"] == "sha256:a6f69c1a5be6278e7e01e2d014a2ca43f36d324068caa70c2922a52d0827099a"
+             and out["signature"].startswith("bd4803e5a61d50c67ad07c35fb3043c9"), json.dumps(out)[:200])
         print("=" * 72)
         print(f"{len(_steps)} steps passed. Phase B is the offline guarantee; phase A reached an index to collect the closure.")
         print("ISOLATED COMPARISON-RESULT-ATTESTATION DISTRIBUTION VERIFIED ✔")

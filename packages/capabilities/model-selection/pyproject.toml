@@ -46,3 +46,8 @@ version = { attr = "ugence_model_selection.version.__version__" }
 [tool.setuptools.packages.find]
 where = ["src"]
 include = ["ugence_model_selection*"]
+
+# PEP 561: the package is typed, and the marker must reach the wheel or a consumer's
+# type checker silently ignores every annotation in it.
+[tool.setuptools.package-data]
+ugence_model_selection = ["py.typed"]

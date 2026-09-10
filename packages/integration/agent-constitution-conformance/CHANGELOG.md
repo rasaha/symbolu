@@ -2,6 +2,35 @@
 
 All notable changes to this distribution.
 
+## 0.2.0 — mirrored overlap detection, as diagnostic evidence
+
+Authorized by `ACC-OVL-2`, which splits the invariant deliberately: **Policy
+Authority owns enforcement**; this package **mirrors the check and produces
+diagnostic evidence**, and *cannot be the sole enforcement boundary, because
+conformance is not issuance authority*. Additive: two new public names, no
+behaviour changed, no digest moved.
+
+### Added
+
+- **`governed_role_overlaps` / `GovernedRoleOverlap`** — a report of every
+  governed role that two presented constitutions both claim over overlapping
+  effective periods. It uses the authority's own half-open interval rule, so a
+  report here and a refusal there agree about what "simultaneously effective"
+  means, and a clean handover is an overlap in neither.
+
+### What it is not
+
+`[R]` **Not enforcement.** It raises nothing, refuses nothing and carries no
+disposition — it does not say which constitution should win (`OD-C3=B`). A
+deployment consulting only this and skipping the authority would have no
+enforcement at all.
+
+`[G]` **Its input is the caller's assertion**, exactly as presented role facts are
+under `ACC-FACTS`. It does not resolve the constitutions it is given, cannot tell
+whether one has since been revoked, superseded or suspended, and a clean report
+is therefore evidence about what the caller presented — never a warrant that no
+overlap exists in the registry.
+
 ## 0.1.0 — Agent Constitution conformance
 
 First release. The second of the two ratified `ACC-S1-Q2` change sets
@@ -13,6 +42,15 @@ slice's release path: first release awaits the separately balloted `OD-C1=B`
 contract-amendment round, which alone ratifies the role- and proposal-surface
 binding. It performs no caller authorization, maps no failure to any
 operational outcome, and holds no authority of any kind.
+
+> **Superseded as a statement of current fact (2026-09-09, `ACC-DR`).**
+> The paragraph above is retained verbatim as the record of what was true at
+> this release. `[V]` It is **no longer current**: the `OD-C1=B` round was ratified (`ACC-AM-IMPL=YES`) and
+> implemented, so it no longer gates the slice. The rest of the paragraph stands:
+> this distribution still performs no caller authorization, maps no failure to any
+> operational outcome, and holds no authority of any kind. `[R]` This note
+> records a fact, ratifies nothing, and reopens no ruling. No constitution has
+> been issued or activated, and no `ACC-FC-5` gate is closed.
 
 ### Added
 

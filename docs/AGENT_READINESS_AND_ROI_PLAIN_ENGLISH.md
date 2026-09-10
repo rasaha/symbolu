@@ -7,7 +7,7 @@ READMEs and the UVI ADR remain authoritative.
 ## The one-sentence version
 
 Two separate modules answer two different questions about an AI agent:
-**"is it ready to deploy?"** (`packages/capabilities/agent-value-readiness`) and
+**"is it ready to deploy?"** (`packages/agent-value-readiness`) and
 **"did it make money?"** (`packages/governed-value`). They are deliberately kept
 apart — the readiness module contains no money vocabulary at all, and the value
 module contains no readiness classification.
@@ -30,7 +30,7 @@ accident.
 
 ## Module 1 — Agent Value Readiness
 
-**Where:** `packages/capabilities/agent-value-readiness/`
+**Where:** `packages/agent-value-readiness/`
 (`src/ugence_agent_value_readiness/`)
 
 ### What it is
@@ -377,8 +377,8 @@ anyone reading a number out of them:
 
 ## Where to read more
 
-- `packages/capabilities/agent-value-readiness/README.md` — scope and boundaries
-- `packages/capabilities/agent-value-readiness/public_api.json` — the exact
+- `packages/agent-value-readiness/README.md` — scope and boundaries
+- `packages/agent-value-readiness/public_api.json` — the exact
   vocabulary, generated from the installed package
 - `packages/governed-value/README.md` — the formulas and their rationale
 - `packages/governed-value/src/governed_value/domain/enums.py` — the

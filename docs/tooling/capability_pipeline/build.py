@@ -12,6 +12,12 @@ Outputs:
 The markdown is converted structurally (headings, paragraphs, lists, tables,
 callouts, code blocks, links); the mermaid figures are replaced by vector
 diagrams from diagrams.py rendered to PNG with cairosvg.
+
+Exit status: 0 when the docx is written and the pdf either converted or was
+deliberately skipped (no soffice on PATH, or --no-pdf). Non-zero when soffice ran
+but this run did not write the pdf, which is reported rather than passed over --
+the previous edition's pdf sits at the same path, so its mere presence proves
+nothing about the current run.
 """
 import os
 import re
@@ -33,14 +39,14 @@ sys.path.insert(0, HERE)
 import diagrams as DG  # noqa: E402
 
 SRC = os.path.join(ROOT, "docs", "UGENCE_ENTERPRISE_AI_GOVERNANCE_CAPABILITY_PIPELINE.md")
-VERSION = "1.1"
-DATE = "4 September 2026"
+VERSION = "2.1"
+DATE = "9 September 2026"
 BASE = f"UGENCE_ENTERPRISE_AI_GOVERNANCE_CAPABILITY_PIPELINE_v{VERSION}"
 OUT_DOCX = os.path.join(ROOT, "docs", BASE + ".docx")
 COPYRIGHT = "© 2026 Ugence Labs. All rights reserved."
 CLASSIFICATION = "Confidential and proprietary · Shared with prospective partners for evaluation"
 TITLE = "Ugence Enterprise AI Governance Capability Pipeline"
-SUBTITLE = "Repository-Based Capability Map, Development Status and Competitive Cross-Check"
+SUBTITLE = "Repository-Based Map of 70 Capabilities, Development Status and Competitive Cross-Check"
 
 NAVY = RGBColor(0x1A, 0x17, 0x40)
 VIOL = RGBColor(0x2A, 0x21, 0x70)
@@ -63,12 +69,16 @@ FIG_CAPTIONS = {
     "sequence": "Figure 1. The nine-stage governance sequence with its feedback loop.",
     "scenario": "Figure 2. The nine stages applied to the governed cloud-scaling scenario.",
     "minimum_path": "Figure 3. Minimum production path for one governed scaling action.",
-    "pipeline": "Figure 4. Canonical development pipeline with the stage tags placed on it.",
+    "pipeline": "Figure 4. Canonical development pipeline with the stage tags placed on it (counts from B.5).",
 }
 FIG_WIDTH_MM = {"sequence": 165, "scenario": 165, "minimum_path": 120, "pipeline": 168}
+# stage counts for the pipeline figure come from the B.5 table so the figure cannot drift from the text
+_md_for_counts = open(SRC, encoding="utf-8").read()
+_b5 = _md_for_counts[_md_for_counts.index("## B.5 Distribution by stage"):_md_for_counts.index("## B.6")]
+STAGE_COUNTS = {m.group(1): int(m.group(2)) for m in re.finditer(r"^\| ([^|]+?) \| (\d+) \|", _b5, re.M)}
 FIGS = {}
 for key in FIG_ORDER:
-    svg, w, h = DG.ALL[key]()
+    svg, w, h = DG.ALL[key](STAGE_COUNTS) if key == "pipeline" else DG.ALL[key]()
     png = os.path.join(FIG_DIR, key + ".png")
     cairosvg.svg2png(bytestring=svg.encode(), write_to=png, scale=2.6, background_color="white")
     FIGS[key] = png
@@ -697,8 +707,8 @@ ctrl = [
     ("Document", TITLE),
     ("Edition", f"Version {VERSION} · Partner evaluation edition"),
     ("Date", DATE),
-    ("Source of truth", "docs/UGENCE_ENTERPRISE_AI_GOVERNANCE_CAPABILITY_PIPELINE.md in rasaha/symbolu (merged in PR #1584, commit 8c6e5ec6)"),
-    ("Scope", "45 platform capabilities under packages/; the two packaged business-solution examples are excluded"),
+    ("Source of truth", "docs/UGENCE_ENTERPRISE_AI_GOVERNANCE_CAPABILITY_PIPELINE.md in rasaha/symbolu, audited at default-branch commit 6ef1f724"),
+    ("Scope", "70 platform capabilities across 72 packages under packages/; the two packaged business-solution examples are excluded"),
     ("Classification", CLASSIFICATION),
     ("Intended recipients", "Prospective clients and development partners evaluating a partnership with Ugence Labs"),
     ("Owner", "Ugence Labs"),
@@ -768,6 +778,8 @@ for vals in [
     ("0.3", "2026-09-04", "Ugence Labs", "Body text cross-checked against package source; five claims corrected in place; competitor supplement and Appendix C added."),
     ("1.0", "2026-09-04", "Ugence Labs", "First docx edition with cover sheet, document control, figures and copyright footer."),
     ("1.1", "2026-09-04", "Ugence Labs", "Partner evaluation edition: confidentiality wording aligned to distribution to prospective clients and partners."),
+    ("2.0", "2026-09-07", "Ugence Labs", "Re-audit at commit cabd218e: 24 capabilities added (46 to 69), 14 existing rows updated, minimum path and figures revised, Appendix C.4 update record."),
+    ("2.1", "2026-09-09", "Ugence Labs", "Correctness re-audit at commit 6ef1f724: capability 70 added, one moved path corrected, 13 versions and 9 test counts refreshed, B.5 recomputed, Appendix C.5 update record."),
 ]:
     row = rev.add_row()
     for ci, v in enumerate(vals):
@@ -943,18 +955,56 @@ with zipfile.ZipFile(OUT_DOCX) as zin, zipfile.ZipFile(tmp, "w", zipfile.ZIP_DEF
 shutil.move(tmp, OUT_DOCX)
 print("DOCX written:", OUT_DOCX)
 
-# PDF via LibreOffice when available
+# PDF via LibreOffice when available.
+#
+# The success test is that THIS run wrote the file, not that a file is present.
+# Those differ: the previous edition's .pdf is committed at exactly this path, so
+# `os.path.exists(pdf)` is already true before soffice runs and stays true when it
+# converts nothing. That is not hypothetical — a container without
+# libreoffice-writer has no Writer import filter, so soffice exits 0 having printed
+# "Error: source file could not be loaded", and the old check reported
+# "PDF written" over a stale artifact from the previous release.
+#
+# So: remember the file's identity beforehand and require it to have moved, and let
+# soffice's own diagnostics through instead of discarding them, since the message
+# above is the one that names the cause. A missing soffice is still not an error —
+# the docx is the primary output — but a soffice that ran and produced nothing is.
 soffice = shutil.which("soffice")
-if soffice and "--no-pdf" not in sys.argv:
+pdf = OUT_DOCX[:-5] + ".pdf"
+if not soffice:
+    print("PDF skipped: no soffice on PATH;", pdf, "not produced")
+elif "--no-pdf" in sys.argv:
+    print("PDF skipped: --no-pdf")
+else:
     import tempfile
 
+    before = os.stat(pdf) if os.path.exists(pdf) else None
     profile = tempfile.mkdtemp(prefix="lo_profile_")
-    subprocess.run(
+    proc = subprocess.run(
         [soffice, f"-env:UserInstallation=file://{profile}", "--headless", "--convert-to", "pdf", "--outdir", os.path.dirname(OUT_DOCX), OUT_DOCX],
         check=False,
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
+        capture_output=True,
+        text=True,
         timeout=600,
     )
-    pdf = OUT_DOCX[:-5] + ".pdf"
-    print("PDF written:" if os.path.exists(pdf) else "PDF not produced:", pdf)
+    after = os.stat(pdf) if os.path.exists(pdf) else None
+    # mtime alone can tie within one filesystem timestamp tick; st_ino and st_size
+    # move too when the converter rewrites the file, so compare the triple.
+    def _identity(st):
+        return None if st is None else (st.st_mtime_ns, st.st_size, st.st_ino)
+
+    if after is not None and _identity(after) != _identity(before):
+        print("PDF written:", pdf)
+    else:
+        why = "soffice produced no file" if after is None else "the file on disk is unchanged — it is the previous build's artifact"
+        print(f"PDF NOT produced: {why}", file=sys.stderr)
+        print(f"  soffice exit {proc.returncode}", file=sys.stderr)
+        for stream, label in ((proc.stdout, "stdout"), (proc.stderr, "stderr")):
+            for line in (stream or "").splitlines():
+                print(f"  {label}: {line}", file=sys.stderr)
+        print(
+            "  If this reads 'source file could not be loaded', the Writer import\n"
+            "  filter is missing: install libreoffice-writer, not just libreoffice-core.",
+            file=sys.stderr,
+        )
+        sys.exit(1)

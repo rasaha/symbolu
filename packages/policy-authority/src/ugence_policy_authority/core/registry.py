@@ -41,6 +41,7 @@ from .records import (
     IssuedPolicyRecord,
     PolicyRevocationRecord,
     PolicySupersessionRecord,
+    PolicySuspensionRecord,
 )
 
 __all__ = ["PolicyRegistry", "InMemoryPolicyRegistry"]
@@ -75,6 +76,18 @@ class PolicyRegistry(Protocol):
         """Every issued version of one identity. Never selects one."""
         ...
 
+    def issued_records_for_family(
+        self, *, policy_family: str, scope: str, tenant_id: str
+    ) -> tuple[IssuedPolicyRecord, ...]:
+        """Every issued version of one family within one scope and tenant.
+
+        `ACC-OVL-7`. Exclusivity is compared **across** policy identities — two
+        different constitutions claiming one role — so
+        :meth:`issued_records_for_identity`, which is keyed by ``policy_id``,
+        cannot answer it. Never selects one, and never orders by insertion.
+        """
+        ...
+
     def append_revocation(self, record: PolicyRevocationRecord) -> PolicyRevocationRecord:
         """Append a policy-version revocation; idempotent iff identical."""
         ...
@@ -101,6 +114,26 @@ class PolicyRegistry(Protocol):
         self, coordinate: PolicyCoordinate
     ) -> tuple[PolicySupersessionRecord, ...]:
         """Supersessions naming this *exact* coordinate as the predecessor."""
+        ...
+
+    def append_suspension(self, record: PolicySuspensionRecord) -> PolicySuspensionRecord:
+        """Append one suspension lifecycle act; idempotent iff identical.
+
+        `ACC-SUSP-IA-7`. Unlike the terminal stores, this one holds an **ordered
+        sequence** per coordinate. An exact replay returns the stored record; a
+        *different* record sharing an already-stored signed instant, or one dated
+        at or before the latest stored record, is a conflict.
+        """
+        ...
+
+    def suspensions_for(
+        self, coordinate: PolicyCoordinate
+    ) -> tuple[PolicySuspensionRecord, ...]:
+        """This coordinate's suspension history, **in accepted order**.
+
+        Stored order is the authoritative order; a caller validates it rather
+        than re-sorting it.
+        """
         ...
 
 
@@ -133,6 +166,8 @@ class InMemoryPolicyRegistry:
         # `ACC-LC-IA-2`: a third append-only store, keyed by the *predecessor*.
         self._supersessions: dict[PolicyCoordinate, PolicySupersessionRecord] = {}
         self._supersession_bytes: dict[PolicyCoordinate, bytes] = {}
+        self._suspensions: dict[PolicyCoordinate, list[PolicySuspensionRecord]] = {}
+        self._suspension_bytes: dict[PolicyCoordinate, list[bytes]] = {}
 
     # ------------------------------------------------------------------
     # Issuance
@@ -196,6 +231,24 @@ class InMemoryPolicyRegistry:
         # Sorted by identity, never by insertion order, so the result cannot
         # depend on the order in which versions were registered.
         return tuple(sorted(matches, key=lambda r: (r.coordinate.version, r.record_id)))
+
+    def issued_records_for_family(
+        self, *, policy_family: str, scope: str, tenant_id: str
+    ) -> tuple[IssuedPolicyRecord, ...]:
+        with self._lock:
+            matches = [
+                record
+                for coordinate, record in self._issued.items()
+                if coordinate.policy_family == policy_family
+                and coordinate.scope == scope
+                and coordinate.tenant_id == tenant_id
+            ]
+        # `ACC-OVL-3`: sorted by identity, never by insertion order. A comparison
+        # whose result depended on registration order would be the very
+        # tie-breaking the ruling forbids.
+        return tuple(
+            sorted(matches, key=lambda r: (r.coordinate.policy_id, r.coordinate.version, r.record_id))
+        )
 
     # ------------------------------------------------------------------
     # Revocation
@@ -305,3 +358,53 @@ class InMemoryPolicyRegistry:
         with self._lock:
             record = self._supersessions.get(coordinate)
         return (record,) if record is not None else ()
+
+    def append_suspension(self, record: PolicySuspensionRecord) -> PolicySuspensionRecord:
+        if not isinstance(record, PolicySuspensionRecord):
+            raise PolicyRegistryConflictError(
+                "append_suspension requires a PolicySuspensionRecord"
+            )
+
+        coordinate = record.coordinate
+        encoded = canonical_bytes(record)
+
+        with self._lock:
+            stored = self._suspensions.setdefault(coordinate, [])
+            encodings = self._suspension_bytes.setdefault(coordinate, [])
+
+            # An exact replay is an idempotent no-op, not a second append.
+            for existing, existing_bytes in zip(stored, encodings):
+                if existing_bytes == encoded:
+                    return existing
+
+            if stored:
+                latest = stored[-1]
+                if record.effective_at == latest.effective_at:
+                    raise PolicyRegistryConflictError(
+                        f"a different suspension record already carries the instant "
+                        f"{record.effective_at.isoformat()} for "
+                        f"{coordinate.policy_id}@{coordinate.version}; two distinct "
+                        "records may not share one signed instant"
+                    )
+                if record.effective_at < latest.effective_at:
+                    raise PolicyRegistryConflictError(
+                        f"suspension records are append-forward: "
+                        f"{record.effective_at.isoformat()} is earlier than the latest "
+                        f"stored {latest.effective_at.isoformat()} for "
+                        f"{coordinate.policy_id}@{coordinate.version}"
+                    )
+            # A record sharing an instant with a *non-latest* stored record is
+            # caught by the monotonicity check above, since it must also be at or
+            # before the latest one.
+
+            stored.append(record)
+            encodings.append(encoded)
+            return record
+
+    def suspensions_for(
+        self, coordinate: PolicyCoordinate
+    ) -> tuple[PolicySuspensionRecord, ...]:
+        if not isinstance(coordinate, PolicyCoordinate):
+            return ()
+        with self._lock:
+            return tuple(self._suspensions.get(coordinate, ()))

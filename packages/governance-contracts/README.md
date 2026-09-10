@@ -6,7 +6,7 @@ never have to depend on each other.
 
 - **Distribution:** `ugence-governance-contracts`
 - **Namespace:** `ugence_governance_contracts`
-- **Version:** 0.8.0 · **Contract version:** 1.0.0
+- **Version:** 0.9.0 · **Contract version:** 1.0.0
 - **Dependencies:** Python standard library only (no third-party, no other Ugence package)
 - **Typing:** fully type-annotated; ships a PEP 561 `py.typed` marker
 - **Ownership / maturity:** extracted verbatim from the frozen `governance_providers`
@@ -123,8 +123,10 @@ is that engine's adapter responsibility.
 The binding is **structural**: `authenticity_status` is a permanently
 `STRUCTURAL_UNVERIFIED` property and `authenticity_verified` a permanently-`False`
 property, because no ratified system-binding verifier exists. The RA-owned
-canonical neutral `SubjectContext` remains a **deferred dependency** (unmerged);
-it and `SystemManifest` are **not** minted here — both are referenced by opaque,
+canonical neutral `SubjectContext` is merged and implemented in `risk_authority`
+(PR #1425/#1432) and is **permanently not adopted** by UVI — D-14, ratified
+2026-09-09, closing UVI ADR §26.2 — so the reference here stays an opaque token
+that nothing resolves; it and `SystemManifest` are **not** minted here — both are referenced by opaque,
 co-required ref + digest tokens.
 
 **Canonicalization (0.3.1).** Every timezone-aware datetime in the binding is

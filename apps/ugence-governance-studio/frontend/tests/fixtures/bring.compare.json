@@ -1,0 +1,14 @@
+{
+  "equivalence_state": "SEMANTICALLY_EQUIVALENT",
+  "report": {
+    "differences": [],
+    "dimension": "adaptation",
+    "report_fingerprint": "sha256:d6132a13c29bade42d73dabf91e189757568a4fa94361414ae24dacfa38218b6",
+    "semantic_equivalence_fingerprint": "sha256:bc29877119f327dee9a22af8bccdd12e423443c3d90137cfe5e73e77c043dac5",
+    "state": "SEMANTICALLY_EQUIVALENT",
+    "v1_fingerprint": "sha256:91c1f7d2533b02f75e1b81c5a5a048b01c4252cd4d6ec9b58a84bfc4babce25a",
+    "v2_fingerprint": "sha256:ae122481859df0797d6cbde0ff2e4d0d41573f64f64a43e829116fb3c962317f"
+  },
+  "v1_adaptation_fingerprint": "sha256:91c1f7d2533b02f75e1b81c5a5a048b01c4252cd4d6ec9b58a84bfc4babce25a",
+  "v2_adaptation_fingerprint": "sha256:ae122481859df0797d6cbde0ff2e4d0d41573f64f64a43e829116fb3c962317f"
+}

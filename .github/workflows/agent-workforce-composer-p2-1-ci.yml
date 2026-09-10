@@ -8,6 +8,13 @@ name: agent-workforce-composer-p2-1-ci
 # isolated clean-install distribution verifier, determinism, terminology, and
 # blocking platform-freeze verification. No external models, no runtime, no web app.
 
+concurrency:
+  # A superseded run proves nothing about the commit that replaced it. Cancel
+  # in-flight runs for the same ref on pull requests; never on a branch push,
+  # where each commit's run is the evidence that commit was green.
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 on:
   pull_request:
     paths:
@@ -37,7 +44,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
-        with: { python-version: "3.11" }
+        with: { python-version: "3.11", cache: pip, cache-dependency-path: requirements.txt }
       - run: python -m pip install --upgrade pip && pip install pytest pydantic
       - env: { PYTHONPATH: "${{ env.SRC }}" }
         run: |
@@ -45,13 +52,17 @@ jobs:
             ${{ env.PKG }}/tests/test_eligibility.py ${{ env.PKG }}/tests/test_ranking.py \
             ${{ env.PKG }}/tests/test_composition.py ${{ env.PKG }}/tests/test_plan.py \
             ${{ env.PKG }}/tests/test_public_api.py -q
-      - name: version 0.2.1 + honest P2.1 maturity
+      - name: Contract + honest P2.1 maturity
         env: { PYTHONPATH: "${{ env.SRC }}" }
         run: |
           python - <<'PY'
           import ugence_agent_workforce_composer as u
           i = u.version_info().to_dict()
-          assert u.__version__ == "0.2.1" and u.CONTRACT_VERSION == "awc.v1"
+          # P2.1's invariants, not the distribution's current version. This pin is true
+          # today and would go red on the next release, exactly as the P1 and P2 pins did.
+          # The version is pinned once, in the package's own tests/test_public_api.py and
+          # distribution verifier. See agent-workforce-composer-p1-ci.yml for the note.
+          assert u.CONTRACT_VERSION == "awc.v1", u.CONTRACT_VERSION
           assert i["composition_contract_version"] == "awc.composition.v1"
           assert i["compiler_adapter_contract_version"] == "awc.compiler_adapter.v2"
           for k in ("compiler_workflow_ir_v1_supported","compiler_workflow_ir_v2_supported",
@@ -72,7 +83,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
-        with: { python-version: "3.11" }
+        with: { python-version: "3.11", cache: pip, cache-dependency-path: requirements.txt }
       - run: python -m pip install --upgrade pip && pip install pytest pydantic
       - env: { PYTHONPATH: "${{ env.SRC }}" }
         run: python -m pytest ${{ env.PKG }}/tests/test_p2_1_adapter.py -q
@@ -83,7 +94,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
-        with: { python-version: "3.11" }
+        with: { python-version: "3.11", cache: pip, cache-dependency-path: requirements.txt }
       - run: python -m pip install --upgrade pip && pip install pytest pydantic
       - env: { PYTHONPATH: "${{ env.SRC }}" }
         run: python -m pytest ${{ env.PKG }}/tests/test_p2_1_adapter.py -q -k "overlay or authority or dependency or non_agent"
@@ -94,7 +105,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
-        with: { python-version: "3.11" }
+        with: { python-version: "3.11", cache: pip, cache-dependency-path: requirements.txt }
       - run: python -m pip install --upgrade pip && pip install pytest pydantic
       - env: { PYTHONPATH: "${{ env.SRC }}" }
         run: python -m pytest ${{ env.PKG }}/tests/test_p2_1_equivalence.py -q
@@ -105,7 +116,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
-        with: { python-version: "3.11" }
+        with: { python-version: "3.11", cache: pip, cache-dependency-path: requirements.txt }
       - run: |
           python -m pip install --upgrade pip && pip install pytest pydantic
           pip install -e packages/tooling/policy-workflow-compiler
@@ -122,7 +133,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
-        with: { python-version: "3.11" }
+        with: { python-version: "3.11", cache: pip, cache-dependency-path: requirements.txt }
       - run: python -m pip install --upgrade pip && pip install pytest pydantic
       - env: { PYTHONPATH: "${{ env.SRC }}" }
         run: python -m pytest ${{ env.PKG }}/tests/test_p2_1_boundaries.py ${{ env.PKG }}/tests/test_boundaries.py ${{ env.PKG }}/tests/test_boundaries_p2.py -q
@@ -133,7 +144,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
-        with: { python-version: "3.11" }
+        with: { python-version: "3.11", cache: pip, cache-dependency-path: requirements.txt }
       - run: python -m pip install --upgrade pip && pip install pydantic
       - env: { PYTHONPATH: "${{ env.SRC }}" }
         run: |
@@ -152,7 +163,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
-        with: { python-version: "3.11" }
+        with: { python-version: "3.11", cache: pip, cache-dependency-path: requirements.txt }
       - run: python -m pip install --upgrade pip && pip install build
       - run: python ${{ env.PKG }}/verify_agent_workforce_composer_distribution.py
 
@@ -183,7 +194,7 @@ jobs:
       - uses: actions/checkout@v4
         with: { fetch-depth: 0 }
       - uses: actions/setup-python@v5
-        with: { python-version: "3.11" }
+        with: { python-version: "3.11", cache: pip, cache-dependency-path: requirements.txt }
       - run: |
           python -m pip install --upgrade pip && pip install pytest pydantic
           pip install -e packages/capabilities/decision-authority
