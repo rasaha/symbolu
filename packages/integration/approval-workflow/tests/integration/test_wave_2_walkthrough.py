@@ -19,6 +19,8 @@ import sys
 
 import pytest
 
+from _tree_guard import tree_was_modified
+
 _REPO = pathlib.Path(__file__).resolve().parents[5]
 _DIRECTORY_SRC = _REPO / "packages" / "integration" / "authority-directory" / "src"
 if _DIRECTORY_SRC.is_dir() and str(_DIRECTORY_SRC) not in sys.path:
@@ -201,17 +203,10 @@ def test_the_kernel_is_1_0_0_and_this_branch_changed_none_of_it():
     assert DA_VERSION == "1.0.0"
     da = "packages/capabilities/decision-authority"
 
-    def git(*args) -> str:
-        return subprocess.run(("git", "-C", str(_REPO)) + args, capture_output=True,
-                              text=True, check=True).stdout.strip()
-
-    assert git("status", "--porcelain", "--", da) == ""
-    here = git("rev-parse", "--abbrev-ref", "HEAD")
-    others = [b.strip() for b in git("branch", "-r", "--format=%(refname:short)").splitlines()
-              if b.strip() and not b.strip().endswith(f"/{here}") and "->" not in b]
-    if len(others) != 1:
-        pytest.skip(f"cannot unambiguously resolve the base branch: {others}")
-    assert git("diff", "--name-only", f"{others[0]}...HEAD", "--", da) == ""
+    # Both halves — pending and committed on this branch. See ``_tree_guard`` for base
+    # resolution and why an unresolvable base fails rather than skipping.
+    changed = tree_was_modified(_REPO, da)
+    assert changed == "", f"the Decision Authority kernel was modified:\n{changed}"
 
 
 # --------------------------------------------------------------------------- #
