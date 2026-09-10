@@ -20,7 +20,7 @@ from datetime import datetime
 import pytest
 from fastapi.testclient import TestClient
 
-from ugence_vendor_dependency import SqliteVendorDeclarations
+from ugence_vendor_dependency import SqliteVendorDeclarations, VocabularyBinding
 from ugence_governance_studio_api.app_v2 import build_studio_context, create_v2_app
 from ugence_governance_studio_api.services.studio_v2 import (
     DECLARED_BY_STATUS,
@@ -37,6 +37,13 @@ TENANT = "tenant-1"
 RECORDED_BY = "governance-studio-private-hosted/0.10.0"
 D = "e" * 64
 PATH = "/api/v2/vendor/declarations"
+
+#: The published vocabulary this test deployment records against. A real deployment
+#: configures its own; what matters here is that one is configured at all, because a
+#: seam handed none refuses to record rather than stamping a vocabulary nobody chose.
+POSTURE_VOCABULARY = VocabularyBinding(
+    vocabulary="vendor-dependency-assessment-state", version="1.0.0",
+    specification_digest="sha256:" + "1a" * 32)
 
 
 def _binding(**over):
@@ -69,7 +76,8 @@ def declarations(tmp_path):
 
 @pytest.fixture()
 def client(declarations):
-    studio = build_studio_context(vendor_declarations=declarations, recorded_by=RECORDED_BY)
+    studio = build_studio_context(vendor_declarations=declarations, recorded_by=RECORDED_BY,
+                                  vendor_posture_vocabulary=POSTURE_VOCABULARY)
     return TestClient(create_v2_app(ApiSettings(environment="test"), studio=studio))
 
 
@@ -293,3 +301,22 @@ def test_the_v2_contract_carries_exactly_the_two_ruled_operations_and_the_amendm
         committed = fh.read()
     assert hashlib.sha256(committed).hexdigest() == previous
     assert committed == canonical_v2_openapi_bytes()
+
+
+def test_a_file_without_a_vocabulary_refuses_to_record_rather_than_stamping_one(declarations):
+    """VV-E and PUB-2: an absent vocabulary reference is never defaulted.
+
+    The store is real and writable; what is missing is the deployment's statement of
+    which published taxonomy its administrators record against. Recording anyway would
+    put a vocabulary nobody chose into a field whose whole purpose is provenance, so the
+    seam reports the gap — the same rule this app already applies to every other
+    dependency it is handed nothing for.
+    """
+
+    studio = build_studio_context(vendor_declarations=declarations, recorded_by=RECORDED_BY)
+    client = TestClient(create_v2_app(ApiSettings(environment="test"), studio=studio))
+    result = _result(_declare(client, _declaration()))
+    assert result["available"] is False and result["result"] is None
+    assert "vocabulary" in result["reason"]
+    # and nothing reached the file
+    assert declarations.count() == 0

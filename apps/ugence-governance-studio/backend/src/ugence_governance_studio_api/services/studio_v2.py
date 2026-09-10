@@ -871,9 +871,31 @@ class RegistryService:
 
     CAPABILITY = "system_registry"
 
-    def __init__(self, registry: Any = None, registered_by: str = "") -> None:
+    def __init__(self, registry: Any = None, registered_by: str = "",
+                 classification_vocabulary: Any = None) -> None:
         self._registry = registry
         self._registered_by = registered_by
+        #: The published system-classification vocabulary this deployment records
+        #: against. Configured, never inferred, and never defaulted (PUB-2).
+        self._classification_vocabulary = classification_vocabulary
+
+    def _vocabulary_gap(self, name: str) -> Dict[str, Any]:
+        """A store without a vocabulary cannot record, and says so.
+
+        ``VV-E`` requires every governed label on a current record to name the published
+        vocabulary it was written against, and ``PUB-2`` forbids defaulting an absent
+        reference to the current one. A deployment that has not said which taxonomy its
+        administrators record against therefore cannot record — which is this app's
+        existing rule, not a new one: a service handed nothing reports itself unavailable
+        and never substitutes a stub.
+        """
+
+        return _unavailable(
+            self.CAPABILITY,
+            f"no {name} is configured: this deployment has not named the published "
+            "vocabulary its labels are written against, and a record may not assert one "
+            "nobody configured (VV-E, PUB-2)",
+        )
 
     def _gap(self) -> Dict[str, Any]:
         return _unavailable(
@@ -889,6 +911,8 @@ class RegistryService:
     def register(self, payload: Dict[str, Any]) -> Dict[str, Any]:
         if self._registry is None:
             return self._gap()
+        if self._classification_vocabulary is None:
+            return self._vocabulary_gap("system-classification vocabulary")
         tenant_id = self._registry.tenant_id
         try:
             binding_input = dict(payload.get("binding") or {})
@@ -914,6 +938,7 @@ class RegistryService:
                 binding=binding,
                 owner_ref=owner_ref,
                 classification_label=payload.get("classification_label", ""),
+                classification_vocabulary=self._classification_vocabulary,
                 validity=validity,
                 supersedes=payload.get("supersedes", "") or "",
                 registered_by=self._registered_by,
@@ -1013,9 +1038,34 @@ class DeclarationService:
 
     CAPABILITY = "data_use_declarations"
 
-    def __init__(self, declarations: Any = None, recorded_by: str = "") -> None:
+    def __init__(self, declarations: Any = None, recorded_by: str = "",
+                 classification_vocabulary: Any = None,
+                 purpose_vocabulary: Any = None) -> None:
         self._declarations = declarations
         self._recorded_by = recorded_by
+        #: Two published vocabularies, independently configured. VV-D forbids the purpose
+        #: binding from being borrowed from the classification one, so this deployment
+        #: names both or records neither.
+        self._classification_vocabulary = classification_vocabulary
+        self._purpose_vocabulary = purpose_vocabulary
+
+    def _vocabulary_gap(self, name: str) -> Dict[str, Any]:
+        """A store without a vocabulary cannot record, and says so.
+
+        ``VV-E`` requires every governed label on a current record to name the published
+        vocabulary it was written against, and ``PUB-2`` forbids defaulting an absent
+        reference to the current one. A deployment that has not said which taxonomy its
+        administrators record against therefore cannot record — which is this app's
+        existing rule, not a new one: a service handed nothing reports itself unavailable
+        and never substitutes a stub.
+        """
+
+        return _unavailable(
+            self.CAPABILITY,
+            f"no {name} is configured: this deployment has not named the published "
+            "vocabulary its labels are written against, and a record may not assert one "
+            "nobody configured (VV-E, PUB-2)",
+        )
 
     def _gap(self) -> Dict[str, Any]:
         return _unavailable(
@@ -1031,6 +1081,12 @@ class DeclarationService:
     def declare(self, payload: Dict[str, Any]) -> Dict[str, Any]:
         if self._declarations is None:
             return self._gap()
+        # Two vocabularies, checked separately: VV-D makes them independent, so a
+        # deployment that configured one and not the other has configured neither.
+        if self._classification_vocabulary is None:
+            return self._vocabulary_gap("data-classification vocabulary")
+        if self._purpose_vocabulary is None:
+            return self._vocabulary_gap("data-use-purpose vocabulary")
         tenant_id = self._declarations.tenant_id
         try:
             binding_input = dict(payload.get("binding") or {})
@@ -1055,13 +1111,17 @@ class DeclarationService:
             purpose_label = payload.get("purpose_label", "")
             declaration = DataUseDeclaration(
                 declaration_id=declaration_id_for(binding, data_ref, classification,
-                                                  purpose_label, validity),
+                                                  purpose_label, validity,
+                                                  self._classification_vocabulary,
+                                                  self._purpose_vocabulary),
                 tenant_id=tenant_id,
                 binding=binding,
                 data_ref=data_ref,
                 classification=classification,
                 purpose_label=purpose_label,
                 validity=validity,
+                classification_vocabulary=self._classification_vocabulary,
+                purpose_vocabulary=self._purpose_vocabulary,
                 residency_label=payload.get("residency_label", "") or "",
                 supersedes=payload.get("supersedes", "") or "",
                 declared_by=payload.get("declared_by", "") or "",
@@ -1170,9 +1230,32 @@ class VendorDeclarationService:
 
     CAPABILITY = "vendor_declarations"
 
-    def __init__(self, declarations: Any = None, recorded_by: str = "") -> None:
+    def __init__(self, declarations: Any = None, recorded_by: str = "",
+                 posture_vocabulary: Any = None) -> None:
         self._declarations = declarations
         self._recorded_by = recorded_by
+        #: The published assessment-state vocabulary this deployment records against.
+        #: Distinct from ``policy_ref``, which VR-4 makes opaque and PUB-2 therefore
+        #: ruled cannot identify a vocabulary.
+        self._posture_vocabulary = posture_vocabulary
+
+    def _vocabulary_gap(self, name: str) -> Dict[str, Any]:
+        """A store without a vocabulary cannot record, and says so.
+
+        ``VV-E`` requires every governed label on a current record to name the published
+        vocabulary it was written against, and ``PUB-2`` forbids defaulting an absent
+        reference to the current one. A deployment that has not said which taxonomy its
+        administrators record against therefore cannot record — which is this app's
+        existing rule, not a new one: a service handed nothing reports itself unavailable
+        and never substitutes a stub.
+        """
+
+        return _unavailable(
+            self.CAPABILITY,
+            f"no {name} is configured: this deployment has not named the published "
+            "vocabulary its labels are written against, and a record may not assert one "
+            "nobody configured (VV-E, PUB-2)",
+        )
 
     def _gap(self) -> Dict[str, Any]:
         return _unavailable(
@@ -1188,6 +1271,8 @@ class VendorDeclarationService:
     def declare(self, payload: Dict[str, Any]) -> Dict[str, Any]:
         if self._declarations is None:
             return self._gap()
+        if self._posture_vocabulary is None:
+            return self._vocabulary_gap("vendor assessment-state vocabulary")
         tenant_id = self._declarations.tenant_id
         try:
             binding_input = dict(payload.get("binding") or {})
@@ -1212,13 +1297,15 @@ class VendorDeclarationService:
             policy_ref = payload.get("policy_ref", "")
             declaration = VendorDependencyDeclaration(
                 declaration_id=vendor_declaration_id_for(binding, vendor_ref, posture,
-                                                         policy_ref, validity),
+                                                         policy_ref, validity,
+                                                         self._posture_vocabulary),
                 tenant_id=tenant_id,
                 binding=binding,
                 vendor_ref=vendor_ref,
                 risk_posture=posture,
                 policy_ref=policy_ref,
                 validity=validity,
+                posture_vocabulary=self._posture_vocabulary,
                 supersedes=payload.get("supersedes", "") or "",
                 declared_by=payload.get("declared_by", "") or "",
                 correlation_id=payload.get("correlation_id", "") or "",
