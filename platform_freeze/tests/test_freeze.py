@@ -10,7 +10,12 @@ from platform_freeze import version as V
 from platform_freeze.api_snapshot import snapshot_all
 from platform_freeze.compat import classify, compare_snapshots, is_compatible
 from platform_freeze.dependencies import dependency_report
-from platform_freeze.hashing import tree_hash
+from platform_freeze.hashing import (
+    TrackedFilesUnavailable,
+    _tracked,
+    tree_hash,
+    tree_manifest,
+)
 from platform_freeze.hiring_baseline import discover_hiring
 from platform_freeze.invariants import REGISTER, invariants_ok, verify_invariants
 from platform_freeze.manifest import build_manifest, load_manifest, verify_manifest
@@ -43,6 +48,62 @@ def test_manifest_has_expected_shape():
 def test_tree_hash_is_stable():
     for t in V.CORE_TREES:
         assert tree_hash(t) == tree_hash(t)
+
+
+def test_tree_hash_ignores_untracked_build_output():
+    """The property the tracked-files scoping exists to deliver.
+
+    ``python -m build`` leaves a ``build/lib/…`` copy of every module beside the source.
+    A directory walk cannot tell those apart from source, so a digest computed after a
+    build did not reproduce on a clean checkout — and the mismatch looked exactly like
+    tampering. On a package tree that is 10 of 46 files, and 78 of 214, so this is not a
+    rounding error.
+
+    The artefact is planted inside a genuinely frozen tree rather than a synthetic one,
+    because ``tree_hash`` resolves paths against the real repository root and a fixture
+    that avoided that would prove nothing about the function as called.
+    """
+
+    tree = REPO / V.CORE_TREES[0]
+    before = tree_hash(V.CORE_TREES[0])
+    planted = tree / "build" / "lib" / "planted_by_a_build.py"
+    assert not planted.exists(), "the fixture must not collide with real content"
+
+    try:
+        planted.parent.mkdir(parents=True, exist_ok=True)
+        planted.write_text("SHOULD_NOT_BE_HASHED = True\n", encoding="utf-8")
+        _tracked.cache_clear()  # tracked-ness is cached per run; this plants a new file
+        assert tree_hash(V.CORE_TREES[0]) == before, (
+            "an untracked build artefact changed the tree hash")
+        assert tree_manifest(V.CORE_TREES[0])["files"].get(
+            "build/lib/planted_by_a_build.py") is None
+    finally:
+        planted.unlink(missing_ok=True)
+        for parent in (planted.parent, planted.parent.parent):
+            if parent.is_dir() and not any(parent.iterdir()):
+                parent.rmdir()
+        _tracked.cache_clear()
+
+    assert tree_hash(V.CORE_TREES[0]) == before, "the fixture did not clean up after itself"
+
+
+def test_tree_hash_fails_loudly_when_tracked_files_cannot_be_listed(monkeypatch):
+    """No git means failure, not a quieter answer.
+
+    A directory-walk fallback would return a *different* digest under the same name —
+    silently wrong rather than loudly absent, and indistinguishable from a real mismatch.
+    """
+
+    def _no_git(*_args, **_kwargs):
+        raise OSError("git not found")
+
+    _tracked.cache_clear()
+    monkeypatch.setattr("platform_freeze.hashing.subprocess.run", _no_git)
+    try:
+        with pytest.raises(TrackedFilesUnavailable):
+            tree_hash(V.CORE_TREES[0])
+    finally:
+        _tracked.cache_clear()
 
 
 # --- API compatibility ------------------------------------------------------
