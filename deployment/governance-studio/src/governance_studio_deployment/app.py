@@ -104,29 +104,52 @@ def _build_backend(config: DeploymentConfig, *, deployment_report: Optional[dict
         provider_registry = build_simulation_registry()
     system_registry = None
     registered_by = ""
+    # The vocabulary travels with the file it records into: configured together or not
+    # at all, because a store without one refuses to record (VV-E, PUB-2).
+    system_classification_vocabulary = None
     if config.system_registry_path:
-        from .registration import REGISTERED_BY, open_system_registry
+        from .registration import (
+            REGISTERED_BY,
+            SYSTEM_CLASSIFICATION_VOCABULARY,
+            open_system_registry,
+        )
 
         system_registry = open_system_registry(config.system_registry_path, tenant_id=config.tenant_id,
                                                production_mode=config.is_production)
         registered_by = REGISTERED_BY
+        system_classification_vocabulary = SYSTEM_CLASSIFICATION_VOCABULARY
     data_use_declarations = None
     recorded_by = ""
+    data_classification_vocabulary = None
+    data_use_purpose_vocabulary = None
     if config.data_use_declarations_path:
-        from .declarations import RECORDED_BY, open_data_use_declarations
+        from .declarations import (
+            DATA_CLASSIFICATION_VOCABULARY,
+            DATA_USE_PURPOSE_VOCABULARY,
+            RECORDED_BY,
+            open_data_use_declarations,
+        )
 
         data_use_declarations = open_data_use_declarations(
             config.data_use_declarations_path, tenant_id=config.tenant_id,
             production_mode=config.is_production)
         recorded_by = RECORDED_BY
+        data_classification_vocabulary = DATA_CLASSIFICATION_VOCABULARY
+        data_use_purpose_vocabulary = DATA_USE_PURPOSE_VOCABULARY
     vendor_declarations = None
+    vendor_posture_vocabulary = None
     if config.vendor_declarations_path:
-        from .vendor import VENDOR_RECORDED_BY, open_vendor_declarations
+        from .vendor import (
+            VENDOR_POSTURE_VOCABULARY,
+            VENDOR_RECORDED_BY,
+            open_vendor_declarations,
+        )
 
         vendor_declarations = open_vendor_declarations(
             config.vendor_declarations_path, tenant_id=config.tenant_id,
             production_mode=config.is_production)
         recorded_by = recorded_by or VENDOR_RECORDED_BY
+        vendor_posture_vocabulary = VENDOR_POSTURE_VOCABULARY
     # Clearance export (CE-7): the receipts this image shipped with, read from the
     # scenario fixtures the pinned synthetic manifest already covers. Composition,
     # not a route — nothing at runtime can add one.
@@ -142,9 +165,13 @@ def _build_backend(config: DeploymentConfig, *, deployment_report: Optional[dict
         review_service_base_url=config.review_service_url or None,
         system_registry=system_registry,
         registered_by=registered_by,
+        system_classification_vocabulary=system_classification_vocabulary,
         data_use_declarations=data_use_declarations,
         recorded_by=recorded_by,
+        data_classification_vocabulary=data_classification_vocabulary,
+        data_use_purpose_vocabulary=data_use_purpose_vocabulary,
         vendor_declarations=vendor_declarations,
+        vendor_posture_vocabulary=vendor_posture_vocabulary,
         received_clearances=received_clearances,
         deployment_report=deployment_report,
     )

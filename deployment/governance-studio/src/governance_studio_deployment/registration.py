@@ -11,15 +11,33 @@ before anything binds. The Registration screen's only write is ``register``
 """
 from __future__ import annotations
 
-from ugence_ai_system_registry import CrossTenantRefused, RegistryStorageError, SqliteSystemRegistry
+from ugence_ai_system_registry import (
+    CrossTenantRefused,
+    RegistryStorageError,
+    SqliteSystemRegistry,
+    VocabularyBinding,
+)
 
 from . import DEPLOYMENT_NAME, DEPLOYMENT_VERSION
 from .config import DeploymentConfigError
 
-__all__ = ["open_system_registry", "REGISTERED_BY"]
+__all__ = ["open_system_registry", "REGISTERED_BY",
+           "SYSTEM_CLASSIFICATION_VOCABULARY"]
 
 #: FD-9.3: what every registration this deployment records is ``registered_by``.
 REGISTERED_BY = f"{DEPLOYMENT_NAME}/{DEPLOYMENT_VERSION}"
+
+#: The published vocabulary this image records system classifications against
+#: (``VV-E``, authorized by ``PUB-2``). Pinned at build time, like the recording
+#: composition above and for the same reason: which taxonomy this image's screens write
+#: under is a property of the image, not of a caller or of a runtime setting. Recorded
+#: here and resolved by nobody — this deployment never opens ``docs/vocabularies/``.
+SYSTEM_CLASSIFICATION_VOCABULARY = VocabularyBinding(
+    vocabulary="eu-ai-act-system-classification",
+    version="1.0.0",
+    specification_digest=(
+        "sha256:673f0d6e3773877566631bc58e18e72614d9c324b2c861adab60c6ee811a152b"),
+)
 
 
 def open_system_registry(path: str, *, tenant_id: str, production_mode: bool) -> SqliteSystemRegistry:

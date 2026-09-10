@@ -266,7 +266,12 @@ def test_the_codec_round_trips_the_family_and_refuses_any_other(runtime_dir):
 # FD-3: the composition record in the registry's own record type
 # --------------------------------------------------------------------------- #
 def test_the_composition_record_is_an_immutable_versioned_registry_record():
-    from ugence_ai_system_registry import AssessedSystemBinding, SystemRegistration, registration_id_for
+    from ugence_ai_system_registry import (
+        LEGACY_CONTRACT_VERSION,
+        AssessedSystemBinding,
+        SystemRegistration,
+        registration_id_for,
+    )
     from ugence_governance_contracts.api import Validity
     from datetime import datetime
 
@@ -276,10 +281,18 @@ def test_the_composition_record_is_an_immutable_versioned_registry_record():
     reg = record["registration"]
     validity = Validity(issued_at=datetime.fromisoformat(reg["validity"]["issued_at"].replace("Z", "+00:00")),
                         expires_at=datetime.fromisoformat(reg["validity"]["expires_at"].replace("Z", "+00:00")))
+    # Every committed composition record was written before the vocabulary binding
+    # existed, and carries no ``record_version`` to say otherwise — so it reconstructs as
+    # the historical record it is (VV-E's UNVERSIONED_LEGACY), under the v1 projection
+    # that produced its stored digest. Stamping a vocabulary on it instead would assert a
+    # taxonomy that did not exist when it was written, which is exactly what MIG-5 ruled
+    # against. A future composition record, written by a build that has one, will carry
+    # it and will digest differently — which is VV-B working as intended.
     rebuilt = SystemRegistration(registration_id=reg["registration_id"], binding=binding,
                                  owner_ref=reg["owner_ref"], classification_label=reg["classification_label"],
                                  validity=validity, supersedes=reg["supersedes"],
-                                 registered_by=reg["registered_by"], notes=reg["notes"])
+                                 registered_by=reg["registered_by"], notes=reg["notes"],
+                                 record_version=LEGACY_CONTRACT_VERSION)
     assert rebuilt.registration_id == registration_id_for(binding, reg["owner_ref"], validity)
     assert rebuilt.to_dict() == reg and rebuilt.record_digest() == record["record_digest"]
     assert binding.system_id == DEPLOYMENT_NAME and binding.system_version == DEPLOYMENT_VERSION
@@ -301,7 +314,8 @@ def test_the_composition_record_is_an_immutable_versioned_registry_record():
             classification_label=pr["classification_label"],
             validity=Validity(issued_at=datetime.fromisoformat(pr["validity"]["issued_at"].replace("Z", "+00:00")),
                               expires_at=datetime.fromisoformat(pr["validity"]["expires_at"].replace("Z", "+00:00"))),
-            supersedes=pr["supersedes"], registered_by=pr["registered_by"], notes=pr["notes"])
+            supersedes=pr["supersedes"], registered_by=pr["registered_by"], notes=pr["notes"],
+            record_version=LEGACY_CONTRACT_VERSION)
 
     seam1, seam1_reg = _load("composition-record.seam-1.json")
     assert seam1_reg.record_digest() == seam1["record_digest"] == \
