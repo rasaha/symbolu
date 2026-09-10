@@ -393,7 +393,8 @@ on whether dispatch may have occurred (§3.5):
 **A vendor-mix reservation is a third object, and the expiry does not touch it either** (D-5,
 2026-09-10). A request reaching `OUTCOME_UNKNOWN` after possible dispatch is **conservatively
 counted as consumed** until an independently authorized reconciliation proves otherwise;
-**lease expiry alone never releases the reservation or permits another billed call.** Releasing
+**neither lease expiry nor content purging releases the reservation or permits another billed
+call** (§4.4). Releasing
 capacity on an ambiguous outcome would reintroduce at the quota layer precisely the duplicate
 billed inference §3.5 exists to prevent — the reservation would come back while the vendor's
 invoice did not.
@@ -608,8 +609,8 @@ protection and production key custody remain separate obligations, unaddressed b
 document rather than discharged by it.
 
 **Nothing here authorizes genuine content or a genuine call.** Five things are verified
-separately first, and **all five are outstanding** — none is partially satisfied, so no
-reading of this document licenses a first exception:
+separately first. Three are now **ruled but unimplemented**, and two remain untouched; **none
+is satisfied**, so no reading of this document licenses a first exception:
 
 | Prerequisite | Where it stands, 2026-09-10 |
 |---|---|
@@ -783,9 +784,10 @@ that is the governance authority the architecture denies it.
 
 | Decision | Blocks |
 |---|---|
-**No design question remains open.** D-1 through D-5, the three transport rulings, the CR-5
-clarification and the exchange grants and tenancy ruling were all settled by 2026-09-10. What
-they left behind is work, and one decision engineering may not make.
+**No design question remains open, and no owner decision is outstanding.** D-1 through D-5,
+the three transport rulings, the CR-5 clarification, the exchange grants and tenancy ruling and
+the retention horizons were all settled by 2026-09-10. Everything below is **work that has not
+been done** — no row here waits on a decision.
 
 | Open item | Blocks |
 |---|---|
