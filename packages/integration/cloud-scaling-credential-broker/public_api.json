@@ -3,7 +3,7 @@
   "distribution": "ugence-cloud-scaling-credential-broker",
   "namespace": "ugence_cloud_scaling_credential_broker",
   "note": "Machine-readable snapshot of the curated public API (ugence_cloud_scaling_credential_broker.__all__). tests/packaging/test_packaging.py asserts this file equals the live package surface. Regenerate with scripts/generate_public_api.py when the curated API changes deliberately.",
-  "package_version": "0.1.0",
+  "package_version": "0.2.0",
   "symbols": {
     "CREDENTIAL_PROFILE": {
       "kind": "constant",
@@ -213,7 +213,7 @@
     },
     "__version__": {
       "kind": "constant",
-      "value": "0.1.0"
+      "value": "0.2.0"
     },
     "derive_grant_id": {
       "kind": "function",

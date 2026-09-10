@@ -75,6 +75,30 @@ omission. Only an authenticated Policy Authority rule, supplied through the new
 `applicability` port, can place an action outside Risk Authority scope; absence, lookup
 failure, ambiguity and malformed answers all mean authority required (ADR §8/D-D).
 
+## Temporal boundary — breaking change at 0.4.0
+
+The envelope window is **half-open**, `[not_before, expires_at)`. At exactly `expires_at`
+an envelope is expired, where it was previously still valid.
+
+`verify_and_bind` asks the temporal question **before** reading the verification result.
+Both the predicate and the canonical verifier refuse at that instant now, so which one
+fires first would otherwise decide the reason a caller sees; asking up front makes it
+stable. At exactly `expires_at` the outcome is a `DENY` carrying `RA_EXPIRED`, not a
+generic `RA_ENVELOPE_INVALID`. This does not reimplement the verifier — it still runs, and
+still owns signature, key, tenant, revocation and epoch.
+
+The consequence that motivated the ruling: **no GRANT is ever minted whose effective
+`expires_at` equals the evaluation instant.** Composition previously produced an ALLOW with
+a zero-microsecond-wide effective window there, which every consumer downstream then
+refused anyway — the credential broker on a zero-width credential window, and
+`governance_contracts.Validity` by being unable to construct `issued_at == expires_at` at
+all. The envelope was the last artifact still saying yes at an instant nothing could act on.
+
+Nothing signed changes. An envelope issued before 0.4.0 still verifies; it stops
+authorizing one microsecond earlier than it used to. Rule 3 of the composition table below
+reads `RA not_before ≤ now < expires_at`, which is what it always said — the leaf is what
+moved to match it.
+
 ## The corrected authority model
 
 ```

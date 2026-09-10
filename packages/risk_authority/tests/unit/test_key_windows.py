@@ -5,9 +5,9 @@ nowhere: ``KeyRing.from_records`` dropped them, so no verification path could se
 even in principle. These tests pin all four ratified rulings.
 
 The interval is **half-open**, ``[not_before, not_after)``: valid at exactly
-``not_before``, invalid at exactly ``not_after``. That deliberately differs from the
-envelope's inclusive boundary, and ``test_the_two_boundary_conventions_differ_on_purpose``
-asserts the difference rather than letting a future reader assume one is a bug.
+``not_before``, invalid at exactly ``not_after``. The envelope window now has the same
+shape; the boundary conformance suite that proves it lives in
+``tests/unit/test_temporal_boundaries.py``.
 """
 
 from __future__ import annotations
@@ -107,22 +107,16 @@ def test_exact_upper_boundary_is_invalid():
     assert successor.is_valid_at(T0) and not predecessor.is_valid_at(T0)
 
 
-def test_the_two_boundary_conventions_differ_on_purpose():
-    """The key is half-open; the envelope is inclusive. Asserted, not assumed.
+def test_the_key_upper_bound_is_exclusive():
+    """The one property this module owns: a key is invalid at exactly ``not_after``.
 
-    If someone "harmonizes" these, this test fails and points at the ruling instead of
-    letting a silent behavior change through.
+    The envelope now shares this shape. That agreement is proved behaviorally in
+    ``test_temporal_boundaries.py`` across every site that decides it; this test is
+    deliberately narrow and makes no claim about the envelope.
     """
 
-    from risk_authority.domain.envelope import RiskAuthorizationEnvelope
-
-    import inspect
-    source = inspect.getsource(RiskAuthorizationEnvelope.is_temporally_valid)
-    assert "self.not_before <= now <= self.expires_at" in source, (
-        "envelope validity is ratified as inclusive at both ends; this work does not "
-        "change it")
-    # ... while the key excludes its upper bound.
     assert not key_window_valid_at(T0, not_before=None, not_after=T0)
+    assert key_window_valid_at(T0, not_before=T0, not_after=None)
 
 
 # ------------------------------------------------------- ruling 3: the window survives

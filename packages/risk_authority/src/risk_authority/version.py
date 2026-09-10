@@ -39,4 +39,18 @@ from __future__ import annotations
 #: built. Reference mode is unchanged and still honors the field, which is what keeps the
 #: conformance suites and the distribution verifiers deterministically replayable. No
 #: other v1 behavior, and no canonical serialization, digest or signature format, changes.
-__version__ = "0.10.0"
+#: ``0.11.0`` makes the envelope's own validity window **half-open**,
+#: ``[not_before, expires_at)``: at exactly ``expires_at`` an envelope is now expired,
+#: where it was previously still valid. Decision expiry moves with it, at both the
+#: issuance seam and ``EnvelopeIssuer``, so the stated rule matches the effective
+#: behavior rather than falling through to a zero-width TTL. This supersedes the earlier
+#: ratified reading in which the envelope alone was inclusive at both ends. The argument
+#: that retired it: the absence of chained envelope windows explains why an inclusive
+#: upper bound caused no overlap, but never why a security validity artifact should stay
+#: usable at its own stated expiry — and every usable downstream consumer already refused
+#: there, so the envelope was the last artifact saying yes at an instant nothing could act
+#: on. Keys, envelopes, decisions, grants and ``ExecutionAuthorization`` now share one
+#: shape: inclusive lower bound, exclusive upper bound. No canonical serialization, digest
+#: or signature format is touched, and an envelope issued before this version still
+#: verifies — it simply stops authorizing one microsecond earlier than it used to.
+__version__ = "0.11.0"

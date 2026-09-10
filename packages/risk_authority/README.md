@@ -484,12 +484,53 @@ invalid at exactly `not_after`, so two adjacent rotation windows are never both 
 instant they meet. An absent bound is unbounded on that side, which is why every existing
 windowless key and signer in the repository behaves exactly as before.
 
-**This deliberately differs from the envelope's boundary, and neither should be
+~~**This deliberately differs from the envelope's boundary, and neither should be
 "harmonized" into the other.** `RiskAuthorizationEnvelope.is_temporally_valid` is inclusive
 at both ends and is **unchanged** by this work: at exactly `expires_at` an envelope is still
 valid, while at exactly `not_after` a key is not. An envelope is a *grant* with a separately
 ratified boundary; a key is a *credential*. The difference is asserted by an executable test
-rather than left to a reader's assumption.
+rather than left to a reader's assumption.~~
+
+> **Superseded at 0.11.0 — the envelope now shares this shape.** The paragraph above is
+> struck through rather than deleted so a reader of the older ADR finds the correction
+> instead of a silent rewrite. Its reasoning was sound about *overlap* — envelopes are
+> never chained, because issuance always sets `not_before` to its own issuance instant,
+> so no two envelope windows ever meet — but the absence of overlap never explained why a
+> security validity artifact should remain usable at its own stated expiry. Nothing
+> downstream would honor it anyway: the credential broker derived a zero-width window and
+> refused, and `governance_contracts.Validity` cannot construct `issued_at == expires_at`
+> at all. See *One temporal rule* below.
+
+## One temporal rule — 0.11.0
+
+> **Authority begins at `not_before` and ends immediately upon reaching `expires_at`.**
+
+Every artifact that carries an *authorization* validity window is half-open: inclusive
+lower bound, exclusive upper bound.
+
+| Artifact | Window | Where |
+|---|---|---|
+| signing key | `[not_before, not_after)` | `crypto/keys.py` |
+| `RiskAuthorizationEnvelope` | `[not_before, expires_at)` | `domain/envelope.py`, `services/envelope_verifier.py` |
+| `RiskDecision` expiry | `[.., expires_at)` | `services/envelope_issuer.py`, `api/envelope_issuance_seam.py` |
+| `ActionAuthorization` expiry | `[.., expires_at)` | copied from the envelope; enforced in the credential broker |
+| `CredentialGrant` validity | `[issued_at, expires_at)` | `governance_contracts.Validity` — already half-open |
+| `ExecutionAuthorization` | `[issued_at, expires_at)` | `cloud-scaling-operations` — already half-open, now ratified as deliberate |
+
+Five sites decide the envelope window, and a conformance suite asserts all five agree at
+`not_before − ε`, `not_before`, `expires_at − ε`, `expires_at` and `expires_at + ε`:
+`tests/unit/test_temporal_boundaries.py`, plus one per consuming package. The proof is
+behavioral, with a negative control. A source-text tripwire is not the normative proof:
+equivalent correct code can spell the comparison many ways, so a substring assertion would
+fail on a correct refactor while passing on any rewrite that kept the string.
+
+**What this rule does *not* cover.** Evidence and control freshness bounds — the
+`valid_until` family on `domain/evidence.py`, `domain/binding.py`, `domain/controls.py`,
+`SubjectContext.subject_valid_until`, and `AuthorityGrant.is_active` — remain **inclusive**
+and are deliberately untouched here. Those answer "is this observation still fresh", not
+"may this act now", and moving them is a separate question that has not been ruled on. The
+table above is the complete list of what changed; do not read it as a claim about every
+datetime comparison in the package.
 
 A malformed window (`not_before >= not_after`, or a non-datetime bound) raises
 `KeyWindowError` at construction rather than becoming a silently always-invalid key — a

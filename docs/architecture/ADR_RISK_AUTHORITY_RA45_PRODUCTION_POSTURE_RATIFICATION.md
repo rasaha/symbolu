@@ -293,6 +293,78 @@ authority entry point. Revisit only if a production consumer is commissioned.
 0.2.0 → **0.3.0** (D-A; `derive` drops its `now` parameter and `production()` gains a
 required `clock`).
 
+## 10. Amendment 3 — the envelope temporal boundary, made half-open
+
+Ratified after an audit of the boundary asymmetry left open by Amendment 2. Five rulings.
+
+### What the audit found, and why the recommendation was rejected
+
+The audit established that the key interval was half-open, `[not_before, not_after)`, while
+the envelope was inclusive, `[not_before, expires_at]`, and recommended **keeping** the
+asymmetry on the grounds that the reason keys are half-open — so two adjacent rotation
+windows cannot both be live where they meet — cannot arise for envelopes, which are never
+chained (issuance always sets `not_before` to its own issuance instant).
+
+**The owner rejected that recommendation, and was right to.** "Envelopes are not chained"
+explains why an inclusive upper bound produced no *overlap*; it never explained why a
+security validity artifact should remain usable at its own stated expiration instant. The
+audit's own evidence made the case against it: at `now == expires_at` the verified path
+minted a GRANT with a zero-microsecond-wide effective window, and every consumer downstream
+refused it anyway — the credential broker on a zero-width credential window, and
+`governance_contracts.Validity` by being structurally unable to construct
+`issued_at == expires_at`. The envelope was the last artifact still saying yes at an instant
+nothing could act on.
+
+### The rulings
+
+**E-A — the envelope window is half-open.** `not_before <= now < expires_at`. At exactly
+`expires_at` an envelope is expired. This supersedes the earlier ratified inclusive reading.
+No signed field, canonical byte, digest or signature format changes; an envelope issued
+before this amendment still verifies and simply stops authorizing one microsecond earlier.
+
+**E-B — the verified path refuses at equality, by name.** `verify_and_bind` asks the
+temporal question before reading the verification result, so exactly `expires_at` yields the
+stable typed `RA_EXPIRED` DENY rather than a generic `RA_ENVELOPE_INVALID`. No GRANT is ever
+minted whose effective `expires_at` equals the evaluation instant.
+
+**E-C — `ExecutionAuthorization` is ratified as intentionally half-open.** Its
+`now >= expires_at` in `cloud-scaling-operations` was correct and is no longer undocumented
+divergence.
+
+**E-D — decision expiry is half-open at both issuance paths.** `EnvelopeIssuer.issue` and
+the issuance seam refuse `DECISION_EXPIRED` at equality. Previously equality passed the
+named check and failed two steps later as a zero-width TTL — the right refusal reason
+reached by an accident of arithmetic rather than by the rule the code states.
+
+**E-E — conformance is behavioral, across every site.** All five sites that decide the
+envelope window are asserted at `not_before − ε`, `not_before`, `expires_at − ε`,
+`expires_at` and `expires_at + ε`, with a negative control proving the suite rejects the
+superseded inclusive rule. The source-text tripwire is retired as normative proof:
+equivalent correct code can spell the comparison many ways, so a substring assertion fails
+on a correct refactor while passing on any rewrite that keeps the string.
+
+### Two findings the implementation surfaced
+
+`[V]` **`ActionAuthorization.expires_at` needed the same move.** It is copied verbatim from
+the envelope at admission, so leaving its check inclusive would have let the derived
+artifact outlive by one instant the envelope it derives from — an inconsistency created by
+E-A itself. Corrected in the credential broker under E-A rather than deferred.
+
+`[G]` **The `valid_until` family is untouched and still inclusive.** `domain/evidence.py`,
+`domain/binding.py`, `domain/controls.py`, `SubjectContext.subject_valid_until` and
+`AuthorityGrant.is_active` all remain `now <= bound`. They answer "is this observation still
+fresh", not "may this act now". Whether they should move is a separate question and is
+**not** ruled on here — the "one temporal rule" statement is scoped to authorization
+validity windows and says so.
+
+### Versions
+
+`ugence-risk-authority` 0.10.0 → **0.11.0** (E-A, E-D).
+`ugence-risk-authority-runtime` 0.3.0 → **0.4.0** (E-B).
+`ugence-risk-authority-status-runtime` 0.2.0 → **0.3.0** (reaper reflects the new window).
+`ugence-cloud-scaling-credential-broker` 0.1.0 → **0.2.0** (E-A on envelope and
+authorization bounds).
+
 ## 7. Invariants this ADR does not touch
 
 The composition engine mints no authority. Deployment assertions are not proof. Only the

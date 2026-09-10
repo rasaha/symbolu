@@ -233,6 +233,29 @@ def verify_and_bind(
     if not workflow_ir_digest:
         raise BindingViolation("envelope carries no workflow_ir_digest (policy identity)")
 
+    # (2) Temporal validity first, so exact expiry always names itself.
+    #
+    # The half-open window ``[not_before, expires_at)`` is also enforced inside the
+    # canonical verifier, which would refuse at ``now == expires_at`` as a generic
+    # RA_ENVELOPE_INVALID. Asking the question here first means the boundary instant
+    # yields the stable, typed RA_EXPIRED outcome instead of depending on which check
+    # happens to fire, and it guarantees no GRANT is ever minted whose effective
+    # ``expires_at`` equals the evaluation instant. This does not reimplement the
+    # verifier: the verifier still runs below and still owns signature, key, tenant,
+    # revocation and epoch, and the conformance suite asserts the two agree at every
+    # boundary instant.
+    if not envelope.is_temporally_valid(now):
+        return _bind(
+            _machine_result(
+                disposition=RiskAuthorityDisposition.DENY,
+                reason=ReasonCode.RA_EXPIRED,
+                envelope=envelope, action=action,
+                raw=("envelope outside [not_before, expires_at) at the trusted instant",),
+                source_version=source_version, include_action=False),
+            envelope=envelope, envelope_digest=envelope_digest, action=action,
+            authorization=authorization, workflow_ir_digest=workflow_ir_digest, now=now,
+            production=production)
+
     # (1) The canonical verification path. Never reimplemented here.
     verification = (verifier or EnvelopeVerifier()).verify(
         envelope=envelope,
@@ -251,19 +274,6 @@ def verify_and_bind(
                 envelope=envelope, action=action,
                 raw=tuple(verification.reasons), source_version=source_version,
                 include_action=False),
-            envelope=envelope, envelope_digest=envelope_digest, action=action,
-            authorization=authorization, workflow_ir_digest=workflow_ir_digest, now=now,
-            production=production)
-
-    # (2) Temporal validity re-asserted at the same trusted instant.
-    if not envelope.is_temporally_valid(now):
-        return _bind(
-            _machine_result(
-                disposition=RiskAuthorityDisposition.DENY,
-                reason=ReasonCode.RA_EXPIRED,
-                envelope=envelope, action=action,
-                raw=("envelope outside [not_before, expires_at] at the trusted instant",),
-                source_version=source_version, include_action=False),
             envelope=envelope, envelope_digest=envelope_digest, action=action,
             authorization=authorization, workflow_ir_digest=workflow_ir_digest, now=now,
             production=production)

@@ -88,7 +88,9 @@ class EnvelopeIssuer:
         # Time binding (spec §29): an envelope may never be minted from a decision
         # whose own validity window has elapsed. Without this an expired decision
         # would be re-minted into fresh runtime authority with a new TTL.
-        if decision.expires_at is not None and now > decision.expires_at:
+        # Half-open ``[.., expires_at)``, matching the issuance seam and the envelope's own
+        # window: at exactly ``decision.expires_at`` the decision is already expired.
+        if decision.expires_at is not None and now >= decision.expires_at:
             raise RiskAuthorityError(
                 f"decision {decision.decision_id} expired at "
                 f"{decision.expires_at.isoformat()}; no envelope may be issued from "

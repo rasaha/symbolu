@@ -233,7 +233,11 @@ class EnvelopeIssuanceSeam:
         if not decision.grants_authority:
             return refuse(EnvelopeIssuanceRefusal.DECISION_GRANTS_NO_AUTHORITY,
                           f"outcome {decision.outcome.value}")
-        if decision.expires_at is not None and now > decision.expires_at:
+        # Half-open ``[.., expires_at)``: at exactly ``decision.expires_at`` the decision is
+        # expired and says so here. It previously passed this check and then failed
+        # indirectly at step 5 as a zero-width TTL — the same refusal reason, reached by an
+        # accident of arithmetic rather than by the stated rule.
+        if decision.expires_at is not None and now >= decision.expires_at:
             return refuse(EnvelopeIssuanceRefusal.DECISION_EXPIRED,
                           f"decision expired at {decision.expires_at.isoformat()}")
         # 4. Verification at this instant.
