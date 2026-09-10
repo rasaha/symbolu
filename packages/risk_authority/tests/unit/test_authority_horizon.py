@@ -36,7 +36,7 @@ import pytest
 from risk_authority.domain import freshness_horizon
 from risk_authority.domain.authority import AuthorityGrant, authority_violations
 from risk_authority.domain.controls import ControlResult
-from risk_authority.domain.enums import ControlStatus, RiskClass
+from risk_authority.domain.enums import ControlStatus, RiskCaseState, RiskClass
 from risk_authority.domain.errors import AuthorityDeniedError, RiskAuthorityError
 
 from ..scenario import (
@@ -44,6 +44,7 @@ from ..scenario import (
     FINANCE_SCOPE,
     FIXED_NOW,
     MODEL,
+    PRINCIPAL,
     TENANT,
     approved_envelope,
     build_application,
@@ -233,7 +234,7 @@ def test_a_zero_width_horizon_is_refused_rather_than_minted_already_expired():
             evidence_snapshot_digest="",
             model_digest="",
             now=FIXED_NOW,
-            freshness_horizon=FIXED_NOW,
+            prerequisite_horizons={"control_freshness": FIXED_NOW},
         )
 
 
@@ -245,6 +246,76 @@ def _pass(control_id, valid_until):
         evaluated_at=FIXED_NOW - timedelta(hours=1),
         valid_until=valid_until,
     )
+
+
+def test_evidence_bounds_cap_transitively_through_the_control_horizon():
+    """Evidence is covered by construction, not by omission.
+
+    ``binding._freshness_is_monotonic`` refuses any trusted control result whose
+    ``valid_until`` outlives the earliest ``valid_until`` of its admitted backing
+    evidence. So a control horizon is already no later than the evidence floor beneath it,
+    and capping the decision by the control horizon caps it by the evidence too. Asserting
+    the invariant here rather than assuming it, because the whole evidence bullet of the
+    ruling rests on it.
+    """
+
+    from risk_authority.domain.binding import AdmittedContext, _freshness_is_monotonic
+
+    evidence_floor = FIXED_NOW + timedelta(minutes=5)
+    admitted = AdmittedContext(valid_until_by_id={"ev1": evidence_floor})
+
+    within = replace(_pass("A", evidence_floor), evidence_ids=("ev1",))
+    outliving = replace(
+        _pass("A", evidence_floor + EPS), evidence_ids=("ev1",))
+    non_expiring = replace(_pass("A", None), evidence_ids=("ev1",))
+
+    assert _freshness_is_monotonic(within, admitted)
+    assert not _freshness_is_monotonic(outliving, admitted)
+    assert not _freshness_is_monotonic(non_expiring, admitted)
+
+
+def test_downstream_execution_authority_inherits_the_cap():
+    """Reach past the earliest authorizing bound is zero for the *action* too.
+
+    ``ActionAuthorization.expires_at`` is copied from the envelope at admission, so the
+    chain grant -> decision -> envelope -> authorization must not widen at any hop.
+    """
+
+    from risk_authority.api import ActionAdmissionRequest, ActionAdmissionSeam
+    from risk_authority.domain.actions import CanonicalAction
+
+    horizon = FIXED_NOW + timedelta(minutes=10)
+    app = _app_with(_grant_expiring_at(horizon))
+    _evaluation, decision, envelope = approved_envelope(app)
+
+    action = CanonicalAction(
+        tenant_id=TENANT, actor_id=ACTOR, model_id=MODEL, action_type="crm.read",
+        target_id="txn", purpose="CUSTOMER_REFUND_REVIEW",
+        destination="internal://finance")
+    admitted = ActionAdmissionSeam.reference(
+        app=app, clock=lambda: FIXED_NOW).issue(
+        ActionAdmissionRequest(tenant_id=TENANT, envelope_id=envelope.envelope_id,
+                               action=action, session_id=envelope.session_id))
+
+    assert admitted.admitted, (admitted.refusal, admitted.detail)
+    for name, bound in (
+        ("decision", decision.expires_at),
+        ("envelope", envelope.expires_at),
+        ("authorization", admitted.authorization.expires_at),
+    ):
+        assert bound <= horizon, (
+            f"{name} reaches {bound - horizon} past the grant horizon "
+            f"{horizon.isoformat()}")
+
+
+# ------------------------------------------------- the subject assertion as a bound
+#
+# NOT IMPLEMENTED, deliberately. ``SubjectContext.subject_valid_until`` is a ratified
+# prerequisite of the decision cap, and wiring it works — but it moves ten frozen digests
+# in ``cloud-scaling-authorization-contracts`` and ``cloud-scaling-policy-authenticity``,
+# because ``expires_at`` is inside ``decision_digest`` and every v2-seam decision carries a
+# subject bound. Those fixtures exist to "fail rather than silently re-baseline", so
+# re-freezing them is an owner decision. Reported, not taken.
 
 
 def test_the_freshness_horizon_is_the_earliest_backing_bound():
@@ -300,12 +371,64 @@ def test_a_decision_never_outlives_the_freshness_that_justified_it():
         evidence_snapshot_digest="",
         model_digest="",
         now=FIXED_NOW,
-        freshness_horizon=stale_soon,
+        prerequisite_horizons={"control_freshness": stale_soon},
     )
 
     assert capped.expires_at == stale_soon, (
         f"decision expires {capped.expires_at.isoformat()}, past the freshness horizon "
         f"{stale_soon.isoformat()}")
+
+
+def test_the_application_wires_the_control_horizon_into_the_decision():
+    """The wiring, not just the cap logic — and it needs the repository to reach.
+
+    ``ControlResultInput`` carries no ``valid_until``, so no public request can create a
+    bounded control result and the wiring in ``issue_decision`` is unreachable from the
+    normal flow. Seeding the persisted control state directly is what makes it testable:
+    that state is exactly what the application re-derives its authoritative evaluation
+    from, so this exercises the real path rather than a stub.
+
+    Without this, dropping the control bound from the application is a mutation the suite
+    survives — which is how it was found.
+    """
+
+    from risk_authority.api import (
+        ControlResultInput,
+        CreateCaseRequest,
+        DecisionRequest,
+        EvaluateRequest,
+    )
+
+    horizon = FIXED_NOW + timedelta(minutes=7)
+    app = build_application()
+    case_id = "rdc_wired"
+
+    # Drive the real state machine only as far as AUTHORITY_REVIEW, which is the one state
+    # ``issue_decision`` may be reached from.
+    app.create_case(CreateCaseRequest(
+        tenant_id=TENANT, case_id=case_id, subject_id=ACTOR, model_id=MODEL,
+        purpose="CUSTOMER_REFUND_REVIEW", domain="FINANCE", jurisdictions=("US",),
+        tools=("crm.read", "refund.prepare"), autonomy_level=2,
+        data_classes=("CUSTOMER_PII", "TRANSACTION_DATA"),
+        workflow_ir_id="finance-ai-risk", inherent_risk=RiskClass.HIGH,
+        residual_risk=RiskClass.MEDIUM))
+    evaluation = app.evaluate(TENANT, case_id, EvaluateRequest(control_results=(
+        ControlResultInput("MODEL_PROVENANCE_VALID", "PASS"),
+        ControlResultInput("HUMAN_OVERSIGHT_VALID", "PASS"),
+        ControlResultInput("BIAS_EVALUATION_CURRENT", "PASS"))))
+
+    bounded = tuple(
+        replace(r, valid_until=horizon) for r in app.controls.get(TENANT, case_id))
+    assert bounded, "fixture assumption: evaluation persisted control results"
+    app.controls.put(TENANT, case_id, bounded)
+
+    decision = app.issue_decision(
+        TENANT, case_id, evaluation,
+        DecisionRequest(principal_id=PRINCIPAL, requested_scope=FINANCE_SCOPE))
+
+    assert decision.expires_at == horizon, (
+        f"decision expires {decision.expires_at.isoformat()}; the control horizon "
+        f"{horizon.isoformat()} did not reach the authority")
 
 
 def test_the_reference_flow_is_unaffected_because_its_controls_are_unbounded():

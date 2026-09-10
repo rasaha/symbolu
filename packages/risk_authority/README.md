@@ -499,67 +499,102 @@ rather than left to a reader's assumption.~~
 > security validity artifact should remain usable at its own stated expiry. Nothing
 > downstream would honor it anyway: the credential broker derived a zero-width window and
 > refused, and `governance_contracts.Validity` cannot construct `issued_at == expires_at`
-> at all. See *One temporal rule* below.
+> at all. See *Temporal rules by artifact category* below.
 
-## One temporal rule — 0.11.0
+## Temporal rules by artifact category — 0.13.0
 
-> **Authority begins at `not_before` and ends immediately upon reaching `expires_at`.**
+> **A point-in-time fact may remain valid at its final instant, but it cannot create
+> authority that survives beyond that instant.**
 
-Every artifact that carries an *authorization* validity window is half-open: inclusive
-lower bound, exclusive upper bound.
+**This supersedes the earlier "one temporal rule" claim.** That framing said every
+temporal field followed a single half-open rule. It was never true — evidence and control
+freshness were always inclusive, and the 0.11.0 text papered over it by listing exceptions.
+Worse, that text named `AuthorityGrant` among the exceptions when it is an authorization
+gate, and the amendment that followed found ninety minutes of authority reaching past
+expired delegations behind exactly that misclassification. There are two categories, and
+naming them is what keeps the difference legible.
+
+### 1. Operational validity — half-open `[start, end)`
+
+Artifacts that *authorize action*. Expired at exactly the upper bound.
 
 | Artifact | Window | Where |
 |---|---|---|
 | signing key | `[not_before, not_after)` | `crypto/keys.py` |
 | `RiskAuthorizationEnvelope` | `[not_before, expires_at)` | `domain/envelope.py`, `services/envelope_verifier.py` |
+| `AuthorityGrant` | `[.., expires_at)` | `domain/authority.py` |
 | `RiskDecision` expiry | `[.., expires_at)` | `services/envelope_issuer.py`, `api/envelope_issuance_seam.py` |
 | `ActionAuthorization` expiry | `[.., expires_at)` | copied from the envelope; enforced in the credential broker |
-| `CredentialGrant` validity | `[issued_at, expires_at)` | `governance_contracts.Validity` — already half-open |
-| `ExecutionAuthorization` | `[issued_at, expires_at)` | `cloud-scaling-operations` — already half-open, now ratified as deliberate |
+| `CredentialGrant` validity | `[issued_at, expires_at)` | `governance_contracts.Validity` |
+| `ExecutionAuthorization` | `[issued_at, expires_at)` | `cloud-scaling-operations` |
 
-Five sites decide the envelope window, and a conformance suite asserts all five agree at
-`not_before − ε`, `not_before`, `expires_at − ε`, `expires_at` and `expires_at + ε`:
-`tests/unit/test_temporal_boundaries.py`, plus one per consuming package. The proof is
-behavioral, with a negative control. A source-text tripwire is not the normative proof:
-equivalent correct code can spell the comparison many ways, so a substring assertion would
-fail on a correct refactor while passing on any rewrite that kept the string.
+### 2. Point-in-time validity — inclusive `[start, end]`
 
-**`AuthorityGrant` joined the rule at 0.12.0, and a scoping correction.** The 0.11.0 text
-here listed `AuthorityGrant.is_active` among the untouched freshness bounds. That was
-wrong: it is an authorization gate, not a freshness report — `authority_violations` calls
-it at the instant a `RiskDecision` is minted, and a violation raises `AuthorityDeniedError`.
-It is now half-open, and it uses `expires_at`, not `valid_until`, which is the naming
-signal that always separated it from the three below.
+Facts that *report an observation*. Still valid at exactly the upper bound, deliberately,
+because an assertion may be true at exactly one instant.
 
-**Delegated authority also bounds the *lifetime* of what it delegates — 0.12.0.** The
-operator alone was not enough. `RiskDecision.expires_at` was `now + DEFAULT_DECISION_TTL`,
-uncapped, so a grant expiring moments after a decision was minted still produced a full
-hour of decision validity — and an envelope TTL on top of that. Measured before the fix,
-machine authority reached **1:29:59.999999 past an expired delegation**. Decision expiry is
-now `min(now + ttl, grant.expires_at, freshness_horizon)`, and `EnvelopeIssuer.issue` caps
-the envelope by its decision's expiry — which only the issuance seam did before, so a
-direct caller with a generous `ttl` could mint an envelope outliving its own decision.
+| Fact | Window | Where |
+|---|---|---|
+| `SubjectContext` assertion | `[subject_valid_from, subject_valid_until]` | `api/evaluation_seam.py` |
+| evidence freshness | `[.., valid_until]` | `domain/evidence.py` |
+| backing-evidence freshness | `[.., valid_until]` | `domain/binding.py` |
+| control-result freshness | `[.., valid_until]` | `domain/controls.py` |
 
-| Bound | Caps |
-|---|---|
-| `grant.expires_at` | the decision minted under it |
-| `freshness_horizon` (earliest required-control `valid_until`) | the decision it satisfied |
-| `decision.expires_at` | every envelope issued from it, at the seam **and** the service |
+A zero-width `SubjectContext` — `subject_valid_from == subject_valid_until` — is a
+**ratified point-in-time contract**, not an accidental exception. It represents a subject
+assertion valid at exactly one instant, and `test_context_accepts_equal_validity_bounds`
+commits it deliberately.
 
-A cap that lands on `now` produces a window authorizing nothing, so it is refused rather
-than returned already expired. That is reachable precisely because the freshness bounds
-below stay inclusive: a control is still current at exactly its `valid_until`.
+### 3. Derived authority is capped by the earliest contributing prerequisite
 
-**What this rule does *not* cover.** Evidence and control freshness bounds — the
-`valid_until` family on `domain/evidence.py`, `domain/binding.py` and `domain/controls.py`,
-plus `SubjectContext.subject_valid_until` — remain **inclusive** and are deliberately
-untouched. The first three answer "is this observation still fresh", not "may this act
-now". `subject_valid_until` is an authorization gate and is the acknowledged exception:
-`test_context_accepts_equal_validity_bounds` deliberately commits a zero-width
-`SubjectContext` (`subject_valid_from == subject_valid_until`), which a half-open rule would
-make evaluable at no instant at all, so moving it needs its own ruling. The tables above are
-the complete list of what changed; do not read them as a claim about every datetime
-comparison in the package.
+This is what makes category 2 safe. A point-in-time fact may be current at its final
+instant, but the authority derived from it may not outlive it.
+
+`RiskDecision.expires_at` is the earliest of `now + ttl`, the active
+`AuthorityGrant.expires_at`, and the control freshness horizon — the earliest `valid_until`
+among the required controls that were *actually relied upon*, never over unrelated or
+rejected results that merely appeared in the request. Evidence bounds are covered
+transitively and by construction: `binding._freshness_is_monotonic` refuses any trusted
+result outliving its backing evidence, so the control horizon is already no later than the
+evidence floor beneath it. Prerequisites are passed as a named mapping, so the refusal can
+say which one bound.
+
+**`[G]` `SubjectContext.subject_valid_until` is a ratified member of this cap and is NOT
+yet wired.** It works — a mid-window decision correctly capped at the subject bound rather
+than the TTL, and a terminal-instant assertion minted nothing — but `expires_at` is inside
+`decision_digest`, and every v2-seam decision carries a subject bound, so enabling it moves
+**ten frozen digests** across `cloud-scaling-authorization-contracts` and
+`cloud-scaling-policy-authenticity`. Those fixtures state their own purpose: *"regression
+anchors: if any canonicalization, field set or binding rule moves, these fail rather than
+silently re-baselining."* Re-freezing them is an owner decision, so it is reported rather
+than taken.
+
+Each hop then inherits: `EnvelopeIssuer.issue` caps the envelope by its decision — at the
+service, not only at the seam — and `ActionAuthorization` copies the envelope's expiry.
+
+### 4. No executable decision may have a zero or negative remaining window
+
+A cap landing on `now` authorizes nothing at any instant, so the authority refuses rather
+than minting a decision that is already expired. This is precisely how the two categories
+meet: a subject assertion evaluated at its terminal instant is still valid (category 2) and
+still mints nothing (category 4).
+
+**`[G]` One known misattribution.** That refusal surfaces through the subject seam as
+`AUTHORITY_UNAVAILABLE`, which says the evaluator principal is not entitled — wrong.
+`EXPIRED_SUBJECT` would be equally wrong, since the subject is *not* expired at that
+instant. A new `SubjectRiskNonDecisionReason` member is required; it is deliberately not
+invented here, and `test_a_terminal_instant_subject_mints_no_executable_decision` pins the
+current behavior so the gap stays visible rather than silently settling.
+
+### Verification
+
+Boundary conformance is behavioral, at `start − ε`, `start`, `end − ε`, `end` and
+`end + ε`, with negative controls and per-mutation checks:
+`tests/unit/test_temporal_boundaries.py` (envelope, five sites),
+`tests/unit/test_authority_horizon.py` (grant, caps, reach), plus one suite per consuming
+package. A source-text tripwire is not the normative proof: equivalent correct code can
+spell a comparison many ways, so a substring assertion fails on a correct refactor while
+passing on any rewrite that keeps the string.
 
 A malformed window (`not_before >= not_after`, or a non-datetime bound) raises
 `KeyWindowError` at construction rather than becoming a silently always-invalid key — a

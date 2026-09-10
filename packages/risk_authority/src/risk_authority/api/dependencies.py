@@ -723,13 +723,22 @@ class RiskAuthorityApplication:
             # decision, so the instant downstream admission depends on is covered by
             # ``decision_digest`` rather than by an outer field anyone may rewrite (R-12b).
             evaluated_at=req.evaluated_at,
-            # The decision may not outlive the freshness of the controls that satisfied
-            # it. Derived here, from the case's own persisted control state and the
-            # authoritative required set — never from the caller — for the same reason
-            # the recommendation is re-derived above.
-            freshness_horizon=freshness_horizon(
-                authoritative.required_controls, controls
-            ),
+            # The decision may not outlive any prerequisite that authorized it. The
+            # control-freshness bound is derived here from the case's own persisted
+            # control state and the *authoritative* required set — never from the
+            # caller's advisory evaluation — for the same reason the recommendation is
+            # re-derived above; that is also what keeps unrelated or rejected results
+            # from capping a decision they did not contribute to.
+            #
+            # ``subject_assertion`` is a ratified prerequisite of this cap and is
+            # deliberately ABSENT pending an owner ruling: adding it moves ten frozen
+            # digests in cloud-scaling, which exist to fail rather than silently
+            # re-baseline. See the README's temporal-rules section.
+            prerequisite_horizons={
+                "control_freshness": freshness_horizon(
+                    authoritative.required_controls, controls
+                ),
+            },
         )
         self.decisions.save(decision)
 

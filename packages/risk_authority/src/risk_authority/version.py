@@ -74,4 +74,29 @@ from __future__ import annotations
 #: implementer is unaffected. Control results created through the evaluation seam carry no
 #: ``valid_until``, so the freshness cap is inert on the reference flow and no existing
 #: decision moves. No canonical serialization, digest or signature format is touched.
-__version__ = "0.12.0"
+#: ``0.13.0`` completes the prerequisite cap and replaces the "one temporal rule" framing.
+#: The governing principle: *a point-in-time fact may remain valid at its final instant,
+#: but it cannot create authority that survives beyond that instant.* Two categories, not
+#: one rule — operational validity (keys, envelopes, authority grants, decisions,
+#: authorizations, execution authorizations) is half-open; point-in-time validity (subject
+#: assertions, evidence/binding/control freshness) is inclusive and stays that way.
+#: Prerequisites are now passed as a NAMED mapping (``prerequisite_horizons``), superseding
+#: 0.12.0's scalar ``freshness_horizon`` keyword, because the ruling requires identifying
+#: which prerequisite bound a decision — and the refusal names it. Evidence is covered
+#: transitively by construction —
+#: ``binding._freshness_is_monotonic`` refuses a trusted result outliving its backing
+#: evidence, so the control horizon is already no later than the evidence floor. A
+#: zero-width subject context stays ratified and constructible.
+#: **BLOCKED, reported not taken:** ``SubjectContext.subject_valid_until`` is a ratified
+#: member of this cap and is NOT wired. It works — verified — but ``expires_at`` is inside
+#: ``decision_digest`` and every v2-seam decision carries a subject bound, so enabling it
+#: moves ten frozen digests across ``cloud-scaling-authorization-contracts`` and
+#: ``cloud-scaling-policy-authenticity`` (``FROZEN_DECISION_DIGEST`` sha256:6aba137d… ->
+#: sha256:4636dee2…). Those fixtures exist to fail rather than silently re-baseline, so
+#: re-freezing them requires a ruling. A second gap rides on it: at a terminal-instant
+#: subject the refusal surfaces as ``AUTHORITY_UNAVAILABLE``, which misattributes the
+#: cause; ``EXPIRED_SUBJECT`` would be wrong in the other direction, so a new
+#: ``SubjectRiskNonDecisionReason`` member is required and deliberately not invented.
+#: No canonical serialization, digest or signature format is touched, and no committed
+#: digest fixture moves.
+__version__ = "0.13.0"

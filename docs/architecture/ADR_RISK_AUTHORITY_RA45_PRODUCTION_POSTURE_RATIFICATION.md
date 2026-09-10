@@ -435,6 +435,87 @@ inclusive as freshness reports.
 
 `ugence-risk-authority` 0.11.0 → **0.12.0** (H-A, H-B, H-C).
 
+## 12. Amendment 5 — two temporal categories, and derived authority capped by all of them
+
+Ratified as five rulings. The governing principle:
+
+> **A point-in-time fact may remain valid at its final instant, but it cannot create
+> authority that survives beyond that instant.**
+
+### T-1 — `AuthorityGrant.is_active` is half-open
+
+`now < expires_at`. Implemented at Amendment 4 (H-A). `AuthorityGrant` carries no lower
+bound field, so there is no `valid_from` half to make inclusive.
+
+### T-2 — decision expiry is capped by *every* contributing prerequisite
+
+`RiskDecision.expires_at` is the earliest of `now + ttl`, `grant.expires_at`, and the
+control-freshness horizon.
+
+`[G]` **The subject bullet of T-2 is BLOCKED and was not taken.** Wiring
+`SubjectContext.subject_valid_until` into the cap is implemented and verified to work — a
+mid-window decision capped at the subject bound instead of the TTL, and a terminal-instant
+assertion minted nothing — but `expires_at` is inside `decision_digest` and every v2-seam
+decision carries a subject bound, so it moves **ten frozen digests** across
+`cloud-scaling-authorization-contracts` (`test_frozen_digests.py`, 5 tests) and
+`cloud-scaling-policy-authenticity` (`test_phase5a_untouched.py`, plus a candidate-validity
+ordering test). Measured: `FROZEN_DECISION_DIGEST` moves from `sha256:6aba137d…` to
+`sha256:4636dee2…`. Those fixtures declare themselves *"regression anchors: if any
+canonicalization, field set or binding rule moves, these fail rather than silently
+re-baselining"*, so re-freezing them requires ratification. Reported, not taken.
+
+Prerequisites are now passed as a **named mapping** (`prerequisite_horizons`), superseding
+Amendment 4's scalar `freshness_horizon` keyword, because the ruling requires the
+implementation to identify which prerequisites contributed — and the refusal names the one
+that bound.
+
+`[V]` **Only contributing prerequisites cap.** The control horizon is computed over the
+*authoritative* required set that was actually satisfied, from the case's own persisted
+state — never over every result that happened to appear in the request. `[V]` **Evidence
+is covered transitively and by construction**, not by omission:
+`binding._freshness_is_monotonic` refuses any trusted control result whose `valid_until`
+outlives the earliest `valid_until` of its admitted backing evidence, so the control
+horizon is already no later than the evidence floor. Asserted directly rather than assumed.
+
+`[V]` **Reach is zero at every hop.** `EnvelopeIssuer.issue` caps the envelope by its
+decision (Amendment 4), and `ActionAuthorization` copies the envelope's expiry — asserted
+end to end for decision, envelope and authorization against a short-lived grant.
+
+### T-3 — `SubjectContext` stays inclusive, as a deliberate point-in-time contract
+
+`subject_valid_from <= now <= subject_valid_until`. The zero-width subject context is
+**ratified**, not an accidental exception: it represents an assertion valid at exactly one
+instant. Under T-2 it mints nothing at that instant, because no positive validity window
+remains.
+
+`[G]` **A reason code is required and was deliberately not invented.** The refusal surfaces
+through the subject seam as `AUTHORITY_UNAVAILABLE` — which says the evaluator principal is
+not entitled, misattributing a subject-window cause to an authority-configuration gap.
+`EXPIRED_SUBJECT` is equally wrong: the subject is *not* expired at that instant, which is
+the whole point of T-3. This module's own history is the precedent —
+`CALLER_SUPPLIED_EVALUATION_TIME` was added rather than reusing `INVALID_SUBJECT` for
+exactly this reason. A new `SubjectRiskNonDecisionReason` member is needed; the current
+behavior is pinned by test so the gap stays visible rather than silently settling.
+
+### T-4 — evidence, binding and control freshness stay inclusive
+
+Unchanged. T-2 removes the amplification, so there is no reason to move them for syntactic
+uniformity. `[V]` This is also what makes T-2's zero-width refusal reachable: a control is
+current at exactly its `valid_until`, yielding a horizon of exactly `now`.
+
+### T-5 — the "one temporal rule" claim is superseded
+
+`[V]` It was never true. Evidence and control freshness were always inclusive, and the
+0.11.0 text papered over that by listing exceptions — including `AuthorityGrant`, which is
+an authorization gate, and behind that misclassification sat ninety minutes of reach. The
+README now documents four things: the two categories with their members, the derived-cap
+rule, and the no-zero-width rule.
+
+### Versions
+
+`ugence-risk-authority` 0.12.0 → **0.13.0** (T-2, T-5). No canonical serialization, digest
+or signature format is touched, and no committed digest fixture moves.
+
 ## 7. Invariants this ADR does not touch
 
 The composition engine mints no authority. Deployment assertions are not proof. Only the

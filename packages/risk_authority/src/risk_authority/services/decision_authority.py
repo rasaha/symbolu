@@ -22,7 +22,7 @@ ruler here must not be mistaken for that canonical kernel.
 from __future__ import annotations
 
 from datetime import datetime, timedelta
-from typing import Optional, Protocol, runtime_checkable
+from typing import Mapping, Optional, Protocol, runtime_checkable
 
 from ..domain.authority import AuthorityGrant, authority_violations
 from ..domain.decision import RiskDecision
@@ -71,7 +71,7 @@ class DecisionAuthorityPort(Protocol):
         now: datetime,
         evaluated_at: Optional[datetime] = None,
         ttl: timedelta = DEFAULT_DECISION_TTL,
-        freshness_horizon: Optional[datetime] = None,
+        prerequisite_horizons: "Mapping[str, Optional[datetime]] | None" = None,
     ) -> RiskDecision: ...
 
 
@@ -98,7 +98,7 @@ class ReferenceDecisionAuthority:
         now: datetime,
         evaluated_at: Optional[datetime] = None,
         ttl: timedelta = DEFAULT_DECISION_TTL,
-        freshness_horizon: Optional[datetime] = None,
+        prerequisite_horizons: "Mapping[str, Optional[datetime]] | None" = None,
     ) -> RiskDecision:
         """Issue a binding :class:`RiskDecision`.
 
@@ -133,29 +133,50 @@ class ReferenceDecisionAuthority:
             if reasons:
                 raise AuthorityDeniedError(reasons)
 
-            # A decision may not outlive what justified it. Previously ``now + ttl`` was
-            # applied unconditionally, so a grant that expired moments after the decision
-            # was minted still yielded a full hour of decision validity — and a further
-            # envelope TTL on top of that. Capping here is what makes the delegation's own
-            # expiry mean something downstream; the half-open operator on
-            # ``AuthorityGrant.is_active`` only closes the boundary instant.
+            # Derived authority is capped by the earliest prerequisite that actually
+            # authorized it. Previously ``now + ttl`` was applied unconditionally, so a
+            # grant expiring moments after the decision was minted still yielded a full
+            # hour of decision validity — and a further envelope TTL on top of that. The
+            # half-open operator on ``AuthorityGrant.is_active`` only closes the boundary
+            # instant; this is what closes the reach.
             #
-            # Both bounds are optional and each caps independently: an absent bound
-            # imposes no cap rather than a zero one.
-            for bound in (grant.expires_at, freshness_horizon):
-                if bound is not None:
-                    expires_at = min(expires_at, bound)
+            # Each bound is named so the refusal below can say which one bound, and so a
+            # reader can tell which prerequisites participate. Only prerequisites that
+            # contributed to *this* authorization appear here: the caller passes the
+            # control-freshness horizon computed over the required set that was actually
+            # satisfied, never over every result that happened to be in the request.
+            #
+            # Evidence bounds are covered transitively and by construction, not by
+            # omission: ``binding._freshness_is_monotonic`` refuses any trusted control
+            # result whose ``valid_until`` outlives the earliest ``valid_until`` of its
+            # admitted backing evidence, so the control horizon is already no later than
+            # the evidence floor beneath it.
+            horizons: "dict[str, Optional[datetime]]" = {
+                "authority_grant": grant.expires_at,
+            }
+            if prerequisite_horizons:
+                horizons.update(prerequisite_horizons)
+
+            binding_prerequisite: Optional[str] = None
+            for name, bound in horizons.items():
+                # An absent bound imposes no cap, never a cap of zero.
+                if bound is not None and bound < expires_at:
+                    expires_at, binding_prerequisite = bound, name
 
             # Windows are half-open, so ``expires_at == now`` authorizes nothing at any
             # instant. Refuse rather than mint a decision that is already expired: a
-            # zero-width grant of authority is a configuration error, and returning one
-            # would push the failure to a later, less obvious refusal.
+            # point-in-time fact may remain valid at its final instant, but it cannot
+            # create authority that survives beyond that instant, and returning a
+            # zero-width decision would push the failure to a later, less obvious refusal.
             if expires_at <= now:
                 raise AuthorityDeniedError(
                     [
-                        "no validity remains for a decision at this instant: "
-                        f"grant expires_at={grant.expires_at}, "
-                        f"control freshness horizon={freshness_horizon}"
+                        "no validity remains for a decision at this instant "
+                        f"(bound by {binding_prerequisite or 'decision ttl'}): "
+                        + ", ".join(
+                            f"{name}={bound.isoformat() if bound else None}"
+                            for name, bound in horizons.items()
+                        )
                     ]
                 )
         else:
