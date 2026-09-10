@@ -7,8 +7,14 @@ take is refused by the stores themselves, and two of them are refused by rulings
 than by omission.** So this is not a gap where the design exists and the code is
 missing. It is a gap where the design is blocked, and the block is `[R]` to clear.
 
-**No implementation is authorized by this document, and nothing here is ruled.** Five
-decisions are marked `[R]` and none is taken.
+**Status: `MIG-5` RULED `NOT_IN_SCOPE`**, 2026-09-10, under owner direction — the owner
+named the two options and their costs and directed the ruling, as they did for `PUB-1a`.
+`MIG-1` to `MIG-4` are **closed as moot** by it. §8 records the ruling and its ground;
+the analysis below is left as written, because the ground for the ruling is in it and a
+document that edits out its own reasoning is worth less next time.
+
+**No implementation is authorized, and none is needed.** The ruling's whole content is
+that a thing does not get built.
 
 ---
 
@@ -108,16 +114,17 @@ exist: no owner has ruled what any member *entails*, and no package permitted to
 has been given a vocabulary. **Migrating records so that a layer nobody has built can
 interpret them more conveniently is work done ahead of its own justification.**
 
-`[R]` **Decision `MIG-5` — is migration in scope at all?** Leaving v1 files permanently
-readable and unmigrated is a real option with a real cost (two files, forever, per
-tenant), and it is the only option that needs no ruling. Every other decision below is
-moot if this one is "no".
+**Decision `MIG-5` — is migration in scope at all? Ruled `NOT_IN_SCOPE`; see §8.**
+Leaving v1 files permanently readable and unmigrated has a real cost — two files,
+forever, per tenant — and it is the only option that needs no further ruling. Every
+other decision below is moot, and §8 says why.
 
 ---
 
 ## 5. Who may assert a historical record's vocabulary, and on what evidence
 
-`[R]` **Decision `MIG-1`.** A migration asserts a fact nobody recorded: which vocabulary
+**Decision `MIG-1` — closed as moot by `MIG-5`.** The analysis stands, and it is the
+largest part of the ground for that ruling. A migration asserts a fact nobody recorded: which vocabulary
 version a label was read under at the time it was written. Three sources are available
 and none is evidence:
 
@@ -136,15 +143,16 @@ repository cannot check, presented in a field whose whole purpose is to make pro
 checkable. That is a worse failure than an honest `UNVERSIONED_LEGACY`: the second says
 "unknown", the first says "known" and is not.
 
-`[R]` The ruling needed is whether an administrator's assertion is an acceptable basis
-at all, and if so whether a migrated binding must be **distinguishable** from one
-recorded at the time — a third `VocabularyBindingState`, say, rather than plain `BOUND`.
+The ruling this needed — whether an administrator's assertion is an acceptable basis at
+all, and whether a migrated binding must be distinguishable from one recorded at the
+time — is not required, because `MIG-5` means no migrated binding is ever written. Had
+migration gone ahead, a third `VocabularyBindingState` would have been the minimum.
 
 ---
 
 ## 6. Supersession or rewrite, and which write surface moves
 
-`[R]` **Decision `MIG-2`.** Rewriting in place is refused by every store by
+**Decision `MIG-2` — closed as moot by `MIG-5`.** Rewriting in place is refused by every store by
 construction — "a declaration is never edited or deleted" — and reopening that is a much
 larger change than migration, since append-only is what makes the stored digests mean
 anything. Supersession is the shape the contracts already permit (§2), and it needs
@@ -161,17 +169,18 @@ anything. Supersession is the shape the contracts already permit (§2), and it n
   every invariant, and is the option most likely to produce a file the package would
   have refused to write.
 
-`[R]` **Decision `MIG-3` — is a migrated record a new record or the same one restated?**
+**Decision `MIG-3` — closed as moot by `MIG-5`.** Is a migrated record a new record or
+the same one restated?
 In `data-use-admission` and `vendor-dependency` the derived id changes, so the answer is
 forced to "new" whatever the intent; anything keyed by the old id must be re-pointed. In
 `ai-system-registry` the id cannot change, so the answer is forced the other way, and
 §3's `D-3` refusal blocks it. **The two halves cannot be given one answer**, which is
 `VV-C`'s split reappearing — and this time it is not obviously right.
 
-`[R]` **Decision `MIG-4` — may a record whose taxonomy is genuinely unknown be migrated
-at all?** Given §5, this is not an edge case: it is the ordinary case. If the answer is
-no, `MIG-1` to `MIG-3` apply only to records whose vocabulary somebody can actually
-attest, which may be none of them.
+**Decision `MIG-4` — closed as moot by `MIG-5`, and it is the reason for it.** May a
+record whose taxonomy is genuinely unknown be migrated at all? Given §5 this is not an
+edge case, it is the ordinary case — and §8 makes it the ordinary case by a stronger
+route than §5 reached.
 
 ---
 
@@ -182,17 +191,96 @@ migration touches neither. `[G]` It *is* entangled with the missing interpreting
 as §4 says — a migration whose only beneficiary is an unbuilt layer is hard to justify
 and hard to specify, because nobody can say what the layer will need.
 
-| Decision | Question | Blocked on |
+| Decision | Question | Outcome |
 |---|---|---|
-| `MIG-5` | Is migration in scope at all, or do v1 files stay readable forever? | nothing — rule first |
-| `MIG-1` | Who may assert a historical vocabulary, and is an unverifiable assertion acceptable? | `MIG-5` |
-| `MIG-2` | Which write surface moves: a second write, cross-file resolution, or an external tool? | `MIG-5` |
-| `MIG-3` | New record or same record restated — and may the two halves differ? | `MIG-2`; `D-3` for `ai-system-registry` |
-| `MIG-4` | May a record of genuinely unknown taxonomy be migrated? | `MIG-1` |
+| `MIG-5` | Is migration in scope at all, or do v1 files stay readable forever? | **`NOT_IN_SCOPE`** — §8 |
+| `MIG-1` | Who may assert a historical vocabulary, and is an unverifiable assertion acceptable? | moot |
+| `MIG-2` | Which write surface moves: a second write, cross-file resolution, or an external tool? | moot |
+| `MIG-3` | New record or same record restated — and may the two halves differ? | moot |
+| `MIG-4` | May a record of genuinely unknown taxonomy be migrated? | moot |
 
-**`ai-system-registry` additionally needs `D-3` revisited or an explicit exemption**, and
-that is an amendment to a ratified ADR rather than a decision this row can carry.
+`[V]` **`D-3` does not need revisiting after all.** §3 recorded that
+`ai-system-registry` would need that ratified ADR amended or an explicit exemption before
+a migration could be expressed. Under `MIG-5` no migration is expressed, so `D-3` stands
+untouched — which is the ruling paying for itself immediately: the cheapest way to avoid
+amending a ratified ruling turned out to be not needing to.
 
-**Next step.** Rule `MIG-5` before anything else. If it is "no", this document closes and
-the two-file state is recorded as intended rather than pending; every other decision here
-is moot. If it is "yes", `MIG-1` is next, because §5 may make the rest unnecessary.
+---
+
+## 8. `MIG-5` — ruled `NOT_IN_SCOPE`
+
+**Ruled 2026-09-10 under owner direction**, who named the two options and their costs and
+directed the ruling. Recorded here with its ground, because a delegated ruling is not a
+less inspectable one.
+
+**Historical records stay in their v1 files, readable and unmigrated, permanently. No
+migration process is designed, authorized or forthcoming.** A deployment holding v1
+records keeps two files per tenant per package in `data-use-admission`,
+`ai-system-registry` and `vendor-dependency`. That is the intended end state, not a
+pending one.
+
+### The ground, in the order that decides it
+
+`[V]` **1. A migrated binding would be false, not merely unverifiable.** §5 argued that
+no evidence can establish which vocabulary a historical record was written under. The
+dates make the stronger claim available: every vocabulary was published at
+`2026-09-09T23:59Z`, and every record in a v1 file was written by code that shipped
+before the bindings landed on `2026-09-10T01:40Z` or later. A record written before
+publication was **not** written under `1.0.0` of anything, because `1.0.0` did not exist.
+Migrating it would not be recording an uncertain fact; it would be recording a fact known
+to be untrue, in the one field on the record whose entire purpose is to make provenance
+checkable. `UNVERSIONED_LEGACY` is not a degraded answer here. It is the correct one.
+
+A window is arithmetically available — the two hours on 2026-09-10 between publication
+and the bindings landing — in which a published vocabulary existed while v1 code was
+still current. `[V]` **It is empty, and by a firmer fact than timing.** Neither the
+publication nor the bindings has reached the default branch:
+`docs/vocabularies/` does not exist there at all, and none of the five commits carrying
+this work is an ancestor of it. So no release of any package has ever coexisted with a
+published vocabulary, and every record a v1 file can hold was written by code that had
+nothing to cite. If that ever ceases to be true — after this branch merges and before
+every deployment upgrades — it is a reason to revisit this ruling, and it is listed below
+as one.
+
+`[V]` **2. Nothing is lost by not migrating.** Reads work across both files today — the
+pure selectors take a caller-held collection and a v1 store reads normally — so no record
+is unreadable, no query unanswerable and no history broken. The cost is one extra file,
+paid by composition roots that already hold every other decision.
+
+`[G]` **3. The only beneficiary does not exist.** Migration's payoff is a uniform answer
+to "under which taxonomy was this written", which nothing can use: the ballot's §2
+conditions 2 and 3 are still unmet, no owner has ruled what any member *entails*, and no
+package permitted to decide has been given a vocabulary. Specifying work for an unbuilt
+consumer means guessing what it will need, and guessing wrong is how a migration gets run
+twice.
+
+`[V]` **4. The price of "yes" was two ratified guarantees.** Every route in §6 requires
+either a second write in three packages that state "the only write is `declare`" as a
+structural guarantee, or record-writing code outside the class holding the invariants.
+`ai-system-registry` additionally required `D-3` amended or exempted. Spending ratified
+guarantees on point 3's payoff is a bad trade at any price.
+
+### What this ruling does not say
+
+It does not say the two-file state is elegant, and it does not say migration is
+impossible — §2 showed the *contracts* already permit the supersession and only the store
+cannot express it. It says the case for spending anything on it has not been made.
+
+`[R]` **What would reopen it.** Any of: an interpreting layer is authorized and needs
+uniform bindings; a deployment is found holding v1 records written **after this work
+merges**, which is the first moment a record could be written while a citable vocabulary
+exists — ground 1 holds today because publication has not reached the default branch, and
+it stops being self-maintaining the moment it does; or the two-file cost turns out to
+bite something concrete rather than being an inconvenience. Reopening means ruling
+`MIG-5` again, not treating `MIG-1` to `MIG-4` as merely paused.
+
+---
+
+## 9. The one thing left to correct
+
+`[G]` Three packages refuse a write to a v1 file with a message ending "Migrating it
+needs its own ruled process (VV-E), not an append". That sentence is still **true** — and
+it now reads as a promise that such a process is coming, when the ruling is that none is.
+The messages and the CHANGELOG entries that echo them should say the v1 file is closed
+permanently. **That is a code change, outside this document's authorization**, and it is
+the only follow-up this ruling generates.
