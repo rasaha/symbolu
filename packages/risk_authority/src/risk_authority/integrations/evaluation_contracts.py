@@ -150,6 +150,14 @@ class SubjectRiskNonDecisionReason(str, Enum):
     # untouched — it remains the only place an explicit clock may be supplied (ADR §10).
     CALLER_SUPPLIED_EVALUATION_TIME = "caller_supplied_evaluation_time"
     EXPIRED_SUBJECT = "expired_subject"
+    # The subject assertion is VALID — including at exactly ``subject_valid_until``, which
+    # is a ratified point-in-time contract — but it leaves no forward window for a decision
+    # to occupy, so nothing executable can be minted from it. No pre-existing member said
+    # that. ``EXPIRED_SUBJECT`` asserts the opposite of what is true here, and
+    # ``AUTHORITY_UNAVAILABLE`` blames the evaluator principal for a subject-window cause;
+    # either would have misattributed the refusal in the audit record, exactly as reusing
+    # ``INVALID_SUBJECT`` would have for ``CALLER_SUPPLIED_EVALUATION_TIME`` above.
+    NO_REMAINING_SUBJECT_VALIDITY = "no_remaining_subject_validity"
     NO_AUTHORITATIVE_POLICY = "no_authoritative_policy"
     AMBIGUOUS_POLICY = "ambiguous_policy"
     EXPIRED_POLICY = "expired_policy"

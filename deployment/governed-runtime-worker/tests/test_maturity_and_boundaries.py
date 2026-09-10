@@ -109,15 +109,29 @@ def test_the_shadow_workload_is_labelled_a_fixture_and_touches_nothing_outside_t
     assert all(t.consequential for t in definition.tasks)
 
 
-def test_the_evidence_note_names_the_jwks_host_as_the_only_egress_and_claims_nothing_else():
+def test_the_evidence_note_declares_every_destination_and_claims_nothing_else():
+    """Three declared destinations, and the model egress unit is not one of them.
+
+    Until 2026-09-10 this asserted a single permitted destination, which the deployment it
+    described did not have: the worker also dials PostgreSQL for its application and DBOS
+    durable state. The CR-5 clarification declares that connectivity rather than excusing
+    it, so the count is three — the JWKS endpoint and the two private persistence endpoints
+    — and a fourth requires a CR-family amendment.
+    """
     import json
 
     note = json.loads((PKG / "EXTERNAL_DEPLOYMENT_EVIDENCE.json").read_text())
     assert note["evidence_class"] == "EXTERNAL_DEPLOYMENT_EVIDENCE"
     assert note["maturity"] == worker.MATURITY
     assert note["deployment_version"] == worker.__version__
-    assert len(note["permitted_egress"]) == 1
-    assert note["permitted_egress"][0]["scheme"] == "https"
+
+    schemes = sorted(entry["scheme"] for entry in note["permitted_egress"])
+    assert schemes == ["https", "postgresql", "postgresql"], schemes
+    assert len(note["permitted_egress"]) == 3
+
+    forbidden = " ".join(note["forbidden_egress"]).lower()
+    for destination in ("model egress unit", "model provider", "public internet"):
+        assert destination in forbidden, destination
     assert note["secrets_held"] == ["UGENCE_REVIEW_APP_DATABASE_URL",
                                     "UGENCE_REVIEW_SYSTEM_DATABASE_URL"]
     assert note["container_gate_evidence"].startswith("NONE")

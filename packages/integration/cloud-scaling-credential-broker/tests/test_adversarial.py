@@ -109,7 +109,27 @@ def test_an_unknown_reservation_is_refused(world):
 
 
 def test_an_expired_lease_is_refused(world):
-    world.clock.at = world.reservation.lease.expires_at + timedelta(seconds=1)
+    """The lease gate, isolated so the lease is the bound that actually decides.
+
+    RA 0.13.0's T-2 cap shortens the whole chain — decision, envelope, then
+    authorization — so the fixture's 600s lease now outlives them. At the lease-expiry
+    instant an earlier gate fires and this test would prove nothing about leases.
+
+    Re-reserving with a lease that expires *inside* the envelope's window restores the
+    isolation. Nothing is weakened: the assertion is unchanged and the lease keeps a real,
+    unmodified expiry — it is simply short enough to be the first bound again.
+    """
+
+    world.reservations._receipts.clear()
+    world.reservations._reservations.clear()
+    world.reservation = reserve(
+        world.reservations, world.authorization, world.action, world.target_scope,
+        as_of=RESERVATION_INSTANT, ttl_s=30)
+    lease_expiry = world.reservation.lease.expires_at
+    assert lease_expiry < world.envelope.expires_at <= world.authorization.expires_at, (
+        "the lease must be the first bound for this test to be about leases")
+
+    world.clock.at = lease_expiry + timedelta(seconds=1)
     _refused(world, expected=R.LEASE_EXPIRED)
 
 

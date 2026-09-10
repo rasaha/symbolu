@@ -1,0 +1,33 @@
+# Exact deployment constraint for the governed runtime worker.
+#
+# WHAT THIS IS, AND WHAT IT IS NOT. This file fixes the DBOS version the worker's CI and
+# image install. It is NOT a package dependency: `dbos>=2.0` stays in both
+# `pyproject.toml` files because that declares *library compatibility*, which is a
+# property of the code. The exact version belongs to a deployment, which is a property of
+# a build. Replacing the floor with a pin would propagate a deployment concern into a
+# package contract; a `>=2.31.1,<2.32` range would re-admit the drift this file removes.
+#
+# THE BASELINE IS PROVEN, NOT CHOSEN. CI run 86 (2026-09-10, head 20175b13) installed
+# dbos 2.31.1 on Python 3.11.16 against PostgreSQL 16 and the whole worker suite passed,
+# including the end-to-end test over a real cluster. Before this file, nothing pinned
+# DBOS: every CI run and every image build resolved `>=2.0` independently, so no two were
+# guaranteed to exercise the same engine.
+#
+# THIS PINS DBOS AND NOTHING ELSE. The rest of the successful set is recorded below as
+# observed, not constrained. Full transitive reproducibility would need the complete
+# dependency closure locked, which this file does not attempt and must not be read as
+# providing.
+#
+#     observed in the same successful run: SQLAlchemy 2.0.52, psycopg 3.3.5 (+binary)
+#
+# THE DEPLOYED IMAGE IS NOT COVERED BY THIS FILE UNTIL IT IS REBUILT. The Railway worker
+# running today was built on 2026-09-09 under the unpinned floor; its DBOS version is
+# UNKNOWN and stays UNKNOWN until a newly constrained image is built and its runtime
+# inventory or SBOM verifies what was installed. Those gates are blocked on the base-image
+# mirror (RW-2).
+#
+# Applied with `-c` by: the worker CI install, the image build, and any future
+# isolated-distribution or deployment-rehearsal install. `ci/verify_dbos_constraint.py`
+# asserts that those references agree and that this line still says what it says.
+
+dbos==2.31.1

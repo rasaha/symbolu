@@ -20,6 +20,7 @@ MODULE_PROPERTY_CATEGORY = {
     "test_production_posture": "adversarial",
     "test_no_secret_material": "adversarial",
     "test_time_authority": "adversarial",
+    "test_temporal_boundaries": "adversarial",
     "test_import_boundary": "adversarial",
     "test_typed_outcomes": "adversarial",
     "test_packaging": "invariant",

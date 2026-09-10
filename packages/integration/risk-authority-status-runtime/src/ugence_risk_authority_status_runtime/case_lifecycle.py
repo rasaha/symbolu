@@ -46,9 +46,13 @@ def expire_case_if_elapsed(
     now: datetime,
     actor: str = "lifecycle-reaper",
 ) -> Optional[GovernanceEvent]:
-    """Transition an ACTIVE case to EXPIRED when ``now > expires_at`` (audit only)."""
+    """Transition an ACTIVE case to EXPIRED when ``now >= expires_at`` (audit only).
 
-    if case.state is not RiskCaseState.ACTIVE or now <= expires_at:
+    Half-open, matching the envelope window this reaper reflects: a case whose envelope
+    expired at exactly ``now`` is EXPIRED, not ACTIVE.
+    """
+
+    if case.state is not RiskCaseState.ACTIVE or now < expires_at:
         return None
     return case.transition(
         target=RiskCaseState.EXPIRED,
@@ -113,7 +117,7 @@ def reconcile_case_state(
     if case.state is not RiskCaseState.ACTIVE:
         return None
 
-    if now > envelope.expires_at:
+    if now >= envelope.expires_at:
         return expire_case_if_elapsed(
             case, expires_at=envelope.expires_at, now=now, actor=actor
         )

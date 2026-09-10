@@ -57,9 +57,9 @@ class EnvelopeVerifier:
         # under an expired or not-yet-valid key is not a weaker pass — it is no pass at
         # all, so there is nothing to gain by computing it first.
         #
-        # Note the deliberate boundary difference from step 3 below: the key interval is
-        # half-open ``[not_before, not_after)`` while the envelope's is inclusive at both
-        # ends. See ``crypto.keys`` for why, and do not "harmonize" them.
+        # The key interval and the envelope window in step 3 below now share one shape:
+        # half-open, inclusive lower bound, exclusive upper bound. They were briefly
+        # different — see ``crypto.keys`` for the superseded reasoning.
         key_record = key_ring.resolve_record(envelope.key_id)
         if key_record is None:
             return EnvelopeVerification.deny(f"unknown key_id {envelope.key_id!r}")
@@ -86,10 +86,12 @@ class EnvelopeVerifier:
                 f"session mismatch: {envelope.session_id!r} != {expected_session!r}"
             )
 
-        # 3. Time window (nbf / exp).
+        # 3. Time window (nbf / exp), half-open ``[not_before, expires_at)``. Must stay
+        # equivalent to ``RiskAuthorizationEnvelope.is_temporally_valid``; the conformance
+        # suite asserts the two agree at every boundary instant rather than by inspection.
         if now < envelope.not_before:
             reasons.append("envelope not yet valid (nbf)")
-        if now > envelope.expires_at:
+        if now >= envelope.expires_at:
             reasons.append("envelope expired (exp)")
 
         # 4. Revocation / authority epoch.

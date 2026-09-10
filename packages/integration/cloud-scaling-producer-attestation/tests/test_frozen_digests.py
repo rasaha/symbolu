@@ -76,7 +76,7 @@ FROZEN_V2_SIGNATURE = (
 #: ``candidate_digest``, and the Phase 5A candidate digest moved when the Risk Authority
 #: decision snapshot gained ``evaluated_at``. Source untouched; fixture pins only.
 FROZEN_VERIFIED_ARTIFACT_DIGEST = (
-    "sha256:fefe4884af18907fc4e304e3142c4001f4f6280edd91d5259d78fe297058de29"
+    "sha256:596b4631acf841b4e3721f9d5dc32ac41b31649097fd3d987459e4dac1060b0a"
 )
 #: The verified artifact this package produced while the decision snapshot carried no
 #: ``evaluated_at`` — i.e. while the instant Phase 5B's occurrence gate depends on was
@@ -104,7 +104,7 @@ FROZEN_REFUSAL_OUTCOME = O.SIGNATURE_INVALID
 # ======================================================================================= #
 
 PHASE_5A_CANDIDATE_DIGEST = (
-    "sha256:357bb3d4d660034c9abe50000986808a1e9c15fce05b4a22b6cb82836cc50e79"
+    "sha256:7ffeefce768d3fbfb23a0d3ed0be2a028e222b26d84767d392455b9f76d1e930"
 )
 #: What the Phase 5A candidate hashed to between 5B-1 and R-12b — correct until the decision
 #: snapshot gained ``evaluated_at`` and moved ``decision_digest`` beneath the candidate.

@@ -315,8 +315,11 @@ def test_v1_and_v2_remain_unrelated_types_after_the_seam_widening():
 
 
 def test_the_v1_non_decision_reasons_are_unchanged():
-    # Phase 4B adds exactly one member and renames/removes none, so no existing consumer
-    # of the taxonomy can break.
+    # Phase 4B added one member and T-2/T-3 (RA 0.14.0) added a second; neither renames or
+    # removes any, so no existing consumer of the taxonomy can break. ``existing <= names``
+    # is the assertion that protects consumers and it is unchanged — the added set below is
+    # a record of what grew, not a second guarantee, and it is what makes an accidental
+    # addition visible rather than silent.
     existing = {
         "UNSUPPORTED_SCHEMA_VERSION", "INVALID_SUBJECT", "EXPIRED_SUBJECT",
         "NO_AUTHORITATIVE_POLICY", "AMBIGUOUS_POLICY", "EXPIRED_POLICY",
@@ -325,4 +328,11 @@ def test_the_v1_non_decision_reasons_are_unchanged():
     }
     names = {member.name for member in SubjectRiskNonDecisionReason}
     assert existing <= names
-    assert names - existing == {"CALLER_SUPPLIED_EVALUATION_TIME"}
+    assert names - existing == {
+        "CALLER_SUPPLIED_EVALUATION_TIME",
+        # T-3: a subject valid at exactly its terminal instant, minting nothing.
+        # Neither EXPIRED_SUBJECT (it is not expired) nor AUTHORITY_UNAVAILABLE
+        # (the principal is entitled) describes that, and either would misattribute
+        # the refusal in the audit record.
+        "NO_REMAINING_SUBJECT_VALIDITY",
+    }
