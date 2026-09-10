@@ -1,5 +1,49 @@
 # Changelog — ugence-data-use-admission
 
+## 0.3.0 — a declaration names the vocabulary each of its labels was written against
+
+`CONTRACT_VERSION` moves to `data_use_admission.v2` and `SCHEMA_VERSION` to
+`data_use_admission.sqlite.v2`. `ugence-governance-contracts` is untouched and its
+`CONTRACT_VERSION` does not move, which is `VV-A` working as intended.
+
+**Why.** A label recorded *what* a declarer called the data and left *under what
+taxonomy* unrecorded, so an old declaration silently re-read under a new vocabulary.
+Ballot `LV-1` §2 names that as one of four conditions blocking interpretation;
+`VV-A` to `VV-E` scoped the fix and `PUB-2` authorized it, sequenced behind the
+publication of the vocabularies themselves.
+
+- `VocabularyBinding(vocabulary, version, specification_digest)` — one published
+  vocabulary, named exactly. Package-local by `VV-A`: the binding lands on the record
+  so that no new neutral type enters governance-contracts and `LP-5` is not pre-empted.
+  A bare version string is refused, and so are `""`, `latest` and `current`.
+- `DataUseDeclaration` gains `classification_vocabulary` and `purpose_vocabulary` —
+  **two independent** bindings (`VV-D`), both **required** (`VV-E`). Purpose gets its
+  own: `LV-E`'s open shape means the platform closes no member set, not that purpose
+  terminology is anonymously sourced.
+- Both are in `record_digest()` (`VV-B`) and in the derived `declaration_id` (`VV-C`,
+  because these labels already participate in this record's identity). Two records
+  identical but for the vocabulary version are now two records. **This is not additive
+  and does not pretend to be**: `VV-B` accepted the compatibility consequence rather
+  than leave authoritative semantics outside the digest.
+- Re-declaring the same label under a new vocabulary version is an admissible
+  supersession — the words are identical and what they were read to mean is not.
+- **Records written before this still read.** A record with no stored version is v1 by
+  construction, projects the v1 keys, and keeps the id and digest it was stored with
+  (`VV-B`); it reports `UNVERSIONED_LEGACY` and is **never** resolved to a published
+  vocabulary (`VV-E`). A v1 file opens read-only: appending to it would make its own
+  schema row a lie, and migration needs its own ruled process.
+
+**Still nothing interpreted.** Naming a vocabulary is not reading one. `DE-3` is
+untouched: no taxonomy, no ordering, no comparison of members. The binding is recorded
+and never resolved — this package does not open `docs/vocabularies/`, and a test
+asserts it cannot.
+
+**Two names differ from the published specification on purpose.** Its key is
+`content_digest` and the field here is `specification_digest`, and the validation is
+written in string operations rather than a regular expression, because this package's
+payload guard forbids the identifier `content` and the `re` import outright. Both were
+fixed at the coupling rather than by relaxing what the guard discriminates.
+
 ## [Unreleased] — public_api.json no longer records the interpreter it was generated on
 
 No API change: every exported symbol, kind, field list and version is identical. The

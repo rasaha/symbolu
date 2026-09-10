@@ -30,12 +30,14 @@ from ugence_data_use_admission import (
 from _fixtures import (
     AFTER_WINDOW,
     BEFORE_WINDOW,
+    CLASSIFICATION_VOCABULARY,
     DATA,
     LABEL,
     OTHER_DATA,
     OTHER_LABEL,
     OTHER_PURPOSE,
     PURPOSE,
+    PURPOSE_VOCABULARY,
     T1,
     TENANT,
     binding,
@@ -141,17 +143,23 @@ def test_declaration_id_for_refuses_look_alikes_and_blanks():
 
 def test_the_id_is_derived_and_a_chosen_one_is_refused():
     b, v = binding(), window()
-    derived = declaration_id_for(b, DATA, LABEL, PURPOSE, v)
+    vocabularies = dict(classification_vocabulary=CLASSIFICATION_VOCABULARY,
+                        purpose_vocabulary=PURPOSE_VOCABULARY)
+    derived = declaration_id_for(b, DATA, LABEL, PURPOSE, v, CLASSIFICATION_VOCABULARY,
+                                 PURPOSE_VOCABULARY)
     DataUseDeclaration(declaration_id=derived, tenant_id=TENANT, binding=b, data_ref=DATA,
-                       classification=LABEL, purpose_label=PURPOSE, validity=v)
+                       classification=LABEL, purpose_label=PURPOSE, validity=v, **vocabularies)
     with pytest.raises(ContractViolation, match="must be the derived id"):
         DataUseDeclaration(declaration_id="dud_chosen", tenant_id=TENANT, binding=b,
-                           data_ref=DATA, classification=LABEL, purpose_label=PURPOSE, validity=v)
+                           data_ref=DATA, classification=LABEL, purpose_label=PURPOSE,
+                           validity=v, **vocabularies)
     # …and the id must match *these* fields, not merely be some derived id.
     with pytest.raises(ContractViolation, match="must be the derived id"):
-        DataUseDeclaration(declaration_id=declaration_id_for(b, OTHER_DATA, LABEL, PURPOSE, v),
-                           tenant_id=TENANT, binding=b, data_ref=DATA, classification=LABEL,
-                           purpose_label=PURPOSE, validity=v)
+        DataUseDeclaration(
+            declaration_id=declaration_id_for(b, OTHER_DATA, LABEL, PURPOSE, v,
+                                              CLASSIFICATION_VOCABULARY, PURPOSE_VOCABULARY),
+            tenant_id=TENANT, binding=b, data_ref=DATA, classification=LABEL,
+            purpose_label=PURPOSE, validity=v, **vocabularies)
 
 
 def test_two_declarations_can_never_share_an_id():

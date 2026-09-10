@@ -76,8 +76,8 @@ label is what the declarer *called* the data, never what that means.
 ## The declaration
 
 `DataUseDeclaration(declaration_id, tenant_id, binding, data_ref, classification,
-purpose_label, validity, residency_label, supersedes, declared_by, correlation_id,
-notes)`.
+purpose_label, validity, classification_vocabulary, purpose_vocabulary, record_version,
+residency_label, supersedes, declared_by, correlation_id, notes)`.
 
 - **`tenant_id`** must agree with the binding's tenant. A mismatch is **refused** at
   construction, never resolved either way; a declaration never crosses tenants.
@@ -88,13 +88,62 @@ notes)`.
   are **uninterpreted** (DE-3). A blank label is refused; an unrecognized one is not
   — sets are now ratified, but as a Policy-Authority document under ballot `LV-1`,
   never as an enum here, so nothing in this package can recognize a member.
+- **`classification_vocabulary`** and **`purpose_vocabulary`** name *which published
+  vocabulary each label was written against* — `VocabularyBinding(vocabulary, version,
+  specification_digest)`, since 0.3.0. Two **independent** bindings, because two
+  vocabularies (`VV-D`); purpose gets its own even though `LV-E` ruled it an open
+  shape, since open means the platform closes no member set, not that purpose
+  terminology is timeless or anonymously sourced. Both are **required** (`VV-E`), and
+  `""`, `latest` and `current` are refused by name: a record citing a moving reference
+  records nothing durable, because what it meant changes the next time somebody
+  publishes.
+- **`record_version`** says which record shape this is, and a caller never chooses it
+  for new work.
 - **`residency_label`** is recorded and never evaluated (DE-2).
 - **`declaration_id`** is derived from the binding's digest, the data reference, the
-  label's digest, the purpose and the window — no UUID, no clock — and the record
-  **verifies** it at construction, so an id is never chosen by a caller. That is
-  what makes the collision-freedom real: a different system, data, label, purpose
-  or window is a different id, so a collection keyed by id can never silently lose
-  a declaration.
+  label's digest, the purpose, the window **and both vocabulary bindings** — no UUID,
+  no clock — and the record **verifies** it at construction, so an id is never chosen
+  by a caller. That is what makes the collision-freedom real: a different system,
+  data, label, purpose, window or vocabulary version is a different id, so a
+  collection keyed by id can never silently lose a declaration.
+
+## Which vocabulary a label was read under (0.3.0, `VV-A` to `VV-E`)
+
+Before this, a declaration recorded *what* a declarer called the data and left *under
+what taxonomy* unrecorded — so an old declaration silently re-read under a new
+vocabulary. The binding closes that, and the shape of it is three rulings deep.
+
+**It is a reference, not a resolution.** `PUB-2` allowed reusing `vendor-dependency`'s
+opaque `policy_ref` shape only if it normatively identified the exact vocabulary, and
+found it did not: `VR-4` forbids that package from resolving or interpreting the string
+at all, and a string nobody may interpret identifies nothing in particular. So a
+binding here has three named parts — identifier, exact version, specification digest —
+which name one immutable published document and no other. The digest is required rather
+than encouraged: a version alone is a claim about *a* document, a version and a digest
+are a claim about *this* one.
+
+**And nobody here resolves it.** Structural validation is not resolution: this package
+never opens `docs/vocabularies/`, never fetches, and never checks that a digest belongs
+to a document that exists. It records a reference precise enough for someone else to
+check. A test asserts the code contains no call that could read one.
+
+**In the digest and in the id** (`VV-B`, `VV-C`). A digest excluding the taxonomy would
+prove the *bytes* of a label while failing to prove what that label meant, so two
+records identical but for the vocabulary version are two records. The compatibility
+consequence was accepted deliberately rather than preserving an additive *appearance*.
+Re-declaring the same label under a new vocabulary version is therefore an admissible
+supersession — the words are identical and what they were read to mean is not.
+
+**Records written before it still read** (`VV-E`). A stored record with no version is
+v1 by construction, projects the v1 keys, and keeps the id and digest it was stored
+with; it reports `UNVERSIONED_LEGACY`, which is a statement that the taxonomy is
+**unknown** and never an invitation to assume the current one. A v1 file opens
+read-only — appending to it would make its own schema row a lie, and migration needs
+its own ruled process. Nothing upgrades a record as a side effect of reading it.
+
+**Naming a vocabulary is not interpreting a label.** `DE-3` is untouched: no taxonomy,
+no ordering, no comparison of members, and `governance-contracts` gained no type and
+did not move its `CONTRACT_VERSION` — which is `VV-A` working as intended.
 
 ## The window
 
@@ -180,8 +229,11 @@ import it; no capability package may — enforced repository-wide by
   `docs/vocabularies/data-use-purpose/1.0.0.json`, the second publishing
   interpretation rules rather than members because `LV-E` ruled the shape open. They
   are canonical content, explicitly **not** issued Policy Authority policy, and
-  **neither is cited by any field here**: the two independent record-local references
-  `VV-D` requires are authorized by `PUB-2` and not implemented.
+  and **both are now cited**, since 0.3.0, by the two independent record-local
+  references `VV-D` requires. What still does not exist is the interpreting layer:
+  §2's conditions 2 and 3 remain unmet — no owner has ruled what each member *entails*,
+  and no package permitted to decide has been given the vocabulary. The binding makes
+  interpretation possible later; it makes this package an interpreter never.
 - Result egress and residency consolidation stay out of scope until a further
   ruling.
 - A dynamic `importlib.import_module(name)` cannot be caught by any static checker;
