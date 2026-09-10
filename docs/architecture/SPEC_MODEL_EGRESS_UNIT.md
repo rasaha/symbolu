@@ -3,10 +3,14 @@
 **Opened by** D-1 `INFERENCE_IS_AN_ACTION` and D-2 `SEPARATE_EGRESS_UNIT`, ratified
 2026-09-10 (`OWNER_RATIFICATION_LIVE_MODEL_PROVIDER.md`).
 
-**Scope of this revision.** Architecture and boundary only. D-3 (credential custody), D-4
-(what is recorded) and D-5 (concentration limits at execution) are open, and every section
-that depends on one says so rather than assuming an answer. Nothing here is implemented,
-and no gate identifier of P3E-CTR or GRW-CTR is marked satisfied.
+**Scope of this revision.** Architecture and boundary only, plus §3's ratified direction.
+The interface and deployment sections are **deliberately not written**: they depend on D-3,
+and writing them first would describe a partially decided architecture. D-4 and D-5 remain
+explicitly open. Nothing here is implemented, and no gate identifier of P3E-CTR or GRW-CTR
+is marked satisfied.
+
+**One finding requires an owner answer before the next revision** — §3.1. It is not about
+the Model Egress Unit.
 
 ## 1 — What the two rulings fix
 
@@ -51,28 +55,89 @@ Two properties of that diagram are load-bearing and easy to lose:
   fails verification produces a typed refusal rather than a degraded result — the same
   refusal shape the shipped console scenarios already demonstrate `[V]`.
 
-## 3 — The direction of the call is not yet decided `[R]`
+## 3 — Direction — **RATIFIED: `MEU_PULLS_AUTHORIZED_WORK_ASYNCHRONOUSLY`**
 
-**This is the first thing the next revision must settle, and the rulings do not settle
-it.** CR-5 says the worker's only egress is the configured JWKS host. The MEU is not that
-host. So if the worker initiates the call to the MEU, the worker has a second outbound
-destination and CR-5 needs a narrow amendment after all — for a private in-perimeter host
-rather than a vendor, but an amendment nonetheless.
+> **§3 — MEU_PULLS_AUTHORIZED_WORK_ASYNCHRONOUSLY.** The Agent Runtime worker must not open
+> a network connection to the Model Egress Unit. It records an inference proposal through
+> the existing durable-execution mechanism and yields.
+>
+> After governance authorization and context minimization, the MEU initiates retrieval or
+> leasing of the authorized request from the durable control-plane/outbox boundary. It then
+> calls the approved provider and writes a correlated result back through that boundary.
+> The durable engine resumes the waiting workflow.
+>
+> The MEU must not call directly into a specific worker process. Requests and responses are
+> correlated through immutable request identity and digest, so worker restarts, retries and
+> scaling do not change the result's identity.
+>
+> The MEU may consume only an already-authorized inference request. Retrieving work does not
+> give it authority to approve, modify or broaden the request. The returned provider output
+> remains untrusted evidence/proposal data.
+>
+> CR-5 remains unchanged: the worker's only outbound destination remains its ratified JWKS
+> host. If the existing durable-execution mechanism cannot support the request/outbox and
+> result/resume sequence without adding worker egress, stop and report that contradiction
+> rather than silently amending CR-5.
+> — owner, 2026-09-10
 
-| Option | Consequence |
+The flow:
+
+```
+Worker records inference proposal and yields
+        ↓
+Control Plane authorizes + minimizes context
+        ↓
+Durable authorized-request outbox
+        ↓
+MEU retrieves request and calls model provider
+        ↓
+MEU records correlated untrusted response
+        ↓
+Durable engine resumes worker
+```
+
+### 3.1 — The contradiction this ruling asked to be reported `[R]`
+
+**Stopping here as instructed rather than proceeding.** The ruling's condition is met, but
+not in the way it anticipated: the obstacle is not the durable mechanism's capability. It
+is that **the worker already makes an outbound connection the egress record does not
+account for**, and the outbox would use that same connection.
+
+`EXTERNAL_DEPLOYMENT_EVIDENCE.json` states: *"the worker's only outbound connection is the
+JWKS fetch its identity adapter makes to `UGENCE_REVIEW_IDENTITY_JWKS_URL` over HTTPS"*,
+and lists exactly one entry under `permitted_egress` `[V]`.
+
+The worker also dials PostgreSQL at boot, three times: `SQLAlchemyDatasource.create`,
+`DBOS(system_database_url=…, application_database_url=…)`, and one direct
+`sa.create_engine` for the schema step (`composition.py:223-260`) `[V]`. The 2026-09-09
+deployment's own startup line records both DSNs pointing at
+`postgres.railway.internal:5432` `[V]`. PostgreSQL appears in neither `permitted_egress`
+nor `forbidden_egress`.
+
+So one of two things is true, and only the owner can say which:
+
+| Reading | Consequence for this specification |
 |---|---|
-| `WORKER_CALLS_THE_UNIT` | The natural request/response shape, and the smaller change to the runtime. CR-5 gains a second permitted destination; the claim becomes "the JWKS host and one private unit" rather than "one host". |
-| `UNIT_CALLS_THE_WORKER` | The worker stays inbound-only and CR-5 is preserved **literally**, with no amendment at all. The MEU claims authorized requests and returns results through the worker's existing inbound surface. Costs an asynchronous shape: a request queue, claim semantics, and a result that arrives later than the proposal. |
+| **`EGRESS_MEANS_LEAVING_THE_PERIMETER`** — an in-perimeter datastore connection is not egress | The design is admissible as ratified. The outbox lives in the database the worker already uses; the MEU reaches the same database from its own side; the worker opens nothing new. CR-5 is untouched, and the egress record needs one clarifying sentence rather than an amendment. |
+| **`EGRESS_MEANS_ANY_OUTBOUND_CONNECTION`** — the record means what it literally says | The record is already inaccurate today, before any MEU exists, and the contradiction is pre-existing rather than introduced here. A Postgres-backed outbox would then be a second instance of the same problem, and the ruling's "stop and report" applies to the current deployment as much as to this design. |
 
-**Recommendation: `UNIT_CALLS_THE_WORKER`.** D-2's stated purpose is to preserve CR-5, and
-only this option preserves it without an amendment. It also puts the boundary the safer way
-round: the worker never initiates a connection toward the component that talks to vendors,
-so a compromised MEU cannot reach inward except through the surface the worker already
-exposes and already authenticates.
+**This is not a question about the Model Egress Unit.** It is a question about what CR-5
+has meant since the worker first connected to a database. The specification cannot choose
+between the readings without deciding a ratified ruling's scope, so it stops here.
 
-The cost is real and should be accepted knowingly: inference becomes asynchronous, which
-the durable-execution engine already accommodates but the current synchronous
-`Provider.execute(ToolInvocation) -> ToolResult` shape does not `[V]`.
+**No amendment to CR-5 is proposed, and none is implied.** Under the first reading none is
+needed. Under the second, what needs correcting is a record about the deployment that
+already exists.
+
+### 3.2 — What the durable mechanism can carry, separately from the above
+
+Assessed on the assumption that 3.1 resolves to the first reading. DBOS is composed into
+the worker over PostgreSQL system and application databases `[V]`, which is the class of
+mechanism the ruling names. Whether it supports an externally-leased outbox with the
+claim, correlation and resume semantics §4 and §5 require — without the worker initiating
+anything — is **not yet verified here** `[G]`. It is the next revision's first engineering
+question, and it is answerable offline against the composed engine rather than by
+deploying anything.
 
 ## 4 — What crosses, in each direction
 
@@ -119,8 +184,8 @@ with the same inputs** — that is the difference between a control and a speed 
 
 | Decision | Blocks |
 |---|---|
-| **§3 direction** `[R]` | The request/result transport, the runtime's inference shape, and whether CR-5 is amended at all |
-| **D-3** credential custody `[R]` | Where the MEU's vendor credential lives, how it rotates, and whether the unit is deployable in *this* deployment or only a customer-operated one |
+| **§3.1 what CR-5 counts as egress** `[R]` | Whether the ratified §3 design is admissible at all, and whether the current deployment's egress record is accurate |
+| **D-3** credential custody `[R]` | The interface and deployment sections in full — where the MEU's vendor credential lives, how it rotates, and whether the unit is deployable in *this* deployment or only a customer-operated one |
 | **D-4** what is recorded `[R]` | The provenance record's content in §4, and whether the response payload reaches the ledger at all |
 | **D-5** concentration limits `[R]` | Whether the MEU refuses a call that would breach the vendor mix a plan promised — a §5 refusal that cannot be written until this is answered |
 | **New CR-family ruling** `[R]` | What may cross the boundary in §2, as an owner act rather than a consequence of this document |
