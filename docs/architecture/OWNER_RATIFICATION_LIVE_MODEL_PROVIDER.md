@@ -1,7 +1,10 @@
 # Owner ratification — a live model-calling provider
 
-**Status:** D-1, D-2 and D-3 **RATIFIED 2026-09-10**, together with §3's direction and a
-CR-5 clarification recorded in the composition-root ADR; D-4 and D-5 open. Nothing is
+**Status:** D-1, D-2 and D-3 **RATIFIED 2026-09-10**, together with §3's direction, a CR-5
+clarification recorded in the composition-root ADR, and three transport rulings — a
+worker-owned reconciliation driver, a dedicated exchange schema under least privilege, and
+`OUTCOME_UNKNOWN` as a terminal outcome — recorded in `SPEC_MODEL_EGRESS_UNIT.md` §3.3-§3.5.
+D-4 and D-5 open. Nothing is
 implemented. No gate identifier is marked satisfied and no ratified pin, gate record or
 evidence manifest is modified by this document. The implementation specification opened by
 these two rulings is `SPEC_MODEL_EGRESS_UNIT.md`.

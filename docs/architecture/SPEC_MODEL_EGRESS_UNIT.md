@@ -4,8 +4,9 @@
 2026-09-10 (`OWNER_RATIFICATION_LIVE_MODEL_PROVIDER.md`).
 
 **Also opened by** §3 `MEU_PULLS_AUTHORIZED_WORK_ASYNCHRONOUSLY`, D-3
-`NO_CREDENTIAL_IN_THIS_DEPLOYMENT`, and the CR-5 clarification of 2026-09-10 recorded in
-`ADR_UGENCE_REVIEW_SERVICE_COMPOSITION_ROOT_SCOPING.md`.
+`NO_CREDENTIAL_IN_THIS_DEPLOYMENT`, the CR-5 clarification of 2026-09-10 recorded in
+`ADR_UGENCE_REVIEW_SERVICE_COMPOSITION_ROOT_SCOPING.md`, and the three transport rulings of
+2026-09-10 recorded in §3.3, §3.4 and §3.5 below.
 
 **Scope of this revision.** Architecture, boundary, interface and deployment. **D-4** (what
 is recorded) and **D-5** (concentration limits at execution) remain open, and the sections
@@ -95,8 +96,13 @@ MEU retrieves request and calls model provider
         ↓
 MEU records correlated untrusted response
         ↓
-Durable engine resumes worker
+Worker's reconciliation driver observes it and advances the instance
 ```
+
+**Amended 2026-09-10 (§3.3).** The ruling above says *"the durable engine resumes the
+waiting workflow."* It does not. The engine holds no waiting workflow and observes no row;
+the worker's own reconciliation driver observes a durable result and explicitly advances
+the parked instance. §3.2 records the audit that established this.
 
 ### 3.1 — The reported contradiction, and how it was resolved
 
@@ -122,20 +128,147 @@ nothing new and, in particular, never opens a connection toward the MEU.
 Schema, authorization and tenancy changes to that outbox remain **separately reviewable**
 and are not authorized by this document.
 
-### 3.2 — What the durable mechanism must be shown to carry `[G]`
+### 3.2 — What the audit established `[V]`
 
-DBOS is composed into the worker over PostgreSQL system and application databases `[V]`,
-which is the class of mechanism the ruling names. Whether it supports an externally-leased
-outbox with the claim, correlation and resume semantics §5 and §6 require — without the
-worker initiating anything — is **not verified here**. It is the first engineering question
-of implementation, answerable offline against the composed engine, and it is a
-precondition rather than a detail: if DBOS cannot resume a workflow on a row written by a
-process it does not host, the transport needs rethinking before any code is written.
+A read-only investigation of the repository's durable-execution package, 2026-09-10:
+
+| Question | Finding |
+|---|---|
+| Does the engine hold a waiting workflow? | **No.** *"Each `advance` runs as a fresh DBOS workflow, so DBOS never replays a previously recorded advance result"* (`dbos_engine.py:29-33`) `[V]` |
+| Does writing a row wake anything? | **No.** Nothing observes rows `[V]` |
+| Does `resume()` run the workflow? | **No.** *"Re-arm a parked instance. The NEXT `advance` re-evaluates; this call runs nothing"* `[V]` |
+| What advances an instance? | A caller of `advance()`. The only one in the product is the start relay (`starter.py:83`), driven by an inbound HTTP request `[V]` |
+| Is there a scheduler, poller or background loop? | **None anywhere** in the durable-execution or worker packages `[V]` |
+| Is DBOS messaging used? | **No.** No `send`, `recv`, `set_event` or `get_event` in the product tree `[V]` |
+| Is there a precedent for an outside result reaching a parked instance? | **Yes, shipped.** The human-review path does `signal()` then `resume()` (`service.py:763-787`) `[V]` — but from inside the worker, with something inbound driving the next quantum |
+| Does the model survive a different replica? | Yes by construction: `worker_claims`, `state.claim(...)`, `recover(worker_id)`, and `advance` returning `CLAIM_HELD_BY_ANOTHER_WORKER` **parked rather than executing** `[V]` |
+
+**Not determinable here `[G]`.** What DBOS 2.x offers as a public messaging API could not be
+established: the package is not installed in the audit environment, and `dbos>=2.0` is a
+floor rather than a pin. §3.6 makes that a prerequisite rather than a footnote.
+
+### 3.3 — Reconciliation — **RATIFIED: worker-owned driver**
+
+> **1. Worker-owned reconciliation driver.** Commission an in-worker background
+> reconciliation loop that periodically finds committed MEU results awaiting delivery and
+> invokes the existing worker-owned sequence:
+>
+> ```
+> observe committed result
+> → validate request/result identity and digest
+> → signal()
+> → resume()
+> → advance()
+> ```
+>
+> The scheduler provides liveness only. It does not authorize inference, create a
+> successful result, bypass a refusal or reuse prior clearance. `advance()` must
+> re-evaluate from durable state under current governance.
+>
+> The loop must be restart-safe and idempotent. It must query durable pending work rather
+> than depend on an in-memory timer or PostgreSQL notification. Existing claims, advisory
+> locks and instance integrity checks remain authoritative when multiple replicas contend.
+>
+> Amend §3: the durable engine does not independently resume a waiting workflow. The
+> worker's reconciliation driver observes a durable result and explicitly advances the
+> parked instance.
+> — owner, 2026-09-10
+
+**Liveness only** is the whole of the scheduler's remit, and the sentence to hold it to.
+It decides nothing. Every governance question is re-asked by `advance()`, which re-enters
+the boundary from the beginning against current durable state — the property
+`dbos_engine.py` already relies on and the reason a clearance obtained before parking is
+never reused `[V]`.
+
+It queries durable pending work. An in-memory timer would lose its schedule on restart and
+a notification would lose the wake it missed; neither is a mechanism a governed loop may
+depend on for delivery.
+
+### 3.4 — The exchange boundary — **RATIFIED: dedicated schema, least privilege**
+
+> **2. Dedicated exchange schema with least privilege.** Do not give the MEU access to the
+> worker's application schema, `runtime_events`, or DBOS-owned tables.
+>
+> Create a logically separate model-egress exchange schema with distinct database roles:
+>
+> - The worker may create authorized requests and read committed results.
+> - The MEU may lease authorized requests and write correlated results or refusals.
+> - The MEU may not call `signal()`, `resume()` or `advance()`.
+> - The MEU may not write worker lifecycle state or DBOS system state.
+> - The worker alone translates a verified exchange result into its internal
+>   `signal()`/`resume()` sequence.
+>
+> The exchange may use the same Railway PostgreSQL server, but schema ownership, table
+> grants and credentials must remain separate. **Sharing one database server does not mean
+> sharing authority.**
+> — owner, 2026-09-10
+
+This closes the boundary question the audit raised. The pull design's real cost was never
+the network shape; it was that the obvious implementation hands the MEU write access to the
+worker's own state. It does not. The MEU reaches an exchange schema and nothing else, and
+the translation from *a row in the exchange* to *a governed state transition* is the
+worker's alone.
+
+The resulting shape:
+
+```
+MEU → dedicated exchange tables
+Worker scheduler → reads result
+Worker only → signal + resume + advance
+```
+
+**The MEU transports inference. It never gains control over workflow execution.**
+
+### 3.5 — The ambiguous interval — **RATIFIED: `OUTCOME_UNKNOWN` is terminal**
+
+> **3. Ambiguous provider outcome.** Ratify `OUTCOME_UNKNOWN` as a durable terminal outcome
+> for the original request whenever provider dispatch may have occurred but no provider
+> result was durably committed.
+>
+> Lease expiry alone must never authorize another provider call after possible dispatch.
+> The original request may not return to `PENDING`, and its previous authorization or
+> clearance may not be reused.
+>
+> Recovery rules:
+>
+> - Before dispatch: an expired lease may make the request claimable again.
+> - After possible dispatch: persist or reconstruct `OUTCOME_UNKNOWN`; do not retry
+>   automatically.
+> - With a verified provider idempotency guarantee bound to the same `request_id` and
+>   identical `request_digest`: recovery may be considered only after fresh governance
+>   authorization.
+> - Without verified provider idempotency: any new call is a potentially duplicate billed
+>   inference and requires an explicitly authorized new request linked to the uncertain
+>   original. **It must not be described as a retry of the old request.**
+>
+> A refusal or `OUTCOME_UNKNOWN` must resume the workflow so it does not remain parked
+> indefinitely.
+> — owner, 2026-09-10
+
+The last line is the one an implementation is most likely to drop. An unknown outcome is
+still an outcome: it is written back through the exchange, the reconciliation driver
+observes it like any other, and the workflow advances on it. A request whose provider
+outcome is unknown must not become a workflow parked forever.
+
+The naming rule is not cosmetic either. Calling a fresh authorized call a *retry* would
+imply the first one did not happen — which is precisely what nobody knows.
+
+### 3.6 — Prerequisite: pin DBOS before writing the scheduler `[R]`
+
+`dbos>=2.0` is a floor, not a pin `[V]`, and the audit could not establish the installed
+contract because the package is absent from the audit environment. **Before the scheduler
+is coded, identify the exact DBOS version CI exercises and adopt a tested pin or a bounded
+compatibility range.** No part of this design may depend on unspecified future DBOS 2.x
+behaviour; the mechanisms it does depend on — `@DBOS.workflow`, `@ds.transaction`,
+`launch`, `destroy`, `SQLAlchemyDatasource`, `run_tx_step` — are the ones the repository
+already exercises `[V]`.
 
 ## 4 — The interface
 
-Two records on the durable boundary, and no endpoint on either side. Neither party calls the
-other: the worker writes and later resumes; the MEU claims and writes back.
+Two records in the **dedicated exchange schema** (§3.4), and no endpoint on either side.
+Neither party calls the other. The exchange is the entire vocabulary between them: the
+worker creates requests and reads committed results; the MEU leases requests and writes
+results or refusals. Nothing else crosses, in either direction, at any privilege.
 
 ### 4.1 — The authorized inference request
 
@@ -165,7 +298,7 @@ so the result's identity derives from the request rather than from whoever produ
 | Field | Purpose |
 |---|---|
 | `trust` | Always `UNTRUSTED_EVIDENCE`. There is no other value. |
-| `outcome` | `ANSWERED`, `REFUSED` or `FAILED` — each a first-class outcome, none an exception. |
+| `outcome` | `ANSWERED`, `REFUSED`, `FAILED` or `OUTCOME_UNKNOWN` — each a first-class outcome, none an exception. `OUTCOME_UNKNOWN` is **terminal** for this request (§3.5). |
 | `provenance` | Which adapter, which model, when, and **whether the call was genuine or a deterministic fake** (§5.2). |
 | `metering` | Token counts, latency, and cost where the adapter reports it — the governance the request was authorized against. |
 | `payload` | The provider output, or absent on refusal. Its content is D-4's subject `[R]`. |
@@ -174,13 +307,23 @@ so the result's identity derives from the request rather than from whoever produ
 nothing: the output arrives as evidence and is verified downstream, never believed because
 it arrived.
 
-### 4.3 — Leasing
+### 4.3 — Leasing, and what an expiry may and may not do
 
-A claim is a lease with an expiry, not a removal. An expired lease returns the request to
-the unclaimed set; it does not delete it, and it does not entitle a second call. The
-`request_id` plus `request_digest` pair is the idempotency key: **a request already served
-is never served twice**, whatever the lease state, because the cost of a duplicate is a
-second billed vendor call the governance authorized once.
+A claim is a lease with an expiry, not a removal. What the expiry permits depends entirely
+on whether dispatch may have occurred (§3.5):
+
+| State when the lease expires | What the expiry permits |
+|---|---|
+| Before dispatch | The request becomes claimable again. No call was made. |
+| After possible dispatch | **Nothing.** The request becomes `OUTCOME_UNKNOWN`, terminal. It does not return to `PENDING`, and its authorization and clearance are spent. |
+
+The `request_id` plus `request_digest` pair is the durable dedup key: **a request already
+served is never served twice**. But dedup and lease expiry between them cannot make the
+ambiguous interval safe, because the provider call happens outside any transaction — which
+is why §3.5 exists rather than a cleverer lease.
+
+A fresh authorized call after an `OUTCOME_UNKNOWN` is a **new request linked to the
+uncertain original**, never a retry of it.
 
 ## 5 — Deployment
 
@@ -195,13 +338,29 @@ Its network posture, stated as the worker's now is:
 
 | Destination | |
 |---|---|
-| The shared PostgreSQL persistence endpoints | permitted — how it claims work and writes results |
+| The exchange schema, under its own role and credential | permitted — how it leases work and writes results. Not the worker's application schema, not `runtime_events`, not DBOS-owned tables (§3.4) |
 | Approved model provider endpoints | permitted **only where a credential exists** (§5.2) |
 | The worker's listener | **forbidden.** The MEU never calls a worker process, by §3 |
 | The authority plane, the studio, the console | **forbidden** |
 | Anything else | **forbidden.** A new destination is a CR-family amendment, as for the worker |
 
-### 5.2 — In this deployment there is no credential, and that is a posture
+### 5.2 — Privilege, stated as grants rather than as intent
+
+The same PostgreSQL server may host both, and that is not a shared authority. Schema
+ownership, table grants and credentials are separate, and the separation is enforced by the
+database rather than by the code's good behaviour:
+
+| Role | May |
+|---|---|
+| worker | create authorized requests; read committed results |
+| MEU | lease authorized requests; write correlated results, refusals and `OUTCOME_UNKNOWN` |
+
+And the MEU may **not**, at any privilege: call `signal()`, `resume()` or `advance()`;
+write worker lifecycle state; touch DBOS system state; or read or write the worker's
+application schema. The translation from an exchange row to a governed state transition is
+the worker's alone, and it is the reconciliation driver of §3.3 that performs it.
+
+### 5.3 — In this deployment there is no credential, and that is a posture
 
 Under D-3, the reference deployment **contains no model-provider credential and makes no
 genuine provider call** `[V]`. What that requires of the implementation, stated as
@@ -229,7 +388,7 @@ rotation policy, an audit trail and a named custody owner are separately commiss
 `PLATFORM_ENVIRONMENT_VARIABLE` is rejected as a production custody mechanism `[V]`, and
 this specification does not reopen it.
 
-### 5.3 — What the deterministic fake must not become
+### 5.4 — What the deterministic fake must not become
 
 A fake adapter that returns plausible model output is a demo; one that returns *labelled*
 output is a test fixture. The difference is the provenance record, and it is the only thing
@@ -251,8 +410,12 @@ The MEU refuses rather than proceeds when:
 
 Each is a typed refusal naming the reason and correlated to the request. **A refusal must
 not be recoverable by retrying with the same inputs** — that is the difference between a
-control and a speed bump. A refusal is a result, written back through the boundary like any
-other, so the waiting workflow resumes on a refusal rather than hanging.
+control and a speed bump.
+
+**A refusal and an `OUTCOME_UNKNOWN` are both written back through the exchange**, so the
+reconciliation driver observes them like any answered result and the instance advances on
+them (§3.3, §3.5). An instance parked forever because nothing came back is a failure of
+this design, not an acceptable degradation.
 
 D-5 would add one more refusal — a call that would breach the vendor mix a plan promised —
 and it cannot be written until D-5 is ruled `[R]`.
@@ -274,9 +437,10 @@ and it cannot be written until D-5 is ruled `[R]`.
 | Decision | Blocks |
 |---|---|
 | **D-4** what is recorded `[R]` | The `payload` field of §4.2 — whether the provider output reaches the ledger, as content, as a digest, or through Context Minimization |
+| **DBOS pin** `[R]` | §3.6 — a prerequisite to coding the scheduler, not a cleanup afterwards |
+| **Exchange schema, grants, tenancy** `[R]` | Separately reviewable under the CR-5 clarification and §3.4; not authorized by this document |
 | **D-5** concentration limits `[R]` | One refusal in §6 — whether the MEU refuses a call that would breach the vendor mix a plan promised |
-| **DBOS external leasing** `[G]` | §3.2 — the first engineering question, and a precondition rather than a detail |
-| **Outbox schema, authorization, tenancy** `[R]` | Separately reviewable by the CR-5 clarification; not authorized by this document |
+
 
 ## 9 — What exists to build on
 
@@ -287,5 +451,9 @@ and it cannot be written until D-5 is ruled `[R]`.
 | Context Minimization, TAP, ActionGate, Autonomous Control Plane | Composed into the loop and demonstrated `[V]` |
 | Clearance receipts (`cer-…`) | Ride every disposition `[V]` |
 | Receipt verification by a consumer | Does not exist `[G]` |
-| Durable execution able to carry an asynchronous result | DBOS engine composed `[V]`; used for this, unproven `[G]` |
+| `signal()` / `resume()` / `advance()` on application-owned tables | Built, and exercised by the human-review path `[V]` |
+| An outside party delivering a result to a parked instance | Shipped precedent, from inside the worker `[V]` |
+| A reconciliation driver | Does not exist. No scheduler, poller or background loop anywhere `[V]` |
+| The exchange schema and its roles | Do not exist `[G]` |
+| A pinned DBOS version | Does not exist; `dbos>=2.0` is a floor `[V]` |
 | The MEU | Does not exist. No package, no image, no deployment unit `[G]` |
