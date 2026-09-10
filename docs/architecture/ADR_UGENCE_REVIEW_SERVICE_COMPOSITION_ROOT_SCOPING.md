@@ -131,6 +131,39 @@ bundle. The same switch never enables LIVE execution: `ENFORCEMENT_ENABLED` stay
 | **CR-4** | **`ONE_DEPLOYMENT_MODE_SWITCH`.** `UGENCE_REVIEW_DEPLOYMENT_MODE=production` sets every production switch together and refuses any fixture adapter, in-memory store or non-authoritative bundle at composition. It certifies nothing and enables no LIVE execution. |
 | **CR-5** | **`ALLOWLISTED_JWKS_HOST`.** The worker's only egress is the configured JWKS host over HTTPS, as platform configuration recorded as `EXTERNAL_DEPLOYMENT_EVIDENCE`; no discovery document, no docker.io, nothing else. |
 
+#### CR-5 clarification, 2026-09-10 — internal connectivity is not vendor egress, but it must still be declared
+
+> Supersede the statement that the worker has only one outbound connection. The worker
+> currently initiates:
+>
+> - JWKS retrieval to its ratified identity endpoint;
+> - PostgreSQL connections for application and DBOS durable state.
+>
+> PostgreSQL is outbound network connectivity even when addressed through
+> `postgres.railway.internal`. It must appear explicitly in the deployment evidence and
+> network allowlist; do not hide it by redefining it as "not egress."
+>
+> CR-5's security boundary is clarified as:
+>
+> - the worker may connect only to its approved JWKS endpoint and explicitly configured
+>   private PostgreSQL persistence endpoints;
+> - it may not connect to the MEU, model providers, arbitrary private services or the
+>   public internet;
+> - adding any new destination requires a separate CR-family amendment.
+>
+> The asynchronous MEU design may use the existing PostgreSQL/DBOS connection for an
+> authorized-request outbox only if this introduces no additional network destination.
+> Schema, authorization and tenancy changes to that outbox remain separately reviewable.
+> — owner, 2026-09-10
+
+This clarification was prompted by a finding recorded in `SPEC_MODEL_EGRESS_UNIT.md` §3.1:
+`EXTERNAL_DEPLOYMENT_EVIDENCE.json` claimed the JWKS fetch was the worker's only outbound
+connection while the worker had been dialling PostgreSQL since it first composed
+(`composition.py:223-260`) `[V]`. The record now declares three destinations rather than
+one, and the ruling's refusal to solve the problem by redefining the word is the substance
+of it: the boundary is narrowed by naming what crosses, never by renaming it.
+
+
 Ruled alongside, on evidence: **`SEPARATE_P3E_EQUIVALENT_EVIDENCE`**. The worker image
 gets its own P3E-equivalent gate set and evidence manifest; the studio profile is not
 extended to cover it (§4, §6 step 4).
