@@ -8,7 +8,11 @@ client — including in a module nobody remembered to update the constant for.
 from __future__ import annotations
 
 import ast
+import os
 import pathlib
+import subprocess
+import sys
+import textwrap
 
 import pytest
 
@@ -120,13 +124,90 @@ def test_the_only_third_party_dependency_is_the_database_driver():
 
 
 def test_only_the_postgres_subpackage_imports_the_driver():
-    """The records, the digests and the providers stay importable without a
-    database driver present."""
+    """No module outside ``postgres/`` names the driver. Necessary, not sufficient —
+    see the transitive test below, which is the one that has teeth."""
 
     for path in SOURCES:
         if "psycopg" in _imported_roots(path):
             assert path.parent.name == "postgres", (
                 f"{path.name} imports psycopg outside the postgres subpackage")
+
+
+def test_the_package_imports_with_no_database_driver_at_all():
+    """The claim, tested by removing the driver rather than by reasoning about imports.
+
+    This is the test that was missing, and CI is what found the gap. The scan
+    above reads *direct* imports and passed while the real chain —
+    ``__init__ → reconcile → postgres.exchange → psycopg`` — was three deep and
+    broken. Every test in this suite was green; the CI step that uninstalled
+    psycopg and tried to import the package failed on all three Pythons.
+
+    A structural test that reasons about imports is not a substitute for taking
+    the dependency away and looking. This runs in a subprocess so the blocked
+    import cannot be satisfied by a module the parent already loaded.
+    """
+
+    program = textwrap.dedent(
+        """
+        import sys
+
+        class Block:
+            def find_module(self, name, path=None):
+                if name == "psycopg" or name.startswith("psycopg."):
+                    return self
+            def load_module(self, name):
+                raise ImportError("No module named %r (blocked)" % name)
+
+        sys.meta_path.insert(0, Block())
+
+        import ugence_model_egress_unit as meu
+        assert meu.LIVE_VENDOR_EGRESS is False
+        assert meu.DeterministicFakeProvider().maturity == "FIXTURE_ONLY"
+        assert meu.RequestNotClaimable is not None
+        assert "psycopg" not in sys.modules
+        print("OK")
+        """
+    )
+    result = subprocess.run(
+        [sys.executable, "-c", program],
+        capture_output=True, text=True,
+        env={**os.environ, "PYTHONPATH": str(SRC.parent)},
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "OK" in result.stdout
+
+
+def test_the_store_still_needs_the_driver():
+    """The other half. Without it, a package that had quietly stopped talking to
+    PostgreSQL at all would satisfy the test above."""
+
+    program = textwrap.dedent(
+        """
+        import sys
+
+        class Block:
+            def find_module(self, name, path=None):
+                if name == "psycopg" or name.startswith("psycopg."):
+                    return self
+            def load_module(self, name):
+                raise ImportError("No module named %r (blocked)" % name)
+
+        sys.meta_path.insert(0, Block())
+        try:
+            import ugence_model_egress_unit.postgres
+        except ImportError:
+            print("REFUSED")
+        else:
+            raise SystemExit("the store imported without a driver")
+        """
+    )
+    result = subprocess.run(
+        [sys.executable, "-c", program],
+        capture_output=True, text=True,
+        env={**os.environ, "PYTHONPATH": str(SRC.parent)},
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "REFUSED" in result.stdout
 
 
 def test_the_package_imports_no_first_party_package():

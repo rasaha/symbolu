@@ -35,6 +35,13 @@ from uuid import UUID
 
 from psycopg.pq import TransactionStatus
 
+from ..errors import (
+    ExchangeError,
+    RequestNotClaimable,
+    ResultNotAcknowledgeable,
+    TenantMismatch,
+    UnscopableConnection,
+)
 from ..records import (
     EgressRequest,
     EgressResult,
@@ -53,42 +60,6 @@ __all__ = [
     "ClaimedRequest",
     "Exchange",
 ]
-
-
-class ExchangeError(RuntimeError):
-    """A request or result could not be moved the way the caller asked."""
-
-
-class UnscopableConnection(ExchangeError):
-    """A connection arrived mid-transaction, so tenant identity cannot be scoped.
-
-    ``SET LOCAL`` is scoped to the enclosing **transaction**, not to a savepoint.
-    On a connection that already has one open, ``conn.transaction()`` opens a
-    savepoint instead, and the tenant identity established inside it survives the
-    savepoint's release — staying live for the rest of the outer transaction and
-    for whatever the next caller does with it. That is a cross-tenant read no
-    policy can catch, because by then the session genuinely *is* that tenant.
-
-    Demonstrated in ``tests/test_rls.py``: on an IDLE connection the identity
-    reverts to the empty string and the next read fails closed; on an ``INTRANS``
-    one it leaks. So the exchange refuses rather than degrade quietly.
-    """
-
-
-class TenantMismatch(ExchangeError):
-    """A row came back carrying a tenant the caller did not ask for.
-
-    Raised by the application-level check. Reaching this means row-level security
-    did not do its job, so the transaction is abandoned rather than trusted.
-    """
-
-
-class RequestNotClaimable(ExchangeError):
-    """The request is not in a state a result may be recorded against."""
-
-
-class ResultNotAcknowledgeable(ExchangeError):
-    """No unacknowledged result exists for this request."""
 
 
 @dataclass(frozen=True)

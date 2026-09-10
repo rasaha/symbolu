@@ -10,11 +10,13 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
 from uuid import UUID
 
-from .postgres.exchange import Exchange
 from .records import EgressResult, RequestState, ResultOutcome
+
+if TYPE_CHECKING:  # the annotation only; importing it would drag in psycopg
+    from .postgres.exchange import Exchange
 
 __all__ = ["UnitPass", "EgressUnit"]
 
@@ -42,7 +44,7 @@ class EgressUnit:
 
     def __init__(
         self,
-        exchange: Exchange,
+        exchange: "Exchange",
         provider,
         *,
         holder: str,

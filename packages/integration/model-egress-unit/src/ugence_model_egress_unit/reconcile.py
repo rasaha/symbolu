@@ -28,11 +28,14 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Sequence
+from typing import TYPE_CHECKING, Sequence
 from uuid import UUID
 
-from .postgres.exchange import Exchange, RequestNotClaimable
+from .errors import RequestNotClaimable
 from .records import EgressResult, RequestState
+
+if TYPE_CHECKING:  # the annotation only; importing it would drag in psycopg
+    from .postgres.exchange import Exchange
 
 __all__ = ["ReconciliationPass", "ReconciliationScheduler"]
 
@@ -53,7 +56,7 @@ class ReconciliationPass:
 class ReconciliationScheduler:
     """Sweeps expired leases into terminal ``OUTCOME_UNKNOWN`` results."""
 
-    def __init__(self, exchange: Exchange, *, reconciler_id: str = "meu-reconciler") -> None:
+    def __init__(self, exchange: "Exchange", *, reconciler_id: str = "meu-reconciler") -> None:
         self._exchange = exchange
         self._reconciler_id = reconciler_id
 

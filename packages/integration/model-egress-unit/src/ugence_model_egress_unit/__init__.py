@@ -28,6 +28,13 @@ from .canonical import (
     canonical_digest,
     content_digest,
 )
+from .errors import (
+    ExchangeError,
+    RequestNotClaimable,
+    ResultNotAcknowledgeable,
+    TenantMismatch,
+    UnscopableConnection,
+)
 from .provider import (
     REFERENCE_RESPONSE_MARKER,
     DeterministicFakeProvider,
@@ -73,6 +80,11 @@ __all__ = [
     "TERMINAL_STATES",
     "EgressRequest",
     "EgressResult",
+    "ExchangeError",
+    "UnscopableConnection",
+    "TenantMismatch",
+    "RequestNotClaimable",
+    "ResultNotAcknowledgeable",
     "EgressProvider",
     "DeterministicFakeProvider",
     "LiveEgressUnavailableProvider",

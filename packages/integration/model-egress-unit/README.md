@@ -76,5 +76,6 @@ ugence-model-egress-unit
 ```
 
 No first-party dependency, so it cannot drag the governance kernel into an egress
-deployment unit. Only the `postgres` subpackage imports the driver; the records,
-digests and providers stay importable without it.
+deployment unit. Only the `postgres` subpackage needs the driver; the records,
+digests, providers and failure vocabulary stay importable without it — tested by
+uninstalling `psycopg` and importing, not by reasoning about the import graph.
