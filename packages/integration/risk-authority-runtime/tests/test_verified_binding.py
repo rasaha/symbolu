@@ -50,6 +50,8 @@ def _authorize(ra, action=None, identity=None):
         identity=identity if identity is not None else ra.identity(),
         key_ring=ra.key_ring,
         revocation_state=ra.revocation,
+        # The RA leaf's gate still takes an explicit instant — D-A moved the clock off
+        # RiskAuthorityEnforcer.derive, deliberately preserving every leaf signature.
         now=ra.now,
     ), action
 
@@ -192,7 +194,7 @@ def test_h_production_composition_refuses_a_look_alike(ra):
 def test_i_reference_results_cannot_enter_the_production_path(ra):
     """The requirement ADR §8/D-E names, proven rather than asserted."""
 
-    enforcer = RiskAuthorityEnforcer.reference()
+    enforcer = RiskAuthorityEnforcer.reference(clock=lambda: ra.now)
     assert enforcer.is_production is False
 
     verified = enforcer.derive(
@@ -202,7 +204,6 @@ def test_i_reference_results_cannot_enter_the_production_path(ra):
         identity=ra.identity(),
         key_ring=ra.key_ring,
         revocation_state=ra.revocation,
-        now=ra.now,
     )
     assert verified.result.disposition is RiskAuthorityDisposition.ALLOW
     assert verified.production is False
@@ -223,13 +224,13 @@ def test_j_implicit_reference_construction_is_refused(ra):
 
 def test_k_production_factory_refuses_the_reference_gate(ra):
     with pytest.raises(EnforcerConfigurationError):
-        RiskAuthorityEnforcer.production(gate=ReferenceActionGate())
+        RiskAuthorityEnforcer.production(gate=ReferenceActionGate(), clock=lambda: ra.now)
 
     class _Subclass(ReferenceActionGate):
         is_production_authoritative = True
 
     with pytest.raises(EnforcerConfigurationError):
-        RiskAuthorityEnforcer.production(gate=_Subclass())
+        RiskAuthorityEnforcer.production(gate=_Subclass(), clock=lambda: ra.now)
 
 
 def test_l_production_factory_requires_a_declared_posture(ra):
@@ -238,7 +239,7 @@ def test_l_production_factory_requires_a_declared_posture(ra):
             raise AssertionError
 
     with pytest.raises(EnforcerConfigurationError):
-        RiskAuthorityEnforcer.production(gate=_Silent())
+        RiskAuthorityEnforcer.production(gate=_Silent(), clock=lambda: ra.now)
 
 
 def test_m_a_production_gate_yields_a_composable_verified_result(ra):
@@ -250,7 +251,7 @@ def test_m_a_production_gate_yields_a_composable_verified_result(ra):
         def authorize(self, **kw):
             return ReferenceActionGate().authorize(**kw)
 
-    enforcer = RiskAuthorityEnforcer.production(gate=_ProductionGate())
+    enforcer = RiskAuthorityEnforcer.production(gate=_ProductionGate(), clock=lambda: ra.now)
     assert enforcer.is_production is True
 
     verified = enforcer.derive(
@@ -260,7 +261,6 @@ def test_m_a_production_gate_yields_a_composable_verified_result(ra):
         identity=ra.identity(),
         key_ring=ra.key_ring,
         revocation_state=ra.revocation,
-        now=ra.now,
     )
     assert verified.production is True
 
@@ -278,3 +278,105 @@ def test_n_a_revoked_envelope_denies_through_the_verified_path(ra):
     v = _bind(ra, authorization=auth, action=action)
     assert v.result.disposition is RiskAuthorityDisposition.DENY
     assert v.authorized is False
+
+
+# ------------------------------------------------- #1398 item 1, D-A: clock authority
+def test_o_a_production_enforcer_requires_an_injected_clock(ra):
+    """A production enforcer with no clock could only fall back to a caller instant."""
+
+    class _ProductionGate:
+        is_production_authoritative = True
+
+        def authorize(self, **kw):
+            return ReferenceActionGate().authorize(**kw)
+
+    with pytest.raises(TypeError):
+        RiskAuthorityEnforcer.production(gate=_ProductionGate())  # noqa: PLE1120
+    with pytest.raises(EnforcerConfigurationError):
+        RiskAuthorityEnforcer.production(gate=_ProductionGate(), clock=None)
+    with pytest.raises(EnforcerConfigurationError):
+        RiskAuthorityEnforcer(_ProductionGate(), production=True)
+
+
+def test_p_derive_takes_no_caller_instant(ra):
+    """The exposure D-A closes: derive() used to accept `now` from its caller.
+
+    Passing one is now a TypeError rather than being quietly honored, so a composition
+    root that still supplies a timestamp fails loudly at the call site instead of having
+    its value silently govern envelope, epoch and key-window validity.
+    """
+
+    enforcer = RiskAuthorityEnforcer.reference(clock=lambda: ra.now)
+    with pytest.raises(TypeError):
+        enforcer.derive(
+            authorization_id="auth_x", envelope=ra.envelope, action=ra.action(),
+            identity=ra.identity(), key_ring=ra.key_ring,
+            revocation_state=ra.revocation, now=ra.now)  # noqa: E1123
+
+
+def test_q_derive_reads_the_injected_clock_exactly_once(ra):
+    """One read per derive, so envelope, epoch and key window are judged at one instant."""
+
+    reads = []
+
+    def _counting_clock():
+        reads.append(ra.now)
+        return ra.now
+
+    verified = RiskAuthorityEnforcer.reference(clock=_counting_clock).derive(
+        authorization_id="auth_once", envelope=ra.envelope, action=ra.action(),
+        identity=ra.identity(), key_ring=ra.key_ring, revocation_state=ra.revocation)
+
+    assert len(reads) == 1, f"clock read {len(reads)} times; D-A requires exactly one"
+    assert verified.verified_at == ra.now
+
+
+def test_r_a_reference_clock_never_confers_production_posture(ra):
+    """Passing a deterministic clock is a replay aid, not a posture claim."""
+
+    enforcer = RiskAuthorityEnforcer.reference(clock=lambda: ra.now)
+    assert enforcer.is_production is False
+
+    verified = enforcer.derive(
+        authorization_id="auth_ref_clock", envelope=ra.envelope, action=ra.action(),
+        identity=ra.identity(), key_ring=ra.key_ring, revocation_state=ra.revocation)
+    assert verified.production is False
+
+    with pytest.raises(ProductionCompositionError):
+        RiskAuthorityCompositionEngine().compose_verified(
+            risk_authority=verified, decision_authority=DA_NO_VETO, actiongate=AG_NO_VETO)
+
+
+def test_s_a_deterministic_reference_clock_replays_byte_for_byte(ra):
+    """Determinism is preserved: the same fixed instant yields the same binding twice."""
+
+    def _derive():
+        return RiskAuthorityEnforcer.reference(clock=lambda: ra.now).derive(
+            authorization_id="auth_replay", envelope=ra.envelope, action=ra.action(),
+            identity=ra.identity(), key_ring=ra.key_ring, revocation_state=ra.revocation)
+
+    first, second = _derive(), _derive()
+    assert first.verified_at == second.verified_at == ra.now
+    assert first.envelope_digest == second.envelope_digest
+    assert first.action_digest == second.action_digest
+    assert first.result.disposition is second.result.disposition
+
+
+def test_t_the_injected_clock_governs_the_key_window_too(ra):
+    """The instant D-A moved off the caller now also decides key validity (RA 0.9.0)."""
+
+    from datetime import timedelta
+
+    from risk_authority.crypto.keys import KeyRing, SigningKeyRecord
+    from risk_authority.crypto.signing import SigningKey
+
+    expired_ring = KeyRing.from_records([SigningKeyRecord(
+        ra.envelope.key_id, SigningKey.from_seed(bytes(range(32))),
+        not_after=ra.now - timedelta(hours=1))])
+
+    verified = RiskAuthorityEnforcer.reference(clock=lambda: ra.now).derive(
+        authorization_id="auth_key", envelope=ra.envelope, action=ra.action(),
+        identity=ra.identity(), key_ring=expired_ring, revocation_state=ra.revocation)
+
+    assert verified.result.disposition is RiskAuthorityDisposition.DENY
+    assert verified.authorized is False

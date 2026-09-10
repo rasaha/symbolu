@@ -78,7 +78,6 @@ def _request(**kw):
         requested_autonomy_level=1,
         correlation_id="corr-1",
         idempotency_key="idem-1",
-        evaluation_time=NOW,
     )
     base.update(kw)
     return SubjectRiskEvaluationRequest(**base)
