@@ -12,7 +12,10 @@ from datetime import datetime, timedelta, timezone
 
 import pytest
 
+from _fixtures import MODEL, binding, request as _make_request
 from ugence_model_egress_unit import (
+    MinimizedUnit,
+    ResultOutcome,
     EGRESS_REQUEST_DIGEST_DOMAIN,
     EGRESS_RESULT_DIGEST_DOMAIN,
     EXCHANGE_CONTENT_DIGEST_DOMAIN,
@@ -28,14 +31,24 @@ from ugence_model_egress_unit import (
 NOW = datetime(2026, 3, 1, 12, 0, 0, 123456, tzinfo=timezone.utc)
 RID = uuid.UUID("11111111-1111-1111-1111-111111111111")
 TID = uuid.UUID("22222222-2222-2222-2222-222222222222")
+CID = uuid.UUID("33333333-3333-3333-3333-333333333333")
 
 
 def _request(**over):
-    kwargs = dict(request_id=RID, tenant_id=TID, submitted_at=NOW,
-                  model_id="reference-model-a", purpose="reference-exchange",
-                  content="ask something")
-    kwargs.update(over)
-    return EgressRequest.create(**kwargs)
+    """A fully pinned request: every identifier fixed unless the caller varies it.
+
+    ``_fixtures.request`` mints a fresh ``request_id`` and ``correlation_id`` per
+    call, which is right for the exchange suites and wrong here — a digest test
+    must vary exactly one field at a time or it proves nothing about which field
+    moved the value.
+    """
+
+    over.setdefault("request_id", RID)
+    over.setdefault("correlation_id", CID)
+    over.setdefault("submitted_at", NOW)
+    tenant = over.pop("tenant_id", TID)
+    over.setdefault("authorization", binding(tenant))
+    return _make_request(tenant, **over)
 
 
 # --- determinism and totality ------------------------------------------------
@@ -52,16 +65,16 @@ def test_every_field_moves_the_request_digest():
     assert _request(request_id=uuid.uuid4()).digest() != base
     assert _request(tenant_id=uuid.uuid4()).digest() != base
     assert _request(submitted_at=NOW + timedelta(microseconds=1)).digest() != base
-    assert _request(model_id="reference-model-b").digest() != base
-    assert _request(purpose="something-else").digest() != base
-    assert _request(content="ask something else").digest() != base
+    assert _request(authorization=binding(TID, model="other")).digest() != base
+    assert _request(context=(MinimizedUnit("u", "different", 1),)).digest() != base
     assert _request(parameters={"temperature": 1}).digest() != base
 
 
 def test_every_field_moves_the_result_digest():
     def result(**over):
-        kwargs = dict(request_id=RID, tenant_id=TID, recorded_at=NOW,
-                      provider_id="p", content="an answer")
+        kwargs = dict(request_id=RID, tenant_id=TID, correlation_id=CID,
+                      recorded_at=NOW, adapter_id="p", payload="an answer",
+                      model_ref=MODEL)
         kwargs.update(over)
         return EgressResult.answered(**kwargs)
 
@@ -69,15 +82,15 @@ def test_every_field_moves_the_result_digest():
     assert result(request_id=uuid.uuid4()).digest() != base
     assert result(tenant_id=uuid.uuid4()).digest() != base
     assert result(recorded_at=NOW + timedelta(microseconds=1)).digest() != base
-    assert result(provider_id="q").digest() != base
-    assert result(content="a different answer").digest() != base
+    assert result(adapter_id="q").digest() != base
+    assert result(payload="a different answer").digest() != base
 
     refused = EgressResult.refused(
-        request_id=RID, tenant_id=TID, recorded_at=NOW, provider_id="p",
-        reason=RefusalReason.MODEL_NOT_AVAILABLE)
+        request_id=RID, tenant_id=TID, correlation_id=CID, recorded_at=NOW,
+        adapter_id="p", reason=RefusalReason.MODEL_NOT_AVAILABLE)
     other = EgressResult.refused(
-        request_id=RID, tenant_id=TID, recorded_at=NOW, provider_id="p",
-        reason=RefusalReason.PURPOSE_NOT_PERMITTED)
+        request_id=RID, tenant_id=TID, correlation_id=CID, recorded_at=NOW,
+        adapter_id="p", reason=RefusalReason.TARGET_NOT_AUTHORIZED)
     assert refused.digest() != other.digest() != base
 
 
@@ -191,19 +204,37 @@ def test_the_canonicalization_version_is_bound_into_every_digest():
 
 def test_a_refusal_must_name_a_reason():
     with pytest.raises(ValueError, match="must name its reason"):
-        EgressResult(request_id=RID, tenant_id=TID, recorded_at=NOW,
-                     outcome=EgressResult.refused(
-                         request_id=RID, tenant_id=TID, recorded_at=NOW,
-                         provider_id="p",
-                         reason=RefusalReason.ALREADY_TERMINAL).outcome,
-                     provider_id="p", content=None, content_sha256=None,
-                     refusal_reason=None)
+        EgressResult(
+            request_id=RID, tenant_id=TID, correlation_id=CID, recorded_at=NOW,
+            outcome=ResultOutcome.REFUSED, adapter_id="p",
+            provenance={"kind": "RESPONSE", "genuine_call": False},
+            payload=None, content_digest=None, refusal_reason=None)
 
 
-def test_only_an_answer_carries_content():
-    with pytest.raises(ValueError, match="no content to carry"):
-        EgressResult(request_id=RID, tenant_id=TID, recorded_at=NOW,
-                     outcome=EgressResult.outcome_unknown(
-                         request_id=RID, tenant_id=TID, recorded_at=NOW,
-                         provider_id="p").outcome,
-                     provider_id="p", content="smuggled", content_sha256=None)
+def test_only_an_answer_carries_a_payload():
+    with pytest.raises(ValueError, match="no payload to carry"):
+        EgressResult(
+            request_id=RID, tenant_id=TID, correlation_id=CID, recorded_at=NOW,
+            outcome=ResultOutcome.OUTCOME_UNKNOWN, adapter_id="p",
+            provenance={"kind": "DISPATCH_ATTEMPT", "genuine_call": False},
+            payload="smuggled", content_digest=None)
+
+
+def test_no_result_may_claim_a_genuine_call():
+    """The provenance check, in the record rather than only in the database."""
+
+    with pytest.raises(ValueError, match="no genuine provider call"):
+        EgressResult(
+            request_id=RID, tenant_id=TID, correlation_id=CID, recorded_at=NOW,
+            outcome=ResultOutcome.FAILED, adapter_id="p",
+            provenance={"kind": "RESPONSE", "genuine_call": True},
+            payload=None, content_digest=None)
+
+
+def test_trust_is_not_a_field_a_caller_may_raise():
+    with pytest.raises(ValueError, match="constant"):
+        EgressResult(
+            request_id=RID, tenant_id=TID, correlation_id=CID, recorded_at=NOW,
+            outcome=ResultOutcome.FAILED, adapter_id="p",
+            provenance={"kind": "RESPONSE", "genuine_call": False},
+            payload=None, content_digest=None, trust="TRUSTED")

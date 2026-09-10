@@ -13,9 +13,9 @@ from datetime import datetime, timedelta, timezone
 
 import pytest
 
+from _fixtures import LEASE, MODEL, NOW, request as _make_request
 from ugence_model_egress_unit import (
     DeterministicFakeProvider,
-    EgressRequest,
     EgressResult,
     EgressUnit,
     ReconciliationScheduler,
@@ -23,8 +23,6 @@ from ugence_model_egress_unit import (
     ResultOutcome,
 )
 
-NOW = datetime(2026, 3, 1, 12, 0, 0, tzinfo=timezone.utc)
-LEASE = timedelta(minutes=5)
 AFTER = NOW + LEASE + timedelta(seconds=1)
 
 pytestmark = pytest.mark.postgres
@@ -35,21 +33,34 @@ def _slow_answer(request, tenant):
     sweep managed to write. It still holds the lease, so it records directly."""
 
     return EgressResult.answered(
-        request_id=request.request_id, tenant_id=tenant, recorded_at=AFTER,
-        provider_id="unit-slow", content="an answer that arrived late")
+        request_id=request.request_id, tenant_id=tenant,
+        correlation_id=request.correlation_id, recorded_at=AFTER,
+        adapter_id="unit-slow", payload="an answer that arrived late",
+        model_ref=MODEL)
 
 
-def _request(tenant, content="work that may or may not have happened"):
-    return EgressRequest.create(
-        request_id=uuid.uuid4(), tenant_id=tenant, submitted_at=NOW,
-        model_id="reference-model-a", purpose="reference-exchange", content=content)
+def _request(tenant, **kw):
+    return _make_request(tenant, **kw)
+
+
+def _leased_and_dispatched(worker, unit, tenant, holder="unit-that-crashed"):
+    """A request whose dispatch may already have happened.
+
+    Every test below that expects OUTCOME_UNKNOWN needs this: under the ratified
+    §4.3, an *undispatched* expiry returns the request to the queue instead, so a
+    test that only leased would now be exercising the other branch.
+    """
+
+    request = _request(tenant)
+    worker.submit(request)
+    unit.claim(tenant, holder=holder, now=NOW, lease=LEASE)
+    unit.mark_dispatched(tenant, request.request_id, at=NOW)
+    return request
 
 
 def test_an_expired_lease_becomes_terminal_outcome_unknown(worker_exchange,
                                                            unit_exchange, tenant):
-    request = _request(tenant)
-    worker_exchange.submit(request)
-    unit_exchange.claim(tenant, holder="unit-that-crashed", now=NOW, lease=LEASE)
+    request = _leased_and_dispatched(worker_exchange, unit_exchange, tenant)
 
     swept = ReconciliationScheduler(unit_exchange).sweep(tenant, now=AFTER)
 
@@ -60,7 +71,7 @@ def test_an_expired_lease_becomes_terminal_outcome_unknown(worker_exchange,
 
     result = worker_exchange.read_result(tenant, request.request_id)
     assert result["outcome"] is ResultOutcome.OUTCOME_UNKNOWN
-    assert result["content"] is None and result["content_sha256"] is None
+    assert result["payload"] is None and result["content_digest"] is None
     assert result["refusal_reason"] is None, (
         "an unknown outcome is not a refusal: nobody decided anything")
 
@@ -69,9 +80,7 @@ def test_an_unexpired_lease_is_left_alone(worker_exchange, unit_exchange, tenant
     """The positive control. Without it a sweep that expired everything would
     also satisfy the test above."""
 
-    request = _request(tenant)
-    worker_exchange.submit(request)
-    unit_exchange.claim(tenant, holder="unit-1", now=NOW, lease=LEASE)
+    request = _leased_and_dispatched(worker_exchange, unit_exchange, tenant, "unit-1")
 
     swept = ReconciliationScheduler(unit_exchange).sweep(
         tenant, now=NOW + timedelta(minutes=1))
@@ -89,9 +98,7 @@ def test_a_reconciled_request_is_never_returned_to_the_queue(worker_exchange,
     again — dispatching a second time an exchange that may already have happened.
     """
 
-    request = _request(tenant)
-    worker_exchange.submit(request)
-    unit_exchange.claim(tenant, holder="unit-that-crashed", now=NOW, lease=LEASE)
+    request = _leased_and_dispatched(worker_exchange, unit_exchange, tenant)
     ReconciliationScheduler(unit_exchange).sweep(tenant, now=AFTER)
 
     unit = EgressUnit(unit_exchange, DeterministicFakeProvider(), holder="unit-2")
@@ -108,13 +115,11 @@ def test_a_result_landing_before_the_sweep_is_not_overwritten(worker_exchange,
     rather than clobbered.
     """
 
-    request = _request(tenant)
-    worker_exchange.submit(request)
-    unit_exchange.claim(tenant, holder="unit-slow", now=NOW, lease=LEASE)
+    request = _leased_and_dispatched(worker_exchange, unit_exchange, tenant, "unit-slow")
 
     scheduler = ReconciliationScheduler(unit_exchange)
     expired = unit_exchange.expired_leases(tenant, now=AFTER)
-    assert [r for r, _ in expired] == [request.request_id]
+    assert [r for r, _, _ in expired] == [request.request_id]
 
     # The slow unit's answer arrives now, between the sweep's read and its write.
     # It already holds the lease, so it records directly rather than claiming
@@ -137,9 +142,7 @@ def test_the_sweep_reports_what_it_skipped(worker_exchange, unit_exchange, tenan
     write — the exact interleaving the ``expect_states`` guard exists for.
     """
 
-    request = _request(tenant)
-    worker_exchange.submit(request)
-    unit_exchange.claim(tenant, holder="unit-slow", now=NOW, lease=LEASE)
+    request = _leased_and_dispatched(worker_exchange, unit_exchange, tenant, "unit-slow")
 
     scheduler = ReconciliationScheduler(unit_exchange)
     real_expired = unit_exchange.expired_leases
@@ -171,9 +174,7 @@ def test_the_lease_window_is_half_open(worker_exchange, unit_exchange, tenant):
     path, so the sweep is a pure function of the instant it is handed.
     """
 
-    request = _request(tenant)
-    worker_exchange.submit(request)
-    unit_exchange.claim(tenant, holder="unit-1", now=NOW, lease=LEASE)
+    request = _leased_and_dispatched(worker_exchange, unit_exchange, tenant, "unit-1")
 
     scheduler = ReconciliationScheduler(unit_exchange)
     exactly_at_expiry = NOW + LEASE
@@ -187,9 +188,7 @@ def test_the_lease_window_is_half_open(worker_exchange, unit_exchange, tenant):
 def test_one_tenants_sweep_does_not_touch_anothers_leases(worker_exchange,
                                                           unit_exchange, tenant,
                                                           other_tenant):
-    request = _request(tenant)
-    worker_exchange.submit(request)
-    unit_exchange.claim(tenant, holder="unit-1", now=NOW, lease=LEASE)
+    request = _leased_and_dispatched(worker_exchange, unit_exchange, tenant, "unit-1")
 
     swept = ReconciliationScheduler(unit_exchange).sweep(other_tenant, now=AFTER)
 

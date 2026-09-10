@@ -1,28 +1,31 @@
-"""The exchange itself: submit, claim, record, acknowledge, purge.
+"""The exchange: submit, claim, dispatch, record, acknowledge, purge.
 
 Transaction boundaries, stated once
 -----------------------------------
 Every operation runs inside one transaction and sets the tenant identity with
-``SET LOCAL``. ``SET LOCAL`` — never plain ``SET`` — because a plain ``SET``
-outlives the transaction on a pooled connection, and the next borrower of that
-connection would inherit the previous caller's tenant identity. That is a
-cross-tenant read that no policy can catch, because as far as PostgreSQL is
-concerned the session really is that tenant. The transaction-scoped form makes
-the identity expire with the work it was established for.
+``SET LOCAL``. Never a plain ``SET``: that outlives the transaction on a pooled
+connection and the next borrower inherits the previous caller's tenant identity —
+a cross-tenant read no policy can catch, because the session really is that
+tenant. ``SET LOCAL`` is scoped to a *transaction* and not to a savepoint, so
+:meth:`Exchange.require_scopable` refuses a connection that arrives mid-transaction
+rather than degrading quietly.
 
 The application checks the tenant too, on every row it reads back. Row-level
-security is the boundary that holds when the application is wrong; the
-application check is the one that holds if a policy is ever dropped, disabled or
-mis-granted. Neither is redundant: they fail independently, which is the only
-reason to have two.
+security is the boundary that holds when the application is wrong; the application
+check holds if a policy is ever dropped, disabled or mis-granted. The ruling of
+2026-09-10 requires both, and they fail independently, which is the only reason to
+have two.
+
+Tenant identity is part of every operation, not a column beside them: it is in the
+primary key, in the claim predicate, in result correlation, in acknowledgement and
+in purging. There is no wildcard and no implicit tenant.
 
 Claiming is ``FOR UPDATE SKIP LOCKED``
 --------------------------------------
 Two units polling the same queue must not both claim one request. ``SKIP LOCKED``
-lets each take a different row instead of serializing behind the same one, and
-the lease it writes is what the reconciler later expires. A claim and its lease
-are written in the same transaction, so there is no window in which a row is
-claimed but unleased.
+lets each take a different row instead of serializing behind the same one. A claim
+and its lease are written in the same transaction, so there is no window in which a
+row is claimed but unleased.
 """
 
 from __future__ import annotations
@@ -34,6 +37,7 @@ from typing import Optional, Sequence
 from uuid import UUID
 
 from psycopg.pq import TransactionStatus
+from psycopg.types.json import Jsonb
 
 from ..errors import (
     ExchangeError,
@@ -43,11 +47,15 @@ from ..errors import (
     UnscopableConnection,
 )
 from ..records import (
+    AuthorizationBinding,
     EgressRequest,
     EgressResult,
+    MinimizedUnit,
+    ProvenanceKind,
     RefusalReason,
     RequestState,
     ResultOutcome,
+    purge_deadline,
 )
 from .schema import SCHEMA_NAME, TENANT_SETTING
 
@@ -58,6 +66,7 @@ __all__ = [
     "RequestNotClaimable",
     "ResultNotAcknowledgeable",
     "ClaimedRequest",
+    "PurgeSweep",
     "Exchange",
 ]
 
@@ -71,17 +80,37 @@ class ClaimedRequest:
     lease_expires_at: datetime
 
 
+@dataclass(frozen=True)
+class PurgeSweep:
+    """What one retention sweep destroyed, by artifact."""
+
+    requests: Sequence[UUID]
+    results: Sequence[UUID]
+
+    @property
+    def count(self) -> int:
+        return len(self.requests) + len(self.results)
+
+
 def _uuid(value) -> UUID:
     return value if isinstance(value, UUID) else UUID(str(value))
+
+
+def _units(raw) -> Optional[tuple]:
+    if raw is None:
+        return None
+    return tuple(
+        MinimizedUnit(unit_id=u["unit_id"], text=u["text"], token_count=u["token_count"])
+        for u in raw
+    )
 
 
 class Exchange:
     """Tenant-scoped access to the egress exchange.
 
     ``connect`` is a zero-argument callable returning a new psycopg connection —
-    injected rather than constructed here so a caller chooses the pool, and so
-    the worker and the unit can connect as different database roles against the
-    same exchange.
+    injected so a caller chooses the pool, and so the worker and the unit connect
+    as different database roles against the same exchange.
     """
 
     def __init__(self, connect) -> None:
@@ -91,12 +120,7 @@ class Exchange:
 
     @staticmethod
     def require_scopable(conn) -> None:
-        """Refuse a connection that is already inside a transaction.
-
-        See :class:`UnscopableConnection`. This is checked rather than documented
-        because the degradation is silent: everything keeps working, and the only
-        symptom is that a later caller reads another tenant's rows.
-        """
+        """Refuse a connection that is already inside a transaction."""
 
         status = conn.info.transaction_status
         if status != TransactionStatus.IDLE:
@@ -109,14 +133,6 @@ class Exchange:
             )
 
     def _scoped(self, conn, tenant_id: UUID) -> None:
-        """Establish tenant identity for the enclosing transaction only.
-
-        ``SET LOCAL`` reverts at commit or rollback — provided the enclosing
-        transaction is a real one. :meth:`require_scopable` is what guarantees
-        that; see the module docstring for why the unscoped form would be a
-        cross-tenant leak rather than a style preference.
-        """
-
         with conn.cursor() as cur:
             cur.execute(
                 f"SELECT set_config('{TENANT_SETTING}', %s, true)", (str(tenant_id),))
@@ -125,17 +141,18 @@ class Exchange:
         for row in rows:
             if _uuid(row[index]) != tenant_id:
                 raise TenantMismatch(
-                    f"row carries tenant {row[index]} while the caller scoped to "
-                    f"{tenant_id}. Row-level security should have made this "
-                    f"unreachable, so the transaction is abandoned rather than "
-                    f"trusted.")
+                    f"row carries a tenant the caller did not scope to "
+                    f"({RefusalReason.TENANT_SCOPE_REFUSED.value}). Row-level "
+                    f"security should have made this unreachable, so the transaction "
+                    f"is abandoned rather than trusted.")
 
     # -- worker side ----------------------------------------------------------
 
     def submit(self, request: EgressRequest) -> str:
-        """Record a pending request. Returns its request digest."""
+        """Record a pending authorized request. Returns its request digest."""
 
         digest = request.digest()
+        a = request.authorization
         with self._connect() as conn:
             self.require_scopable(conn)
             with conn.transaction():
@@ -143,67 +160,69 @@ class Exchange:
                 with conn.cursor() as cur:
                     cur.execute(
                         f"""INSERT INTO {SCHEMA_NAME}.egress_request
-                            (request_id, tenant_id, submitted_at, state, model_id,
-                             purpose, parameters, content, content_sha256,
-                             request_digest)
-                            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)""",
+                            (tenant_id, request_id, correlation_id,
+                             exchange_schema_version, submitted_at, not_valid_after,
+                             state, clearance_ref, clearance_digest,
+                             authorized_vendor, authorized_model, policy_id,
+                             reservation_id, parameters, minimized_context,
+                             content_digest, content_created_at, request_digest)
+                            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
                         (
-                            str(request.request_id),
-                            str(request.tenant_id),
-                            request.submitted_at,
-                            RequestState.PENDING.value,
-                            request.model_id,
-                            request.purpose,
-                            json.dumps(dict(request.parameters), sort_keys=True),
-                            request.content,
-                            request.content_sha256,
+                            str(request.tenant_id), str(request.request_id),
+                            str(request.correlation_id),
+                            request.exchange_schema_version, request.submitted_at,
+                            request.not_valid_after, RequestState.PENDING.value,
+                            a.clearance_ref, a.clearance_digest, a.authorized_vendor,
+                            a.authorized_model, a.policy_id, a.reservation_id,
+                            Jsonb(dict(request.parameters)),
+                            Jsonb([u.__dict__ for u in (request.minimized_context or [])]),
+                            request.content_digest,
+                            request.submitted_at,  # the context's own creation clock
                             digest,
                         ),
                     )
         return digest
 
     def read_result(self, tenant_id: UUID, request_id: UUID) -> Optional[dict]:
-        """The recorded result for a request, or ``None`` if there is not one yet."""
-
         with self._connect() as conn:
             self.require_scopable(conn)
             with conn.transaction():
                 self._scoped(conn, tenant_id)
                 with conn.cursor() as cur:
                     cur.execute(
-                        f"""SELECT request_id, tenant_id, recorded_at, outcome,
-                                   provider_id, refusal_reason, content,
-                                   content_sha256, response_digest,
-                                   acknowledged_at, content_purged_at
+                        f"""SELECT tenant_id, request_id, correlation_id, recorded_at,
+                                   trust, outcome, refusal_reason, adapter_id,
+                                   provenance_kind, genuine_call, provenance, payload,
+                                   content_digest, content_created_at,
+                                   content_purged_at, response_digest, acknowledged_at,
+                                   reservation_released
                             FROM {SCHEMA_NAME}.egress_result
-                            WHERE request_id = %s""",
-                        (str(request_id),),
+                            WHERE tenant_id = %s AND request_id = %s""",
+                        (str(tenant_id), str(request_id)),
                     )
                     rows = cur.fetchall()
         if not rows:
             return None
-        self._check_tenant(rows, 1, tenant_id)
-        row = rows[0]
+        self._check_tenant(rows, 0, tenant_id)
+        r = rows[0]
         return {
-            "request_id": _uuid(row[0]),
-            "tenant_id": _uuid(row[1]),
-            "recorded_at": row[2],
-            "outcome": ResultOutcome(row[3]),
-            "provider_id": row[4],
-            "refusal_reason": RefusalReason(row[5]) if row[5] else None,
-            "content": row[6],
-            "content_sha256": row[7],
-            "response_digest": row[8],
-            "acknowledged_at": row[9],
-            "content_purged_at": row[10],
+            "tenant_id": _uuid(r[0]), "request_id": _uuid(r[1]),
+            "correlation_id": _uuid(r[2]), "recorded_at": r[3], "trust": r[4],
+            "outcome": ResultOutcome(r[5]),
+            "refusal_reason": RefusalReason(r[6]) if r[6] else None,
+            "adapter_id": r[7], "provenance_kind": ProvenanceKind(r[8]),
+            "genuine_call": r[9], "provenance": r[10], "payload": r[11],
+            "content_digest": r[12], "content_created_at": r[13],
+            "content_purged_at": r[14], "response_digest": r[15],
+            "acknowledged_at": r[16], "reservation_released": r[17],
         }
 
     def acknowledge(self, tenant_id: UUID, request_id: UUID, *, at: datetime) -> None:
-        """Record that the requester has read the result.
+        """Record that the requester has durably consumed the result.
 
-        Purge is gated on this. Without it, a sweep would be free to destroy an
-        answer before anybody had seen it — and the tombstone would be indis-
-        tinguishable from one left after a normal read.
+        Starts the one-hour grace. It does not *grant* retention: the 24-hour hard
+        deadline is unconditional, so a worker that never acknowledges only loses
+        the earlier purge it would have had.
         """
 
         with self._connect() as conn:
@@ -214,32 +233,23 @@ class Exchange:
                     cur.execute(
                         f"""UPDATE {SCHEMA_NAME}.egress_result
                             SET acknowledged_at = %s
-                            WHERE request_id = %s AND acknowledged_at IS NULL
+                            WHERE tenant_id = %s AND request_id = %s
+                              AND acknowledged_at IS NULL
                             RETURNING tenant_id""",
-                        (at, str(request_id)),
+                        (at, str(tenant_id), str(request_id)),
                     )
                     rows = cur.fetchall()
                     if not rows:
                         raise ResultNotAcknowledgeable(
-                            f"no unacknowledged result for {request_id}: it is "
-                            f"either absent or already acknowledged")
+                            f"no unacknowledged result for {request_id}: it is either "
+                            f"absent, another tenant's, or already acknowledged")
                     self._check_tenant(rows, 0, tenant_id)
 
     # -- unit side ------------------------------------------------------------
 
-    def claim(
-        self,
-        tenant_id: UUID,
-        *,
-        holder: str,
-        now: datetime,
-        lease: timedelta,
-    ) -> Optional[ClaimedRequest]:
-        """Take a lease on the oldest pending request, or ``None`` if there is none.
-
-        ``FOR UPDATE SKIP LOCKED`` so concurrent units take different rows rather
-        than queueing behind one another.
-        """
+    def claim(self, tenant_id: UUID, *, holder: str, now: datetime,
+              lease: timedelta) -> Optional[ClaimedRequest]:
+        """Take a lease on the oldest claimable request for this tenant."""
 
         expires_at = now + lease
         with self._connect() as conn:
@@ -250,52 +260,80 @@ class Exchange:
                     cur.execute(
                         f"""UPDATE {SCHEMA_NAME}.egress_request AS r
                             SET state = %s, lease_holder = %s, lease_expires_at = %s
-                            WHERE r.request_id = (
-                                SELECT request_id FROM {SCHEMA_NAME}.egress_request
+                            WHERE (r.tenant_id, r.request_id) = (
+                                SELECT tenant_id, request_id
+                                FROM {SCHEMA_NAME}.egress_request
                                 WHERE state = %s
                                 ORDER BY submitted_at
                                 FOR UPDATE SKIP LOCKED
                                 LIMIT 1)
-                            RETURNING r.request_id, r.tenant_id, r.submitted_at,
-                                      r.model_id, r.purpose, r.parameters, r.content,
-                                      r.content_sha256""",
-                        (
-                            RequestState.LEASED.value,
-                            holder,
-                            expires_at,
-                            RequestState.PENDING.value,
-                        ),
+                            RETURNING r.tenant_id, r.request_id, r.correlation_id,
+                                      r.submitted_at, r.not_valid_after,
+                                      r.clearance_ref, r.clearance_digest,
+                                      r.authorized_vendor, r.authorized_model,
+                                      r.policy_id, r.reservation_id, r.parameters,
+                                      r.minimized_context, r.content_digest,
+                                      r.exchange_schema_version""",
+                        (RequestState.LEASED.value, holder, expires_at,
+                         RequestState.PENDING.value),
                     )
                     rows = cur.fetchall()
         if not rows:
             return None
-        self._check_tenant(rows, 1, tenant_id)
-        row = rows[0]
+        self._check_tenant(rows, 0, tenant_id)
+        r = rows[0]
         return ClaimedRequest(
             request=EgressRequest(
-                request_id=_uuid(row[0]),
-                tenant_id=_uuid(row[1]),
-                submitted_at=row[2],
-                model_id=row[3],
-                purpose=row[4],
-                content=row[6],
-                content_sha256=row[7],
-                parameters=row[5] or {},
+                request_id=_uuid(r[1]), tenant_id=_uuid(r[0]),
+                correlation_id=_uuid(r[2]), submitted_at=r[3], not_valid_after=r[4],
+                authorization=AuthorizationBinding(
+                    clearance_ref=r[5], clearance_digest=r[6],
+                    tenant_id=_uuid(r[0]), authorized_vendor=r[7],
+                    authorized_model=r[8], policy_id=r[9], reservation_id=r[10]),
+                minimized_context=_units(r[12]), content_digest=r[13],
+                parameters=r[11] or {}, exchange_schema_version=r[14],
             ),
-            lease_holder=holder,
-            lease_expires_at=expires_at,
+            lease_holder=holder, lease_expires_at=expires_at,
         )
 
-    def record_result(
-        self,
-        result: EgressResult,
-        *,
-        expect_states: Sequence[RequestState] = (RequestState.LEASED,),
-    ) -> str:
+    def mark_dispatched(self, tenant_id: UUID, request_id: UUID, *,
+                        at: datetime) -> None:
+        """Record that dispatch may have occurred, before it is attempted.
+
+        Written *before* the call, not after: a crash between the write and the
+        call must leave the row looking dispatched. The whole point of §3.5 is
+        that after this instant nobody may assume the call did not happen, and a
+        marker written afterwards would be missing in exactly the case it exists
+        for.
+        """
+
+        with self._connect() as conn:
+            self.require_scopable(conn)
+            with conn.transaction():
+                self._scoped(conn, tenant_id)
+                with conn.cursor() as cur:
+                    cur.execute(
+                        f"""UPDATE {SCHEMA_NAME}.egress_request
+                            SET dispatched_at = COALESCE(dispatched_at, %s)
+                            WHERE tenant_id = %s AND request_id = %s AND state = %s
+                            RETURNING tenant_id""",
+                        (at, str(tenant_id), str(request_id),
+                         RequestState.LEASED.value),
+                    )
+                    rows = cur.fetchall()
+                    if not rows:
+                        raise RequestNotClaimable(
+                            f"request {request_id} is not leased, so dispatch cannot "
+                            f"be recorded against it")
+                    self._check_tenant(rows, 0, tenant_id)
+
+    def record_result(self, result: EgressResult, *,
+                      expect_states: Sequence[RequestState] = (RequestState.LEASED,)
+                      ) -> str:
         """Write the result and move the request to its terminal state.
 
         Both halves in one transaction: a result without a terminal request would
-        leave a row the reconciler would later expire into ``OUTCOME_UNKNOWN``,
+        leave a row the reconciler later expires into ``OUTCOME_UNKNOWN``,
         overwriting an outcome that was in fact known.
         """
 
@@ -303,6 +341,7 @@ class Exchange:
         terminal = {
             ResultOutcome.ANSWERED: RequestState.COMPLETED,
             ResultOutcome.REFUSED: RequestState.REFUSED,
+            ResultOutcome.FAILED: RequestState.FAILED,
             ResultOutcome.OUTCOME_UNKNOWN: RequestState.OUTCOME_UNKNOWN,
         }[result.outcome]
 
@@ -315,56 +354,111 @@ class Exchange:
                         f"""UPDATE {SCHEMA_NAME}.egress_request
                             SET state = %s, terminal_at = %s,
                                 lease_holder = NULL, lease_expires_at = NULL
-                            WHERE request_id = %s AND state = ANY(%s)
+                            WHERE tenant_id = %s AND request_id = %s
+                              AND state = ANY(%s)
                             RETURNING tenant_id""",
-                        (
-                            terminal.value,
-                            result.recorded_at,
-                            str(result.request_id),
-                            [s.value for s in expect_states],
-                        ),
+                        (terminal.value, result.recorded_at, str(result.tenant_id),
+                         str(result.request_id), [s.value for s in expect_states]),
                     )
                     rows = cur.fetchall()
                     if not rows:
                         raise RequestNotClaimable(
                             f"request {result.request_id} is not in "
-                            f"{[s.value for s in expect_states]}, so a result "
-                            f"cannot be recorded against it")
+                            f"{[s.value for s in expect_states]}, so a result cannot "
+                            f"be recorded against it")
                     self._check_tenant(rows, 0, result.tenant_id)
 
                     cur.execute(
                         f"""INSERT INTO {SCHEMA_NAME}.egress_result
-                            (request_id, tenant_id, recorded_at, outcome, provider_id,
-                             refusal_reason, content, content_sha256, response_digest)
-                            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)""",
+                            (tenant_id, request_id, correlation_id, recorded_at, trust,
+                             outcome, refusal_reason, adapter_id, provenance_kind,
+                             genuine_call, provenance, payload, content_digest,
+                             content_created_at, response_digest)
+                            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
                         (
-                            str(result.request_id),
-                            str(result.tenant_id),
-                            result.recorded_at,
-                            result.outcome.value,
-                            result.provider_id,
+                            str(result.tenant_id), str(result.request_id),
+                            str(result.correlation_id), result.recorded_at,
+                            result.trust, result.outcome.value,
                             result.refusal_reason.value if result.refusal_reason else None,
-                            result.content,
-                            result.content_sha256,
+                            result.adapter_id, result.provenance_kind.value,
+                            bool(result.provenance.get("genuine_call")),
+                            Jsonb(dict(result.provenance)), result.payload,
+                            result.content_digest,
+                            result.recorded_at,  # the payload's own creation clock
                             digest,
                         ),
                     )
         return digest
 
-    # -- purge ----------------------------------------------------------------
+    # -- retention ------------------------------------------------------------
 
-    def purge_content(self, tenant_id: UUID, request_id: UUID, *, at: datetime) -> bool:
-        """Destroy the content on both sides, leaving a digest-only tombstone.
+    def purge_due(self, tenant_id: UUID, *, now: datetime) -> PurgeSweep:
+        """Destroy every artifact whose retention deadline has passed.
 
-        Refuses unless the result has been acknowledged: purging an answer nobody
-        read destroys it rather than retiring it.
+        Two independent clocks per artifact, earlier wins: one hour after the
+        worker's durable acknowledgement, and 24 hours after **that artifact's own**
+        creation. The request context and the response are governed separately, so
+        a consumed response is purged on its own schedule rather than waiting on
+        the exchange as a unit.
 
-        What survives is deliberate. ``content_sha256`` and the request and
-        response digests stay, so the row can still answer "was it this?" for a
-        reader holding a candidate — and cannot answer "what was it?" for anyone.
-        Every other field survives too, which is what keeps the request digest
-        recomputable from the tombstone: a purge that removed a digested field
-        would leave a digest nobody could check.
+        The hard deadline is unconditional and evaluated in SQL rather than by a
+        caller passing a cutoff: absence of an acknowledgement never extends
+        content past 24 hours, which is exactly the case a caller-supplied cutoff
+        would be most likely to get wrong.
+        """
+
+        grace = "INTERVAL '1 hour'"
+        hard = "INTERVAL '24 hours'"
+        with self._connect() as conn:
+            self.require_scopable(conn)
+            with conn.transaction():
+                self._scoped(conn, tenant_id)
+                with conn.cursor() as cur:
+                    cur.execute(
+                        f"""UPDATE {SCHEMA_NAME}.egress_result AS t
+                            SET payload = NULL, content_purged_at = %s
+                            WHERE t.tenant_id = %s AND t.content_purged_at IS NULL
+                              AND LEAST(
+                                    COALESCE(t.acknowledged_at + {grace}, 'infinity'),
+                                    t.content_created_at + {hard}) <= %s
+                            RETURNING t.tenant_id, t.request_id""",
+                        (now, str(tenant_id), now),
+                    )
+                    result_rows = cur.fetchall()
+                    self._check_tenant(result_rows, 0, tenant_id)
+
+                    cur.execute(
+                        f"""UPDATE {SCHEMA_NAME}.egress_request AS q
+                            SET minimized_context = NULL, content_purged_at = %s
+                            WHERE q.tenant_id = %s AND q.content_purged_at IS NULL
+                              AND LEAST(
+                                    COALESCE(
+                                        (SELECT s.acknowledged_at + {grace}
+                                         FROM {SCHEMA_NAME}.egress_result s
+                                         WHERE s.tenant_id = q.tenant_id
+                                           AND s.request_id = q.request_id),
+                                        'infinity'),
+                                    q.content_created_at + {hard}) <= %s
+                            RETURNING q.tenant_id, q.request_id""",
+                        (now, str(tenant_id), now),
+                    )
+                    request_rows = cur.fetchall()
+                    self._check_tenant(request_rows, 0, tenant_id)
+
+        return PurgeSweep(
+            requests=[_uuid(r[1]) for r in request_rows],
+            results=[_uuid(r[1]) for r in result_rows],
+        )
+
+    def tombstone(self, tenant_id: UUID, request_id: UUID) -> Optional[dict]:
+        """Everything that survives a purge, and nothing that does not.
+
+        The approved retention set: identities, digests, terminal outcome,
+        acknowledgement and purge times, correlation identifier, clearance
+        reference, reservation identity, vendor/model binding, and non-content
+        attempt provenance. Content is absent by construction — this method
+        selects no column that could carry it, so a tombstone cannot leak one by
+        a caller forgetting to strip it.
         """
 
         with self._connect() as conn:
@@ -373,28 +467,47 @@ class Exchange:
                 self._scoped(conn, tenant_id)
                 with conn.cursor() as cur:
                     cur.execute(
-                        f"""UPDATE {SCHEMA_NAME}.egress_result
-                            SET content = NULL, content_purged_at = %s
-                            WHERE request_id = %s
-                              AND acknowledged_at IS NOT NULL
-                              AND content_purged_at IS NULL
-                            RETURNING tenant_id""",
-                        (at, str(request_id)),
+                        f"""SELECT q.tenant_id, q.request_id, q.correlation_id,
+                                   q.exchange_schema_version, q.state,
+                                   q.clearance_ref, q.clearance_digest,
+                                   q.authorized_vendor, q.authorized_model,
+                                   q.policy_id, q.reservation_id,
+                                   q.content_digest, q.request_digest,
+                                   q.submitted_at, q.terminal_at,
+                                   q.content_purged_at, q.dispatched_at,
+                                   s.outcome, s.response_digest, s.content_digest,
+                                   s.provenance_kind, s.provenance, s.genuine_call,
+                                   s.acknowledged_at, s.content_purged_at,
+                                   s.reservation_released
+                            FROM {SCHEMA_NAME}.egress_request q
+                            LEFT JOIN {SCHEMA_NAME}.egress_result s
+                              ON s.tenant_id = q.tenant_id
+                             AND s.request_id = q.request_id
+                            WHERE q.tenant_id = %s AND q.request_id = %s""",
+                        (str(tenant_id), str(request_id)),
                     )
                     rows = cur.fetchall()
-                    if not rows:
-                        return False
-                    self._check_tenant(rows, 0, tenant_id)
-
-                    cur.execute(
-                        f"""UPDATE {SCHEMA_NAME}.egress_request
-                            SET content = NULL, content_purged_at = %s
-                            WHERE request_id = %s AND content_purged_at IS NULL
-                            RETURNING tenant_id""",
-                        (at, str(request_id)),
-                    )
-                    self._check_tenant(cur.fetchall(), 0, tenant_id)
-        return True
+        if not rows:
+            return None
+        self._check_tenant(rows, 0, tenant_id)
+        r = rows[0]
+        return {
+            "tenant_id": _uuid(r[0]), "request_id": _uuid(r[1]),
+            "correlation_id": _uuid(r[2]), "exchange_schema_version": r[3],
+            "state": RequestState(r[4]),
+            "clearance_ref": r[5], "clearance_digest": r[6],
+            "authorized_vendor": r[7], "authorized_model": r[8],
+            "policy_id": r[9], "reservation_id": r[10],
+            "request_content_digest": r[11], "request_digest": r[12],
+            "submitted_at": r[13], "terminal_at": r[14],
+            "request_content_purged_at": r[15], "dispatched_at": r[16],
+            "outcome": ResultOutcome(r[17]) if r[17] else None,
+            "response_digest": r[18], "response_content_digest": r[19],
+            "provenance_kind": ProvenanceKind(r[20]) if r[20] else None,
+            "provenance": r[21], "genuine_call": r[22],
+            "acknowledged_at": r[23], "response_content_purged_at": r[24],
+            "reservation_released": r[25],
+        }
 
     # -- reads used by the reconciler and the tests ---------------------------
 
@@ -405,37 +518,43 @@ class Exchange:
                 self._scoped(conn, tenant_id)
                 with conn.cursor() as cur:
                     cur.execute(
-                        f"""SELECT request_id, tenant_id, submitted_at, state, model_id,
-                                   purpose, parameters, content, content_sha256,
+                        f"""SELECT tenant_id, request_id, correlation_id, submitted_at,
+                                   not_valid_after, state, authorized_vendor,
+                                   authorized_model, clearance_ref, clearance_digest,
+                                   policy_id, reservation_id, parameters,
+                                   minimized_context, content_digest,
+                                   content_created_at, content_purged_at,
                                    request_digest, lease_holder, lease_expires_at,
-                                   terminal_at, content_purged_at
-                            FROM {SCHEMA_NAME}.egress_request WHERE request_id = %s""",
-                        (str(request_id),),
+                                   dispatched_at, terminal_at, exchange_schema_version
+                            FROM {SCHEMA_NAME}.egress_request
+                            WHERE tenant_id = %s AND request_id = %s""",
+                        (str(tenant_id), str(request_id)),
                     )
                     rows = cur.fetchall()
         if not rows:
             return None
-        self._check_tenant(rows, 1, tenant_id)
-        row = rows[0]
+        self._check_tenant(rows, 0, tenant_id)
+        r = rows[0]
         return {
-            "request_id": _uuid(row[0]),
-            "tenant_id": _uuid(row[1]),
-            "submitted_at": row[2],
-            "state": RequestState(row[3]),
-            "model_id": row[4],
-            "purpose": row[5],
-            "parameters": row[6] or {},
-            "content": row[7],
-            "content_sha256": row[8],
-            "request_digest": row[9],
-            "lease_holder": row[10],
-            "lease_expires_at": row[11],
-            "terminal_at": row[12],
-            "content_purged_at": row[13],
+            "tenant_id": _uuid(r[0]), "request_id": _uuid(r[1]),
+            "correlation_id": _uuid(r[2]), "submitted_at": r[3],
+            "not_valid_after": r[4], "state": RequestState(r[5]),
+            "authorized_vendor": r[6], "authorized_model": r[7],
+            "clearance_ref": r[8], "clearance_digest": r[9], "policy_id": r[10],
+            "reservation_id": r[11], "parameters": r[12] or {},
+            "minimized_context": _units(r[13]), "content_digest": r[14],
+            "content_created_at": r[15], "content_purged_at": r[16],
+            "request_digest": r[17], "lease_holder": r[18],
+            "lease_expires_at": r[19], "dispatched_at": r[20], "terminal_at": r[21],
+            "exchange_schema_version": r[22],
         }
 
     def expired_leases(self, tenant_id: UUID, *, now: datetime) -> list:
-        """Requests whose lease has run out. The reconciler's input."""
+        """Expired leases, and whether dispatch may already have occurred.
+
+        The distinction is the whole of §4.3: before dispatch an expiry may return
+        the request to the queue, after possible dispatch it may not.
+        """
 
         with self._connect() as conn:
             self.require_scopable(conn)
@@ -443,12 +562,43 @@ class Exchange:
                 self._scoped(conn, tenant_id)
                 with conn.cursor() as cur:
                     cur.execute(
-                        f"""SELECT request_id, tenant_id, lease_holder
+                        f"""SELECT tenant_id, request_id, lease_holder, dispatched_at
                             FROM {SCHEMA_NAME}.egress_request
-                            WHERE state = %s AND lease_expires_at <= %s
+                            WHERE tenant_id = %s AND state = %s
+                              AND lease_expires_at <= %s
                             ORDER BY lease_expires_at""",
-                        (RequestState.LEASED.value, now),
+                        (str(tenant_id), RequestState.LEASED.value, now),
                     )
                     rows = cur.fetchall()
-        self._check_tenant(rows, 1, tenant_id)
-        return [(_uuid(r[0]), r[2]) for r in rows]
+        self._check_tenant(rows, 0, tenant_id)
+        return [(_uuid(r[1]), r[2], r[3]) for r in rows]
+
+    def release_undispatched_lease(self, tenant_id: UUID, request_id: UUID) -> bool:
+        """Return an undispatched expired request to the queue.
+
+        Guarded by ``dispatched_at IS NULL`` **in the UPDATE itself**, not by a
+        prior read: if a dispatch marker lands between a reconciler's read and its
+        write, this must not undo it. A request that may have been dispatched is
+        never made claimable again.
+        """
+
+        with self._connect() as conn:
+            self.require_scopable(conn)
+            with conn.transaction():
+                self._scoped(conn, tenant_id)
+                with conn.cursor() as cur:
+                    cur.execute(
+                        f"""UPDATE {SCHEMA_NAME}.egress_request
+                            SET state = %s, lease_holder = NULL,
+                                lease_expires_at = NULL
+                            WHERE tenant_id = %s AND request_id = %s
+                              AND state = %s AND dispatched_at IS NULL
+                            RETURNING tenant_id""",
+                        (RequestState.PENDING.value, str(tenant_id), str(request_id),
+                         RequestState.LEASED.value),
+                    )
+                    rows = cur.fetchall()
+                    if not rows:
+                        return False
+                    self._check_tenant(rows, 0, tenant_id)
+        return True

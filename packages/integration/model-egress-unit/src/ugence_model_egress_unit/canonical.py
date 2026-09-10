@@ -67,6 +67,8 @@ __all__ = [
     "canonical_bytes",
     "canonical_digest",
     "content_digest",
+    "minimized_context_digest",
+    "payload_digest",
 ]
 
 #: The rule-set version bound into every digest. Changing any rule in this
@@ -192,3 +194,45 @@ def content_digest(content: str) -> str:
         ensure_ascii=False,
     ).encode("utf-8")
     return hashlib.sha256(framed).hexdigest()
+
+
+def minimized_context_digest(units) -> str:
+    """Digest over the **ordered** minimized units: identifier and exact text.
+
+    D-4 binds "the ordered minimized unit identifiers and their exact text". Order
+    is part of the value, not a presentation detail — the same units in a
+    different order are a different prompt, so they must be a different digest.
+    The encoder never reorders.
+
+    ``token_count`` is deliberately **outside** this digest. It is metering that
+    survives a purge, and a declared count that disagreed with the text would
+    otherwise make the content unverifiable for a reason that has nothing to do
+    with the content.
+
+    This is the value the request digest binds, and the value that lets a purged
+    request still be checked against a candidate context.
+    """
+
+    entries = [[u.unit_id, u.text] for u in units]
+    framed = json.dumps(
+        {
+            "canonicalization": MEU_CANONICALIZATION_VERSION,
+            "domain": EXCHANGE_CONTENT_DIGEST_DOMAIN,
+            "type": "MinimizedContext",
+            "units": _to_canonical_obj(entries, "$.units"),
+        },
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=False,
+    ).encode("utf-8")
+    return hashlib.sha256(framed).hexdigest()
+
+
+def payload_digest(payload: str) -> str:
+    """Digest of one provider payload. Domain-separated from the context digest.
+
+    A payload digest can never be presented as a context digest, so a response
+    cannot be substituted for the prompt that produced it.
+    """
+
+    return content_digest(payload)

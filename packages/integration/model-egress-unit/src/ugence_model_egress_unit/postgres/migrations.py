@@ -3,24 +3,31 @@
 What "deterministic" buys, and why not Alembic
 ----------------------------------------------
 Alembic orders by a ``down_revision`` chain and identifies a migration by a hash
-somebody typed. That is fine, and it is not what this exchange needs. Here a
-migration is identified by **the digest of its own text**, the list is a Python
-tuple in apply order, and :func:`migrate` refuses to proceed if a migration that
-was already applied no longer hashes to what was recorded.
+somebody typed. Here a migration is identified by **the digest of its own text**,
+the list is a Python tuple in apply order, and :func:`migrate` refuses to proceed
+if a migration that was already applied no longer hashes to what was recorded.
 
 That last property is the one worth having. Editing an already-applied migration
 is the classic way a schema silently diverges between two deployments: the file
 says one thing, the database contains another, and nothing notices until a
 constraint that "exists" turns out not to. Pinning the digest turns that from a
-latent divergence into a refusal at startup, naming the migration that changed.
+latent divergence into a refusal at startup, naming the migration.
 
 Applying is all-or-nothing. PostgreSQL has transactional DDL, so every pending
-migration and the ledger rows recording them commit together or not at all. A
-crash halfway through leaves the database on the last fully-applied version, not
-in a state no migration describes.
+migration and the ledger rows recording them commit together or not at all.
 
-The ledger is created outside the exchange schema's ownership dance because it
-has to exist before the owner role does.
+**Migration is never startup.** ``migrate`` is not called at import and no runtime
+composes it: the ruling of 2026-09-10 forbids role creation, grants and migration
+authority during worker or MEU startup, because a service that provisions its own
+privileges on boot holds, for one moment on every deploy, exactly the authority
+the boundary denies it. A separately controlled migration identity assumes the
+non-login owner role during reviewed migrations only.
+
+**Provisioning and credential custody are unimplemented production prerequisites**
+`[G]`, recorded as such rather than substituted by a runbook claim. This module
+creates the roles a *test* cluster needs; it does not issue credentials, and the
+runtime roles are created without ``LOGIN`` precisely so that nothing here can be
+mistaken for having provisioned a usable identity.
 """
 
 from __future__ import annotations
@@ -48,13 +55,7 @@ class Migration:
 
 
 def migration_digest(sql: str) -> str:
-    """SHA-256 over the migration's exact text.
-
-    Domain-separated so a migration digest cannot be presented as an exchange
-    digest, and computed over the text verbatim — including whitespace, because
-    a reformatted migration *is* a different migration as far as "did this file
-    change since we ran it" is concerned.
-    """
+    """SHA-256 over the migration's exact text, domain-separated."""
 
     framed = b"ugence.model-egress-unit/migration/v1\x00" + sql.encode("utf-8")
     return hashlib.sha256(framed).hexdigest()
@@ -75,6 +76,10 @@ CREATE TABLE IF NOT EXISTS public.meu_schema_version (
 _0001 = f"""
 -- Roles. Created idempotently: a shared cluster may already carry them, and a
 -- migration that fell over on CREATE ROLE would be un-rerunnable.
+--
+-- None of the three has LOGIN. Credential custody is an unimplemented production
+-- prerequisite, and a role with a password here would be a credential this
+-- repository had provisioned without any custody for it.
 DO $$
 BEGIN
     IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = '{OWNER_ROLE}') THEN
@@ -101,77 +106,130 @@ CREATE SCHEMA IF NOT EXISTS {SCHEMA_NAME} AUTHORIZATION {OWNER_ROLE};
 -- else: tables created inside it still belong to whoever ran the statement. Left
 -- that way the migrating role — typically a superuser — would own the tables,
 -- FORCE ROW LEVEL SECURITY would be binding a role nobody uses, and the "the
--- owner cannot log in" property would be a claim about an empty schema. The
--- package's RLS tests assert the ownership directly for this reason.
+-- owner cannot log in" property would be a claim about an empty schema.
 SET ROLE {OWNER_ROLE};
 
--- One request for a model exchange.
+-- One authorized request for a model exchange.
 --
--- ``content`` and ``canonical_request`` are nullable because a purge destroys
--- them; the digests beside them are NOT NULL and survive, which is what makes a
+-- The primary key is (tenant_id, request_id), not request_id alone. Tenant
+-- identity participates in request identity and uniqueness, so two tenants'
+-- requests can never collapse into one row and the dedup key is tenant-scoped by
+-- construction rather than by every query remembering to say so.
+--
+-- ``minimized_context`` is a purgeable artifact with its own creation clock;
+-- ``content_digest`` beside it is NOT NULL and survives, which is what makes a
 -- purged row a tombstone rather than a hole.
 CREATE TABLE IF NOT EXISTS {SCHEMA_NAME}.egress_request (
-    request_id        uuid PRIMARY KEY,
     tenant_id         uuid NOT NULL,
+    request_id        uuid NOT NULL,
+    correlation_id    uuid NOT NULL,
+    exchange_schema_version text NOT NULL,
     submitted_at      timestamptz NOT NULL,
+    not_valid_after   timestamptz NOT NULL,
     state             text NOT NULL,
-    model_id          text NOT NULL,
-    purpose           text NOT NULL,
+
+    -- The authorization binding. Verified by the MEU, never decided by it.
+    clearance_ref     text NOT NULL,
+    clearance_digest  char(64) NOT NULL,
+    authorized_vendor text NOT NULL,
+    authorized_model  text NOT NULL,
+    policy_id         text NOT NULL,
+    reservation_id    text NOT NULL,
+
     parameters        jsonb NOT NULL,
-    content           text,
-    content_sha256    char(64) NOT NULL,
+
+    -- Content artifact, independently retained.
+    minimized_context jsonb,
+    content_digest    char(64) NOT NULL,
+    content_created_at timestamptz NOT NULL,
+    content_purged_at timestamptz,
+
     request_digest    char(64) NOT NULL,
+
+    -- Mutable, and excluded from the request digest for that reason.
     lease_holder      text,
     lease_expires_at  timestamptz,
     dispatched_at     timestamptz,
     terminal_at       timestamptz,
-    content_purged_at timestamptz,
+
+    PRIMARY KEY (tenant_id, request_id),
+    CONSTRAINT egress_request_tenant_not_empty CHECK (tenant_id IS NOT NULL),
     CONSTRAINT egress_request_state_known CHECK (
-        state IN ('PENDING', 'LEASED', 'COMPLETED', 'REFUSED', 'OUTCOME_UNKNOWN')),
+        state IN ('PENDING', 'LEASED', 'COMPLETED', 'REFUSED', 'FAILED',
+                  'OUTCOME_UNKNOWN')),
     -- A leased request has a lease; an unleased one does not. Without this a
-    -- crashed claim could leave a row that is LEASED forever with nothing for
-    -- the reconciler to expire.
+    -- crashed claim could leave a row LEASED forever with nothing to expire.
     CONSTRAINT egress_request_lease_iff_leased CHECK (
         (state = 'LEASED') = (lease_holder IS NOT NULL AND lease_expires_at IS NOT NULL)),
     CONSTRAINT egress_request_terminal_at_iff_terminal CHECK (
-        (state IN ('COMPLETED', 'REFUSED', 'OUTCOME_UNKNOWN')) = (terminal_at IS NOT NULL)),
+        (state IN ('COMPLETED', 'REFUSED', 'FAILED', 'OUTCOME_UNKNOWN'))
+        = (terminal_at IS NOT NULL)),
     -- Purge destroys content and records when. One without the other would be
     -- either an unrecorded destruction or a claim of one that did not happen.
     CONSTRAINT egress_request_purged_has_no_content CHECK (
-        (content_purged_at IS NULL) OR (content IS NULL))
+        (content_purged_at IS NULL) OR (minimized_context IS NULL))
 );
 
--- What came back, or what could not be determined. One result per request: the
--- primary key is the request id, so a second write for the same request is a
--- key violation rather than a silent second answer.
+-- What came back, or what could not be determined. One result per request within
+-- a tenant, so a second write is a key violation rather than a silent second
+-- answer.
 CREATE TABLE IF NOT EXISTS {SCHEMA_NAME}.egress_result (
-    request_id        uuid PRIMARY KEY
-                      REFERENCES {SCHEMA_NAME}.egress_request (request_id),
     tenant_id         uuid NOT NULL,
+    request_id        uuid NOT NULL,
+    correlation_id    uuid NOT NULL,
     recorded_at       timestamptz NOT NULL,
+    trust             text NOT NULL,
     outcome           text NOT NULL,
-    provider_id       text NOT NULL,
     refusal_reason    text,
-    content           text,
-    content_sha256    char(64),
+
+    -- Provenance survives every purge: it is what keeps a purged
+    -- OUTCOME_UNKNOWN reconcilable, and what names the adapter and whether the
+    -- call was genuine.
+    adapter_id        text NOT NULL,
+    provenance_kind   text NOT NULL,
+    genuine_call      boolean NOT NULL,
+    provenance        jsonb NOT NULL,
+
+    -- Content artifact, independently retained on its own clock.
+    payload           text,
+    content_digest    char(64),
+    content_created_at timestamptz NOT NULL,
+    content_purged_at timestamptz,
+
     response_digest   char(64) NOT NULL,
     acknowledged_at   timestamptz,
-    content_purged_at timestamptz,
+
+    -- The vendor allocation D-5 reserved. Neither lease expiry nor content
+    -- purging releases it, and the CHECK makes "released" unrepresentable rather
+    -- than merely unwritten: purging the content does not purge the obligation.
+    reservation_released boolean NOT NULL DEFAULT false,
+
+    PRIMARY KEY (tenant_id, request_id),
+    FOREIGN KEY (tenant_id, request_id)
+        REFERENCES {SCHEMA_NAME}.egress_request (tenant_id, request_id),
+    CONSTRAINT egress_result_trust_is_constant CHECK (trust = 'UNTRUSTED_EVIDENCE'),
     CONSTRAINT egress_result_outcome_known CHECK (
-        outcome IN ('ANSWERED', 'REFUSED', 'OUTCOME_UNKNOWN')),
-    -- A refusal names its reason and carries nothing else; anything else carries
-    -- no reason. An unexplained refusal cannot be acted on by the requester.
+        outcome IN ('ANSWERED', 'REFUSED', 'FAILED', 'OUTCOME_UNKNOWN')),
+    CONSTRAINT egress_result_provenance_kind_known CHECK (
+        provenance_kind IN ('RESPONSE', 'DISPATCH_ATTEMPT')),
+    -- An ambiguous dispatch writes a distinct record type, never a response
+    -- record with empty fields.
+    CONSTRAINT egress_result_unknown_is_a_dispatch_attempt CHECK (
+        (outcome = 'OUTCOME_UNKNOWN') = (provenance_kind = 'DISPATCH_ATTEMPT')),
+    -- This distribution makes no genuine provider call, and no row may claim one.
+    CONSTRAINT egress_result_no_genuine_call CHECK (genuine_call = false),
+    CONSTRAINT egress_result_reservation_never_released CHECK (
+        reservation_released = false),
     CONSTRAINT egress_result_reason_iff_refused CHECK (
         (outcome = 'REFUSED') = (refusal_reason IS NOT NULL)),
-    CONSTRAINT egress_result_content_only_when_answered CHECK (
-        outcome = 'ANSWERED' OR (content IS NULL AND content_sha256 IS NULL)),
-    CONSTRAINT egress_result_purged_has_no_content CHECK (
-        (content_purged_at IS NULL) OR (content IS NULL))
+    CONSTRAINT egress_result_payload_only_when_answered CHECK (
+        outcome = 'ANSWERED' OR (payload IS NULL AND content_digest IS NULL)),
+    CONSTRAINT egress_result_purged_has_no_payload CHECK (
+        (content_purged_at IS NULL) OR (payload IS NULL))
 );
 
--- The queue read: pending work for one tenant, oldest first. Partial, because
--- the terminal rows are the ones that accumulate and the claim never looks at
--- them.
+-- The queue read: claimable work for one tenant, oldest first. Partial, because
+-- the terminal rows accumulate and the claim never looks at them.
 CREATE INDEX IF NOT EXISTS egress_request_claimable
     ON {SCHEMA_NAME}.egress_request (tenant_id, submitted_at)
     WHERE state = 'PENDING';
@@ -181,9 +239,13 @@ CREATE INDEX IF NOT EXISTS egress_request_expiring_lease
     ON {SCHEMA_NAME}.egress_request (lease_expires_at)
     WHERE state = 'LEASED';
 
--- The purge sweep's read: answered-and-acknowledged results still holding content.
-CREATE INDEX IF NOT EXISTS egress_result_purgeable
-    ON {SCHEMA_NAME}.egress_result (tenant_id, acknowledged_at)
+-- The retention sweep's reads: content still present, by its own clock.
+CREATE INDEX IF NOT EXISTS egress_request_unpurged_content
+    ON {SCHEMA_NAME}.egress_request (tenant_id, content_created_at)
+    WHERE content_purged_at IS NULL;
+
+CREATE INDEX IF NOT EXISTS egress_result_unpurged_content
+    ON {SCHEMA_NAME}.egress_result (tenant_id, content_created_at)
     WHERE content_purged_at IS NULL;
 
 ALTER TABLE {SCHEMA_NAME}.egress_request ENABLE ROW LEVEL SECURITY;
@@ -205,23 +267,22 @@ CREATE POLICY tenant_isolation ON {SCHEMA_NAME}.egress_result
 GRANT USAGE ON SCHEMA {SCHEMA_NAME} TO {WORKER_ROLE}, {UNIT_ROLE};
 
 -- Asymmetric by design: neither side can forge the other's half of the
--- conversation. The worker writes requests, acknowledges results and purges
--- content; the unit dispositions requests and writes results.
+-- conversation. The worker creates authorized requests, reads terminal results
+-- for its tenant and acknowledges consumption; the MEU leases requests and
+-- writes terminal results.
 --
--- The worker's writes are granted **by column**, not by table. It has to be able
--- to purge content and stamp an acknowledgement, and a table-level UPDATE that
--- let it do so would also let it set ``state`` — so a worker could mark its own
--- request COMPLETED with no exchange having happened, or rewrite an outcome the
--- unit recorded. Column grants give it exactly the two capabilities it needs and
--- refuse the rest at the database.
+-- The worker's writes are granted **by column**. It has to purge content and
+-- stamp an acknowledgement, and a table-level UPDATE that let it do so would
+-- also let it set ``state`` — so a worker could mark its own request COMPLETED
+-- with no exchange having happened, or rewrite an outcome the unit recorded.
 GRANT SELECT, INSERT ON {SCHEMA_NAME}.egress_request TO {WORKER_ROLE};
-GRANT UPDATE (content, content_purged_at)
+GRANT UPDATE (minimized_context, content_purged_at)
     ON {SCHEMA_NAME}.egress_request TO {WORKER_ROLE};
 
 GRANT SELECT, UPDATE ON {SCHEMA_NAME}.egress_request TO {UNIT_ROLE};
 
 GRANT SELECT ON {SCHEMA_NAME}.egress_result TO {WORKER_ROLE};
-GRANT UPDATE (acknowledged_at, content, content_purged_at)
+GRANT UPDATE (acknowledged_at, payload, content_purged_at)
     ON {SCHEMA_NAME}.egress_result TO {WORKER_ROLE};
 
 GRANT SELECT, INSERT, UPDATE ON {SCHEMA_NAME}.egress_result TO {UNIT_ROLE};

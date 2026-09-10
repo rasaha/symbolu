@@ -3,29 +3,27 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 import pytest
 
+from _fixtures import CONTEXT, MODEL, NOW, VENDOR, binding, request as _make_request
 from ugence_model_egress_unit import (
     REFERENCE_RESPONSE_MARKER,
     DeterministicFakeProvider,
-    EgressRequest,
     LiveEgressUnavailableProvider,
+    MinimizedUnit,
     ProviderRefusedInProduction,
     RefusalReason,
     ResultOutcome,
 )
 
-NOW = datetime(2026, 3, 1, 12, 0, 0, tzinfo=timezone.utc)
-
 
 def _request(**over):
-    kwargs = dict(request_id=uuid.uuid4(), tenant_id=uuid.uuid4(), submitted_at=NOW,
-                  model_id="reference-model-a", purpose="reference-exchange",
-                  content="ask something")
-    kwargs.update(over)
-    return EgressRequest.create(**kwargs)
+    """A request for a fresh tenant, so each case is independent."""
+
+    tenant = over.pop("tenant", None) or uuid.uuid4()
+    return _make_request(tenant, **over)
 
 
 # --- determinism -------------------------------------------------------------
@@ -42,16 +40,36 @@ def test_the_same_request_always_gets_the_same_answer():
 def test_a_different_request_gets_a_different_answer():
     provider = DeterministicFakeProvider()
     assert provider.answer_for(_request()) != provider.answer_for(
-        _request(content="ask something else"))
+        _request(context=(MinimizedUnit("unit-1", "something else", 3),)))
 
 
-def test_the_answer_depends_on_no_clock():
+def test_the_answer_body_depends_on_no_clock():
+    """The body is a pure function of the request; only the timestamp differs.
+
+    Asserted on ``answer_for`` rather than through ``execute``, because ``execute``
+    also enforces the request's own expiry — see the test below. Conflating the
+    two would let a validity change silently pass as a determinism change.
+    """
+
     provider = DeterministicFakeProvider()
     request = _request()
+    assert provider.answer_for(request) == provider.answer_for(request)
+
     early = provider.execute(request, now=NOW)
-    late = provider.execute(request, now=datetime(2030, 1, 1, tzinfo=timezone.utc))
-    assert early.content == late.content
-    assert early.recorded_at != late.recorded_at
+    slightly_later = provider.execute(request, now=NOW + timedelta(minutes=1))
+    assert early.payload == slightly_later.payload
+    assert early.recorded_at != slightly_later.recorded_at
+
+
+def test_a_request_past_its_own_expiry_is_refused():
+    """§4.1: ``not_valid_after`` is the request's own expiry, independent of any
+    lease. A request that outlived its authorization is not served late."""
+
+    provider = DeterministicFakeProvider()
+    request = _request()
+    late = provider.execute(
+        request, now=datetime(2030, 1, 1, tzinfo=timezone.utc))
+    assert late.refusal_reason is RefusalReason.REQUEST_NOT_VALID
 
 
 # --- it cannot pass for production -------------------------------------------
@@ -69,18 +87,18 @@ def test_every_answer_carries_the_marker_and_names_its_provider():
     produced it. There is no rendering of it that reads as a model's answer."""
 
     provider = DeterministicFakeProvider()
-    answer = provider.execute(_request(), now=NOW).content
+    answer = provider.execute(_request(), now=NOW).payload
     assert answer.startswith(REFERENCE_RESPONSE_MARKER)
     assert "NOT A MODEL RESPONSE" in answer
-    assert provider.provider_id in answer
+    assert provider.adapter_id in answer
 
 
 def test_the_marker_is_not_configurable():
     """A marker a deployment can switch off is a marker that will be off in the
     deployment that most needed it."""
 
-    provider = DeterministicFakeProvider(provider_id="renamed")
-    assert provider.execute(_request(), now=NOW).content.startswith(
+    provider = DeterministicFakeProvider(adapter_id="renamed")
+    assert provider.execute(_request(), now=NOW).payload.startswith(
         REFERENCE_RESPONSE_MARKER)
 
 
@@ -93,19 +111,27 @@ def test_both_shipped_providers_declare_the_repository_maturity_convention():
 # --- terminal refusals -------------------------------------------------------
 
 def test_an_unavailable_model_is_refused_terminally():
-    provider = DeterministicFakeProvider(
-        available_models=frozenset({"reference-model-a"}))
-    result = provider.execute(_request(model_id="another"), now=NOW)
+    tenant = uuid.uuid4()
+    provider = DeterministicFakeProvider(available_models=frozenset({MODEL}))
+    result = provider.execute(
+        _request(tenant=tenant, authorization=binding(tenant, model="another")),
+        now=NOW)
     assert result.outcome is ResultOutcome.REFUSED
     assert result.refusal_reason is RefusalReason.MODEL_NOT_AVAILABLE
-    assert result.content is None
+    assert result.payload is None
 
 
-def test_an_impermissible_purpose_is_refused_terminally():
-    provider = DeterministicFakeProvider(
-        permitted_purposes=frozenset({"reference-exchange"}))
-    result = provider.execute(_request(purpose="exfiltration"), now=NOW)
-    assert result.refusal_reason is RefusalReason.PURPOSE_NOT_PERMITTED
+def test_an_unauthorized_vendor_is_refused_terminally():
+    """Replaces the old ``purpose`` check. The ratified binding is what the unit
+    verifies, and a vendor the clearance did not name is the sharpest case of a
+    target the unit may not broaden to."""
+
+    tenant = uuid.uuid4()
+    provider = DeterministicFakeProvider(vendor=VENDOR)
+    result = provider.execute(
+        _request(tenant=tenant, authorization=binding(tenant, vendor="other-vendor")),
+        now=NOW)
+    assert result.refusal_reason is RefusalReason.TARGET_NOT_AUTHORIZED
 
 
 def test_content_over_the_ceiling_is_refused_terminally():
@@ -113,7 +139,8 @@ def test_content_over_the_ceiling_is_refused_terminally():
     to send different content, which is a different request."""
 
     provider = DeterministicFakeProvider(content_ceiling=10)
-    result = provider.execute(_request(content="x" * 11), now=NOW)
+    result = provider.execute(
+        _request(context=(MinimizedUnit("unit-1", "x" * 11, 1),)), now=NOW)
     assert result.refusal_reason is RefusalReason.CONTENT_EXCEEDS_CEILING
 
 
@@ -129,7 +156,7 @@ def test_an_unconstrained_provider_answers():
 def test_the_no_egress_provider_refuses_everything_by_name():
     result = LiveEgressUnavailableProvider().execute(_request(), now=NOW)
     assert result.outcome is ResultOutcome.REFUSED
-    assert result.refusal_reason is RefusalReason.LIVE_EGRESS_NOT_AVAILABLE
+    assert result.refusal_reason is RefusalReason.CREDENTIAL_NOT_COMMISSIONED
 
 
 def test_there_is_no_catch_all_refusal_reason():

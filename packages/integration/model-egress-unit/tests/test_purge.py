@@ -15,31 +15,29 @@ from datetime import datetime, timedelta, timezone
 import psycopg
 import pytest
 
+from _fixtures import CONTEXT, LEASE, NOW, request as _make_request
 from ugence_model_egress_unit import (
+    HARD_RETENTION_DEADLINE,
     DeterministicFakeProvider,
     EgressRequest,
     EgressUnit,
     RequestState,
-    content_digest,
+    minimized_context_digest,
+    payload_digest,
 )
 from ugence_model_egress_unit.postgres import SCHEMA_NAME
 
-NOW = datetime(2026, 3, 1, 12, 0, 0, tzinfo=timezone.utc)
 ACK = NOW + timedelta(minutes=2)
-PURGE = NOW + timedelta(hours=1)
+#: Late enough that both clocks have run out, so a purge is unconditionally due.
+PURGE = NOW + HARD_RETENTION_DEADLINE
 
 pytestmark = pytest.mark.postgres
 
-PROMPT = "the prompt that must not survive the purge"
-
-
 def _answered(worker_exchange, unit_exchange, tenant):
-    request = EgressRequest.create(
-        request_id=uuid.uuid4(), tenant_id=tenant, submitted_at=NOW,
-        model_id="reference-model-a", purpose="reference-exchange", content=PROMPT)
+    request = _make_request(tenant)
     worker_exchange.submit(request)
-    EgressUnit(unit_exchange, DeterministicFakeProvider(), holder="unit-1"
-               ).run_once(tenant, now=NOW)
+    EgressUnit(unit_exchange, DeterministicFakeProvider(), holder="unit-1",
+               lease=LEASE).run_once(tenant, now=NOW)
     return request
 
 
@@ -50,82 +48,65 @@ def test_purge_destroys_content_on_both_sides_and_keeps_every_digest(
 
     before_request = worker_exchange.read_request(tenant, request.request_id)
     before_result = worker_exchange.read_result(tenant, request.request_id)
-    answer = before_result["content"]
-    assert before_request["content"] == PROMPT and answer is not None
+    answer = before_result["payload"]
+    assert before_request["minimized_context"] == CONTEXT and answer is not None
 
-    assert worker_exchange.purge_content(tenant, request.request_id, at=PURGE) is True
+    assert request.request_id in worker_exchange.purge_due(tenant, now=PURGE).results
 
     after_request = worker_exchange.read_request(tenant, request.request_id)
     after_result = worker_exchange.read_result(tenant, request.request_id)
 
     # Gone.
-    assert after_request["content"] is None
-    assert after_result["content"] is None
+    assert after_request["minimized_context"] is None
+    assert after_result["payload"] is None
     assert after_request["content_purged_at"] == PURGE
     assert after_result["content_purged_at"] == PURGE
 
     # Still there, and unchanged.
-    assert after_request["content_sha256"] == before_request["content_sha256"]
+    assert after_request["content_digest"] == before_request["content_digest"]
     assert after_request["request_digest"] == before_request["request_digest"]
-    assert after_result["content_sha256"] == before_result["content_sha256"]
+    assert after_result["content_digest"] == before_result["content_digest"]
     assert after_result["response_digest"] == before_result["response_digest"]
 
     # The tombstone answers "was it this?" for a reader who has a candidate...
-    assert after_request["content_sha256"] == content_digest(PROMPT)
-    assert after_result["content_sha256"] == content_digest(answer)
+    assert after_request["content_digest"] == minimized_context_digest(CONTEXT)
+    assert after_result["content_digest"] == payload_digest(answer)
     # ...and refuses the wrong candidate.
-    assert after_request["content_sha256"] != content_digest(PROMPT + " ")
+    assert after_request["content_digest"] != minimized_context_digest(CONTEXT[:1])
 
 
-def test_the_request_digest_is_still_recomputable_from_the_tombstone(
+# The "a purged request still recomputes its own request digest" property lives in
+# test_conformance.py, beside the ruling it comes from. One copy, so the two cannot
+# drift into disagreeing about what a tombstone owes.
+
+
+def test_an_unacknowledged_result_survives_only_until_the_hard_deadline(
         worker_exchange, unit_exchange, tenant):
-    """The reason content is digested separately rather than inlined.
+    """Acknowledgement is a grace, not a gate — and this is where that bites.
 
-    Had the request digest covered the content itself, purging would leave a
-    digest nobody could ever recheck — a claim with no way to test it. Every
-    field the digest covers survives the purge, so the tombstone can be verified
-    against itself.
+    Before the ruling of 2026-09-10 this package treated the acknowledgement as a
+    precondition for purging at all, so an unread answer lived forever. The ruling
+    is the other way round: the acknowledgement only *shortens* retention, and the
+    24-hour deadline is unconditional. An unread answer is destroyed on time.
     """
 
     request = _answered(worker_exchange, unit_exchange, tenant)
-    worker_exchange.acknowledge(tenant, request.request_id, at=ACK)
-    worker_exchange.purge_content(tenant, request.request_id, at=PURGE)
 
-    row = worker_exchange.read_request(tenant, request.request_id)
-    assert row["content"] is None
+    early = NOW + timedelta(hours=23)
+    assert request.request_id not in worker_exchange.purge_due(tenant, now=early).results
+    assert worker_exchange.read_result(tenant, request.request_id)["payload"] is not None
 
-    rebuilt = EgressRequest(
-        request_id=row["request_id"],
-        tenant_id=row["tenant_id"],
-        submitted_at=row["submitted_at"],
-        model_id=row["model_id"],
-        purpose=row["purpose"],
-        content=None,
-        content_sha256=row["content_sha256"],
-        parameters=row["parameters"],
-    )
-    assert rebuilt.digest() == row["request_digest"]
-
-
-def test_an_unacknowledged_result_is_not_purgeable(worker_exchange, unit_exchange,
-                                                   tenant):
-    """Purge is gated on consumption, so a sweep cannot destroy an answer that
-    nobody has read — which would be indistinguishable afterwards from one that
-    had been read and retired."""
-
-    request = _answered(worker_exchange, unit_exchange, tenant)
-
-    assert worker_exchange.purge_content(tenant, request.request_id, at=PURGE) is False
-    assert worker_exchange.read_result(tenant, request.request_id)["content"] is not None
+    assert request.request_id in worker_exchange.purge_due(tenant, now=PURGE).results
+    assert worker_exchange.read_result(tenant, request.request_id)["payload"] is None
 
 
 def test_purge_is_idempotent(worker_exchange, unit_exchange, tenant):
     request = _answered(worker_exchange, unit_exchange, tenant)
     worker_exchange.acknowledge(tenant, request.request_id, at=ACK)
 
-    assert worker_exchange.purge_content(tenant, request.request_id, at=PURGE) is True
-    assert worker_exchange.purge_content(
-        tenant, request.request_id, at=PURGE + timedelta(hours=1)) is False
+    assert request.request_id in worker_exchange.purge_due(tenant, now=PURGE).results
+    assert request.request_id not in worker_exchange.purge_due(
+        tenant, now=PURGE + timedelta(hours=1)).results
     assert worker_exchange.read_result(
         tenant, request.request_id)["content_purged_at"] == PURGE, (
         "a second purge must not restamp the first one's time")
@@ -136,9 +117,8 @@ def test_one_tenant_cannot_purge_anothers_content(worker_exchange, unit_exchange
     request = _answered(worker_exchange, unit_exchange, tenant)
     worker_exchange.acknowledge(tenant, request.request_id, at=ACK)
 
-    assert worker_exchange.purge_content(
-        other_tenant, request.request_id, at=PURGE) is False
-    assert worker_exchange.read_result(tenant, request.request_id)["content"] is not None
+    assert worker_exchange.purge_due(other_tenant, now=PURGE).count == 0
+    assert worker_exchange.read_result(tenant, request.request_id)["payload"] is not None
 
 
 def test_the_database_refuses_a_purge_stamp_without_a_purge(database, tenant):
@@ -154,10 +134,15 @@ def test_the_database_refuses_a_purge_stamp_without_a_purge(database, tenant):
         with pytest.raises(psycopg.errors.CheckViolation):
             conn.execute(
                 f"""INSERT INTO {SCHEMA_NAME}.egress_request
-                    (request_id, tenant_id, submitted_at, state, model_id, purpose,
-                     parameters, content, content_sha256, request_digest,
-                     content_purged_at)
-                    VALUES (%s, %s, now(), 'PENDING', 'm', 'p', '{{}}',
-                            'still here', repeat('0', 64), repeat('0', 64), now())""",
-                (str(uuid.uuid4()), str(tenant)),
+                    (tenant_id, request_id, correlation_id, exchange_schema_version,
+                     submitted_at, not_valid_after, state, clearance_ref,
+                     clearance_digest, authorized_vendor, authorized_model, policy_id,
+                     reservation_id, parameters, minimized_context, content_digest,
+                     content_created_at, request_digest, content_purged_at)
+                    VALUES (%s, %s, %s, 'v1', now(), now() + interval '1 hour',
+                            'PENDING', 'cer-raw', repeat('0', 64), 'v', 'm', 'p',
+                            'rsv', '{{}}', '[{{"unit_id":"u","text":"still here",
+                            "token_count":1}}]', repeat('0', 64), now(),
+                            repeat('0', 64), now())""",
+                (str(tenant), str(uuid.uuid4()), str(uuid.uuid4())),
             )

@@ -12,6 +12,7 @@ from datetime import datetime, timedelta, timezone
 import psycopg
 import pytest
 
+from _fixtures import LEASE, MODEL, NOW, VENDOR, binding, request as _make_request
 from ugence_model_egress_unit import (
     DeterministicFakeProvider,
     EgressRequest,
@@ -21,28 +22,18 @@ from ugence_model_egress_unit import (
     RefusalReason,
     RequestState,
     ResultOutcome,
-    content_digest,
+    payload_digest,
 )
 from ugence_model_egress_unit.postgres import (
     RequestNotClaimable,
     ResultNotAcknowledgeable,
 )
 
-NOW = datetime(2026, 3, 1, 12, 0, 0, tzinfo=timezone.utc)
-LEASE = timedelta(minutes=5)
-
 pytestmark = pytest.mark.postgres
 
 
-def _request(tenant, content="summarize the attached record", model="reference-model-a"):
-    return EgressRequest.create(
-        request_id=uuid.uuid4(),
-        tenant_id=tenant,
-        submitted_at=NOW,
-        model_id=model,
-        purpose="reference-exchange",
-        content=content,
-    )
+def _request(tenant, **kw):
+    return _make_request(tenant, **kw)
 
 
 # --- the happy path ----------------------------------------------------------
@@ -71,7 +62,7 @@ def test_a_request_travels_from_pending_to_completed(worker_exchange, unit_excha
     result = worker_exchange.read_result(tenant, request.request_id)
     assert result["outcome"] is ResultOutcome.ANSWERED
     assert result["response_digest"] == done.response_digest
-    assert result["content_sha256"] == content_digest(result["content"])
+    assert result["content_digest"] == payload_digest(result["payload"])
 
 
 def test_an_idle_queue_reports_no_work(unit_exchange, tenant):
@@ -111,13 +102,8 @@ def test_two_units_never_claim_the_same_request(worker_exchange, unit_exchange, 
 
 
 def test_the_queue_is_served_oldest_first(worker_exchange, unit_exchange, tenant):
-    early = EgressRequest.create(
-        request_id=uuid.uuid4(), tenant_id=tenant, submitted_at=NOW,
-        model_id="m", purpose="p", content="first")
-    late = EgressRequest.create(
-        request_id=uuid.uuid4(), tenant_id=tenant,
-        submitted_at=NOW + timedelta(minutes=1),
-        model_id="m", purpose="p", content="second")
+    early = _request(tenant, submitted_at=NOW)
+    late = _request(tenant, submitted_at=NOW + timedelta(minutes=1))
     worker_exchange.submit(late)
     worker_exchange.submit(early)
 
@@ -129,18 +115,18 @@ def test_the_queue_is_served_oldest_first(worker_exchange, unit_exchange, tenant
 
 def test_a_refusal_is_terminal_and_names_its_reason(worker_exchange, unit_exchange,
                                                     tenant):
-    request = _request(tenant, model="a-model-this-unit-does-not-have")
+    request = _request(tenant, authorization=binding(
+        tenant, model="a-model-this-unit-does-not-have"))
     worker_exchange.submit(request)
 
-    provider = DeterministicFakeProvider(
-        available_models=frozenset({"reference-model-a"}))
+    provider = DeterministicFakeProvider(available_models=frozenset({MODEL}))
     unit = EgressUnit(unit_exchange, provider, holder="unit-1", lease=LEASE)
     done = unit.run_once(tenant, now=NOW)
 
     assert done.outcome is ResultOutcome.REFUSED
     result = worker_exchange.read_result(tenant, request.request_id)
     assert result["refusal_reason"] is RefusalReason.MODEL_NOT_AVAILABLE
-    assert result["content"] is None, "a refusal carries no content"
+    assert result["payload"] is None, "a refusal carries no payload"
 
     after = worker_exchange.read_request(tenant, request.request_id)
     assert after["state"] is RequestState.REFUSED
@@ -163,7 +149,7 @@ def test_a_unit_without_egress_refuses_rather_than_stalling(worker_exchange,
 
     assert done.outcome is ResultOutcome.REFUSED
     result = worker_exchange.read_result(tenant, request.request_id)
-    assert result["refusal_reason"] is RefusalReason.LIVE_EGRESS_NOT_AVAILABLE
+    assert result["refusal_reason"] is RefusalReason.CREDENTIAL_NOT_COMMISSIONED
 
 
 def test_a_result_cannot_be_recorded_against_an_unclaimed_request(worker_exchange,
@@ -172,8 +158,10 @@ def test_a_result_cannot_be_recorded_against_an_unclaimed_request(worker_exchang
     worker_exchange.submit(request)
 
     result = EgressResult.answered(
-        request_id=request.request_id, tenant_id=tenant, recorded_at=NOW,
-        provider_id="unit-1", content="an answer nobody claimed the right to give")
+        request_id=request.request_id, tenant_id=tenant,
+        correlation_id=request.correlation_id, recorded_at=NOW,
+        adapter_id="unit-1", payload="an answer nobody claimed the right to give",
+        model_ref=MODEL)
 
     with pytest.raises(RequestNotClaimable):
         unit_exchange.record_result(result)
@@ -188,8 +176,9 @@ def test_one_request_cannot_receive_two_results(worker_exchange, unit_exchange, 
     unit_exchange.claim(tenant, holder="unit-1", now=NOW, lease=LEASE)
 
     first = EgressResult.answered(
-        request_id=request.request_id, tenant_id=tenant, recorded_at=NOW,
-        provider_id="unit-1", content="the answer")
+        request_id=request.request_id, tenant_id=tenant,
+        correlation_id=request.correlation_id, recorded_at=NOW,
+        adapter_id="unit-1", payload="the answer", model_ref=MODEL)
     unit_exchange.record_result(first)
 
     with pytest.raises((RequestNotClaimable, psycopg.errors.UniqueViolation)):

@@ -1,126 +1,328 @@
-"""The exchange vocabulary: states, outcomes, refusal reasons and the two records.
+"""The exchange vocabulary: the authorization binding, the records, and their digests.
 
-Three ideas here are load-bearing and worth stating before the code.
+Conformance note. This module was written before `SPEC_MODEL_EGRESS_UNIT.md` and
+`OWNER_RATIFICATION_MEU_EXCHANGE_TENANCY.md` were ratified on 2026-09-10, and is
+now written against them. Where the two differ, the ruling wins.
 
-**A refusal is terminal.** When the unit declines a request it declines it once
-and for all. A retriable condition is not a refusal; it is a request that is
-still ``PENDING``. Collapsing the two would produce the failure this exchange
-exists to avoid — a request that was refused for a reason that will never change,
-retried forever.
+Five ideas here are load-bearing.
 
-**``OUTCOME_UNKNOWN`` is terminal too, and that is the point.** It is recorded
-when a lease expired after the request may already have been dispatched. The
-honest answer is that nobody knows whether the call happened. Retrying would
-convert "we don't know" into "we did it twice", which is strictly worse than
-never knowing: an unknown outcome can be reconciled by a human, a duplicated side
-effect cannot be un-done. So the reconciler moves such a request to a terminal
-state and stops, rather than returning it to the queue.
+**The MEU verifies an authorization; it never makes one.** ``AuthorizationBinding``
+carries what the authorization already decided — the clearance receipt and its
+digest, the tenant, the vendor and model that were selected, the policy identity
+and the reservation identity. The unit's only job against it is to check that the
+target it is about to call is the target that was authorized. Claiming work
+confers no authority over what was claimed, so there is no method here that
+grants, widens or re-derives any of those fields. D-5 binds at authorization; this
+package is downstream of that and stays downstream.
 
-**Consumption is acknowledged, not assumed.** A result is not finished when it is
-written; it is finished when the requester says it has read it. Only then may the
-content be purged. Without the acknowledgement, purge would race the reader and
-destroy an answer nobody ever saw.
+**A refusal is terminal.** A retriable condition is not a refusal; it is a request
+that is still ``PENDING``. Every ``RefusalReason`` names a condition re-running
+cannot change, and there is no ``OTHER`` member — an escape hatch becomes the one
+everybody uses.
+
+**``OUTCOME_UNKNOWN`` is terminal, and its reservation is never released.** It is
+recorded when dispatch may already have happened and no result was durably
+committed. Retrying would turn "we don't know" into "we did it twice", and a
+duplicated billed inference cannot be undone. Neither lease expiry nor content
+purging releases the vendor allocation: purging the content does not purge the
+obligation.
+
+**An ambiguous dispatch writes a different record, not a half-filled response.**
+``DispatchAttempt`` asserts only locally known facts and leaves provider receipt,
+acceptance, completion, billing, tokens, cost and even response existence
+explicitly ``UNKNOWN``. A partially filled response record would quietly assert
+zeros for things nobody measured.
+
+**Consumption is acknowledged, not assumed** — and acknowledgement is a grace, not
+a licence. Content is purged at the earlier of one hour after the worker's durable
+acknowledgement and 24 hours after that artifact's own creation. A missing
+acknowledgement never extends the hard deadline.
 """
 
 from __future__ import annotations
 
 import enum
 from dataclasses import dataclass, field
-from datetime import datetime
-from typing import Mapping, Optional
+from datetime import datetime, timedelta
+from typing import Mapping, Optional, Sequence, Tuple
 from uuid import UUID
 
 from .canonical import (
     EGRESS_REQUEST_DIGEST_DOMAIN,
     EGRESS_RESULT_DIGEST_DOMAIN,
     canonical_digest,
-    content_digest,
+    minimized_context_digest,
+    payload_digest,
 )
 
 __all__ = [
+    "EXCHANGE_SCHEMA_VERSION",
+    "TRUST_LEVEL",
+    "ACKNOWLEDGEMENT_GRACE",
+    "HARD_RETENTION_DEADLINE",
     "RequestState",
     "ResultOutcome",
     "RefusalReason",
+    "ProvenanceKind",
     "TERMINAL_STATES",
+    "MinimizedUnit",
+    "AuthorizationBinding",
+    "DispatchAttempt",
     "EgressRequest",
     "EgressResult",
+    "purge_deadline",
 ]
+
+#: The version of the exchange a request is written under. Bound into the request
+#: digest, so a request cannot be reinterpreted under a later schema — which is
+#: the whole reason it is a field rather than a deployment fact.
+EXCHANGE_SCHEMA_VERSION = "ugence.model-egress-unit/exchange/v1"
+
+#: There is no other value. ``trust`` is not something the MEU computes: D-1 grants
+#: the response nothing, so the output arrives as evidence to be verified
+#: downstream and is never believed because it arrived.
+TRUST_LEVEL = "UNTRUSTED_EVIDENCE"
+
+#: Ratified 2026-09-10. Engineering may shorten neither here; production policy may
+#: shorten both, and may lengthen neither without a new owner ruling.
+ACKNOWLEDGEMENT_GRACE = timedelta(hours=1)
+HARD_RETENTION_DEADLINE = timedelta(hours=24)
 
 
 class RequestState(str, enum.Enum):
     """Where a request is in the exchange.
 
-    ``PENDING`` and ``LEASED`` are the only non-terminal states. Everything else
-    is an end: nothing transitions out of a terminal state except a purge, which
-    destroys content without changing the state.
+    ``PENDING`` and ``LEASED`` are the only non-terminal states. Nothing leaves a
+    terminal state; a purge destroys content without changing it.
     """
 
     PENDING = "PENDING"
     LEASED = "LEASED"
     COMPLETED = "COMPLETED"
     REFUSED = "REFUSED"
+    FAILED = "FAILED"
     OUTCOME_UNKNOWN = "OUTCOME_UNKNOWN"
 
 
-#: Terminal states, named once so no caller has to re-derive the set.
-TERMINAL_STATES = frozenset(
-    {RequestState.COMPLETED, RequestState.REFUSED, RequestState.OUTCOME_UNKNOWN}
-)
+TERMINAL_STATES = frozenset({
+    RequestState.COMPLETED,
+    RequestState.REFUSED,
+    RequestState.FAILED,
+    RequestState.OUTCOME_UNKNOWN,
+})
 
 
 class ResultOutcome(str, enum.Enum):
-    """What the unit found out.
+    """What the unit found out. Four outcomes, none of them an exception.
 
-    ``OUTCOME_UNKNOWN`` is a first-class outcome rather than an error, because
-    "the call may or may not have happened" is a fact about the world that the
-    ledger has to be able to state. A schema that could only record success or
-    failure would force it to be recorded as one of the two, and both would be
-    lies.
+    ``FAILED`` is a call that demonstrably did not produce a result.
+    ``OUTCOME_UNKNOWN`` is a call that may or may not have happened. Collapsing
+    the two would let a schema record "it failed" for something nobody knows the
+    outcome of, which is a lie the ledger would carry forever.
     """
 
     ANSWERED = "ANSWERED"
     REFUSED = "REFUSED"
+    FAILED = "FAILED"
     OUTCOME_UNKNOWN = "OUTCOME_UNKNOWN"
 
 
-class RefusalReason(str, enum.Enum):
-    """Terminal refusals. Each names a condition that re-running cannot change.
+class ProvenanceKind(str, enum.Enum):
+    """Which shape of provenance a result carries.
 
-    There is deliberately no ``UNKNOWN`` or ``OTHER`` member. A refusal a caller
-    cannot name is a refusal a caller cannot act on, and an escape-hatch member
-    would become the one everybody uses.
+    ``DISPATCH_ATTEMPT`` is a distinct record type, not a response record with
+    empty fields — see :class:`DispatchAttempt`.
     """
 
-    #: The request names a model the unit is not configured to reach.
+    RESPONSE = "RESPONSE"
+    DISPATCH_ATTEMPT = "DISPATCH_ATTEMPT"
+
+
+class RefusalReason(str, enum.Enum):
+    """Terminal refusals. Each names a condition re-running cannot change."""
+
     MODEL_NOT_AVAILABLE = "model_not_available"
-    #: The declared purpose is not one this unit serves.
     PURPOSE_NOT_PERMITTED = "purpose_not_permitted"
-    #: The content exceeds the unit's declared ceiling. Retrying the same content
-    #: cannot help; the caller has to send different content.
     CONTENT_EXCEEDS_CEILING = "content_exceeds_ceiling"
-    #: The request was already terminal when the unit reached it.
     ALREADY_TERMINAL = "already_terminal"
-    #: The requested exchange would need live vendor egress, which this
-    #: distribution does not have and cannot be configured to have.
     LIVE_EGRESS_NOT_AVAILABLE = "live_egress_not_available"
+    #: The target the unit was about to call is not the target the authorization
+    #: named. Terminal: the unit may not broaden or reinterpret a binding.
+    TARGET_NOT_AUTHORIZED = "target_not_authorized"
+    #: The stored content no longer hashes to the digest the request was written
+    #: with. Terminal: a substituted prompt is a different logical action.
+    CONTENT_DIGEST_MISMATCH = "content_digest_mismatch"
+    #: The request's own expiry has passed, independently of any lease.
+    REQUEST_NOT_VALID = "request_not_valid"
+    #: No provider credential has been commissioned in this deployment.
+    CREDENTIAL_NOT_COMMISSIONED = "credential_not_commissioned"
+    #: A row belonging to another tenant. Never disclosed as such to a caller —
+    #: cross-tenant reads are indistinguishable from unknown — but named
+    #: internally so the refusal is not a generic database error.
+    TENANT_SCOPE_REFUSED = "tenant_scope_refused"
+
+
+@dataclass(frozen=True)
+class MinimizedUnit:
+    """One unit Context Minimization admitted, in the order the run fixed.
+
+    ``token_count`` is the unit's declared size. It is metering, not content: it
+    survives a purge, so a tombstone can still say how much was sent without
+    saying what.
+    """
+
+    unit_id: str
+    text: str
+    token_count: int
+
+    def __post_init__(self) -> None:
+        if not self.unit_id:
+            raise ValueError("a minimized unit must carry an identifier")
+        if self.token_count < 0:
+            raise ValueError("token_count cannot be negative")
+
+
+@dataclass(frozen=True)
+class AuthorizationBinding:
+    """What the authorization decided, carried so the unit can verify it.
+
+    The MEU **verifies**; it does not decide. There is deliberately no constructor
+    here that derives a vendor, resolves a model alias or mints a reservation:
+    every field arrives already decided by Model Authority under D-5's
+    ``BIND_AT_AUTHORIZATION``, and this package is downstream of that.
+    """
+
+    clearance_ref: str
+    clearance_digest: str
+    tenant_id: UUID
+    authorized_vendor: str
+    authorized_model: str
+    policy_id: str
+    reservation_id: str
+
+    def __post_init__(self) -> None:
+        missing = [
+            name for name in (
+                "clearance_ref", "clearance_digest", "authorized_vendor",
+                "authorized_model", "policy_id", "reservation_id")
+            if not getattr(self, name)
+        ]
+        if missing:
+            raise ValueError(
+                f"an authorization binding is incomplete without {missing}: an "
+                f"unbound field is a target nobody authorized")
+
+    def authorizes(self, *, vendor: str, model: str, tenant_id: UUID) -> bool:
+        """Whether this binding authorizes exactly this target, for this tenant.
+
+        Exact equality on every component. There is no family match, no alias
+        resolution and no prefix rule: an authorization for one model does not
+        authorize its successor, and D-5 reserved capacity against *this* pair.
+        """
+
+        return (
+            vendor == self.authorized_vendor
+            and model == self.authorized_model
+            and tenant_id == self.tenant_id
+        )
+
+    def digest_body(self) -> dict:
+        return {
+            "clearance_ref": self.clearance_ref,
+            "clearance_digest": self.clearance_digest,
+            "tenant_id": str(self.tenant_id),
+            "authorized_vendor": self.authorized_vendor,
+            "authorized_model": self.authorized_model,
+            "policy_id": self.policy_id,
+            "reservation_id": self.reservation_id,
+        }
+
+
+@dataclass(frozen=True)
+class DispatchAttempt:
+    """Locally known facts about a dispatch whose outcome is unknown.
+
+    Every provider-side fact is ``UNKNOWN`` and stays ``UNKNOWN`` unless something
+    independent evidences it. That is the point of the type: a response record
+    with empty fields would assert zero tokens and zero cost for a call that may
+    have consumed both.
+    """
+
+    #: Explicitly unknown, always, for every provider-side fact.
+    UNKNOWN = "UNKNOWN"
+
+    adapter_id: str
+    dispatch_observed_at: Optional[datetime]
+    detected_at: datetime
+    reason: str
+
+    def as_record(self) -> dict:
+        """The durable shape. The ``UNKNOWN``s are written, not omitted.
+
+        Omitting them would let a reader infer absence from silence; writing them
+        makes the ignorance explicit and survives into the tombstone, where it is
+        what keeps a purged ``OUTCOME_UNKNOWN`` reconcilable.
+        """
+
+        return {
+            "kind": ProvenanceKind.DISPATCH_ATTEMPT.value,
+            "adapter_id": self.adapter_id,
+            "genuine_call": False,
+            "dispatch_observed_at": (
+                self.dispatch_observed_at.isoformat()
+                if self.dispatch_observed_at is not None else self.UNKNOWN),
+            "detected_at": self.detected_at.isoformat(),
+            "reason": self.reason,
+            "provider_receipt": self.UNKNOWN,
+            "provider_acceptance": self.UNKNOWN,
+            "provider_completion": self.UNKNOWN,
+            "billed": self.UNKNOWN,
+            "token_usage": self.UNKNOWN,
+            "cost": self.UNKNOWN,
+            "response_exists": self.UNKNOWN,
+        }
+
+
+def purge_deadline(
+    *, content_created_at: datetime, acknowledged_at: Optional[datetime]
+) -> datetime:
+    """When this artifact's content must be gone. Earlier of the two clocks.
+
+    The hard deadline is not conditional: **absence of an acknowledgement never
+    extends content past 24 hours.** A worker that never acknowledges does not
+    thereby keep a prompt alive; it only loses the earlier purge it would have got
+    by acknowledging.
+
+    Each content-bearing artifact is governed independently, so a request's
+    context and its response each carry their own creation instant and are purged
+    on their own clock rather than waiting on the exchange as a unit.
+    """
+
+    hard = content_created_at + HARD_RETENTION_DEADLINE
+    if acknowledged_at is None:
+        return hard
+    return min(acknowledged_at + ACKNOWLEDGEMENT_GRACE, hard)
 
 
 @dataclass(frozen=True)
 class EgressRequest:
-    """One request for a model exchange, as the requester wrote it.
+    """One authorized request for a model exchange, as the worker wrote it.
 
-    ``content`` is the payload; ``content_sha256`` is its digest, computed at
-    construction so that the record carries it even after ``content`` is purged.
+    ``minimized_context`` is the purgeable artifact; ``content_digest`` is its
+    fingerprint and outlives it. Everything else is immutable identity, and all of
+    it is bound into ``request_digest``.
     """
 
     request_id: UUID
     tenant_id: UUID
+    correlation_id: UUID
     submitted_at: datetime
-    model_id: str
-    purpose: str
-    content: Optional[str]
-    content_sha256: str
+    not_valid_after: datetime
+    authorization: AuthorizationBinding
+    minimized_context: Optional[Tuple[MinimizedUnit, ...]]
+    content_digest: str
     parameters: Mapping[str, object] = field(default_factory=dict)
+    exchange_schema_version: str = EXCHANGE_SCHEMA_VERSION
 
     @classmethod
     def create(
@@ -128,40 +330,63 @@ class EgressRequest:
         *,
         request_id: UUID,
         tenant_id: UUID,
+        correlation_id: UUID,
         submitted_at: datetime,
-        model_id: str,
-        purpose: str,
-        content: str,
+        not_valid_after: datetime,
+        authorization: AuthorizationBinding,
+        minimized_context: Sequence[MinimizedUnit],
         parameters: Optional[Mapping[str, object]] = None,
     ) -> "EgressRequest":
-        """Build a request, digesting its content once at the boundary."""
+        """Build a request, digesting its ordered context once at the boundary."""
 
+        if authorization.tenant_id != tenant_id:
+            raise ValueError(
+                f"the authorization binds tenant {authorization.tenant_id} but the "
+                f"request is for {tenant_id}; a request may not be attributed to a "
+                f"tenant its clearance did not name")
+        units = tuple(minimized_context)
         return cls(
             request_id=request_id,
             tenant_id=tenant_id,
+            correlation_id=correlation_id,
             submitted_at=submitted_at,
-            model_id=model_id,
-            purpose=purpose,
-            content=content,
-            content_sha256=content_digest(content),
+            not_valid_after=not_valid_after,
+            authorization=authorization,
+            minimized_context=units,
+            content_digest=minimized_context_digest(units),
             parameters=dict(parameters or {}),
         )
 
-    def digest_body(self) -> dict:
-        """Every field that identifies this request, with content by digest.
+    def content_matches_digest(self) -> bool:
+        """Whether the surviving content still hashes to its recorded digest.
 
-        ``content`` itself is absent by construction — see the module docstring
-        of :mod:`.canonical`. Everything else is present unconditionally, so the
-        digest is total over the request's identity.
+        Answers ``True`` for a purged request: there is no content to disagree
+        with the digest, and a tombstone is not a mismatch. Callers that need to
+        distinguish the two ask ``minimized_context is None`` first.
+        """
+
+        if self.minimized_context is None:
+            return True
+        return minimized_context_digest(self.minimized_context) == self.content_digest
+
+    def digest_body(self) -> dict:
+        """Every immutable field that identifies this request.
+
+        Content enters by digest, not inline — see :mod:`.canonical`. Mutable
+        lease, claim, attempt and processing timestamps are excluded because they
+        are not part of what was authorized; ``submitted_at`` is included because
+        a creation instant never changes.
         """
 
         return {
+            "exchange_schema_version": self.exchange_schema_version,
             "request_id": str(self.request_id),
             "tenant_id": str(self.tenant_id),
+            "correlation_id": str(self.correlation_id),
             "submitted_at": self.submitted_at,
-            "model_id": self.model_id,
-            "purpose": self.purpose,
-            "content_sha256": self.content_sha256,
+            "not_valid_after": self.not_valid_after,
+            "authorization": self.authorization.digest_body(),
+            "content_digest": self.content_digest,
             "parameters": dict(self.parameters),
         }
 
@@ -176,22 +401,27 @@ class EgressRequest:
 class EgressResult:
     """What came back, or what could not be determined.
 
-    ``content`` is ``None`` for every outcome but ``ANSWERED``, and also for an
-    ``ANSWERED`` result whose content has since been purged. The two are told
-    apart by ``content_sha256``: a refusal has no content digest, a purged answer
-    still has one.
+    ``trust`` is a constant. ``provenance`` always says whether the call was
+    genuine, and in this distribution it never was.
     """
 
     request_id: UUID
     tenant_id: UUID
+    correlation_id: UUID
     recorded_at: datetime
     outcome: ResultOutcome
-    provider_id: str
-    content: Optional[str]
-    content_sha256: Optional[str]
+    adapter_id: str
+    provenance: Mapping[str, object]
+    payload: Optional[str]
+    content_digest: Optional[str]
     refusal_reason: Optional[RefusalReason] = None
+    trust: str = TRUST_LEVEL
 
     def __post_init__(self) -> None:
+        if self.trust != TRUST_LEVEL:
+            raise ValueError(
+                f"trust is a constant {TRUST_LEVEL!r}; a result that could claim a "
+                f"stronger status would be believed because it arrived")
         if self.outcome is ResultOutcome.REFUSED and self.refusal_reason is None:
             raise ValueError(
                 "a REFUSED result must name its reason: an unexplained terminal "
@@ -199,89 +429,115 @@ class EgressResult:
         if self.outcome is not ResultOutcome.REFUSED and self.refusal_reason is not None:
             raise ValueError(
                 f"a {self.outcome.value} result must not carry a refusal reason")
-        if self.outcome is not ResultOutcome.ANSWERED and self.content is not None:
+        if self.outcome is not ResultOutcome.ANSWERED and self.payload is not None:
+            raise ValueError(f"a {self.outcome.value} result has no payload to carry")
+        if self.provenance.get("genuine_call") is not False:
             raise ValueError(
-                f"a {self.outcome.value} result has no content to carry")
+                "this distribution makes no genuine provider call, so no result may "
+                "record one; a provenance record mistakable for provider evidence is "
+                "the failure this check exists to prevent")
+
+    @property
+    def provenance_kind(self) -> ProvenanceKind:
+        return ProvenanceKind(self.provenance["kind"])
 
     @classmethod
-    def answered(
-        cls,
-        *,
-        request_id: UUID,
-        tenant_id: UUID,
-        recorded_at: datetime,
-        provider_id: str,
-        content: str,
-    ) -> "EgressResult":
+    def answered(cls, *, request_id, tenant_id, correlation_id, recorded_at,
+                 adapter_id, payload, model_ref, token_count=None) -> "EgressResult":
         return cls(
-            request_id=request_id,
-            tenant_id=tenant_id,
-            recorded_at=recorded_at,
-            outcome=ResultOutcome.ANSWERED,
-            provider_id=provider_id,
-            content=content,
-            content_sha256=content_digest(content),
+            request_id=request_id, tenant_id=tenant_id, correlation_id=correlation_id,
+            recorded_at=recorded_at, outcome=ResultOutcome.ANSWERED,
+            adapter_id=adapter_id,
+            provenance={
+                "kind": ProvenanceKind.RESPONSE.value,
+                "adapter_id": adapter_id,
+                "genuine_call": False,
+                "model_ref": model_ref,
+                "observed_at": recorded_at.isoformat(),
+                "token_count": token_count,
+            },
+            payload=payload,
+            content_digest=payload_digest(payload),
         )
 
     @classmethod
-    def refused(
-        cls,
-        *,
-        request_id: UUID,
-        tenant_id: UUID,
-        recorded_at: datetime,
-        provider_id: str,
-        reason: RefusalReason,
-    ) -> "EgressResult":
+    def refused(cls, *, request_id, tenant_id, correlation_id, recorded_at,
+                adapter_id, reason, model_ref=None) -> "EgressResult":
         return cls(
-            request_id=request_id,
-            tenant_id=tenant_id,
-            recorded_at=recorded_at,
-            outcome=ResultOutcome.REFUSED,
-            provider_id=provider_id,
-            content=None,
-            content_sha256=None,
-            refusal_reason=reason,
+            request_id=request_id, tenant_id=tenant_id, correlation_id=correlation_id,
+            recorded_at=recorded_at, outcome=ResultOutcome.REFUSED,
+            adapter_id=adapter_id,
+            provenance={
+                "kind": ProvenanceKind.RESPONSE.value,
+                "adapter_id": adapter_id,
+                "genuine_call": False,
+                "model_ref": model_ref,
+                "observed_at": recorded_at.isoformat(),
+            },
+            payload=None, content_digest=None, refusal_reason=reason,
         )
 
     @classmethod
-    def outcome_unknown(
-        cls,
-        *,
-        request_id: UUID,
-        tenant_id: UUID,
-        recorded_at: datetime,
-        provider_id: str,
-    ) -> "EgressResult":
-        """The lease expired after the request may already have been dispatched.
+    def failed(cls, *, request_id, tenant_id, correlation_id, recorded_at,
+               adapter_id, model_ref=None) -> "EgressResult":
+        """A call that demonstrably did not produce a result.
 
-        Recorded, never retried. See the module docstring.
+        Distinct from ``OUTCOME_UNKNOWN``: here the absence of a response is a
+        known fact, not an open question.
         """
 
         return cls(
-            request_id=request_id,
-            tenant_id=tenant_id,
-            recorded_at=recorded_at,
-            outcome=ResultOutcome.OUTCOME_UNKNOWN,
-            provider_id=provider_id,
-            content=None,
-            content_sha256=None,
+            request_id=request_id, tenant_id=tenant_id, correlation_id=correlation_id,
+            recorded_at=recorded_at, outcome=ResultOutcome.FAILED,
+            adapter_id=adapter_id,
+            provenance={
+                "kind": ProvenanceKind.RESPONSE.value,
+                "adapter_id": adapter_id,
+                "genuine_call": False,
+                "model_ref": model_ref,
+                "observed_at": recorded_at.isoformat(),
+            },
+            payload=None, content_digest=None,
+        )
+
+    @classmethod
+    def outcome_unknown(cls, *, request_id, tenant_id, correlation_id, recorded_at,
+                        attempt: DispatchAttempt) -> "EgressResult":
+        """Dispatch may have happened; nothing about the provider side is known.
+
+        Carries a :class:`DispatchAttempt`, which is a different record type from
+        a response — not a response with blanks.
+        """
+
+        return cls(
+            request_id=request_id, tenant_id=tenant_id, correlation_id=correlation_id,
+            recorded_at=recorded_at, outcome=ResultOutcome.OUTCOME_UNKNOWN,
+            adapter_id=attempt.adapter_id,
+            provenance=attempt.as_record(),
+            payload=None, content_digest=None,
         )
 
     def digest_body(self) -> dict:
         return {
             "request_id": str(self.request_id),
             "tenant_id": str(self.tenant_id),
+            "correlation_id": str(self.correlation_id),
             "recorded_at": self.recorded_at,
+            "trust": self.trust,
             "outcome": self.outcome.value,
-            "provider_id": self.provider_id,
-            "content_sha256": self.content_sha256,
+            "adapter_id": self.adapter_id,
+            "provenance": dict(self.provenance),
+            "content_digest": self.content_digest,
             "refusal_reason": (
                 self.refusal_reason.value if self.refusal_reason is not None else None),
         }
 
     def digest(self) -> str:
-        """The response digest. Recomputable from a purged tombstone."""
+        """The response digest. Binds the payload *and* its provenance.
+
+        What distinguishes *the provider returned this* from *a row was edited
+        afterwards*, and what the ledger retains in the payload's place.
+        """
 
         return canonical_digest(
             EGRESS_RESULT_DIGEST_DOMAIN, "EgressResult", self.digest_body())

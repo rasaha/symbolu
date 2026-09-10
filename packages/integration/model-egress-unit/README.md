@@ -18,10 +18,12 @@ What *is* real is the boundary. The exchange, the roles, the row-level security
 and the reconciliation are built and tested against PostgreSQL 16, so that a live
 provider — **if one is ever ratified** — has somewhere to land.
 
-Whether a live provider may run here at all is an open owner decision:
-`docs/architecture/OWNER_RATIFICATION_LIVE_MODEL_PROVIDER.md`, D-1 through D-5.
-This package neither answers it nor presumes an answer, and deliberately does not
-wire itself into the governed execution hook — that seam is D-1's to decide.
+**D-1 through D-5 were ratified on 2026-09-10**, together with the exchange grants
+and tenancy and the retention horizons, and this package is written against them
+(`SPEC_MODEL_EGRESS_UNIT.md`, `OWNER_RATIFICATION_MEU_EXCHANGE_TENANCY.md`). What
+is still unauthorized is a *live* provider: D-3 keeps provider custody out of this
+deployment, and CR-1 admits only one companion deployment unit, so the MEU's
+boundary is specified while its commissioning as a running unit is not.
 
 ## What it provides
 
@@ -32,10 +34,13 @@ wire itself into the governed execution hook — that seam is D-1's to decide.
 | Forced RLS | `FORCE ROW LEVEL SECURITY` on both tables, so the owner is bound too |
 | Required tenant identity | `current_setting('ugence.tenant_id')` **without** `missing_ok` — an unscoped session raises rather than reading an empty exchange |
 | Application checks | every row read back is re-checked against the caller's tenant, independently of the policy |
-| Complete digests | canonical request and response digests over every field, content by digest |
-| Reconciliation | expired leases become terminal `OUTCOME_UNKNOWN`, never a retry |
-| Consumption | a result is acknowledged before its content may be purged |
-| Purge | content destroyed on both sides; digests survive as a tombstone |
+| Authorization binding | clearance reference and digest, tenant, authorized vendor and model, policy and reservation identity — **verified** by the unit, never decided by it |
+| Ordered context | `{unit_id, text, token_count}` in run order; the digest binds identifiers, exact text and order |
+| Complete digests | request digest binds tenant, schema version, content digest, vendor/model binding, parameters and clearance identity |
+| Reconciliation | before dispatch an expired lease is claimable again; after possible dispatch it is terminal `OUTCOME_UNKNOWN` |
+| Consumption | acknowledgement starts a one-hour grace — it does not gate the 24-hour deadline |
+| Retention | per artifact, the earlier of ack + 1h and creation + 24h, failing closed at the hard deadline |
+| Purge | content destroyed on both sides; the approved tombstone survives |
 | Migrations | ordered, digest-pinned, all-or-nothing; a drifted schema is refused |
 
 ## The three decisions worth knowing
@@ -54,7 +59,13 @@ re-submitting. That is the trade, taken deliberately.
 **Content is digested separately from the record.** The request digest covers a
 *content digest*, not the content. That is what keeps a purged row verifiable: the
 tombstone still answers "was it this?" for a reader holding a candidate, and still
-cannot answer "what was it?" for anyone.
+cannot answer "what was it?" for anyone. This diverges from D-4's letter, which says
+the digest binds the exact text; the ADR flags it for the owner.
+
+**The reservation is never released.** Neither lease expiry nor content purging
+releases the vendor allocation an `OUTCOME_UNKNOWN` conservatively consumed —
+purging the content does not purge the obligation, and a database CHECK makes
+"released" unrepresentable rather than merely unwritten.
 
 ## Running the tests
 

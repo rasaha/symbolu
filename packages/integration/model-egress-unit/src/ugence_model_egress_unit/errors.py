@@ -53,8 +53,13 @@ class UnscopableConnection(ExchangeError):
 class TenantMismatch(ExchangeError):
     """A row came back carrying a tenant the caller did not ask for.
 
-    Raised by the application-level check. Reaching this means row-level security
+    Raised by the application-level check, and mapped internally to
+    ``RefusalReason.TENANT_SCOPE_REFUSED``. Reaching it means row-level security
     did not do its job, so the transaction is abandoned rather than trusted.
+
+    The message deliberately does not say whether a row exists under another
+    tenant. Cross-tenant reads are indistinguishable from unknown, and an error
+    that distinguished them would confirm to the wrong role that a request exists.
     """
 
 

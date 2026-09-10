@@ -14,7 +14,7 @@ from datetime import datetime, timedelta, timezone
 import psycopg
 import pytest
 
-from ugence_model_egress_unit import EgressRequest
+from _fixtures import NOW, request as _make_request
 from ugence_model_egress_unit.postgres import (
     OWNER_ROLE,
     SCHEMA_NAME,
@@ -23,8 +23,6 @@ from ugence_model_egress_unit.postgres import (
     Exchange,
     UnscopableConnection,
 )
-
-NOW = datetime(2026, 3, 1, 12, 0, 0, tzinfo=timezone.utc)
 
 pytestmark = pytest.mark.postgres
 
@@ -38,16 +36,21 @@ pytestmark = pytest.mark.postgres
 #: exercise each path deliberately rather than accepting whichever turns up.
 FAIL_CLOSED = (psycopg.errors.UndefinedObject, psycopg.errors.InvalidTextRepresentation)
 
+#: A minimal well-formed request row, for tests that must bypass ``Exchange`` to
+#: reach the policy or the grant directly. Parameterised (tenant, request,
+#: correlation) so each caller supplies only what it is testing.
+_RAW_INSERT = f"""INSERT INTO {SCHEMA_NAME}.egress_request
+    (tenant_id, request_id, correlation_id, exchange_schema_version, submitted_at,
+     not_valid_after, state, clearance_ref, clearance_digest, authorized_vendor,
+     authorized_model, policy_id, reservation_id, parameters, minimized_context,
+     content_digest, content_created_at, request_digest)
+    VALUES (%s, %s, %s, 'v1', now(), now() + interval '1 hour', 'PENDING',
+            'cer-raw', repeat('0', 64), 'v', 'm', 'p', 'rsv', '{{}}', '[]',
+            repeat('0', 64), now(), repeat('0', 64))"""
 
-def _request(tenant, content="ask something"):
-    return EgressRequest.create(
-        request_id=uuid.uuid4(),
-        tenant_id=tenant,
-        submitted_at=NOW,
-        model_id="reference-model-a",
-        purpose="reference-exchange",
-        content=content,
-    )
+
+def _request(tenant, **kw):
+    return _make_request(tenant, **kw)
 
 
 # --- the required tenant identity -------------------------------------------
@@ -73,12 +76,7 @@ def test_a_session_without_tenant_identity_cannot_write_either(database, tenant)
         conn.execute(f"SET ROLE {WORKER_ROLE}")
         with pytest.raises(psycopg.errors.UndefinedObject):
             conn.execute(
-                f"""INSERT INTO {SCHEMA_NAME}.egress_request
-                    (request_id, tenant_id, submitted_at, state, model_id, purpose,
-                     parameters, content, content_sha256, request_digest)
-                    VALUES (%s, %s, now(), 'PENDING', 'm', 'p', '{{}}', 'c',
-                            repeat('0', 64), repeat('0', 64))""",
-                (str(uuid.uuid4()), str(tenant)),
+                _RAW_INSERT, (str(tenant), str(uuid.uuid4()), str(uuid.uuid4())),
             )
 
 
@@ -100,14 +98,7 @@ def test_one_tenant_cannot_write_a_row_belonging_to_another(worker_exchange, ten
     author could never read back — a write-only cross-tenant channel.
     """
 
-    forged = EgressRequest.create(
-        request_id=uuid.uuid4(),
-        tenant_id=other_tenant,
-        submitted_at=NOW,
-        model_id="reference-model-a",
-        purpose="reference-exchange",
-        content="not mine to write",
-    )
+    forged = _make_request(other_tenant)
     # The exchange scopes the transaction to the row's own tenant, so to test the
     # policy we have to try the mismatch the application would never make.
     exchange = Exchange(worker_exchange._connect)
@@ -116,15 +107,9 @@ def test_one_tenant_cannot_write_a_row_belonging_to_another(worker_exchange, ten
             with conn.transaction():
                 exchange._scoped(conn, tenant)
                 conn.execute(
-                    f"""INSERT INTO {SCHEMA_NAME}.egress_request
-                        (request_id, tenant_id, submitted_at, state, model_id, purpose,
-                         parameters, content, content_sha256, request_digest)
-                        VALUES (%s, %s, %s, 'PENDING', %s, %s, '{{}}', %s, %s, %s)""",
-                    (
-                        str(forged.request_id), str(forged.tenant_id),
-                        forged.submitted_at, forged.model_id, forged.purpose,
-                        forged.content, forged.content_sha256, forged.digest(),
-                    ),
+                    _RAW_INSERT,
+                    (str(forged.tenant_id), str(forged.request_id),
+                     str(forged.correlation_id)),
                 )
 
 
@@ -209,15 +194,17 @@ def test_the_workers_write_is_scoped_to_columns_not_to_the_table(database,
 
     # Permitted: the two columns a purge touches.
     as_worker(f"UPDATE {SCHEMA_NAME}.egress_request "
-              f"SET content = NULL, content_purged_at = now() WHERE request_id = %s")
+              f"SET minimized_context = NULL, content_purged_at = now() "
+              f"WHERE request_id = %s")
 
     # Refused: everything else on the same table.
     for column, value in (
         ("state", "'COMPLETED'"),
         ("terminal_at", "now()"),
         ("request_digest", "repeat('f', 64)"),
-        ("content_sha256", "repeat('f', 64)"),
-        ("model_id", "'something-else'"),
+        ("content_digest", "repeat('f', 64)"),
+        ("authorized_model", "'something-else'"),
+        ("reservation_id", "'rsv-someone-elses'"),
     ):
         with pytest.raises(psycopg.errors.InsufficientPrivilege):
             as_worker(f"UPDATE {SCHEMA_NAME}.egress_request "
@@ -242,7 +229,8 @@ def test_the_worker_cannot_rewrite_an_outcome_the_unit_recorded(database,
         conn.execute("SELECT set_config('ugence.tenant_id', %s, false)", (str(tenant),))
         for column, value in (
             ("outcome", "'REFUSED'"),
-            ("provider_id", "'not-the-one-that-answered'"),
+            ("adapter_id", "'not-the-one-that-answered'"),
+            ("genuine_call", "true"),
             ("response_digest", "repeat('f', 64)"),
         ):
             with pytest.raises(psycopg.errors.InsufficientPrivilege):
@@ -259,12 +247,7 @@ def test_the_unit_cannot_submit_a_request(database, tenant):
         conn.execute("SELECT set_config('ugence.tenant_id', %s, false)", (str(tenant),))
         with pytest.raises(psycopg.errors.InsufficientPrivilege):
             conn.execute(
-                f"""INSERT INTO {SCHEMA_NAME}.egress_request
-                    (request_id, tenant_id, submitted_at, state, model_id, purpose,
-                     parameters, content, content_sha256, request_digest)
-                    VALUES (%s, %s, now(), 'PENDING', 'm', 'p', '{{}}', 'c',
-                            repeat('0', 64), repeat('0', 64))""",
-                (str(uuid.uuid4()), str(tenant)),
+                _RAW_INSERT, (str(tenant), str(uuid.uuid4()), str(uuid.uuid4())),
             )
 
 

@@ -57,6 +57,20 @@ class EgressUnit:
         self._lease = lease
         self._production = production
 
+    def _provider_will_dispatch(self, request, now: datetime) -> bool:
+        """Whether the adapter would actually reach a provider for this request.
+
+        An adapter that refuses on its pre-flight never dispatches, so marking it
+        would strand a refusable request in ``OUTCOME_UNKNOWN`` on the next lease
+        expiry. Adapters that expose no pre-flight are assumed to dispatch: the
+        conservative answer is the safe one.
+        """
+
+        refusal = getattr(self._provider, "_refusal", None)
+        if refusal is None:
+            return True
+        return refusal(request, now) is None
+
     def run_once(self, tenant_id: UUID, *, now: datetime) -> UnitPass:
         """Claim at most one request, serve it, and record the outcome."""
 
@@ -64,6 +78,16 @@ class EgressUnit:
             tenant_id, holder=self._holder, now=now, lease=self._lease)
         if claimed is None:
             return UnitPass(request_id=None, outcome=None, response_digest=None)
+
+        # Dispatch is marked BEFORE the adapter is called, never after. A crash
+        # between the marker and the call leaves the row looking dispatched, which
+        # is the conservative reading; a marker written afterwards would be missing
+        # in exactly the case it exists for. Only refusals decided before dispatch
+        # skip it — and those are decided by the adapter, which is why the marker
+        # is written by the adapter's own pre-flight rather than here.
+        if self._provider_will_dispatch(claimed.request, now):
+            self._exchange.mark_dispatched(
+                tenant_id, claimed.request.request_id, at=now)
 
         result = self._provider.execute(
             claimed.request, now=now, production=self._production)

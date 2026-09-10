@@ -1,6 +1,7 @@
 # ADR — Model Egress Unit, reference vertical slice
 
-**Status:** implemented under delegated authority; **ratifies nothing**.
+**Status:** implemented under delegated authority, and **conformed to the rulings of
+2026-09-10**. Ratifies nothing.
 **Package:** `packages/integration/model-egress-unit` (`ugence-model-egress-unit` 0.1.0)
 **Maturity:** `REFERENCE_GRADE_SHADOW_ONLY` · `ENFORCEMENT_ENABLED = False` · `LIVE_VENDOR_EGRESS = False`
 
@@ -9,145 +10,117 @@ Evidence labels: `[V]` verified against this repository, `[I]` inferred,
 
 ## The load-bearing question
 
-**Can the egress boundary be built without first answering D-1 to D-5?**
+**What does this package implement, and what does it still not authorize?**
 
-Yes, for everything in this slice, and the reason is narrow enough to state
-exactly: this unit has no egress. It carries no HTTP client, no vendor SDK, no
-credential reader and no destination configuration `[V]`, so nothing it does
-crosses a boundary the owner has reserved. What it builds is the *place* a live
-provider would land — the schema, the roles, the isolation, the digests, the
-reconciliation — none of which depends on whether a live provider is ever
-ratified.
+It implements the exchange the rulings of 2026-09-10 specify: the schema, the three
+roles, forced row-level security over a required tenant, the authorization binding,
+the ordered minimized context and its digests, the two retention clocks, the
+tombstone, the ambiguous-dispatch record, and a deterministic fake adapter. It
+authorizes nothing: no live provider, no credential, and no second deployment unit.
 
-The open decisions stay open, and are named below rather than assumed away.
+## History, because it explains the shape
 
-## What was ratified, and what was not
+This package was written **before** `SPEC_MODEL_EGRESS_UNIT.md` and
+`OWNER_RATIFICATION_MEU_EXCHANGE_TENANCY.md` existed, against a ballot in which
+D-1 to D-5 were open. Those decisions were **ratified on 2026-09-10** `[V]`, and
+the package has been brought into conformance rather than merged as it stood.
 
-`CR-1` to `CR-5` were ruled by the owner on 2026-09-05
-(`ADR_UGENCE_REVIEW_SERVICE_COMPOSITION_ROOT_SCOPING.md` §5) `[V]`.
+A striking amount needed no change. The tenancy ruling independently requires
+mandatory application validation *backed by* forced RLS, three logical roles with a
+non-login owner, no runtime identity owning the protected tables, column-scoped
+worker grants, a required non-empty tenant on every row, terminal
+`OUTCOME_UNKNOWN`, and a fake adapter that cannot be mistaken for genuine — all of
+which were already here. The ruling also records that `TWO_ROLES_BY_MIGRATION` was
+declined only because "a migration mechanism does not exist" `[V]`; this package
+has one.
 
-**CR-5 is not contradicted by this package.** It scopes *the worker's* egress:
-"the worker's only egress is the configured JWKS host". This is a different
-deployment unit — which is precisely what `SEPARATE_EGRESS_UNIT` means in D-2, and
-why that option preserves CR-5 rather than amending it `[V]`. In this slice the
-question does not even arise, because the unit's egress set is empty.
+**What did change is recorded below**, because a reader comparing this package to
+the spec deserves to know which parts were convergent and which were corrections.
 
-**CR-4 is preserved.** `ENFORCEMENT_ENABLED` is `False` and the maturity label is
-`REFERENCE_GRADE_SHADOW_ONLY`, matching every package the worker composes `[V]`.
+## Conformance, item by item
 
-**D-1 to D-5 remain unanswered `[R]`.** The ballot records `SEPARATE_EGRESS_UNIT`
-as the owner's *stated preference*, explicitly "recorded as a preference; the
-decision is open" `[V]`. This slice is built along that preference and does not
-convert it into a ratification. In particular:
+| Ruling | How it is met |
+| --- | --- |
+| §4.1 authorization binding | `AuthorizationBinding` carries clearance reference and digest, tenant, authorized vendor and model, policy identity and reservation identity. The unit **verifies**; there is no method that mints, widens or re-derives one |
+| §4.1 ordered minimized context | `MinimizedUnit(unit_id, text, token_count)` in run order; `minimized_context_digest` binds identifiers and exact text, and order moves the value |
+| §4.1 exchange schema version | A field, bound into the request digest, so a request cannot be reinterpreted under a later schema |
+| §4.4 what the request digest binds | Tenant, schema version, content digest, vendor/model binding, parameters, clearance identity, correlation, `not_valid_after`. `submitted_at` is bound (immutable); lease, claim, dispatch and terminal timestamps are excluded |
+| §4.2 `trust` | Constant `UNTRUSTED_EVIDENCE`, in the record *and* as a database CHECK |
+| §4.2 four outcomes | `ANSWERED`, `REFUSED`, `FAILED`, `OUTCOME_UNKNOWN` |
+| §4.2 dispatch-attempt provenance | `DispatchAttempt` is a distinct record type; provider receipt, acceptance, completion, billing, tokens, cost and response existence are written as explicit `UNKNOWN`. A CHECK makes `OUTCOME_UNKNOWN` and `DISPATCH_ATTEMPT` inseparable |
+| §4.3 lease expiry | Before dispatch the request becomes claimable again; after possible dispatch it is terminal `OUTCOME_UNKNOWN`. The requeue is guarded by `dispatched_at IS NULL` *inside its own UPDATE* |
+| §4.3 tenant in identity | Primary key is `(tenant_id, request_id)`, so the dedup key is tenant-scoped by construction rather than by every query remembering |
+| §4.4 retention | Earlier of acknowledgement + 1h and creation + 24h, **per artifact**, evaluated in SQL. A missing or late acknowledgement never extends the hard deadline |
+| §4.4 tombstone | Identities, digests, terminal outcome, acknowledgement and purge times, correlation, clearance reference, reservation identity, vendor/model binding, non-content provenance. `tombstone()` selects no column that could carry content |
+| D-5 reservation | Never released. `reservation_released` exists only so a CHECK can make "released" unrepresentable — purging the content does not purge the obligation |
+| §5.2 grants | Three roles, non-login owner, column-scoped worker writes, forced RLS |
+| §5.3 no credential | The unit composes, claims, validates and refuses with `CREDENTIAL_NOT_COMMISSIONED` — never a generic error, never a fabricated answer |
+| Tenancy §4 cross-tenant | Reads and leases indistinguishable from unknown; writes rejected by the database and mapped internally to `TENANT_SCOPE_REFUSED` without disclosing whether another tenant's row exists |
 
-- **D-1 (is inference an action?)** is untouched. This package is deliberately
-  **not** wired into the governed execution hook, and nothing here decides whether
-  a model call requires clearance. That seam is left unbuilt `[G]` — building it
-  either way would have answered D-1 by implementation.
-- **D-3 (credential custody)** cannot arise: there is no credential to custody,
-  and `tests/test_boundaries.py` fails if any module reads the environment `[V]`.
-- **D-4 (what is recorded)** is implemented as the *shape* `RECORD_DIGEST_AND_METADATA`
-  can occupy, plus a purge that reduces a full exchange to exactly that. Which
-  posture a deployment runs under is still D-4's to decide.
-- **D-5 (concentration limits at execution)** is out of scope by instruction —
-  the vendor-mix quantity is undefined and no counter is implemented `[G]`.
+## Decisions taken, and two divergences named
 
-**A live provider still requires the CR-family ruling §4b names.** Nothing here
-shortens that path.
-
-## Decisions taken (reversible mechanics)
-
-Each of these was mine to make under the delegation, and each is recorded because
-it is the kind of thing a reader will otherwise have to reverse-engineer.
-
-**A bespoke migration runner rather than Alembic.** Alembic orders by a
-`down_revision` chain and identifies a revision by a hand-typed hash. The runner
-here identifies a migration by *the digest of its own text* and refuses to
-proceed if an already-applied migration no longer hashes to what the ledger
-recorded. Editing an applied migration is the classic way two deployments diverge
-silently — the file says one thing, the database contains another, and nothing
-notices until a constraint that "exists" turns out not to. This turns that into a
-refusal at startup naming the migration. It also adds no dependency, and the
-repository's other `packages/` Postgres consumer has no migration tool at all `[V]`.
+**A bespoke digest-pinned migration runner rather than Alembic.** A migration is
+identified by the digest of its own text, and an already-applied migration whose
+text changed is refused at startup. Editing an applied migration is the classic way
+two deployments diverge silently. It adds no dependency, and the ruling's own
+objection to `TWO_ROLES_BY_MIGRATION` was the absence of a mechanism.
 
 **Raw psycopg3 rather than SQLAlchemy Core.** `durable-execution` uses SQLAlchemy
-because DBOS requires it `[V]`; this package does not use DBOS. The exchange is
-eight statements, and it needs precise control over `SET LOCAL` and role-scoped
-connections — plumbing an ORM layer would obscure rather than help.
+because DBOS requires it `[V]`; this package does not use DBOS, needs precise
+control over `SET LOCAL` and role-scoped connections, and is eight statements long.
 
-**Three roles, with the owner unable to log in.** `meu_exchange_owner` owns every
-object and has `NOLOGIN`; neither application role owns anything, so neither can
-`DROP`, `ALTER` or disable a policy. A role nobody can authenticate as cannot be
-phished, leaked or reused.
+**Migration 1 was edited rather than superseded.** The v1 schema was never applied
+anywhere, so a v2 migration would leave a shape in history that no database ever
+had. The digest pin exists to prevent editing an *applied* migration, and this one
+is not.
 
-**Column-scoped grants for the worker.** The worker must purge content and stamp
-an acknowledgement. A table-level `UPDATE` granting that would also let it set
-`state` — so it could mark its own request `COMPLETED` with no exchange having
-happened, or rewrite an outcome the unit recorded. `GRANT UPDATE (content,
-content_purged_at)` gives exactly the needed capability and the database refuses
-the rest `[V]`.
+**Divergence, flagged for the owner rather than decided: the request digest binds a
+content digest, not the inline text.** D-4's letter says "ordered minimized unit
+identifiers and exact text". Inlining would make the request digest unrecomputable
+the moment content is purged, leaving a tombstone whose central claim could no
+longer be checked — the same reasoning the retention ruling itself uses. Binding a
+content digest satisfies the intent (a substituted prompt still fails verification,
+and this is tested) while diverging from the letter. **This is the owner's call.**
 
-**`current_setting` without `missing_ok`.** The two-argument form returns `NULL`
-when unset, `tenant_id = NULL` is false for every row, and a session that forgot
-its tenant identity would read an empty exchange and conclude there was no work —
-an answer indistinguishable from a correct one. The one-argument form raises `[V]`.
+**Divergence, resolved: `submitted_at` is inside the digest.** D-4 excludes "mutable
+lease, claim, attempt and processing timestamps". A creation instant is none of
+those and never changes, so it stays bound; the four mutable ones are excluded and
+a test asserts their absence.
 
-**Per-operation connections, and a refusal for anything else.** See the finding
-below.
+## Two findings the tests produced, from the earlier revision
 
-**Content digested separately from the record.** The request digest covers a
-*content digest*, not the content. Inlining would make the request digest
-unrecomputable the moment content was purged, leaving a tombstone whose central
-claim could no longer be checked. Asserted directly: a purged row still rebuilds
-its own request digest `[V]`.
+**`CREATE SCHEMA ... AUTHORIZATION` does not own the tables.** It sets the schema's
+owner and nothing else. The migrating superuser owned them, so `FORCE ROW LEVEL
+SECURITY` bound a role nobody used and "the owner cannot log in" was a true
+statement about a role that owned nothing. Fixed with an explicit `SET ROLE` `[V]`.
 
-## Two findings the tests produced
+**`SET LOCAL` is scoped to a transaction, not to a savepoint.** A connection handed
+in mid-transaction leaks tenant identity past the savepoint's release — a
+cross-tenant read no policy can catch, because the session genuinely *is* that
+tenant. Measured both directions; the exchange refuses a connection it cannot scope
+`[V]`.
 
-**`CREATE SCHEMA ... AUTHORIZATION` does not own the tables.** It sets the
-schema's owner and nothing else; tables created inside it belong to whoever ran
-the statement. The first implementation therefore left the migrating superuser
-owning them — `FORCE ROW LEVEL SECURITY` was binding a role nobody used, and "the
-owner cannot log in" was a true statement about a role that owned nothing. Caught
-by asserting ownership directly rather than trusting the `AUTHORIZATION` clause;
-fixed with an explicit `SET ROLE` in the migration `[V]`.
+## What remains unimplemented, and is recorded rather than papered over
 
-**`SET LOCAL` is scoped to a transaction, not to a savepoint.** Hand the exchange
-a connection that already has a transaction open and `conn.transaction()` gives a
-savepoint — the tenant identity then survives its release and stays live for
-whatever the next caller does. Nothing fails; a later read just quietly belongs to
-the wrong tenant, and no policy can catch it because the session genuinely *is*
-that tenant by then. Measured, both directions: on an `IDLE` connection the
-identity reverts and the next read fails closed; on an `INTRANS` one it leaks
-`[V]`. The exchange now refuses a connection it cannot scope
-(`UnscopableConnection`), and both the leak and the refusal are tests.
+The ruling explicitly refuses an unenforced runbook claim as a substitute for a
+provisioning mechanism, so these stay visible:
 
-## Verification
-
-114 tests, all passing against PostgreSQL 16.13 `[V]`. The suite **fails rather
-than skips** without a server, and CI fails the job if any test skipped or if none
-was collected — row-level security cannot be exercised against a stand-in, and for
-a security boundary a skipped row that reads as a pass is worse than a red one.
-
-Properties asserted with their mechanism removed, so each measures what it claims:
-
-| Property | The mutation that proves it |
+| | |
 | --- | --- |
-| `FORCE` binds the table owner | dropping `FORCE` makes the owner read across the tenant boundary |
-| the wall-clock scan works | a planted `datetime.now()` trips it; a docstring mentioning it does not |
-| the `SET LOCAL` refusal is needed | the raw leak is reproduced outside `Exchange` |
-| refusals are terminal | a positive control answers, so "refuses everything" fails |
-| the sweep is not a retry | a unit polling after reconciliation finds nothing |
-| drift is refused | an edited applied migration; a pending step is proven not to land |
-
-Repo gates: package CI coverage, package license and import boundaries all pass
-with the new package present `[V]`.
+| **Role provisioning in production** `[G]` | This package's migration creates roles for a *test* cluster. It issues no credential, and the runtime roles are created without `LOGIN` precisely so nothing here can be mistaken for a usable identity |
+| **Credential custody** `[G]` | None exists, for the runtime roles or the migration identity. `PLATFORM_ENVIRONMENT_VARIABLE` is rejected for production and this ADR does not reopen it |
+| **Controlled migrations** `[G]` | A separately controlled migration identity assuming the owner role during reviewed migrations only. `migrate()` is never called at import or at startup, which is necessary and not sufficient |
+| **Transport protection** `[G]` | `sslmode` is set nowhere. RLS over an unencrypted connection controls who may read a row, not who may observe it in flight |
+| **Tenant-bound database identities** `[G]` | Required before multi-tenancy. This package takes the tenant as a caller argument, which is single-tenant-safe and is **not** an approved multi-tenant design |
+| **Vendor-mix reservation counter** `[G]` | Out of scope by instruction. The binding carries a `reservation_id`; nothing here defines, counts or releases it |
+| **CR-1** `[R]` | Admits one companion deployment unit, named. The MEU is a second, so its boundary is specified and its **existence** is not. This package ships no deployment unit, so it does not depend on the amendment — but nothing here may be read as authorizing one to run |
 
 ## What this does not do
 
 It composes nothing into the worker, changes no signed field, no canonical
 serialization of any other package, no digest and no signature format. It adds no
-external destination, no credential, no vendor dependency and no Railway
-migration. It marks no gate identifier satisfied and changes no ratified pin.
+external destination, no credential, no vendor dependency and no Railway migration.
+It marks no gate identifier satisfied and changes no ratified pin.
 
-It is not production-capable and is not a step that makes live egress closer to
+It is not production-capable, and it does not make live egress closer to
 authorized — only better prepared for, if it ever is.
