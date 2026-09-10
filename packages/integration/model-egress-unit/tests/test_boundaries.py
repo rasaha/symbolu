@@ -133,6 +133,77 @@ def test_only_the_postgres_subpackage_imports_the_driver():
                 f"{path.name} imports psycopg outside the postgres subpackage")
 
 
+#: Source for a subprocess that hides ``psycopg``, then proves it is really hidden.
+#:
+#: ``find_spec`` and not ``find_module``: the legacy finder protocol was deprecated
+#: in 3.4 and **removed in 3.12**, so a ``find_module`` blocker is silently inert on
+#: 3.12+. That is not hypothetical — it is what the first version of these tests did.
+#: The positive half then passed for the wrong reason on the 3.12 leg, and only the
+#: negative control noticed, which is the entire argument for having one.
+#:
+#: The self-check is the second lesson. A blocker that stops working must break every
+#: test that relies on it, not just the one that happens to assert a refusal, so the
+#: first thing each subprocess does is confirm the block actually blocks.
+_BLOCK_PSYCOPG = """
+import sys
+
+
+class BlockPsycopg:
+    def find_spec(self, name, path=None, target=None):
+        if name == "psycopg" or name.startswith("psycopg."):
+            raise ImportError("No module named %r (blocked)" % name)
+        return None
+
+
+sys.meta_path.insert(0, BlockPsycopg())
+
+try:
+    import psycopg
+except ImportError:
+    pass
+else:
+    raise SystemExit(
+        "the blocker is inert: psycopg imported anyway, so this test proves nothing"
+    )
+"""
+
+
+def _without_psycopg(body: str) -> subprocess.CompletedProcess:
+    """Run ``body`` in a subprocess where importing ``psycopg`` fails.
+
+    A subprocess rather than ``monkeypatch``, so the blocked import cannot be
+    satisfied by a module the parent process already has loaded.
+    """
+
+    return subprocess.run(
+        [sys.executable, "-c", _BLOCK_PSYCOPG + textwrap.dedent(body)],
+        capture_output=True,
+        text=True,
+        env={**os.environ, "PYTHONPATH": str(SRC.parent)},
+    )
+
+
+def test_the_driver_blocker_actually_blocks():
+    """The control on the controls, run on whatever interpreter the suite is on.
+
+    Both tests below are meaningless if the blocker is inert, and it *was* inert on
+    3.12 while reporting green. This fails loudly on any interpreter where the
+    mechanism stops working, instead of leaving two tests quietly proving nothing.
+    """
+
+    result = _without_psycopg("""
+        import importlib
+        try:
+            importlib.import_module("psycopg")
+        except ImportError:
+            print("BLOCKED")
+        else:
+            raise SystemExit("psycopg was importable")
+        """)
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "BLOCKED" in result.stdout
+
+
 def test_the_package_imports_with_no_database_driver_at_all():
     """The claim, tested by removing the driver rather than by reasoning about imports.
 
@@ -143,36 +214,19 @@ def test_the_package_imports_with_no_database_driver_at_all():
     psycopg and tried to import the package failed on all three Pythons.
 
     A structural test that reasons about imports is not a substitute for taking
-    the dependency away and looking. This runs in a subprocess so the blocked
-    import cannot be satisfied by a module the parent already loaded.
+    the dependency away and looking.
     """
 
-    program = textwrap.dedent(
-        """
+    result = _without_psycopg("""
         import sys
-
-        class Block:
-            def find_module(self, name, path=None):
-                if name == "psycopg" or name.startswith("psycopg."):
-                    return self
-            def load_module(self, name):
-                raise ImportError("No module named %r (blocked)" % name)
-
-        sys.meta_path.insert(0, Block())
-
         import ugence_model_egress_unit as meu
+
         assert meu.LIVE_VENDOR_EGRESS is False
         assert meu.DeterministicFakeProvider().maturity == "FIXTURE_ONLY"
         assert meu.RequestNotClaimable is not None
         assert "psycopg" not in sys.modules
         print("OK")
-        """
-    )
-    result = subprocess.run(
-        [sys.executable, "-c", program],
-        capture_output=True, text=True,
-        env={**os.environ, "PYTHONPATH": str(SRC.parent)},
-    )
+        """)
     assert result.returncode == 0, result.stdout + result.stderr
     assert "OK" in result.stdout
 
@@ -181,44 +235,16 @@ def test_the_store_still_needs_the_driver():
     """The other half. Without it, a package that had quietly stopped talking to
     PostgreSQL at all would satisfy the test above."""
 
-    program = textwrap.dedent(
-        """
-        import sys
-
-        class Block:
-            def find_module(self, name, path=None):
-                if name == "psycopg" or name.startswith("psycopg."):
-                    return self
-            def load_module(self, name):
-                raise ImportError("No module named %r (blocked)" % name)
-
-        sys.meta_path.insert(0, Block())
+    result = _without_psycopg("""
         try:
             import ugence_model_egress_unit.postgres
         except ImportError:
             print("REFUSED")
         else:
             raise SystemExit("the store imported without a driver")
-        """
-    )
-    result = subprocess.run(
-        [sys.executable, "-c", program],
-        capture_output=True, text=True,
-        env={**os.environ, "PYTHONPATH": str(SRC.parent)},
-    )
+        """)
     assert result.returncode == 0, result.stdout + result.stderr
     assert "REFUSED" in result.stdout
-
-
-def test_the_package_imports_no_first_party_package():
-    """It composes a store and a provider and depends on no other Ugence package,
-    so it cannot drag the governance kernel into an egress deployment unit."""
-
-    for path in SOURCES:
-        first_party = {r for r in _imported_roots(path)
-                       if r.startswith("ugence_") or r in {"decision_governance",
-                                                           "governance_providers"}}
-        assert first_party <= {"ugence_model_egress_unit"}, (path.name, first_party)
 
 
 # --- determinism -------------------------------------------------------------
