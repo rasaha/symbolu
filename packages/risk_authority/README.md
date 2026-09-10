@@ -524,13 +524,42 @@ behavioral, with a negative control. A source-text tripwire is not the normative
 equivalent correct code can spell the comparison many ways, so a substring assertion would
 fail on a correct refactor while passing on any rewrite that kept the string.
 
+**`AuthorityGrant` joined the rule at 0.12.0, and a scoping correction.** The 0.11.0 text
+here listed `AuthorityGrant.is_active` among the untouched freshness bounds. That was
+wrong: it is an authorization gate, not a freshness report — `authority_violations` calls
+it at the instant a `RiskDecision` is minted, and a violation raises `AuthorityDeniedError`.
+It is now half-open, and it uses `expires_at`, not `valid_until`, which is the naming
+signal that always separated it from the three below.
+
+**Delegated authority also bounds the *lifetime* of what it delegates — 0.12.0.** The
+operator alone was not enough. `RiskDecision.expires_at` was `now + DEFAULT_DECISION_TTL`,
+uncapped, so a grant expiring moments after a decision was minted still produced a full
+hour of decision validity — and an envelope TTL on top of that. Measured before the fix,
+machine authority reached **1:29:59.999999 past an expired delegation**. Decision expiry is
+now `min(now + ttl, grant.expires_at, freshness_horizon)`, and `EnvelopeIssuer.issue` caps
+the envelope by its decision's expiry — which only the issuance seam did before, so a
+direct caller with a generous `ttl` could mint an envelope outliving its own decision.
+
+| Bound | Caps |
+|---|---|
+| `grant.expires_at` | the decision minted under it |
+| `freshness_horizon` (earliest required-control `valid_until`) | the decision it satisfied |
+| `decision.expires_at` | every envelope issued from it, at the seam **and** the service |
+
+A cap that lands on `now` produces a window authorizing nothing, so it is refused rather
+than returned already expired. That is reachable precisely because the freshness bounds
+below stay inclusive: a control is still current at exactly its `valid_until`.
+
 **What this rule does *not* cover.** Evidence and control freshness bounds — the
-`valid_until` family on `domain/evidence.py`, `domain/binding.py`, `domain/controls.py`,
-`SubjectContext.subject_valid_until`, and `AuthorityGrant.is_active` — remain **inclusive**
-and are deliberately untouched here. Those answer "is this observation still fresh", not
-"may this act now", and moving them is a separate question that has not been ruled on. The
-table above is the complete list of what changed; do not read it as a claim about every
-datetime comparison in the package.
+`valid_until` family on `domain/evidence.py`, `domain/binding.py` and `domain/controls.py`,
+plus `SubjectContext.subject_valid_until` — remain **inclusive** and are deliberately
+untouched. The first three answer "is this observation still fresh", not "may this act
+now". `subject_valid_until` is an authorization gate and is the acknowledged exception:
+`test_context_accepts_equal_validity_bounds` deliberately commits a zero-width
+`SubjectContext` (`subject_valid_from == subject_valid_until`), which a half-open rule would
+make evaluable at no instant at all, so moving it needs its own ruling. The tables above are
+the complete list of what changed; do not read them as a claim about every datetime
+comparison in the package.
 
 A malformed window (`not_before >= not_after`, or a non-datetime bound) raises
 `KeyWindowError` at construction rather than becoming a silently always-invalid key — a

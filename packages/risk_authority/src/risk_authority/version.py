@@ -53,4 +53,25 @@ from __future__ import annotations
 #: shape: inclusive lower bound, exclusive upper bound. No canonical serialization, digest
 #: or signature format is touched, and an envelope issued before this version still
 #: verifies — it simply stops authorizing one microsecond earlier than it used to.
-__version__ = "0.11.0"
+#: **Correction, recorded at 0.12.0:** the sentence above naming "grants" overclaimed.
+#: ``AuthorityGrant.is_active`` was still inclusive at 0.11.0; only the credential-grant
+#: validity window was half-open. 0.12.0 is what makes the claim true.
+#: ``0.12.0`` closes the delegation-reach exposure that the temporal-boundary audit found
+#: behind ``AuthorityGrant``. Two defects, neither closed by the other.
+#: ``AuthorityGrant.is_active`` becomes half-open: it is an authorization gate —
+#: ``authority_violations`` calls it at the moment a ``RiskDecision`` is minted — not a
+#: freshness report, so a grant expiring at exactly ``now`` may no longer mint. And
+#: ``RiskDecision.expires_at``, previously ``now + DEFAULT_DECISION_TTL`` uncapped, is now
+#: capped at ``min(now + ttl, grant.expires_at, freshness_horizon)``. The two together are
+#: what matter: with only the operator, the boundary instant moved one microsecond and a
+#: grant expiring a moment later still yielded a full hour of decision validity plus an
+#: envelope TTL on top — measured at 1:29:59.999999 of machine authority past an expired
+#: delegation. ``EnvelopeIssuer.issue`` now also caps the envelope by its decision's
+#: expiry, which only the issuance seam did before, so a direct caller with a generous
+#: ``ttl`` can no longer mint an envelope outliving the decision that justified it.
+#: ``freshness_horizon`` is added to ``domain.controls`` and threaded through
+#: ``DecisionAuthorityPort.issue_decision`` as an optional keyword, so an existing
+#: implementer is unaffected. Control results created through the evaluation seam carry no
+#: ``valid_until``, so the freshness cap is inert on the reference flow and no existing
+#: decision moves. No canonical serialization, digest or signature format is touched.
+__version__ = "0.12.0"

@@ -43,7 +43,22 @@ class AuthorityGrant:
     grantable_scope: Scope = field(default_factory=Scope)
 
     def is_active(self, now: datetime) -> bool:
-        return self.expires_at is None or now <= self.expires_at
+        """Half-open ``[.., expires_at)`` — expired at exactly ``expires_at``.
+
+        This is an *authorization* gate, not a freshness report: ``authority_violations``
+        calls it at the moment a ``RiskDecision`` is minted, and a violation raises
+        ``AuthorityDeniedError``. It decides who may issue decisions at all.
+
+        It was previously inclusive, and the boundary instant did not cost a microsecond —
+        it cost ninety minutes. A grant expiring at exactly ``now`` was still "active", so
+        it minted a decision carrying a full ``DEFAULT_DECISION_TTL``, from which an
+        envelope carrying a further ``DEFAULT_ENVELOPE_TTL`` could be issued as late as
+        that decision allowed. Machine authority reached 1:29:59.999999 past a delegation
+        that had already expired when it was exercised. The operator closes the instant;
+        the expiry caps in ``ReferenceDecisionAuthority.issue_decision`` close the reach.
+        """
+
+        return self.expires_at is None or now < self.expires_at
 
 
 def authority_violations(

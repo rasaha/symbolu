@@ -97,6 +97,19 @@ class EnvelopeIssuer:
                 "an expired decision"
             )
 
+        # An envelope may not outlive the decision it is minted from. The issuance seam
+        # already capped its own TTL this way; this service did not, so a caller passing a
+        # generous ``ttl`` here produced an envelope that outlived its decision — six-hour
+        # TTL against a one-hour decision gave five hours of authority no decision covered.
+        # Capping at the source closes it for every caller, seam or direct.
+        if decision.expires_at is not None:
+            ttl = min(ttl, decision.expires_at - now)
+            if ttl <= timedelta(0):
+                raise RiskAuthorityError(
+                    f"decision {decision.decision_id} leaves no validity at "
+                    f"{now.isoformat()}; no envelope may be issued"
+                )
+
         # Default to the exact decision scope; a caller may narrow it.
         scope = (envelope_scope or decision.scope).normalized()
         validate_envelope_subset(scope, decision.scope.normalized())

@@ -17,6 +17,7 @@ from .enums import ControlStatus
 __all__ = [
     "ControlResult",
     "SATISFYING_STATUSES",
+    "freshness_horizon",
     "required_controls_satisfied",
     "unsatisfied_controls",
 ]
@@ -113,6 +114,37 @@ def _group(results: Iterable[ControlResult]) -> dict[str, list[ControlResult]]:
     for r in results:
         grouped.setdefault(r.control_id, []).append(r)
     return grouped
+
+
+def freshness_horizon(
+    required: Iterable[str],
+    results: Iterable[ControlResult],
+) -> Optional[datetime]:
+    """The earliest ``valid_until`` among the required controls backing a decision.
+
+    A decision rests on the controls that satisfied it, so it may not outlive the
+    freshness of the weakest of them: past this instant the evidence that justified the
+    decision has gone stale, and re-evaluating would no longer reach the same answer.
+
+    ``None`` means no required control declares an upper bound, so freshness imposes no
+    cap — not that the cap is zero. Only ``PASS`` results contribute: a
+    ``NOT_APPLICABLE`` control asserts nothing that can go stale, and a non-satisfying
+    control would already have prevented the decision.
+
+    Pure and clock-free by design: it reports a bound, it does not decide whether that
+    bound has elapsed. ``unsatisfied_controls`` is what decides staleness, at an explicit
+    ``now``.
+    """
+
+    wanted = set(required)
+    bounds = [
+        r.valid_until
+        for r in results
+        if r.control_id in wanted
+        and r.status is ControlStatus.PASS
+        and r.valid_until is not None
+    ]
+    return min(bounds) if bounds else None
 
 
 def required_controls_satisfied(

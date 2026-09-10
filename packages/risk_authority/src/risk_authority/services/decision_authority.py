@@ -71,6 +71,7 @@ class DecisionAuthorityPort(Protocol):
         now: datetime,
         evaluated_at: Optional[datetime] = None,
         ttl: timedelta = DEFAULT_DECISION_TTL,
+        freshness_horizon: Optional[datetime] = None,
     ) -> RiskDecision: ...
 
 
@@ -97,6 +98,7 @@ class ReferenceDecisionAuthority:
         now: datetime,
         evaluated_at: Optional[datetime] = None,
         ttl: timedelta = DEFAULT_DECISION_TTL,
+        freshness_horizon: Optional[datetime] = None,
     ) -> RiskDecision:
         """Issue a binding :class:`RiskDecision`.
 
@@ -116,6 +118,8 @@ class ReferenceDecisionAuthority:
 
         bound_scope = requested_scope.normalized()
 
+        expires_at = now + ttl
+
         if grants_authority:
             reasons = authority_violations(
                 grant,
@@ -128,8 +132,35 @@ class ReferenceDecisionAuthority:
             )
             if reasons:
                 raise AuthorityDeniedError(reasons)
+
+            # A decision may not outlive what justified it. Previously ``now + ttl`` was
+            # applied unconditionally, so a grant that expired moments after the decision
+            # was minted still yielded a full hour of decision validity — and a further
+            # envelope TTL on top of that. Capping here is what makes the delegation's own
+            # expiry mean something downstream; the half-open operator on
+            # ``AuthorityGrant.is_active`` only closes the boundary instant.
+            #
+            # Both bounds are optional and each caps independently: an absent bound
+            # imposes no cap rather than a zero one.
+            for bound in (grant.expires_at, freshness_horizon):
+                if bound is not None:
+                    expires_at = min(expires_at, bound)
+
+            # Windows are half-open, so ``expires_at == now`` authorizes nothing at any
+            # instant. Refuse rather than mint a decision that is already expired: a
+            # zero-width grant of authority is a configuration error, and returning one
+            # would push the failure to a later, less obvious refusal.
+            if expires_at <= now:
+                raise AuthorityDeniedError(
+                    [
+                        "no validity remains for a decision at this instant: "
+                        f"grant expires_at={grant.expires_at}, "
+                        f"control freshness horizon={freshness_horizon}"
+                    ]
+                )
         else:
-            # A refusal grants nothing.
+            # A refusal grants nothing, so neither cap applies: the decision conveys no
+            # authority whose lifetime could exceed the grant's or the evidence's.
             bound_scope = Scope()
 
         return RiskDecision(
@@ -150,7 +181,7 @@ class ReferenceDecisionAuthority:
             # rather than substituting ``now``, which would make the authority's own clock
             # masquerade as the evaluator's (R-12b).
             evaluated_at=evaluated_at,
-            expires_at=now + ttl,
+            expires_at=expires_at,
             applicable_rules=evaluation.applicable_rules,
             reason=("; ".join(evaluation.trace))[:512],
         )

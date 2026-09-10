@@ -20,6 +20,7 @@ from .binding import (
 )
 from .controls import (
     ControlResult,
+    freshness_horizon,
     required_controls_satisfied,
     unsatisfied_controls,
 )
@@ -101,6 +102,7 @@ __all__ = [
     "SUPPORTED_SIGNAL_SCHEMA_VERSIONS",
     # controls / evidence
     "ControlResult",
+    "freshness_horizon",
     "required_controls_satisfied",
     "unsatisfied_controls",
     "ControlEvidenceRecord",

@@ -22,7 +22,7 @@ from typing import Callable, Mapping, Optional, Any
 from ..crypto.keys import KeyRing, SigningKeyRecord
 from ..domain.actions import ActionAuthorization, CanonicalAction
 from ..domain.binding import AdmittedContext, CaseBindingContext, usable_control_results
-from ..domain.controls import ControlResult
+from ..domain.controls import ControlResult, freshness_horizon
 from ..domain.decision import RiskDecision
 from ..domain.enums import (
     ControlStatus,
@@ -723,6 +723,13 @@ class RiskAuthorityApplication:
             # decision, so the instant downstream admission depends on is covered by
             # ``decision_digest`` rather than by an outer field anyone may rewrite (R-12b).
             evaluated_at=req.evaluated_at,
+            # The decision may not outlive the freshness of the controls that satisfied
+            # it. Derived here, from the case's own persisted control state and the
+            # authoritative required set — never from the caller — for the same reason
+            # the recommendation is re-derived above.
+            freshness_horizon=freshness_horizon(
+                authoritative.required_controls, controls
+            ),
         )
         self.decisions.save(decision)
 

@@ -365,6 +365,76 @@ validity windows and says so.
 `ugence-cloud-scaling-credential-broker` 0.1.0 → **0.2.0** (E-A on envelope and
 authorization bounds).
 
+## 11. Amendment 4 — delegated authority bounds what it delegates
+
+Ratified after auditing the five sites Amendment 3 left inclusive. Two of the five turned
+out not to be freshness at all, and one of those carried the largest temporal exposure yet
+found in Risk Authority.
+
+### The finding
+
+`AuthorityGrant.is_active` is an **authorization gate**: `authority_violations` calls it at
+the moment a `RiskDecision` is minted, and a violation raises `AuthorityDeniedError`. It
+decides who may issue decisions at all. Amendment 3's own scoping paragraph had listed it
+among the untouched freshness bounds — that was wrong, and this amendment corrects it.
+
+`[V]` **The boundary instant did not cost a microsecond; it cost ninety minutes.**
+`RiskDecision.expires_at` was `now + DEFAULT_DECISION_TTL`, uncapped. Driven through the
+real path with a grant expiring at exactly `now`, before the fix:
+
+```
+is_active(now) -> True     authority_violations -> [] (AUTHORIZED)
+decision.expires_at -> now + 1:00:00     envelope.expires_at -> now + 0:30:00
+issue the envelope as late as the decision permits:
+machine authority reaches 1:29:59.999999 past the expired delegation
+```
+
+### The rulings
+
+**H-A — `AuthorityGrant.is_active` is half-open.** `now < expires_at`.
+
+**H-B — decision expiry is capped by what justified it.**
+`min(now + ttl, grant.expires_at, freshness_horizon)`, where `freshness_horizon` is the
+earliest `valid_until` among the required controls that satisfied the decision. H-A alone
+would have moved the ninety-minute reach one microsecond earlier; H-B is what closes it.
+
+**H-C — a zero-width result is refused, not minted already expired.** A cap landing on
+`now` authorizes nothing at any instant under the half-open rule.
+
+### One gap the implementation surfaced, closed here
+
+`[V]` **`EnvelopeIssuer.issue` capped nothing by the decision's expiry — only the issuance
+seam did.** A direct caller passing a six-hour `ttl` against a one-hour decision produced
+an envelope outliving its decision by five hours. The regression test H-B requires cannot
+hold without closing this, so it is closed at the service, where it covers every caller.
+
+### Two limits stated rather than hidden
+
+`[V]` **The freshness cap is inert on the reference flow.** `ControlResultInput` carries no
+`valid_until`, so control results created through the evaluation seam are unbounded and
+supply no horizon. This is why no existing decision moved. The cap is proved at
+`ReferenceDecisionAuthority` directly, with a companion test pinning the unbounded case,
+rather than by changing a public request schema to manufacture a test condition.
+
+`[V]` **H-C is reachable only because the freshness bounds stay inclusive.** A control is
+current at exactly its `valid_until`, so it satisfies the required set while yielding a
+horizon of exactly `now`. Without that interaction the refusal branch would be dead code —
+a mutation of it survived until a test was written for precisely this path.
+
+### Still not ruled on
+
+`[G]` `SubjectContext.subject_valid_until` is an authorization gate and remains inclusive.
+`test_context_accepts_equal_validity_bounds` deliberately commits a zero-width
+`SubjectContext`, which a half-open rule would make evaluable at no instant at all. Unlike
+the envelope — where nothing was pinned to the endpoint — this one has a committed
+dependency, so changing it means first deciding whether a zero-width subject window is
+itself the defect. `domain/evidence.py`, `domain/binding.py` and `domain/controls.py` remain
+inclusive as freshness reports.
+
+### Versions
+
+`ugence-risk-authority` 0.11.0 → **0.12.0** (H-A, H-B, H-C).
+
 ## 7. Invariants this ADR does not touch
 
 The composition engine mints no authority. Deployment assertions are not proof. Only the
