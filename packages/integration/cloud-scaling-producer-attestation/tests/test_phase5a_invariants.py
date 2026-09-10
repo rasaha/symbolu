@@ -238,7 +238,7 @@ PHASE_5A_FROZEN_DIGESTS = {
     ),
     # Moved by R-12b: the decision snapshot gained ``evaluated_at``.
     "decision_digest": (
-        "sha256:6aba137d8d2c057d768b1243469636e4c1137037883adfb9a078c9a3fbbf0ca2"
+        "sha256:4636dee22546d8f801f1da9482fc85c78c991e44368ea6207ea3f0fb012e1ed6"
     ),
     "producer_signing_payload_digest": (
         "sha256:1035d2fc2ab8f4b443f815562f9f6ad8e4ce0032633f03a12e04e691c24cf2d0"
@@ -256,7 +256,7 @@ PHASE_5A_FROZEN_DIGESTS = {
     # ``decision_snapshot_digest``, so the candidate digest moved beneath an unchanged
     # field set.
     "candidate_digest": (
-        "sha256:357bb3d4d660034c9abe50000986808a1e9c15fce05b4a22b6cb82836cc50e79"
+        "sha256:7ffeefce768d3fbfb23a0d3ed0be2a028e222b26d84767d392455b9f76d1e930"
     ),
 }
 

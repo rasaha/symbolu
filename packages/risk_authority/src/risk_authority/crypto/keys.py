@@ -23,14 +23,27 @@ Both bounds absent therefore means unbounded-valid, which is what every existing
 ``SigningKeyRecord`` in the repository relies on and what the Policy Authority key
 window (``ugence_policy_authority.core.signing``) already does.
 
-**This deliberately differs from the envelope's own validity boundary, and the two must
-not be conflated.** ``RiskAuthorizationEnvelope.is_temporally_valid`` is *inclusive* at
-both ends (``not_before <= now <= expires_at``): at exactly ``expires_at`` an envelope is
-still valid. At exactly ``not_after`` a key is **not**. The difference is intentional and
-separately ratified: an envelope is a *grant*, whose ratified boundary is unchanged by this
-work, while a key is a *credential*, whose interval is half-open so that two adjacent
-rotation windows cannot both be valid at the instant they meet. Anyone tempted to "fix" the
-inconsistency should change neither without a ruling.
+**The envelope now shares this shape.** ``RiskAuthorizationEnvelope.is_temporally_valid``
+is ``not_before <= now < expires_at``, so at exactly ``expires_at`` an envelope is expired,
+exactly as a key is at ``not_after``. One rule covers both: *authority begins at the lower
+bound and ends immediately upon reaching the upper bound.*
+
+.. note:: **Superseded wording, retained for traceability.**
+
+   This module previously said the two conventions "deliberately differ … and must not be
+   conflated", on the reasoning that a key is a *credential* whose interval must be
+   half-open so two adjacent rotation windows cannot both be valid at the instant they
+   meet, while an envelope is a *grant* whose inclusive boundary was separately ratified.
+
+   That argument was retired on review. It is sound about *overlap* — envelopes are never
+   chained, since issuance always sets ``not_before`` to its own issuance instant, so no
+   two envelope windows ever meet — but the absence of overlap never explained why a
+   security validity artifact should remain usable at its own stated expiry. The practical
+   evidence was that nothing downstream would honor it: at ``now == expires_at`` the
+   credential broker derived a zero-width window and refused, and
+   ``governance_contracts.Validity`` cannot construct ``issued_at == expires_at`` at all.
+   The envelope was the last artifact still saying yes at an instant no consumer could act
+   on. Changing it altered no signed field, canonical byte, digest or signature.
 
 Before this, ``not_before`` / ``not_after`` were declared on ``SigningKeyRecord`` and read
 nowhere: ``KeyRing.from_records`` discarded them, so no verification path could see a

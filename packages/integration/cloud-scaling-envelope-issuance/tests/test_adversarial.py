@@ -92,11 +92,28 @@ def test_the_caller_cannot_point_the_verifier_at_another_policy(world):
 # Time: one instant, the seam's, and nothing the caller chose
 # --------------------------------------------------------------------------- #
 def test_an_instant_outside_the_candidate_window_refuses_issuance(world):
+    """Still refused outside the window, and now by an earlier, more accurate gate.
+
+    This asserted ``VERIFICATION_NOT_VERIFIED``: the decision used to carry a full
+    ``DEFAULT_DECISION_TTL`` (expiring 01:05:00), so at 00:10 it was still valid and
+    policy-authenticity verification was the first thing to refuse.
+
+    RA 0.13.0's T-2 cap binds a decision by every prerequisite that authorized it,
+    including ``SubjectContext.subject_valid_until`` — which for this chain *is* the
+    candidate window, ending 00:08:10. At 00:10 the decision has genuinely expired, so
+    ``DECISION_EXPIRED`` fires first and no verification report is produced.
+
+    The gate this test names is not weakened, it is unreachable by instant choice: the two
+    bounds now coincide by construction, so no instant is outside the candidate window
+    while the decision remains valid. That is the cap working. Policy-authenticity refusal
+    keeps its own coverage on non-temporal routes in the three tests above, which do not
+    depend on this collapse.
+    """
+
     world.clock.at = EVALUATION_INSTANT + timedelta(minutes=10)  # recommendation expired 00:08:10
     out = _refused(world)
-    assert out.refusal is R.VERIFICATION_NOT_VERIFIED
-    assert out.report.as_of == world.clock.at
-    assert out.report.status_of(BINDING_KIND_POLICY_AUTHENTICITY) == S.POLICY_AUTHENTICITY_REFUSED
+    assert out.refusal is R.DECISION_EXPIRED, (out.refusal, out.detail)
+    assert out.report is None, "no verifier runs once the decision itself has expired"
 
 
 def test_an_expired_decision_refuses_before_any_verifier_runs(world, monkeypatch):

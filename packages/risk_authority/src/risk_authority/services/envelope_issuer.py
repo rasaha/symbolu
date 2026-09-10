@@ -88,12 +88,27 @@ class EnvelopeIssuer:
         # Time binding (spec §29): an envelope may never be minted from a decision
         # whose own validity window has elapsed. Without this an expired decision
         # would be re-minted into fresh runtime authority with a new TTL.
-        if decision.expires_at is not None and now > decision.expires_at:
+        # Half-open ``[.., expires_at)``, matching the issuance seam and the envelope's own
+        # window: at exactly ``decision.expires_at`` the decision is already expired.
+        if decision.expires_at is not None and now >= decision.expires_at:
             raise RiskAuthorityError(
                 f"decision {decision.decision_id} expired at "
                 f"{decision.expires_at.isoformat()}; no envelope may be issued from "
                 "an expired decision"
             )
+
+        # An envelope may not outlive the decision it is minted from. The issuance seam
+        # already capped its own TTL this way; this service did not, so a caller passing a
+        # generous ``ttl`` here produced an envelope that outlived its decision — six-hour
+        # TTL against a one-hour decision gave five hours of authority no decision covered.
+        # Capping at the source closes it for every caller, seam or direct.
+        if decision.expires_at is not None:
+            ttl = min(ttl, decision.expires_at - now)
+            if ttl <= timedelta(0):
+                raise RiskAuthorityError(
+                    f"decision {decision.decision_id} leaves no validity at "
+                    f"{now.isoformat()}; no envelope may be issued"
+                )
 
         # Default to the exact decision scope; a caller may narrow it.
         scope = (envelope_scope or decision.scope).normalized()

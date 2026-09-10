@@ -224,12 +224,20 @@ class CredentialBrokerSeam:
             return refuse(R.AUTHORIZATION_NOT_FOUND, "no authorization under this tenant and id")
         if authorization.decision is not ActionGateDecision.AUTHORIZED:
             return refuse(R.AUTHORIZATION_NOT_AUTHORIZED, f"decision is {authorization.decision.value}")
-        if authorization.expires_at is None or now > authorization.expires_at:
+        # Half-open, like the envelope below. ``ActionAuthorization.expires_at`` is copied
+        # verbatim from the envelope at admission, so an inclusive test here would let the
+        # derived artifact outlive the envelope it derives from by one instant — the exact
+        # inconsistency the boundary ruling removes.
+        if authorization.expires_at is None or now >= authorization.expires_at:
             return refuse(R.AUTHORIZATION_EXPIRED, "authorization has expired or carries no expiry")
         envelope = self._app.envelopes.get(request.tenant_id, authorization.envelope_id)
         if envelope is None:
             return refuse(R.ENVELOPE_NOT_FOUND, "the authorization's envelope is not in the store")
-        if now > envelope.expires_at:
+        # Half-open ``[not_before, expires_at)``: at exactly ``expires_at`` the envelope is
+        # expired and refuses here, by name. It previously passed this check and then
+        # refused ``WINDOW_INVALID`` two steps later on a zero-width credential window —
+        # fail-closed either way, but naming the wrong cause.
+        if now >= envelope.expires_at:
             return refuse(R.ENVELOPE_EXPIRED, "the envelope has expired")
         # 3. The reservation.
         reservation = self._reservations.get_reservation(request.reservation_id)

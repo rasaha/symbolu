@@ -118,4 +118,21 @@ class RiskAuthorizationEnvelope:
         return canonical_bytes(self)
 
     def is_temporally_valid(self, now: datetime) -> bool:
-        return self.not_before <= now <= self.expires_at
+        """Half-open ``[not_before, expires_at)`` — valid at ``not_before``, expired at
+        ``expires_at``.
+
+        This supersedes the earlier inclusive reading (``now <= expires_at``). The
+        argument that retired it: the absence of chained envelope windows explains why an
+        inclusive upper bound caused no *overlap*, but it never explained why a security
+        validity artifact should remain usable at its own stated expiry. Every usable
+        downstream authorization already refused there — the credential broker computes a
+        zero-width window and refuses ``WINDOW_INVALID``, and ``governance_contracts.
+        Validity`` cannot even construct ``issued_at == expires_at`` — so the envelope was
+        the last artifact still saying yes at an instant nothing could act on.
+
+        No signed field, canonical byte, digest or signature changes. An envelope issued
+        before this change still verifies; it simply stops authorizing at exactly
+        ``expires_at``.
+        """
+
+        return self.not_before <= now < self.expires_at

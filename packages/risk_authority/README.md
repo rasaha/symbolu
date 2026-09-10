@@ -484,12 +484,116 @@ invalid at exactly `not_after`, so two adjacent rotation windows are never both 
 instant they meet. An absent bound is unbounded on that side, which is why every existing
 windowless key and signer in the repository behaves exactly as before.
 
-**This deliberately differs from the envelope's boundary, and neither should be
+~~**This deliberately differs from the envelope's boundary, and neither should be
 "harmonized" into the other.** `RiskAuthorizationEnvelope.is_temporally_valid` is inclusive
 at both ends and is **unchanged** by this work: at exactly `expires_at` an envelope is still
 valid, while at exactly `not_after` a key is not. An envelope is a *grant* with a separately
 ratified boundary; a key is a *credential*. The difference is asserted by an executable test
-rather than left to a reader's assumption.
+rather than left to a reader's assumption.~~
+
+> **Superseded at 0.11.0 — the envelope now shares this shape.** The paragraph above is
+> struck through rather than deleted so a reader of the older ADR finds the correction
+> instead of a silent rewrite. Its reasoning was sound about *overlap* — envelopes are
+> never chained, because issuance always sets `not_before` to its own issuance instant,
+> so no two envelope windows ever meet — but the absence of overlap never explained why a
+> security validity artifact should remain usable at its own stated expiry. Nothing
+> downstream would honor it anyway: the credential broker derived a zero-width window and
+> refused, and `governance_contracts.Validity` cannot construct `issued_at == expires_at`
+> at all. See *Temporal rules by artifact category* below.
+
+## Temporal rules by artifact category — 0.13.0
+
+> **A point-in-time fact may remain valid at its final instant, but it cannot create
+> authority that survives beyond that instant.**
+
+**This supersedes the earlier "one temporal rule" claim.** That framing said every
+temporal field followed a single half-open rule. It was never true — evidence and control
+freshness were always inclusive, and the 0.11.0 text papered over it by listing exceptions.
+Worse, that text named `AuthorityGrant` among the exceptions when it is an authorization
+gate, and the amendment that followed found ninety minutes of authority reaching past
+expired delegations behind exactly that misclassification. There are two categories, and
+naming them is what keeps the difference legible.
+
+### 1. Operational validity — half-open `[start, end)`
+
+Artifacts that *authorize action*. Expired at exactly the upper bound.
+
+| Artifact | Window | Where |
+|---|---|---|
+| signing key | `[not_before, not_after)` | `crypto/keys.py` |
+| `RiskAuthorizationEnvelope` | `[not_before, expires_at)` | `domain/envelope.py`, `services/envelope_verifier.py` |
+| `AuthorityGrant` | `[.., expires_at)` | `domain/authority.py` |
+| `RiskDecision` expiry | `[.., expires_at)` | `services/envelope_issuer.py`, `api/envelope_issuance_seam.py` |
+| `ActionAuthorization` expiry | `[.., expires_at)` | copied from the envelope; enforced in the credential broker |
+| `CredentialGrant` validity | `[issued_at, expires_at)` | `governance_contracts.Validity` |
+| `ExecutionAuthorization` | `[issued_at, expires_at)` | `cloud-scaling-operations` |
+
+### 2. Point-in-time validity — inclusive `[start, end]`
+
+Facts that *report an observation*. Still valid at exactly the upper bound, deliberately,
+because an assertion may be true at exactly one instant.
+
+| Fact | Window | Where |
+|---|---|---|
+| `SubjectContext` assertion | `[subject_valid_from, subject_valid_until]` | `api/evaluation_seam.py` |
+| evidence freshness | `[.., valid_until]` | `domain/evidence.py` |
+| backing-evidence freshness | `[.., valid_until]` | `domain/binding.py` |
+| control-result freshness | `[.., valid_until]` | `domain/controls.py` |
+
+A zero-width `SubjectContext` — `subject_valid_from == subject_valid_until` — is a
+**ratified point-in-time contract**, not an accidental exception. It represents a subject
+assertion valid at exactly one instant, and `test_context_accepts_equal_validity_bounds`
+commits it deliberately.
+
+### 3. Derived authority is capped by the earliest contributing prerequisite
+
+This is what makes category 2 safe. A point-in-time fact may be current at its final
+instant, but the authority derived from it may not outlive it.
+
+`RiskDecision.expires_at` is the earliest of `now + ttl`, the active
+`AuthorityGrant.expires_at`, and the control freshness horizon — the earliest `valid_until`
+among the required controls that were *actually relied upon*, never over unrelated or
+rejected results that merely appeared in the request. Evidence bounds are covered
+transitively and by construction: `binding._freshness_is_monotonic` refuses any trusted
+result outliving its backing evidence, so the control horizon is already no later than the
+evidence floor beneath it. Prerequisites are passed as a named mapping, so the refusal can
+say which one bound.
+
+`SubjectContext.subject_valid_until` joins them at 0.14.0, through the additive
+`DecisionRequest.subject_valid_until` that the v2 seam populates from the re-validated
+context. Enabling it moved three ratified digests — one semantic field,
+`decision_expires_at_fact` (01:05:00 → 00:08:10), with the decision, candidate and
+verified-artifact digests following. That re-freeze was ratified, and the superseded values
+are pinned as negative anchors rather than replaced silently. No canonicalization, field
+set or signature format changed; nothing was re-signed.
+
+Each hop then inherits: `EnvelopeIssuer.issue` caps the envelope by its decision — at the
+service, not only at the seam — and `ActionAuthorization` copies the envelope's expiry.
+
+### 4. No executable decision may have a zero or negative remaining window
+
+A cap landing on `now` authorizes nothing at any instant, so the authority refuses rather
+than minting a decision that is already expired. This is precisely how the two categories
+meet: a subject assertion evaluated at its terminal instant is still valid (category 2) and
+still mints nothing (category 4).
+
+The refusal names its own cause. `NoRemainingValidityError` — a subclass of
+`AuthorityDeniedError`, so every existing handler keeps working — carries which prerequisite
+bound, and the seam maps it by type and field rather than by parsing a reason string. When
+the subject bound, that becomes `SubjectRiskNonDecisionReason.NO_REMAINING_SUBJECT_VALIDITY`.
+Neither pre-existing member fit: `EXPIRED_SUBJECT` asserts the opposite of what is true at
+that instant, and `AUTHORITY_UNAVAILABLE` blames the evaluator principal for a
+subject-window cause.
+
+### Verification
+
+Boundary conformance is behavioral, at `start − ε`, `start`, `end − ε`, `end` and
+`end + ε`, with negative controls and per-mutation checks:
+`tests/unit/test_temporal_boundaries.py` (envelope, five sites),
+`tests/unit/test_authority_horizon.py` (grant, caps, reach), plus one suite per consuming
+package. A source-text tripwire is not the normative proof: equivalent correct code can
+spell a comparison many ways, so a substring assertion fails on a correct refactor while
+passing on any rewrite that keeps the string.
 
 A malformed window (`not_before >= not_after`, or a non-datetime bound) raises
 `KeyWindowError` at construction rather than becoming a silently always-invalid key — a

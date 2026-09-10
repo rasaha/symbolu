@@ -293,6 +293,238 @@ authority entry point. Revisit only if a production consumer is commissioned.
 0.2.0 → **0.3.0** (D-A; `derive` drops its `now` parameter and `production()` gains a
 required `clock`).
 
+## 10. Amendment 3 — the envelope temporal boundary, made half-open
+
+Ratified after an audit of the boundary asymmetry left open by Amendment 2. Five rulings.
+
+### What the audit found, and why the recommendation was rejected
+
+The audit established that the key interval was half-open, `[not_before, not_after)`, while
+the envelope was inclusive, `[not_before, expires_at]`, and recommended **keeping** the
+asymmetry on the grounds that the reason keys are half-open — so two adjacent rotation
+windows cannot both be live where they meet — cannot arise for envelopes, which are never
+chained (issuance always sets `not_before` to its own issuance instant).
+
+**The owner rejected that recommendation, and was right to.** "Envelopes are not chained"
+explains why an inclusive upper bound produced no *overlap*; it never explained why a
+security validity artifact should remain usable at its own stated expiration instant. The
+audit's own evidence made the case against it: at `now == expires_at` the verified path
+minted a GRANT with a zero-microsecond-wide effective window, and every consumer downstream
+refused it anyway — the credential broker on a zero-width credential window, and
+`governance_contracts.Validity` by being structurally unable to construct
+`issued_at == expires_at`. The envelope was the last artifact still saying yes at an instant
+nothing could act on.
+
+### The rulings
+
+**E-A — the envelope window is half-open.** `not_before <= now < expires_at`. At exactly
+`expires_at` an envelope is expired. This supersedes the earlier ratified inclusive reading.
+No signed field, canonical byte, digest or signature format changes; an envelope issued
+before this amendment still verifies and simply stops authorizing one microsecond earlier.
+
+**E-B — the verified path refuses at equality, by name.** `verify_and_bind` asks the
+temporal question before reading the verification result, so exactly `expires_at` yields the
+stable typed `RA_EXPIRED` DENY rather than a generic `RA_ENVELOPE_INVALID`. No GRANT is ever
+minted whose effective `expires_at` equals the evaluation instant.
+
+**E-C — `ExecutionAuthorization` is ratified as intentionally half-open.** Its
+`now >= expires_at` in `cloud-scaling-operations` was correct and is no longer undocumented
+divergence.
+
+**E-D — decision expiry is half-open at both issuance paths.** `EnvelopeIssuer.issue` and
+the issuance seam refuse `DECISION_EXPIRED` at equality. Previously equality passed the
+named check and failed two steps later as a zero-width TTL — the right refusal reason
+reached by an accident of arithmetic rather than by the rule the code states.
+
+**E-E — conformance is behavioral, across every site.** All five sites that decide the
+envelope window are asserted at `not_before − ε`, `not_before`, `expires_at − ε`,
+`expires_at` and `expires_at + ε`, with a negative control proving the suite rejects the
+superseded inclusive rule. The source-text tripwire is retired as normative proof:
+equivalent correct code can spell the comparison many ways, so a substring assertion fails
+on a correct refactor while passing on any rewrite that keeps the string.
+
+### Two findings the implementation surfaced
+
+`[V]` **`ActionAuthorization.expires_at` needed the same move.** It is copied verbatim from
+the envelope at admission, so leaving its check inclusive would have let the derived
+artifact outlive by one instant the envelope it derives from — an inconsistency created by
+E-A itself. Corrected in the credential broker under E-A rather than deferred.
+
+`[G]` **The `valid_until` family is untouched and still inclusive.** `domain/evidence.py`,
+`domain/binding.py`, `domain/controls.py`, `SubjectContext.subject_valid_until` and
+`AuthorityGrant.is_active` all remain `now <= bound`. They answer "is this observation still
+fresh", not "may this act now". Whether they should move is a separate question and is
+**not** ruled on here — the "one temporal rule" statement is scoped to authorization
+validity windows and says so.
+
+### Versions
+
+`ugence-risk-authority` 0.10.0 → **0.11.0** (E-A, E-D).
+`ugence-risk-authority-runtime` 0.3.0 → **0.4.0** (E-B).
+`ugence-risk-authority-status-runtime` 0.2.0 → **0.3.0** (reaper reflects the new window).
+`ugence-cloud-scaling-credential-broker` 0.1.0 → **0.2.0** (E-A on envelope and
+authorization bounds).
+
+## 11. Amendment 4 — delegated authority bounds what it delegates
+
+Ratified after auditing the five sites Amendment 3 left inclusive. Two of the five turned
+out not to be freshness at all, and one of those carried the largest temporal exposure yet
+found in Risk Authority.
+
+### The finding
+
+`AuthorityGrant.is_active` is an **authorization gate**: `authority_violations` calls it at
+the moment a `RiskDecision` is minted, and a violation raises `AuthorityDeniedError`. It
+decides who may issue decisions at all. Amendment 3's own scoping paragraph had listed it
+among the untouched freshness bounds — that was wrong, and this amendment corrects it.
+
+`[V]` **The boundary instant did not cost a microsecond; it cost ninety minutes.**
+`RiskDecision.expires_at` was `now + DEFAULT_DECISION_TTL`, uncapped. Driven through the
+real path with a grant expiring at exactly `now`, before the fix:
+
+```
+is_active(now) -> True     authority_violations -> [] (AUTHORIZED)
+decision.expires_at -> now + 1:00:00     envelope.expires_at -> now + 0:30:00
+issue the envelope as late as the decision permits:
+machine authority reaches 1:29:59.999999 past the expired delegation
+```
+
+### The rulings
+
+**H-A — `AuthorityGrant.is_active` is half-open.** `now < expires_at`.
+
+**H-B — decision expiry is capped by what justified it.**
+`min(now + ttl, grant.expires_at, freshness_horizon)`, where `freshness_horizon` is the
+earliest `valid_until` among the required controls that satisfied the decision. H-A alone
+would have moved the ninety-minute reach one microsecond earlier; H-B is what closes it.
+
+**H-C — a zero-width result is refused, not minted already expired.** A cap landing on
+`now` authorizes nothing at any instant under the half-open rule.
+
+### One gap the implementation surfaced, closed here
+
+`[V]` **`EnvelopeIssuer.issue` capped nothing by the decision's expiry — only the issuance
+seam did.** A direct caller passing a six-hour `ttl` against a one-hour decision produced
+an envelope outliving its decision by five hours. The regression test H-B requires cannot
+hold without closing this, so it is closed at the service, where it covers every caller.
+
+### Two limits stated rather than hidden
+
+`[V]` **The freshness cap is inert on the reference flow.** `ControlResultInput` carries no
+`valid_until`, so control results created through the evaluation seam are unbounded and
+supply no horizon. This is why no existing decision moved. The cap is proved at
+`ReferenceDecisionAuthority` directly, with a companion test pinning the unbounded case,
+rather than by changing a public request schema to manufacture a test condition.
+
+`[V]` **H-C is reachable only because the freshness bounds stay inclusive.** A control is
+current at exactly its `valid_until`, so it satisfies the required set while yielding a
+horizon of exactly `now`. Without that interaction the refusal branch would be dead code —
+a mutation of it survived until a test was written for precisely this path.
+
+### Still not ruled on
+
+`[G]` `SubjectContext.subject_valid_until` is an authorization gate and remains inclusive.
+`test_context_accepts_equal_validity_bounds` deliberately commits a zero-width
+`SubjectContext`, which a half-open rule would make evaluable at no instant at all. Unlike
+the envelope — where nothing was pinned to the endpoint — this one has a committed
+dependency, so changing it means first deciding whether a zero-width subject window is
+itself the defect. `domain/evidence.py`, `domain/binding.py` and `domain/controls.py` remain
+inclusive as freshness reports.
+
+### Versions
+
+`ugence-risk-authority` 0.11.0 → **0.12.0** (H-A, H-B, H-C).
+
+## 12. Amendment 5 — two temporal categories, and derived authority capped by all of them
+
+Ratified as five rulings. The governing principle:
+
+> **A point-in-time fact may remain valid at its final instant, but it cannot create
+> authority that survives beyond that instant.**
+
+### T-1 — `AuthorityGrant.is_active` is half-open
+
+`now < expires_at`. Implemented at Amendment 4 (H-A). `AuthorityGrant` carries no lower
+bound field, so there is no `valid_from` half to make inclusive.
+
+### T-2 — decision expiry is capped by *every* contributing prerequisite
+
+`RiskDecision.expires_at` is the earliest of `now + ttl`, `grant.expires_at`, and the
+control-freshness horizon.
+
+`SubjectContext.subject_valid_until` joins the cap at 0.14.0, through the additive
+`DecisionRequest.subject_valid_until` populated by the v2 seam from the re-validated
+context — never from the raw caller object.
+
+`[V]` **The re-freeze it required, ratified and recorded.** Exactly one semantic field
+moved: `decision_expires_at_fact`, 01:05:00 → 00:08:10, the decision now bound by the
+subject assertion instead of its own TTL. Three digests followed it:
+
+| Anchor | Was | Now |
+|---|---|---|
+| decision | `sha256:6aba137d…` | `sha256:4636dee2…` |
+| candidate | `sha256:357bb3d4…` | `sha256:7ffeefce…` |
+| verified artifact (transitive) | `sha256:fefe4884…` | `sha256:596b4631…` |
+
+No canonicalization, field set or signature format changed, and nothing was re-signed —
+the producer attestation signs the recommendation, not the candidate. The fixture was
+regenerated with the package's own `scripts/generate_frozen_candidate.py` rather than
+hand-edited, and the superseded values are pinned as `SUPERSEDED_PRE_T2_*` negative anchors
+in the repo's established style, so dropping the cap is a failure rather than a silent
+re-baseline.
+
+`[G]` **A guard this exposed.** `test_no_phase_5a_source_file_was_modified` (P-11) asserts
+the Phase 5A tree is unmodified by running `git status --porcelain` — a *working-tree*
+check, so it passes once a change is committed. It caught this edit before commit and
+cannot catch it after. The guard was not weakened or whitelisted; the limitation is
+recorded here instead.
+
+### The reason code T-3 needed
+
+`[V]` `NoRemainingValidityError`, a subclass of `AuthorityDeniedError` so every existing
+handler keeps working, carries the name of the prerequisite that bound. The seam maps it by
+type and field, never by parsing a reason string, into the new
+`SubjectRiskNonDecisionReason.NO_REMAINING_SUBJECT_VALIDITY`. Neither existing member fit:
+`EXPIRED_SUBJECT` asserts the opposite of what is true at that instant, and
+`AUTHORITY_UNAVAILABLE` blames the evaluator principal for a subject-window cause — the
+same misattribution reasoning that added `CALLER_SUPPLIED_EVALUATION_TIME` rather than
+reusing `INVALID_SUBJECT`.
+
+### T-3 — `SubjectContext` stays inclusive, as a deliberate point-in-time contract
+
+`subject_valid_from <= now <= subject_valid_until`. The zero-width subject context is
+**ratified**, not an accidental exception: it represents an assertion valid at exactly one
+instant. Under T-2 it mints nothing at that instant, because no positive validity window
+remains.
+
+`[G]` **A reason code is required and was deliberately not invented.** The refusal surfaces
+through the subject seam as `AUTHORITY_UNAVAILABLE` — which says the evaluator principal is
+not entitled, misattributing a subject-window cause to an authority-configuration gap.
+`EXPIRED_SUBJECT` is equally wrong: the subject is *not* expired at that instant, which is
+the whole point of T-3. This module's own history is the precedent —
+`CALLER_SUPPLIED_EVALUATION_TIME` was added rather than reusing `INVALID_SUBJECT` for
+exactly this reason. A new `SubjectRiskNonDecisionReason` member is needed; the current
+behavior is pinned by test so the gap stays visible rather than silently settling.
+
+### T-4 — evidence, binding and control freshness stay inclusive
+
+Unchanged. T-2 removes the amplification, so there is no reason to move them for syntactic
+uniformity. `[V]` This is also what makes T-2's zero-width refusal reachable: a control is
+current at exactly its `valid_until`, yielding a horizon of exactly `now`.
+
+### T-5 — the "one temporal rule" claim is superseded
+
+`[V]` It was never true. Evidence and control freshness were always inclusive, and the
+0.11.0 text papered over that by listing exceptions — including `AuthorityGrant`, which is
+an authorization gate, and behind that misclassification sat ninety minutes of reach. The
+README now documents four things: the two categories with their members, the derived-cap
+rule, and the no-zero-width rule.
+
+### Versions
+
+`ugence-risk-authority` 0.12.0 → **0.13.0** (T-2, T-5). No canonical serialization, digest
+or signature format is touched, and no committed digest fixture moves.
+
 ## 7. Invariants this ADR does not touch
 
 The composition engine mints no authority. Deployment assertions are not proof. Only the
