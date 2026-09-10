@@ -1,5 +1,37 @@
 # Changelog — ugence-incident-response
 
+## 0.2.0 — an incident names the vocabulary its severity label was written against
+
+`CONTRACT_VERSION` moves to `incident_response.v2`. `ugence-governance-contracts` is
+untouched and its `CONTRACT_VERSION` does not move, which is `VV-A` working as intended.
+
+- `IncidentRecord.severity_vocabulary` —
+  `VocabularyBinding(vocabulary, version, specification_digest)`, **required** on a v2
+  record (`VV-E`). `""`, `latest` and `current` are refused by name.
+- In `record_digest()` (`VV-B`) and deliberately **not** in the derived `incident_id`
+  (`VV-C`): an incident's identity is its tenant, subject, evidence and instant, and the
+  severity label never took part in it. Every incident id written before this is
+  unchanged.
+- The rule is re-run by `__setstate__` with every other invariant, so a record cannot be
+  serialised, stripped of its binding in transit, and revived without one — the same
+  bypass the containment asymmetry already had to close.
+- **No store ships here** (D-4), so `LEGACY_CONTRACT_VERSION` exists for records whose
+  digests were taken by somebody else and kept: those stay valid under the v1 projection
+  and are never recomputed under the new one.
+
+**It does not smuggle an ordering back.** `LV-D` ruled `SEV1` to `SEV4` opaque and
+unordered, accepting by name that "every incident at or above SEV2" is unanswerable
+here. The binding says which taxonomy was in force, never what a member outranks, and
+`AE-3` is untouched.
+
+**Found by the sweep.** `scripts/mutation_sweep.py` reported seven refusals in the new
+code that no test observed, including every guard in the reconstruction helpers. Each is
+now covered, and one branch was deleted instead: `ContractViolation` subclasses
+`ValueError`, so the `except (TypeError, ValueError)` beside the re-raise could only
+catch what the re-raise had already handled — while blunting the precise refusal message
+on any path that reached it. The sweep is back to zero unclassified survivors.
+
+
 ## [Unreleased] — public_api.json no longer records the interpreter it was generated on
 
 No API change: every exported symbol, kind, field list and version is identical. The

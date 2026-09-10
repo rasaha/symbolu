@@ -8,17 +8,30 @@ from datetime import datetime, timedelta, timezone
 from ugence_governance_contracts.api import AuditReference
 
 from ugence_incident_response import (
+    LEGACY_CONTRACT_VERSION,
     ContainmentLift,
     ContainmentRequest,
     IncidentRecord,
     IncidentState,
     RemediationProposal,
+    VocabularyBinding,
     incident_id_for,
 )
 
 TENANT = "tenant-a"
 SUBJECT = "envelope:env-1"
 SEVERITY = "sev-1"
+
+#: The published vocabulary a current incident cites. The digest is fixture-shaped
+#: rather than the real published one on purpose: this package never resolves a binding,
+#: so a test using the real digest would look like it was checking something it is
+#: forbidden to check.
+SEVERITY_VOCABULARY = VocabularyBinding(
+    vocabulary="incident-severity", version="1.0.0",
+    specification_digest="sha256:" + "1a" * 32)
+NEXT_SEVERITY_VOCABULARY = VocabularyBinding(
+    vocabulary="incident-severity", version="2.0.0",
+    specification_digest="sha256:" + "3c" * 32)
 TARGET = "envelope:env-1"
 
 T0 = datetime(2026, 3, 1, 9, 0, tzinfo=timezone.utc)
@@ -38,12 +51,31 @@ def audit_ref(entry: str = "e:1", *, store: str = "ugence_approval_workflow:ledg
 
 
 def incident(*, tenant: str = TENANT, subject: str = SUBJECT, severity: str = SEVERITY,
-             evidence=None, opened: datetime = T0, by: str = "operator-1") -> IncidentRecord:
+             evidence=None, opened: datetime = T0, by: str = "operator-1",
+             severity_vocabulary: VocabularyBinding | None = None) -> IncidentRecord:
     refs = tuple(evidence) if evidence is not None else (audit_ref(),)
     return IncidentRecord(
         incident_id=incident_id_for(tenant, subject, refs, opened), tenant_id=tenant,
         subject_ref=subject, severity_label=severity, evidence=refs, opened_at=opened,
-        opened_by=by, summary="observed at the seam")
+        opened_by=by, severity_vocabulary=severity_vocabulary or SEVERITY_VOCABULARY,
+        summary="observed at the seam")
+
+
+def legacy_incident(*, tenant: str = TENANT, subject: str = SUBJECT,
+                    severity: str = SEVERITY, evidence=None,
+                    opened: datetime = T0, by: str = "operator-1") -> IncidentRecord:
+    """A record of the shape whose digest was taken before the binding existed.
+
+    Nothing constructs one of these in anger. It exists so the v1 projection can be
+    exercised against a record that really does predate the field.
+    """
+
+    refs = tuple(evidence) if evidence is not None else (audit_ref(),)
+    return IncidentRecord(
+        incident_id=incident_id_for(tenant, subject, refs, opened), tenant_id=tenant,
+        subject_ref=subject, severity_label=severity, evidence=refs, opened_at=opened,
+        opened_by=by, record_version=LEGACY_CONTRACT_VERSION,
+        summary="observed at the seam")
 
 
 def containment(inc: IncidentRecord | None = None, *, target: str = TARGET,

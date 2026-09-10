@@ -150,14 +150,15 @@ def vocabulary_binding_from_dict(value: object, name: str) -> Optional[Vocabular
     unknown = set(value) - {"vocabulary", "version", "specification_digest"}
     if unknown:
         raise ContractViolation(f"{name} has unknown fields: {sorted(unknown)}")
-    try:
-        return VocabularyBinding(
-            vocabulary=value.get("vocabulary", ""), version=value.get("version", ""),
-            specification_digest=value.get("specification_digest", ""))
-    except ContractViolation:
-        raise
-    except (TypeError, ValueError) as exc:
-        raise ContractViolation(f"{name} refused: {exc}") from exc
+    # Constructed directly, with no try/except around it. The sibling reconstruction
+    # helpers wrap a neighbour's constructor, which can raise TypeError for an unknown
+    # keyword; this one passes exactly three keywords to a type whose every guard already
+    # raises ContractViolation, so a wrapper here would only be able to catch what it
+    # itself re-raised — and would blunt the precise message on the way through, since
+    # ContractViolation is a ValueError.
+    return VocabularyBinding(
+        vocabulary=value.get("vocabulary", ""), version=value.get("version", ""),
+        specification_digest=value.get("specification_digest", ""))
 
 
 def _is_semantic_version(value: str) -> bool:

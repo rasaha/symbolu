@@ -35,6 +35,7 @@ from ugence_data_use_admission import (
     declaration_record,
     supersession_refusals,
     vocabulary_binding_from_dict,
+    vocabulary_binding_to_dict,
 )
 
 from _fixtures import (
@@ -230,6 +231,25 @@ def test_a_partial_binding_in_a_record_is_refused_rather_than_completed():
 # --------------------------------------------------------------------------- #
 # VV-E — required now; historical records readable, and never upgraded
 # --------------------------------------------------------------------------- #
+def test_a_look_alike_binding_is_refused():
+    """The record takes this package's own type, not something shaped like it."""
+
+    class NotABinding:
+        vocabulary = "data-classification"
+        version = "1.0.0"
+        specification_digest = "sha256:" + "9f" * 32
+
+    b, v = binding(), window()
+    with pytest.raises(ContractViolation, match="must be a VocabularyBinding"):
+        DataUseDeclaration(
+            declaration_id=declaration_id_for(b, DATA, LABEL, PURPOSE, v,
+                                              CLASSIFICATION_VOCABULARY, PURPOSE_VOCABULARY),
+            tenant_id=TENANT, binding=b, data_ref=DATA, classification=LABEL,
+            purpose_label=PURPOSE, validity=v,
+            classification_vocabulary=NotABinding(),  # type: ignore[arg-type]
+            purpose_vocabulary=PURPOSE_VOCABULARY)
+
+
 def test_a_current_record_cannot_be_built_without_naming_its_vocabularies():
     b, v = binding(), window()
     with pytest.raises(ContractViolation, match="VV-E"):
@@ -450,3 +470,38 @@ def _write_legacy_file(path: pathlib.Path, old: DataUseDeclaration,
          old.record_digest(),
          json.dumps(declaration_record(old), sort_keys=True, separators=(",", ":"))))
     connection.close()
+
+
+# --------------------------------------------------------------------------- #
+# The reconstruction helpers refuse rather than repair
+# --------------------------------------------------------------------------- #
+def test_the_helpers_refuse_the_wrong_shape_rather_than_coercing_it():
+    """Found missing by incident-response's mutation sweep, which runs over the same
+    file: a guard nothing exercises is a guard that can be deleted without a test
+    noticing, which is the same as not having it."""
+
+    with pytest.raises(ContractViolation, match="takes a VocabularyBinding"):
+        vocabulary_binding_to_dict("data-classification@1.0.0")  # type: ignore[arg-type]
+    assert vocabulary_binding_to_dict(None) is None
+
+    with pytest.raises(ContractViolation, match="mapping"):
+        vocabulary_binding_from_dict("data-classification@1.0.0", "binding")
+    assert vocabulary_binding_from_dict(None, "binding") is None
+    assert vocabulary_binding_from_dict({}, "binding") is None
+
+
+def test_a_refusal_from_a_mapping_keeps_the_precise_reason():
+    """ContractViolation is a ValueError, so a broad ``except`` would swallow it.
+
+    Reconstruction therefore wraps nothing: a bad version says it is a bad version,
+    rather than arriving as a generic "refused" with the reason folded into a string.
+    """
+
+    with pytest.raises(ContractViolation, match="MAJOR.MINOR.PATCH"):
+        vocabulary_binding_from_dict(
+            {"vocabulary": "x", "version": "1.0", "specification_digest": "sha256:" + "1" * 64},
+            "binding")
+    with pytest.raises(ContractViolation, match="whatever is current"):
+        vocabulary_binding_from_dict(
+            {"vocabulary": "x", "version": "latest",
+             "specification_digest": "sha256:" + "1" * 64}, "binding")

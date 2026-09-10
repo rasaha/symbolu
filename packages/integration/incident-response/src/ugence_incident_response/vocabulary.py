@@ -28,9 +28,11 @@ belongs to a document that exists. It records a reference precise enough for som
 else to check. Recording is what this package does; checking is what it must not do.
 
 **Nothing here interprets a label.** A binding says which vocabulary was in force. It
-does not say what a member means, and ``D-2`` still forbids this package from having an
+does not say what a member means, and ``AE-3`` still forbids this package from having an
 opinion: no taxonomy, no ordering, no severity, no comparison of one member with
-another.
+another. That restraint is sharpest here, because ``SEV1`` to ``SEV4`` *look* ranked —
+``LV-D`` ruled them opaque and unordered anyway, and the published specification records
+the unordering explicitly rather than leaving it to be inferred from four names.
 
 **The field is ``specification_digest`` where the published file's key is
 ``content_digest``**, and the validation below is string operations rather than a

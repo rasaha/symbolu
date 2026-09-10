@@ -28,6 +28,12 @@ from ugence_governance_contracts.api import AuditReference
 
 from ._canon import domain_digest, iso, optional_text, require_nonempty, require_tzaware
 from .errors import ContainmentLiftRefused, ContractViolation
+from .version import CONTRACT_VERSION, LEGACY_CONTRACT_VERSION
+from .vocabulary import (
+    VocabularyBinding,
+    VocabularyBindingState,
+    vocabulary_binding_to_dict,
+)
 from .states import ContainmentState, IncidentState, require_transition
 
 __all__ = [
@@ -82,6 +88,16 @@ class IncidentRecord:
     evidence: tuple[AuditReference, ...]
     opened_at: datetime
     opened_by: str
+    #: The published vocabulary ``severity_label`` was written against. Required on a v2
+    #: record (``VV-E``); ``""``, ``latest`` and ``current`` are refused, since a moving
+    #: reference records nothing durable. It sits here rather than beside
+    #: ``severity_label`` only because a defaulted field cannot precede an undefaulted
+    #: one.
+    severity_vocabulary: Optional[VocabularyBinding] = None
+    #: Which record shape this is. A caller never chooses it for new work — it defaults
+    #: to the current contract, and the only other accepted value describes a record
+    #: whose digest was taken before the binding existed.
+    record_version: str = CONTRACT_VERSION
     state: IncidentState = IncidentState.OPEN
     containment: ContainmentState = ContainmentState.NONE
     #: The :class:`ContainmentRequest` that put this record in ``REQUESTED``, and
@@ -154,11 +170,56 @@ class IncidentRecord:
             raise ContractViolation(
                 "a closed incident carries closed_at, and an open one does not")
         self._require_containment_evidence()
+        self._require_vocabulary_binding()
         expected = incident_id_for(self.tenant_id, self.subject_ref, self.evidence, self.opened_at)
         if self.incident_id != expected:
             raise ContractViolation(
                 f"IncidentRecord.incident_id must be the derived id {expected!r}; ids are "
                 "derived from the tenant, subject, evidence and instant, never chosen")
+
+    def _require_vocabulary_binding(self) -> None:
+        """``VV-E``: required on a new record version, absent only on a historical one.
+
+        Re-run by ``__setstate__`` with every other invariant, so a record cannot be
+        serialised, stripped of its binding in transit, and revived without one.
+        """
+
+        if self.record_version not in (CONTRACT_VERSION, LEGACY_CONTRACT_VERSION):
+            raise ContractViolation(
+                f"IncidentRecord.record_version {self.record_version!r} is neither the "
+                f"current contract {CONTRACT_VERSION!r} nor the historical "
+                f"{LEGACY_CONTRACT_VERSION!r}")
+        if (self.severity_vocabulary is not None
+                and not isinstance(self.severity_vocabulary, VocabularyBinding)):
+            raise ContractViolation(
+                "IncidentRecord.severity_vocabulary must be a VocabularyBinding")
+        if self.record_version == LEGACY_CONTRACT_VERSION:
+            if self.severity_vocabulary is not None:
+                raise ContractViolation(
+                    f"an {LEGACY_CONTRACT_VERSION} incident carries no vocabulary binding; "
+                    "a record that names a vocabulary is a current record, and its digest "
+                    "is taken under the current projection")
+            return
+        if self.severity_vocabulary is None:
+            raise ContractViolation(
+                "IncidentRecord requires severity_vocabulary: a governed label on a "
+                "current record names the published vocabulary it was written against "
+                "(VV-E). An absent reference is never defaulted to the current vocabulary")
+
+    @property
+    def vocabulary_state(self) -> VocabularyBindingState:
+        """Whether this record names its vocabulary, or predates the requirement.
+
+        ``UNVERSIONED_LEGACY`` says the taxonomy is **unknown**, and ``VV-E`` forbids
+        resolving it to any published vocabulary.
+        """
+
+        return (VocabularyBindingState.BOUND if self.severity_vocabulary is not None
+                else VocabularyBindingState.UNVERSIONED_LEGACY)
+
+    @property
+    def is_current_record(self) -> bool:
+        return self.record_version == CONTRACT_VERSION
 
     def _require_containment_evidence(self) -> None:
         """A containment state is admissible only with the record that produced it.
@@ -269,7 +330,14 @@ class IncidentRecord:
         return replace(self, containment=ContainmentState.LIFTED, containment_lift=lift)
 
     def to_dict(self) -> dict:
-        return {
+        """The canonical projection, from an explicit key list rather than ``asdict``.
+
+        A v1 record projects the v1 keys and nothing else, so a digest somebody took
+        before the binding existed still verifies byte for byte; a v2 record adds the
+        binding and the record version.
+        """
+
+        projected = {
             "incident_id": self.incident_id, "tenant_id": self.tenant_id,
             "subject_ref": self.subject_ref, "severity_label": self.severity_label,
             "evidence": list(self.evidence_digests()),
@@ -283,8 +351,21 @@ class IncidentRecord:
             "closed_at": iso(self.closed_at, "closed_at") if self.closed_at else "",
             "closed_by": self.closed_by,
         }
+        if self.record_version == LEGACY_CONTRACT_VERSION:
+            return projected
+        projected["record_version"] = self.record_version
+        projected["severity_vocabulary"] = vocabulary_binding_to_dict(self.severity_vocabulary)
+        return projected
 
     def record_digest(self) -> str:
+        """The digest of the whole projection, the vocabulary included on a v2 record.
+
+        ``VV-B``: a digest excluding the taxonomy would prove the *bytes* of a label
+        while failing to prove what that label meant. **The derived id is untouched** —
+        ``VV-C`` keeps this record's identity semantics exactly as they were, because
+        the severity label never took part in them.
+        """
+
         return domain_digest("incident", self.to_dict())
 
 

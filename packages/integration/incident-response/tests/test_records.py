@@ -23,6 +23,7 @@ from ugence_incident_response import (
 
 from _fixtures import (
     SEVERITY,
+    SEVERITY_VOCABULARY,
     SUBJECT,
     T0,
     T1,
@@ -76,10 +77,12 @@ def test_the_incident_id_is_derived_and_a_chosen_one_is_refused():
     refs = (audit_ref(),)
     derived = incident_id_for(TENANT, SUBJECT, refs, T0)
     assert derived.startswith("inc_")
+    # The binding is supplied so the refusal is attributable to the chosen id rather
+    # than to the vocabulary requirement added in 0.2.0.
     with pytest.raises(ContractViolation, match="must be the derived id"):
         IncidentRecord(incident_id="inc_chosen", tenant_id=TENANT, subject_ref=SUBJECT,
                        severity_label=SEVERITY, evidence=refs, opened_at=T0,
-                       opened_by="operator-1")
+                       opened_by="operator-1", severity_vocabulary=SEVERITY_VOCABULARY)
 
 
 def test_different_evidence_or_instants_are_different_incidents():

@@ -33,6 +33,8 @@ from ugence_ai_system_registry import (
     registration_from_record,
     registration_id_for,
     registration_record,
+    vocabulary_binding_from_dict,
+    vocabulary_binding_to_dict,
 )
 
 from _fixtures import (
@@ -131,10 +133,16 @@ def test_a_binding_names_one_specification_and_a_bare_version_is_insufficient():
 
 
 def test_a_moving_reference_is_refused_by_name():
-    """VV-E refuses "current" and "latest" semantics; PUB-1 publishes no latest."""
+    """VV-E refuses "current" and "latest" semantics; PUB-1 publishes no latest.
+
+    By name, and with the reason that names it: every moving spelling would also fail
+    the MAJOR.MINOR.PATCH check, so the message is the only observable difference — and
+    it is the part that matters, because VV-E refuses these spellings specifically
+    rather than as malformed versions.
+    """
 
     for moving in ("latest", "current", "HEAD", "*"):
-        with pytest.raises(ContractViolation):
+        with pytest.raises(ContractViolation, match="whatever is current"):
             VocabularyBinding("eu-ai-act-system-classification", moving, "sha256:" + "9f" * 32)
         with pytest.raises(ContractViolation, match="moving reference"):
             VocabularyBinding(moving, "1.0.0", "sha256:" + "9f" * 32)
@@ -143,6 +151,21 @@ def test_a_moving_reference_is_refused_by_name():
 # --------------------------------------------------------------------------- #
 # VV-E — required now; historical records readable, and never upgraded
 # --------------------------------------------------------------------------- #
+def test_a_look_alike_binding_is_refused():
+    """The record takes this package's own type, not something shaped like it."""
+
+    class NotABinding:
+        vocabulary = "eu-ai-act-system-classification"
+        version = "1.0.0"
+        specification_digest = "sha256:" + "9f" * 32
+
+    b, v = binding(), window()
+    with pytest.raises(ContractViolation, match="must be a VocabularyBinding"):
+        SystemRegistration(registration_id=registration_id_for(b, OWNER, v), binding=b,
+                           owner_ref=OWNER, classification_label=LABEL, validity=v,
+                           classification_vocabulary=NotABinding())  # type: ignore[arg-type]
+
+
 def test_a_current_record_cannot_be_built_without_naming_its_vocabulary():
     b, v = binding(), window()
     with pytest.raises(ContractViolation, match="VV-E"):
@@ -189,6 +212,13 @@ def test_a_current_record_round_trips_and_a_partial_binding_is_refused():
     record = registration_record(original)
     record["registration"]["classification_vocabulary"] = {"version": "1.0.0"}
     with pytest.raises(ContractViolation):
+        registration_from_record(record)
+
+    record = registration_record(original)
+    record["registration"]["classification_vocabulary"] = {
+        "vocabulary": "x", "version": "1.0.0",
+        "specification_digest": "sha256:" + "1" * 64, "resolved_at": "now"}
+    with pytest.raises(ContractViolation, match="unknown fields"):
         registration_from_record(record)
 
 
@@ -307,3 +337,38 @@ def _write_legacy_file(path: pathlib.Path, old: SystemRegistration,
          old.classification_label, old.supersedes, old.record_digest(),
          json.dumps(registration_record(old), sort_keys=True, separators=(",", ":"))))
     connection.close()
+
+
+# --------------------------------------------------------------------------- #
+# The reconstruction helpers refuse rather than repair
+# --------------------------------------------------------------------------- #
+def test_the_helpers_refuse_the_wrong_shape_rather_than_coercing_it():
+    """Found missing by incident-response's mutation sweep, which runs over the same
+    file: a guard nothing exercises is a guard that can be deleted without a test
+    noticing, which is the same as not having it."""
+
+    with pytest.raises(ContractViolation, match="takes a VocabularyBinding"):
+        vocabulary_binding_to_dict("data-classification@1.0.0")  # type: ignore[arg-type]
+    assert vocabulary_binding_to_dict(None) is None
+
+    with pytest.raises(ContractViolation, match="mapping"):
+        vocabulary_binding_from_dict("data-classification@1.0.0", "binding")
+    assert vocabulary_binding_from_dict(None, "binding") is None
+    assert vocabulary_binding_from_dict({}, "binding") is None
+
+
+def test_a_refusal_from_a_mapping_keeps_the_precise_reason():
+    """ContractViolation is a ValueError, so a broad ``except`` would swallow it.
+
+    Reconstruction therefore wraps nothing: a bad version says it is a bad version,
+    rather than arriving as a generic "refused" with the reason folded into a string.
+    """
+
+    with pytest.raises(ContractViolation, match="MAJOR.MINOR.PATCH"):
+        vocabulary_binding_from_dict(
+            {"vocabulary": "x", "version": "1.0", "specification_digest": "sha256:" + "1" * 64},
+            "binding")
+    with pytest.raises(ContractViolation, match="whatever is current"):
+        vocabulary_binding_from_dict(
+            {"vocabulary": "x", "version": "latest",
+             "specification_digest": "sha256:" + "1" * 64}, "binding")
