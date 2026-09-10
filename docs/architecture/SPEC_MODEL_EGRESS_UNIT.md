@@ -371,7 +371,7 @@ so the result's identity derives from the request rather than from whoever produ
 |---|---|
 | `trust` | Always `UNTRUSTED_EVIDENCE`. There is no other value. |
 | `outcome` | `ANSWERED`, `REFUSED`, `FAILED` or `OUTCOME_UNKNOWN` — each a first-class outcome, none an exception. `OUTCOME_UNKNOWN` is **terminal** for this request (§3.5). |
-| `provenance` | Which adapter, which model, when, and **whether the call was genuine or a deterministic fake** (§5.2). |
+| `provenance` | Which adapter, which model, when, and **whether the call was genuine or a deterministic fake** (§5.2). On `OUTCOME_UNKNOWN` this is a **distinct dispatch-attempt record**, not a partially filled response record: it asserts only locally known facts and leaves provider receipt, completion, billing, usage, cost and even response existence explicitly `UNKNOWN` (§4.4). |
 | `metering` | Token counts, latency, and cost where the adapter reports it — the governance the request was authorized against. |
 | `payload` | The provider output as structured canonical content, or absent on refusal. It lives in the exchange for a bounded period and never reaches the ledger (§4.4). |
 | `response_digest` | Canonical digest binding the returned payload **and** its provenance (§4.4). It is what distinguishes *the provider returned this* from *a row was edited afterwards*, and it is what the ledger retains in the payload's place. |
@@ -510,23 +510,93 @@ So the tombstone must retain `correlation_id` and `clearance_ref` alongside the 
 digests it already carries — the two references that reach those records. This is a statement
 of what must survive, not a schema: it names existing fields and adds none.
 
-**`[G]` — one link in that chain is not established.** An `OUTCOME_UNKNOWN` is precisely the
-case where no provider answered, so it is unclear whether a `provenance` record naming the
-vendor and the attempt time is written at all; §4.2 describes provenance as reporting a call
-that happened. If it is not written for an ambiguous dispatch, then after purge **nothing
-durable names the vendor**, the reconciliation D-5 relies on cannot be performed, and a
-reservation is held indefinitely on a call that may never have occurred. Whether provenance is
-written on `OUTCOME_UNKNOWN` — and what it may claim, given §5.4's rule that a provenance
-record must never be mistakable for evidence of a provider having answered — is unresolved
-here and is not settled by the retention durations.
+**The retention horizons and the ambiguous-dispatch record — RATIFIED 2026-09-10.**
 
-**The grace period and the maximum retention duration remain unset `[R]`**, and engineering
-may not choose them. Until they are set, no content may be held. Two considerations bear on
-the choice without deciding it: the grace period runs from the worker's durable consumption
-acknowledgement, so it protects against a worker that consumed a result and then failed before
-acting on it — its floor is however long recovering such a worker takes. And an
-`OUTCOME_UNKNOWN` request may warrant a different horizon from an answered one, because the
-reconciliation D-5 permits has not happened yet and the gap above may mean it cannot.
+> Each content-bearing exchange artifact is governed independently. Its purge deadline is the
+> earlier of one hour after the worker's durable consumption acknowledgement and 24 hours after
+> that artifact's durable creation. The request's minimized context and the provider-response
+> content therefore have independently calculated deadlines. Absence of an acknowledgement never
+> permits content to survive beyond 24 hours.
+>
+> At the hard deadline, an unresolved or unconsumed artifact fails closed: preserve its terminal
+> status, identifiers and digests, but purge its content. Production policy may shorten either
+> duration but may not lengthen the one-hour grace period or 24-hour maximum without a new owner
+> ruling.
+>
+> `OUTCOME_UNKNOWN` receives no longer content-retention horizon. Reconciliation must not depend
+> on retaining prompt or response content. Its tombstone must preserve `correlation_id`,
+> `clearance_ref`, request and response digests where present, reservation identity, vendor/model
+> binding and non-content attempt provenance.
+>
+> An ambiguous dispatch must write a distinct dispatch-attempt provenance record rather than
+> ordinary successful-response provenance. It may assert only locally known facts: tenant,
+> request, intended vendor/model, adapter identity and version, local dispatch-attempt time,
+> clearance and reservation references, and a provider correlation identifier only when actually
+> received. Provider receipt, acceptance, completion, billing, token usage, cost and response
+> existence must remain explicitly UNKNOWN unless independently evidenced.
+>
+> The dispatch-attempt record must not claim that a provider call happened merely because local
+> dispatch began. If reconciliation never establishes the outcome, the associated vendor
+> allocation remains conservatively consumed; lease expiry or content purging does not release
+> it.
+> — owner, 2026-09-10
+
+**Two clocks, per artifact, and the earlier one wins.**
+
+| | |
+|---|---|
+| Grace | 1 hour after the worker's durable consumption acknowledgement |
+| Hard deadline | 24 hours after **that artifact's** durable creation |
+| Which applies | whichever falls first |
+
+The minimized context and the provider response are **separate artifacts with separately
+calculated deadlines** — the request's context was created earlier than the response and is
+purged earlier, rather than both waiting on the exchange as a unit. And the hard deadline is not
+conditional: **absence of an acknowledgement never extends content past 24 hours.** A worker that
+never acknowledges cannot hold content open by failing, which is the failure mode a
+consumption-only clock would have created.
+
+At the hard deadline an unresolved artifact **fails closed** — terminal status, identifiers and
+digests survive; content does not. Production policy may shorten either duration and **may not
+lengthen** the hour or the 24 hours without a new owner ruling. The direction is one-way by
+design: a deployment can be stricter than this document, never laxer.
+
+**The reconciliation question is settled by removing the dependency, not by extending the clock.**
+`OUTCOME_UNKNOWN` gets **no longer horizon**, and reconciliation **must not depend on retaining
+prompt or response content**. This supersedes the consideration recorded earlier in this section
+that an ambiguous outcome might warrant a longer window. What the tombstone preserves instead:
+
+`correlation_id`, `clearance_ref`, the request and response digests where present, **reservation
+identity**, **vendor/model binding**, and **non-content attempt provenance**. The first two were
+already identified here as the references reconciliation needs; the ruling adds the three that
+close the gap — the reservation D-5 holds open, the vendor to reconcile against, and a record
+that the attempt occurred at all.
+
+**The dispatch-attempt record is a different kind of record, not a partially filled one.** This
+closes the `[G]` recorded above. It may assert only what the deployment itself knows:
+
+| May assert | Must remain explicitly `UNKNOWN` unless independently evidenced |
+|---|---|
+| tenant; request; intended vendor and model; adapter identity and version; local dispatch-attempt time; clearance and reservation references; a provider correlation identifier **only when actually received** | provider receipt; acceptance; completion; billing; token usage; cost; **whether a response exists at all** |
+
+**It must not claim a provider call happened merely because local dispatch began.** That sentence
+is the whole point, and it is the same discipline §5.4 applies to the deterministic fake: a record
+that could be mistaken for evidence of a provider having answered is the failure both clauses
+exist to prevent. Here the temptation is subtler — the code really did try — but "we sent bytes"
+and "a vendor received a request" are different claims, and only the first is locally knowable.
+
+**And the allocation stays consumed.** If reconciliation never establishes the outcome, the vendor
+allocation D-5 reserved remains conservatively consumed; **neither lease expiry nor content
+purging releases it.** Purging the content does not purge the obligation — the tombstone outlives
+the prompt precisely so that an unresolved call keeps costing what it may have cost.
+
+**`[G]` — three mechanisms, none of which exists or is designed here:** the dispatch-attempt
+provenance **record type**, distinct from successful-response provenance and carrying explicit
+`UNKNOWN`s; the **purge mechanism** that replaces content with a tombstone; and **retention
+enforcement** of the two clocks, including the fail-closed behaviour at the hard deadline. This
+document records the durations and the record's content rules. It builds nothing, designs no
+DDL, and implements no purge.
+
 
 **No encryption is commissioned.** There is no encryption capability in the repository to
 begin with: `cryptography` and `nacl` appear only in `trusted-evidence-authority`, for Ed25519
@@ -545,7 +615,7 @@ reading of this document licenses a first exception:
 |---|---|
 | Exchange tenancy | **Ruled** 2026-09-10 (`OWNER_RATIFICATION_MEU_EXCHANGE_TENANCY.md` §4): every row carries a non-empty tenant, no wildcard or implicit tenant, credentials bound to the configured tenant. `[G]` Unimplemented, and tenant-bound database identities do not exist |
 | Least-privilege database grants | **Ruled** 2026-09-10: three logical roles, RLS enabled and forced, no runtime identity owning the tables. `[G]` No `CREATE ROLE`, `GRANT` or RLS statement exists anywhere in the repository, and provisioning is itself an unimplemented prerequisite — a runbook step is refused as a substitute |
-| Retention and deletion policy | `[R]` The grace period and maximum retention duration are **owner decisions engineering may not make**, and neither is set. Until they are, nothing may hold content at all. A purged `OUTCOME_UNKNOWN` additionally depends on the provenance gap below |
+| Retention and deletion policy | **Ruled** 2026-09-10 (below): 1 hour after consumption acknowledgement or 24 hours after artifact creation, whichever is earlier, per artifact, failing closed at the hard deadline. `[G]` The purge mechanism and the enforcement of both clocks do not exist |
 | Transport protection | `[G]` No `sslmode` is set on either database DSN anywhere in the repository or the runbook `[V]`, and the worker's own listener runs `test` mode over plain HTTP inside the private network because RW-3's certificate authority does not exist `[V]`. The exchange would inherit both conditions |
 | Production credential custody | `[G]` None exists; D-3 keeps it out of this deployment and rejects `PLATFORM_ENVIRONMENT_VARIABLE` as a production mechanism `[V]` |
 
@@ -723,8 +793,9 @@ they left behind is work, and one decision engineering may not make.
 | **Role provisioning** `[G]` | §5.2. Three logical roles with the ruled grants. No mechanism exists, and an unenforced runbook step is refused as a substitute `[V]` |
 | **Controlled migrations** `[G]` | §5.2. A separately controlled migration identity assuming the non-login owner role during reviewed migrations only, never at startup. No migration mechanism exists |
 | **Tenant-bound database identities** `[G]` | §5.2. Required before multi-tenancy, absent a separate ruling accepting the MEU as a trusted cross-tenant processor. Nothing binds a database identity to a tenant today |
-| **Grace period and maximum retention** `[R]` | §4.4's purge horizon. An owner decision explicitly withheld from engineering; until it is set, nothing may hold content. §4.4 records the two considerations that bear on it, including whether `OUTCOME_UNKNOWN` warrants a longer horizon |
-| **Provenance on `OUTCOME_UNKNOWN`** `[G]` | §4.4. If no `provenance` record is written when no provider answered, then after purge nothing durable names the vendor, D-5's reconciliation cannot be performed, and a reservation is held indefinitely on a call that may never have occurred |
+| **Purge mechanism** `[G]` | §4.4. Replacing content with a tombstone carrying identity, digests, reservation identity, vendor/model binding and attempt provenance. Nothing implements it |
+| **Retention enforcement** `[G]` | §4.4. The two clocks — 1 hour post-acknowledgement, 24 hours post-creation, per artifact, earlier wins — and the fail-closed purge at the hard deadline. Nothing enforces them |
+| **Dispatch-attempt provenance record type** `[G]` | §4.2, §4.4. Distinct from successful-response provenance, asserting only locally known facts with explicit `UNKNOWN`s. Does not exist |
 | **Transport protection** `[G]` | §4.4. No `sslmode` on either DSN `[V]`; the worker's listener is plain HTTP in `test` mode because RW-3's CA does not exist `[V]` |
 | **Credential custody** `[G]` | §4.4, §5.2. None exists — for the provider credential D-3 keeps out, nor for the runtime and migration identities the tenancy ruling requires `[V]` |
 | **The MEU ledger-kind schema** `[G]` | §4.4's ledger rule has no enforcement: `LedgerEntry.payload` accepts any canonical dict (`entry.py:52-61`). Unbuilt, and not built here |
