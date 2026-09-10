@@ -9,7 +9,6 @@ reconciliation classification.
 from __future__ import annotations
 
 import inspect
-import sys
 from datetime import datetime, timezone
 
 import pytest
@@ -374,9 +373,10 @@ def test_spine_runs_standalone_with_fakes_only():
         runtime_assurance_port=RecRuntime([]), execution_port=FakeHRISExecutionPort())
     result = svc.run(case, hdc, actor="hm", now=NOW)
     assert result.receipt.execution_status is ExecutionStatus.SUCCEEDED
-    for name in list(sys.modules):
-        assert not name.startswith("ugence_tap_provider")
-        assert not name.startswith("ugence_actiongate_provider")
+    # That the spine binds no provider is enforced statically for the whole package
+    # by tests/packaging/test_dependency_boundaries.py::
+    # test_concrete_tap_actiongate_only_in_integrations. The sys.modules scan that
+    # used to close this test reported the session's import history, not the spine's.
 
 
 def test_hris_fake_satisfies_port_protocol():

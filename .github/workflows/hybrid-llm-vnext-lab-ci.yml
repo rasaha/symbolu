@@ -5,6 +5,13 @@ name: hybrid-llm-vnext-lab-ci
 # the launcher argument checks, the lab integrity verifier, and the merged audit verifier.
 # It does NOT run neural training (see hybrid-llm-slot-neural-reproduction.yml, manual dispatch).
 
+concurrency:
+  # A superseded run proves nothing about the commit that replaced it. Cancel
+  # in-flight runs for the same ref on pull requests; never on a branch push,
+  # where each commit's run is the evidence that commit was green.
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 on:
   push:
     paths:
@@ -29,6 +36,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
+          cache: pip
+          cache-dependency-path: requirements.txt
 
       - name: Lab integrity (provenance, boundaries, JSON, status markers)
         run: python hybrid_llm_vnext_lab/scripts/verify_lab.py

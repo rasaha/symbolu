@@ -292,15 +292,24 @@ identity. Risk Authority imports no Cloud Scaling type and hardcodes no cloud-sc
 
 ### Evaluation-time authority
 
+**Superseded at v0.10.0 by issue #1398 item 1, ruling D-B.** This table previously read
+"v1 (any mode): honored, exactly as before — **unchanged**". Production v1 and v2 were being
+held to different clock-authority rules in the same seam because of the order they were
+built, not because a caller-controlled instant is less dangerous on v1 — it can move
+validity and authorization on both. The rule below is the current one; the row it replaces is
+recorded here rather than deleted, because it was ratified and a reader of the old ADR needs
+to find the correction.
+
 | Path | Caller-supplied `evaluation_time` |
 |---|---|
-| v1 (any mode) | honored, exactly as before — **unchanged** |
-| v2, labelled reference seam | honored (ADR §10: the only place an explicit clock may be injected) |
-| **v2, trusted production seam** | **rejected fail-closed**: `NOT_EVALUATED(CALLER_SUPPLIED_EVALUATION_TIME)` |
+| labelled reference seam (v1 **and** v2) | honored — the only place an explicit clock may be injected, and what keeps conformance replay deterministic |
+| **trusted production seam (v1 and v2 alike)** | **rejected fail-closed**: `NOT_EVALUATED(CALLER_SUPPLIED_EVALUATION_TIME)` |
 
 It is never silently ignored and never becomes the authoritative clock. The rejection record
 is stamped with the **trusted** clock, so a caller cannot influence even the timestamp of its
-own rejection. Rejection happens at gate 3 — before any policy or evidence resolution.
+own rejection. On v2 the rejection happens at gate 3 — before any policy or evidence
+resolution; on v1 it happens at dispatch, before the shared evaluation path is entered.
+Nothing else about v1 changed.
 
 `CALLER_SUPPLIED_EVALUATION_TIME` is a new, owner-ratified member of
 `SubjectRiskNonDecisionReason`. It was minted rather than reused because no existing member

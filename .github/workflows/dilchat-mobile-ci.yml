@@ -82,6 +82,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements.txt
       - name: Generate backend OpenAPI
         working-directory: products/dilchat
         env:
@@ -204,6 +206,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements.txt
 
       - name: Install backend (for alembic + uvicorn)
         working-directory: products/dilchat

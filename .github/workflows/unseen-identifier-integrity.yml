@@ -5,6 +5,13 @@ name: unseen-identifier-integrity
 # never generates smoke/development/final cohorts, never consumes a reserved seed, never produces
 # scientific evidence, and never issues a scientific verdict.
 
+concurrency:
+  # A superseded run proves nothing about the commit that replaced it. Cancel
+  # in-flight runs for the same ref on pull requests; never on a branch push,
+  # where each commit's run is the evidence that commit was green.
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 on:
   pull_request:
     paths:

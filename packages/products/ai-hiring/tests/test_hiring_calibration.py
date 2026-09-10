@@ -299,8 +299,8 @@ def test_proposal_and_report_modules_do_not_import_analytics():
 
 
 # --- standalone -----------------------------------------------------------
-def test_calibration_plane_imports_standalone():
-    import sys
-    for name in list(sys.modules):
-        assert not name.startswith("ugence_tap_provider")
-        assert not name.startswith("ugence_actiongate_provider")
+# That the calibration plane binds no shared platform provider is enforced
+# statically for every module in the package by tests/packaging/
+# test_dependency_boundaries.py::test_concrete_tap_actiongate_only_in_integrations.
+# The check that used to sit here scanned this process's sys.modules without
+# importing the plane, so it reported the session's import history instead.

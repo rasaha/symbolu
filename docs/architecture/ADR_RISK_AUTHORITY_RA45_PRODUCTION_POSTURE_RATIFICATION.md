@@ -238,6 +238,61 @@ results are proven unable to enter the verified production composition path.
 `RiskAuthorizationEnvelope` remains the sole signed machine-authority artifact.
 `ActionAuthorization` is its action-specific binding, **not** a second authority artifact.
 
+## 9. Amendment 2 — the caller-supplied clock (issue #1398 item 1)
+
+Ratified after the §8 work shipped. Three decisions, lettered D-A/D-B/D-C within this
+amendment — **not** the same letters as §8, which addressed the composition input.
+
+### What the investigation found, and the correction it forced
+
+#1398 item 1 was filed against RA-1→RA-4 and describes a facade exposure that **has since
+closed**. `RiskAuthorityApplication` accepts no `now` on any public method (all seven sites
+read `self._clock()`), and the HTTP surface exposes only `create_case` and
+`authorize_action`, neither taking a time. No facade path and no network path can supply a
+clock.
+
+What still takes `now` is the service layer beneath the facade, and that is **not** a
+defect: `EnvelopeVerifier.verify`, `check_authority_status` and `EnvelopeIssuer.issue` are
+pure functions of an instant, which is what makes a stdlib-only offline leaf deterministic,
+replayable from a wheel, and testable without a wall clock.
+
+**The live exposure was introduced by §8's own implementation.**
+`RiskAuthorityEnforcer.derive` — added in `d4557c81` as the production entry point that
+mints `VerifiedRiskAuthorityResult` — took a bare caller timestamp. That single instant
+governed envelope validity, the revocation epoch, and (after `0d012633`) the signing key's
+own validity window. Everything else on that path is fail-closed and envelope-bound; the
+clock was the one input still taken on trust.
+
+**D-A — clock authority at the composition layer.** `RiskAuthorityEnforcer.production(...)`
+requires an injected callable clock and refuses construction without one.
+`derive` no longer accepts `now`; it reads the injected clock **once** per call, so the
+envelope, the epoch and the key window are all judged at the same instant and a long
+derive cannot straddle an expiry boundary. `reference(...)` may take a deterministic clock
+(`lambda: FIXED_NOW`) and never claims production posture. **Every RA leaf signature and the
+`ActionGatePort` protocol are preserved.**
+
+**D-B — the production-v1 asymmetry is closed.** This **narrowly supersedes** the earlier
+ratified rule recorded in the Risk Authority README's *Evaluation-time authority* table
+("v1, any mode: honored, exactly as before — unchanged"). Both v1 and v2 production paths
+now reject a caller-supplied `evaluation_time` with the same typed
+`CALLER_SUPPLIED_EVALUATION_TIME` non-decision, stamped with the trusted clock so a caller
+cannot influence even the timestamp of its own rejection. The reason: production v1 and v2
+were held to different clock-authority rules in the same seam because of the order they
+were built, not because a caller-controlled instant is less dangerous on v1 — it can move
+validity and authorization on both. Reference/test mode continues to honor the field for
+deterministic replay. This is an intentional security-boundary amendment and a documented
+behavior change. No other v1 behavior and no historical record is modified.
+
+**D-C — `StatusAwareActionGate` is unchanged.** Its explicit `now` remains a valid
+pure-function service interface. It has no repository consumer and is not a production
+authority entry point. Revisit only if a production consumer is commissioned.
+
+### Versions
+
+`ugence-risk-authority` 0.9.0 → **0.10.0** (D-B). `ugence-risk-authority-runtime`
+0.2.0 → **0.3.0** (D-A; `derive` drops its `now` parameter and `production()` gains a
+required `clock`).
+
 ## 7. Invariants this ADR does not touch
 
 The composition engine mints no authority. Deployment assertions are not proof. Only the
