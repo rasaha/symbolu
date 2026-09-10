@@ -569,7 +569,7 @@ and it cannot be written until D-5 is ruled `[R]`.
 
 | Decision | Blocks |
 |---|---|
-| **Exchange grants and tenancy** `[R]` | Now first in order, not merely separate: §4.4 forbids designing a content-bearing table until this is ratified. Reviewable under the CR-5 clarification and §3.4; not authorized by this document |
+| **Exchange grants and tenancy** `[R]` | Now first in order, not merely separate: §4.4 forbids designing a content-bearing table until this is ratified. The ballot is `OWNER_RATIFICATION_MEU_EXCHANGE_TENANCY.md`, whose audit finds no `CREATE ROLE`, `GRANT` or row-level security anywhere in the repository — so §5.2's database-enforced separation is an intention, not an implementation `[G]` |
 | **Grace period and maximum retention** `[R]` | The purge horizon of §4.4. An owner decision explicitly withheld from engineering; until it is set, nothing may hold content |
 | **Retention and deletion policy, transport protection, production credential custody** `[R]` | The three remaining prerequisites of §4.4 for genuine customer content or a genuine provider call |
 | **The MEU ledger-kind schema** `[G]` | §4.4's ledger rule has no enforcement: `LedgerEntry.payload` accepts any canonical dict (`entry.py:52-61`). Unbuilt, and not built here |
