@@ -94,6 +94,11 @@ class DeploymentConfig:
     #: file of the tenant-bound vendor declarations under the writable runtime volume;
     #: requires UGENCE_STUDIO_TENANT_ID. Read here and handed to build_studio_context only.
     vendor_declarations_path: str = ""
+    #: Bring Your Workflow phase 3A (authority-plane ADR §24, BW-3A):
+    #: ``UGENCE_STUDIO_WORKFLOW_DRAFTS_PATH``, the sqlite file of the tenant-bound
+    #: workflow drafts under the writable runtime volume; requires UGENCE_STUDIO_TENANT_ID.
+    #: Read here and handed to build_studio_context only.
+    workflow_drafts_path: str = ""
     _errors: List[str] = field(default_factory=list, compare=False)
 
     @property
@@ -132,6 +137,10 @@ class DeploymentConfig:
     def vendor_declarations_configured(self) -> bool:
         return bool(self.vendor_declarations_path)
 
+    @property
+    def workflow_drafts_configured(self) -> bool:
+        return bool(self.workflow_drafts_path)
+
     @classmethod
     def from_env(cls, **overrides) -> "DeploymentConfig":
         mode = (overrides.get("mode") or _env("UGENCE_STUDIO_DEPLOYMENT_MODE") or "production").lower()
@@ -169,6 +178,9 @@ class DeploymentConfig:
             vendor_declarations_path=(overrides.get("vendor_declarations_path")
                                       or _env("UGENCE_STUDIO_VENDOR_DECLARATIONS_PATH")
                                       or "").strip(),
+            workflow_drafts_path=(overrides.get("workflow_drafts_path")
+                                  or _env("UGENCE_STUDIO_WORKFLOW_DRAFTS_PATH")
+                                  or "").strip(),
         )
         return cfg
 
@@ -221,10 +233,12 @@ class DeploymentConfig:
 
         # authority reads (front-door seam 2): typed identities, one tenant, registry required.
         # Since seam 5 the tenant may also stand alone for the system registry, and since
-        # seam 8 for the data-use declarations file.
+        # seam 8 for the data-use declarations file, and since phase 3A for the workflow
+        # drafts file.
         if self.policy_identities or (self.tenant_id and not self.system_registry_path
                                       and not self.data_use_declarations_path
-                                      and not self.vendor_declarations_path):
+                                      and not self.vendor_declarations_path
+                                      and not self.workflow_drafts_path):
             errors.extend(_authority_errors(self.policy_identities, self.tenant_id,
                                             bool(self.constitution_registry_path)))
         elif self.tenant_id:
@@ -255,6 +269,14 @@ class DeploymentConfig:
                 errors.append("UGENCE_STUDIO_VENDOR_DECLARATIONS_PATH requires "
                               "UGENCE_STUDIO_TENANT_ID; the declarations file is bound to "
                               "one tenant")
+
+        # workflow drafts (Bring Your Workflow phase 3A): a file under the volume, tenant-bound
+        if self.workflow_drafts_path:
+            errors.extend(_path_errors("UGENCE_STUDIO_WORKFLOW_DRAFTS_PATH",
+                                       self.workflow_drafts_path, self.runtime_dir))
+            if not self.tenant_id:
+                errors.append("UGENCE_STUDIO_WORKFLOW_DRAFTS_PATH requires UGENCE_STUDIO_TENANT_ID; "
+                              "the drafts file is bound to one tenant")
 
         # simulation provider (front-door seam 3): one boolean, typed; "1" or unset
         if self.simulation_provider not in ("", SIMULATION_PROVIDER_ENABLED):

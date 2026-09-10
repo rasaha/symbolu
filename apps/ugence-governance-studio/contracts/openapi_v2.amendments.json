@@ -95,7 +95,7 @@
       "paths_added": [
         "/api/v2/exports/{receipt_id}"
       ],
-      "note": "Clearance export: one read, and only a read. It returns the portable, content-addressed form of a clearance receipt the deployment already received (CE-1) \u2014 never one the studio minted and never a compile result; the reconstruction path refuses compile-shaped keys outright. No write, no operation that accepts a receipt, no new egress destination and no credential. The artifact carries three honesty claims that cannot be omitted, softened or stripped without changing its fingerprint: identity_assurance PRESENTED_UNPROVEN, authenticity UNSIGNED with the unfed trust-anchor prerequisite named, and data_classification SYNTHETIC_DEMONSTRATION_ONLY. The route is named exports, not clearances, so the SD-2 verb scan over operation ids and paths is left exactly as it was. No other operation changed."
+      "note": "Clearance export: one read, and only a read. It returns the portable, content-addressed form of a clearance receipt the deployment already received (CE-1) — never one the studio minted and never a compile result; the reconstruction path refuses compile-shaped keys outright. No write, no operation that accepts a receipt, no new egress destination and no credential. The artifact carries three honesty claims that cannot be omitted, softened or stripped without changing its fingerprint: identity_assurance PRESENTED_UNPROVEN, authenticity UNSIGNED with the unfed trust-anchor prerequisite named, and data_classification SYNTHETIC_DEMONSTRATION_ONLY. The route is named exports, not clearances, so the SD-2 verb scan over operation ids and paths is left exactly as it was. No other operation changed."
     },
     {
       "amendment_id": "v2-A7",
@@ -111,6 +111,24 @@
         "/api/v2/observe/deployment"
       ],
       "note": "Deployment status: one read returning the deployment's own startup integrity attestation (the six seam states, the checks map, result, failure code and pins), handed to build_studio_context once at composition and never re-read; cert_subject and cert_expiry do not travel; the console's module registry is not here by ruling MS-1; nothing is probed at request time. No other operation changed."
+    },
+    {
+      "amendment_id": "v2-A8",
+      "date": "2026-09-10",
+      "ruling": "ADR_UGENCE_AUTHORITY_PLANE_SCOPING.md section 24 BW-3A DRAFTS_AUTHORIZED_NOW (with BW-3A.1 STORE_VALIDATED_IR_NOT_THE_FILE, BW-3A.2 TENANT_FROM_SERVER_CONFIGURATION, BW-3A.3 APPEND_ONLY_SUPERSESSION, BW-3A.4 REGISTRATION_LINK_REF_PLUS_DIGEST, BW-3A.5 CLAIMED_OWNER_PRESENTED_UNPROVEN)",
+      "previous_sha256": "c6785b267dafe9e2593b58744890606727b26d450ffd1a32f9b544f95a2d0f3e",
+      "sha256": "afb675471bbdf01459a464c2eaf18c04622fed3f16956ed877cd9c3e90e38932",
+      "operations_added": [
+        "v2_workflow_drafts_save",
+        "v2_workflow_drafts_list",
+        "v2_workflow_drafts_read"
+      ],
+      "operations_removed": [],
+      "paths_added": [
+        "/api/v2/workflow-drafts",
+        "/api/v2/workflow-drafts/{draft_id}"
+      ],
+      "note": "Bring Your Workflow phase 3A: typed draft intake over workflow-drafts 0.1.0. Save keeps a document the composer's adapter validated, in its canonical encoding with its digest, as an unapproved DRAFT for the deployment's tenant; read and list answer the tenant's own drafts and lineage. Save is the only write and confers nothing; no operation approves, compiles, publishes, exports or hands a draft to a runtime, and none authenticates a claimed owner (phase 3B, blocked on AP-3). No other operation changed."
     }
   ]
 }

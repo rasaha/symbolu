@@ -1,6 +1,6 @@
 // AUTO-GENERATED from apps/ugence-governance-studio/contracts/openapi_v2.json
 // DO NOT EDIT BY HAND. Regenerate with: npm run generate:api-v2
-// source_openapi_sha256: c6785b267dafe9e2593b58744890606727b26d450ffd1a32f9b544f95a2d0f3e
+// source_openapi_sha256: afb675471bbdf01459a464c2eaf18c04622fed3f16956ed877cd9c3e90e38932
 // api_contract_version: governance_studio.api.v2
 
 export interface paths {
@@ -571,6 +571,58 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v2/workflow-drafts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Workflow Drafts
+         * @description The drafts this deployment's tenant keeps: the head of every lineage, or every
+         *     revision when ``include_superseded`` is set. Fields only; the document itself is
+         *     read one draft at a time.
+         */
+        get: operations["v2_workflow_drafts_list"];
+        put?: never;
+        /**
+         * Save Workflow Draft
+         * @description Keep one validated Workflow IR document as an unapproved draft for this
+         *     deployment's tenant.
+         *
+         *     The document is bounded by the BW-2 limits (a breach is the typed 422
+         *     ``workflow_too_complex``), validated through the composer's adapter, and kept in its
+         *     canonical encoding with its digest. A refusal is typed, never a 500.
+         */
+        post: operations["v2_workflow_drafts_save"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v2/workflow-drafts/{draft_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read Workflow Draft
+         * @description One draft, with its document, its lineage and the revision that supersedes it,
+         *     if any. A draft of another tenant does not exist on this route.
+         */
+        get: operations["v2_workflow_drafts_read"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -988,6 +1040,57 @@ export interface components {
             issued_at: string;
             /** Stale After */
             stale_after?: string | null;
+        };
+        /**
+         * WorkflowDraftSaveRequest
+         * @description Keep one validated Workflow IR document as an unapproved draft for this
+         *     deployment's tenant (typed intake only, FD-4).
+         *
+         *     No ``tenant_id`` (the deployment's, never the caller's), no ``draft_id`` (derived by
+         *     the package, never chosen), no ``recorded_by`` (the deployment's name and version),
+         *     no ``lifecycle`` (the constant ``DRAFT``). ``claimed_owner_ref`` is an opaque handle
+         *     recorded as ``PRESENTED_UNPROVEN``; ``registration_ref`` and ``registration_digest``
+         *     link an existing AI-system registration by reference plus digest, both or neither;
+         *     ``supersedes`` names the draft this revision replaces. The document is validated by
+         *     the composer's adapter before anything is kept, and what is kept is its canonical
+         *     encoding, never the text that was brought.
+         */
+        WorkflowDraftSaveRequest: {
+            /**
+             * Claimed Owner Ref
+             * @default
+             */
+            claimed_owner_ref: string;
+            /** Contract Version */
+            contract_version: string;
+            /**
+             * Notes
+             * @default
+             */
+            notes: string;
+            /**
+             * Registration Digest
+             * @default
+             */
+            registration_digest: string;
+            /**
+             * Registration Ref
+             * @default
+             */
+            registration_ref: string;
+            /** Source Digest */
+            source_digest?: string | null;
+            /**
+             * Supersedes
+             * @default
+             */
+            supersedes: string;
+            /** Title */
+            title: string;
+            /** Workflow */
+            workflow: {
+                [key: string]: unknown;
+            };
         };
     };
     responses: never;
@@ -1805,6 +1908,101 @@ export interface operations {
                 "application/json": components["schemas"]["VendorDeclareRequest"];
             };
         };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    v2_workflow_drafts_list: {
+        parameters: {
+            query?: {
+                include_superseded?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    v2_workflow_drafts_save: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WorkflowDraftSaveRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    v2_workflow_drafts_read: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                draft_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
         responses: {
             /** @description Successful Response */
             200: {

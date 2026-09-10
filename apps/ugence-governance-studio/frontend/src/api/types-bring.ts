@@ -56,3 +56,73 @@ export interface CompareAdaptationsResult {
   v1_adaptation_fingerprint: string;
   v2_adaptation_fingerprint: string;
 }
+
+// -- Workflow drafts (Bring Your Workflow phase 3A, ADR §24) -------------------
+// Projections of the v2 draft answers. A draft is a record, never a permission: its
+// lifecycle is the constant DRAFT and any claimed owner carries PRESENTED_UNPROVEN.
+
+export interface DraftRefusal {
+  refused: true;
+  code: string;
+  reason: string;
+}
+
+export interface WorkflowDraftFields {
+  draft_id: string;
+  tenant_id: string;
+  title: string;
+  contract_version: string;
+  workflow_digest: string;
+  lifecycle: string;
+  claimed_owner_ref: string;
+  claimed_owner_assurance: string;
+  registration_ref: string;
+  registration_digest: string;
+  supersedes: string;
+  recorded_by: string;
+  validated_by: string;
+  notes: string;
+  record_version: string;
+}
+
+export interface WorkflowDraftRecord {
+  draft: WorkflowDraftFields;
+  workflow: Record<string, unknown>;
+}
+
+export interface WorkflowDraftSaved {
+  saved: true;
+  draft_id: string;
+  workflow_digest: string;
+  lifecycle: string;
+  lifecycle_note: string;
+  record: WorkflowDraftRecord;
+  record_digest: string;
+  claimed_owner_status: string;
+  recorded_by: string;
+  validated_by: string;
+  integrity: WorkflowIntegrity;
+  confers: string;
+}
+
+export interface WorkflowDraftRow extends WorkflowDraftFields {
+  superseded_by: string;
+  record_digest: string;
+}
+
+export interface WorkflowDraftListing {
+  count: number;
+  include_superseded: boolean;
+  lifecycle_note: string;
+  claimed_owner_status: string;
+  confers: string;
+  result: WorkflowDraftRow[];
+}
+
+export interface WorkflowDraftRead {
+  found: boolean;
+  draft_id: string;
+  record: WorkflowDraftRecord | null;
+  lineage: string[];
+  superseded_by: string;
+}

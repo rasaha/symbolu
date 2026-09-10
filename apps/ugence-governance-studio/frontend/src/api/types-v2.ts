@@ -53,6 +53,7 @@ export type ReviewStartShadowRunBody = Body<"v2_review_start_shadow_run">;
 export type RegistryRegisterBody = Body<"v2_registry_register">;
 export type DataUseDeclareBody = Body<"v2_data_use_declare">;
 export type VendorDeclareBody = Body<"v2_vendor_declare">;
+export type WorkflowDraftSaveBody = Body<"v2_workflow_drafts_save">;
 
 // -- the gap contract -------------------------------------------------------
 /**

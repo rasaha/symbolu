@@ -33,6 +33,9 @@ _PACKAGE_SRC = [
     os.path.join(_REPO, "packages", "integration", "data-use-admission", "src"),
     # Front-door seam 9 (FD-13): the vendor-dependency intake's package.
     os.path.join(_REPO, "packages", "integration", "vendor-dependency", "src"),
+    # Bring Your Workflow phase 3A (authority-plane ADR §24): the workflow-draft
+    # intake's package.
+    os.path.join(_REPO, "packages", "integration", "workflow-drafts", "src"),
     # Clearance export (CE-6): the export package, and the evaluator package whose
     # frozen receipt type it imports. action-clearance is on the path so the export
     # package can be imported at all; it is NOT on the SD-1 allowlist, so the studio's

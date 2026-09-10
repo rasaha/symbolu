@@ -1,0 +1,44 @@
+# Ugence Workflow Drafts — the unapproved Workflow IR drafts a tenant keeps
+# (owner ruling on Bring Your Workflow phase 3, ADR_UGENCE_AUTHORITY_PLANE_SCOPING.md §24:
+# phase 3A authorized for immediate implementation).
+#
+#   THIS PACKAGE KEEPS WHAT AN OPERATOR VALIDATED, AS A DRAFT, FOR ONE TENANT.
+#   IT NEVER APPROVES, COMPILES, PUBLISHES, EXPORTS, AUTHENTICATES OR EXECUTES.
+#
+# One record type, its refusal reasons, pure selectors, one read-only Protocol and the
+# one ruled local store (a sqlite file the composing deployment owns; no server, no
+# driver, no DSN, no network). Stdlib only: no dependency, no clock.
+#
+# Build:   python -m build packages/integration/workflow-drafts
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ugence-workflow-drafts"
+dynamic = ["version"]
+description = "Ugence Workflow Drafts — tenant-bound, append-only records of validated, unapproved Workflow IR drafts. Keeps what an operator validated; never approves, compiles, publishes, exports, authenticates or executes."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "Proprietary" }
+authors = [{ name = "Rakesh Mohan" }]
+keywords = ["governance", "workflow", "drafts", "bring-your-workflow", "ugence"]
+classifiers = ["Typing :: Typed"]
+dependencies = []
+
+[project.optional-dependencies]
+test = ["pytest>=7.0"]
+
+[tool.setuptools.dynamic]
+version = { attr = "ugence_workflow_drafts.version.__version__" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["ugence_workflow_drafts*"]
+
+[tool.setuptools.package-data]
+ugence_workflow_drafts = ["py.typed"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"

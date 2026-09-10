@@ -84,7 +84,11 @@ def test_the_allowlist_gained_exactly_one_entry_and_it_is_the_ruled_one():
     from tests.test_architecture import _PUBLIC_ENTRY_ALLOWLIST
 
     assert "ugence_clearance_export" in _PUBLIC_ENTRY_ALLOWLIST
-    assert len(_PUBLIC_ENTRY_ALLOWLIST) == 11
+    # Eleven at CE-6. Twelve since owner ruling BW-3A (authority-plane ADR §24, Bring
+    # Your Workflow phase 3A) admitted ugence_workflow_drafts; the count moves only
+    # with a ruling, which is the point of asserting it.
+    assert len(_PUBLIC_ENTRY_ALLOWLIST) == 12
+    assert "ugence_workflow_drafts" in _PUBLIC_ENTRY_ALLOWLIST
     assert _PUBLIC_ENTRY_ALLOWLIST["ugence_clearance_export"] == (
         "from ugence_clearance_export import ",
         "import ugence_clearance_export",

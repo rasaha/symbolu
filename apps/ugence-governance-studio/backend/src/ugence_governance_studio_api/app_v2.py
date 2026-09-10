@@ -43,6 +43,7 @@ from .services.studio_v2 import (
     RegistryService,
     DeclarationService,
     VendorDeclarationService,
+    WorkflowDraftService,
     ReviewRelayService,
     StartRunService,
     LedgerObserveService,
@@ -82,6 +83,7 @@ def build_studio_context(
     data_use_purpose_vocabulary: Any = None,
     vendor_declarations: Any = None,
     vendor_posture_vocabulary: Any = None,
+    workflow_drafts: Any = None,
     received_clearances: Any = None,
     deployment_report: Any = None,
 ) -> V2Context:
@@ -136,6 +138,11 @@ def build_studio_context(
         vendor=VendorDeclarationService(
             declarations=vendor_declarations, recorded_by=recorded_by,
             posture_vocabulary=vendor_posture_vocabulary),
+        # Bring Your Workflow phase 3A (authority-plane ADR §24): the tenant-bound
+        # drafts file, and the system registry a draft may link to by reference plus
+        # digest — the same registry seam 5 handed, never a second one.
+        workflow_drafts=WorkflowDraftService(
+            drafts=workflow_drafts, recorded_by=recorded_by, registry=system_registry),
         clearance_export=ClearanceExportService(
             source=received_clearances,
             tenant_id=getattr(received_clearances, "tenant_id", "")),
@@ -182,7 +189,8 @@ def create_v2_app(
         f"{_V2_SUMMARY}\n\n"
         f"- API contract: {API_V2_CONTRACT_VERSION}\n"
         f"- Frozen companion contract: governance_studio.api.v1 (unchanged)\n"
-        f"- Screens: Registration, Constitution, Policy, Authority, Simulate, Publish, Observe, Review"
+        f"- Screens: Registration, Constitution, Policy, Authority, Simulate, Publish, Observe, Review; "
+        f"Bring Your Workflow drafts (phase 3A)"
     )
     app.openapi_version = "3.1.0"
     return app

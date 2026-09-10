@@ -37,6 +37,7 @@ REPORT = {
     "system_registry": "unwritable",
     "data_use_declarations": "unset",
     "vendor_declarations": "unset",
+    "workflow_drafts": "unset",
     "checks": {"config_valid": True, "tls_certificate_valid": True, "openapi_hash_unchanged": True},
     "result": "PASS",
     "failure_code": "OK",
@@ -73,7 +74,7 @@ def test_the_report_comes_back_as_seam_states_checks_and_pins(client):
     assert status["ceiling"] == STARTUP_ATTESTATION_CEILING
     result = status["result"]
     assert result["seams"] == {name: REPORT[name] for name in SEAM_STATE_FIELDS}
-    assert set(result["seams"]) == set(SEAM_STATE_FIELDS) and len(SEAM_STATE_FIELDS) == 6
+    assert set(result["seams"]) == set(SEAM_STATE_FIELDS) and len(SEAM_STATE_FIELDS) == 7
     assert result["checks"] == REPORT["checks"]
     assert result["result"] == "PASS" and result["failure_code"] == "OK"
     assert result["pins"] == {name: REPORT[name] for name in PIN_FIELDS}

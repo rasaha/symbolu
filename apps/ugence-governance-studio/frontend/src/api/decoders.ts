@@ -15,9 +15,16 @@ import type {
 import type {
   AdaptWorkflowResult,
   CompareAdaptationsResult,
+  DraftRefusal,
   NodeDispositionView,
   RoleRequirementView,
   ValidateWorkflowResult,
+  WorkflowDraftFields,
+  WorkflowDraftListing,
+  WorkflowDraftRead,
+  WorkflowDraftRecord,
+  WorkflowDraftRow,
+  WorkflowDraftSaved,
 } from "./types-bring";
 
 export class DecodeError extends Error {
@@ -218,5 +225,114 @@ export function decodeCompareAdaptations(result: unknown): CompareAdaptationsRes
     report: obj(req(r, "report", "compare_adaptations"), "compare_adaptations.report"),
     v1_adaptation_fingerprint: str(req(r, "v1_adaptation_fingerprint", "compare_adaptations"), "compare_adaptations.v1_adaptation_fingerprint"),
     v2_adaptation_fingerprint: str(req(r, "v2_adaptation_fingerprint", "compare_adaptations"), "compare_adaptations.v2_adaptation_fingerprint"),
+  };
+}
+
+// -- Workflow drafts (Bring Your Workflow phase 3A, ADR §24) ------------------- //
+// The v2 client has already narrowed `available`; these read the available answer and
+// fail closed on any shape the backend did not promise. A typed refusal is returned as
+// a value, not thrown: it is the server's answer, not a transport failure.
+
+export function decodeDraftRefusal(result: unknown): DraftRefusal | null {
+  const r = obj(result, "workflow_drafts");
+  if (r.refused !== true) return null;
+  return {
+    refused: true,
+    code: str(req(r, "code", "workflow_drafts"), "workflow_drafts.code"),
+    reason: str(req(r, "reason", "workflow_drafts"), "workflow_drafts.reason"),
+  };
+}
+
+function draftFields(value: unknown, field: string): WorkflowDraftFields {
+  const d = obj(value, field);
+  const text = (key: string) => str(req(d, key, field), `${field}.${key}`);
+  const fields: WorkflowDraftFields = {
+    draft_id: text("draft_id"),
+    tenant_id: text("tenant_id"),
+    title: text("title"),
+    contract_version: text("contract_version"),
+    workflow_digest: text("workflow_digest"),
+    lifecycle: text("lifecycle"),
+    claimed_owner_ref: text("claimed_owner_ref"),
+    claimed_owner_assurance: text("claimed_owner_assurance"),
+    registration_ref: text("registration_ref"),
+    registration_digest: text("registration_digest"),
+    supersedes: text("supersedes"),
+    recorded_by: text("recorded_by"),
+    validated_by: text("validated_by"),
+    notes: text("notes"),
+    record_version: text("record_version"),
+  };
+  // A record claiming any other lifecycle or assurance is not one this build can
+  // show: the backend never writes one, so its arrival means something is wrong.
+  if (fields.lifecycle !== "DRAFT") throw new DecodeError(`${field}.lifecycle`, `is ${fields.lifecycle}, not DRAFT`);
+  if (fields.claimed_owner_assurance !== "PRESENTED_UNPROVEN") {
+    throw new DecodeError(`${field}.claimed_owner_assurance`, `is ${fields.claimed_owner_assurance}, not PRESENTED_UNPROVEN`);
+  }
+  return fields;
+}
+
+function draftRecord(value: unknown, field: string): WorkflowDraftRecord {
+  const r = obj(value, field);
+  return { draft: draftFields(req(r, "draft", field), `${field}.draft`), workflow: obj(req(r, "workflow", field), `${field}.workflow`) };
+}
+
+export function decodeWorkflowDraftSaved(result: unknown): WorkflowDraftSaved {
+  const f = "workflow_drafts.save";
+  const r = obj(result, f);
+  if (r.saved !== true) throw new DecodeError(f, "not a saved answer");
+  const integrity = obj(req(r, "integrity", f), `${f}.integrity`);
+  return {
+    saved: true,
+    draft_id: str(req(r, "draft_id", f), `${f}.draft_id`),
+    workflow_digest: str(req(r, "workflow_digest", f), `${f}.workflow_digest`),
+    lifecycle: str(req(r, "lifecycle", f), `${f}.lifecycle`),
+    lifecycle_note: str(req(r, "lifecycle_note", f), `${f}.lifecycle_note`),
+    record: draftRecord(req(r, "record", f), `${f}.record`),
+    record_digest: str(req(r, "record_digest", f), `${f}.record_digest`),
+    claimed_owner_status: str(req(r, "claimed_owner_status", f), `${f}.claimed_owner_status`),
+    recorded_by: str(req(r, "recorded_by", f), `${f}.recorded_by`),
+    validated_by: str(req(r, "validated_by", f), `${f}.validated_by`),
+    integrity: {
+      checked: bool(req(integrity, "checked", `${f}.integrity`), `${f}.integrity.checked`),
+      source_digest: typeof integrity.source_digest === "string" ? integrity.source_digest : undefined,
+      computed_digest: typeof integrity.computed_digest === "string" ? integrity.computed_digest : undefined,
+      match: typeof integrity.match === "boolean" ? integrity.match : undefined,
+    },
+    confers: str(req(r, "confers", f), `${f}.confers`),
+  };
+}
+
+export function decodeWorkflowDraftListing(result: unknown): WorkflowDraftListing {
+  const f = "workflow_drafts.list";
+  const r = obj(result, f);
+  const rows: WorkflowDraftRow[] = arr(req(r, "result", f), `${f}.result`).map((row, i) => {
+    const o = obj(row, `${f}.result[${i}]`);
+    return {
+      ...draftFields(o, `${f}.result[${i}]`),
+      superseded_by: str(req(o, "superseded_by", f), `${f}.result[${i}].superseded_by`),
+      record_digest: str(req(o, "record_digest", f), `${f}.result[${i}].record_digest`),
+    };
+  });
+  return {
+    count: num(req(r, "count", f), `${f}.count`),
+    include_superseded: bool(req(r, "include_superseded", f), `${f}.include_superseded`),
+    lifecycle_note: str(req(r, "lifecycle_note", f), `${f}.lifecycle_note`),
+    claimed_owner_status: str(req(r, "claimed_owner_status", f), `${f}.claimed_owner_status`),
+    confers: str(req(r, "confers", f), `${f}.confers`),
+    result: rows,
+  };
+}
+
+export function decodeWorkflowDraftRead(result: unknown): WorkflowDraftRead {
+  const f = "workflow_drafts.read";
+  const r = obj(result, f);
+  const found = bool(req(r, "found", f), `${f}.found`);
+  return {
+    found,
+    draft_id: str(req(r, "draft_id", f), `${f}.draft_id`),
+    record: found ? draftRecord(req(r, "record", f), `${f}.record`) : null,
+    lineage: found ? strList(req(r, "lineage", f), `${f}.lineage`) : [],
+    superseded_by: found ? str(req(r, "superseded_by", f), `${f}.superseded_by`) : "",
   };
 }
