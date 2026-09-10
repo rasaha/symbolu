@@ -29,11 +29,21 @@ claim cannot drift away from the evidence:
 ```
 
 This package is **not** pilot-validated and **not** production-certified. Nothing in it
-reaches a live system, and it carries no credentials — the Credential Broker
-(cloud-scaling Phase 5X) does not exist, and nothing here substitutes for it. Agent
-Runtime's own statements about not being distributed-safe or exactly-once are revised
-only for the properties the matrix actually proves, and only here — the runtime's own
-README is untouched.
+reaches a live system, and it carries no credentials. Agent Runtime's own statements
+about not being distributed-safe or exactly-once are revised only for the properties the
+matrix actually proves, and only here — the runtime's own README is untouched.
+
+**Corrected 2026-09-08.** The paragraph above previously gave its reason as "the
+Credential Broker (cloud-scaling Phase 5X) does not exist, and nothing here substitutes
+for it". It exists: `ugence-cloud-scaling-credential-broker` 0.1.0, with
+`ugence-cloud-scaling-bounded-execution` 0.1.0 (5D) consuming its grants. The conclusion
+is unchanged and the reason is now the real one — both are scoped to Cloud Scaling
+*capacity* actions and neither imports `ugence_agent_runtime`, so neither is on the
+provider path this adapter drives. Within their own scope they also stop short of live
+execution: a 5X grant's `executable` is always false, its reference broker returns an
+inert handle and is refused in production, and 5D resolves every missing LIVE
+precondition to `dry_run`. No credential path exists for Agent Runtime's own providers,
+and nothing here supplies one.
 
 Ratified means exactly this: the ADR §8 matrix passes in CI. It does not mean piloted,
 certified, or approved for any live system. See **Matrix status** below.
@@ -176,6 +186,12 @@ A skipped row is **not** a passing row. Row 7's server-stop case skips loudly wh
 `UGENCE_DE_PGDATA` is unset, and a connection-refusal simulation is not accepted as
 evidence for it.
 
+The SQLAlchemy gate sits on the three matrix modules rather than on the tests directory,
+so `tests/test_boundaries.py` and `tests/test_adr_conformance.py` run with no database
+and no engine dependency installed — ten tests, including the one-way-dependency
+assertion. The matrix itself still skips loudly without them, and CI still fails the job
+if any matrix row skipped.
+
 | Row | Failure | Status |
 |---:|---|---|
 | 1 | Crash before the provider call | PASSING |
@@ -196,10 +212,22 @@ effect of a green suite.
 
 ## Known gaps
 
-Multi-region consistency, HSM/KMS custody and key rotation are untouched. ESCALATE has
-a sink since GAS-7 HR-A (`packages/integration/governed-review` binds and consumes an
-approval before the engine advances), but no queue or decision surface is built yet, so
-a parked instance (row 9) is still not visible to a human. Risk Authority `production_mode` still raises
-`ProductionContainmentError`. Clock discipline is enforced against the known monotonic
+Multi-region consistency, HSM/KMS custody and key rotation are untouched. Risk Authority
+`production_mode` still raises `ProductionContainmentError`, so signed envelope issuance
+remains Phase 5 and unbuilt. Clock discipline is enforced against the known monotonic
 default; a deployment that hides a monotonic reading behind an unrecognisable wrapper
-defeats the guard, and that residual is stated rather than papered over.
+defeats the guard, and that residual is stated rather than papered over. Registries
+remain in-memory.
+
+**Corrected 2026-09-08.** This section previously read: ESCALATE has a sink since GAS-7
+HR-A, "but no queue or decision surface is built yet, so a parked instance (row 9) is
+still not visible to a human". Both surfaces exist. HR-C is
+`packages/integration/governed-review-service` — it lists the ESCALATE queue joined to
+the durable checkpoint, renders a run, records a decision and delivers the bounded resume
+for that instance. HR-D is the studio's Review Queue and Run Detail screens, whose
+`human_review_implemented` flag is `True`. A row 9 ESCALATE is reviewable end to end.
+What survives is narrower and is **not** a human-review gap: a `HOLD_NON_EXECUTABLE`
+carrying no `required_approvals` is ruled deliberately not reviewable (HR-5-SCOPE,
+`docs/architecture/ADR_UGENCE_AGENT_RUNTIME_PRODUCTION_VALIDATION_SCOPING.md`) — it parks
+and an **operator** resumes it, which is not a review — and no surface in this repository
+tells an operator that an instance parked at all. That monitoring gap is open.

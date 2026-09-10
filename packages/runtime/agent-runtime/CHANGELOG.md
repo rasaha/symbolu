@@ -58,8 +58,16 @@ guarantee, reporter containment, and provider execution/retry semantics are unch
 exports: `ObservationFailureKind`, `classify_observation_failure`. Corrected in place (0.7.0 is
 unreleased).
 
-**Package maturity: `IMPLEMENTED_AND_LOCALLY_OFFLINE_VERIFIED`** (upgrade to
-`IMPLEMENTED_AND_CI_VERIFIED` only after the scoped Actions run is observed green).
+**Package maturity: `IMPLEMENTED_AND_CI_VERIFIED`.** This entry previously read
+`IMPLEMENTED_AND_LOCALLY_OFFLINE_VERIFIED`, with the upgrade conditional on the scoped
+Actions run being observed green. That condition is now discharged: `agent-runtime-ci`
+[run 34040504074](https://github.com/rasaha/symbolu/actions/runs/34040504074) on the
+default branch at `26da5f3c` (2026-09-06) completed with all three jobs success — package
+suite and import-boundary checks, wheel build + isolated installation verification, and
+platform-freeze — on a head carrying `0.7.0`. Recorded precisely: the green run is on a
+later default-branch head that contains this release, not on the merge commit that
+introduced it. Still **not** live-verified, pilot-validated, distributed-safe,
+cluster-safe, exactly-once, enforcement-ready, or production-ready.
 
 ## 0.6.0 — H22-D bounded concurrent multi-workflow execution
 

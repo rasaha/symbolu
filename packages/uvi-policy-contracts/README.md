@@ -7,7 +7,7 @@ It is **not** a customer-facing module (D-2, D-18).
 
 - **Distribution:** `ugence-uvi-policy-contracts`
 - **Namespace:** `ugence_uvi_policy_contracts`
-- **Version:** 0.1.0
+- **Version:** 0.2.0
 - **Depends on:** Python standard library **+ `ugence-governance-contracts>=0.2.0`** (the neutral leaf) — nothing else
 - **Typing:** fully type-annotated; ships a PEP 561 `py.typed` marker
 - **Public API snapshot:** `public_api.json` (asserted equal to the installed package by `tests/packaging/test_public_api.py`)
@@ -27,8 +27,10 @@ here **mints no authority** — trust evaluation (signature, approval, revocatio
 freshness) belongs to the Policy Authority and later admission milestones, which
 are explicitly out of scope. `AssessedSystemBinding` is **owned by
 `ugence-governance-contracts`** (UVI ADR §20) and is not defined here; the
-RA-owned `SubjectContext` (PR #1425, unmerged) remains a **deferred dependency**
-and is likewise not defined here.
+RA-owned `SubjectContext` (designed in PR #1425, implemented in PR #1432, both
+merged; it lives in `risk_authority.integrations.evaluation_contracts`) is
+**permanently not adopted** by UVI — D-14, ratified 2026-09-09, closing UVI ADR
+§26.2 — and is likewise not defined here.
 
 ## What's in it
 
@@ -139,7 +141,9 @@ Policy Authority (approval/signing/issuance/revocation), benchmark registry,
 readiness evaluator + target-relative state machine, `ConditionSet` execution,
 value forecasting, attribution/verification engines, financial valuation +
 `ValuationEvidenceManifest` (owned by `governed-value`), and the RA-owned
-`SubjectContext` (PR #1425, unmerged). `AssessedSystemBinding` is **not** deferred
+`SubjectContext` (merged in `risk_authority` via PR #1425/#1432; permanently not
+adopted by UVI — D-14, ratified 2026-09-09). `AssessedSystemBinding` is **not**
+deferred
 — it is owned by `ugence-governance-contracts` (ADR §20) and consumed by
 `ugence-agent-value-readiness`. See ADR §24–§26.
 

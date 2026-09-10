@@ -13,16 +13,41 @@ name: package-suites-ci
 # named by no workflow at all, so the next package cannot drift the same way.
 # tests/boundaries/test_package_ci_coverage.py asserts the same in the local suite.
 #
+# scripts/check_package_license.py is the second gate, on the same pattern and for the
+# same reason: thirty-two of seventy-two packages shipped with no LICENSE while all
+# seventy-two declared one in pyproject.toml. Its local twin is
+# tests/boundaries/test_package_license.py.
+#
 # Each package runs from its own directory, because several rely on their own
 # conftest.py to put src/ and their first-party dependencies on sys.path and cannot
 # be collected from the repository root.
+#
+# Suites run on 3.10, 3.11 and 3.12 — the whole range these packages declare with
+# requires-python >=3.10. The 3.10 leg was blocked until now by three couplings in test
+# code and committed artifacts, none of them in any package's src/: a bare
+# `import tomllib` (stdlib only from 3.11) now falls back to the `tomli` backport, which
+# the install steps below provide; public_api.json manifests recorded
+# `BaseException.add_note`, a 3.11 addition that made the artifact a statement about the
+# interpreter that generated it, and the generators now exclude inherited exception
+# methods so the manifest reproduces on any interpreter; and one assertion pinned
+# CPython's exact AttributeError wording, which 3.10 spells differently for the same
+# refusal. Each was fixed at the coupling, never by relaxing what the test discriminates.
+
+concurrency:
+  # A superseded run proves nothing about the commit that replaced it. Cancel
+  # in-flight runs for the same ref on pull requests; never on a branch push,
+  # where each commit's run is the evidence that commit was green.
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 on:
   pull_request:
     paths:
       - "packages/**"
       - "scripts/check_package_ci_coverage.py"
+      - "scripts/check_package_license.py"
       - "tests/boundaries/test_package_ci_coverage.py"
+      - "tests/boundaries/test_package_license.py"
       - ".github/workflows/package-suites-ci.yml"
   push:
     branches:
@@ -31,7 +56,9 @@ on:
     paths:
       - "packages/**"
       - "scripts/check_package_ci_coverage.py"
+      - "scripts/check_package_license.py"
       - "tests/boundaries/test_package_ci_coverage.py"
+      - "tests/boundaries/test_package_license.py"
       - ".github/workflows/package-suites-ci.yml"
 
 defaults:
@@ -47,20 +74,44 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+          cache: pip
+          cache-dependency-path: requirements.txt
       - name: No package may ship a suite nothing runs
         run: python scripts/check_package_ci_coverage.py
 
+  license-gate:
+    name: Every package ships a LICENSE its metadata agrees with
+    runs-on: ubuntu-latest
+    # Thirty-two of seventy-two packages had no LICENSE while all seventy-two
+    # declared one in pyproject.toml, so the file's presence recorded nothing. The
+    # thirty-two were normalized before this gate landed — a gate introduced midway
+    # through a migration fails on work nobody has done yet, and teaches everyone to
+    # ignore it. It checks agreement, not byte-equality: five distinct proprietary
+    # texts exist, all naming the same license, and a package may say more about it
+    # than the bare word so long as it does not say something else.
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: requirements.txt
+      - name: No package may ship without a LICENSE, or with one it contradicts
+        run: python scripts/check_package_license.py
+
   package-suite:
-    name: ${{ matrix.package }}
+    name: ${{ matrix.package }} (py${{ matrix.python-version }})
     runs-on: ubuntu-latest
     strategy:
       # One package's failure must not hide another's: this is the first run these
-      # suites have ever had in CI, so surface all of them.
+      # suites have ever had in CI, so surface all of them. The same applies across
+      # interpreters — a 3.12-only failure must not be masked by a green 3.11 leg.
       fail-fast: false
       matrix:
+        python-version: ["3.10", "3.11", "3.12"]
         package:
+          - packages/agent-value-readiness
           - packages/capabilities/action-clearance
-          - packages/capabilities/agent-value-readiness
           - packages/capabilities/llm-steering-controller
           - packages/capabilities/model-selection
           - packages/capabilities/readiness-comparison
@@ -85,12 +136,15 @@ jobs:
           - packages/integration/execution-reservation
           - packages/integration/incident-response
           - packages/integration/vendor-dependency
+          - packages/tooling/workflow-converters
           - packages/uvi-policy-contracts
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          python-version: "${{ matrix.python-version }}"
+          cache: pip
+          cache-dependency-path: requirements.txt
       - name: Install test dependencies
         # numpy is a real transitive requirement of the four cloud-scaling packages:
         # each composes ugence-cloud-scaling-controller, whose controller.py imports
@@ -113,7 +167,7 @@ jobs:
         # httpx. Without them those two rulings would be checked by nothing.
         run: |
           python -m pip install --upgrade pip
-          pip install pytest numpy cffi cryptography pydantic pynacl fastapi httpx
+          pip install pytest numpy cffi cryptography pydantic pynacl fastapi httpx tomli
       - name: Suite
         # From the package's own directory: several need their conftest.py to put
         # src/ and their first-party dependencies on sys.path, and cannot be
@@ -121,6 +175,37 @@ jobs:
         run: |
           cd "${{ matrix.package }}"
           python -m pytest -q
+
+  refusal-mutation-sweep:
+    name: ${{ matrix.package }} refusal sweep
+    runs-on: ubuntu-latest
+    # Two packages ship a sweep that disables each refusal in src/ in turn and
+    # reports the ones no test catches. control-plane-root's README says the
+    # coverage claim "ships rather than being described, so it can be run instead
+    # of believed" — which it could not, while nothing ran it. The suite job above
+    # runs suites only, so these are their own job: the sweep re-runs the whole
+    # package suite once per refusal site and is far slower than the suite itself.
+    strategy:
+      fail-fast: false
+      matrix:
+        package:
+          - packages/integration/control-plane-root
+          - packages/integration/incident-response
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: requirements.txt
+      - name: Install test dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest
+      - name: Every refusal is observed by some test; a survivor fails this job
+        # The script exits non-zero when any mutant survives, so no separate
+        # assertion on its output is needed.
+        run: python ${{ matrix.package }}/scripts/mutation_sweep.py
 
   clearance-export-distribution:
     name: ugence-clearance-export built artifact (CE-2, CE-3, CE-4, CE-5, CE-7)
@@ -135,6 +220,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+          cache: pip
+          cache-dependency-path: requirements.txt
       - name: Install build tooling
         run: |
           python -m pip install --upgrade pip
@@ -157,6 +244,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+          cache: pip
+          cache-dependency-path: requirements.txt
       - name: Install build tooling
         run: |
           python -m pip install --upgrade pip

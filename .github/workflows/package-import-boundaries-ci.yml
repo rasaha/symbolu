@@ -16,6 +16,13 @@ name: package-import-boundaries-ci
 # The checker reads source and manifests only: it imports nothing and installs no
 # package, so it needs no dependency present and cannot be defeated by a side effect.
 
+concurrency:
+  # A superseded run proves nothing about the commit that replaced it. Cancel
+  # in-flight runs for the same ref on pull requests; never on a branch push,
+  # where each commit's run is the evidence that commit was green.
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 on:
   pull_request:
     paths:
@@ -37,6 +44,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+          cache: pip
+          cache-dependency-path: requirements.txt
 
       - name: Install test dependencies
         # The checker itself is stdlib-only; pytest is for the guard's own tests.

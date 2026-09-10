@@ -24,9 +24,18 @@ keywords = ["governance", "risk", "authority", "composition", "actiongate", "dec
 # The integration package composes the machine-authority owner with the two
 # additive governance kernels. It adds no third-party runtime dependency of its
 # own beyond what those kernels already declare (pydantic via decision-authority).
+# Floors corrected under the RA-4.5 production-posture ratification (ruling 4). Each
+# floor names the lowest version that actually carries what this package uses:
+#   * risk-authority >=0.4.0 — the RA-1→RA-4 authority spine the composition is specified
+#     against. Deliberately NOT >=0.8.0: the ratification does not adopt
+#     ActionAdmissionSeam, so requiring it would misstate this package as seam-adopting.
+#   * decision-authority >=1.0.0 — the distribution's first and frozen release; the old
+#     >=0.1.0 admitted versions that never existed. The adapter matches the frozen
+#     DecisionOutcome values, which 1.0.0 froze.
+#   * actiongate-provider >=0.1.0 — retained; that is the provider's current version.
 dependencies = [
-    "ugence-risk-authority>=0.1.0",
-    "ugence-decision-authority>=0.1.0",
+    "ugence-risk-authority>=0.4.0",
+    "ugence-decision-authority>=1.0.0",
     "ugence-actiongate-provider>=0.1.0",
 ]
 

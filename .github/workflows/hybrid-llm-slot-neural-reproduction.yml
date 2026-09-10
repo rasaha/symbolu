@@ -5,6 +5,13 @@ name: hybrid-llm-slot-neural-reproduction
 # artifacts. Guards the frozen historical artifact. Expensive full 1200-step training is opt-in
 # via the 'job' input and a generous-but-bounded timeout; default runs parity + complexity only.
 
+concurrency:
+  # A superseded run proves nothing about the commit that replaced it. Cancel
+  # in-flight runs for the same ref on pull requests; never on a branch push,
+  # where each commit's run is the evidence that commit was green.
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 on:
   workflow_dispatch:
     inputs:
@@ -35,6 +42,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
+          cache: pip
+          cache-dependency-path: requirements.txt
 
       - name: Install CPU torch (pinned)
         run: |

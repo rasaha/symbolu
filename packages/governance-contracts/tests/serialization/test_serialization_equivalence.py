@@ -5,6 +5,12 @@ Constructs representative instances of every public dataclass contract and
 asserts their asdict, canonical JSON, fingerprint, repr, constructor signature,
 enum value maps, and error failure-classes are byte-identical to the recorded
 baseline — the guard that the physical move changed no contract semantics.
+
+The fixture carries no public-API hash. It held an ``api_snapshot_hash`` key that
+was permanently ``null`` and read by nothing; the 2026-09-09 §26.9 ruling deleted
+it rather than wiring it, because ``tests/packaging/test_public_api.py`` already
+owns public-API parity and a second hash mechanism is not authorized. Its absence
+here is deliberate, not an omission.
 """
 
 from __future__ import annotations

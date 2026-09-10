@@ -1,12 +1,11 @@
 {
+  "curated_api_module": "ugence_uvi_policy_contracts.api",
   "distribution": "ugence-uvi-policy-contracts",
   "namespace": "ugence_uvi_policy_contracts",
-  "package_version": "0.1.0",
-  "curated_api_module": "ugence_uvi_policy_contracts.api",
   "note": "Machine-readable snapshot of the curated public API (ugence_uvi_policy_contracts.api.__all__). Generated from the installed package; tests/packaging/test_public_api.py asserts this file equals the actual package surface. Regenerate when the curated API changes.",
+  "package_version": "0.2.0",
   "symbols": {
     "AssessmentContext": {
-      "kind": "dataclass",
       "fields": [
         "context_id",
         "tenant_id",
@@ -21,7 +20,8 @@
         "assessment_window",
         "created_at",
         "content_digest"
-      ]
+      ],
+      "kind": "dataclass"
     },
     "AssessmentPurpose": {
       "kind": "enum",
@@ -43,17 +43,17 @@
       ]
     },
     "ComponentEvidenceRequirement": {
-      "kind": "dataclass",
       "fields": [
         "component",
         "requirement_class",
         "required_source_basis",
         "required_attribution",
-        "required_verification"
-      ]
+        "required_verification",
+        "required_usage_scope"
+      ],
+      "kind": "dataclass"
     },
     "DomainPolicy": {
-      "kind": "dataclass",
       "fields": [
         "metadata",
         "governed_outcome_unit",
@@ -64,7 +64,8 @@
         "domain_benchmark_refs",
         "gates",
         "criticality_class"
-      ]
+      ],
+      "kind": "dataclass"
     },
     "GateCategory": {
       "kind": "enum",
@@ -79,7 +80,6 @@
       ]
     },
     "GeographyPolicy": {
-      "kind": "dataclass",
       "fields": [
         "metadata",
         "jurisdiction",
@@ -91,17 +91,18 @@
         "cost_benchmark_refs",
         "regional_thresholds",
         "valuation_policy_refs"
-      ]
+      ],
+      "kind": "dataclass"
     },
     "GovernedThreshold": {
-      "kind": "dataclass",
       "fields": [
         "threshold_id",
         "governed_unit",
         "comparator",
         "literal_value",
         "benchmark_ref"
-      ]
+      ],
+      "kind": "dataclass"
     },
     "HeadlineClassificationPolicy": {
       "kind": "enum",
@@ -110,7 +111,6 @@
       ]
     },
     "IntendedOutcomePolicy": {
-      "kind": "dataclass",
       "fields": [
         "metadata",
         "target_outcome",
@@ -124,7 +124,8 @@
         "required_effect_evidence",
         "acceptance_thresholds",
         "valuation_policy_refs"
-      ]
+      ],
+      "kind": "dataclass"
     },
     "MissingComponentBehavior": {
       "kind": "enum",
@@ -134,7 +135,6 @@
       ]
     },
     "PolicyArtifactMetadata": {
-      "kind": "dataclass",
       "fields": [
         "policy_id",
         "policy_family",
@@ -149,7 +149,8 @@
         "approval_ref",
         "supersedes_ref",
         "created_at"
-      ]
+      ],
+      "kind": "dataclass"
     },
     "PolicyContractError": {
       "kind": "exception"
@@ -165,7 +166,6 @@
       ]
     },
     "PolicyGate": {
-      "kind": "dataclass",
       "fields": [
         "gate_id",
         "category",
@@ -174,7 +174,8 @@
         "threshold",
         "conditionally_compensable",
         "description"
-      ]
+      ],
+      "kind": "dataclass"
     },
     "PolicyLifecycleState": {
       "kind": "enum",
@@ -187,7 +188,6 @@
       ]
     },
     "PolicyReference": {
-      "kind": "dataclass",
       "fields": [
         "policy_id",
         "policy_family",
@@ -195,7 +195,8 @@
         "content_digest",
         "scope",
         "tenant_id"
-      ]
+      ],
+      "kind": "dataclass"
     },
     "PolicyScope": {
       "kind": "enum",
@@ -205,13 +206,13 @@
       ]
     },
     "ReadinessPolicy": {
-      "kind": "dataclass",
       "fields": [
         "metadata",
         "gates",
         "readiness_targets",
         "composite_is_advisory"
-      ]
+      ],
+      "kind": "dataclass"
     },
     "ReadinessTarget": {
       "kind": "enum",
@@ -229,7 +230,6 @@
       ]
     },
     "ValuationPolicy": {
-      "kind": "dataclass",
       "fields": [
         "metadata",
         "permitted_valuation_methods",
@@ -237,7 +237,8 @@
         "headline_classification",
         "missing_component_behavior",
         "acceptance_thresholds"
-      ]
+      ],
+      "kind": "dataclass"
     },
     "ValueComponent": {
       "kind": "enum",

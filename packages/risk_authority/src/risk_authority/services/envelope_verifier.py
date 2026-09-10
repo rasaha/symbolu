@@ -51,9 +51,23 @@ class EnvelopeVerifier:
         reasons: list[str] = []
 
         # 1. Signature / key validity.
-        verify_key = key_ring.resolve(envelope.key_id)
-        if verify_key is None:
+        #
+        # The key's own validity window is checked BEFORE the signature (issue #1398,
+        # F-G item 2), matching the Policy Authority key path. A signature that verifies
+        # under an expired or not-yet-valid key is not a weaker pass — it is no pass at
+        # all, so there is nothing to gain by computing it first.
+        #
+        # Note the deliberate boundary difference from step 3 below: the key interval is
+        # half-open ``[not_before, not_after)`` while the envelope's is inclusive at both
+        # ends. See ``crypto.keys`` for why, and do not "harmonize" them.
+        key_record = key_ring.resolve_record(envelope.key_id)
+        if key_record is None:
             return EnvelopeVerification.deny(f"unknown key_id {envelope.key_id!r}")
+        if not key_record.is_valid_at(now):
+            return EnvelopeVerification.deny(
+                f"key {envelope.key_id!r} is outside its validity window "
+                f"[{key_record.not_before}, {key_record.not_after})")
+        verify_key = key_record.verify_key
         if not verify_key.verify(envelope.signing_payload(), envelope.signature):
             # A bad signature is terminal — nothing else in the body is trustworthy.
             return EnvelopeVerification.deny("invalid signature")

@@ -19,4 +19,15 @@ from __future__ import annotations
 #: ``ActionAdmissionSeam``, the ``AuthorizationRepository`` port with both adapters, derived
 #: authorization ids with ``REPLAYED`` re-admission, and ``ActionAuthorization`` gaining a
 #: typed ``expires_at`` and a ``disposition``. Additive for every existing caller.
-__version__ = "0.8.0"
+#: ``0.9.0`` enforces signing-key validity windows (issue #1398, F-G item 2). ``KeyRing``
+#: now holds ``VerificationKeyRecord`` entries so ``from_records`` stops discarding
+#: ``not_before`` / ``not_after``; ``EnvelopeVerifier`` resolves through the new
+#: ``resolve_record`` and refuses an out-of-window key *before* checking the signature; and
+#: ``EnvelopeIssuer`` independently refuses to sign outside the window, including for an
+#: external signer that declares one through the additive ``WindowedEnvelopeSignerPort``.
+#: The key interval is half-open ``[not_before, not_after)``, deliberately unlike the
+#: envelope's inclusive window, which is unchanged. An absent bound is unbounded-valid, so
+#: every existing windowless key and signer behaves exactly as before; the MINOR bump is for
+#: the ``KeyRing`` entry-type change, not a behavior change for existing callers. No
+#: canonical serialization, digest or signature format is touched.
+__version__ = "0.9.0"

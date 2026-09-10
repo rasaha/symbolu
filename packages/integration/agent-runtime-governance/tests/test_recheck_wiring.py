@@ -127,10 +127,20 @@ def test_epoch_advance_between_clear_and_effect_is_caught():
     assert any("epoch" in r for r in reasons), reasons
 
 
-def test_an_uncleared_proposal_has_nothing_for_the_recheck_to_guard():
-    """A proposal the hook never cleared resolves to ``None`` and the recheck passes
-    through — correct, because the refusal already happened upstream and there is no
-    provider call in flight to guard."""
+def test_an_uncleared_proposal_is_refused_by_the_recheck():
+    """A proposal the hook never cleared resolves to ``None`` — and now fails closed.
+
+    This assertion was inverted by ADR §8/D-D. It previously read "the recheck passes
+    through, because the refusal already happened upstream and there is no provider call
+    in flight to guard", which was sound under the old rule but relied on caller omission
+    to establish that an action is outside Risk Authority scope. D-D forbids exactly that:
+    only an authenticated, applicable Policy Authority rule may.
+
+    The new behavior is strictly safer here, not merely different. An uncleared proposal
+    has no business reaching a provider under any reading, so a recheck that refuses it is
+    correct on both rules; what changed is that the refusal no longer depends on some other
+    layer having caught it first.
+    """
     harness = C.build()
     hook = GovernedExecutionHook(
         source=F.StaticSource(F.inputs(envelope=harness.envelope))
@@ -142,7 +152,10 @@ def test_an_uncleared_proposal_has_nothing_for_the_recheck_to_guard():
 
     recheck = _wire(harness, hook)
     ok, reasons = recheck(None, never_evaluated, 0.0)
-    assert ok and reasons == ()
+    assert not ok
+    assert "RA6_PRE_EFFECT_AUTHORITY_REQUIRED" in reasons
+    # No applicability resolver is wired here, and that alone is never an exemption.
+    assert "RA6_APPLICABILITY_NO_RESOLVER" in reasons
 
 
 def test_a_refused_proposal_records_no_envelope():

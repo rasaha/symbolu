@@ -33,7 +33,7 @@ for _src in (project_root / "packages" / "jcs" / "src",
              # tests/test_readiness_governed_value_doc_drift.py.
              project_root / "packages" / "uvi-policy-contracts" / "src",
              project_root / "packages" / "policy-authority" / "src",
-             project_root / "packages" / "capabilities" / "agent-value-readiness" / "src",
+             project_root / "packages" / "agent-value-readiness" / "src",
              project_root / "packages" / "governed-value" / "src",
              # Reasoning Method Governance slice 1: the shared contracts and the
              # comparison engine. Required by both packages' tests and by

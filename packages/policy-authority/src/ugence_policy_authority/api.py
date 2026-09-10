@@ -22,6 +22,7 @@ from .adapters.uvi import (
 from .core.adapters import (
     GLOBAL_TENANT,
     AdapterRegistry,
+    ExclusivityClaim,
     PolicyArtifactDescriptor,
     PolicyCoordinate,
     PolicyFamilyAdapter,
@@ -61,6 +62,8 @@ from .core.errors import (
     PolicyRegistryStorageError,
     PolicyRevocationError,
     PolicySupersessionError,
+    PolicySuspensionError,
+    PolicyExclusivityError,
     PolicySigningError,
     UnsupportedPolicyArtifactError,
     UnsupportedSupersessionError,
@@ -78,11 +81,17 @@ from .core.records import (
     PolicyResolution,
     PolicyRevocationRecord,
     PolicySupersessionRecord,
+    PolicySuspensionRecord,
 )
 from .core.registry import InMemoryPolicyRegistry, PolicyRegistry
 from .core.registry_sqlite import SQLITE_REGISTRY_SCHEMA_VERSION, SqlitePolicyRegistry
 from .core.resolution import resolve_policy
 from .core.revocation import revoke_policy, verify_revocation_record
+from .core.suspension import (
+    reinstate_policy,
+    suspend_policy,
+    verify_suspension_record,
+)
 from .core.supersession import (
     SUPERSESSION_PREDECESSOR_INADMISSIBLE,
     require_admissible_supersession,
@@ -109,6 +118,7 @@ from .core.statuses import (
     PolicyResolutionReason,
     PolicyResolutionStatus,
     PolicyRevocationReasonCode,
+    PolicySuspensionAction,
 )
 
 __all__ = [
@@ -136,6 +146,8 @@ __all__ = [
     "PolicyRegistryConflictError",
     "PolicyRevocationError",
     "PolicySupersessionError",
+    "PolicySuspensionError",
+    "PolicyExclusivityError",
     "SUPERSESSION_REFERENCE_UNSUPPORTED",
     # Statuses / reasons
     "ApprovalVerificationStatus",
@@ -144,10 +156,12 @@ __all__ = [
     "PolicyResolutionStatus",
     "PolicyResolutionReason",
     "PolicyRevocationReasonCode",
+    "PolicySuspensionAction",
     "HistoricalResolutionRule",
     # Family-neutral identity and the adapter seam
     "GLOBAL_TENANT",
     "PolicyCoordinate",
+    "ExclusivityClaim",
     "PolicyArtifactDescriptor",
     "PolicyFamilyAdapter",
     "AdapterRegistry",
@@ -180,6 +194,7 @@ __all__ = [
     "IssuedPolicyRecord",
     "PolicyRevocationRecord",
     "PolicySupersessionRecord",
+    "PolicySuspensionRecord",
     "PolicyResolution",
     # Registry
     "PolicyRegistry",
@@ -200,6 +215,9 @@ __all__ = [
     "issue_policy",
     "resolve_policy",
     "revoke_policy",
+    "suspend_policy",
+    "reinstate_policy",
+    "verify_suspension_record",
     "verify_revocation_record",
     "require_admissible_supersession",
     "verify_supersession_record",

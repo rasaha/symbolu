@@ -57,6 +57,10 @@ from .records import IssuedPolicyRecord, PolicySupersessionRecord
 from .registry import PolicyRegistry
 from .payload import supersession_signing_payload
 from .signing import PolicySignatureVerifier, PolicySigner
+from .exclusivity import (
+    effective_claim_holders,
+    require_no_exclusivity_conflict,
+)
 from .supersession import (
     require_admissible_supersession,
     verify_supersession_record,
@@ -178,6 +182,34 @@ def issue_policy(
             successor=coordinate,
             registry=registry,
             as_of=issued_at,
+        )
+
+    # -- 4b. Exclusivity admissibility (`ACC-OVL-1`..`ACC-OVL-3`) ---------
+    # Still before the digest, before approval, before signing and before any
+    # mutation: registry reads only, on step 4's exact precedent. Skipped
+    # entirely when the artifact projects no claims, so every family with no
+    # exclusivity semantics pays nothing — not even the read.
+    if descriptor.exclusivity_claims:
+        require_no_exclusivity_conflict(
+            claims=descriptor.exclusivity_claims,
+            coordinate=coordinate,
+            effective_from=descriptor.effective_from,
+            effective_to=descriptor.effective_to,
+            holders=effective_claim_holders(
+                records=registry.issued_records_for_family(
+                    policy_family=coordinate.policy_family,
+                    scope=coordinate.scope,
+                    tenant_id=coordinate.tenant_id,
+                ),
+                adapters=adapters,
+                registry=registry,
+                exclude=coordinate,
+            ),
+            # `ACC-OVL-8`: the supersession predecessor, and nothing else. It is
+            # admitted here only because step 4 above already proved the
+            # relationship — an undeclared or inadmissible predecessor never
+            # reaches this line.
+            permitted=(predecessor,) if predecessor is not None else (),
         )
 
     # -- 5. Canonical body digest and declared-digest equality ------------

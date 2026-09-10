@@ -38,6 +38,11 @@ class ReasonCode(str, Enum):
     LATENCY_LIMIT_EXCEEDED = "LATENCY_LIMIT_EXCEEDED"
     RELIABILITY_BELOW_THRESHOLD = "RELIABILITY_BELOW_THRESHOLD"
     PROVIDER_DEGRADED = "PROVIDER_DEGRADED"
+    #: The candidate's declared capability prior is below the configured hard floor.
+    #: Distinct from RELIABILITY_BELOW_THRESHOLD, which is about *operational* success
+    #: rate: a provider can be perfectly reliable at serving a model too weak for the
+    #: request. Emitted only when ``GateConfig.quality_floor`` is configured.
+    QUALITY_BELOW_FLOOR = "QUALITY_BELOW_FLOOR"
     # evidence quality
     POLICY_STATE_UNKNOWN = "POLICY_STATE_UNKNOWN"
     TELEMETRY_STALE = "TELEMETRY_STALE"

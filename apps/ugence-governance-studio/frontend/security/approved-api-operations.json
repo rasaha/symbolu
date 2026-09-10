@@ -2,6 +2,8 @@
   "contract": "governance_studio.api.v1",
   "openapi_sha256": "dc309eab216e1a4c2f63f286887a4ef218a96ac34f8fa8614bff176db7c36656",
   "approved_operation_ids": [
+    "adapt_workflow",
+    "compare_adaptations",
     "compare_plans",
     "explain_eligibility",
     "explain_plan",
@@ -18,7 +20,8 @@
     "get_version",
     "list_scenarios",
     "replay_plan",
-    "scenario_what_if"
+    "scenario_what_if",
+    "validate_workflow"
   ],
   "approved_paths": [
     "GET /api/v1/scenarios",
@@ -37,23 +40,20 @@
     "POST /api/v1/explanations/ranking",
     "POST /api/v1/plans/compare",
     "POST /api/v1/plans/replay",
-    "POST /api/v1/scenarios/{scenario_id}/what-if"
-  ],
-  "forbidden_operation_ids": [
-    "adapt_workflow",
-    "compare_adaptations",
-    "compose_workforce",
-    "evaluate_eligibility",
-    "evaluate_ranking",
-    "validate_workflow"
-  ],
-  "forbidden_paths": [
-    "POST /api/v1/composition/compose",
-    "POST /api/v1/eligibility/evaluate",
-    "POST /api/v1/ranking/evaluate",
+    "POST /api/v1/scenarios/{scenario_id}/what-if",
     "POST /api/v1/workflows/adapt",
     "POST /api/v1/workflows/compare-adaptations",
     "POST /api/v1/workflows/validate"
   ],
-  "notes": "Frontend may consume only explicitly approved Governance Studio public operations. Derived from the frozen governance_studio.api.v1 OpenAPI document; regenerate only when the frozen contract legitimately changes."
+  "forbidden_operation_ids": [
+    "compose_workforce",
+    "evaluate_eligibility",
+    "evaluate_ranking"
+  ],
+  "forbidden_paths": [
+    "POST /api/v1/composition/compose",
+    "POST /api/v1/eligibility/evaluate",
+    "POST /api/v1/ranking/evaluate"
+  ],
+  "notes": "Frontend may consume only explicitly approved Governance Studio public operations. Derived from the frozen governance_studio.api.v1 OpenAPI document; regenerate only when the frozen contract legitimately changes. The three workflow operations (validate, adapt, compare-adaptations) were moved from forbidden to approved by owner ruling BW-3 (ADR_UGENCE_AUTHORITY_PLANE_SCOPING.md section 22) for the Bring Your Workflow screen; the OpenAPI document itself is unchanged."
 }

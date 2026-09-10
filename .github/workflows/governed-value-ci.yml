@@ -1,0 +1,104 @@
+name: governed-value-ci
+
+# The artifact proofs for ugence-governed-value that nothing was running.
+#
+# The kernel's pytest suite is already executed by package-suites-ci.yml on 3.10,
+# 3.11 and 3.12, and that stays where it is — this workflow does not duplicate it.
+# What had no CI at all was verify_governed_value_distribution.py: it builds this
+# wheel and the one it declares, installs --no-index into a venv with no system
+# site packages and no monorepo path, and then proves inside that environment the
+# things the source tree cannot show, because there every sibling package sits on
+# sys.path and an undeclared import still resolves —
+#
+#   * the reported calculation, with the headline ROI an exact Decimal;
+#   * the honest classification (POST_DEPLOYMENT_VALUE / REPORTED / UNVERIFIED);
+#   * the fail-closed guard: no baseline suppresses ROI and payback;
+#   * GV-1: an additive catastrophic expected-loss item exceeds total benefit and
+#     drives risk-adjusted net governed value deeply negative;
+#   * GV-2: a bound observation is carried and lifts neither quality axis, and a
+#     foreign-tenant observation refuses;
+#   * that no capability, framework, product or authority package is importable.
+#
+# The api-parity job is the cheap source-level half added alongside it. The kernel
+# had no public_api.json and no tests/packaging at all, so its curated 24-symbol
+# surface and its single-dependency boundary were asserted only inside the
+# verifier above — which is to say, on a pull request, by nothing.
+#
+# Nothing here publishes, uses a secret, or contacts a network service.
+
+concurrency:
+  # A superseded run proves nothing about the commit that replaced it. Cancel
+  # in-flight runs for the same ref on pull requests; never on a branch push,
+  # where each commit's run is the evidence that commit was green.
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+on:
+  pull_request:
+    paths:
+      - "packages/governed-value/**"
+      - "packages/governance-contracts/**"
+      - "docs/architecture/ADR_UGENCE_GOVERNED_VALUE_OBSERVATION_INGRESS.md"
+      - ".github/workflows/governed-value-ci.yml"
+  push:
+    branches:
+      - "claude/**"
+    paths:
+      - "packages/governed-value/**"
+      - "packages/governance-contracts/**"
+      - "docs/architecture/ADR_UGENCE_GOVERNED_VALUE_OBSERVATION_INGRESS.md"
+      - ".github/workflows/governed-value-ci.yml"
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  isolated-install:
+    name: Wheel build and isolated --no-index installation verification
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: requirements.txt
+      - name: Install build tooling
+        run: |
+          python -m pip install --upgrade pip
+          pip install build
+      - name: Build, install into a clean venv, and interrogate the installed package
+        run: python packages/governed-value/verify_governed_value_distribution.py
+
+  api-parity:
+    name: Public API parity and dependency boundary (source)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: requirements.txt
+      - name: Install test tooling
+        # pytest and nothing else: all money and rate maths is decimal.Decimal, so
+        # a third-party install appearing here would itself be the regression.
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest
+      - name: public_api.json equals the curated surface; the one arrow holds
+        # Run from the package directory: its conftest.py puts src/ and
+        # governance-contracts on sys.path, and the suite cannot be collected from
+        # the repository root without it.
+        run: |
+          cd packages/governed-value
+          python -m pytest tests/packaging -q
+      - name: The committed manifest reproduces from the live surface
+        # Regenerating must be a no-op. If it is not, public_api.json was edited by
+        # hand or the curated API moved without the manifest being regenerated.
+        run: |
+          python packages/governed-value/scripts/generate_public_api.py
+          git diff --exit-code -- packages/governed-value/public_api.json
+      - name: py.typed marker ships
+        run: test -f packages/governed-value/src/governed_value/py.typed

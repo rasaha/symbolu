@@ -24,7 +24,13 @@ from .record import ReasoningMethodExecutionRecord
 from .task_class import TaskClassIdentity
 
 COMPARISON_REQUEST_SCHEMA_VERSION = "readiness_comparison.request.v1"
-COMPARISON_RESULT_SCHEMA_VERSION = "readiness_comparison.result.v1"
+#: v2 (2026-09-09): ``EvidenceStatusView`` gained ``usage_scope`` per the §26.8
+#: ruling. The view sits inside this result's digested body — ``_stable_digest``
+#: excludes only ``result_digest``, ``produced_at`` and ``assessments`` — so the
+#: projection and every ``result_digest`` move with it. v1 is not retained: this
+#: engine is RESEARCH_ONLY / REQUESTER_ASSERTED, approval-bearing for nothing, and
+#: no store replays a v1 result, so there is no reader to keep compatible.
+COMPARISON_RESULT_SCHEMA_VERSION = "readiness_comparison.result.v2"
 AUTHORITY_RESOLUTION_BASIS_V1 = "REQUESTER_ASSERTED"
 
 

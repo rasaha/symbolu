@@ -117,7 +117,23 @@ def _disable(path: pathlib.Path, line: int, col: int, end, kind: str) -> str:
     return original
 
 
+def _suite_passes() -> bool:
+    return subprocess.run(
+        [sys.executable, "-m", "pytest", "-q", "--no-header"],
+        cwd=PKG, capture_output=True, text=True).returncode == 0
+
+
 def main() -> int:
+    # The baseline, before anything is mutated. Every verdict below is read from a
+    # *failing* suite meaning "caught" — so an interpreter with no pytest, or a
+    # suite already red, makes every mutant look caught and reports flawless
+    # coverage. That false green is exactly how this sweep was once believed.
+    if not _suite_passes():
+        print("BASELINE FAILED: the unmutated suite does not pass under "
+              f"{sys.executable}. No sweep was run and nothing is proved — "
+              "install pytest into this interpreter, or fix the suite, and re-run.")
+        return 2
+
     sites = _sites()
     survivors = []
     for path, line, col, end, kind in sites:
@@ -137,7 +153,9 @@ def main() -> int:
     print(f"\n{len(sites)} refusal sites; {len(survivors)} survived")
     for entry in survivors:
         print(f"  {entry}")
-    return 0
+    # A survivor is a refusal no test observes. Printing it and exiting zero would
+    # let CI call that green, which is the one thing a coverage proof must not do.
+    return 1 if survivors else 0
 
 
 if __name__ == "__main__":

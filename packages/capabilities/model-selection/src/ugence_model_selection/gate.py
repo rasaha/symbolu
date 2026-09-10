@@ -7,6 +7,16 @@ inputs always yield the identical decision (replayable, auditable).
 
 ExecutionGate answers ONLY 'can execute'. It never ranks/selects among eligible
 candidates — that is ModelPolicy's job.
+
+Every condition here is non-compensatory: a failure disqualifies, and no score computed
+later can restore the candidate, because ranking only ever sees the eligible set. That
+includes the optional capability floor (``GateConfig.quality_floor``), which is a hard
+gate here precisely because the same quantity is *also* a soft term in ranking — see the
+``quality_within_floor`` condition for why the two must not be confused.
+
+The gate narrows and never widens. It cannot approve a provider, relax an enterprise
+allowlist, or override policy: a CRITICAL_GOV condition that fails is INELIGIBLE
+regardless of every other condition's verdict.
 """
 from __future__ import annotations
 
@@ -186,6 +196,56 @@ class ExecutionGate:
         elif st: C.append(st)
         elif val >= cfg.reliability_floor: C.append(_cr("reliability_within_limit", Verdict.PASS, ReasonCode.OK, Criticality.OPERATIONAL, ev, f"{val}>= {cfg.reliability_floor}"))
         else: C.append(_cr("reliability_within_limit", Verdict.FAIL, ReasonCode.RELIABILITY_BELOW_THRESHOLD, Criticality.OPERATIONAL, ev, f"{val}< {cfg.reliability_floor}"))
+
+        # 18 quality_within_floor (CRITICAL_OP; fail-closed; evaluated only when configured)
+        #
+        # The capability prior was a *soft* term until now: `policy.select` multiplies it
+        # by a weight and adds it to a utility, where a cheap, fast, weak model can out-
+        # score a strong one. That is the right shape for a preference and the wrong shape
+        # for a floor — "never authorize a model below this capability" is not a
+        # preference that a discount can outbid.
+        #
+        # Placing it here makes it non-compensatory by construction rather than by
+        # convention: `_aggregate` turns a CRITICAL_OP failure into INELIGIBLE, and
+        # `policy.select` only ever considers `dec.selectable`, so no weight, no discount
+        # and no tie-break can reach a candidate this condition rejects. The soft
+        # `PolicyWeights.quality` term is untouched and still orders the survivors.
+        #
+        # Absent configuration the condition is not evaluated at all — not evaluated and
+        # passed, which would append a ConditionResult and change every serialized
+        # decision. A caller who sets no floor gets exactly the decisions they got before.
+        if cfg.quality_floor is not None:
+            floor = cfg.quality_floor
+            sig = _sig(cand, "quality")
+            val, ev = _resolve(sig, now)
+            if val is None:
+                # Missing or stale evidence against a configured floor is fail-closed, and
+                # deliberately not in `indeterminate_on_unknown`: a floor whose input is
+                # unknown must disqualify, or it is not a floor. `_resolve` already
+                # refuses to retain a stale last value.
+                code = ReasonCode.TELEMETRY_STALE if (sig and sig.evidence.is_stale(now)) \
+                    else ReasonCode.POLICY_STATE_UNKNOWN
+                C.append(_cr("quality_within_floor", Verdict.UNKNOWN, code,
+                             Criticality.CRITICAL_OP, ev,
+                             f"no usable quality evidence for floor {floor}"))
+            elif isinstance(val, bool) or not isinstance(val, (int, float)) or val != val:
+                # A non-numeric or NaN prior is unusable evidence, not a zero. Treating it
+                # as 0.0 would be an inference the caller never made; treating it as a
+                # pass would be the failure mode the floor exists to prevent.
+                C.append(_cr("quality_within_floor", Verdict.UNKNOWN,
+                             ReasonCode.POLICY_STATE_UNKNOWN, Criticality.CRITICAL_OP, ev,
+                             f"quality signal {val!r} is not a real number in [0, 1]"))
+            elif not (0.0 <= val <= 1.0):
+                C.append(_cr("quality_within_floor", Verdict.UNKNOWN,
+                             ReasonCode.POLICY_STATE_UNKNOWN, Criticality.CRITICAL_OP, ev,
+                             f"quality {val} is outside [0, 1]"))
+            elif val >= floor:
+                C.append(_cr("quality_within_floor", Verdict.PASS, ReasonCode.OK,
+                             Criticality.CRITICAL_OP, ev, f"{val} >= {floor}"))
+            else:
+                C.append(_cr("quality_within_floor", Verdict.FAIL,
+                             ReasonCode.QUALITY_BELOW_FLOOR, Criticality.CRITICAL_OP, ev,
+                             f"{val} < {floor}"))
 
         return self._aggregate(cand, C, now)
 

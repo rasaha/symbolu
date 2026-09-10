@@ -71,9 +71,11 @@ production=False)`. The first three are required and have no defaults; the claim
 names have no defaults and the two actor fields are set together or not at all. With
 `production=True` a loopback or plain-HTTP JWKS URL is refused.
 
-No composition root in this repository wires the adapter yet (adapter ADR fact 9): a
-deployment constructs `ReviewService(identity_port=JwtApproverIdentityAdapter(...),
-tenant_mode=..., production=...)` in its own root.
+`deployment/governed-runtime-worker` wires the adapter: `build_identity_port` builds
+it from the worker's configuration and passes it to `ReviewService`
+(`composition.py:168-182`, `composition.py:271-279`). Any other deployment constructs
+`ReviewService(identity_port=JwtApproverIdentityAdapter(...), tenant_mode=...,
+production=...)` in its own root.
 
 ## Evidence
 
@@ -104,7 +106,9 @@ ledger: a signed proof records an `IDP_AUTHENTICATED` decision with its
 `authentication_reference`; rows 1, 2, 5, 6, 7 and 14 hold with the adapter in the
 seam; the token reaches neither the ledger, the runtime signal nor the outcome.
 
-`tests/test_boundaries.py` — imports are the review service, PyJWT and stdlib only;
+`tests/test_boundaries.py` — the public API is asserted here, inline
+(`test_public_api_and_honest_labels`), so this package ships no `public_api.json`;
+imports are the review service, PyJWT and stdlib only;
 no clock; asymmetric algorithms only; verification never relaxed; no discovery, no
 introspection, no logging, no private key material, no issuer; bounded dependencies;
 the public API and its honest labels.
@@ -118,8 +122,8 @@ approval ledger, directory, durable engine, studio or HTTP client library.
 ## Known gaps `[G]`
 
 - Unvalidated against a real enterprise issuer; no issuer, test tenant or key
-  rotation policy is provisioned.
-- No composition root wires the adapter into a running review service.
+  rotation policy is provisioned. This is the gap that keeps the package
+  `ISSUER_VALIDATION = "IN_PROCESS_ISSUER_ONLY"`.
 - `nbf` is checked only at authentication (above).
-- The approval record and the linkage carry no `authentication_reference` (AI-D); no
-  assurance policy or gate exists (AI-E).
+- No assurance policy or gate exists (AI-E): the adapter records `acr`/`amr` and the
+  service carries them, and nothing anywhere requires a level of assurance.

@@ -174,7 +174,7 @@ def test_the_label_is_not_the_other_two_labels():
 # --------------------------------------------------------------------------- #
 def test_ae5_is_additive_and_the_provider_surface_is_untouched():
     assert g.CONTRACT_VERSION == "1.0.0"
-    assert g.__version__ == "0.8.0"
+    assert g.__version__ == "0.9.0"
     for name in ("ActionGovernanceRequest", "ActionGovernanceResult",
                  "ExecutionDispatchRequest", "ExecutionDispatchResult",
                  "AssertionGovernanceRequest", "AssertionGovernanceResult",

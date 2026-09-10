@@ -6,6 +6,13 @@ name: cloud-scaling-operations-shadow-harness-ci
 # real-environment observation is a separate, manually-run, resource-gated task whose
 # sanitized evidence would later be checked here.
 
+concurrency:
+  # A superseded run proves nothing about the commit that replaced it. Cancel
+  # in-flight runs for the same ref on pull requests; never on a branch push,
+  # where each commit's run is the evidence that commit was green.
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 on:
   push:
     paths:
@@ -29,6 +36,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+          cache: pip
+          cache-dependency-path: requirements.txt
 
       - name: Install tooling (no cloud SDK, no kubeconfig)
         run: python -m pip install --upgrade pip build pytest pip-audit numpy

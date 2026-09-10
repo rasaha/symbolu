@@ -13,6 +13,13 @@
 # there is no whole-suite job to attach to.
 name: Readiness / Governed Value Doc Drift CI
 
+concurrency:
+  # A superseded run proves nothing about the commit that replaced it. Cancel
+  # in-flight runs for the same ref on pull requests; never on a branch push,
+  # where each commit's run is the evidence that commit was green.
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 on:
   push:
     branches: ["main", "master", "dev", "claude/**"]
@@ -20,7 +27,7 @@ on:
       - "docs/AGENT_READINESS_AND_ROI_PLAIN_ENGLISH.md"
       - "tests/test_readiness_governed_value_doc_drift.py"
       - "conftest.py"
-      - "packages/capabilities/agent-value-readiness/**"
+      - "packages/agent-value-readiness/**"
       - "packages/governed-value/**"
       - "packages/policy-authority/**"
       - "packages/uvi-policy-contracts/**"
@@ -33,7 +40,7 @@ on:
       - "docs/AGENT_READINESS_AND_ROI_PLAIN_ENGLISH.md"
       - "tests/test_readiness_governed_value_doc_drift.py"
       - "conftest.py"
-      - "packages/capabilities/agent-value-readiness/**"
+      - "packages/agent-value-readiness/**"
       - "packages/governed-value/**"
       - "packages/policy-authority/**"
       - "packages/uvi-policy-contracts/**"
@@ -54,7 +61,7 @@ env:
     packages/governance-contracts
     packages/uvi-policy-contracts
     packages/policy-authority
-    packages/capabilities/agent-value-readiness
+    packages/agent-value-readiness
     packages/governed-value
 
 jobs:
@@ -69,6 +76,8 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+          cache: pip
+          cache-dependency-path: requirements.txt
 
       - name: Cache pip dependencies
         uses: actions/cache@v4

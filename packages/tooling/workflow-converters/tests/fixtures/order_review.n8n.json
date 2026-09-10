@@ -1,0 +1,316 @@
+{
+  "active": false,
+  "connections": {
+    "Amount Over Threshold": {
+      "main": [
+        [
+          {
+            "index": 0,
+            "node": "Notify Finance",
+            "type": "main"
+          }
+        ],
+        [
+          {
+            "index": 0,
+            "node": "Normalize",
+            "type": "main"
+          }
+        ]
+      ]
+    },
+    "Create Purchase Order": {
+      "main": [
+        [
+          {
+            "index": 0,
+            "node": "Summarize",
+            "type": "main"
+          }
+        ]
+      ]
+    },
+    "Get Orders": {
+      "main": [
+        [
+          {
+            "index": 0,
+            "node": "Amount Over Threshold",
+            "type": "main"
+          }
+        ]
+      ]
+    },
+    "Normalize": {
+      "main": [
+        [
+          {
+            "index": 0,
+            "node": "Score Risk",
+            "type": "main"
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "index": 0,
+            "node": "Summarize",
+            "type": "ai_languageModel"
+          }
+        ]
+      ]
+    },
+    "Score Risk": {
+      "main": [
+        [
+          {
+            "index": 0,
+            "node": "Create Purchase Order",
+            "type": "main"
+          }
+        ]
+      ]
+    },
+    "When clicking Test workflow": {
+      "main": [
+        [
+          {
+            "index": 0,
+            "node": "Get Orders",
+            "type": "main"
+          }
+        ]
+      ]
+    }
+  },
+  "meta": {
+    "instanceId": "synthetic-instance"
+  },
+  "name": "Order Review",
+  "nodes": [
+    {
+      "id": "n1",
+      "name": "When clicking Test workflow",
+      "parameters": {},
+      "position": [
+        0,
+        0
+      ],
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1
+    },
+    {
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "cred-1",
+          "name": "Orders API"
+        }
+      },
+      "id": "n2",
+      "name": "Get Orders",
+      "parameters": {
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "method": "GET",
+        "url": "https://api.example.invalid/orders"
+      },
+      "position": [
+        0,
+        0
+      ],
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4
+    },
+    {
+      "id": "n3",
+      "name": "Amount Over Threshold",
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "c1",
+              "leftValue": "={{ $json.amount }}",
+              "operator": {
+                "operation": "gt",
+                "type": "number"
+              },
+              "rightValue": 1000
+            },
+            {
+              "id": "c2",
+              "leftValue": "={{ $json.status }}",
+              "operator": {
+                "operation": "equals",
+                "type": "string"
+              },
+              "rightValue": "OPEN"
+            },
+            {
+              "id": "c3",
+              "leftValue": "={{ $json.supplier.tier }}",
+              "operator": {
+                "operation": "equals",
+                "type": "string"
+              },
+              "rightValue": "={{ $('Get Orders').item.json.tier }}"
+            }
+          ],
+          "options": {
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          }
+        }
+      },
+      "position": [
+        0,
+        0
+      ],
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2
+    },
+    {
+      "credentials": {
+        "slackApi": {
+          "id": "cred-2",
+          "name": "Finance Slack"
+        }
+      },
+      "id": "n4",
+      "name": "Notify Finance",
+      "parameters": {
+        "channel": "#finance",
+        "operation": "post",
+        "resource": "message",
+        "text": "=Order {{ $json.id }} needs review"
+      },
+      "position": [
+        0,
+        0
+      ],
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2
+    },
+    {
+      "id": "n5",
+      "name": "Normalize",
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "name": "amount_minor",
+              "type": "number",
+              "value": "={{ $json.amount * 100 }}"
+            }
+          ]
+        }
+      },
+      "position": [
+        0,
+        0
+      ],
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3
+    },
+    {
+      "id": "n6",
+      "name": "Score Risk",
+      "parameters": {
+        "jsCode": "return items.map(i => ({json: {...i.json, risk: i.json.amount > 5000 ? 'high' : 'low'}}));"
+      },
+      "position": [
+        0,
+        0
+      ],
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2
+    },
+    {
+      "credentials": {
+        "httpBasicAuth": {
+          "id": "cred-3",
+          "name": "ERP service account"
+        }
+      },
+      "id": "n7",
+      "name": "Create Purchase Order",
+      "parameters": {
+        "jsonBody": "={{ JSON.stringify($json) }}",
+        "method": "POST",
+        "sendBody": true,
+        "url": "https://erp.example.invalid/purchase-orders"
+      },
+      "position": [
+        0,
+        0
+      ],
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4
+    },
+    {
+      "id": "n8",
+      "name": "Summarize",
+      "parameters": {
+        "promptType": "define",
+        "text": "=Summarize order {{ $json.id }}"
+      },
+      "position": [
+        0,
+        0
+      ],
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1
+    },
+    {
+      "credentials": {
+        "openAiApi": {
+          "id": "cred-4",
+          "name": "OpenAI account"
+        }
+      },
+      "id": "n9",
+      "name": "OpenAI Chat Model",
+      "parameters": {
+        "model": "gpt-4o-mini",
+        "options": {}
+      },
+      "position": [
+        0,
+        0
+      ],
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1
+    },
+    {
+      "disabled": true,
+      "id": "n10",
+      "name": "Archive Old Draft",
+      "parameters": {},
+      "position": [
+        0,
+        0
+      ],
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1
+    }
+  ],
+  "pinData": {
+    "Get Orders": [
+      {
+        "json": {
+          "amount": 1500,
+          "id": "o-1",
+          "status": "OPEN"
+        }
+      }
+    ]
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": [],
+  "versionId": "4f1c2e7a-synthetic"
+}

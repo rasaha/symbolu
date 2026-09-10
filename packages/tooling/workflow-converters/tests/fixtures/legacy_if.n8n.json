@@ -1,0 +1,88 @@
+{
+  "connections": {
+    "Check": {
+      "main": [
+        [
+          {
+            "index": 0,
+            "node": "Send Mail",
+            "type": "main"
+          }
+        ],
+        []
+      ]
+    },
+    "Start": {
+      "main": [
+        [
+          {
+            "index": 0,
+            "node": "Check",
+            "type": "main"
+          }
+        ]
+      ]
+    }
+  },
+  "name": "Legacy Branch",
+  "nodes": [
+    {
+      "id": "a",
+      "name": "Start",
+      "parameters": {},
+      "position": [
+        0,
+        0
+      ],
+      "type": "n8n-nodes-base.start",
+      "typeVersion": 1
+    },
+    {
+      "id": "b",
+      "name": "Check",
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "operation": "true",
+              "value1": "={{ $json.approved }}"
+            }
+          ],
+          "number": [
+            {
+              "operation": "largerEqual",
+              "value1": "={{ $json.total }}",
+              "value2": 250
+            }
+          ]
+        }
+      },
+      "position": [
+        0,
+        0
+      ],
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1
+    },
+    {
+      "credentials": {
+        "smtp": {
+          "id": "cred-9",
+          "name": "Ops SMTP"
+        }
+      },
+      "id": "c",
+      "name": "Send Mail",
+      "parameters": {
+        "subject": "hi",
+        "toEmail": "ops@example.invalid"
+      },
+      "position": [
+        0,
+        0
+      ],
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 1
+    }
+  ]
+}

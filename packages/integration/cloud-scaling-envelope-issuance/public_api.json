@@ -66,10 +66,7 @@
     },
     "CloudScalingEnvelopeIssuanceError": {
       "kind": "class",
-      "methods": [
-        "add_note",
-        "with_traceback"
-      ]
+      "methods": []
     },
     "CloudScalingEnvelopeIssuanceOutcome": {
       "fields": [
@@ -107,24 +104,15 @@
     },
     "EnvelopeIssuanceConfigurationError": {
       "kind": "class",
-      "methods": [
-        "add_note",
-        "with_traceback"
-      ]
+      "methods": []
     },
     "EnvelopeIssuanceContractError": {
       "kind": "class",
-      "methods": [
-        "add_note",
-        "with_traceback"
-      ]
+      "methods": []
     },
     "EnvelopeIssuanceExactTypeError": {
       "kind": "class",
-      "methods": [
-        "add_note",
-        "with_traceback"
-      ]
+      "methods": []
     },
     "REFUSING_STATUSES": {
       "kind": "frozenset",
@@ -150,10 +138,7 @@
     },
     "UpstreamVerifierUnavailableError": {
       "kind": "class",
-      "methods": [
-        "add_note",
-        "with_traceback"
-      ]
+      "methods": []
     },
     "__version__": {
       "kind": "constant",

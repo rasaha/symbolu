@@ -8,6 +8,13 @@ name: agent-workforce-composer-p1-ci
 # assertions, a stale-terminology scan, and platform-freeze verification (blocking).
 # No network runs, no live agents, no secrets, no model APIs. Path-scoped triggers.
 
+concurrency:
+  # A superseded run proves nothing about the commit that replaced it. Cancel
+  # in-flight runs for the same ref on pull requests; never on a branch push,
+  # where each commit's run is the evidence that commit was green.
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 on:
   pull_request:
     paths:
@@ -39,25 +46,45 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+          cache: pip
+          cache-dependency-path: requirements.txt
       - run: python -m pip install --upgrade pip && pip install pytest pydantic
       - name: Full test suite
         env:
           PYTHONPATH: ${{ env.SRC }}
         run: python -m pytest ${{ env.PKG }}/tests -q
-      - name: Version / maturity metadata is honest
+      - name: Contract + honest P1 maturity
         env:
           PYTHONPATH: ${{ env.SRC }}
         run: |
           python -m ugence_agent_workforce_composer.cli version
           python - <<'PY'
+          # What this job asserts is P1's invariants — the contract P1 established and
+          # the capabilities P1 delivered — and deliberately NOT the distribution's
+          # current version.
+          #
+          # It used to assert `__version__ == "0.1.0"`, and went red the day P2 shipped
+          # 0.2.0, staying red through P2.1. Every phase workflow re-pinned the current
+          # version, so only the newest phase could ever pass and each release turned its
+          # predecessors red. The literal also lived in three workflows plus the package's
+          # own suite, which is four places to update for one fact.
+          #
+          # The version is pinned exactly once now, in the package's own
+          # tests/test_public_api.py and its distribution verifier — both of which travel
+          # with the package and change in the same commit the version does. This job runs
+          # that suite in the step above, so the fact is still checked; it is just no
+          # longer duplicated here where it cannot be kept true.
           import ugence_agent_workforce_composer as u
-          assert u.__version__ == "0.1.0" and u.CONTRACT_VERSION == "awc.v1"
+          # awc.v1 is a real P1 invariant: P2 and P2.1 are additive and must not move it.
+          assert u.CONTRACT_VERSION == "awc.v1", u.CONTRACT_VERSION
           i = u.version_info().to_dict()
           for k in ("canonical_object_model_implemented","compiler_adapter_implemented",
                     "hard_constraint_eligibility_implemented","deterministic_replay_verified"):
               assert i[k] is True, k
-          for k in ("agent_ranking_implemented","team_composition_implemented",
-                    "permission_assignment_implemented","runtime_handoff_implemented",
+          # `agent_ranking_implemented` and `team_composition_implemented` were in this
+          # list and are now True: P2 implements them, and agent-workforce-composer-p2-ci
+          # asserts them True. A later phase delivering them is not this phase regressing.
+          for k in ("permission_assignment_implemented","runtime_handoff_implemented",
                     "h16_migration_implemented","live_registry_implemented",
                     "pilot_validated","production_certified"):
               assert i[k] is False, k
@@ -72,6 +99,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+          cache: pip
+          cache-dependency-path: requirements.txt
       - run: |
           python -m pip install --upgrade pip && pip install pytest pydantic
           pip install -e packages/capabilities/decision-authority
@@ -90,6 +119,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+          cache: pip
+          cache-dependency-path: requirements.txt
       - run: python -m pip install --upgrade pip && pip install pytest pydantic
       - env:
           PYTHONPATH: ${{ env.SRC }}
@@ -103,6 +134,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+          cache: pip
+          cache-dependency-path: requirements.txt
       - run: python -m pip install --upgrade pip && pip install pytest pydantic
       - env:
           PYTHONPATH: ${{ env.SRC }}
@@ -116,6 +149,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+          cache: pip
+          cache-dependency-path: requirements.txt
       - run: python -m pip install --upgrade pip && pip install pydantic
       - name: Snapshot is in sync with the frozen artifact
         env:
@@ -139,6 +174,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+          cache: pip
+          cache-dependency-path: requirements.txt
       - run: python -m pip install --upgrade pip && pip install build
       - run: python ${{ env.PKG }}/verify_agent_workforce_composer_distribution.py
 
@@ -150,36 +187,83 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+          cache: pip
+          cache-dependency-path: requirements.txt
       - run: python -m pip install --upgrade pip && pip install pytest pydantic
       - env:
           PYTHONPATH: ${{ env.SRC }}
         run: python -m pytest ${{ env.PKG }}/tests/test_determinism.py ${{ env.PKG }}/tests/test_cli.py -q
 
   architecture-assertions:
-    name: Architecture assertions (boundaries + no ranking)
+    name: Architecture assertions (eligibility is score-free; nothing grants or executes)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+          cache: pip
+          cache-dependency-path: requirements.txt
       - run: python -m pip install --upgrade pip && pip install pydantic
-      - name: No ranking/team/permission surface; leaf boundary holds
+      - name: Eligibility stays score-free, and no grant or execution surface exists
         env:
           PYTHONPATH: ${{ env.SRC }}
         run: |
           python - <<'PY'
+          # This job asserted a blacklist of seven names, and had two problems.
+          #
+          # It was stale: AgentTeamPlan is banned there and P2 delivers it
+          # (agent_team_plan_implemented is True), which is what failed here.
+          #
+          # It was also vacuous, which matters more. The other six names — rank_agents,
+          # score_agents, compose_team, select_agent, PolicyWeights, assign_permissions —
+          # have never existed in this package under those spellings. The real surface is
+          # rank_eligible_candidates, compose_agent_team, build_agent_team_plan and
+          # propose_permission_bound, so the blacklist would have passed unchanged even if
+          # P1 itself had shipped ranking. A name blacklist only catches the one spelling
+          # somebody thought of.
+          #
+          # What replaces it is the invariant that is actually true and actually load-
+          # bearing, tied to what version_info() reports rather than to a list of words:
+          # this package proposes and never grants, and plans and never executes.
+          import re
+          import ugence_agent_workforce_composer as u
           import ugence_agent_workforce_composer.api as api
-          banned = {"rank_agents","score_agents","compose_team","select_agent",
-                    "AgentTeamPlan","PolicyWeights","assign_permissions"}
-          assert not (banned & set(api.__all__)), banned & set(api.__all__)
-          # every eligibility result is score-free
+
+          names = set(api.__all__)
+          maturity = u.version_info().to_dict()
+
+          # 1. No granting, assigning, executing, dispatching or provisioning surface —
+          #    checked by pattern, so a new name cannot slip past a fixed list, and tied
+          #    to the booleans that must stay False for as long as that is true.
+          for flag in ("permission_granting_implemented", "permission_assignment_implemented",
+                       "runtime_execution_implemented", "runtime_handoff_implemented"):
+              assert maturity[flag] is False, f"{flag} became True; this gate needs rewriting"
+          forbidden = re.compile(
+              r"grant|assign_permission|execute|execution|dispatch|invoke|authorize|provision|runtime",
+              re.I)
+          offenders = sorted(n for n in names if forbidden.search(n))
+          assert not offenders, (
+              "a grant/execute surface appeared while the maturity booleans say there is "
+              f"none: {offenders}")
+
+          # 2. Proposing permission is allowed and granting it is not, so the proposal
+          #    type must exist — a gate that passes because a surface vanished is not
+          #    measuring anything.
+          assert "PermissionBoundProposal" in names, "the permission-proposal surface is gone"
+
+          # 3. Every eligibility result is score-free. This is the P1 invariant that
+          #    survives P2 intact: ranking happens over the eligible set, and never
+          #    inside the eligibility record itself.
           from ugence_agent_workforce_composer import fixtures
           _, res = fixtures.run_demo("procurement")
+          checked = 0
           for rep in res.reports:
               for r in rep.results:
                   assert not ({"score","rank","winner","recommended","selected"} & set(r.model_dump()))
-          print("architecture assertions OK")
+                  checked += 1
+          assert checked, "no eligibility results were examined"
+          print(f"architecture assertions OK ({checked} eligibility results, score-free)")
           PY
 
   terminology:
@@ -214,6 +298,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+          cache: pip
+          cache-dependency-path: requirements.txt
       - run: |
           python -m pip install --upgrade pip && pip install pytest pydantic
           pip install -e packages/capabilities/decision-authority

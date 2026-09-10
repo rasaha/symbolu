@@ -17,7 +17,14 @@ import sys
 import textwrap
 
 import pytest
-import sqlalchemy as sa
+
+sa = pytest.importorskip(
+    "sqlalchemy",
+    reason=(
+        "SQLAlchemy is required for the matrix. A skipped row is not a passing row: "
+        "CI installs the engine dependencies and fails the job if any row skipped."
+    ),
+)
 
 from conftest import requires_postgres  # noqa: F401  (fixture module on sys.path)
 

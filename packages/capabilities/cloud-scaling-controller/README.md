@@ -9,7 +9,7 @@ Ugence control plane.
 
 - **Distribution:** `ugence-cloud-scaling-controller`
 - **Import namespace:** `ugence_cloud_scaling_controller`
-- **Version:** `0.3.0`
+- **Version:** `0.4.0`
 - **Authority class:** ADVISORY · **Execution capability:** NONE (no code in the wheel can apply the advice)
 - **Core dependency:** NumPy only · **Network required (core):** no · **Cloud credentials required:** no
 - **Determinism:** decision-deterministic; identity diagnostics vary before bootstrap.

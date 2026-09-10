@@ -1,5 +1,12 @@
 name: bindingslots-e1-3factor-ci
 
+concurrency:
+  # A superseded run proves nothing about the commit that replaced it. Cancel
+  # in-flight runs for the same ref on pull requests; never on a branch push,
+  # where each commit's run is the evidence that commit was green.
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 on:
   push:
     paths:
@@ -21,7 +28,7 @@ jobs:
       - uses: actions/checkout@v4
         with: {fetch-depth: 0}
       - uses: actions/setup-python@v5
-        with: {python-version: '3.11'}
+        with: { python-version: '3.11', cache: pip, cache-dependency-path: requirements.txt }
 
       - name: Frozen abc.json digest (pre)
         run: sha256sum experiments/phase_lc/results/abc.json | tee /tmp/abc_before.txt

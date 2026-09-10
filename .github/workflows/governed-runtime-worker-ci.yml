@@ -16,6 +16,13 @@ name: governed-runtime-worker-ci
 # owner-approved mirror serves the ratified digest; until then no gate executes and every
 # evidence manifest is INCOMPLETE.
 
+concurrency:
+  # A superseded run proves nothing about the commit that replaced it. Cancel
+  # in-flight runs for the same ref on pull requests; never on a branch push,
+  # where each commit's run is the evidence that commit was green.
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 on:
   pull_request:
     paths:
@@ -59,6 +66,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+          cache: pip
+          cache-dependency-path: requirements.txt
 
       - name: Install PostgreSQL server binaries
         run: |
@@ -163,7 +172,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
-        with: { python-version: "3.11" }
+        with: { python-version: "3.11", cache: pip, cache-dependency-path: requirements.txt }
 
       - name: evidence-dir-init
         # Run-scoped, outside the checkout, must be empty at creation (as the studio's).
@@ -178,6 +187,20 @@ jobs:
       - name: ratified-pin-conformance
         # BLOCKING, first, offline: the worker builds only from the ratified python digest.
         run: python deployment/governed-runtime-worker/ci/verify_ratified_pins.py
+
+      - name: build-context-conformance
+        # BLOCKING, offline, and ahead of every step that needs a registry: each COPY
+        # source of the deployment Dockerfile(s) must survive the .dockerignore the build
+        # actually reads — the sibling <dockerfile>.dockerignore where one exists, the
+        # context root's otherwise. Until 2026-09-08 neither image could be built at all:
+        # both are built with the repository root as context, where the root file ("*"
+        # plus re-includes for symbolu/) excluded all 29 and all 19 COPY sources. No gate
+        # saw it: every check that could have seen it sat behind the registry blocker.
+        # Reachability only: this builds nothing and satisfies no ratified gate identifier
+        # of P3E-CTR or GRW-CTR (BUILD_CONTEXT_EXCLUSION_DEFECT.json).
+        run: |
+          python deployment/governance-studio/ci/verify_build_context.py \
+            deployment/governed-runtime-worker/Dockerfile
 
       - name: mirror-digest-conformance
         id: mirror
@@ -332,6 +355,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+          cache: pip
+          cache-dependency-path: requirements.txt
       - run: |
           python -m pip install --upgrade pip
           pip install build

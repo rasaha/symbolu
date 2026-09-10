@@ -12,6 +12,14 @@ Permission executable. A family that can be issued still needs a concrete
 resolver before anything runs end to end, and that resolver is a separate
 distribution. Until it lands the capability still cannot execute end to end.
 
+> **Superseded as a statement of current fact (2026-09-09, `ACC-DR`).**
+> The paragraph above is retained verbatim as the record of what was true at
+> this release. `[V]` It is **no longer current**: the concrete resolver landed afterwards as
+> `ugence-agentic-proposer-strategy-permission-runtime`, so Reasoning Strategy
+> Permission runs end to end with the pair — never with this distribution alone. `[R]` This note
+> records a fact, ratifies nothing, and reopens no ruling. No constitution has
+> been issued or activated, and no `ACC-FC-5` gate is closed.
+
 ### Added
 
 - **`StrategyPermissionPolicy`** — a declarative, versioned, digest-bound

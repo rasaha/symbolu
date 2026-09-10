@@ -35,17 +35,11 @@
     },
     "ContractViolation": {
       "kind": "class",
-      "methods": [
-        "add_note",
-        "with_traceback"
-      ]
+      "methods": []
     },
     "CrossTenantRefused": {
       "kind": "class",
-      "methods": [
-        "add_note",
-        "with_traceback"
-      ]
+      "methods": []
     },
     "DECLARATION_ID_PREFIX": {
       "kind": "constant",
@@ -53,31 +47,19 @@
     },
     "DeclarationProductionModeError": {
       "kind": "class",
-      "methods": [
-        "add_note",
-        "with_traceback"
-      ]
+      "methods": []
     },
     "DeclarationStorageError": {
       "kind": "class",
-      "methods": [
-        "add_note",
-        "with_traceback"
-      ]
+      "methods": []
     },
     "DeclarationSupersessionError": {
       "kind": "class",
-      "methods": [
-        "add_note",
-        "with_traceback"
-      ]
+      "methods": []
     },
     "DuplicateDeclarationError": {
       "kind": "class",
-      "methods": [
-        "add_note",
-        "with_traceback"
-      ]
+      "methods": []
     },
     "ENFORCEMENT_ENABLED": {
       "kind": "constant",
@@ -129,10 +111,7 @@
     },
     "VendorDependencyError": {
       "kind": "class",
-      "methods": [
-        "add_note",
-        "with_traceback"
-      ]
+      "methods": []
     },
     "VendorDependencyPort": {
       "kind": "class",

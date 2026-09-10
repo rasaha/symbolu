@@ -1,7 +1,7 @@
 {
   "distribution": "ugence-agent-constitution-policy",
   "namespace": "ugence_agent_constitution_policy",
-  "package_version": "0.2.0",
+  "package_version": "0.3.0",
   "policy_family": "agent_governance.agent_constitution",
   "adapter_id": "ugence.agent-constitution/v1",
   "policy_type": "AgentConstitutionPolicy",
@@ -13,6 +13,7 @@
     "AGENT_CONSTITUTION_POLICY_FAMILY": "agent_governance.agent_constitution",
     "AGENT_CONSTITUTION_POLICY_TYPE": "AgentConstitutionPolicy",
     "CONSTITUTION_VOCABULARY_VERSION": "ugence.agent-constitution/clauses/v1",
+    "GOVERNED_ROLE_EXCLUSIVITY_NAMESPACE": "ugence.agent-constitution/governed-role",
     "LIFECYCLE_APPROVED_ACTIVE": "APPROVED_ACTIVE",
     "LIFECYCLE_DRAFT": "DRAFT",
     "LIFECYCLE_SUPERSEDED": "SUPERSEDED",
@@ -118,6 +119,10 @@
     "CONSTITUTION_VOCABULARY_VERSION": {
       "kind": "str_constant",
       "value": "ugence.agent-constitution/clauses/v1"
+    },
+    "GOVERNED_ROLE_EXCLUSIVITY_NAMESPACE": {
+      "kind": "str_constant",
+      "value": "ugence.agent-constitution/governed-role"
     },
     "LIFECYCLE_APPROVED_ACTIVE": {
       "kind": "str_constant",

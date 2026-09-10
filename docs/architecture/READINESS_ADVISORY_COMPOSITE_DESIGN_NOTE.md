@@ -2,7 +2,7 @@
 
 **Status:** design note; **owner ballot 1 recorded AMENDED 2026-09-02** (§10;
 ballots 2–5 remain `[R]`). No implementation, no package change.
-**Scope:** `packages/capabilities/agent-value-readiness`, its consumed contracts,
+**Scope:** `packages/agent-value-readiness`, its consumed contracts,
 the UVI ADR (`ADR_UGENCE_VALUE_INTELLIGENCE_GV2C_GV2E_GV3R.md`) and the ratified
 Trusted Evidence and Benchmark Registry ADR
 (`ADR_UGENCE_TRUSTED_EVIDENCE_AND_BENCHMARK_REGISTRY.md`).

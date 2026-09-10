@@ -64,7 +64,7 @@ def test_documented_public_api_matches_actual():
     symbols, constants = _actual_surface()
     assert documented["distribution"] == "ugence-policy-authority"
     assert documented["namespace"] == "ugence_policy_authority"
-    assert documented["package_version"] == g.__version__ == "0.3.1"
+    assert documented["package_version"] == g.__version__ == "0.5.0"
     assert documented["curated_api_module"] == "ugence_policy_authority.api"
     assert documented["symbols"] == symbols
     assert documented["constants"] == constants
@@ -130,10 +130,19 @@ def test_obsolete_uvi_ownership_and_permissive_supersession_api_is_gone():
         assert not hasattr(api, retired), retired
 
 
-def test_no_existing_package_version_was_bumped():
+def test_this_package_drives_no_contracts_leaf_version():
+    """policy-authority consumes the contracts leaf; it never forces a bump there.
+
+    The pinned value tracks whatever the leaf currently ships, so a bump driven by
+    *this* package still fails here. 0.1.0 -> 0.2.0 on 2026-09-09 was driven by the
+    §26.8 ruling, which added ``required_usage_scope`` to
+    ``ComponentEvidenceRequirement`` in uvi-policy-contracts — a change owned by
+    that package, not by this one, and this package's own surface is unchanged by it.
+    """
+
     import ugence_uvi_policy_contracts
 
-    assert ugence_uvi_policy_contracts.__version__ == "0.1.0"
+    assert ugence_uvi_policy_contracts.__version__ == "0.2.0"
 
 
 def test_no_symbol_shadows_a_contract_symbol():

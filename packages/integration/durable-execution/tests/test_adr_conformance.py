@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import inspect
 
+from conftest import requires_engine_deps
 from ugence_durable_execution.interfaces import (
     DurableExecutionAdapter,
     DurableStepOutcome,
@@ -65,6 +66,7 @@ def test_adapter_signatures_match_the_adr():
             )
 
 
+@requires_engine_deps
 def test_concrete_dbos_adapter_satisfies_the_protocol():
     from ugence_durable_execution.engine.dbos_engine import DbosExecutionAdapter, StepOutcome
 
@@ -77,6 +79,7 @@ def test_concrete_dbos_adapter_satisfies_the_protocol():
     assert isinstance(outcome, DurableStepOutcome)
 
 
+@requires_engine_deps
 def test_step_outcome_hides_the_governance_reason():
     """The engine must not be able to schedule differently for HOLD versus ESCALATE."""
     from ugence_durable_execution.engine.dbos_engine import StepOutcome

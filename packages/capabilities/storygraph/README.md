@@ -108,3 +108,9 @@ Legacy imports resolve to the **same** objects via a logic-free redirect shim at
   It is **not** an intent-understanding system, **not** a learned anomaly
   detector, and infers **no** malicious intent.
 - **No direct enforcement authority.** Advisory findings only.
+- **Enforcement promotion is deferred** by owner ruling (2026-09-09): StoryGraph is
+  retained as an optional advisory capability, and no shadow pilot or enforcement
+  integration is funded while its promotion checklist stands at 0 of 10. This is a
+  spending decision about promotion, **not** a finding against the capability —
+  deferred, not failed. The five re-entry conditions are in
+  [`docs/evaluation/DEFERRAL_AND_REENTRY.md`](docs/evaluation/DEFERRAL_AND_REENTRY.md).

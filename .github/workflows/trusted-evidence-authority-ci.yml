@@ -20,25 +20,62 @@ name: trusted-evidence-authority-ci
 # here, and dedicated jobs run the strict malformed corpus and the cross-backend
 # differential suite.
 #
+# It also runs the independent TEV-2 closure re-audit under audit/, which lives
+# outside the package on purpose: PR #1446's own merged body records that "green checks
+# are not a merge signal" and asked for a fresh independent closure re-audit. The probes
+# that answer it were run by no workflow until the packages capability audit, which is
+# exactly how the previous audit (PR #1463) rotted into scripts that could not be re-run
+# at all — hardcoded scratchpad paths, imports of deleted modules, calls to a removed API
+# shape. Audit evidence nothing re-executes decays into a claim about a tree that no
+# longer exists, so it is executed here on every change to either tree.
+#
+# Suites run on 3.10, 3.11 and 3.12 — the whole range these packages declare with
+# requires-python >=3.10. The 3.10 leg was blocked until now by three couplings in test
+# code and committed artifacts, none of them in any package's src/: a bare
+# `import tomllib` (stdlib only from 3.11) now falls back to the `tomli` backport, which
+# the install steps below provide; public_api.json manifests recorded
+# `BaseException.add_note`, a 3.11 addition that made the artifact a statement about the
+# interpreter that generated it, and the generators now exclude inherited exception
+# methods so the manifest reproduces on any interpreter; and one assertion pinned
+# CPython's exact AttributeError wording, which 3.10 spells differently for the same
+# refusal. Each was fixed at the coupling, never by relaxing what the test discriminates.
+#
 # It publishes nothing, uses no secret, and contacts no external trust service. All
 # cryptographic key material it touches is fixed, hard-coded, unmistakably
 # non-production test material (see tests/_authority_builders.py).
+
+concurrency:
+  # A superseded run proves nothing about the commit that replaced it. Cancel
+  # in-flight runs for the same ref on pull requests; never on a branch push,
+  # where each commit's run is the evidence that commit was green.
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 on:
   pull_request:
     paths:
       - "packages/trusted-evidence-authority/**"
+      - "audit/tev2-1446-closure-reaudit/**"
       - "docs/architecture/ADR_UGENCE_TRUSTED_EVIDENCE_AND_BENCHMARK_REGISTRY.md"
       - ".github/workflows/trusted-evidence-authority-ci.yml"
   push:
     # Feature branches AND the repository's actual default branch, so a merge
     # touching the package (matching the path filter) gets a recorded CI run.
     branches:
+      # A branch that changes this workflow, or the packages it gates, must be able to
+      # run it. The per-milestone prefixes above are kept, and `claude/**` is added
+      # alongside them — the same filter agent-runtime-governance-ci, governed-review-ci,
+      # package-suites-ci and four others already use. Without it these jobs ran on no
+      # branch but their own milestone's: PR events do not start workflow runs in this
+      # repository, so a workflow whose push filter excludes the working branch is a
+      # workflow whose changes nothing executes before merge.
       - "claude/setup-symbolu-monorepo-**"
       - "claude/tev-**"
       - "claude/trusted-evidence-**"
+      - "claude/**"
     paths:
       - "packages/trusted-evidence-authority/**"
+      - "audit/tev2-1446-closure-reaudit/**"
       - "docs/architecture/ADR_UGENCE_TRUSTED_EVIDENCE_AND_BENCHMARK_REGISTRY.md"
       - ".github/workflows/trusted-evidence-authority-ci.yml"
 
@@ -48,15 +85,22 @@ defaults:
 
 jobs:
   package-suite:
-    name: Trusted Evidence package suite (source)
+    name: Trusted Evidence package suite (source, py${{ matrix.python-version }})
     runs-on: ubuntu-latest
+    strategy:
+      # One interpreter's failure must not hide the other's.
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.11", "3.12"]
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          python-version: "${{ matrix.python-version }}"
+          cache: pip
+          cache-dependency-path: requirements.txt
       - name: Install dependencies
         # The two declared cryptographic backends, plus pytest. The package is
         # not zero-dependency: it calls `cryptography` and `PyNaCl` and
@@ -64,7 +108,7 @@ jobs:
         # PyNaCl directly to cross-check the package against libsodium.
         run: |
           python -m pip install --upgrade pip
-          pip install pytest "cryptography>=41.0.7,<47.0.0" "PyNaCl>=1.5.0,<2.0.0"
+          pip install pytest tomli "cryptography>=41.0.7,<47.0.0" "PyNaCl>=1.5.0,<2.0.0"
           python -c "import importlib.metadata as m; print('cryptography', m.version('cryptography')); print('PyNaCl', m.version('PyNaCl'))"
       - name: Package suite (contracts, authority, canonicalization, packaging)
         run: python -m pytest packages/trusted-evidence-authority/tests -q
@@ -135,13 +179,19 @@ jobs:
         run: git diff --exit-code -- packages/trusted-evidence-authority/resolver_mutation_ledger.json
 
   adversarial-probes:
-    name: Independent adversarial probes (source)
+    name: Independent adversarial probes (source, py${{ matrix.python-version }})
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.11", "3.12"]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          python-version: "${{ matrix.python-version }}"
+          cache: pip
+          cache-dependency-path: requirements.txt
       - name: Install the declared cryptographic backends
         run: |
           python -m pip install --upgrade pip
@@ -154,6 +204,46 @@ jobs:
           PYTHONPATH: packages/trusted-evidence-authority/src
         run: python packages/trusted-evidence-authority/adversarial_probes.py
 
+  closure-reaudit:
+    name: TEV-2 closure re-audit probes (audit-owned, independent of the suite)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # The TEV-1 pin probe recomputes both sides against the TEV-1 merge commit
+          # rather than trusting a hardcoded hex constant, so that commit must be
+          # reachable. A shallow checkout cannot produce the worktree below.
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: requirements.txt
+      - name: Install the declared cryptographic backends
+        # The probes install nothing else and import no test module, helper, fixture or
+        # conftest of the package: each puts the checkout's src/ on sys.path itself and
+        # builds its own fixtures, so it cannot merely re-confirm the suite's assumptions.
+        run: |
+          python -m pip install --upgrade pip
+          pip install "cryptography>=41.0.7,<47.0.0" "PyNaCl>=1.5.0,<2.0.0"
+      - name: Check out the TEV-1 merge commit as the baseline to diff against
+        run: git worktree add --detach "${RUNNER_TEMP}/tev1_baseline" 41d85dfc
+      - name: Six probes — F-01/F-03, F-02, F-04/F-05, F-08, F-09, and the TEV-1 pins
+        # run_all.py exits 0 when every probe it *ran* passed, and it silently skips the
+        # TEV-1 pin probe when no baseline root is given. A green job that quietly ran
+        # five probes instead of six is the failure mode this whole job exists to prevent,
+        # so the summary is checked for a skip as well as for a failure.
+        run: |
+          python audit/tev2-1446-closure-reaudit/run_all.py . "${RUNNER_TEMP}/tev1_baseline" \
+            | tee "${RUNNER_TEMP}/reaudit.txt"
+          if grep -q "SKIPPED" "${RUNNER_TEMP}/reaudit.txt"; then
+            echo "::error::a closure-re-audit probe was skipped; all six must run"
+            exit 1
+          fi
+      - name: Remove the baseline worktree
+        if: always()
+        run: git worktree remove --force "${RUNNER_TEMP}/tev1_baseline"
+
   isolated-install:
     name: Wheel build and isolated wheelhouse installation verification
     runs-on: ubuntu-latest
@@ -162,6 +252,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+          cache: pip
+          cache-dependency-path: requirements.txt
       - name: Install build tooling
         run: |
           python -m pip install --upgrade pip
@@ -184,10 +276,12 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+          cache: pip
+          cache-dependency-path: requirements.txt
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install pytest "cryptography>=41.0.7,<47.0.0" "PyNaCl>=1.5.0,<2.0.0"
+          pip install pytest tomli "cryptography>=41.0.7,<47.0.0" "PyNaCl>=1.5.0,<2.0.0"
       - name: public_api.json equals the actual curated surface
         run: |
           python -m pytest \
@@ -206,6 +300,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+          cache: pip
+          cache-dependency-path: requirements.txt
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip

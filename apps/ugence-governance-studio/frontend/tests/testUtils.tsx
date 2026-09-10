@@ -25,6 +25,9 @@ import procWhatIf from "./fixtures/procurement.whatif.json";
 import procCompare from "./fixtures/procurement.compare.json";
 import cyberPlan from "./fixtures/cybersecurity_no_feasible_team.plan.json";
 import cyberReplay from "./fixtures/cybersecurity_no_feasible_team.replay.json";
+import bringValidate from "./fixtures/bring.validate.json";
+import bringAdapt from "./fixtures/bring.adapt.json";
+import bringCompare from "./fixtures/bring.compare.json";
 
 const RESULT: Record<string, unknown> = {
   "/api/v1/scenarios": scenarios,
@@ -64,6 +67,7 @@ function jsonResponse(body: unknown, status = 200): Response {
 
 export interface FetchMockOptions {
   unsupportedContract?: boolean;
+  workflowTooComplex?: boolean;
   notReady?: boolean;
   unreachable?: boolean;
 }
@@ -92,6 +96,33 @@ export function installFetchMock(opts: FetchMockOptions = {}) {
       return jsonResponse(envelope(sid === "cybersecurity_no_feasible_team" ? cyberReplay : procReplay));
     }
     if (path === "/api/v1/plans/compare") return jsonResponse(envelope(procCompare));
+    // Bring Your Workflow (ADR §22): the three workflow operations, answered from
+    // fixtures the real backend produced for the guided example. Validate echoes the
+    // digest the client sent so the integrity block reads as the server would write it.
+    if (path === "/api/v1/workflows/validate") {
+      let sent: string | undefined;
+      let declared = "workflow_ir.v1";
+      try {
+        const body = JSON.parse(String(init?.body ?? "{}"));
+        sent = body.source_digest;
+        declared = body.contract_version ?? declared;
+      } catch {
+        /* default */
+      }
+      const computed = bringValidate.integrity.computed_digest;
+      const integrity = sent ? { checked: true, source_digest: sent, computed_digest: computed, match: sent === computed } : { checked: false };
+      return jsonResponse(envelope({ ...bringValidate, declared_contract_version: declared, integrity }));
+    }
+    if (path === "/api/v1/workflows/adapt") {
+      if (opts.workflowTooComplex) {
+        return jsonResponse(
+          { error: { code: "workflow_too_complex", message: "workflow: nodes 201 exceeds the limit 200", request_id: "req_test", field_path: "workflow", safe_details: { measure: "nodes", observed: 201, limit: 200 } } },
+          422,
+        );
+      }
+      return jsonResponse(envelope(bringAdapt));
+    }
+    if (path === "/api/v1/workflows/compare-adaptations") return jsonResponse(envelope(bringCompare));
     if (path.endsWith("/what-if")) return jsonResponse(envelope(procWhatIf));
     if (path === "/api/v1/explanations/eligibility") {
       let scenarioId = "procurement";

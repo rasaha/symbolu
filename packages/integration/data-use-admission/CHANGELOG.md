@@ -1,5 +1,16 @@
 # Changelog — ugence-data-use-admission
 
+## [Unreleased] — public_api.json no longer records the interpreter it was generated on
+
+No API change: every exported symbol, kind, field list and version is identical. The
+manifest's `class` entries for exception types listed `add_note` and `with_traceback`,
+which are inherited from `BaseException` rather than declared by this package — and
+`add_note` exists only from Python 3.11, so a 3.10 run could never reproduce a file
+generated on 3.11 whatever the package declared. `scripts/generate_public_api.py` now
+excludes inherited exception methods, and the manifest is regenerated accordingly. This
+is what unblocked the suite's 3.10 leg, which the package's own
+`requires-python >= 3.10` had always claimed and no workflow had ever run.
+
 ## 0.2.0 — the one ruled local home (front-door seam 8, ruling FD-12.2)
 
 The record shape is unchanged and still contracts-only (`CONTRACT_MATURITY`); what is

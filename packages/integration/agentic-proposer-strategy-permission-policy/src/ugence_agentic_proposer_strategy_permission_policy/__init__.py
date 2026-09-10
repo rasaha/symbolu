@@ -27,9 +27,11 @@ What it deliberately does not do
   deliberately unruled, and nothing here maps one.
 * **No clock, socket, storage or plugin loading.** Every instant is a caller's.
 
-**Status.** This distribution alone does not make Reasoning Strategy Permission
-executable: a family that can be issued still needs a concrete resolver before
-anything runs end to end. That resolver ships separately.
+**Status.** This distribution alone does not resolve a strategy permission: it
+supplies an issuable artifact and the adapter that registers it. The concrete
+resolver ships separately, in
+``ugence-agentic-proposer-strategy-permission-runtime``; Reasoning Strategy
+Permission runs end to end with the pair.
 
 Wiring is the composition root's job: register
 :class:`StrategyPermissionPolicyFamilyAdapter` on an ``AdapterRegistry`` alongside

@@ -17,11 +17,12 @@ declare.
 
 ## Status — what this distribution does and does not make true
 
-It makes a strategy permission **issuable**. It does **not** make Reasoning
-Strategy Permission executable: a family that can be issued still needs a
-concrete resolver before anything runs end to end, and that resolver is a
-separate distribution. Until it lands, the capability still cannot execute end to
-end, and nothing here should be read as saying otherwise.
+It makes a strategy permission **issuable**. It does **not** resolve one: this
+distribution supplies an artifact and an adapter, and nothing in it executes. The
+concrete resolver ships separately, as
+`ugence-agentic-proposer-strategy-permission-runtime`, and has landed — so
+Reasoning Strategy Permission runs end to end with the pair, never with this
+distribution alone. Nothing here should be read as saying otherwise.
 
 ## What it is
 

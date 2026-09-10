@@ -1,0 +1,64 @@
+name: workflow-efficiency-ci
+
+# Repository-wide guard on the CI configuration itself.
+#
+# Two mechanisms whose absence made the queue, rather than the tests, the bottleneck.
+#
+#   1. concurrency — three of ninety-three workflows declared a group. A four-commit
+#      push to one pull request fanned out four complete times and all four kept
+#      running, so failures arrived for commits already fixed while the current head
+#      waited behind them. A superseded run proves nothing about the commit that
+#      replaced it.
+#   2. dependency cache — five of two hundred and fifty setup-python steps set one,
+#      across five hundred and thirty pip install invocations. For jobs whose test run
+#      is two to ten seconds, the install is the job.
+#
+# Like package-import-boundaries-ci, this is a claim about the whole repository that no
+# single workflow can make about itself, so it is enforced here. The checker reads YAML
+# only: it installs nothing, runs no job, and cannot be defeated by a side effect.
+#
+# It deliberately does not measure speed — it cannot see a runner, and a workflow can
+# satisfy both rules and still be slow. It checks that the two cheap mechanisms are
+# present, because their absence is what cost the time.
+
+concurrency:
+  # A superseded run proves nothing about the commit that replaced it. Cancel
+  # in-flight runs for the same ref on pull requests; never on a branch push,
+  # where each commit's run is the evidence that commit was green.
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/**"
+      - "scripts/check_workflow_efficiency.py"
+      - "tests/boundaries/test_workflow_efficiency.py"
+  push:
+    branches:
+      - "claude/**"
+    paths:
+      - ".github/workflows/**"
+      - "scripts/check_workflow_efficiency.py"
+      - "tests/boundaries/test_workflow_efficiency.py"
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  workflow-efficiency:
+    name: Every workflow cancels superseded runs and caches its dependencies
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: requirements.txt
+      - run: python -m pip install --upgrade pip && pip install pytest pyyaml
+      - name: No workflow may leave superseded runs queued or re-download its dependencies
+        run: python scripts/check_workflow_efficiency.py
+      - name: The gate's own guards
+        run: python -m pytest tests/boundaries/test_workflow_efficiency.py -q

@@ -29,6 +29,7 @@ from .errors import PolicyAuthorityRequestError, UnsupportedPolicyArtifactError
 
 __all__ = [
     "GLOBAL_TENANT",
+    "ExclusivityClaim",
     "PolicyCoordinate",
     "PolicyArtifactDescriptor",
     "PolicyFamilyAdapter",
@@ -95,6 +96,39 @@ class PolicyCoordinate:
 
 
 @dataclass(frozen=True)
+class ExclusivityClaim:
+    """One family-neutral claim to exclusive governance of something (`ACC-OVL-7`).
+
+    The core compares these for **equality** and never parses them. That is the
+    whole of what keeps the seam family-neutral: a family with exclusivity
+    semantics registers claims under its own ``namespace``, and a second family
+    doing the same can never collide with the first, without either family
+    appearing in core code.
+
+    ``subject`` is an **opaque token**. To the core it is a string to normalise
+    and compare; what it denotes — a governed role, a capacity envelope, anything
+    a future family needs — is the adapter's business and stays there.
+
+    **Scope and tenant are deliberately absent.** They are taken from the
+    artifact's own :class:`PolicyCoordinate` at comparison time, never restated
+    here. An adapter that could restate them could widen its own claim's reach;
+    reading them from the coordinate makes `ACC-OVL-1`'s "within the same tenant
+    and scope" structural rather than advisory.
+    """
+
+    namespace: str
+    subject: str
+
+    def __post_init__(self) -> None:
+        object.__setattr__(
+            self, "namespace", _require_token(self.namespace, "ExclusivityClaim.namespace")
+        )
+        object.__setattr__(
+            self, "subject", _require_token(self.subject, "ExclusivityClaim.subject")
+        )
+
+
+@dataclass(frozen=True)
 class PolicyArtifactDescriptor:
     """Everything the core needs to know about a family artifact.
 
@@ -118,6 +152,17 @@ class PolicyArtifactDescriptor:
     supersedes_coordinate: Optional[PolicyCoordinate] = None
     effective_from: Optional[datetime] = None
     effective_to: Optional[datetime] = None
+    #: `ACC-OVL-7`. What this artifact claims exclusive governance of, as
+    #: family-neutral tokens the core compares but never interprets. The default
+    #: is **empty**, and that is the ruled behaviour for every family with no
+    #: exclusivity semantics: they produce no claims and nothing changes for them.
+    #:
+    #: `[G]` The core cannot distinguish "this family has nothing to claim" from
+    #: "this family failed to project what it should have claimed" — the two are
+    #: the same empty tuple. A family whose claims are load-bearing must
+    #: therefore fail closed in its **own** adapter, before a descriptor with no
+    #: claims can be built. The constitution family does exactly that.
+    exclusivity_claims: tuple = ()
 
     def __post_init__(self) -> None:
         _require_token(self.adapter_id, "PolicyArtifactDescriptor.adapter_id")
@@ -153,6 +198,19 @@ class PolicyArtifactDescriptor:
             value = getattr(self, name)
             if value is not None:
                 require_tzaware(value, path=f"PolicyArtifactDescriptor.{name}")
+        claims = tuple(self.exclusivity_claims)
+        for claim in claims:
+            if not isinstance(claim, ExclusivityClaim):
+                raise PolicyAuthorityRequestError(
+                    "PolicyArtifactDescriptor.exclusivity_claims must contain "
+                    "ExclusivityClaim values — a bare string cannot claim anything"
+                )
+        if len(set(claims)) != len(claims):
+            raise PolicyAuthorityRequestError(
+                "PolicyArtifactDescriptor.exclusivity_claims contains a duplicate; a "
+                "claim is held once or not at all, and a repeat is a projection defect"
+            )
+        object.__setattr__(self, "exclusivity_claims", claims)
 
     @property
     def declares_supersession(self) -> bool:
