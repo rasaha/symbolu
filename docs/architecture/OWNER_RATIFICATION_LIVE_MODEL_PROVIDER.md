@@ -1,6 +1,7 @@
 # Owner ratification — a live model-calling provider
 
-**Status:** D-1 and D-2 **RATIFIED 2026-09-10**; D-3, D-4 and D-5 open. Nothing is
+**Status:** D-1, D-2 and D-3 **RATIFIED 2026-09-10**, together with §3's direction and a
+CR-5 clarification recorded in the composition-root ADR; D-4 and D-5 open. Nothing is
 implemented. No gate identifier is marked satisfied and no ratified pin, gate record or
 evidence manifest is modified by this document. The implementation specification opened by
 these two rulings is `SPEC_MODEL_EGRESS_UNIT.md`.
@@ -103,7 +104,33 @@ outstanding `[R]`.
 | `SEPARATE_EGRESS_UNIT` | A second deployment unit holds the vendor call; the worker's egress claim survives intact. A new unit, a new boundary, a new CR-family ruling. |
 | `NO_LIVE_PROVIDER_IN_THIS_ARCHITECTURE` | The seam stays unimplemented and the claim stays absolute. |
 
-### D-3 — Credential custody
+### D-3 — Credential custody — **RATIFIED: `NO_CREDENTIAL_IN_THIS_DEPLOYMENT`**
+
+> **D-3 — NO_CREDENTIAL_IN_THIS_DEPLOYMENT.** The reference deployment must contain no
+> model-provider credential and must make no genuine provider call. It may implement and
+> test:
+>
+> - the MEU deployment boundary;
+> - authorized-request leasing;
+> - minimized-context validation;
+> - provider-adapter interfaces using deterministic fakes;
+> - response correlation;
+> - refusal and retry behavior;
+> - provenance placeholders that do not claim genuine provider evidence.
+>
+> Production model invocation remains blocked until an external secret-manager integration,
+> rotation policy, audit trail and custody owner are separately commissioned.
+> `PLATFORM_ENVIRONMENT_VARIABLE` is rejected as a production custody mechanism.
+>
+> A customer-managed credential may not be smuggled into the reference deployment through an
+> environment variable, fixture or undocumented operator step. The absence of custody must
+> produce an explicit non-production/refusal posture.
+> — owner, 2026-09-10
+
+The last paragraph is the enforceable part and the specification treats it as such: absence
+of custody is a **posture the unit states and acts on**, not a configuration gap it happens
+to have. A deployment with no credential refuses to call and says so; it does not merely
+fail to find a key.
 
 | Option | Consequence |
 |---|---|
