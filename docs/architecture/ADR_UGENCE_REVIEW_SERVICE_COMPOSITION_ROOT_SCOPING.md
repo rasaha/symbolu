@@ -164,6 +164,100 @@ one, and the ruling's refusal to solve the problem by redefining the word is the
 of it: the boundary is narrowed by naming what crosses, never by renaming it.
 
 
+#### CR-4 and CR-5 amendment drafts for the Model Egress Unit, 2026-09-10 — `[R]` **DRAFT, NOT RATIFIED**
+
+D-2 `SEPARATE_EGRESS_UNIT` (`OWNER_RATIFICATION_LIVE_MODEL_PROVIDER.md`) placed the vendor
+call in a second deployment unit and recorded that the amendments it requires to CR-5 and
+CR-4 are **owner acts, not consequences of the specification**. What follows is drafted text
+for those two acts and the audit behind it. **Nothing here is ratified.** The rulings of §5
+above are unchanged, and no cell of that table has been edited.
+
+##### What each ruling says, and what actually contradicts it
+
+**CR-4** as ratified `[V]` (§5 above): *"`UGENCE_REVIEW_DEPLOYMENT_MODE=production` sets every
+production switch together and refuses any fixture adapter, in-memory store or
+non-authoritative bundle at composition. It certifies nothing and enables no LIVE
+execution."*
+
+**Nothing contradicts it today** `[V]`. D-3 `NO_CREDENTIAL_IN_THIS_DEPLOYMENT` forbids a
+genuine provider call, so no LIVE execution occurs and the clause holds. The risk CR-4 needs
+guarding against is a *future misreading*: once an MEU exists, a reader may take
+`production` as the switch that turns it on. It is not, and §6's ceiling already names what
+LIVE waits on — AI-E, the external security review and the mirror `[V]`. The draft below
+therefore **narrows** CR-4 rather than relaxing it.
+
+**CR-5** as ratified `[V]`, and as clarified on 2026-09-10 (above): the worker may connect
+only to its approved JWKS endpoint and its configured private PostgreSQL endpoints; it may
+not connect to the MEU, model providers, arbitrary private services or the public internet.
+
+**The MEU does not contradict CR-5 either — it falls outside it** `[V]`. Every clause of the
+CR family is written about *the worker*: CR-3 is "the worker's listener", CR-5 is "the
+worker's only egress", and the prohibitions of §5 read "no credential beyond the database
+DSNs **in the worker**". The MEU's own destinations — the exchange schema and approved
+provider endpoints (`SPEC_MODEL_EGRESS_UNIT.md` §5.1) — are governed by nothing. That is the
+gap, and it is not closed by weakening the worker's three destinations, which the draft below
+leaves exactly as they are.
+
+##### `[G]` — the gap neither draft closes, and which is prior to both
+
+**CR-1 `SEPARATE_WORKER_UNIT` authorizes one companion deployment unit, named** `[V]`: *"A
+companion deployment unit, the governed runtime worker, hosts…"*. The MEU is a **second**
+companion unit, and no ruling of this family authorizes its existence. Amending CR-5 to
+declare the egress of a unit CR-1 does not admit would record a boundary around something
+unauthorized.
+
+This was not in the scope of the drafting request and no amendment text for it is proposed
+here. Stated plainly so the sequencing is visible: **CR-1 is amended first, or the two drafts
+below have no unit to attach to.**
+
+##### Draft — CR-4 amendment `[R]`
+
+> **Amended \<date\> under `OWNER_RATIFICATION_LIVE_MODEL_PROVIDER.md` D-2
+> (`SEPARATE_EGRESS_UNIT`):** `UGENCE_REVIEW_DEPLOYMENT_MODE=production` continues to
+> certify nothing and to enable no LIVE execution, and **that is unchanged by the existence
+> of a Model Egress Unit**. Setting the mode does not commission an MEU, does not admit a
+> model-provider credential to any unit, and does not authorize a genuine provider call. The
+> mode switch governs the worker's composition only; it is not a deployment-wide LIVE
+> switch and must not be implemented or documented as one. A genuine provider call remains
+> blocked by D-3 until credential custody, rotation, an audit trail and a named custody
+> owner are separately commissioned, and by §6's ceiling until AI-E, the external security
+> review and the mirror are cleared.
+
+##### Draft — CR-5 amendment `[R]`
+
+> **Amended \<date\> under `OWNER_RATIFICATION_LIVE_MODEL_PROVIDER.md` D-2
+> (`SEPARATE_EGRESS_UNIT`):** the worker's permitted destinations are **unchanged** — its
+> approved JWKS endpoint and its explicitly configured private PostgreSQL persistence
+> endpoints, and nothing else. The worker still may not connect to the Model Egress Unit,
+> to model providers, to arbitrary private services or to the public internet, and the MEU
+> still may not connect to the worker.
+>
+> The Model Egress Unit, as a distinct deployment unit, carries its **own** egress record
+> under this family, recorded as its own `EXTERNAL_DEPLOYMENT_EVIDENCE` and not merged into
+> the worker's. Its permitted destinations are exactly two:
+>
+> - the model-egress exchange schema, over its own database role and credential, under the
+>   grants ratified in `OWNER_RATIFICATION_MEU_EXCHANGE_TENANCY.md` — never the worker's
+>   application schema, `runtime_events` or DBOS-owned tables;
+> - approved model provider endpoints, **only where a credential has been commissioned for
+>   the named provider**; where none has, the unit composes, claims work and refuses the
+>   call.
+>
+> Everything else is forbidden to it, including the worker's listener, the authority plane,
+> the studio and the console. A destination beyond these two requires a further CR-family
+> amendment, on the same terms as the worker's.
+>
+> Two units, two records, one rule: a boundary is narrowed by naming what crosses, never by
+> renaming it.
+
+##### What ratifying these would and would not do
+
+It would place the MEU's egress under the same family that governs the worker's, and pin
+`production` as a composition switch rather than a LIVE switch. It would **not** commission
+the unit, create the credential, build the exchange, or satisfy any gate: `SPEC_MODEL_EGRESS_UNIT.md`
+§8 lists thirteen unbuilt mechanisms, and this changes none of them.
+
+
 Ruled alongside, on evidence: **`SEPARATE_P3E_EQUIVALENT_EVIDENCE`**. The worker image
 gets its own P3E-equivalent gate set and evidence manifest; the studio profile is not
 extended to cover it (§4, §6 step 4).
