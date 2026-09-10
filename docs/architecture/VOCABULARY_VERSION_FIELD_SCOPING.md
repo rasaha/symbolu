@@ -291,13 +291,45 @@ appearing to record provenance.
 prior condition is discharged: nothing this document scopes is now waiting on a
 missing referent.
 
-So the next step is the first binding, and the choice of which record goes first is the
-only judgment left in it. A new record version and schema version carries the
-vocabulary's identity, exact version and content digest; the binding is required
-(`VV-E`), covered by `record_digest()` (`VV-B`), and in the derived id only where the
-label already participates in identity (`VV-C`) — `DataUseDeclaration` and
-`VendorDependencyDeclaration`. Each package is its own change, and
-`data-use-admission` is the hardest of the four rather than the easiest: it is the only
-record needing **two** independent bindings, and `VV-D` forbids the purpose binding
-from being borrowed from the classification one. Doing it first proves the shape
-against the difficult case instead of discovering it on the fourth.
+`[V]` **And the bindings are implemented**, in all four packages —
+`data-use-admission` 0.3.0, `ai-system-registry` 0.3.0, `incident-response` 0.2.0 and
+`vendor-dependency` 0.3.0. Each carries the vocabulary's identity, exact version and
+content digest as a package-local `VocabularyBinding`; each is required (`VV-E`),
+covered by `record_digest()` (`VV-B`), and in the derived id only where the label
+already participated in identity (`VV-C`). `governance-contracts` gained no type and
+did not move its `CONTRACT_VERSION` in any of the four, which is `VV-A` working as
+intended.
+
+**Two things the scoping did not anticipate, recorded because they cost something.**
+
+`[V]` The `VV-C` split is visible in the code now, and it decided more than the id: the
+two records where the answer is *no* keep every id they ever wrote, so the change is
+invisible to anything keyed by their ids, while the two where it is *yes* renumber every
+new record. The binary framing `VV-C` rejected would have got one of those two halves
+wrong whichever way it was answered.
+
+`[V]` The four copies of `VocabularyBinding` are the price `VV-A` chose, and one of them
+found a defect for all four: `incident-response` is the only one of the four running a
+refusal mutation sweep, and it reported seven guards in the shared file that no test
+observed. Each is now covered in every copy, and one branch was deleted rather than
+tested — `ContractViolation` subclasses `ValueError`, so an `except (TypeError,
+ValueError)` beside a bare re-raise could only catch what the re-raise had already
+handled, while blunting the precise refusal message on any path that reached it. A
+shared type would have had one test suite; four copies had one sweep, and the sweep is
+what found it.
+
+## 8. What is still not done
+
+`[G]` **The interpreting layer.** §2's conditions 2 and 3 remain unmet: no owner has
+ruled what each member *entails*, and no package permitted to decide has been given the
+vocabulary. Every record can now say which taxonomy it was written under; nothing can
+say what that taxonomy means.
+
+`[R]` **Two contract changes are ruled and unscoped** — the
+`GeneralPurposeAIModelRegistration` record (`PUB-3`) and the regulatory-status field
+(`PUB-4`). Each needs its own scoping and its own implementation authorization.
+
+`[G]` **Migration of historical records.** Every package reads its v1 records and
+refuses to write beside them; `VV-E` rules that turning a `UNVERSIONED_LEGACY` record
+into a bound one needs its own ruled process, and no such process exists. Until one
+does, a deployment with v1 files keeps two files rather than one.

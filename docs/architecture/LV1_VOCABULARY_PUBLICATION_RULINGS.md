@@ -219,7 +219,7 @@ treating it as a different object rather than another rung.
 | Step | Authorized by | Blocked on |
 |---|---|---|
 | ~~Publish all five vocabularies at `1.0.0`~~ | `PUB-1`, `PUB-1a` | **done** — `docs/vocabularies/` |
-| Implement record bindings | `PUB-2` | publication of the vocabulary each cites |
+| ~~Implement record bindings~~ | `PUB-2` | **done** — all four packages, `[V]` |
 | Scope `GeneralPurposeAIModelRegistration` | — | its own authorization (`PUB-3`) |
 | Scope the regulatory-status field | — | its own authorization (`PUB-4`) |
 
