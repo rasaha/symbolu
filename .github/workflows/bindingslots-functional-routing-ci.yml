@@ -8,6 +8,13 @@ name: bindingslots-functional-routing-ci
 # re-derive the Stage-1 verdict from committed results WITHOUT retraining.
 # The expensive Stage-1 matrix runs only via manual dispatch.
 
+concurrency:
+  # A superseded run proves nothing about the commit that replaced it. Cancel
+  # in-flight runs for the same ref on pull requests; never on a branch push,
+  # where each commit's run is the evidence that commit was green.
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 on:
   push:
     paths:
@@ -37,7 +44,7 @@ jobs:
       - uses: actions/checkout@v4
         with: {fetch-depth: 0}
       - uses: actions/setup-python@v5
-        with: {python-version: '3.11'}
+        with: { python-version: '3.11', cache: pip, cache-dependency-path: requirements.txt }
 
       - name: Frozen abc.json digest (pre)
         run: sha256sum experiments/phase_lc/results/abc.json | tee /tmp/abc_before.txt
@@ -89,7 +96,7 @@ jobs:
       - name: Disk guard
         run: df -h .
       - uses: actions/setup-python@v5
-        with: {python-version: '3.11'}
+        with: { python-version: '3.11', cache: pip, cache-dependency-path: requirements.txt }
       - name: Pre-registration integrity
         run: python experiments/bindingslots_functional_routing/verify_fr_prereg.py
       - name: Install CPU torch

@@ -4,6 +4,13 @@ name: authoritative-policy-compilation-ci
 # the derived-reference prohibition proved by AST, the custody bound, and the
 # public-api-only import boundary to both neighbours. Offline; no network, no keys.
 
+concurrency:
+  # A superseded run proves nothing about the commit that replaced it. Cancel
+  # in-flight runs for the same ref on pull requests; never on a branch push,
+  # where each commit's run is the evidence that commit was green.
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 on:
   pull_request:
     paths:
@@ -31,7 +38,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
-        with: { python-version: "3.11" }
+        with: { python-version: "3.11", cache: pip, cache-dependency-path: requirements.txt }
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
@@ -49,7 +56,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
-        with: { python-version: "3.11" }
+        with: { python-version: "3.11", cache: pip, cache-dependency-path: requirements.txt }
       - run: |
           python -m pip install --upgrade pip && pip install pydantic
           pip install -e packages/governance-contracts --no-deps

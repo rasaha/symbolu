@@ -33,14 +33,14 @@ sys.path.insert(0, HERE)
 import diagrams as DG  # noqa: E402
 
 SRC = os.path.join(ROOT, "docs", "UGENCE_ENTERPRISE_AI_GOVERNANCE_CAPABILITY_PIPELINE.md")
-VERSION = "1.1"
-DATE = "4 September 2026"
+VERSION = "2.1"
+DATE = "9 September 2026"
 BASE = f"UGENCE_ENTERPRISE_AI_GOVERNANCE_CAPABILITY_PIPELINE_v{VERSION}"
 OUT_DOCX = os.path.join(ROOT, "docs", BASE + ".docx")
 COPYRIGHT = "© 2026 Ugence Labs. All rights reserved."
 CLASSIFICATION = "Confidential and proprietary · Shared with prospective partners for evaluation"
 TITLE = "Ugence Enterprise AI Governance Capability Pipeline"
-SUBTITLE = "Repository-Based Capability Map, Development Status and Competitive Cross-Check"
+SUBTITLE = "Repository-Based Map of 70 Capabilities, Development Status and Competitive Cross-Check"
 
 NAVY = RGBColor(0x1A, 0x17, 0x40)
 VIOL = RGBColor(0x2A, 0x21, 0x70)
@@ -63,12 +63,16 @@ FIG_CAPTIONS = {
     "sequence": "Figure 1. The nine-stage governance sequence with its feedback loop.",
     "scenario": "Figure 2. The nine stages applied to the governed cloud-scaling scenario.",
     "minimum_path": "Figure 3. Minimum production path for one governed scaling action.",
-    "pipeline": "Figure 4. Canonical development pipeline with the stage tags placed on it.",
+    "pipeline": "Figure 4. Canonical development pipeline with the stage tags placed on it (counts from B.5).",
 }
 FIG_WIDTH_MM = {"sequence": 165, "scenario": 165, "minimum_path": 120, "pipeline": 168}
+# stage counts for the pipeline figure come from the B.5 table so the figure cannot drift from the text
+_md_for_counts = open(SRC, encoding="utf-8").read()
+_b5 = _md_for_counts[_md_for_counts.index("## B.5 Distribution by stage"):_md_for_counts.index("## B.6")]
+STAGE_COUNTS = {m.group(1): int(m.group(2)) for m in re.finditer(r"^\| ([^|]+?) \| (\d+) \|", _b5, re.M)}
 FIGS = {}
 for key in FIG_ORDER:
-    svg, w, h = DG.ALL[key]()
+    svg, w, h = DG.ALL[key](STAGE_COUNTS) if key == "pipeline" else DG.ALL[key]()
     png = os.path.join(FIG_DIR, key + ".png")
     cairosvg.svg2png(bytestring=svg.encode(), write_to=png, scale=2.6, background_color="white")
     FIGS[key] = png
@@ -697,8 +701,8 @@ ctrl = [
     ("Document", TITLE),
     ("Edition", f"Version {VERSION} · Partner evaluation edition"),
     ("Date", DATE),
-    ("Source of truth", "docs/UGENCE_ENTERPRISE_AI_GOVERNANCE_CAPABILITY_PIPELINE.md in rasaha/symbolu (merged in PR #1584, commit 8c6e5ec6)"),
-    ("Scope", "45 platform capabilities under packages/; the two packaged business-solution examples are excluded"),
+    ("Source of truth", "docs/UGENCE_ENTERPRISE_AI_GOVERNANCE_CAPABILITY_PIPELINE.md in rasaha/symbolu, audited at default-branch commit 6ef1f724"),
+    ("Scope", "70 platform capabilities across 72 packages under packages/; the two packaged business-solution examples are excluded"),
     ("Classification", CLASSIFICATION),
     ("Intended recipients", "Prospective clients and development partners evaluating a partnership with Ugence Labs"),
     ("Owner", "Ugence Labs"),
@@ -768,6 +772,8 @@ for vals in [
     ("0.3", "2026-09-04", "Ugence Labs", "Body text cross-checked against package source; five claims corrected in place; competitor supplement and Appendix C added."),
     ("1.0", "2026-09-04", "Ugence Labs", "First docx edition with cover sheet, document control, figures and copyright footer."),
     ("1.1", "2026-09-04", "Ugence Labs", "Partner evaluation edition: confidentiality wording aligned to distribution to prospective clients and partners."),
+    ("2.0", "2026-09-07", "Ugence Labs", "Re-audit at commit cabd218e: 24 capabilities added (46 to 69), 14 existing rows updated, minimum path and figures revised, Appendix C.4 update record."),
+    ("2.1", "2026-09-09", "Ugence Labs", "Correctness re-audit at commit 6ef1f724: capability 70 added, one moved path corrected, 13 versions and 9 test counts refreshed, B.5 recomputed, Appendix C.5 update record."),
 ]:
     row = rev.add_row()
     for ci, v in enumerate(vals):

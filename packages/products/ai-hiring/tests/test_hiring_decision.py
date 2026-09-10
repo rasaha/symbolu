@@ -14,7 +14,6 @@ Focused on the required invariants:
 from __future__ import annotations
 
 import inspect
-import sys
 
 import pydantic
 import pytest
@@ -144,9 +143,12 @@ def test_eligibility_derives_from_gates_only_no_score_input():
 
 
 # --- Overall Fit ≠ Policy -------------------------------------------------
-def test_importing_decision_plane_does_not_load_analytics():
-    # fresh import state check: the plane must never pull in the analytics path
-    assert "ugence_ai_hiring.hiring_decision.analytics" not in sys.modules
+# The "plane must not bind the analytics path" constraint is enforced statically,
+# for every module in the package at once, by
+# tests/packaging/test_dependency_boundaries.py::test_quarantined_internal_modules_are_not_imported
+# (see QUARANTINED_INTERNAL_MODULES). The check that used to sit here read this
+# process's sys.modules without importing anything, so it reported what the rest of
+# the session had imported rather than anything about the plane.
 
 
 @pytest.mark.parametrize(
@@ -335,11 +337,10 @@ def test_fakes_satisfy_port_protocols():
     assert isinstance(FakeReconciliationPort(), ReconciliationPort)
 
 
-def test_decision_plane_import_pulls_no_shared_service():
-    # importing the plane must not load any shared platform provider module
-    for name in list(sys.modules):
-        assert not name.startswith("ugence_tap_provider")
-        assert not name.startswith("ugence_actiongate_provider")
+# The "no shared platform provider in the plane" constraint is enforced statically
+# by tests/packaging/test_dependency_boundaries.py::
+# test_concrete_tap_actiongate_only_in_integrations, which already scans every
+# module in the package rather than whichever ones a given session imported.
 
 
 # --- action request → CER payload ----------------------------------------

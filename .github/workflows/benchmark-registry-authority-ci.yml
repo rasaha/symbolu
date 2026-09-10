@@ -26,6 +26,13 @@ name: benchmark-registry-authority-ci
 # dedicated verifier module, and the isolated-install job fetches the pair
 # into the local wheelhouse before installing --no-index.
 
+concurrency:
+  # A superseded run proves nothing about the commit that replaced it. Cancel
+  # in-flight runs for the same ref on pull requests; never on a branch push,
+  # where each commit's run is the evidence that commit was green.
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 on:
   pull_request:
     paths:
@@ -69,6 +76,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "${{ matrix.python-version }}"
+          cache: pip
+          cache-dependency-path: requirements.txt
       - name: Install test tooling and the D-41 pair
         # pytest plus the two declared third-party dependencies, at the bounds
         # pyproject declares. BR-1 still resolves from the sibling source tree
@@ -156,6 +165,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+          cache: pip
+          cache-dependency-path: requirements.txt
       - name: Install the D-41 pair
         run: |
           python -m pip install --upgrade pip
@@ -176,6 +187,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+          cache: pip
+          cache-dependency-path: requirements.txt
       - name: Install test tooling and the D-41 pair
         run: |
           python -m pip install --upgrade pip
@@ -193,6 +206,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+          cache: pip
+          cache-dependency-path: requirements.txt
       - name: Install build tooling
         run: |
           python -m pip install --upgrade pip
@@ -216,6 +231,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+          cache: pip
+          cache-dependency-path: requirements.txt
       - name: Install test tooling and the D-41 pair
         run: |
           python -m pip install --upgrade pip
@@ -242,6 +259,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+          cache: pip
+          cache-dependency-path: requirements.txt
       - name: Install test tooling and the D-41 pair
         # The freeze matrix imports this package's curated API to compare its
         # canonicalization version against BR-1's, and at the candidate rung
@@ -271,6 +290,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+          cache: pip
+          cache-dependency-path: requirements.txt
       - name: Install tooling
         run: |
           python -m pip install --upgrade pip
@@ -292,6 +313,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+          cache: pip
+          cache-dependency-path: requirements.txt
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip

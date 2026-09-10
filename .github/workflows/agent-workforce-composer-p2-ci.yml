@@ -8,6 +8,13 @@ name: agent-workforce-composer-p2-ci
 # verifier, a terminology scan, and platform-freeze verification (blocking).
 # No external model APIs, no live agents, no secrets, no web server.
 
+concurrency:
+  # A superseded run proves nothing about the commit that replaced it. Cancel
+  # in-flight runs for the same ref on pull requests; never on a branch push,
+  # where each commit's run is the evidence that commit was green.
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 on:
   pull_request:
     paths:
@@ -37,7 +44,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
-        with: { python-version: "3.11" }
+        with: { python-version: "3.11", cache: pip, cache-dependency-path: requirements.txt }
       - run: python -m pip install --upgrade pip && pip install pytest pydantic
       - env: { PYTHONPATH: "${{ env.SRC }}" }
         run: |
@@ -75,7 +82,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
-        with: { python-version: "3.11" }
+        with: { python-version: "3.11", cache: pip, cache-dependency-path: requirements.txt }
       - run: python -m pip install --upgrade pip && pip install pytest pydantic
       - env: { PYTHONPATH: "${{ env.SRC }}" }
         run: python -m pytest ${{ env.PKG }}/tests/test_ranking.py -q
@@ -86,7 +93,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
-        with: { python-version: "3.11" }
+        with: { python-version: "3.11", cache: pip, cache-dependency-path: requirements.txt }
       - run: python -m pip install --upgrade pip && pip install pytest pydantic
       - env: { PYTHONPATH: "${{ env.SRC }}" }
         run: python -m pytest ${{ env.PKG }}/tests/test_composition.py ${{ env.PKG }}/tests/test_dependency.py -q
@@ -97,7 +104,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
-        with: { python-version: "3.11" }
+        with: { python-version: "3.11", cache: pip, cache-dependency-path: requirements.txt }
       - run: python -m pip install --upgrade pip && pip install pytest pydantic
       - env: { PYTHONPATH: "${{ env.SRC }}" }
         run: python -m pytest ${{ env.PKG }}/tests/test_permissions.py -q
@@ -108,7 +115,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
-        with: { python-version: "3.11" }
+        with: { python-version: "3.11", cache: pip, cache-dependency-path: requirements.txt }
       - run: python -m pip install --upgrade pip && pip install pytest pydantic
       - env: { PYTHONPATH: "${{ env.SRC }}" }
         run: python -m pytest ${{ env.PKG }}/tests/test_fallback.py -q
@@ -119,7 +126,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
-        with: { python-version: "3.11" }
+        with: { python-version: "3.11", cache: pip, cache-dependency-path: requirements.txt }
       - run: python -m pip install --upgrade pip && pip install pytest pydantic
       - env: { PYTHONPATH: "${{ env.SRC }}" }
         run: python -m pytest ${{ env.PKG }}/tests/test_plan.py ${{ env.PKG }}/tests/test_perturbations.py ${{ env.PKG }}/tests/test_cli.py -q
@@ -130,7 +137,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
-        with: { python-version: "3.11" }
+        with: { python-version: "3.11", cache: pip, cache-dependency-path: requirements.txt }
       - run: python -m pip install --upgrade pip && pip install pytest pydantic
       - env: { PYTHONPATH: "${{ env.SRC }}" }
         run: python -m pytest "${{ env.PKG }}/tests/test_composition.py::test_exact_optimum_matches_bruteforce_oracle" -q
@@ -141,7 +148,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
-        with: { python-version: "3.11" }
+        with: { python-version: "3.11", cache: pip, cache-dependency-path: requirements.txt }
       - run: python -m pip install --upgrade pip && pip install pytest pydantic
       - env: { PYTHONPATH: "${{ env.SRC }}" }
         run: python -m pytest ${{ env.PKG }}/tests/test_boundaries.py ${{ env.PKG }}/tests/test_boundaries_p2.py -q
@@ -152,7 +159,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
-        with: { python-version: "3.11" }
+        with: { python-version: "3.11", cache: pip, cache-dependency-path: requirements.txt }
       - run: python -m pip install --upgrade pip && pip install pydantic
       - env: { PYTHONPATH: "${{ env.SRC }}" }
         run: |
@@ -171,7 +178,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
-        with: { python-version: "3.11" }
+        with: { python-version: "3.11", cache: pip, cache-dependency-path: requirements.txt }
       - run: python -m pip install --upgrade pip && pip install build
       - run: python ${{ env.PKG }}/verify_agent_workforce_composer_distribution.py
 
@@ -181,7 +188,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
-        with: { python-version: "3.11" }
+        with: { python-version: "3.11", cache: pip, cache-dependency-path: requirements.txt }
       - run: python -m pip install --upgrade pip && pip install pydantic
       - env: { PYTHONPATH: "${{ env.SRC }}" }
         run: |
@@ -227,7 +234,7 @@ jobs:
       - uses: actions/checkout@v4
         with: { fetch-depth: 0 }
       - uses: actions/setup-python@v5
-        with: { python-version: "3.11" }
+        with: { python-version: "3.11", cache: pip, cache-dependency-path: requirements.txt }
       - run: |
           python -m pip install --upgrade pip && pip install pytest pydantic
           pip install -e packages/capabilities/decision-authority
