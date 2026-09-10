@@ -253,15 +253,42 @@ outcome is unknown must not become a workflow parked forever.
 The naming rule is not cosmetic either. Calling a fresh authorized call a *retry* would
 imply the first one did not happen — which is precisely what nobody knows.
 
-### 3.6 — Prerequisite: pin DBOS before writing the scheduler `[R]`
+### 3.6 — The DBOS baseline, and what is still unknown
 
-`dbos>=2.0` is a floor, not a pin `[V]`, and the audit could not establish the installed
-contract because the package is absent from the audit environment. **Before the scheduler
-is coded, identify the exact DBOS version CI exercises and adopt a tested pin or a bounded
-compatibility range.** No part of this design may depend on unspecified future DBOS 2.x
-behaviour; the mechanisms it does depend on — `@DBOS.workflow`, `@ds.transaction`,
-`launch`, `destroy`, `SQLAlchemyDatasource`, `run_tx_step` — are the ones the repository
-already exercises `[V]`.
+**Implementation baseline `[V]`: DBOS 2.31.1**, proven by CI run 86 (2026-09-10, head
+`20175b13`) on Python 3.11.16 against PostgreSQL 16, where the whole worker suite passed
+including the end-to-end test over a real cluster. That run exercised the entire imported
+surface — `DBOS`, `DBOSConfig`, `SQLAlchemyDatasource`, `DBOS.workflow`, `DBOS.launch`,
+`DBOS.destroy`, `ds.transaction`, `run_tx_step` — which is stronger evidence of
+compatibility than inspecting signatures would be.
+
+**Fixed by `deployment/governed-runtime-worker/constraints.txt`**, applied with `-c` by
+the worker CI install and the image build, and held together by
+`ci/verify_dbos_constraint.py` `[V]`. The separation is deliberate:
+
+| | |
+|---|---|
+| Package contract | `dbos>=2.0` in both `pyproject.toml` files — library compatibility, a property of the code |
+| Tested deployment | `dbos==2.31.1` in the constraints file — a property of a build |
+
+A `>=2.31.1,<2.32` range was refused: it is neither a contract nor a fixed version, and it
+re-admits the drift the pin removes. Before this file nothing pinned DBOS at all, so every
+CI run and every image build resolved the floor independently `[V]`.
+
+**Deployed Railway version: `UNKNOWN` `[G]`.** The worker running today was built on
+2026-09-09 under the unpinned floor. It stays `UNKNOWN` until a newly constrained image is
+built **and** its runtime inventory or SBOM verifies what was installed — and those gates
+are skipped by the base-image mirror blocker (RW-2), so the container evidence is not
+complete and must not be described as such. Nothing here licenses the claim that the
+current Railway worker runs 2.31.1.
+
+**This pins DBOS and nothing else.** SQLAlchemy 2.0.52 and psycopg 3.3.5 are recorded as
+the observed successful set, not constrained `[V]`. Full transitive reproducibility would
+require the complete dependency closure to be locked, which this does not attempt.
+
+The prerequisite is therefore satisfied for the scheduler's *design*: it may depend on
+2.31.1's semantics rather than on an unspecified future 2.x. It is not satisfied for any
+claim about the deployment.
 
 ## 4 — The interface
 
@@ -437,7 +464,7 @@ and it cannot be written until D-5 is ruled `[R]`.
 | Decision | Blocks |
 |---|---|
 | **D-4** what is recorded `[R]` | The `payload` field of §4.2 — whether the provider output reaches the ledger, as content, as a digest, or through Context Minimization |
-| **DBOS pin** `[R]` | §3.6 — a prerequisite to coding the scheduler, not a cleanup afterwards |
+| **The deployed DBOS version** `[G]` | §3.6 — `UNKNOWN` until a constrained image is built and inspected; blocked on the mirror (RW-2) |
 | **Exchange schema, grants, tenancy** `[R]` | Separately reviewable under the CR-5 clarification and §3.4; not authorized by this document |
 | **D-5** concentration limits `[R]` | One refusal in §6 — whether the MEU refuses a call that would breach the vendor mix a plan promised |
 
@@ -455,5 +482,6 @@ and it cannot be written until D-5 is ruled `[R]`.
 | An outside party delivering a result to a parked instance | Shipped precedent, from inside the worker `[V]` |
 | A reconciliation driver | Does not exist. No scheduler, poller or background loop anywhere `[V]` |
 | The exchange schema and its roles | Do not exist `[G]` |
-| A pinned DBOS version | Does not exist; `dbos>=2.0` is a floor `[V]` |
+| A pinned DBOS version for the deployment | `constraints.txt` pins 2.31.1, applied by CI and the image, guarded offline `[V]` |
+| Proof of what the deployed image runs | None. Blocked on the mirror (RW-2) `[G]` |
 | The MEU | Does not exist. No package, no image, no deployment unit `[G]` |
