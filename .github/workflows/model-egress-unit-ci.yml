@@ -153,16 +153,28 @@ jobs:
           assert meu.ENFORCEMENT_ENABLED is False
           assert meu.LIVE_VENDOR_EGRESS is False
           assert meu.CONTRACT_VERSION == "model_egress_unit.exchange.v1"
-          # The reference provider refuses a production posture even here, where
+          # The reference adapter refuses a production posture even here, where
           # nothing in the source tree is on the path to explain it.
+          #
+          # This probe builds its request through the package's own public API on
+          # purpose: it is the one place the *installed* distribution is exercised,
+          # and it is not covered by the test suite — so when the record shape
+          # changed under the 2026-09-10 rulings, only CI caught that this had gone
+          # stale. Keeping it on the public API is what makes the next such change
+          # fail here loudly rather than silently stop testing anything.
           import uuid, datetime
+          now = datetime.datetime.now(datetime.timezone.utc)
+          tenant = uuid.uuid4()
           req = meu.EgressRequest.create(
-              request_id=uuid.uuid4(), tenant_id=uuid.uuid4(),
-              submitted_at=datetime.datetime.now(datetime.timezone.utc),
-              model_id="m", purpose="p", content="c")
+              request_id=uuid.uuid4(), tenant_id=tenant, correlation_id=uuid.uuid4(),
+              submitted_at=now, not_valid_after=now + datetime.timedelta(hours=1),
+              authorization=meu.reference_clearance(
+                  tenant_id=tenant, vendor="reference-vendor", model="m"),
+              minimized_context=[meu.MinimizedUnit("u-1", "probe text", 2)])
+          assert req.content_matches_digest()
+          assert meu.EXCHANGE_SCHEMA_VERSION in req.digest_body().values()
           try:
-              meu.DeterministicFakeProvider().execute(
-                  req, now=req.submitted_at, production=True)
+              meu.DeterministicFakeProvider().execute(req, now=now, production=True)
           except meu.ProviderRefusedInProduction:
               print("installed distribution refuses a production posture:", meu.__version__)
           else:
