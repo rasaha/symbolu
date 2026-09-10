@@ -26,7 +26,7 @@ from ugence_governance_contracts.api import (
     SystemBindingAuthenticityStatus,
 )
 
-from .durable import SCHEMA_VERSION, SqliteSystemRegistry
+from .durable import LEGACY_SCHEMA_VERSION, SCHEMA_VERSION, SqliteSystemRegistry
 from .errors import (
     AiSystemRegistryError,
     ContractViolation,
@@ -57,16 +57,24 @@ from .registry import (
     select_for_tenant,
     supersession_chain,
 )
+from .vocabulary import (
+    VocabularyBinding,
+    VocabularyBindingState,
+    vocabulary_binding_from_dict,
+    vocabulary_binding_to_dict,
+)
 from .version import (
     CONTRACT_MATURITY,
     CONTRACT_VERSION,
+    LEGACY_CONTRACT_VERSION,
     ENFORCEMENT_ENABLED,
     MATURITY,
     __version__,
 )
 
 __all__ = [
-    "__version__", "CONTRACT_VERSION", "MATURITY", "CONTRACT_MATURITY", "ENFORCEMENT_ENABLED",
+    "__version__", "CONTRACT_VERSION", "LEGACY_CONTRACT_VERSION", "MATURITY",
+    "CONTRACT_MATURITY", "ENFORCEMENT_ENABLED",
     # the system identity, re-exported and never redefined
     "AssessedSystemBinding", "SystemBindingAuthenticityStatus",
     # the record
@@ -75,7 +83,10 @@ __all__ = [
     "validity_to_dict", "validity_from_dict",
     "binding_to_dict", "binding_from_dict", "registration_record", "registration_from_record",
     # the one ruled local store (FD-9.2) and its refusals
-    "SqliteSystemRegistry", "SCHEMA_VERSION", "RegistryStorageError",
+    "SqliteSystemRegistry", "SCHEMA_VERSION", "LEGACY_SCHEMA_VERSION", "RegistryStorageError",
+    # which published vocabulary the classification label was written against
+    "VocabularyBinding", "VocabularyBindingState",
+    "vocabulary_binding_to_dict", "vocabulary_binding_from_dict",
     "RegistryProductionModeError", "DuplicateRegistrationError", "CrossTenantRefused",
     # the read seam and its pure selectors
     "SystemRegistryPort", "registered_at", "select_for_tenant", "select_for_system",

@@ -3,7 +3,7 @@
   "distribution": "ugence-ai-system-registry",
   "namespace": "ugence_ai_system_registry",
   "note": "Machine-readable snapshot of the curated public API (ugence_ai_system_registry.__all__). tests/packaging/test_packaging.py asserts this file equals the live package surface. Regenerate with scripts/generate_public_api.py when the curated API changes deliberately.",
-  "package_version": "0.2.0",
+  "package_version": "0.3.0",
   "symbols": {
     "AiSystemRegistryError": {
       "kind": "class",
@@ -35,7 +35,7 @@
     },
     "CONTRACT_VERSION": {
       "kind": "constant",
-      "value": "ai_system_registry.v1"
+      "value": "ai_system_registry.v2"
     },
     "ContractViolation": {
       "kind": "class",
@@ -52,6 +52,14 @@
     "ENFORCEMENT_ENABLED": {
       "kind": "constant",
       "value": false
+    },
+    "LEGACY_CONTRACT_VERSION": {
+      "kind": "constant",
+      "value": "ai_system_registry.v1"
+    },
+    "LEGACY_SCHEMA_VERSION": {
+      "kind": "constant",
+      "value": "ai_system_registry.sqlite.v1"
     },
     "MATURITY": {
       "kind": "constant",
@@ -75,7 +83,7 @@
     },
     "SCHEMA_VERSION": {
       "kind": "constant",
-      "value": "ai_system_registry.sqlite.v1"
+      "value": "ai_system_registry.sqlite.v2"
     },
     "SqliteSystemRegistry": {
       "kind": "class",
@@ -103,6 +111,8 @@
         "owner_ref",
         "classification_label",
         "validity",
+        "classification_vocabulary",
+        "record_version",
         "supersedes",
         "registered_by",
         "notes"
@@ -118,9 +128,24 @@
         "registrations_for_tenant"
       ]
     },
+    "VocabularyBinding": {
+      "fields": [
+        "vocabulary",
+        "version",
+        "specification_digest"
+      ],
+      "kind": "dataclass"
+    },
+    "VocabularyBindingState": {
+      "kind": "enum",
+      "values": [
+        "BOUND",
+        "UNVERSIONED_LEGACY"
+      ]
+    },
     "__version__": {
       "kind": "constant",
-      "value": "0.2.0"
+      "value": "0.3.0"
     },
     "binding_from_dict": {
       "kind": "function",
@@ -219,6 +244,19 @@
       "kind": "function",
       "parameters": [
         "validity"
+      ]
+    },
+    "vocabulary_binding_from_dict": {
+      "kind": "function",
+      "parameters": [
+        "value",
+        "name"
+      ]
+    },
+    "vocabulary_binding_to_dict": {
+      "kind": "function",
+      "parameters": [
+        "binding"
       ]
     }
   }

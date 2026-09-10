@@ -59,9 +59,13 @@ def _reg(**kw) -> SystemRegistration:
 def test_the_store_satisfies_the_read_only_port_and_adds_exactly_one_write(store):
     assert isinstance(store, SystemRegistryPort)
     public = {n for n in dir(store) if not n.startswith("_")}
+    # schema_version and accepts_writes describe the file; neither changes it. They are
+    # named here rather than left to fall through, so a genuine second write would still
+    # fail this assertion.
     writes = public - {"get_registration", "registrations_for_tenant", "registrations_for_system",
                        "registrations_by_classification", "close", "count", "all_registered_at",
-                       "kind", "path", "tenant_id", "production_mode"}
+                       "kind", "path", "tenant_id", "production_mode",
+                       "schema_version", "accepts_writes"}
     assert writes == {"register"}
     for forbidden in ("edit", "update", "delete", "revoke", "admit", "gate", "promote", "attest",
                       "approve", "resolve", "save", "upsert"):

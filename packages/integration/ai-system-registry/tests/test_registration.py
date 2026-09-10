@@ -25,6 +25,7 @@ from ugence_ai_system_registry import (
 from _fixtures import (
     AFTER_WINDOW,
     BEFORE_WINDOW,
+    CLASSIFICATION_VOCABULARY,
     LABEL,
     OWNER,
     T0,
@@ -95,16 +96,18 @@ def test_the_id_is_derived_and_a_chosen_one_is_refused():
     non-empty, which makes the collision-freedom the README claims actually true."""
 
     b, v = binding(), window()
+    vocabulary = dict(classification_vocabulary=CLASSIFICATION_VOCABULARY)
     derived = registration_id_for(b, OWNER, v)
     SystemRegistration(registration_id=derived, binding=b, owner_ref=OWNER,
-                       classification_label=LABEL, validity=v)
+                       classification_label=LABEL, validity=v, **vocabulary)
     with pytest.raises(ContractViolation, match="must be the derived id"):
         SystemRegistration(registration_id="reg_dup", binding=b, owner_ref=OWNER,
-                           classification_label=LABEL, validity=v)
+                           classification_label=LABEL, validity=v, **vocabulary)
     # …and the id must match *these* fields, not merely be some derived id.
     with pytest.raises(ContractViolation, match="must be the derived id"):
         SystemRegistration(registration_id=registration_id_for(binding(version="9.9.9"), OWNER, v),
-                           binding=b, owner_ref=OWNER, classification_label=LABEL, validity=v)
+                           binding=b, owner_ref=OWNER, classification_label=LABEL, validity=v,
+                           **vocabulary)
 
 
 def test_two_registrations_can_never_share_an_id():
@@ -118,15 +121,19 @@ def test_two_registrations_can_never_share_an_id():
 
 def test_required_fields_are_required():
     b, v = binding(), window()
+    # The binding is supplied in every case, so each refusal below is attributable to
+    # the field under test rather than to the vocabulary requirement added in 0.3.0.
     for field in ("owner_ref", "classification_label"):
         kwargs = dict(registration_id=registration_id_for(b, OWNER, v), binding=b,
-                      owner_ref=OWNER, classification_label=LABEL, validity=v)
+                      owner_ref=OWNER, classification_label=LABEL, validity=v,
+                      classification_vocabulary=CLASSIFICATION_VOCABULARY)
         kwargs[field] = "   "
-        with pytest.raises(ContractViolation):
+        with pytest.raises(ContractViolation, match=field):
             SystemRegistration(**kwargs)
-    with pytest.raises(ContractViolation):
+    with pytest.raises(ContractViolation, match="Validity"):
         SystemRegistration(registration_id=registration_id_for(b, OWNER, v), binding=b,
                            owner_ref=OWNER, classification_label=LABEL,
+                           classification_vocabulary=CLASSIFICATION_VOCABULARY,
                            validity="not-a-validity")
 
 
