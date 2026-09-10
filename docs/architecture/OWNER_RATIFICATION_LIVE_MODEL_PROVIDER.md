@@ -1,13 +1,14 @@
 # Owner ratification — a live model-calling provider
 
-**Status:** D-1, D-2 and D-3 **RATIFIED 2026-09-10**, together with §3's direction, a CR-5
-clarification recorded in the composition-root ADR, and three transport rulings — a
+**Status:** D-1, D-2, D-3 and D-4 **RATIFIED 2026-09-10**, together with §3's direction, a
+CR-5 clarification recorded in the composition-root ADR, and three transport rulings — a
 worker-owned reconciliation driver, a dedicated exchange schema under least privilege, and
 `OUTCOME_UNKNOWN` as a terminal outcome — recorded in `SPEC_MODEL_EGRESS_UNIT.md` §3.3-§3.5.
-D-4 and D-5 open. Nothing is
-implemented. No gate identifier is marked satisfied and no ratified pin, gate record or
-evidence manifest is modified by this document. The implementation specification opened by
-these two rulings is `SPEC_MODEL_EGRESS_UNIT.md`.
+D-5 open. Nothing is
+implemented. No exchange table is designed and no exchange exists. No gate identifier is
+marked satisfied and no ratified pin, gate record or evidence manifest is modified by this
+document. The implementation specification opened by these rulings is
+`SPEC_MODEL_EGRESS_UNIT.md`.
 
 **The question:** may the agent runtime gain a provider that calls a model vendor's API,
 and under what constraints?
@@ -141,17 +142,65 @@ fail to find a key.
 | `EXTERNAL_SECRET_MANAGER` | Custody is a named dependency with rotation and audit. Correct, and prerequisite work before any provider ships. |
 | `NO_CREDENTIAL_IN_THIS_DEPLOYMENT` | A live provider is scoped to a customer-operated deployment only. |
 
-### D-4 — What is recorded
+### D-4 — What is recorded — **RATIFIED: the exchange is the temporary content plane**
 
 Prompts and responses are the highest-value evidence and the highest-risk payload. This
 collides directly with context minimization and data-use admission, both of which are
 already composed into the loop.
+
+> **D-4.** The dedicated model-egress exchange is the temporary content plane. It may carry
+> structured canonical content consisting only of the authorized, minimized context required
+> for inference and the resulting provider output. It may never carry unminimized source
+> material, removed context, credentials, authority decisions, grant contents, clearance
+> contents, workflow state, or another tenant's data.
+>
+> `request_digest` must bind the complete immutable inference request — not merely unit
+> identifiers — including tenant identity, exchange schema version, ordered minimized unit
+> identifiers and exact text, model-selection constraints, inference parameters, and the
+> clearance reference and digest. Mutable lease, claim, attempt and processing timestamps are
+> excluded. The response record must bind the canonical returned payload and its provenance
+> through a response digest.
+>
+> The append-only audit ledger may retain only identifiers, digests, references, enumerated
+> outcomes, metering and provenance. For Model Egress Unit ledger kinds, enforce this through
+> a kind-specific schema that refuses content-bearing keys; record this as an unimplemented
+> gap until built.
+>
+> No application-level encrypted-object mechanism is commissioned for the reference
+> deployment. This does not waive transport security, database protection or future
+> production key custody. No genuine customer content or genuine provider call is authorized
+> until exchange tenancy, least-privilege database grants, retention and deletion policy,
+> transport protection, and production credential custody are separately verified.
+>
+> Content remains only until the terminal result has been durably consumed by the worker,
+> followed by an owner-approved grace period. Purging replaces content with a non-content
+> tombstone containing request identity, digests, outcome, consumption acknowledgement and
+> purge time. Engineering may not choose the grace period or maximum retention duration.
+>
+> Exchange grants and tenancy must be ratified before any content-bearing table is designed
+> or implemented.
+> — owner, 2026-09-10
+
+**The ballot's framing did not survive the ruling, and that is the point.** Each option below
+assumes one store and asks how much of the exchange goes into it. The ruling separates the
+planes instead: content lives in the exchange, where it can be purged; the record lives in
+the append-only ledger, where it cannot. So it is neither `RECORD_FULL_EXCHANGE` nor
+`RECORD_DIGEST_AND_METADATA`, and it is stricter than `RECORD_MINIMIZED_EXCHANGE` — minimized
+content is admitted to the exchange only, never to the ledger, and only until the worker has
+durably consumed the result.
 
 | Option | Consequence |
 |---|---|
 | `RECORD_FULL_EXCHANGE` | The audit answers what was actually asked and answered. The ledger becomes a store of potentially sensitive content, under a durability posture RW-6 already limits to single-instance reference grade. |
 | `RECORD_DIGEST_AND_METADATA` | Hash, token counts, model id, latency, disposition — no content. Defensible, and cannot reconstruct what happened. |
 | `RECORD_MINIMIZED_EXCHANGE` | Content admitted through context minimization only. Consistent with the existing gate; the most work. |
+
+Two consequences are worth stating separately, because they are the ones an implementation
+would otherwise soften. **The ledger's content rule has no enforcement today** —
+`LedgerEntry.payload` accepts any canonically serializable dict `[G]`, so until the
+kind-specific schema exists the rule is stated and unpoliced. And **the grace period and the
+maximum retention duration are owner decisions withheld from engineering** `[R]`: until they
+are set, no content may be held at all. Recorded in full at `SPEC_MODEL_EGRESS_UNIT.md` §4.4.
 
 ### D-5 — Do concentration limits carry into execution?
 
@@ -264,18 +313,24 @@ recorded in this repository today `[G]`. Until one is, the amendment buys nothin
 spends a claim.
 
 Nothing in §4a or §4b ratifies anything. Whether the loop is arranged this way is part of
-D-1; where the first step runs is D-2; and both remain unanswered.
+D-1; where the first step runs is D-2.
+
+**Superseded 2026-09-10.** §4a and §4b are kept as the pre-ratification record and their
+present tense is read as of the day they were written. D-1 and D-2 have since been ratified
+(§4), and `SEPARATE_EGRESS_UNIT` is the answer §4b argued toward.
 
 ## 5 — What this document does not do
 
 It specifies nothing. No interface, no package layout, no configuration surface, no
-sequencing. An implementation specification written before D-1 and D-2 are answered would
-be a specification of one arbitrary reading among several, and the two readings of D-2 are
-different products.
+sequencing. An implementation specification written before D-1 and D-2 were answered would
+have been a specification of one arbitrary reading among several, and the two readings of
+D-2 were different products.
 
 It also marks no gate identifier satisfied, admits nothing to the P3E-CTR or GRW-CTR
 families, and changes no ratified pin.
 
-**On ratification of D-1 through D-5, the next artifact is an implementation
-specification** written against the answers, followed by the amendments D-2 requires to
-CR-5 and CR-4 — which are owner acts, not consequences of the spec.
+**The implementation specification opened by these rulings is
+`SPEC_MODEL_EGRESS_UNIT.md`,** written against D-1 through D-4 and stating plainly which
+sections D-5 still blocks. The amendments D-2 requires to CR-5 and CR-4 remain outstanding
+and are owner acts, not consequences of the spec. Nothing is implemented: no exchange
+table is designed, no exchange exists, and no genuine provider call is authorized.

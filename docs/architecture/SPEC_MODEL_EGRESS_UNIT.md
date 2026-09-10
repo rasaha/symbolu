@@ -4,15 +4,17 @@
 2026-09-10 (`OWNER_RATIFICATION_LIVE_MODEL_PROVIDER.md`).
 
 **Also opened by** §3 `MEU_PULLS_AUTHORIZED_WORK_ASYNCHRONOUSLY`, D-3
-`NO_CREDENTIAL_IN_THIS_DEPLOYMENT`, the CR-5 clarification of 2026-09-10 recorded in
+`NO_CREDENTIAL_IN_THIS_DEPLOYMENT`, D-4 `EXCHANGE_IS_THE_TEMPORARY_CONTENT_PLANE` (§4.4),
+the CR-5 clarification of 2026-09-10 recorded in
 `ADR_UGENCE_REVIEW_SERVICE_COMPOSITION_ROOT_SCOPING.md`, and the three transport rulings of
 2026-09-10 recorded in §3.3, §3.4 and §3.5 below.
 
-**Scope of this revision.** Architecture, boundary, interface and deployment. **D-4** (what
-is recorded) and **D-5** (concentration limits at execution) remain open, and the sections
-that depend on them say so rather than assuming an answer. Nothing here is implemented, no
-provider SDK is introduced, no real network call is specified, and no gate identifier of
-P3E-CTR or GRW-CTR is marked satisfied.
+**Scope of this revision.** Architecture, boundary, interface and deployment, and the
+D-4 ruling of 2026-09-10 recorded in §4.4. **D-5** (concentration limits at execution)
+remains open, and the sections that depend on it say so rather than assuming an answer.
+Nothing here is implemented, no provider SDK is introduced, no real network call is
+specified, no exchange table is designed, and no gate identifier of P3E-CTR or GRW-CTR is
+marked satisfied.
 
 ## 1 — What the rulings fix
 
@@ -305,13 +307,14 @@ minimized — never before. Its identity is immutable:
 | Field | Purpose |
 |---|---|
 | `request_id` | Immutable identity. Not a process, host or attempt — restarts, retries and scaling do not change it. |
-| `request_digest` | Canonical digest over the authorized fields. The MEU verifies it before calling; a mismatch is a refusal. |
+| `request_digest` | Canonical digest binding the **complete immutable request** (§4.4): tenant identity, exchange schema version, the ordered minimized unit identifiers **and their exact text**, model-selection constraints, inference parameters, and the clearance reference and its digest. Mutable lease, claim, attempt and processing timestamps are excluded. The MEU verifies it before calling; a mismatch is a refusal. |
+| `exchange_schema_version` | The version of the exchange the request was written under. Bound by the digest, so a request cannot be reinterpreted under a later schema. |
 | `correlation_id` | Ties the request, its result and the audit trail together. |
 | `clearance_ref` | The `cer-…` receipt that authorized **this request**, with its action binding, scope and expiry. |
 | `tenant_id` | The tenant the request belongs to. Never inferred from the claim. |
 | `model_ref` | The model the authorization named, not a family or an alias resolved later. |
 | `parameters` | The call parameters the authorization named. |
-| `minimized_context` | What Context Minimization admitted, and only that. |
+| `minimized_context` | Structured canonical content: what Context Minimization admitted, and only that — the surviving units in the order the run fixed, each carrying its identifier and its exact text. Never source material, never removed units, never anything the authorization did not name (§4.4). |
 | `not_valid_after` | The request's own expiry, independent of the lease. |
 
 The MEU **may not** modify, broaden or reinterpret any of these. Claiming work confers no
@@ -328,7 +331,8 @@ so the result's identity derives from the request rather than from whoever produ
 | `outcome` | `ANSWERED`, `REFUSED`, `FAILED` or `OUTCOME_UNKNOWN` — each a first-class outcome, none an exception. `OUTCOME_UNKNOWN` is **terminal** for this request (§3.5). |
 | `provenance` | Which adapter, which model, when, and **whether the call was genuine or a deterministic fake** (§5.2). |
 | `metering` | Token counts, latency, and cost where the adapter reports it — the governance the request was authorized against. |
-| `payload` | The provider output, or absent on refusal. Its content is D-4's subject `[R]`. |
+| `payload` | The provider output as structured canonical content, or absent on refusal. It lives in the exchange for a bounded period and never reaches the ledger (§4.4). |
+| `response_digest` | Canonical digest binding the returned payload **and** its provenance (§4.4). It is what distinguishes *the provider returned this* from *a row was edited afterwards*, and it is what the ledger retains in the payload's place. |
 
 `trust` is not a field the MEU computes. It is a constant, because D-1 grants the response
 nothing: the output arrives as evidence and is verified downstream, never believed because
@@ -345,12 +349,110 @@ on whether dispatch may have occurred (§3.5):
 | After possible dispatch | **Nothing.** The request becomes `OUTCOME_UNKNOWN`, terminal. It does not return to `PENDING`, and its authorization and clearance are spent. |
 
 The `request_id` plus `request_digest` pair is the durable dedup key: **a request already
-served is never served twice**. But dedup and lease expiry between them cannot make the
+served is never served twice**. Because the digest binds the exact minimized text and not
+merely the unit identifiers (§4.4), an altered prompt under unchanged identifiers is a
+*different* logical action rather than a duplicate — which is also what makes §3.5's
+"identical `request_digest`" recovery condition meaningful rather than vacuous. But dedup and lease expiry between them cannot make the
 ambiguous interval safe, because the provider call happens outside any transaction — which
 is why §3.5 exists rather than a cleverer lease.
 
 A fresh authorized call after an `OUTCOME_UNKNOWN` is a **new request linked to the
 uncertain original**, never a retry of it.
+
+### 4.4 — What may cross, and for how long — **RATIFIED: the exchange is the temporary content plane**
+
+> **D-4.** The dedicated model-egress exchange is the temporary content plane. It may carry
+> structured canonical content consisting only of the authorized, minimized context required
+> for inference and the resulting provider output. It may never carry unminimized source
+> material, removed context, credentials, authority decisions, grant contents, clearance
+> contents, workflow state, or another tenant's data.
+>
+> `request_digest` must bind the complete immutable inference request — not merely unit
+> identifiers — including tenant identity, exchange schema version, ordered minimized unit
+> identifiers and exact text, model-selection constraints, inference parameters, and the
+> clearance reference and digest. Mutable lease, claim, attempt and processing timestamps are
+> excluded. The response record must bind the canonical returned payload and its provenance
+> through a response digest.
+>
+> The append-only audit ledger may retain only identifiers, digests, references, enumerated
+> outcomes, metering and provenance. For Model Egress Unit ledger kinds, enforce this through
+> a kind-specific schema that refuses content-bearing keys; record this as an unimplemented
+> gap until built.
+>
+> No application-level encrypted-object mechanism is commissioned for the reference
+> deployment. This does not waive transport security, database protection or future
+> production key custody. No genuine customer content or genuine provider call is authorized
+> until exchange tenancy, least-privilege database grants, retention and deletion policy,
+> transport protection, and production credential custody are separately verified.
+>
+> Content remains only until the terminal result has been durably consumed by the worker,
+> followed by an owner-approved grace period. Purging replaces content with a non-content
+> tombstone containing request identity, digests, outcome, consumption acknowledgement and
+> purge time. Engineering may not choose the grace period or maximum retention duration.
+>
+> Exchange grants and tenancy must be ratified before any content-bearing table is designed
+> or implemented.
+> — owner, 2026-09-10
+
+**Two planes, and the line between them is deletability.** The ballot offered three options
+that each assumed one store — record the full exchange, record digests only, or record a
+minimized exchange. The ruling declines that framing: content and record are different
+planes with different lifetimes, and the question is which plane holds which.
+
+| | Exchange | Audit ledger |
+|---|---|---|
+| Holds | structured canonical content — minimized context in, provider output back | identifiers, digests, references, enumerated outcomes, metering, provenance |
+| Lifetime | until the terminal result is durably consumed, plus an owner-approved grace period | append-only, permanent |
+| Deletable | yes, by purge to a tombstone | **no** — an entry is never edited `[V]` |
+
+The asymmetry is the whole argument. A ledger entry cannot be recalled, so anything content-
+bearing that reaches it is undeletable; exchange rows can be purged on a fixed horizon. Put
+the content where it can be removed and the record where it cannot.
+
+**Why content must cross at all.** The MEU cannot call a vendor without the prompt text, and
+§3.4 forbids it reading the worker's application schema. Content therefore sits in the
+exchange or in a third store the MEU may dereference — and a third store is a second trust
+boundary this document does not authorize. "References only" was never available for the
+outbound leg; it is the ledger's rule, not the exchange's.
+
+**What the ruling rests on `[V]`:**
+
+| Precedent | |
+|---|---|
+| `ContextUnit.text` is "the extractive payload — every surviving output span is this exact value, byte-for-byte" (`context-minimization/…/models.py:101-111`), while `MinimizationResult` records only surviving/removed identifiers and two fingerprints (`models.py:280`) | The content/record seam already exists inside minimization. The exchange needs the units; the record needs the identifiers. |
+| `DataUseDeclaration.data_ref` — "An opaque, non-secret reference… **Never the data itself: there is no field that could carry a payload**" (`data-use-admission/…/declaration.py:127-130`), tenant mismatch refused at construction (`declaration.py:164-168`) | Where the repository wanted a reference it removed the field that could hold content, rather than relying on discipline. That is the model the ledger's kind-specific schema follows. |
+| `LinkageIndex.reference_for(tenant_id=…, linkage_digest=…)` (`governed-review-service/…/linkage.py:94, 106-108`) | A reference never dereferences on its own; the tenant must match. |
+
+**`[G]` — the ledger has no such constraint today.** `LedgerEntry.payload` is a free-form
+`dict` (`control-plane-root/…/entry.py:52-61`), validated only for string keys and canonical
+serializability. Nothing structurally prevents provider output reaching an append-only row.
+The kind-specific schema that refuses content-bearing keys for MEU ledger kinds **is not
+built**, and this specification does not build it. Until it exists, the ledger's content rule
+is a stated rule with no enforcement behind it, and must not be described otherwise.
+
+**Purge leaves a tombstone, not a hole.** When the grace period expires, content is replaced
+by a non-content record carrying request identity, the request and response digests, the
+outcome, the worker's consumption acknowledgement, and the purge time. A purged request is
+therefore still auditable as *having happened, with this identity and this outcome* — what is
+gone is what was said. A row that simply vanished would make the exchange's own history
+unverifiable.
+
+**No encryption is commissioned.** There is no encryption capability in the repository to
+begin with: `cryptography` and `nacl` appear only in `trusted-evidence-authority`, for Ed25519
+signature verification `[V]`. An application-level encrypted object would also buy little
+here — the MEU must decrypt to call the vendor, so it protects against the database operator
+rather than against the party performing the egress — and the key it requires is exactly what
+D-3 keeps out of this deployment. This waives nothing: transport security, database
+protection and production key custody remain separate obligations, unaddressed by this
+document rather than discharged by it.
+
+**Nothing here authorizes genuine content or a genuine call.** Five things are verified
+separately first: exchange tenancy, least-privilege database grants, retention and deletion
+policy, transport protection, and production credential custody. Two of them — the grace
+period and the maximum retention duration — are **owner decisions that engineering may not
+make** `[R]`. And exchange grants and tenancy must be ratified **before** any content-bearing
+table is designed, because in the exchange tenant isolation is a property of row data until a
+grant makes it a property of the database.
 
 ## 5 — Deployment
 
@@ -457,16 +559,24 @@ and it cannot be written until D-5 is ruled `[R]`.
 - **The MEU is not a second governance layer.** It performs one call and returns one
   result, as RA-7 observes without owning authority consequences `[V]`.
 - **No schema, authorization or tenancy change to the outbox is authorized here.** Those
-  remain separately reviewable `[V]`.
+  remain separately reviewable `[V]`, and under §4.4 they are now a **prerequisite**: no
+  content-bearing exchange table may be designed or implemented until exchange grants and
+  tenancy are ratified.
+- **No exchange table is designed by this document**, no exchange is implemented, and no
+  genuine customer content or genuine provider call is authorized (§4.4).
 
 ## 8 — Open decisions, and what each one blocks
 
 | Decision | Blocks |
 |---|---|
-| **D-4** what is recorded `[R]` | The `payload` field of §4.2 — whether the provider output reaches the ledger, as content, as a digest, or through Context Minimization |
+| **Exchange grants and tenancy** `[R]` | Now first in order, not merely separate: §4.4 forbids designing a content-bearing table until this is ratified. Reviewable under the CR-5 clarification and §3.4; not authorized by this document |
+| **Grace period and maximum retention** `[R]` | The purge horizon of §4.4. An owner decision explicitly withheld from engineering; until it is set, nothing may hold content |
+| **Retention and deletion policy, transport protection, production credential custody** `[R]` | The three remaining prerequisites of §4.4 for genuine customer content or a genuine provider call |
+| **The MEU ledger-kind schema** `[G]` | §4.4's ledger rule has no enforcement: `LedgerEntry.payload` accepts any canonical dict (`entry.py:52-61`). Unbuilt, and not built here |
 | **The deployed DBOS version** `[G]` | §3.6 — `UNKNOWN` until a constrained image is built and inspected; blocked on the mirror (RW-2) |
-| **Exchange schema, grants, tenancy** `[R]` | Separately reviewable under the CR-5 clarification and §3.4; not authorized by this document |
 | **D-5** concentration limits `[R]` | One refusal in §6 — whether the MEU refuses a call that would breach the vendor mix a plan promised |
+
+**D-4 is closed** — ratified 2026-09-10 and recorded verbatim in §4.4.
 
 
 ## 9 — What exists to build on
