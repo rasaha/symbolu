@@ -63,6 +63,20 @@ CANONICAL_PROVIDER_ROOTS = {"ugence_tap_provider", "ugence_actiongate_provider"}
 # retained compatibility documentation and tests.
 LEGACY_PROVIDER_ROOTS = {"tap_provider", "actiongate_provider"}
 
+# Internal modules quarantined from the rest of the package, each mapped to the
+# module paths permitted to import it. Paths are dotted and relative to
+# ``ugence_ai_hiring``; an empty set means nothing in the package may import it.
+#
+# These are intra-package edges, so ``_imported_roots`` cannot see them: it skips
+# relative imports and keeps only the first segment of absolute ones.
+# ``_internal_targets`` below resolves both forms to a dotted module path.
+QUARANTINED_INTERNAL_MODULES: dict[str, frozenset[str]] = {
+    # Overall Fit is analytics, not policy. The decision plane derives eligibility
+    # from gates alone, so nothing may bind the analytics path at import time: the
+    # plane can then be read, reasoned about and shipped without it.
+    "hiring_decision.analytics": frozenset(),
+}
+
 INTEGRATIONS_DIR = PKG_ROOT / "integrations"
 
 
@@ -90,6 +104,134 @@ def _imported_roots(path: pathlib.Path):
             if node.module:
                 roots.add(node.module.split(".")[0])
     return roots
+
+
+def _module_path(path: pathlib.Path) -> str:
+    """Dotted path of ``path`` within the package, e.g. ``hiring_decision.gates``."""
+    rel = path.relative_to(PKG_ROOT).with_suffix("")
+    parts = list(rel.parts)
+    if parts[-1] == "__init__":
+        parts.pop()
+    return ".".join(parts)
+
+
+def _resolve_internal_targets(source: str, module_path: str, is_package_init: bool) -> set[str]:
+    """Intra-package module paths ``source`` imports, by relative or absolute form.
+
+    ``from . import analytics``, ``from .analytics import x``,
+    ``from ugence_ai_hiring.hiring_decision import analytics`` and
+    ``import ugence_ai_hiring.hiring_decision.analytics`` all resolve to
+    ``hiring_decision.analytics``. A ``from pkg import name`` is ambiguous — ``name``
+    may be a submodule or a symbol re-exported by it — so both readings are
+    reported; either one binds the module at import time, which is what matters.
+
+    Pure: takes source text and a position, touches no filesystem, so the form
+    coverage below can exercise it on synthetic modules without writing into the
+    package tree.
+    """
+    own_parts = module_path.split(".") if module_path else []
+    # A relative import counts levels from the *package* containing the module. For
+    # a package's own __init__.py that package is itself; for any other module it is
+    # the parent. Conflating the two shifts every relative import by one level.
+    pkg_parts = own_parts if is_package_init else own_parts[:-1]
+    tree = ast.parse(source)
+    targets: set[str] = set()
+
+    def _add(dotted: str, names: list[str]) -> None:
+        if dotted:
+            targets.add(dotted)
+        targets.update(f"{dotted}.{n}" if dotted else n for n in names)
+
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            for alias in node.names:
+                if alias.name == "ugence_ai_hiring":
+                    continue
+                if alias.name.startswith("ugence_ai_hiring."):
+                    targets.add(alias.name[len("ugence_ai_hiring.") :])
+        elif isinstance(node, ast.ImportFrom):
+            names = [a.name for a in node.names if a.name != "*"]
+            if node.level:
+                if node.level - 1 > len(pkg_parts):
+                    continue  # escapes the package entirely
+                base = pkg_parts[: len(pkg_parts) - (node.level - 1)]
+                prefix = ".".join(base + (node.module.split(".") if node.module else []))
+                _add(prefix, names)
+            elif node.module == "ugence_ai_hiring":
+                _add("", names)
+            elif node.module and node.module.startswith("ugence_ai_hiring."):
+                _add(node.module[len("ugence_ai_hiring.") :], names)
+    return targets
+
+
+def _internal_targets(path: pathlib.Path) -> set[str]:
+    """``_resolve_internal_targets`` for a real module file in the package."""
+    return _resolve_internal_targets(
+        path.read_text(), _module_path(path), path.name == "__init__.py"
+    )
+
+
+def test_quarantined_internal_modules_are_not_imported():
+    """Each quarantined internal module is imported only by its permitted importers.
+
+    This is the declarative form of the plane-isolation constraint. It is a static
+    scan of every module in the package, so it holds regardless of test ordering,
+    of what else is installed, and of which planes a given run happens to import.
+    """
+    offenders: dict[str, list[str]] = {}
+    for path in _iter_module_files():
+        importer = _module_path(path)
+        targets = _internal_targets(path)
+        for quarantined, permitted in QUARANTINED_INTERNAL_MODULES.items():
+            if quarantined == importer or importer in permitted:
+                continue
+            if quarantined in targets:
+                offenders.setdefault(quarantined, []).append(importer)
+    assert not offenders, f"quarantined internal modules imported: {offenders}"
+
+
+def test_the_quarantine_map_is_deliberate():
+    """The quarantine map is pinned, so emptying it is a visible edit, not a drift.
+
+    A rule table that can be silently emptied is a gate that stops gating without
+    anything going red. This names what the map must contain; removing an entry
+    means changing this test too, which is a decision a reviewer can see.
+    """
+    assert "hiring_decision.analytics" in QUARANTINED_INTERNAL_MODULES
+    assert QUARANTINED_INTERNAL_MODULES["hiring_decision.analytics"] == frozenset()
+
+
+def test_the_quarantine_resolver_sees_every_import_form():
+    """``_internal_targets`` resolves relative and absolute forms alike.
+
+    The resolver is the whole rule: a form it cannot see is a boundary that is not
+    enforced, silently. Relative levels are counted from the package containing the
+    module, which differs between a package's ``__init__.py`` and any other module,
+    so both are exercised here.
+    """
+    # (module position, is __init__.py, import statement)
+    forms = (
+        ("hiring_decision", True, "from . import analytics"),
+        ("hiring_decision.gates", False, "from .analytics import compute_overall_fit"),
+        ("hiring_decision.gates", False,
+         "from ugence_ai_hiring.hiring_decision import analytics"),
+        ("hiring_decision.gates", False,
+         "import ugence_ai_hiring.hiring_decision.analytics"),
+        ("hiring_decision.gates", False,
+         "from ugence_ai_hiring.hiring_decision.analytics import compute_overall_fit"),
+        ("hiring_calibration.report", False, "from ..hiring_decision import analytics"),
+        ("hiring_calibration.report", False,
+         "from ..hiring_decision.analytics import compute_overall_fit"),
+    )
+    for module_path, is_init, statement in forms:
+        targets = _resolve_internal_targets(statement + "\n", module_path, is_init)
+        assert "hiring_decision.analytics" in targets, (module_path, statement, sorted(targets))
+
+    # …and does not report it for an import that does not reach it, so the coverage
+    # above is not just a function that says yes to everything.
+    assert "hiring_decision.analytics" not in _resolve_internal_targets(
+        "from .gates import MandatoryGateEvaluator\n", "hiring_decision.eligibility", False
+    )
 
 
 def test_no_forbidden_imports_anywhere_in_core():

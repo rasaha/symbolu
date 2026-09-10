@@ -299,21 +299,8 @@ def test_proposal_and_report_modules_do_not_import_analytics():
 
 
 # --- standalone -----------------------------------------------------------
-def test_calibration_plane_imports_standalone():
-    # The calibration plane must import without pulling in a platform provider.
-    # This runs in a clean interpreter on purpose — scanning this process's
-    # sys.modules would report what the rest of the session imported, not what
-    # importing the plane does, and would pass or fail on test ordering.
-    import json
-    import subprocess
-    import sys
-
-    code = (
-        "import ugence_ai_hiring.hiring_calibration, sys, json; "
-        "pre = ('ugence_tap_provider', 'ugence_actiongate_provider'); "
-        "print(json.dumps([m for m in sys.modules if m.startswith(pre)]))"
-    )
-    proc = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True)
-    assert proc.returncode == 0, proc.stderr
-    loaded = json.loads(proc.stdout.strip().splitlines()[-1])
-    assert not loaded, loaded
+# That the calibration plane binds no shared platform provider is enforced
+# statically for every module in the package by tests/packaging/
+# test_dependency_boundaries.py::test_concrete_tap_actiongate_only_in_integrations.
+# The check that used to sit here scanned this process's sys.modules without
+# importing the plane, so it reported the session's import history instead.
