@@ -6,12 +6,16 @@
 **Also opened by** §3 `MEU_PULLS_AUTHORIZED_WORK_ASYNCHRONOUSLY`, D-3
 `NO_CREDENTIAL_IN_THIS_DEPLOYMENT`, D-4 `EXCHANGE_IS_THE_TEMPORARY_CONTENT_PLANE` (§4.4),
 the CR-5 clarification of 2026-09-10 recorded in
-`ADR_UGENCE_REVIEW_SERVICE_COMPOSITION_ROOT_SCOPING.md`, and the three transport rulings of
-2026-09-10 recorded in §3.3, §3.4 and §3.5 below.
+`ADR_UGENCE_REVIEW_SERVICE_COMPOSITION_ROOT_SCOPING.md`, the three transport rulings of
+2026-09-10 recorded in §3.3, §3.4 and §3.5 below, and the exchange grants and tenancy ruling
+of 2026-09-10 recorded in `OWNER_RATIFICATION_MEU_EXCHANGE_TENANCY.md` §4.
 
-**Scope of this revision.** Architecture, boundary, interface and deployment, and the
-D-4 ruling of 2026-09-10 recorded in §4.4. **D-5** (concentration limits at execution)
-remains open, and the sections that depend on it say so rather than assuming an answer.
+**Scope of this revision.** Architecture, boundary, interface and deployment, the D-4 ruling
+of 2026-09-10 recorded in §4.4, and the exchange grants and tenancy ruling of the same day,
+recorded in §3.4, §5.2 and §6. **D-5** (concentration limits at execution) remains the one
+open decision, and the section that depends on it says so rather than assuming an answer.
+Every other item in §8 is an unbuilt mechanism or an owner decision withheld from
+engineering, not an unanswered design question.
 Nothing here is implemented, no provider SDK is introduced, no real network call is
 specified, no exchange table is designed, and no gate identifier of P3E-CTR or GRW-CTR is
 marked satisfied.
@@ -221,15 +225,23 @@ Worker only → signal + resume + advance
 
 **The MEU transports inference. It never gains control over workflow execution.**
 
-**`[G]` — none of this separation exists yet, and the mechanism it needs does not either.**
-There is no exchange schema, no second database role and no grant. More than that: **no
-`CREATE ROLE`, `GRANT` or row-level security statement exists anywhere in the repository**,
-and the reference deployment holds one database credential, from which both the application
-and system DSNs are derived (`OWNER_RATIFICATION_MEU_EXCHANGE_TENANCY.md` §1-§2) `[V]`. An
-exchange created today would therefore be reached by the credential that already reaches
-`ugence_art` — the thing this ruling forbids — with nothing to detect it `[I]`. What
-enforces the separation is itself an open ratification, and until it is ruled this section
-states a requirement rather than describing an arrangement.
+**How the separation is to be enforced is now ruled** (`OWNER_RATIFICATION_MEU_EXCHANGE_TENANCY.md`
+§4, 2026-09-10): mandatory application validation **backed by** PostgreSQL row-level
+security as the final refusal boundary — both, not either — with RLS enabled *and* forced,
+three logical roles (worker runtime, MEU runtime, non-login exchange owner), and no runtime
+identity owning the protected tables, holding `BYPASSRLS`, acting as superuser or altering
+policies. Role creation, grants and migration authority may not occur at worker or MEU
+startup.
+
+**`[G]` — none of it exists.** There is no exchange schema, no second or third database
+role, no grant and no policy: **no `CREATE ROLE`, `GRANT` or row-level security statement
+exists anywhere in the repository** `[V]`, and the reference deployment holds one database
+credential, from which both the application and system DSNs are derived `[V]`. That
+credential is the one that created the system database, so it is not a least-privilege
+runtime identity `[I]`. An exchange created today would be reached by the credential that
+already reaches `ugence_art` — the thing this ruling forbids — with nothing to detect it.
+A decision implements nothing: this section states a required arrangement, never an existing
+one.
 
 ### 3.5 — The ambiguous interval — **RATIFIED: `OUTCOME_UNKNOWN` is terminal**
 
@@ -369,6 +381,12 @@ is why §3.5 exists rather than a cleverer lease.
 A fresh authorized call after an `OUTCOME_UNKNOWN` is a **new request linked to the
 uncertain original**, never a retry of it.
 
+**Tenant identity is part of every one of these operations,** not a column beside them: it
+participates in request identity, uniqueness, leasing, result correlation, acknowledgement
+and content purging (`OWNER_RATIFICATION_MEU_EXCHANGE_TENANCY.md` §4). So the dedup key is
+tenant-scoped, a lease is a lease *within a tenant*, and there is no wildcard or implicit
+tenant that could make two tenants' requests one identity.
+
 ### 4.4 — What may cross, and for how long — **RATIFIED: the exchange is the temporary content plane**
 
 > **D-4.** The dedicated model-egress exchange is the temporary content plane. It may carry
@@ -462,8 +480,8 @@ reading of this document licenses a first exception:
 
 | Prerequisite | Where it stands, 2026-09-10 |
 |---|---|
-| Exchange tenancy | `[R]` The ballot is `OWNER_RATIFICATION_MEU_EXCHANGE_TENANCY.md` E-1 and E-5, unruled. It gates table design, not merely implementation |
-| Least-privilege database grants | `[R]` E-2 and E-3 of the same ballot, unruled — and `[G]` no `CREATE ROLE`, `GRANT` or row-level security statement exists anywhere in the repository, so there is no mechanism for a ruling to switch on |
+| Exchange tenancy | **Ruled** 2026-09-10 (`OWNER_RATIFICATION_MEU_EXCHANGE_TENANCY.md` §4): every row carries a non-empty tenant, no wildcard or implicit tenant, credentials bound to the configured tenant. `[G]` Unimplemented, and tenant-bound database identities do not exist |
+| Least-privilege database grants | **Ruled** 2026-09-10: three logical roles, RLS enabled and forced, no runtime identity owning the tables. `[G]` No `CREATE ROLE`, `GRANT` or RLS statement exists anywhere in the repository, and provisioning is itself an unimplemented prerequisite — a runbook step is refused as a substitute |
 | Retention and deletion policy | `[R]` The grace period and maximum retention duration are **owner decisions engineering may not make**, and neither is set. Until they are, nothing may hold content at all |
 | Transport protection | `[G]` No `sslmode` is set on either database DSN anywhere in the repository or the runbook `[V]`, and the worker's own listener runs `test` mode over plain HTTP inside the private network because RW-3's certificate authority does not exist `[V]`. The exchange would inherit both conditions |
 | Production credential custody | `[G]` None exists; D-3 keeps it out of this deployment and rejects `PLATFORM_ENVIRONMENT_VARIABLE` as a production mechanism `[V]` |
@@ -499,8 +517,16 @@ ownership, table grants and credentials are to be separate. The intended distrib
 
 | Role | May |
 |---|---|
-| worker | create authorized requests; read committed results |
-| MEU | lease authorized requests; write correlated results, refusals and `OUTCOME_UNKNOWN` |
+| worker runtime | create authorized requests, read terminal results **for its tenant**, and acknowledge consumption |
+| MEU runtime | lease authorized requests and write terminal results **for its tenant** — results, refusals and `OUTCOME_UNKNOWN` |
+| exchange owner | **non-login.** Owns the schema and the policies. Assumed by a separately controlled migration identity, during reviewed migrations only |
+
+Neither runtime owns the exchange schema, and neither may reach the worker application
+schema, DBOS tables, the other service's unrelated state, role administration or schema
+administration. In the reference deployment both runtime credentials are bound to the one
+configured tenant; a shared credential able to select arbitrary tenants is **not an approved
+multi-tenant design**, and multi-tenancy needs tenant-bound database identities or a separate
+ruling accepting the MEU as a trusted cross-tenant processor `[V]`.
 
 And the MEU may **not**, at any privilege: call `signal()`, `resume()` or `advance()`;
 write worker lifecycle state; touch DBOS system state; or read or write the worker's
@@ -509,10 +535,21 @@ the worker's alone, and it is the reconciliation driver of §3.3 that performs i
 
 **An earlier revision of this section said the separation was "enforced by the database
 rather than by the code's good behaviour". That was not true of anything, and the sentence
-is withdrawn `[G]`.** No role, grant or policy in this repository enforces it; what would
-enforce it is the subject of `OWNER_RATIFICATION_MEU_EXCHANGE_TENANCY.md` E-1 through E-3,
-unruled. Until that is decided, this table is a specification of grants to be created, and
-no reader may take it as a description of a database's current state.
+stays withdrawn `[G]`** — the ruling of 2026-09-10 decided *what* will enforce it, which is
+not the same as enforcing it. No role, grant or policy in this repository enforces anything
+today. This table is a specification of roles and grants to be created, and no reader may
+take it as a description of a database's current state.
+
+**RLS must be forced, not merely enabled, and that is why the owner role is non-login.** A
+table's owner is exempt from its own policies unless `FORCE ROW LEVEL SECURITY` is set; an
+owner that cannot log in cannot be the identity a runtime reaches the table with. The two
+constraints hold each other up, and implementing one without the other yields a boundary that
+reads correctly and refuses nothing.
+
+**Provisioning is a gap, not a runbook step `[G]`.** The ruling explicitly refuses an
+unenforced runbook claim as a substitute for a provisioning mechanism, so the mechanism and
+the credential custody it needs are recorded as unimplemented production prerequisites. This
+document does not create roles, write policies or design DDL.
 
 ### 5.3 — In this deployment there is no credential, and that is a posture
 
@@ -566,6 +603,16 @@ Each is a typed refusal naming the reason and correlated to the request. **A ref
 not be recoverable by retrying with the same inputs** — that is the difference between a
 control and a speed bump.
 
+**Cross-tenant access is refused differently by direction, and deliberately so** (ruled
+2026-09-10): cross-tenant **reads, leases and updates are indistinguishable from unknown or
+not-found** — the row is simply not there, the same posture the authority plane already takes
+on a foreign tenant's grant `[V]`; cross-tenant **writes are rejected by the database** and
+mapped internally to `TENANT_SCOPE_REFUSED`, **without disclosing whether another tenant's
+record exists**. The asymmetry is the point: a silent absence cannot leave an instance
+parked, because a request that cannot be leased was never claimed, while a write that reaches
+the boundary must produce a typed outcome without becoming an oracle for other tenants'
+traffic.
+
 **A refusal and an `OUTCOME_UNKNOWN` are both written back through the exchange**, so the
 reconciliation driver observes them like any answered result and the instance advances on
 them (§3.3, §3.5). An instance parked forever because nothing came back is a failure of
@@ -584,9 +631,9 @@ and it cannot be written until D-5 is ruled `[R]`.
 - **The MEU is not a second governance layer.** It performs one call and returns one
   result, as RA-7 observes without owning authority consequences `[V]`.
 - **No schema, authorization or tenancy change to the outbox is authorized here.** Those
-  remain separately reviewable `[V]`, and under §4.4 they are now a **prerequisite**: no
-  content-bearing exchange table may be designed or implemented until exchange grants and
-  tenancy are ratified.
+  were ratified separately (`OWNER_RATIFICATION_MEU_EXCHANGE_TENANCY.md` §4) `[V]`, which
+  lifted §4.4's gate on designing an exchange table and replaced it with five implementation
+  gaps. Designing that schema is a further artifact, not a consequence of this one.
 - **No exchange table is designed by this document**, no exchange is implemented, and no
   genuine customer content or genuine provider call is authorized (§4.4).
 
@@ -594,17 +641,27 @@ and it cannot be written until D-5 is ruled `[R]`.
 
 | Decision | Blocks |
 |---|---|
-| **Exchange grants and tenancy** `[R]` | Now first in order, not merely separate: §4.4 forbids designing a content-bearing table until this is ratified. The ballot is `OWNER_RATIFICATION_MEU_EXCHANGE_TENANCY.md`, whose audit finds no `CREATE ROLE`, `GRANT` or row-level security anywhere in the repository — so §5.2's database-enforced separation is an intention, not an implementation `[G]` |
-| **Grace period and maximum retention** `[R]` | The purge horizon of §4.4. An owner decision explicitly withheld from engineering; until it is set, nothing may hold content |
-| **Retention and deletion policy** `[R]` | §4.4. The grace period and maximum retention are unset owner decisions; until they are set, nothing may hold content |
+**Every open item is now a gap or an owner decision, not an unanswered design question.**
+D-4 (§4.4) and exchange grants and tenancy
+(`OWNER_RATIFICATION_MEU_EXCHANGE_TENANCY.md` §4) were both ratified on 2026-09-10. What
+they left behind is work, and one decision engineering may not make.
+
+| Open item | Blocks |
+|---|---|
+| **Row-level security** `[G]` | §3.4, §5.2. Enabled *and* forced, policies no runtime identity may alter. No RLS statement exists in the repository `[V]` |
+| **Role provisioning** `[G]` | §5.2. Three logical roles with the ruled grants. No mechanism exists, and an unenforced runbook step is refused as a substitute `[V]` |
+| **Controlled migrations** `[G]` | §5.2. A separately controlled migration identity assuming the non-login owner role during reviewed migrations only, never at startup. No migration mechanism exists |
+| **Tenant-bound database identities** `[G]` | §5.2. Required before multi-tenancy, absent a separate ruling accepting the MEU as a trusted cross-tenant processor. Nothing binds a database identity to a tenant today |
+| **Grace period and maximum retention** `[R]` | §4.4's purge horizon. An owner decision explicitly withheld from engineering; until it is set, nothing may hold content |
 | **Transport protection** `[G]` | §4.4. No `sslmode` on either DSN `[V]`; the worker's listener is plain HTTP in `test` mode because RW-3's CA does not exist `[V]` |
-| **Production credential custody** `[G]` | §4.4. None exists; D-3 keeps it out and rejects `PLATFORM_ENVIRONMENT_VARIABLE` for production `[V]` |
-| **Database-enforced least privilege** `[G]` | §3.4 and §5.2 state grants that nothing implements: no `CREATE ROLE`, `GRANT` or row-level security exists in the repository, and the deployment holds one credential `[V]` |
+| **Credential custody** `[G]` | §4.4, §5.2. None exists — for the provider credential D-3 keeps out, nor for the runtime and migration identities the tenancy ruling requires `[V]` |
 | **The MEU ledger-kind schema** `[G]` | §4.4's ledger rule has no enforcement: `LedgerEntry.payload` accepts any canonical dict (`entry.py:52-61`). Unbuilt, and not built here |
 | **The deployed DBOS version** `[G]` | §3.6 — `UNKNOWN` until a constrained image is built and inspected; blocked on the mirror (RW-2) |
 | **D-5** concentration limits `[R]` | One refusal in §6 — whether the MEU refuses a call that would breach the vendor mix a plan promised |
 
-**D-4 is closed** — ratified 2026-09-10 and recorded verbatim in §4.4.
+**A ratification implements nothing.** Both rulings of 2026-09-10 decided how the exchange
+must work; neither created a table, a role, a policy or a credential, and this document
+creates none either.
 
 
 ## 9 — What exists to build on
