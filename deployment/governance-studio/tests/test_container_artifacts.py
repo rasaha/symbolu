@@ -119,7 +119,8 @@ def test_approved_runtime_config_permits_exactly_one_egress_the_review_relay():
                                                 "UGENCE_STUDIO_SIMULATION_PROVIDER",
                                                 "UGENCE_STUDIO_SYSTEM_REGISTRY_PATH",
                                                 "UGENCE_STUDIO_DATA_USE_DECLARATIONS_PATH",
-                                                "UGENCE_STUDIO_VENDOR_DECLARATIONS_PATH"]
+                                                "UGENCE_STUDIO_VENDOR_DECLARATIONS_PATH",
+                                                "UGENCE_STUDIO_WORKFLOW_DRAFTS_PATH"]
     # Against the constant, not a literal: the version moves with every seam and
     # what matters is that the config and the package agree.
     from governance_studio_deployment import DEPLOYMENT_VERSION
@@ -137,7 +138,7 @@ def test_approved_runtime_config_records_front_door_seam_3_exactly():
     assert [s.split(" ")[0] for s in seams["handed_to_build_studio_context"]] == [
         "review_service_base_url", "activation_root", "policy_registry", "policy_identities",
         "provider_registry", "system_registry", "data_use_declarations",
-        "vendor_declarations"]
+        "vendor_declarations", "workflow_drafts"]
     assert [s.split(" ")[0] for s in seams["absent_by_ruling"]] == [
         "decision_store", "governance_hook", "console_base_url"]
     assert "RUNTIME_DEFAULT_BLOCK" in seams["absent_by_ruling"][1]

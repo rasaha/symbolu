@@ -36,6 +36,7 @@ for _p in (
     os.path.join(_REPO, "packages", "integration", "ai-system-registry", "src"),
     os.path.join(_REPO, "packages", "integration", "data-use-admission", "src"),
     os.path.join(_REPO, "packages", "integration", "vendor-dependency", "src"),
+    os.path.join(_REPO, "packages", "integration", "workflow-drafts", "src"),
     os.path.join(_REPO, "packages", "integration", "clearance-export", "src"),
     os.path.join(_REPO, "packages", "capabilities", "action-clearance", "src"),
 ):

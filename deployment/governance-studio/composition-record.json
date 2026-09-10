@@ -1,37 +1,37 @@
 {
   "schema": "governance-studio.composition-record.v1",
-  "ruling": "ADR_UGENCE_STUDIO_FRONT_DOOR_SCOPING.md FD-3 COMPOSITION_RECORD_IN_REGISTRY: an ai-system-registry SystemRegistration; immutable and versioned by system_version; supersedes composition-record.seam-10.json; no new package for composition metadata",
+  "ruling": "ADR_UGENCE_STUDIO_FRONT_DOOR_SCOPING.md FD-3 COMPOSITION_RECORD_IN_REGISTRY: an ai-system-registry SystemRegistration; immutable and versioned by system_version; supersedes composition-record.seam-11.json; no new package for composition metadata",
   "binding": {
-    "binding_id": "governance-studio-private-hosted/front-door/seam-11",
+    "binding_id": "governance-studio-private-hosted/front-door/seam-12",
     "tenant_id": "ugence-platform",
     "subject_id": "governance-studio",
     "context_id": "p3e-private-hosted",
-    "context_digest": "d9ebeb83db45755fc3dad33c956bc5666f080cac5ceba297a5813e6080917828",
+    "context_digest": "4be2db4da8ed29a48f13d1de6c54e98834ac1dfed03aa4e33769428b094dd8ff",
     "system_id": "governance-studio-private-hosted",
-    "system_version": "0.12.0",
+    "system_version": "0.13.0",
     "configuration_id": "approved-runtime-config.json",
-    "configuration_digest": "8eac694d24db2bcfeb681cbbd1c16f9ac06166f0e38414f20c363a3ea6ea71fc",
+    "configuration_digest": "a8846ffb2f07c5f2424554f695dd92ed37dd1bce3a3ea6850e6b946556a3447b",
     "deployment_environment_ref": "private-hosted"
   },
   "registration": {
-    "registration_id": "reg_8dd15380a80bdf47a456ba0c95ef97f1",
-    "binding_digest": "d2eca31e1efb8596ef6f4588828f5277fcd5054004308c9c0a03a0f80d9cb13c",
+    "registration_id": "reg_dcf49c552c26261aa75717b6674b9d74",
+    "binding_digest": "aa7b541d6bb7f8b4d598a2137183df91625b02131bc7f50f0e0ca16897754f2f",
     "tenant_id": "ugence-platform",
     "system_id": "governance-studio-private-hosted",
-    "system_version": "0.12.0",
+    "system_version": "0.13.0",
     "owner_ref": "rasaha",
     "classification_label": "REFERENCE_GRADE_SHADOW_ONLY",
     "validity": {
-      "issued_at": "2026-09-06T00:00:00.000000+00:00",
-      "expires_at": "2027-09-06T00:00:00.000000+00:00",
+      "issued_at": "2026-09-10T00:00:00.000000+00:00",
+      "expires_at": "2027-09-10T00:00:00.000000+00:00",
       "stale_after": ""
     },
-    "supersedes": "reg_a860dc7e07c67c2bdd857e84391a2f66",
-    "registered_by": "governance-studio-deployment/0.12.0",
-    "notes": "Deployment status composition (ADR_UGENCE_MODULE_ADMINISTRATION_SCOPING.md MA-2 as amended by MS-1 to MS-5 as ruled: SEAM_STATES_ONLY, IN_MEMORY_RESULT_AT_COMPOSITION, OBSERVE_DEPLOYMENT_ONE_READ, SEAM_STATES_CHECKS_AND_PINS, SEPARATE_STATUS_PANEL): build_studio_context receives one further seam, deployment_report - the startup integrity report the gate computed before the port bound, handed once by server.run() as a dict and copied by the backend; no file under the runtime volume is read by any route, no package is imported for it and no SD-1 entry is added. The frozen v2 contract is amended a seventh time (v2-A7) by one read, v2_observe_deployment, which returns the six seam states, the checks map, the gate result and failure code and the pins; cert_subject and cert_expiry do not travel; the console's nine module rows are struck by MS-1 and reach the studio by no ruled path; nothing is probed at request time and the answer carries the STARTUP_ATTESTATION ceiling saying a configured seam is not a reachable engine. The panel is /studio/status, separate from Observe, whose two labelled sources are unchanged (FD-11.4). No configuration value, image package, credential, LIVE path or egress destination is added, and decision_store, governance_hook and console_base_url stay absent. Supersedes the seam-10 registration, which is never edited."
+    "supersedes": "reg_8dd15380a80bdf47a456ba0c95ef97f1",
+    "registered_by": "governance-studio-deployment/0.13.0",
+    "notes": "Bring Your Workflow phase 3A composition (ADR_UGENCE_AUTHORITY_PLANE_SCOPING.md section 24, owner ruling BW-3A as ruled: DRAFTS_AUTHORIZED_NOW, STORE_VALIDATED_IR_NOT_THE_FILE, TENANT_FROM_SERVER_CONFIGURATION, APPEND_ONLY_SUPERSESSION, REGISTRATION_LINK_REF_PLUS_DIGEST, CLAIMED_OWNER_PRESENTED_UNPROVEN): build_studio_context receives one further seam, workflow_drafts - the tenant-bound SqliteWorkflowDrafts file named by UGENCE_STUDIO_WORKFLOW_DRAFTS_PATH under the writable runtime volume (workflow-drafts 0.1.0), with the recording composition this deployment's name and version; the seam-5 system registry is the one a draft may link to by reference plus digest, and no second registry is handed. The frozen v2 contract is amended an eighth time (v2-A8) by one write and two reads: save keeps a document the composer's adapter validated, in its canonical encoding with its digest, as an unapproved DRAFT for the deployment's tenant and confers nothing; read and list answer the tenant's own drafts and lineage. No route approves, compiles, publishes, exports, clears or hands a draft to a runtime; a claimed owner is recorded as PRESENTED_UNPROVEN; phase 3B (verified owners, directory grants, submit for approval) stays blocked on AP-3. The frozen v1 contract is unchanged. No credential, LIVE path or egress destination is added, and decision_store, governance_hook and console_base_url stay absent. Supersedes the seam-11 registration, which is never edited."
   },
-  "record_digest": "f65c1ae48643951ca23951536865a6e6be9098104c723030ec936f8dc9bbeb4c",
-  "supersedes_record": "composition-record.seam-10.json",
+  "record_digest": "4546cdecf95336d54452ae9b7c913edb8b9e6695b85de78fdd6165557308bd94",
+  "supersedes_record": "composition-record.seam-11.json",
   "seams_handed_to_build_studio_context": [
     "review_service_base_url",
     "activation_root",
@@ -42,8 +42,9 @@
     "data_use_declarations",
     "vendor_declarations",
     "received_clearances",
-    "deployment_report"
+    "deployment_report",
+    "workflow_drafts"
   ],
   "configuration_digest_of": "deployment/governance-studio/approved-runtime-config.json (sha-256 of the file bytes)",
-  "context_digest_of": "sha-256 of 'governance-studio-private-hosted/front-door/seam-11|p3e-private-hosted|ADR_UGENCE_MODULE_ADMINISTRATION_SCOPING.md MA-2 as amended by MS-1 to MS-5'"
+  "context_digest_of": "sha-256 of 'governance-studio-private-hosted/front-door/seam-12|p3e-private-hosted|ADR_UGENCE_AUTHORITY_PLANE_SCOPING.md section 24 BW-3A'"
 }

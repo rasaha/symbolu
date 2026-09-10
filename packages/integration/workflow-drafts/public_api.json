@@ -1,0 +1,233 @@
+{
+  "curated_api_module": "ugence_workflow_drafts",
+  "distribution": "ugence-workflow-drafts",
+  "namespace": "ugence_workflow_drafts",
+  "note": "Machine-readable snapshot of the curated public API (ugence_workflow_drafts.__all__). tests/packaging/test_packaging.py asserts this file equals the live package surface. Regenerate with scripts/generate_public_api.py when the curated API changes deliberately.",
+  "package_version": "0.1.0",
+  "symbols": {
+    "CLAIMED_OWNER_ASSURANCE": {
+      "kind": "constant",
+      "value": "PRESENTED_UNPROVEN"
+    },
+    "CONTRACT_VERSION": {
+      "kind": "constant",
+      "value": "workflow_draft.v1"
+    },
+    "ContractViolation": {
+      "kind": "class",
+      "methods": []
+    },
+    "CrossTenantRefused": {
+      "kind": "class",
+      "methods": []
+    },
+    "DRAFT_ID_PREFIX": {
+      "kind": "constant",
+      "value": "wfd_"
+    },
+    "DraftProductionModeError": {
+      "kind": "class",
+      "methods": []
+    },
+    "DraftStorageError": {
+      "kind": "class",
+      "methods": []
+    },
+    "DraftSupersessionError": {
+      "kind": "class",
+      "methods": []
+    },
+    "DuplicateDraftError": {
+      "kind": "class",
+      "methods": []
+    },
+    "ENFORCEMENT_ENABLED": {
+      "kind": "constant",
+      "value": false
+    },
+    "LIFECYCLE": {
+      "kind": "constant",
+      "value": "DRAFT"
+    },
+    "LIMITS": {
+      "keys": [
+        "notes_chars",
+        "ref_chars",
+        "title_chars",
+        "workflow_bytes"
+      ],
+      "kind": "mapping"
+    },
+    "MATURITY": {
+      "kind": "constant",
+      "value": "REFERENCE_GRADE"
+    },
+    "SCHEMA_VERSION": {
+      "kind": "constant",
+      "value": "workflow_drafts.sqlite.v1"
+    },
+    "SUPPORTED_WORKFLOW_CONTRACTS": {
+      "kind": "tuple",
+      "values": [
+        "workflow_ir.v1",
+        "workflow_ir.v2"
+      ]
+    },
+    "SqliteWorkflowDrafts": {
+      "kind": "class",
+      "methods": [
+        "close",
+        "count",
+        "drafts_for_tenant",
+        "get_draft",
+        "lineage_of",
+        "save",
+        "superseded_by"
+      ]
+    },
+    "WorkflowDraft": {
+      "fields": [
+        "draft_id",
+        "tenant_id",
+        "title",
+        "contract_version",
+        "workflow",
+        "workflow_digest",
+        "claimed_owner_ref",
+        "registration_ref",
+        "registration_digest",
+        "supersedes",
+        "recorded_by",
+        "validated_by",
+        "notes",
+        "record_version"
+      ],
+      "kind": "dataclass"
+    },
+    "WorkflowDraftPort": {
+      "kind": "class",
+      "methods": [
+        "drafts_for_tenant",
+        "get_draft",
+        "lineage_of"
+      ]
+    },
+    "WorkflowDraftsError": {
+      "kind": "class",
+      "methods": []
+    },
+    "__version__": {
+      "kind": "constant",
+      "value": "0.1.0"
+    },
+    "build_draft": {
+      "kind": "function",
+      "parameters": [
+        "tenant_id",
+        "title",
+        "contract_version",
+        "workflow",
+        "claimed_owner_ref",
+        "registration_ref",
+        "registration_digest",
+        "supersedes",
+        "recorded_by",
+        "validated_by",
+        "notes"
+      ]
+    },
+    "canonical_text": {
+      "kind": "function",
+      "parameters": [
+        "document"
+      ]
+    },
+    "draft_from_record": {
+      "kind": "function",
+      "parameters": [
+        "record"
+      ]
+    },
+    "draft_id_for": {
+      "kind": "function",
+      "parameters": [
+        "tenant_id",
+        "revision",
+        "supersedes"
+      ]
+    },
+    "draft_record": {
+      "kind": "function",
+      "parameters": [
+        "draft"
+      ]
+    },
+    "heads": {
+      "kind": "function",
+      "parameters": [
+        "drafts"
+      ]
+    },
+    "lineage": {
+      "kind": "function",
+      "parameters": [
+        "drafts",
+        "draft_id"
+      ]
+    },
+    "require_admissible_supersession": {
+      "kind": "function",
+      "parameters": [
+        "successor",
+        "predecessor",
+        "predecessor_successor_id"
+      ]
+    },
+    "revision_digest": {
+      "kind": "function",
+      "parameters": [
+        "draft"
+      ]
+    },
+    "revision_digest_of": {
+      "kind": "function",
+      "parameters": [
+        "title",
+        "contract_version",
+        "workflow_digest_value",
+        "claimed_owner_ref",
+        "registration_ref",
+        "registration_digest",
+        "notes"
+      ]
+    },
+    "select_for_tenant": {
+      "kind": "function",
+      "parameters": [
+        "drafts",
+        "tenant_id",
+        "include_superseded"
+      ]
+    },
+    "superseded_by": {
+      "kind": "function",
+      "parameters": [
+        "drafts"
+      ]
+    },
+    "supersession_refusals": {
+      "kind": "function",
+      "parameters": [
+        "successor",
+        "predecessor",
+        "predecessor_successor_id"
+      ]
+    },
+    "workflow_digest": {
+      "kind": "function",
+      "parameters": [
+        "document"
+      ]
+    }
+  }
+}

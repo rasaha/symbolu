@@ -26,6 +26,7 @@ on:
       - "packages/integration/ai-system-registry/**"
       - "packages/integration/data-use-admission/**"
       - "packages/integration/vendor-dependency/**"
+      - "packages/integration/workflow-drafts/**"
       - "apps/ugence-governance-studio/demo_data/**"
       - "docs/audits/ugence_governance_studio_p3e/**"
       - ".github/workflows/governance-studio-p3e-private-hosted-ci.yml"
@@ -38,7 +39,7 @@ on:
 
 env:
   PYTHONPATH: >-
-    deployment/governance-studio/src:apps/ugence-governance-studio/backend/src:packages/capabilities/agent-workforce-composer/src:packages/tooling/policy-workflow-compiler/src:packages/runtime/agent-runtime/src:packages/integration/agent-constitution-activation/src:packages/integration/agent-constitution-policy/src:packages/integration/agent-constitution-conformance/src:packages/capabilities/agentic-proposer/src:packages/policy-authority/src:packages/uvi-policy-contracts/src:packages/governance-contracts/src:packages/jcs/src:packages/integration/ai-system-registry/src:packages/integration/data-use-admission/src:packages/integration/vendor-dependency/src:packages/integration/clearance-export/src:packages/capabilities/action-clearance/src:packages/integration/agent-constitution-policy/tests:packages/integration/agent-constitution-activation/tests:packages/policy-authority/tests
+    deployment/governance-studio/src:apps/ugence-governance-studio/backend/src:packages/capabilities/agent-workforce-composer/src:packages/tooling/policy-workflow-compiler/src:packages/runtime/agent-runtime/src:packages/integration/agent-constitution-activation/src:packages/integration/agent-constitution-policy/src:packages/integration/agent-constitution-conformance/src:packages/capabilities/agentic-proposer/src:packages/policy-authority/src:packages/uvi-policy-contracts/src:packages/governance-contracts/src:packages/jcs/src:packages/integration/ai-system-registry/src:packages/integration/data-use-admission/src:packages/integration/vendor-dependency/src:packages/integration/workflow-drafts/src:packages/integration/clearance-export/src:packages/capabilities/action-clearance/src:packages/integration/agent-constitution-policy/tests:packages/integration/agent-constitution-activation/tests:packages/policy-authority/tests
 
 jobs:
   application:
@@ -210,7 +211,7 @@ jobs:
           echo "evidence dir initialised empty: $DIR"
 
       - name: install-e2e-driver-deps
-        run: pip install -e packages/governance-contracts -e packages/jcs -e packages/uvi-policy-contracts -e packages/policy-authority -e packages/capabilities/agentic-proposer -e packages/integration/agent-constitution-policy -e packages/integration/agent-constitution-conformance -e packages/integration/agent-constitution-activation -e packages/integration/ai-system-registry -e packages/integration/data-use-admission -e packages/integration/vendor-dependency -e packages/tooling/policy-workflow-compiler -e packages/capabilities/agent-workforce-composer -e packages/runtime/agent-runtime -e apps/ugence-governance-studio/backend -e deployment/governance-studio
+        run: pip install -e packages/governance-contracts -e packages/jcs -e packages/uvi-policy-contracts -e packages/policy-authority -e packages/capabilities/agentic-proposer -e packages/integration/agent-constitution-policy -e packages/integration/agent-constitution-conformance -e packages/integration/agent-constitution-activation -e packages/integration/ai-system-registry -e packages/integration/data-use-admission -e packages/integration/vendor-dependency -e packages/integration/workflow-drafts -e packages/tooling/policy-workflow-compiler -e packages/capabilities/agent-workforce-composer -e packages/runtime/agent-runtime -e apps/ugence-governance-studio/backend -e deployment/governance-studio
 
       - name: ratified-pin-conformance
         # BLOCKING, and deliberately ahead of every other container step. Asserts

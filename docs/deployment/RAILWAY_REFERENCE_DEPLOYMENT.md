@@ -152,6 +152,7 @@ pip install "pydantic>=2" "fastapi>=0.110" "uvicorn>=0.27" "starlette>=0.36" \
   ./packages/integration/ai-system-registry \
   ./packages/integration/data-use-admission \
   ./packages/integration/vendor-dependency \
+  ./packages/integration/workflow-drafts \
   ./packages/capabilities/action-clearance \
   ./packages/integration/clearance-export \
   ./apps/ugence-governance-studio/backend

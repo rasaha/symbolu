@@ -241,7 +241,7 @@ unchanged). **With seam 9 the front door under FD-1 is at its ceiling**, as FD-1
 ruled: no studio-alone seam remains. Row 5's third element, egress restrictions, has a
 ratified ADR and no package and stays a gap; the console remains a packaging body of
 work, a durable Decision Authority store a package decision, and the mirror
-coordinates, Langflow fixture and enterprise issuer owner inputs.
+coordinates, Langflow fixture and enterprise issuer owner inputs. **Seam 12 shipped** (`governance-studio-deployment` 0.13.0, under owner ruling BW-3A of `ADR_UGENCE_AUTHORITY_PLANE_SCOPING.md` §24 rather than a further FD ruling: the new package §15.4 required exists, `workflow-drafts` 0.1.0, and the ratification is the owner's BW-3A): `UGENCE_STUDIO_WORKFLOW_DRAFTS_PATH` hands the Bring Your Workflow screen a tenant-bound `SqliteWorkflowDrafts` file under the runtime volume in the seam-5 posture; `save` is the only write, it keeps the composer-validated canonical document as an unapproved `DRAFT`, a claimed owner is recorded as `PRESENTED_UNPROVEN`, the v2 contract is amended an eighth time (v2-A8), and the composition record supersedes the seam-11 record (`composition-record.seam-11.json`, unchanged).
 
 The shape every seam follows: the CR-2 shape (one configuration value, one freeze-test amendment, its own failure tests and
 maturity statement, one PR), preserving `REFERENCE_GRADE_SHADOW_ONLY`, the frozen

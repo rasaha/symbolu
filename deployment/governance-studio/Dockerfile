@@ -50,6 +50,9 @@ COPY packages/integration/ai-system-registry /build/pkgs/ai-system-registry
 COPY packages/integration/data-use-admission /build/pkgs/data-use-admission
 # Front-door seam 9 (FD-13): the vendor declarations the Vendor screen declares into.
 COPY packages/integration/vendor-dependency /build/pkgs/vendor-dependency
+# Bring Your Workflow phase 3A (authority-plane ADR §24): the drafts file the Bring
+# Your Workflow screen keeps validated, unapproved documents in.
+COPY packages/integration/workflow-drafts /build/pkgs/workflow-drafts
 # Clearance export (CE-5, CE-6): the contracts-only export package the studio
 # reaches through its one SD-1 entry, and the evaluator package whose frozen
 # receipt type it imports. action-clearance is installed because the export
@@ -62,7 +65,7 @@ RUN pip install --no-cache-dir "pydantic>=2" "fastapi>=0.110" "uvicorn>=0.27" "s
       /build/pkgs/governance-contracts /build/pkgs/jcs /build/pkgs/uvi-policy-contracts /build/pkgs/policy-authority \
       /build/pkgs/agentic-proposer /build/pkgs/agent-constitution-policy /build/pkgs/agent-constitution-conformance \
       /build/pkgs/agent-constitution-activation /build/pkgs/ai-system-registry \
-      /build/pkgs/data-use-admission /build/pkgs/vendor-dependency \
+      /build/pkgs/data-use-admission /build/pkgs/vendor-dependency /build/pkgs/workflow-drafts \
       /build/pkgs/action-clearance /build/pkgs/clearance-export \
       /build/backend /build/deployment
 

@@ -844,7 +844,8 @@ the v2 contract; LIVE execution.
 This slice ships phase 1. Phase 2 (converters) needs its own read-only scoping
 audit and ballot before any code. Phases 3 and 4 wait, in that order, on the
 prerequisites named in §22.3 and on §20.5 as it stands. Nothing in §18 to §21
-moves.
+moves. (Phase 2 shipped under §23; phase 3 was split by owner ruling BW-3A, §24,
+with its drafts half shipped and its identity half kept behind AP-3.)
 
 ---
 
@@ -977,3 +978,143 @@ ballot. What it added and what was proven:
 
 The screen's sentence and the explainer's entry now name both converters. §23.3's
 non-authorizations stand: the deferred three wait for a declarative export.
+
+---
+
+## 24 — Owner ruling BW-3A: Bring Your Workflow phase 3 split, and phase 3A authorized (owner, 2026-09-10)
+
+**Status:** ratified by the owner in their own words on 2026-09-10 ("The owner
+ratifies a split of Bring Your Workflow Phase 3 into Phase 3A and Phase 3B. Phase 3A is
+authorized for immediate implementation ... Phase 3B remains blocked on AP-3 ... Do
+not wait for Phase 3B before shipping Phase 3A"), and implemented in the same slice.
+
+### 24.1 — The question, and what the repository settled before the ruling `[V]`
+
+§22.3 left phase 3 — saving an uploaded workflow as a draft, assigning an owner or
+tenant, versioning, linking a policy or constitution, submitting for approval — behind
+tenant identity, IAM and the Portfolio Registry, each its own ballot. What the
+repository had settled since:
+
+- The Portfolio Registry prerequisite is met in the form the registry ADR ruled
+  (D-5, contracts-only): `ai-system-registry` 0.3.0 with its one ruled local store,
+  served on the studio's v2 contract as front-door seam 5 (FD-9).
+- Tenant identity and IAM both resolve to AP-3, which reads
+  `BLOCKED_PENDING_OWNER-PROVISIONED_ENTERPRISE_IDP_TEST_TENANT` (§20). The identity
+  port, the OIDC adapter and the directory exist and have run only against an
+  in-process issuer, which §20 says can never satisfy the gate.
+- The studio's persistence posture was settled three times over for exactly one
+  shape (FD-9.2, FD-12.2, FD-13.2): one append-only sqlite file under the writable
+  runtime volume, bound to `UGENCE_STUDIO_TENANT_ID` at first open, a declarer
+  recorded as `PRESENTED_UNPROVEN`, a derived id, supersession instead of edit, and
+  the `persistent_database` prohibition standing.
+- The compiler refuses to compile a `DRAFT` pack (`IllegalLifecycleTransition`), and
+  Workflow IR is not a pack: a kept document cannot reach the compiler by any path.
+
+So the half of phase 3 that needs no proven identity — keeping a validated document
+and its lineage — was buildable in the ruled posture, and the half that does — a
+verified owner, a directory grant, submission for approval — was not.
+
+### 24.2 — The ruling
+
+| # | Question | Ruling |
+|---|---|---|
+| **BW-3A** | The split | **`DRAFTS_AUTHORIZED_NOW`.** Phase 3 is split. Phase 3A — save, retrieve, list and supersede unapproved workflow drafts — is authorized for immediate implementation in the studio's existing append-only, tenant-bound persistence pattern. Phase 3B — authenticated ownership, directory grants and submit-for-approval — stays blocked on AP-3 and is entered only after AP-3 is `MET`. |
+| **BW-3A.1** | What is kept | **`STORE_VALIDATED_IR_NOT_THE_FILE`.** The validated, normalized Workflow IR document and its digest, in the studio's own canonical encoding; never the uploaded n8n or BPMN file, never the pasted text. The document is validated through the composer's adapter before anything is kept; only a document that validates is kept. |
+| **BW-3A.2** | Tenant | **`TENANT_FROM_SERVER_CONFIGURATION`.** The tenant of every draft is `UGENCE_STUDIO_TENANT_ID`, trusted server configuration; it is never accepted from the client, and a caller-supplied tenant is a contract refusal. |
+| **BW-3A.3** | Revisions | **`APPEND_ONLY_SUPERSESSION`.** Each revision is a new immutable record linked to its predecessor through `supersedes`; lineage is linear (a predecessor must be the head), a revision must change something, and no record is ever edited or deleted. Ids are derived, never chosen. |
+| **BW-3A.4** | Registration link | **`REGISTRATION_LINK_REF_PLUS_DIGEST`.** A draft may link to an AI-system registration only through a tenant-matched reference plus the digest of the record it names, both or neither; the studio matches the pair against the deployment's own registry and nothing resolves it afterwards. |
+| **BW-3A.5** | Owner | **`CLAIMED_OWNER_PRESENTED_UNPROVEN`.** Any submitted owner identifier is a claim with assurance `PRESENTED_UNPROVEN`, named so in the contract and on the screen (`claimed_owner_ref`, `claimed_owner_assurance`). It confers no read, write, approval or execution authority. |
+
+Under every row: phase 3A must not submit for approval, authenticate an owner,
+compile, publish, export, issue clearance or become consumable by a runtime; the
+compiler's refusal of `DRAFT` is preserved structurally; the slice is
+`REFERENCE_GRADE`, and genuine customer workflow content is not to be kept before its
+production data-handling posture is separately verified.
+
+**AP-3 in parallel, in the owner's words:** prepare the enterprise-issuer validation
+using a non-production OIDC client in the identity provider already governing
+`ugence.ai`; there is no advantage in creating another IdP merely for validation.
+Populate issuer, audience, JWKS, tenant and principal claims, actor mapping and
+directory binding; run the 16-row matrix of §20.2; record redacted evidence; place no
+client secret in the repository. §20's protocol and status line are unchanged by this
+section until that record is written.
+
+### 24.3 — What this ruling supersedes, and what it does not authorize
+
+**Supersedes**, for the drafts half only, §22.3's sentence that phase 3 waits on
+tenant identity, IAM and the Portfolio Registry: the registry half was met under D-5,
+and the identity half is deferred to phase 3B rather than waived. Supersedes BW-4's
+"no server write exists for it" and BW-5's disclaimer wording for exactly one write —
+the draft — and the screen, the studio README, `P3D_SECURITY.md` and the screen
+explainer say so in place. BW-1 to BW-3 stand; §22.3's phase 4 and §20.5 stand.
+
+**Does not authorize:** any owner assignment beyond a claim; any directory grant;
+submission for approval; compiling, simulating, approving, publishing, issuing
+clearance for or exporting a draft to a runtime; a second registry or a second
+store; a draft of any tenant but the deployment's; a route or screen that edits or
+deletes a draft; any change to the frozen v1 contract; LIVE execution; keeping genuine
+customer content before the data-handling verification named above.
+
+### 24.4 — Implementation record `[V]`
+
+- **Package.** `packages/integration/workflow-drafts` 0.1.0 (`ugence-workflow-drafts`),
+  stdlib only: `WorkflowDraft` (frozen; `lifecycle` and `claimed_owner_assurance` are
+  constants, not fields; the digest is recomputed from the document at construction
+  and never asserted over it; the id is derived from the tenant, the revision and the
+  predecessor), `supersession_refusals`, the read-only `WorkflowDraftPort`, the pure
+  selectors, and `SqliteWorkflowDrafts`, whose only write is `save`. Its canonical
+  encoding is the backend's own (`serialization/canonical.py`), so the digest a draft
+  records equals the `computed_digest` that `validate_workflow` reports and the
+  digest the screen computes in the browser.
+- **Studio backend.** `WorkflowDraftService` (typed intake; the composer's adapter is
+  the validator, the same call `validate_workflow` makes; the BW-2 limits apply before
+  it); `WorkflowDraftSaveRequest`; three routes on the v2 contract —
+  `v2_workflow_drafts_save`, `v2_workflow_drafts_list`, `v2_workflow_drafts_read` —
+  frozen as amendment **v2-A8** (sha256 `afb67547…`); `ugence_workflow_drafts`
+  admitted to the SD-1 public-entry allowlist as its twelfth entry. The v1 document
+  and its twenty approved operations are byte-identical.
+- **Front end.** The Bring Your Workflow screen keeps a gated document as a draft
+  through the v2 client only (`saveWorkflowDraft`, `listWorkflowDrafts`,
+  `readWorkflowDraft`); the form names the claimed owner's assurance; the drafts a
+  deployment keeps are read on request, never on load, and a kept draft loads back
+  through the same gate with its lineage pre-filled. The disclaimer reads: "Accepts
+  Ugence Workflow IR JSON. It does not execute, compile, approve or publish the
+  submitted workflow. A validated document may be kept only as an unapproved DRAFT
+  for this deployment's tenant." The v2 allowlist holds twenty-nine operations.
+- **Deployment.** `governance-studio-deployment` 0.13.0: `UGENCE_STUDIO_WORKFLOW_DRAFTS_PATH`
+  (requires `UGENCE_STUDIO_TENANT_ID`; a path outside the volume, a foreign-tenant
+  file or an unwritable directory is refused before bind, failure code
+  `GOVERNANCE_STUDIO_P3E_WORKFLOW_DRAFTS_SEAM_FAILED`); the seventh seam state
+  `workflow_drafts` on the Status panel; the package in the image; the P3E freeze
+  carrying v2-A8; composition record seam 12 superseding seam 11, kept byte-for-byte.
+
+### 24.5 — Verification recorded with the slice `[V]`
+
+`packages/integration/workflow-drafts/tests` (50: derivation and verification of the
+id and digest, the constants, tamper refusal, the typed refusals, the supersession
+rules, the store's append-only and tenant-bound behaviour, restart, an altered record
+refused on read, production mode, stdlib-only and clock-free by AST, no method or
+identifier that could approve, compile, publish, export, authenticate or execute, the
+public-API snapshot). Studio backend `tests/test_workflow_drafts_seam.py` (13: the
+typed gap on every route, the canonical document and digest kept, read and list with
+lineage, what the caller cannot choose, invalid and mismatched documents refused, the
+BW-2 limits, duplicates and inadmissible supersessions, the registration link matched
+against the tenant's registry and refused without one, save the only write, the
+amendment chain ending at the committed bytes, v1 unchanged); the whole backend suite
+passes with the allowlist at twelve. Front end `tests/bring-drafts.test.tsx` (7: the
+exact request body and what is never sent, the answer shown as given, refusal and gap
+never shown as success, results cleared on edit, list on request only and load
+through the gate, axe clean, the source scan) beside the existing bring suites; every
+verifier (`verify:openapi`, `verify:openapi-v2`, `verify:api-boundary`,
+`verify:v2-api-boundary`, `verify:terminology`, `verify:tracked-sources`), the full
+vitest suite and the production build pass. Deployment
+`tests/test_workflow_drafts_seam.py` (13, the seam-9 failure matrix shape); the whole
+profile suite passes with the composition-record chain extended to seam 12. The
+package is named by the package-suites CI matrix, and the repository's
+import-boundary, CI-coverage, license and README-version gates pass with it present.
+
+### 24.6 — Sequence
+
+Phase 3A shipped. Phase 3B — verified owner assignment, directory-backed grants and
+submit-for-approval over the drafts kept here — is entered only after AP-3 is `MET`
+(§20.4), then in the order §20.5 fixes. Phase 4 of §22 is unchanged.
