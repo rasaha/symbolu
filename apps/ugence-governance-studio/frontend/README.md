@@ -25,7 +25,7 @@ P3C (eligibility) plus the P3D planning explorer:
 - **Replay** — plan fingerprint match + deterministic export (not agent re-execution)
 - **Comparison** — the backend's plan diff
 - **Controlled What-If** — nine allowlisted bounded perturbations on a temporary copy
-- **Bring Your Workflow** — validate, adapt and compare an operator-supplied Ugence Workflow IR document (`workflow_ir.v1` / `workflow_ir.v2` JSON, pasted or a local file), ephemeral, with a local download of the report; owner ruling BW-1 to BW-5, ADR §22
+- **Bring Your Workflow** — validate, adapt and compare an operator-supplied Ugence Workflow IR document (`workflow_ir.v1` / `workflow_ir.v2` JSON, pasted or a local file), with a local download of the report; owner ruling BW-1 to BW-5, ADR §22. Since owner ruling BW-3A (ADR §24, phase 3A) a validated document may also be kept as an unapproved `DRAFT` for the deployment's own tenant, listed, read back through the gate and superseded by a revision; a claimed owner is recorded as `PRESENTED_UNPROVEN`, and nothing approves, compiles, publishes or exports a draft
 
 It consistently distinguishes **Eligible ≠ Ranked ≠ Selected ≠ Assigned ≠
 Proposed ≠ Granted ≠ Executed**.
@@ -88,8 +88,12 @@ one operator-supplied document it accepts is Ugence Workflow IR JSON on the Brin
 Your Workflow screen (owner ruling BW-1 to BW-5, ADR §22, which superseded the
 earlier "no arbitrary JSON" sentence here): gated in the browser and again on the
 server (1 MiB, depth 32, 200 nodes, 400 edges), sent only to validate, adapt and
-compare-adaptations, stored nowhere, never executed, and never written to the
-scenario catalog. The only mutating-looking control is what-if, restricted to nine
+compare-adaptations and — since owner ruling BW-3A, ADR §24 — to the one draft write
+of the v2 contract, which keeps the server-validated canonical document as an
+unapproved `DRAFT` for the deployment's configured tenant (never the pasted text,
+never a tenant the browser names); never executed, never written to the scenario
+catalog, and never approved, compiled, published or exported from here. The only
+other mutating-looking control is what-if, restricted to nine
 allowlisted operations with validated parameters applied to a server-side temporary
 copy. Every response is
 validated by a fail-closed decoder; `NO_FEASIBLE_TEAM` is a domain state, not an

@@ -713,11 +713,83 @@
         ],
         "title": "VendorValidityInput",
         "type": "object"
+      },
+      "WorkflowDraftSaveRequest": {
+        "additionalProperties": false,
+        "description": "Keep one validated Workflow IR document as an unapproved draft for this\ndeployment's tenant (typed intake only, FD-4).\n\nNo ``tenant_id`` (the deployment's, never the caller's), no ``draft_id`` (derived by\nthe package, never chosen), no ``recorded_by`` (the deployment's name and version),\nno ``lifecycle`` (the constant ``DRAFT``). ``claimed_owner_ref`` is an opaque handle\nrecorded as ``PRESENTED_UNPROVEN``; ``registration_ref`` and ``registration_digest``\nlink an existing AI-system registration by reference plus digest, both or neither;\n``supersedes`` names the draft this revision replaces. The document is validated by\nthe composer's adapter before anything is kept, and what is kept is its canonical\nencoding, never the text that was brought.",
+        "properties": {
+          "claimed_owner_ref": {
+            "default": "",
+            "maxLength": 512,
+            "title": "Claimed Owner Ref",
+            "type": "string"
+          },
+          "contract_version": {
+            "maxLength": 32,
+            "minLength": 1,
+            "title": "Contract Version",
+            "type": "string"
+          },
+          "notes": {
+            "default": "",
+            "maxLength": 2000,
+            "title": "Notes",
+            "type": "string"
+          },
+          "registration_digest": {
+            "default": "",
+            "maxLength": 64,
+            "title": "Registration Digest",
+            "type": "string"
+          },
+          "registration_ref": {
+            "default": "",
+            "maxLength": 512,
+            "title": "Registration Ref",
+            "type": "string"
+          },
+          "source_digest": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Digest"
+          },
+          "supersedes": {
+            "default": "",
+            "maxLength": 64,
+            "title": "Supersedes",
+            "type": "string"
+          },
+          "title": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Title",
+            "type": "string"
+          },
+          "workflow": {
+            "additionalProperties": true,
+            "title": "Workflow",
+            "type": "object"
+          }
+        },
+        "required": [
+          "workflow",
+          "contract_version",
+          "title"
+        ],
+        "title": "WorkflowDraftSaveRequest",
+        "type": "object"
       }
     }
   },
   "info": {
-    "description": "Additive Governed Agent Studio surface over the Ugence governance packages. Thin orchestration only; synthetic and fixture data; planning and observation only. No route issues, activates, revokes, grants, authorizes, clears or executes.\n\n- API contract: governance_studio.api.v2\n- Frozen companion contract: governance_studio.api.v1 (unchanged)\n- Screens: Registration, Constitution, Policy, Authority, Simulate, Publish, Observe, Review",
+    "description": "Additive Governed Agent Studio surface over the Ugence governance packages. Thin orchestration only; synthetic and fixture data; planning and observation only. No route issues, activates, revokes, grants, authorizes, clears or executes.\n\n- API contract: governance_studio.api.v2\n- Frozen companion contract: governance_studio.api.v1 (unchanged)\n- Screens: Registration, Constitution, Policy, Authority, Simulate, Publish, Observe, Review; Bring Your Workflow drafts (phase 3A)",
     "summary": "Additive Governed Agent Studio surface over the Ugence governance packages. Thin orchestration only; synthetic and fixture data; planning and observation only. No route issues, activates, revokes, grants, authorizes, clears or executes.",
     "title": "Ugence Governed Agent Studio API v2",
     "version": "governance_studio.api.v2"
@@ -1769,6 +1841,127 @@
         "summary": "Declare Vendor Dependency",
         "tags": [
           "vendor"
+        ]
+      }
+    },
+    "/api/v2/workflow-drafts": {
+      "get": {
+        "description": "The drafts this deployment's tenant keeps: the head of every lineage, or every\nrevision when ``include_superseded`` is set. Fields only; the document itself is\nread one draft at a time.",
+        "operationId": "v2_workflow_drafts_list",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "include_superseded",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Include Superseded",
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Workflow Drafts",
+        "tags": [
+          "workflow-drafts"
+        ]
+      },
+      "post": {
+        "description": "Keep one validated Workflow IR document as an unapproved draft for this\ndeployment's tenant.\n\nThe document is bounded by the BW-2 limits (a breach is the typed 422\n``workflow_too_complex``), validated through the composer's adapter, and kept in its\ncanonical encoding with its digest. A refusal is typed, never a 500.",
+        "operationId": "v2_workflow_drafts_save",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WorkflowDraftSaveRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Save Workflow Draft",
+        "tags": [
+          "workflow-drafts"
+        ]
+      }
+    },
+    "/api/v2/workflow-drafts/{draft_id}": {
+      "get": {
+        "description": "One draft, with its document, its lineage and the revision that supersedes it,\nif any. A draft of another tenant does not exist on this route.",
+        "operationId": "v2_workflow_drafts_read",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "draft_id",
+            "required": true,
+            "schema": {
+              "title": "Draft Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Read Workflow Draft",
+        "tags": [
+          "workflow-drafts"
         ]
       }
     }

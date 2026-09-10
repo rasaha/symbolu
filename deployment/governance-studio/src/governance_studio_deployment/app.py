@@ -64,7 +64,10 @@ def _build_backend(config: DeploymentConfig, *, deployment_report: Optional[dict
     Data use screen declares into, with this deployment's name and version as the
     recording composition (seam 8, FD-12); and when a vendor declarations path is
     configured, the tenant-bound file the Vendor screen declares into on the same
-    terms (seam 9, FD-13). No decision
+    terms (seam 9, FD-13); and when a workflow drafts path is configured, the
+    tenant-bound file the Bring Your Workflow screen keeps unapproved drafts in, with
+    this deployment's name and version as the recording composition (Bring Your
+    Workflow phase 3A, authority-plane ADR §24). No decision
     store, governance hook (FD-7.3: the runtime's fail-closed default stays; FD-7.5:
     nothing permissive is ever handed) or console URL: those screens report their
     gaps rather than a stand-in.
@@ -150,6 +153,14 @@ def _build_backend(config: DeploymentConfig, *, deployment_report: Optional[dict
             production_mode=config.is_production)
         recorded_by = recorded_by or VENDOR_RECORDED_BY
         vendor_posture_vocabulary = VENDOR_POSTURE_VOCABULARY
+    workflow_drafts = None
+    if config.workflow_drafts_path:
+        from .drafts import DRAFTS_RECORDED_BY, open_workflow_drafts
+
+        workflow_drafts = open_workflow_drafts(
+            config.workflow_drafts_path, tenant_id=config.tenant_id,
+            production_mode=config.is_production)
+        recorded_by = recorded_by or DRAFTS_RECORDED_BY
     # Clearance export (CE-7): the receipts this image shipped with, read from the
     # scenario fixtures the pinned synthetic manifest already covers. Composition,
     # not a route — nothing at runtime can add one.
@@ -172,6 +183,7 @@ def _build_backend(config: DeploymentConfig, *, deployment_report: Optional[dict
         data_use_purpose_vocabulary=data_use_purpose_vocabulary,
         vendor_declarations=vendor_declarations,
         vendor_posture_vocabulary=vendor_posture_vocabulary,
+        workflow_drafts=workflow_drafts,
         received_clearances=received_clearances,
         deployment_report=deployment_report,
     )

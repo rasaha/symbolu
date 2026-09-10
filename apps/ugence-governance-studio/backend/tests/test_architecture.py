@@ -92,6 +92,13 @@ _PUBLIC_ENTRY_ALLOWLIST = {
         "import ugence_agent_runtime.api",
         "from ugence_agent_runtime.api import ",
     ),
+    # Bring Your Workflow phase 3A (authority-plane ADR §24): the workflow-draft
+    # intake over the package's curated public surface only; its `durable` store is
+    # reached through that surface.
+    "ugence_workflow_drafts": (
+        "from ugence_workflow_drafts import ",
+        "import ugence_workflow_drafts",
+    ),
     # Front-door seam 5 (FD-9): the registration intake over the package's curated
     # public surface only; its `durable` store is reached through that surface.
     "ugence_ai_system_registry": (

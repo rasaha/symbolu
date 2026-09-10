@@ -378,13 +378,21 @@ def test_the_composition_record_is_an_immutable_versioned_registry_record():
     assert seam10["registration"]["supersedes"] == seam9_reg.registration_id
     assert seam10_reg.system_version == "0.11.0"
     assert supersession_refusals(seam10_reg, seam9_reg) == ()
-    # The head of the chain: deployment status (MA-2 as amended by MS-1 to MS-5).
-    assert reg["supersedes"] == seam10_reg.registration_id
-    assert supersession_refusals(rebuilt, seam10_reg) == ()
-    assert rebuilt.registration_id == "reg_8dd15380a80bdf47a456ba0c95ef97f1"
-    assert record["record_digest"].startswith("f65c1ae48643951c")
-    assert record["supersedes_record"] == "composition-record.seam-10.json"
+    seam11, seam11_reg = _load("composition-record.seam-11.json")
+    assert seam11_reg.record_digest() == seam11["record_digest"] == \
+        "f65c1ae48643951c" + seam11["record_digest"][16:]
+    assert seam11_reg.registration_id == "reg_8dd15380a80bdf47a456ba0c95ef97f1"
+    assert seam11["registration"]["supersedes"] == seam10_reg.registration_id
+    assert seam11_reg.system_version == "0.12.0"
+    assert supersession_refusals(seam11_reg, seam10_reg) == ()
+    # The head of the chain: workflow drafts (Bring Your Workflow phase 3A, authority-plane
+    # ADR §24, BW-3A).
+    assert reg["supersedes"] == seam11_reg.registration_id
+    assert supersession_refusals(rebuilt, seam11_reg) == ()
+    assert rebuilt.registration_id == "reg_dcf49c552c26261aa75717b6674b9d74"
+    assert record["record_digest"].startswith("4546cdecf95336d5")
+    assert record["supersedes_record"] == "composition-record.seam-11.json"
     assert record["seams_handed_to_build_studio_context"] == [
         "review_service_base_url", "activation_root", "policy_registry", "policy_identities",
         "provider_registry", "system_registry", "data_use_declarations",
-        "vendor_declarations", "received_clearances", "deployment_report"]
+        "vendor_declarations", "received_clearances", "deployment_report", "workflow_drafts"]

@@ -136,6 +136,7 @@ jobs:
           - packages/integration/execution-reservation
           - packages/integration/incident-response
           - packages/integration/vendor-dependency
+          - packages/integration/workflow-drafts
           - packages/tooling/workflow-converters
           - packages/uvi-policy-contracts
     steps:

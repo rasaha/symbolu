@@ -1,0 +1,6 @@
+{
+  "available": false,
+  "capability": "workflow_drafts",
+  "reason": "no workflow drafts file is configured: this deployment keeps no drafts, so nothing can be kept, read or listed",
+  "result": null
+}

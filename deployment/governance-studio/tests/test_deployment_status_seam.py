@@ -35,7 +35,9 @@ HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CONTRACTS = os.path.join(REPO, "apps", "ugence-governance-studio", "contracts")
 ROUTE = "/api/v2/observe/deployment"
 SEAMS = ("constitution_registry", "authority_reads", "simulation_provider",
-         "system_registry", "data_use_declarations", "vendor_declarations")
+         "system_registry", "data_use_declarations", "vendor_declarations",
+         # Bring Your Workflow phase 3A (authority-plane ADR §24): the seventh seam state.
+         "workflow_drafts")
 
 
 def _headers(**extra) -> dict:
@@ -180,18 +182,24 @@ def test_the_seventh_amendment_is_recorded_in_the_p3e_freeze():
     record = json.load(open(os.path.join(CONTRACTS, "openapi_v2.amendments.json"), encoding="utf-8"))
     with open(os.path.join(CONTRACTS, "openapi_v2.json"), "rb") as fh:
         committed = hashlib.sha256(fh.read()).hexdigest()
-    a6, a7 = record["amendments"][-2:]
-    assert a6["amendment_id"] == "v2-A6" and a7["amendment_id"] == "v2-A7"
+    # Found by id, not by position: seam 12 (workflow drafts, BW-3A) appended v2-A8
+    # after this seam's v2-A7, and the committed bytes are the chain's last entry.
+    (a6,) = [a for a in record["amendments"] if a["amendment_id"] == "v2-A6"]
+    (a7,) = [a for a in record["amendments"] if a["amendment_id"] == "v2-A7"]
     assert a7["previous_sha256"] == a6["sha256"]
     assert a7["operations_added"] == ["v2_observe_deployment"] and a7["operations_removed"] == []
     assert a7["paths_added"] == ["/api/v2/observe/deployment"]
     assert "MS-3 OBSERVE_DEPLOYMENT_ONE_READ" in a7["ruling"]
-    assert cfg["frozen"]["openapi_v2_sha256"] == committed == a7["sha256"]
-    assert cfg["frozen"]["openapi_v2_amendment"].startswith("v2-A7 (MS-3")
-    for tag in ("v2-A6", "v2-A5", "v2-A4", "v2-A3", "v2-A2", "v2-A1"):
+    assert a7["sha256"] == "c6785b267dafe9e2593b58744890606727b26d450ffd1a32f9b544f95a2d0f3e"
+    assert cfg["frozen"]["openapi_v2_sha256"] == committed == record["amendments"][-1]["sha256"]
+    # The freeze note is prepended by each new amendment: v2-A8 (BW-3A, Bring Your
+    # Workflow phase 3A) now leads and this seam's v2-A7 entry sits behind it.
+    assert cfg["frozen"]["openapi_v2_amendment"].startswith("v2-A8 (BW-3A")
+    for tag in ("v2-A7 (MS-3", "v2-A6", "v2-A5", "v2-A4", "v2-A3", "v2-A2", "v2-A1"):
         assert tag in cfg["frozen"]["openapi_v2_amendment"]
     assert cfg["frozen"]["openapi_sha256"] == "dc309eab216e1a4c2f63f286887a4ef218a96ac34f8fa8614bff176db7c36656"
-    assert cfg["deployment_version"] == DEPLOYMENT_VERSION == "0.12.0"
+    # Against the constant: seam 12 (workflow drafts) moved the version past 0.12.0.
+    assert cfg["deployment_version"] == DEPLOYMENT_VERSION
 
 
 def test_the_runtime_config_records_the_seam_and_nothing_else_moved():
@@ -205,11 +213,15 @@ def test_the_runtime_config_records_the_seam_and_nothing_else_moved():
     assert seam["live_probe"].startswith("none")
     assert seam["screen"].startswith("/studio/status")
     assert "once" in seam["source"] and "read by no route" in seam["source"]
-    # nothing else moved
-    assert len(cfg["configuration_added"]) == 8, "no configuration value was added"
+    # nothing else moved by this seam; the one value, package and seam beyond MS-3's
+    # count are seam 12's (workflow drafts, BW-3A), named here so a further addition
+    # still fails
+    assert len(cfg["configuration_added"]) == 9, "no configuration value was added"
+    assert "UGENCE_STUDIO_WORKFLOW_DRAFTS_PATH" in cfg["configuration_added"]
     assert "console" not in " ".join(cfg["first_party_packages_in_image"])
-    assert len(cfg["first_party_packages_in_image"]) == 17, "no image package was added"
-    assert len(cfg["front_door_seams"]["handed_to_build_studio_context"]) == 8
+    assert len(cfg["first_party_packages_in_image"]) == 18, "no image package was added"
+    assert "packages/integration/workflow-drafts" in cfg["first_party_packages_in_image"]
+    assert len(cfg["front_door_seams"]["handed_to_build_studio_context"]) == 9
     assert any(s.startswith("console_base_url") for s in cfg["front_door_seams"]["absent_by_ruling"])
     (permitted,) = cfg["external_network_egress"]["permitted"]
     assert len(permitted["routes"]) == 7, "no egress route was added"
@@ -217,14 +229,20 @@ def test_the_runtime_config_records_the_seam_and_nothing_else_moved():
 
 
 def test_the_composition_record_names_the_new_seam_and_the_prior_record_is_kept():
-    head = json.load(open(os.path.join(HERE, "composition-record.json"), encoding="utf-8"))
-    assert head["seams_handed_to_build_studio_context"][-1] == "deployment_report"
-    assert head["supersedes_record"] == "composition-record.seam-10.json"
-    assert head["binding"]["binding_id"].endswith("front-door/seam-11")
-    assert head["binding"]["system_version"] == DEPLOYMENT_VERSION
-    notes = head["registration"]["notes"]
+    # This seam's record was the head at 0.12.0; seam 12 (workflow drafts, BW-3A)
+    # superseded it and kept it byte-for-byte as composition-record.seam-11.json.
+    mine = json.load(open(os.path.join(HERE, "composition-record.seam-11.json"), encoding="utf-8"))
+    assert mine["seams_handed_to_build_studio_context"][-1] == "deployment_report"
+    assert mine["supersedes_record"] == "composition-record.seam-10.json"
+    assert mine["binding"]["binding_id"].endswith("front-door/seam-11")
+    assert mine["binding"]["system_version"] == "0.12.0"
+    notes = mine["registration"]["notes"]
     assert "MS-1 to MS-5" in notes and "never edited" in notes
     prior = json.load(open(os.path.join(HERE, "composition-record.seam-10.json"), encoding="utf-8"))
     assert prior["seams_handed_to_build_studio_context"][-1] == "received_clearances"
     assert prior["supersedes_record"] == "composition-record.seam-9.json"
-    assert head["registration"]["supersedes"] == prior["registration"]["registration_id"]
+    assert mine["registration"]["supersedes"] == prior["registration"]["registration_id"]
+    head = json.load(open(os.path.join(HERE, "composition-record.json"), encoding="utf-8"))
+    assert head["supersedes_record"] == "composition-record.seam-11.json"
+    assert head["registration"]["supersedes"] == mine["registration"]["registration_id"]
+    assert head["binding"]["system_version"] == DEPLOYMENT_VERSION
