@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import copy
 import pathlib
+import subprocess
 
 import pytest
 
@@ -85,6 +86,118 @@ def test_tree_hash_ignores_untracked_build_output():
         _tracked.cache_clear()
 
     assert tree_hash(V.CORE_TREES[0]) == before, "the fixture did not clean up after itself"
+
+
+def _plant(tree, rel, body="PLANTED = True\n"):
+    """Create an untracked file under a frozen tree; caller removes it."""
+
+    target = tree / rel
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(body, encoding="utf-8")
+    _tracked.cache_clear()
+    return target
+
+
+def _unplant(target, tree):
+    target.unlink(missing_ok=True)
+    for parent in sorted(target.parents, key=lambda q: -len(q.parts)):
+        if parent == tree:
+            break
+        if parent.is_dir() and not any(parent.iterdir()):
+            parent.rmdir()
+    _tracked.cache_clear()
+
+
+@pytest.mark.parametrize("rel", [
+    "build/lib/from_a_build.py",
+    "src.egg-info/from_packaging.py",
+    "an_untracked_module.py",
+])
+def test_untracked_python_never_enters_the_v1_digest(rel):
+    """V1 is defined over the tracked tree. Three shapes of untracked ``.py``, none count.
+
+    ``build/`` and ``egg-info/`` are what ``python -m build`` leaves behind; a bare
+    untracked module is what a work-in-progress file looks like. A directory walk could
+    tell none of them from source, which is why a digest taken after a build did not
+    reproduce on a clean checkout.
+    """
+
+    name = V.CORE_TREES[0]
+    tree = REPO / name
+    before = tree_hash(name)
+    planted = _plant(tree, rel)
+    try:
+        assert tree_hash(name) == before, f"untracked {rel} changed the digest"
+        assert rel not in tree_manifest(name)["files"]
+    finally:
+        _unplant(planted, tree)
+    assert tree_hash(name) == before, "the fixture did not clean up after itself"
+
+
+def test_a_tracked_python_change_does_move_the_digest(tmp_path):
+    """The other half: V1 must still notice what it is supposed to notice.
+
+    Addition, modification and deletion of a *tracked* ``.py`` each move the value. Without
+    this, an implementation that returned a constant would satisfy every exclusion test
+    above.
+    """
+
+    name = V.CORE_TREES[0]
+    tree = REPO / name
+    tracked_py = sorted(
+        p for p in tree.rglob("*.py")
+        if "__pycache__" not in p.parts
+    )
+    assert tracked_py, "fixture assumption: the frozen tree has tracked python"
+    victim = tracked_py[0]
+    original = victim.read_bytes()
+    before = tree_hash(name)
+
+    try:
+        victim.write_bytes(original + b"\n# modified\n")
+        _tracked.cache_clear()
+        assert tree_hash(name) != before, "a tracked modification must move the digest"
+
+        victim.unlink()
+        _tracked.cache_clear()
+        assert tree_hash(name) != before, "a tracked deletion must move the digest"
+    finally:
+        victim.write_bytes(original)
+        _tracked.cache_clear()
+
+    assert tree_hash(name) == before, "the fixture did not restore the tree"
+
+
+def test_tracked_non_python_is_outside_v1_by_design():
+    """V1's scope is tracked ``*.py`` — not "every tracked file".
+
+    Widening is a different algorithm needing its own name, version and an owner ruling
+    that the tree is permanently frozen; it is not a setting on this one. Asserted so the
+    boundary is a decision on the record rather than an artefact of the implementation.
+
+    Two ways, because neither alone is enough. The structural half holds for every frozen
+    tree and cannot skip. The concrete half needs a tree that actually tracks a
+    non-Python file — none of the four core trees does, so it uses a behaviour tree, and
+    without it the structural assertion would be satisfied by a tree that simply had
+    nothing else to exclude.
+    """
+
+    for name in list(V.CORE_TREES) + list(V.BEHAVIOUR_TREES):
+        stray = [f for f in tree_manifest(name)["files"] if not f.endswith(".py")]
+        assert stray == [], f"{name}: V1 covered non-python {stray}"
+
+    witness = "enterprise_validation_pilot"
+    tracked = subprocess.run(
+        ["git", "-C", str(REPO), "ls-files", "--", witness],
+        capture_output=True, text=True, check=True).stdout.split()
+    non_python = [f for f in tracked if not f.endswith(".py")]
+    assert non_python, (
+        f"fixture assumption: {witness} tracks a non-python file to exclude")
+
+    covered = tree_manifest(witness)["files"]
+    for rel in non_python:
+        assert str(pathlib.Path(rel).relative_to(witness)) not in covered, (
+            f"{rel} is tracked and non-python; V1 must not cover it")
 
 
 def test_tree_hash_fails_loudly_when_tracked_files_cannot_be_listed(monkeypatch):

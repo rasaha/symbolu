@@ -81,7 +81,7 @@ def test_a_committed_edit_is_caught(repo):
 
     report = tree_was_modified(repo, repo / GUARDED)
 
-    assert "committed on this branch, unratified" in report
+    assert "committed on this branch" in report
     assert "frozen.py" in report
 
 
@@ -95,67 +95,13 @@ def test_a_pending_edit_is_caught(repo):
     assert "uncommitted" in report and "frozen.py" in report
 
 
-def test_a_ratified_commit_is_allowed(repo):
-    """The allow-list works — otherwise a ratified change fails its own branch forever."""
-
-    _write(repo, f"{GUARDED}/frozen.py", "VALUE = 4\n")
-    sha = _commit(repo, "a ratified re-freeze")
-
-    assert tree_was_modified(
-        repo, repo / GUARDED, ratified={f"{GUARDED}/frozen.py": sha}
-    ) == ""
 
 
-def test_a_second_commit_to_a_ratified_path_is_still_caught(repo):
-    """The entry authorizes one change, not the file. This is what keeps it narrow."""
-
-    _write(repo, f"{GUARDED}/frozen.py", "VALUE = 5\n")
-    sha = _commit(repo, "the ratified change")
-    _write(repo, f"{GUARDED}/frozen.py", "VALUE = 6\n")
-    _commit(repo, "an unratified change riding along behind it")
-
-    report = tree_was_modified(
-        repo, repo / GUARDED, ratified={f"{GUARDED}/frozen.py": sha}
-    )
-
-    assert "is ratified for" in report and "also changed by" in report
 
 
-def test_a_pending_edit_to_a_ratified_path_is_never_covered(repo):
-    """Ratification covers a commit that was reviewed, never the working tree."""
-
-    _write(repo, f"{GUARDED}/frozen.py", "VALUE = 7\n")
-    sha = _commit(repo, "the ratified change")
-    _write(repo, f"{GUARDED}/frozen.py", "VALUE = 8\n")  # left pending
-
-    report = tree_was_modified(
-        repo, repo / GUARDED, ratified={f"{GUARDED}/frozen.py": sha}
-    )
-
-    assert "uncommitted" in report
 
 
-def test_an_invented_ratification_entry_fails_on_its_own(repo):
-    """A stale or fabricated entry must not sit there quietly widening the guard."""
 
-    report = tree_was_modified(
-        repo, repo / GUARDED, ratified={f"{GUARDED}/frozen.py": "deadbee"}
-    )
-
-    assert "names a commit that does not exist" in report
-
-
-def test_a_stale_ratification_entry_fails_on_its_own(repo):
-    """An entry whose commit never touched its path is a defect in the list."""
-
-    _write(repo, "packages/other/mine.py", "OK = 2\n")
-    sha = _commit(repo, "a commit that touches something else entirely")
-
-    report = tree_was_modified(
-        repo, repo / GUARDED, ratified={f"{GUARDED}/frozen.py": sha}
-    )
-
-    assert "is stale" in report
 
 
 # ------------------------------------------------------------------ base resolution

@@ -183,28 +183,6 @@ def test_the_v1_attestation_object_is_not_admitted_by_the_v2_verifier(candidate)
     assert result.refusal.outcome is O.UNSUPPORTED_EXACT_TYPE
 
 
-#: Edits to the Phase 5A tree that were ratified, keyed by path to the ONE commit
-#: authorized to have made them. Promoting P-11 to see committed edits made this list
-#: unavoidable: the guard reports that an edit exists and cannot know whether it was
-#: allowed, so a ratified change would otherwise fail this suite forever on the branch
-#: that made it.
-#:
-#: It is not a mute button. A different commit touching a listed path is still a
-#: violation, a pending edit is never covered, and an entry naming a commit that does not
-#: exist or never touched its path fails on its own — so the list cannot rot into a
-#: standing exemption. Adding an entry is the ratification record; it should be as hard to
-#: justify as the change it authorizes.
-RATIFIED_PHASE_5A_EDITS = {
-    # T-2 (RA 0.14.0): a decision's ``expires_at`` became capped by the subject assertion
-    # that authorized it, moving three ratified digests — decision, candidate, and the
-    # transitive verified artifact. The superseded values are pinned as
-    # ``SUPERSEDED_PRE_T2_*`` negative anchors in Phase 5A's own test_frozen_digests.py,
-    # so dropping the cap is a failure rather than a silent re-baseline.
-    "packages/integration/cloud-scaling-authorization-contracts/tests/"
-    "test_frozen_digests.py": "d46cf6cb",
-}
-
-
 def test_no_phase_5a_source_file_was_modified():
     """P-11: this package's tree adds files; it edits none of Phase 5A's.
 
@@ -213,16 +191,20 @@ def test_no_phase_5a_source_file_was_modified():
     edit was caught while pending and invisible once committed. See ``_tree_guard`` for
     why an unresolvable base fails rather than skips.
 
-    **One authorized edit is on record.** The T-2 re-freeze at ``d46cf6cb`` moved three
-    ratified digests in this tree — decision, candidate and the transitive verified
-    artifact — because a decision's ``expires_at`` became capped by the subject assertion
-    that authorized it. That was ratified, and the superseded values are pinned as
-    ``SUPERSEDED_PRE_T2_*`` anchors in Phase 5A's own ``test_frozen_digests.py``. It is
-    named here so a future reader can tell a ratified change from a violation: this guard
-    reports *that* an edit exists, never whether it was allowed.
+    **This is a change-scope guard, not a freeze.** Its promise is "this change did not
+    edit those packages" — never "those packages are permanently frozen". So it carries no
+    allow-list and grants no standing exemption: a branch that legitimately edits the
+    Phase 5A tree makes this guard report the truth, and the right response is to justify
+    the edit in review, not to add an entry that silences it forever.
+
+    An earlier revision of this file did carry such a list, for the ratified T-2 re-freeze
+    at ``d46cf6cb``. It was removed on owner ruling: a permanent exemption never expires,
+    is never re-examined, and quietly widens the guard for every change that follows. The
+    ratification record for that re-freeze lives where it belongs — the
+    ``SUPERSEDED_PRE_T2_*`` negative anchors in Phase 5A's own ``test_frozen_digests.py``.
     """
 
-    changed = tree_was_modified(REPO, PHASE_5A_DIR, ratified=RATIFIED_PHASE_5A_EDITS)
+    changed = tree_was_modified(REPO, PHASE_5A_DIR)
     assert changed == "", f"Phase 5A tree was modified:\n{changed}"
 
 

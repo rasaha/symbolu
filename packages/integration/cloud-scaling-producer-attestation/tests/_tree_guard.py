@@ -118,82 +118,29 @@ def base_ref(repo: pathlib.Path) -> str:
     return min(scored)[1]
 
 
-def tree_was_modified(
-    repo: pathlib.Path,
-    tree: pathlib.Path,
-    *,
-    ratified: "dict[str, str] | None" = None,
-) -> str:
-    """Report any *unratified* edit to ``tree``, pending or committed. ``""`` if none.
+def tree_was_modified(repo: pathlib.Path, tree: pathlib.Path) -> str:
+    """Any edit to ``tree``, pending or committed on this branch. ``""`` if none.
 
     Both halves are reported together so a caller sees every offending path at once
     instead of fixing them one failure at a time.
 
-    ``ratified`` maps a repo-relative path to the one commit authorized to have changed
-    it. Promoting this guard to see committed edits made an allow-list unavoidable: the
-    guard reports *that* an edit exists and cannot know whether it was allowed, so a
-    ratified change would otherwise fail the suite forever on the branch that made it.
-
-    The allow-list is deliberately narrow, and it is not a mute button:
-
-    * it is keyed by **path and commit**, so a *different* commit touching an
-      already-ratified path is still a violation — the entry authorizes one change, not
-      the file;
-    * a pending (uncommitted) edit is never covered, whatever the path;
-    * an entry naming a commit that does not exist, or that never touched its path, is
-      itself a failure rather than being ignored, so a stale or invented entry cannot sit
-      there quietly widening the guard.
+    **There is no allow-list, by ruling.** An earlier revision took a ``ratified`` mapping
+    of path to authorized commit, so a ratified change would not fail its own branch. That
+    mechanism is removed: a permanent exemption never expires, is never re-examined, and
+    quietly widens the guard for every change that follows it. These guards promise "this
+    change did not edit those packages", not "those packages are permanently frozen", so a
+    branch that legitimately edits a guarded tree *should* fail here and justify the edit
+    in review. The parameter is gone rather than merely unused, because a tested,
+    reachable exemption hook is an invitation.
     """
 
-    ratified = ratified or {}
     report = []
-
     pending = git(repo, "status", "--porcelain", "--", str(tree))
     if pending:
         report.append(f"uncommitted:\n{pending}")
-
-    base = base_ref(repo)
-    committed = [
-        line
-        for line in git(
-            repo, "diff", "--name-only", f"{base}...HEAD", "--", str(tree)
-        ).splitlines()
-        if line.strip()
-    ]
-
-    unratified = []
-    for path in committed:
-        authorized = ratified.get(path)
-        touching = set(
-            git(repo, "log", "--format=%h", f"{base}..HEAD", "--", path).split()
-        )
-        if authorized is None:
-            unratified.append(f"  {path} (touched by {sorted(touching)})")
-            continue
-        rogue = {c for c in touching if not authorized.startswith(c) and not c.startswith(authorized)}
-        if rogue:
-            unratified.append(
-                f"  {path} is ratified for {authorized} only, but also changed by "
-                f"{sorted(rogue)}"
-            )
-    if unratified:
-        report.append("committed on this branch, unratified:\n" + "\n".join(unratified))
-
-    # A ratification entry that no longer describes reality is a defect in the allow-list
-    # itself. Checked here so the list cannot rot into a permanent exemption.
-    for path, commit in ratified.items():
-        # ``cat-file -e`` prints nothing and signals through its exit status, so the test
-        # is ``is None`` (the call failed), never falsiness (success prints "" too).
-        if _git_or_none(repo, "cat-file", "-e", f"{commit}^{{commit}}") is None:
-            report.append(f"ratified entry names a commit that does not exist: {commit}")
-        elif path not in committed and not _git_or_none(
-            # ``diff-tree`` asks whether THIS commit touched the path. ``git log``
-            # would answer whether any ancestor did, which the base commit that created
-            # the file satisfies — so a stale entry would never be reported.
-            repo, "diff-tree", "--no-commit-id", "--name-only", "-r", commit, "--", path
-        ):
-            report.append(
-                f"ratified entry is stale: {commit} never touched {path}"
-            )
-
+    committed = git(
+        repo, "diff", "--name-only", f"{base_ref(repo)}...HEAD", "--", str(tree)
+    )
+    if committed:
+        report.append(f"committed on this branch:\n{committed}")
     return "\n".join(report)

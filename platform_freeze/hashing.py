@@ -19,12 +19,17 @@ pinned values. That is luck about which trees are frozen, not a property of the 
 implementation, and it is exactly the kind of latent defect that only shows up once
 someone points these functions at a package tree.
 
-**The ``*.py`` restriction is kept deliberately.** Widening to every tracked file is a
-separate, unratified question: it would bring `pyproject.toml`, `README.md`,
-`guard_inventory.json` and similar into scope, changing what "the tree" means and moving
-pinned values for a second, unrelated reason. This change fixes tracked-versus-untracked
-only. The two decisions should not ride together, because a single moved digest would then
-have two possible causes.
+**V1's semantic scope is tracked ``*.py``, and stays that way.** Widening to every tracked
+file would bring ``pyproject.toml``, ``README.md``, ``guard_inventory.json`` and the rest
+into scope, changing what "the tree" means and moving pinned values for a second,
+unrelated reason. This change fixes tracked-versus-untracked only; the two decisions must
+not ride together, because a single moved digest would then have two possible causes.
+
+Absolute package-tree protection — a digest over *every* tracked file — is a different
+algorithm, not a wider setting on this one. If it is ever commissioned it needs its own
+name and version (``tree_hash_v2`` / ``TREE_HASH_ALL_TRACKED``, pinned under its own
+manifest key), and an owner ruling that the trees in question are permanently frozen.
+Overloading V1 would silently redefine every value already pinned against it.
 
 **No git means failure, not a fallback.** Tracked-ness is not derivable from the
 filesystem, so without git these functions cannot compute the value they claim to. Falling
@@ -126,20 +131,24 @@ def tree_manifest(pkg: str, *, include_tests: bool = True) -> dict:
 
 
 def conformance_hash(pkg: str) -> str:
-    """Hash the conformance suite files that certify a package."""
+    """Hash the conformance suite files that certify a package.
+
+    **Unfixed, deliberately.** This walks the directory and carries exactly the
+    file-discovery defect corrected in ``tree_hash`` above: an untracked ``.py`` under a
+    ``conformance/`` directory would enter the digest. The ruling authorizing that
+    correction named ``tree_hash`` and ``tree_manifest`` only, and ``conformance_hashes``
+    is a *checked* value in ``verify_manifest``, so changing it is a second decision with
+    its own blast radius rather than a tidy-up to fold in here.
+
+    Reported rather than fixed. Today both conformance directories are clean — one tracked
+    file each, zero untracked — so the exposure is latent, not live.
+    """
 
     root = REPO / pkg / "conformance"
     if not root.exists():
         return ""
-    rel_root = str(root.relative_to(REPO))
-    entries = [
-        (str(path.relative_to(root)), file_hash(path))
-        for path in sorted(
-            REPO / rel
-            for rel in _tracked(rel_root)
-            if rel.endswith(".py") and (REPO / rel).is_file()
-        )
-    ]
+    entries = [(str(p.relative_to(root)), file_hash(p))
+               for p in sorted(root.rglob("*.py")) if "__pycache__" not in p.parts]
     return _sha(json.dumps(entries, sort_keys=True).encode())
 
 
