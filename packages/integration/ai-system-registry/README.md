@@ -119,7 +119,13 @@ that could.
 **Records written before it still read** (`VV-E`). A stored record with no version is v1
 by construction, projects the v1 keys, and keeps the digest it was stored with; it
 reports `UNVERSIONED_LEGACY`, which is a statement that the taxonomy is **unknown** and
-never an invitation to assume the current one. A v1 file opens read-only.
+never an invitation to assume the current one. A v1 file opens read-only, **permanently**:
+`MIG-5` ruled migration out of scope (`docs/architecture/VOCABULARY_BINDING_MIGRATION_SCOPING.md`), because
+every vocabulary was published after every record a v1 file can hold, so a binding
+asserted for one would be false rather than merely unverifiable. This package is why the
+ruling was cheap: its derived id does not carry the vocabulary, so a migrated registration
+would collide with the record it migrates, and `D-3` refuses a supersession binding the
+same system identity — which a migration always does. `D-3` therefore stands untouched.
 
 **Naming a vocabulary is not interpreting a label.** `D-2` is untouched: no taxonomy, no
 ordering, no severity, and `governance-contracts` gained no type and did not move its

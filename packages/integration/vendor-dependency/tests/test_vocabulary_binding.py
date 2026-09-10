@@ -291,7 +291,11 @@ def test_a_current_file_records_the_binding_and_reads_it_back(tmp_path):
 
 
 def test_a_legacy_file_reads_its_records_and_refuses_every_write(tmp_path):
-    """VV-E: migration needs its own ruled process, not the next append."""
+    """The v1 file is closed permanently, and the refusal says so.
+
+    `VV-E` left migration to a ruled process; `MIG-5` ruled there will not be one, so the
+    message must not read as a promise that a reader could wait for.
+    """
 
     path = tmp_path / "legacy.sqlite3"
     old = legacy_declaration()
@@ -305,7 +309,7 @@ def test_a_legacy_file_reads_its_records_and_refuses_every_write(tmp_path):
     assert read_back.declaration_id == V1_DECLARATION_ID
     assert read_back.vocabulary_state is VocabularyBindingState.UNVERSIONED_LEGACY
 
-    with pytest.raises(DeclarationStorageError, match="ruled process"):
+    with pytest.raises(DeclarationStorageError, match="closed permanently: MIG-5"):
         store.declare(declaration())
     store.close()
 

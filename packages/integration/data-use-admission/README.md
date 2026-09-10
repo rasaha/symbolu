@@ -137,9 +137,16 @@ supersession — the words are identical and what they were read to mean is not.
 **Records written before it still read** (`VV-E`). A stored record with no version is
 v1 by construction, projects the v1 keys, and keeps the id and digest it was stored
 with; it reports `UNVERSIONED_LEGACY`, which is a statement that the taxonomy is
-**unknown** and never an invitation to assume the current one. A v1 file opens
-read-only — appending to it would make its own schema row a lie, and migration needs
-its own ruled process. Nothing upgrades a record as a side effect of reading it.
+**unknown** and never an invitation to assume the current one. Nothing upgrades a record
+as a side effect of reading it.
+
+**And they stay that way.** A v1 file opens read-only, permanently: `MIG-5` ruled
+migration out of scope (`docs/architecture/VOCABULARY_BINDING_MIGRATION_SCOPING.md`). The reason is not
+that nobody got round to it — every vocabulary was published *after* every record a v1
+file can hold, so such a record was not written under `1.0.0` of anything, and a binding
+asserted for it would be **false** rather than merely unverifiable. `UNVERSIONED_LEGACY`
+is the correct answer there. A deployment holding v1 records keeps two files and reads
+both; the pure selectors take a caller-held collection, so no query is unanswerable.
 
 **Naming a vocabulary is not interpreting a label.** `DE-3` is untouched: no taxonomy,
 no ordering, no comparison of members, and `governance-contracts` gained no type and

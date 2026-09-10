@@ -143,7 +143,11 @@ no call that could.
 **Records written before it still read** (`VV-E`). A stored record with no version is v1
 by construction, projects the v1 keys, derives the id it was stored under, and reports
 `UNVERSIONED_LEGACY` — a statement that the taxonomy is **unknown**, never an invitation
-to assume the current one. A v1 file opens read-only.
+to assume the current one. A v1 file opens read-only, **permanently**: `MIG-5` ruled
+migration out of scope (`docs/architecture/VOCABULARY_BINDING_MIGRATION_SCOPING.md`), because every
+vocabulary was published after every record a v1 file can hold, so a binding asserted for
+one would be false rather than merely unverifiable. A deployment holding v1 records keeps
+two files and reads both.
 
 ## The window
 

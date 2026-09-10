@@ -276,11 +276,17 @@ bite something concrete rather than being an inconvenience. Reopening means ruli
 
 ---
 
-## 9. The one thing left to correct
+## 9. The one follow-up, and it is done
 
-`[G]` Three packages refuse a write to a v1 file with a message ending "Migrating it
-needs its own ruled process (VV-E), not an append". That sentence is still **true** — and
-it now reads as a promise that such a process is coming, when the ruling is that none is.
-The messages and the CHANGELOG entries that echo them should say the v1 file is closed
-permanently. **That is a code change, outside this document's authorization**, and it is
-the only follow-up this ruling generates.
+`[V]` Three packages refused a write to a v1 file with a message ending "Migrating it
+needs its own ruled process (VV-E), not an append". That sentence was still *true*, and
+it read as a promise that such a process was coming when the ruling is that none is. All
+three now say the file is closed permanently and name this document, so a reader is not
+left waiting; the docstrings, the `LEGACY_SCHEMA_VERSION` comments, the three CHANGELOG
+entries, the three READMEs and the tests that match on the message were carried with
+them. **The refusal itself is unchanged** — same condition, same exception type, same
+records refused. Only what it tells the reader moved.
+
+Nothing else follows from this ruling. `MIG-1` to `MIG-4` are moot, `D-3` stands
+untouched, and the two-file state is now described as the end state everywhere it is
+described at all.

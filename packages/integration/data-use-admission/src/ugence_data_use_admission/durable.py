@@ -22,8 +22,15 @@ admission.
 published vocabulary each of its labels was written against, so a v2 file holds a shape
 a v1 file never held. A v1 file opens, reads, and refuses every write: its records come
 back as ``UNVERSIONED_LEGACY`` under their own projection, with the digests and ids they
-were stored with, and nothing here upgrades them — ``VV-E`` rules that migration needs
-its own ruled process rather than happening as a side effect of an append.
+were stored with, and nothing here upgrades them.
+
+**That is permanent, not pending.** ``VV-E`` left migration to a ruled process, and
+``MIG-5`` ruled there will not be one
+(``docs/architecture/VOCABULARY_BINDING_MIGRATION_SCOPING.md``): every vocabulary was
+published after every record a v1 file can hold, so a binding asserted for one would be
+**false**, not merely unverifiable — and ``UNVERSIONED_LEGACY`` is the correct answer
+rather than a degraded one. A deployment holding v1 records keeps two files and reads
+both; the pure selectors take a caller-held collection, so nothing is unanswerable.
 
 No clock is read here. Every ``as_of`` is the caller's instant, exactly as the pure
 selectors take it, so a lapsed declaration is absent from an answer without a sweeper.
@@ -69,10 +76,10 @@ __all__ = ["SqliteDataUseDeclarations", "SCHEMA_VERSION", "LEGACY_SCHEMA_VERSION
 #: place for the same fact to be wrong.
 SCHEMA_VERSION = "data_use_admission.sqlite.v2"
 
-#: Files written before the bindings. They stay **readable**, and are closed to writes:
-#: appending a v2 record to a v1 file would make its own schema row a lie, and VV-E
-#: rules that any migration needs its own ruled process rather than happening as a side
-#: effect of the next append.
+#: Files written before the bindings. They stay **readable**, and are closed to writes
+#: **permanently**: appending a v2 record to a v1 file would make its own schema row a
+#: lie, and MIG-5 ruled that no migration follows, so this is the end state rather than a
+#: waiting room.
 LEGACY_SCHEMA_VERSION = "data_use_admission.sqlite.v1"
 
 _SCHEMA = (
@@ -200,7 +207,11 @@ class SqliteDataUseDeclarations:
             raise DeclarationStorageError(
                 f"this file is {self.schema_version!r} and holds records written before "
                 "the vocabulary bindings; it stays readable and takes no new records. "
-                "Migrating it needs its own ruled process (VV-E), not an append")
+                "It is closed permanently: MIG-5 ruled migration out of scope "
+                "(docs/architecture/VOCABULARY_BINDING_MIGRATION_SCOPING.md), because a "
+                "binding asserted for a record written before any vocabulary was "
+                "published would be false rather than merely unverifiable. Open a "
+                "current file for new records and read this one alongside it")
         if declaration.record_version != CONTRACT_VERSION:
             raise ContractViolation(
                 f"declare takes a {CONTRACT_VERSION} declaration; "

@@ -30,8 +30,11 @@ publication of the vocabularies themselves.
 - **Records written before this still read.** A record with no stored version is v1 by
   construction, projects the v1 keys, and keeps the id and digest it was stored with
   (`VV-B`); it reports `UNVERSIONED_LEGACY` and is **never** resolved to a published
-  vocabulary (`VV-E`). A v1 file opens read-only: appending to it would make its own
-  schema row a lie, and migration needs its own ruled process.
+  vocabulary (`VV-E`). A v1 file opens read-only, **permanently**: appending to it would
+  make its own schema row a lie, and `MIG-5` ruled migration out of scope
+  (`docs/architecture/VOCABULARY_BINDING_MIGRATION_SCOPING.md`), because every vocabulary was published after every record a v1
+  file can hold, so a binding asserted for one would be false rather than merely
+  unverifiable. A deployment holding v1 records keeps two files and reads both.
 
 **Still nothing interpreted.** Naming a vocabulary is not reading one. `DE-3` is
 untouched: no taxonomy, no ordering, no comparison of members. The binding is recorded

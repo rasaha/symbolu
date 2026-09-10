@@ -54,10 +54,14 @@ __all__ = ["SqliteSystemRegistry", "SCHEMA_VERSION", "LEGACY_SCHEMA_VERSION"]
 #: never held, and the meta row is the only thing that can say which.
 SCHEMA_VERSION = "ai_system_registry.sqlite.v2"
 
-#: Files written before the binding. They stay **readable**, and are closed to writes:
-#: appending a v2 record to a v1 file would make its own schema row a lie, and VV-E
-#: rules that migration needs its own process rather than happening as a side effect of
-#: the next append.
+#: Files written before the binding. They stay **readable**, and are closed to writes
+#: **permanently**: appending a v2 record to a v1 file would make its own schema row a
+#: lie, and MIG-5 ruled that no migration follows
+#: (docs/architecture/VOCABULARY_BINDING_MIGRATION_SCOPING.md), so this is the end state
+#: rather than a waiting room. This package is the reason the ruling was cheap: its
+#: derived id does not carry the vocabulary, so a migrated registration would collide
+#: with the record it migrates, and D-3 refuses a supersession binding the same system
+#: identity — which a migration always does.
 LEGACY_SCHEMA_VERSION = "ai_system_registry.sqlite.v1"
 
 _SCHEMA = (
@@ -181,7 +185,11 @@ class SqliteSystemRegistry:
             raise RegistryStorageError(
                 f"this file is {self.schema_version!r} and holds records written before "
                 "the vocabulary binding; it stays readable and takes no new records. "
-                "Migrating it needs its own ruled process (VV-E), not an append")
+                "It is closed permanently: MIG-5 ruled migration out of scope "
+                "(docs/architecture/VOCABULARY_BINDING_MIGRATION_SCOPING.md), because a "
+                "binding asserted for a record written before any vocabulary was "
+                "published would be false rather than merely unverifiable. Open a "
+                "current file for new records and read this one alongside it")
         if registration.record_version != CONTRACT_VERSION:
             raise ContractViolation(
                 f"register takes a {CONTRACT_VERSION} registration; "

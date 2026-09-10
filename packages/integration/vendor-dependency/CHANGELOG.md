@@ -24,7 +24,10 @@ field beside it, and the refusal a caller sees when they omit the binding says w
 - **Records written before this still read.** A record with no stored version is v1 by
   construction, projects the v1 keys, and keeps the id and digest it was stored with; it
   reports `UNVERSIONED_LEGACY` and is never resolved to a published vocabulary. A v1
-  file opens read-only — migration needs its own ruled process.
+  file opens read-only, **permanently**: `MIG-5` ruled migration out of scope
+  (`docs/architecture/VOCABULARY_BINDING_MIGRATION_SCOPING.md`), because every vocabulary was published after every record a v1
+  file can hold, so a binding asserted for one would be false rather than merely
+  unverifiable. A deployment holding v1 records keeps two files and reads both.
 
 **Citing a vocabulary confers nothing.** `VR-3` forbids implied eligibility, `LV-C`
 refused a permission ladder for it, and `PUB-1a` renamed the vocabulary from
