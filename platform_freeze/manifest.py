@@ -114,11 +114,45 @@ def verify_manifest(manifest: dict) -> dict:
         return {"ok": manifest.get(key) == current.get(key),
                 "expected": manifest.get(key), "actual": current.get(key)}
 
+    def cmp_exact_keys(key, expected_keys):
+        """Compare a digest mapping *and* its key set, naming each kind of failure.
+
+        A plain equality check already fails on a missing, extra or mismatched entry, but
+        it reports only "not equal". These hashes are the thing a reviewer reads when a
+        freeze goes red, so the three failures are separated: a key that vanished is a
+        coverage regression, a key that appeared is an unratified addition, and a moved
+        digest is a content change. Silently dropping a key would otherwise look exactly
+        like passing.
+        """
+
+        stored = manifest.get(key) or {}
+        live = current.get(key) or {}
+        expected = set(expected_keys)
+        missing = sorted(expected - set(stored))
+        extra = sorted(set(stored) - expected)
+        mismatched = sorted(
+            k for k in expected & set(stored) & set(live) if stored[k] != live[k])
+        uncomputed = sorted(expected - set(live))
+        return {
+            "ok": not (missing or extra or mismatched or uncomputed),
+            "missing_keys": missing,
+            "extra_keys": extra,
+            "mismatched_keys": mismatched,
+            "uncomputed_keys": uncomputed,
+            "expected": stored,
+            "actual": live,
+        }
+
     checks["components"] = cmp("components")
     checks["core_tree_hashes"] = cmp("core_tree_hashes")
     checks["conformance_hashes"] = cmp("conformance_hashes")
     checks["public_api_manifests"] = cmp("public_api_manifests")
     checks["dependency_rules"] = cmp("dependency_rules")
+    # BH-IMPORT: the behaviour trees are verified, not merely recorded. Until this was
+    # added they were written into the manifest and never compared, so the three imported
+    # values sat drifted and unnoticed while the CLI reported eleven green checks.
+    checks["behaviour_tree_hashes"] = cmp_exact_keys(
+        "behaviour_tree_hashes", V.BEHAVIOUR_TREES)
 
     # API compatibility vs stored snapshots (breaking changes fail)
     stored = load_stored_snapshots()

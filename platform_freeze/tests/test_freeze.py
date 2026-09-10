@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import copy
+import json
 import pathlib
 import subprocess
 
@@ -19,9 +20,14 @@ from platform_freeze.hashing import (
 )
 from platform_freeze.hiring_baseline import discover_hiring
 from platform_freeze.invariants import REGISTER, invariants_ok, verify_invariants
-from platform_freeze.manifest import build_manifest, load_manifest, verify_manifest
+from platform_freeze.manifest import (
+    MANIFEST_PATH,
+    build_manifest,
+    load_manifest,
+    verify_manifest,
+)
 from platform_freeze.classify_change import classify_change
-from platform_freeze.verify import run_verification
+from platform_freeze.verify import main as verify_main, run_verification
 
 REPO = pathlib.Path(__file__).resolve().parents[2]
 
@@ -298,6 +304,152 @@ def test_full_verification_passes_and_is_reproducible():
     r2 = run_verification()
     assert r1["passed"], r1["checks"]
     assert r1["substantive_digest"] == r2["substantive_digest"]
+
+
+# --- behaviour-tree verification: the negative controls ---------------------
+#
+# The three behaviour hashes were written into the manifest from the day it was added and
+# never compared against anything. Nothing in the tooling could have told a correct value
+# from a wrong one, which is why the imported values sat drifted and the freeze stayed
+# green over them. ``verify_manifest`` now requires the expected key set exactly, and the
+# four ways that requirement can be violated are asserted below.
+#
+# Each is asserted on *both* surfaces the freeze is read through: ``verify_manifest``
+# against the stored manifest, and the ``platform_freeze.verify`` CLI. Agreement between
+# them is the property, not an implementation detail — the CLI reports its own check list,
+# and a check that reaches only one of the two is a check half the readers never see.
+
+
+def _cli(tmp_path, manifest_path=None) -> int:
+    """The CLI's exit code, with reports written somewhere disposable."""
+
+    argv = ["--output", str(tmp_path / "reports")]
+    if manifest_path is not None:
+        argv += ["--manifest", str(manifest_path)]
+    return verify_main(argv)
+
+
+def _manifest_with(tmp_path, mutate) -> tuple[dict, pathlib.Path]:
+    """The stored manifest, mutated in memory and on disk. The real one is untouched."""
+
+    stored = load_manifest()
+    mutate(stored)
+    path = tmp_path / "MUTATED_PLATFORM_FREEZE_V1.json"
+    path.write_text(json.dumps(stored, indent=2, sort_keys=True) + "\n")
+    return stored, path
+
+
+def _behaviour(result: dict) -> dict:
+    return result["checks"]["behaviour_tree_hashes"]
+
+
+@pytest.mark.parametrize("tree", V.BEHAVIOUR_TREES)
+def test_a_tracked_behaviour_file_modification_fails_both_surfaces(tmp_path, tree, capsys):
+    """The case the freeze exists for: someone edits a frozen behaviour tree.
+
+    A comment is appended rather than code changed, so the only thing under test is the
+    digest — nothing that could fail for an unrelated reason such as an import error.
+    """
+
+    victim = sorted(
+        REPO / rel for rel in subprocess.run(
+            ["git", "-C", str(REPO), "ls-files", "--", tree],
+            capture_output=True, text=True, check=True).stdout.split()
+        if rel.endswith(".py")
+    )[0]
+    original = victim.read_bytes()
+
+    try:
+        victim.write_bytes(original + b"\n# negative control\n")
+        _tracked.cache_clear()
+
+        stored = verify_manifest(load_manifest())
+        assert not stored["passed"]
+        assert _behaviour(stored)["mismatched_keys"] == [tree], _behaviour(stored)
+        assert _behaviour(stored)["missing_keys"] == []
+        assert _behaviour(stored)["extra_keys"] == []
+
+        assert _cli(tmp_path) == 1
+        assert f"FAIL manifest:behaviour_tree_hashes" in capsys.readouterr().out
+    finally:
+        victim.write_bytes(original)
+        _tracked.cache_clear()
+
+    assert verify_manifest(load_manifest())["passed"], "the fixture did not restore the tree"
+
+
+def test_a_missing_behaviour_key_fails_both_surfaces(tmp_path, capsys):
+    """Dropping a key is a coverage regression, and plain equality would call it "not equal".
+
+    This is the failure that most needs naming: a key silently removed from the manifest
+    removes the tree from the freeze entirely, and without an expected key set there is
+    nothing left to notice its absence.
+    """
+
+    dropped = V.BEHAVIOUR_TREES[0]
+    stored, path = _manifest_with(
+        tmp_path, lambda m: m["behaviour_tree_hashes"].pop(dropped))
+
+    result = verify_manifest(stored)
+    assert not result["passed"]
+    assert _behaviour(result)["missing_keys"] == [dropped], _behaviour(result)
+    assert _behaviour(result)["mismatched_keys"] == []
+
+    assert _cli(tmp_path, path) == 1
+    out = capsys.readouterr().out
+    assert "FAIL manifest:behaviour_tree_hashes" in out
+    assert f"behaviour_tree_hashes.missing_keys: {dropped}" in out
+
+
+def test_an_extra_behaviour_key_fails_both_surfaces(tmp_path, capsys):
+    """A key nobody ratified is an unauthorized widening of the freeze, not a bonus."""
+
+    stored, path = _manifest_with(
+        tmp_path,
+        lambda m: m["behaviour_tree_hashes"].update({"unratified_tree": "0" * 64}))
+
+    result = verify_manifest(stored)
+    assert not result["passed"]
+    assert _behaviour(result)["extra_keys"] == ["unratified_tree"], _behaviour(result)
+    assert _behaviour(result)["missing_keys"] == []
+    assert _behaviour(result)["mismatched_keys"] == []
+
+    assert _cli(tmp_path, path) == 1
+    out = capsys.readouterr().out
+    assert "FAIL manifest:behaviour_tree_hashes" in out
+    assert "behaviour_tree_hashes.extra_keys: unratified_tree" in out
+
+
+def test_an_incorrect_behaviour_digest_fails_both_surfaces(tmp_path, capsys):
+    """A wrong value must fail even though the key set is perfect.
+
+    Without this, an implementation that compared only key sets would satisfy the three
+    tests above — and that is precisely the shape of the defect being corrected, where the
+    keys were present and the values were not the tree's.
+    """
+
+    wrong = V.BEHAVIOUR_TREES[-1]
+    stored, path = _manifest_with(
+        tmp_path, lambda m: m["behaviour_tree_hashes"].update({wrong: "f" * 64}))
+
+    result = verify_manifest(stored)
+    assert not result["passed"]
+    assert _behaviour(result)["mismatched_keys"] == [wrong], _behaviour(result)
+    assert _behaviour(result)["missing_keys"] == []
+    assert _behaviour(result)["extra_keys"] == []
+
+    assert _cli(tmp_path, path) == 1
+    out = capsys.readouterr().out
+    assert "FAIL manifest:behaviour_tree_hashes" in out
+    assert f"behaviour_tree_hashes.mismatched_keys: {wrong}" in out
+
+
+def test_the_two_surfaces_agree_on_the_unmutated_repository(tmp_path):
+    """Both green together, so the four tests above are not measuring a permanent red."""
+
+    assert verify_manifest(load_manifest())["passed"]
+    assert _cli(tmp_path) == 0
+    assert MANIFEST_PATH.exists()
 
 
 # --- AI hiring baseline discovery + docs -----------------------------------

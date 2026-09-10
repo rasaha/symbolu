@@ -7,9 +7,9 @@
   ],
   "baseline_tests": 1006,
   "behaviour_tree_hashes": {
-    "comparative_governance_benchmark": "827ed95f7ae21abe8500a8b66d14de9a44a12b7048806a29094619c52da1e662",
-    "enterprise_validation_pilot": "9241f73c57fa5b9ba5186046caf714e93a3131b1384a7a06f69a5c9bbdf978af",
-    "provider_heterogeneity_validation": "85c35cba7ee55dce6e4fd73fd396e172bbdcbd257d8d7f5e5b8bd3a741e49c49"
+    "comparative_governance_benchmark": "8cfd88bc8378c6c3de21ec314b278ebf7ebecda8b1dc4c6bd38b0b7f7ce9d60c",
+    "enterprise_validation_pilot": "71fe8c32f44567e3ca66e04d72ff8279ebddbd6ecee434ce78ad92d7fdfcf180",
+    "provider_heterogeneity_validation": "d09ee616b9f6d060c3b0598f1eb2abc5f07f2c9d6393b43239574c861286acc4"
   },
   "behaviour_trees": [
     "enterprise_validation_pilot",
@@ -191,7 +191,7 @@
       "statement": "Frozen package dependency direction remains acyclic."
     }
   ],
-  "manifest_digest": "05fdb1caace9216a9b42b979c66eb144e17d8a0032aae3500ab668a446094402",
+  "manifest_digest": "df0c61f4d01fef31251ee78f8803b1c7329e255257e193334be587d22cc3b9ee",
   "platform_name": "Decision Governance Platform",
   "platform_version": "1.0.0",
   "public_api_manifests": {
