@@ -12,14 +12,11 @@ of 2026-09-10 recorded in `OWNER_RATIFICATION_MEU_EXCHANGE_TENANCY.md` §4.
 
 **Scope of this revision.** Architecture, boundary, interface and deployment, and every
 ruling of 2026-09-10: D-4 in §4.4, exchange grants and tenancy in §3.4, §5.2 and §6, and D-5
-`BIND_AT_AUTHORIZATION` in §4.1, §4.3, §6 and §7. **No design question remains open.** Every
-item in §8 is an unbuilt mechanism or the one owner decision on retention withheld from
-engineering. Nothing here is implemented, no provider SDK is introduced, no real network call
-is specified, no exchange table is designed, and no gate identifier of P3E-CTR or GRW-CTR is
-marked satisfied.
-Nothing here is implemented, no provider SDK is introduced, no real network call is
-specified, no exchange table is designed, and no gate identifier of P3E-CTR or GRW-CTR is
-marked satisfied.
+`BIND_AT_AUTHORIZATION` in §4.1, §4.3, §6 and §7, and the retention horizons in §4.4.
+**No design question remains open and no owner decision is outstanding.** Every item in §8 is
+an unbuilt mechanism. Nothing here is implemented, no provider SDK is introduced, no real
+network call is specified, no exchange table is designed, and no gate identifier of P3E-CTR or
+GRW-CTR is marked satisfied.
 
 ## 1 — What the rulings fix
 
