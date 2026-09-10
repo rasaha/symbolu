@@ -12,6 +12,12 @@ Outputs:
 The markdown is converted structurally (headings, paragraphs, lists, tables,
 callouts, code blocks, links); the mermaid figures are replaced by vector
 diagrams from diagrams.py rendered to PNG with cairosvg.
+
+Exit status: 0 when the docx is written and the pdf either converted or was
+deliberately skipped (no soffice on PATH, or --no-pdf). Non-zero when soffice ran
+but this run did not write the pdf, which is reported rather than passed over --
+the previous edition's pdf sits at the same path, so its mere presence proves
+nothing about the current run.
 """
 import os
 import re
@@ -949,18 +955,56 @@ with zipfile.ZipFile(OUT_DOCX) as zin, zipfile.ZipFile(tmp, "w", zipfile.ZIP_DEF
 shutil.move(tmp, OUT_DOCX)
 print("DOCX written:", OUT_DOCX)
 
-# PDF via LibreOffice when available
+# PDF via LibreOffice when available.
+#
+# The success test is that THIS run wrote the file, not that a file is present.
+# Those differ: the previous edition's .pdf is committed at exactly this path, so
+# `os.path.exists(pdf)` is already true before soffice runs and stays true when it
+# converts nothing. That is not hypothetical — a container without
+# libreoffice-writer has no Writer import filter, so soffice exits 0 having printed
+# "Error: source file could not be loaded", and the old check reported
+# "PDF written" over a stale artifact from the previous release.
+#
+# So: remember the file's identity beforehand and require it to have moved, and let
+# soffice's own diagnostics through instead of discarding them, since the message
+# above is the one that names the cause. A missing soffice is still not an error —
+# the docx is the primary output — but a soffice that ran and produced nothing is.
 soffice = shutil.which("soffice")
-if soffice and "--no-pdf" not in sys.argv:
+pdf = OUT_DOCX[:-5] + ".pdf"
+if not soffice:
+    print("PDF skipped: no soffice on PATH;", pdf, "not produced")
+elif "--no-pdf" in sys.argv:
+    print("PDF skipped: --no-pdf")
+else:
     import tempfile
 
+    before = os.stat(pdf) if os.path.exists(pdf) else None
     profile = tempfile.mkdtemp(prefix="lo_profile_")
-    subprocess.run(
+    proc = subprocess.run(
         [soffice, f"-env:UserInstallation=file://{profile}", "--headless", "--convert-to", "pdf", "--outdir", os.path.dirname(OUT_DOCX), OUT_DOCX],
         check=False,
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
+        capture_output=True,
+        text=True,
         timeout=600,
     )
-    pdf = OUT_DOCX[:-5] + ".pdf"
-    print("PDF written:" if os.path.exists(pdf) else "PDF not produced:", pdf)
+    after = os.stat(pdf) if os.path.exists(pdf) else None
+    # mtime alone can tie within one filesystem timestamp tick; st_ino and st_size
+    # move too when the converter rewrites the file, so compare the triple.
+    def _identity(st):
+        return None if st is None else (st.st_mtime_ns, st.st_size, st.st_ino)
+
+    if after is not None and _identity(after) != _identity(before):
+        print("PDF written:", pdf)
+    else:
+        why = "soffice produced no file" if after is None else "the file on disk is unchanged — it is the previous build's artifact"
+        print(f"PDF NOT produced: {why}", file=sys.stderr)
+        print(f"  soffice exit {proc.returncode}", file=sys.stderr)
+        for stream, label in ((proc.stdout, "stdout"), (proc.stderr, "stderr")):
+            for line in (stream or "").splitlines():
+                print(f"  {label}: {line}", file=sys.stderr)
+        print(
+            "  If this reads 'source file could not be loaded', the Writer import\n"
+            "  filter is missing: install libreoffice-writer, not just libreoffice-core.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
