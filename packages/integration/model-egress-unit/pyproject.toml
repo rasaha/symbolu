@@ -1,0 +1,64 @@
+# Ugence Model Egress Unit — the reference exchange between the governance worker
+# and a model call, as a separate deployment unit.
+#
+#   THIS PACKAGE CANNOT CALL A MODEL VENDOR.
+#   NO HTTP CLIENT, NO VENDOR SDK, NO CREDENTIAL READER, NO DESTINATION CONFIG.
+#   THE ONLY PROVIDERS IT SHIPS ANSWER FROM A HASH OR REFUSE OUTRIGHT.
+#
+# What is real: a dedicated PostgreSQL schema; three roles whose owner cannot log
+# in; forced row-level security keyed on a required tenant identity; request and
+# result records with complete canonical digests; terminal refusals and
+# OUTCOME_UNKNOWN; consumption acknowledgement; content purge leaving digest-only
+# tombstones; a deterministic migration runner that refuses a drifted schema.
+#
+# Placed in the integration layer because it composes a store and a provider. It
+# is therefore not importable by anything under packages/capabilities or by a
+# leaf package — see scripts/check_package_import_boundaries.py.
+#
+# Whether a LIVE provider may ever run behind this seam is an open owner
+# decision: docs/architecture/OWNER_RATIFICATION_LIVE_MODEL_PROVIDER.md, D-1
+# through D-5, none of which this package answers or presumes.
+#
+# Dependency direction (one-way):
+#     psycopg (third party)
+#         ▲
+#     ugence-model-egress-unit (this package)   <- no first-party dependency
+#
+# Build:   python -m build packages/integration/model-egress-unit
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ugence-model-egress-unit"
+dynamic = ["version"]
+description = "Ugence Model Egress Unit — the reference exchange between the governance worker and a model call: a dedicated PostgreSQL schema with forced row-level security, complete canonical request and response digests, terminal refusals, OUTCOME_UNKNOWN reconciliation, consumption acknowledgement and digest-only tombstones. Ships no vendor egress and cannot be configured to have any."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "Proprietary" }
+authors = [{ name = "Rakesh Mohan" }]
+keywords = ["governance", "egress", "model", "exchange", "postgres", "rls", "ugence"]
+classifiers = ["Typing :: Typed"]
+dependencies = [
+    "psycopg[binary]>=3.1",
+]
+
+[project.optional-dependencies]
+test = ["pytest>=7.0"]
+
+[tool.setuptools.dynamic]
+version = { attr = "ugence_model_egress_unit.version.__version__" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["ugence_model_egress_unit*"]
+
+[tool.setuptools.package-data]
+ugence_model_egress_unit = ["py.typed"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+markers = [
+    "postgres: requires a live PostgreSQL server (UGENCE_MEU_TEST_PG)",
+]

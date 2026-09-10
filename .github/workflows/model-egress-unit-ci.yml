@@ -1,0 +1,170 @@
+name: model-egress-unit-ci
+
+# Scoped CI for ugence-model-egress-unit.
+#
+# The security properties this package claims — forced row-level security, a
+# non-login table owner, column-scoped grants, a tenant identity that fails
+# closed when unset — exist only in PostgreSQL. There is no stand-in: SQLite has
+# no policies, no roles and no current_setting, so a suite that fell back to one
+# would report green for exactly the properties it exists to prove.
+#
+# So a real server is installed and driven with pg_ctl, on 5433 so the runner's
+# own cluster is untouched, and the suite FAILS rather than skips when it is
+# absent. The final step fails the job if any test skipped: a skipped row is not
+# a passing row, and for a security boundary it is worse than a red one because
+# it reads as a pass.
+
+concurrency:
+  # A superseded run proves nothing about the commit that replaced it. Cancel
+  # in-flight runs for the same ref on pull requests; never on a branch push,
+  # where each commit's run is the evidence that commit was green.
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+on:
+  pull_request:
+    paths:
+      - "packages/integration/model-egress-unit/**"
+      - "docs/architecture/ADR_MODEL_EGRESS_UNIT_REFERENCE_SLICE.md"
+      - ".github/workflows/model-egress-unit-ci.yml"
+  push:
+    branches:
+      - "claude/**"
+    paths:
+      - "packages/integration/model-egress-unit/**"
+      - "docs/architecture/ADR_MODEL_EGRESS_UNIT_REFERENCE_SLICE.md"
+      - ".github/workflows/model-egress-unit-ci.yml"
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  exchange-suite:
+    name: Exchange suite (real PostgreSQL, py${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.11", "3.12"]
+    env:
+      PGVERSION: "16"
+      PGPORT: "5433"
+      PGDATA: /tmp/meu-pgdata
+      PGSOCK: /tmp/meu-pgsock
+      UGENCE_MEU_TEST_PG: postgresql://postgres@127.0.0.1:5433/postgres
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+          cache-dependency-path: requirements.txt
+
+      - name: Install PostgreSQL server binaries
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-$PGVERSION postgresql-client-$PGVERSION
+
+      - name: Initialise and start an independent cluster on 5433
+        run: |
+          PGBIN=/usr/lib/postgresql/$PGVERSION/bin
+          # The runner's default cluster occupies 5432; ours is independent so
+          # nothing here can disturb another job's database.
+          sudo systemctl stop postgresql || true
+          sudo rm -rf "$PGDATA" "$PGSOCK"
+          sudo mkdir -p "$PGDATA" "$PGSOCK"
+          sudo chown -R postgres:postgres "$PGDATA" "$PGSOCK"
+          sudo chmod 700 "$PGDATA"
+          sudo -u postgres "$PGBIN/initdb" -D "$PGDATA" -U postgres --auth=trust
+          sudo -u postgres "$PGBIN/pg_ctl" -D "$PGDATA" \
+            -o "-p $PGPORT -k $PGSOCK -c listen_addresses=127.0.0.1" \
+            -l /tmp/meu-pg.log -w start
+          "$PGBIN/pg_isready" -h 127.0.0.1 -p "$PGPORT"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest "psycopg[binary]>=3.1" tomli
+
+      - name: Exchange suite
+        run: |
+          cd packages/integration/model-egress-unit
+          python -m pytest -o addopts= -v --no-header --junitxml=/tmp/meu.xml
+
+      - name: Fail if any test was skipped
+        run: |
+          python - <<'PY'
+          import sys, xml.etree.ElementTree as ET
+          root = ET.parse("/tmp/meu.xml").getroot()
+          skipped = [tc.get("name") for tc in root.iter("testcase")
+                     if tc.find("skipped") is not None]
+          total = len(list(root.iter("testcase")))
+          if total == 0:
+              print("No tests were collected at all — that is not a pass.")
+              sys.exit(1)
+          if skipped:
+              print("A skipped row is NOT a passing row. Skipped:")
+              for name in skipped:
+                  print(f"  - {name}")
+              sys.exit(1)
+          print(f"{total} tests, none skipped.")
+          PY
+
+      - name: The package must be importable without a database driver
+        run: |
+          # The records, the digests and the providers are usable by a caller that
+          # has no Postgres at all; only the postgres subpackage needs psycopg.
+          # Proven by removing the driver rather than by reading the imports.
+          pip uninstall -y psycopg psycopg-binary
+          cd packages/integration/model-egress-unit
+          PYTHONPATH=src python - <<'PY'
+          import ugence_model_egress_unit as meu
+          assert meu.LIVE_VENDOR_EGRESS is False
+          assert meu.DeterministicFakeProvider().maturity == "FIXTURE_ONLY"
+          print("imported without psycopg:", meu.__version__, meu.MATURITY)
+          PY
+
+  distribution:
+    name: Wheel build + isolated install
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: requirements.txt
+      - name: Build and install the wheel into a clean environment
+        run: |
+          python -m pip install --upgrade pip build
+          python -m build packages/integration/model-egress-unit
+          python -m venv /tmp/meu-venv
+          /tmp/meu-venv/bin/pip install --upgrade pip
+          /tmp/meu-venv/bin/pip install \
+            packages/integration/model-egress-unit/dist/*.whl
+      - name: Interrogate the installed distribution, not the source tree
+        run: |
+          cd /tmp
+          /tmp/meu-venv/bin/python - <<'PY'
+          import ugence_model_egress_unit as meu
+          assert meu.MATURITY == "REFERENCE_GRADE_SHADOW_ONLY", meu.MATURITY
+          assert meu.ENFORCEMENT_ENABLED is False
+          assert meu.LIVE_VENDOR_EGRESS is False
+          assert meu.CONTRACT_VERSION == "model_egress_unit.exchange.v1"
+          # The reference provider refuses a production posture even here, where
+          # nothing in the source tree is on the path to explain it.
+          import uuid, datetime
+          req = meu.EgressRequest.create(
+              request_id=uuid.uuid4(), tenant_id=uuid.uuid4(),
+              submitted_at=datetime.datetime.now(datetime.timezone.utc),
+              model_id="m", purpose="p", content="c")
+          try:
+              meu.DeterministicFakeProvider().execute(
+                  req, now=req.submitted_at, production=True)
+          except meu.ProviderRefusedInProduction:
+              print("installed distribution refuses a production posture:", meu.__version__)
+          else:
+              raise SystemExit("the installed fake did NOT refuse production")
+          PY
