@@ -101,6 +101,18 @@ jobs:
             -e deployment/governance-studio
           python -c "import argon2, governance_studio_deployment, ugence_agent_workforce_composer.api as a; assert a.__version__=='0.2.1'; print('install OK: argon2 + deployment + AWC', a.__version__)"
 
+      - name: build-context-gate-fixtures
+        # The gate that ran before `install` is only worth its blocking status if it still
+        # means what it says, and these fixtures hold it to that: ordered exclusions and
+        # later negation, the sibling file overriding the context root, a directory whose
+        # descendants are partly ignored passing while one wholly excluded fails, glob
+        # expansion, the JSON form, --from being skipped, and every unmodelled source form
+        # raising rather than being approximated. It sits here rather than beside the gate
+        # because it needs pytest, which `install` provides; the gate itself is standard
+        # library only, which is why it can run before any dependency exists. Offline, no
+        # daemon, and it satisfies no ratified gate identifier either.
+        run: python -m pytest deployment/governance-studio/ci/tests -q
+
       - name: p3d-prerequisite
         working-directory: apps/ugence-governance-studio/frontend
         run: |
