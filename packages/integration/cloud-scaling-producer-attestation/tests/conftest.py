@@ -80,6 +80,10 @@ MODULE_PROPERTY_CATEGORY = {
     "test_verified_artifact": "adversarial",
     "test_frozen_digests": "invariant",
     "test_phase5a_invariants": "invariant",
+    # The guards in test_phase5a_invariants measured against synthetic repos: an
+    # immutability guard that cannot fail is decoration, so its detection path is
+    # exercised rather than trusted.
+    "test_tree_guard": "invariant",
     "test_packaging": "invariant",
     "test_sdist_payload": "invariant",
     "test_property_ledger": "invariant",

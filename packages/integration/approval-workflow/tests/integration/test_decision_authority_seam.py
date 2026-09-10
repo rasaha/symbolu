@@ -15,6 +15,8 @@ import subprocess
 
 import pytest
 
+from _tree_guard import tree_was_modified
+
 pytest.importorskip("pydantic", reason="the Decision Authority kernel requires pydantic")
 
 from ugence_decision_authority.api.audit import AuditService, InMemoryAuditRepository
@@ -136,22 +138,12 @@ def test_the_kernel_is_1_0_0_and_this_branch_changed_none_of_it():
     repo = pathlib.Path(__file__).resolve().parents[5]
     da = "packages/capabilities/decision-authority"
 
-    def git(*args) -> str:
-        return subprocess.run(("git", "-C", str(repo)) + args, capture_output=True,
-                              text=True, check=True).stdout.strip()
-
-    # Nothing uncommitted under the kernel.
-    assert git("status", "--porcelain", "--", da) == ""
-
-    # And no commit on this branch touches it. The base is the one other remote
-    # branch; when it cannot be resolved, this half of the check is skipped rather
-    # than asserted against a guess.
-    here = git("rev-parse", "--abbrev-ref", "HEAD")
-    others = [b.strip() for b in git("branch", "-r", "--format=%(refname:short)").splitlines()
-              if b.strip() and not b.strip().endswith(f"/{here}") and "->" not in b]
-    if len(others) != 1:
-        pytest.skip(f"cannot unambiguously resolve the base branch: {others}")
-    assert git("diff", "--name-only", f"{others[0]}...HEAD", "--", da) == ""
+    # Both halves — pending and committed on this branch. Base resolution and the
+    # skip-versus-fail decision live in ``_tree_guard``; the short version is that the
+    # base used to be "the one other remote branch", which skipped once a third branch
+    # existed and passed vacuously in a shallow clone against a pointer at HEAD itself.
+    changed = tree_was_modified(repo, da)
+    assert changed == "", f"the Decision Authority kernel was modified:\n{changed}"
 
 
 # --------------------------------------------------------------------------- #

@@ -516,9 +516,21 @@ jobs:
           # The baseline population, pinned because `baseline_agrees` cannot check it at
           # n=1. A sweep whose baseline collected a different number of tests is
           # measuring a different suite, and every other check above would still pass.
-          if report["baselines"] != {"1": 461}:
+          #
+          # 461 -> 469 when the frozen-tree guards gained a suite of their own. The
+          # delta is exactly eight tests and every one was added deliberately:
+          # tests/test_tree_guard.py contributes 6 (the guard's own properties, which
+          # is the point of that change — a guard that cannot fail is decoration), and
+          # tests/packaging/test_sdist_payload.py goes 27 -> 29 because _tree_guard.py
+          # joined the shipped payload it asserts over. No existing test disappeared:
+          # the per-file counts are identical everywhere else, measured against
+          # 5b17dee9. The gate exists to make a population change deliberate rather
+          # than to forbid one, and the mutation properties it guards are untouched —
+          # inventory is still 116, killed still 101, message-only kills still zero,
+          # and the excluded sites are the same fifteen.
+          if report["baselines"] != {"1": 469}:
               problems.append(
-                  f"baseline collected {report['baselines']}, expected {{'1': 461}}"
+                  f"baseline collected {report['baselines']}, expected {{'1': 469}}"
               )
           if report["inventory_total"] != 116:
               problems.append(f"inventory is {report['inventory_total']}, not 116")

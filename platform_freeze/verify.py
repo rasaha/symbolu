@@ -77,6 +77,21 @@ def _docs_presence() -> dict:
     return {"passed": not missing, "missing": missing}
 
 
+def check_ok(check: dict) -> bool:
+    """Whether a check passed, under either of the two key names in use.
+
+    ``verify_manifest`` reports ``ok``; the checks built here report ``passed``. The CLI
+    used to read ``passed`` alone with a default of ``True``, so every manifest-derived
+    check printed ``ok`` unconditionally — a moved tree hash produced a ``FAIL`` header
+    above eleven green lines and left the operator nothing to read. The overall verdict was
+    never wrong (it is ``and``-ed with ``manifest_check["passed"]``); only the report was.
+    """
+
+    if "passed" in check:
+        return bool(check["passed"])
+    return bool(check.get("ok", True))
+
+
 def run_verification(manifest_path=MANIFEST_PATH) -> dict:
     manifest = load_manifest(manifest_path)
     manifest_check = verify_manifest(manifest)
@@ -100,12 +115,22 @@ def run_verification(manifest_path=MANIFEST_PATH) -> dict:
         "benchmark_identity": benchmark,
         "documentation_presence": docs,
     }
-    passed = all(c.get("passed", True) for c in checks.values()) and manifest_check["passed"]
+    passed = all(check_ok(c) for c in checks.values()) and manifest_check["passed"]
     substantive = {k: {kk: vv for kk, vv in v.items() if kk not in ("results",)}
                    for k, v in checks.items()}
+    # Reported beside ``checks``, never inside it. ``substantive_digest`` is computed over
+    # ``checks`` alone and is pinned as a literal in
+    # ``packages/benchmark-registry-authority/verify_br1_freeze_matrix.py`` and across the
+    # audit records, so adding a twelfth entry there would move a pinned value for a
+    # reporting reason. ``manifest_check["passed"]`` already gates the verdict — including
+    # ``behaviour_tree_hashes``, which reaches no line in ``checks`` — so what was missing
+    # was never the failure, only the name of it.
+    manifest_checks = {name: check_ok(c) for name, c in manifest_check["checks"].items()}
     return {"platform_version": V.PLATFORM_VERSION, "freeze_commit": V.FREEZE_COMMIT,
             "manifest_digest": manifest.get("manifest_digest"), "passed": passed,
             "checks": checks,
+            "manifest_checks": manifest_checks,
+            "manifest_check_detail": manifest_check["checks"],
             "substantive_digest": canonical_hash(substantive)}
 
 
@@ -130,7 +155,10 @@ def write_reports(result: dict, out_dir: pathlib.Path) -> list:
              f"- **Manifest digest:** `{result['manifest_digest'][:16]}…`",
              f"- **Substantive digest:** `{result['substantive_digest'][:16]}…`", "", "## Checks", ""]
     for name, c in result["checks"].items():
-        lines.append(f"- `{name}`: {'PASS' if c.get('passed', True) else 'FAIL'}")
+        lines.append(f"- `{name}`: {'PASS' if check_ok(c) else 'FAIL'}")
+    lines += ["", "## Manifest checks", ""]
+    for name, ok in result["manifest_checks"].items():
+        lines.append(f"- `{name}`: {'PASS' if ok else 'FAIL'}")
     summary = out_dir / "verification-summary.md"
     summary.write_text("\n".join(lines) + "\n")
     written.append(summary)
@@ -148,7 +176,14 @@ def main(argv=None) -> int:
     print(f"Platform v{result['platform_version']} freeze verification: "
           f"{'PASS' if result['passed'] else 'FAIL'}")
     for name, c in result["checks"].items():
-        print(f"  {'ok ' if c.get('passed', True) else 'FAIL'} {name}")
+        print(f"  {'ok ' if check_ok(c) else 'FAIL'} {name}")
+    for name, ok in result["manifest_checks"].items():
+        print(f"  {'ok ' if ok else 'FAIL'} manifest:{name}")
+    for name in ("behaviour_tree_hashes",):
+        detail = result["manifest_check_detail"].get(name, {})
+        for kind in ("missing_keys", "extra_keys", "mismatched_keys", "uncomputed_keys"):
+            if detail.get(kind):
+                print(f"       {name}.{kind}: {', '.join(detail[kind])}")
     print(f"substantive digest: {result['substantive_digest']}")
     print(f"reports: {len(written)} -> {args.output}")
     return 0 if result["passed"] else 1

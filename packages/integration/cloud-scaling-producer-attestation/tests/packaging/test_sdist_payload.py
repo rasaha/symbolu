@@ -62,6 +62,10 @@ REQUIRED_SDIST_PAYLOAD = (
 DELIBERATELY_NOT_SHIPPED = (
     "tests/test_import_boundary.py",
     "tests/test_phase5a_invariants.py",
+    # The tree guards and the module that measures them: both need a git checkout with a
+    # resolvable base branch, which no distribution contains.
+    "tests/_tree_guard.py",
+    "tests/test_tree_guard.py",
     "tests/test_frozen_digests.py",
     "tests/test_property_ledger.py",
 )
