@@ -42,9 +42,15 @@ grants are not expressible" (`authority_reads.py:9-11`). `MULTI_TENANT` exists i
 (`RAILWAY_REFERENCE_DEPLOYMENT.md` §7.4). Railway provisions one database user; no runbook
 step creates a second, and no code or gate would notice if none existed `[G]`.
 
+**No transport protection on the database connection `[V]`.** `sslmode` is set nowhere in
+the repository or the runbook, on either DSN. This does not change which option is right —
+it means E-1's stronger options are not, on their own, sufficient: row-level security over an
+unencrypted connection controls who may read a row, not who may observe it in flight.
+
 **The consequence, stated plainly `[I]`:** an exchange added today would be reached by the
-same credential that reaches `ugence_art` — exactly what §3.4 forbids — and nothing in the
-repository or the deployment would detect it. The boundary is currently a sentence.
+same credential that reaches `ugence_art` — exactly what §3.4 forbids — over a connection
+with no declared transport protection, and nothing in the repository or the deployment would
+detect either condition. The boundary is currently a sentence.
 
 ## 3 — The ballot
 
