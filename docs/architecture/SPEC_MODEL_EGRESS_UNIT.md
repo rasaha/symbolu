@@ -618,8 +618,16 @@ reconciliation driver observes them like any answered result and the instance ad
 them (§3.3, §3.5). An instance parked forever because nothing came back is a failure of
 this design, not an acceptable degradation.
 
-D-5 would add one more refusal — a call that would breach the vendor mix a plan promised —
-and it cannot be written until D-5 is ruled `[R]`.
+**D-5 may or may not add a refusal here, and the audit of 2026-09-10 argues it should not**
+`[R]`. `OWNER_RATIFICATION_LIVE_MODEL_PROVIDER.md` D-5 establishes that the repository's
+concentration limit measures **role assignments in a team**, not model invocations
+(`agent-workforce-composer/…/composition.py:38, 177-183`) `[V]`, that neither the composer
+nor model-selection reaches the runtime `[V]`, and that the exchange cannot hold the counter a
+mix check needs — §4.4's tombstone drops `model_ref` and provenance at purge, so the
+denominator resets at the retention horizon `[V]`. The recommendation is therefore to bind the
+limit **before the authorized request is written**, where `ModelAuthority` already issues a
+binding decision `[V]`, and to add **no refusal to this list**: a refusal on grounds the
+authorization did not settle is the authority §7 denies the MEU. Unruled either way.
 
 ## 7 — What the rulings do not authorize
 
@@ -657,7 +665,7 @@ they left behind is work, and one decision engineering may not make.
 | **Credential custody** `[G]` | §4.4, §5.2. None exists — for the provider credential D-3 keeps out, nor for the runtime and migration identities the tenancy ruling requires `[V]` |
 | **The MEU ledger-kind schema** `[G]` | §4.4's ledger rule has no enforcement: `LedgerEntry.payload` accepts any canonical dict (`entry.py:52-61`). Unbuilt, and not built here |
 | **The deployed DBOS version** `[G]` | §3.6 — `UNKNOWN` until a constrained image is built and inspected; blocked on the mirror (RW-2) |
-| **D-5** concentration limits `[R]` | One refusal in §6 — whether the MEU refuses a call that would breach the vendor mix a plan promised |
+| **D-5** concentration limits `[R]` | §6. Audited 2026-09-10; the recommendation is that the limit binds at authorization and the MEU gains **no** refusal. Two things would have to be built first, neither licensed by ruling D-5: a vendor-mix quantity over invocations rather than role assignments `[G]`, and a durable per-vendor counter with a database-enforced ceiling, shaped like `PostgresBudgetLedger` `[G]` |
 
 **A ratification implements nothing.** Both rulings of 2026-09-10 decided how the exchange
 must work; neither created a table, a role, a policy or a credential, and this document

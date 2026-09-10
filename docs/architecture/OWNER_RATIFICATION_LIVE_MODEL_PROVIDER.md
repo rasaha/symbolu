@@ -204,14 +204,71 @@ are set, no content may be held at all. Recorded in full at `SPEC_MODEL_EGRESS_U
 
 ### D-5 — Do concentration limits carry into execution?
 
-The registry already reasons about provider concentration in **planning** — the
-procurement scenario is non-greedy team selection under provider concentration limits
-`[V]`. A live provider makes those limits enforceable at execution for the first time.
+**Audit first, because the question contains an assumption the repository does not support.**
+D-5 asks whether "the vendor mix a plan promised" binds at execution. There is no such
+quantity today. Three unrelated things are called a provider:
+
+| | |
+|---|---|
+| `AgentProfile.provider_id` (`agent-workforce-composer/…/agents.py:119`) `[V]` | Who supplies the **agent**. This is what `provider_concentration_limit_pct` — "max % of **roles** to one provider" — constrains (`composition.py:38, 177-183`) |
+| `Candidate.provider` (`model-selection/…/model.py:37`) `[V]` | The **serving model vendor** — `anthropic`, `google`, `alibaba_modelstudio` — bounded by an optional enterprise allowlist, `approved_providers` (`model.py:26`) |
+| `ShadowProvider.provider_id = "shadow-recorder"` (`governed-runtime-worker/…/workload.py:48`) `[V]` | A **tool provider** in the runtime's registry |
+
+Only the second is a model vendor, and it is not the one the concentration limit measures.
+The composer's constraint is over **role assignments in a team at composition time**: a
+three-role team at 67% may give at most two roles to one agent supplier. It says nothing
+about how many times anything calls a vendor. So a limit that "carries into execution"
+cannot simply be re-evaluated later — **the quantity it would bind does not exist yet** `[G]`.
+
+**Neither capability reaches the runtime `[V]`.** Outside their own packages,
+`ugence_agent_workforce_composer` and `ugence_model_selection` appear only in boundary tests
+that **forbid importing them** (for example `agent-runtime/tests/test_import_boundaries.py:42`)
+and in the compiler's capability registry — where `MODEL_SELECTION` is
+`disposition=ADVISORY, optional=True`, described as "policy-bounded model eligibility
+(mandatory) + selection (advisory)" (`policy-workflow-compiler/…/capability_registry.py:105-112`),
+and the workforce composer **is not a listed capability at all**. The governed loop the worker
+runs composes neither.
+
+**Concentration is a property of a sequence, and nothing in the selection path counts `[V]`.**
+`ExecutionGate`'s `quota_available` condition reads a `quota_state` **signal the caller
+supplies** (`gate.py:113-119`); the gate holds no history. The only stateful counter anywhere
+in the runtime is the budget ledger — `PostgresBudgetLedger.reserve()`, idempotent per key,
+with the ceiling enforced by a PostgreSQL `CHECK` constraint rather than in-process
+bookkeeping (`durable-execution/…/budgets.py:43-72`, `postgres/schema.py:62-78`). Whatever
+binds a mix at execution has to look like that, and nothing today does.
+
+**Where the MEU would get the knowledge, and why it cannot.** §3.4 forbids the MEU reading
+the worker's application schema, so a count would have to come from the exchange, from a third
+store, or not from the MEU at all. The exchange is ruled out by D-4 itself: content is purged
+once the terminal result is consumed, and §4.4's tombstone retains request identity, digests,
+outcome, consumption acknowledgement and purge time — **it does not retain `model_ref` or
+provenance** `[V]`. After a purge the exchange cannot say which vendor was called, so a
+counter derived from it silently resets at the retention horizon. A third store is a new trust
+boundary, refused by the same reasoning that settled D-4. And a counter the MEU both writes
+and enforces against is the MEU marking its own homework.
 
 | Option | Consequence |
 |---|---|
-| `LIMITS_BIND_AT_EXECUTION` | The vendor mix a plan promised is the mix that runs. Closes the gap between planned and actual governance. |
-| `PLANNING_ONLY` | Concentration limits stay advisory. A plan may promise a mix the runtime does not honour, which is a gap worth stating plainly rather than discovering. |
+| `PLANNING_ONLY` | Concentration limits stay advisory. Honest about today, and it leaves a plan free to promise a mix the runtime does not honour — the gap worth stating plainly rather than discovering. |
+| `BIND_AT_AUTHORIZATION` | The limit binds before the request is written to the exchange: the worker refuses, the MEU never sees the request, and §6 gains no refusal. Consistent with `ModelAuthority` already issuing a **binding** ALLOW/DENY/HOLD/ESCALATE under non-compensatory eligibility (`authority.py:146, 172`) `[V]`, and with the registry's split of eligibility (mandatory) from selection (advisory). Needs a durable per-vendor counter shaped like the budget ledger, and a vendor-mix quantity that does not exist yet. |
+| `BIND_AT_THE_MEU` | The MEU refuses a call that would breach the mix. Places the check closest to the act — and requires the MEU to hold state it also authors, over a store whose purge horizon resets the denominator. It also gives the MEU a second reason to refuse that is not derived from the authorization it was handed, which is the shape D-1 was careful to deny it. |
+
+**Recommendation: `BIND_AT_AUTHORIZATION`, with the prerequisite stated rather than assumed.**
+Binding at execution is right — a plan that promises a mix the runtime ignores is governance
+theatre — but "at execution" must mean *before the authorized request is written*, not *at the
+MEU*. That keeps the MEU what D-1 and §7 make it: a unit that performs one call and returns
+one result, with no authority to refuse on grounds the authorization did not already settle.
+So **§6 gains no D-5 refusal**, and the placeholder there resolves by removal rather than by
+addition.
+
+Two things must be built before this means anything, and neither is licensed by ruling D-5
+`[G]`: a **vendor-mix quantity** over model invocations rather than role assignments, since
+none of the three `provider` vocabularies is the one D-5 names; and a **durable per-vendor
+counter** with a database-enforced ceiling, shaped like `PostgresBudgetLedger` and owned by
+the worker. The audit ledger is not a substitute: it retains metering and provenance under D-4,
+but deriving a live quota from an append-only audit trail makes the record load-bearing for
+admission, which is not what it is for.
+
 
 ## 4a — The execution sequence, and where it still needs a decision
 
