@@ -33,14 +33,14 @@ sys.path.insert(0, HERE)
 import diagrams as DG  # noqa: E402
 
 SRC = os.path.join(ROOT, "docs", "UGENCE_ENTERPRISE_AI_GOVERNANCE_CAPABILITY_PIPELINE.md")
-VERSION = "2.0"
-DATE = "7 September 2026"
+VERSION = "2.1"
+DATE = "9 September 2026"
 BASE = f"UGENCE_ENTERPRISE_AI_GOVERNANCE_CAPABILITY_PIPELINE_v{VERSION}"
 OUT_DOCX = os.path.join(ROOT, "docs", BASE + ".docx")
 COPYRIGHT = "© 2026 Ugence Labs. All rights reserved."
 CLASSIFICATION = "Confidential and proprietary · Shared with prospective partners for evaluation"
 TITLE = "Ugence Enterprise AI Governance Capability Pipeline"
-SUBTITLE = "Repository-Based Map of 69 Capabilities, Development Status and Competitive Cross-Check"
+SUBTITLE = "Repository-Based Map of 70 Capabilities, Development Status and Competitive Cross-Check"
 
 NAVY = RGBColor(0x1A, 0x17, 0x40)
 VIOL = RGBColor(0x2A, 0x21, 0x70)
@@ -701,8 +701,8 @@ ctrl = [
     ("Document", TITLE),
     ("Edition", f"Version {VERSION} · Partner evaluation edition"),
     ("Date", DATE),
-    ("Source of truth", "docs/UGENCE_ENTERPRISE_AI_GOVERNANCE_CAPABILITY_PIPELINE.md in rasaha/symbolu, audited at default-branch commit cabd218e"),
-    ("Scope", "69 platform capabilities across 71 packages under packages/; the two packaged business-solution examples are excluded"),
+    ("Source of truth", "docs/UGENCE_ENTERPRISE_AI_GOVERNANCE_CAPABILITY_PIPELINE.md in rasaha/symbolu, audited at default-branch commit 6ef1f724"),
+    ("Scope", "70 platform capabilities across 72 packages under packages/; the two packaged business-solution examples are excluded"),
     ("Classification", CLASSIFICATION),
     ("Intended recipients", "Prospective clients and development partners evaluating a partnership with Ugence Labs"),
     ("Owner", "Ugence Labs"),
@@ -773,6 +773,7 @@ for vals in [
     ("1.0", "2026-09-04", "Ugence Labs", "First docx edition with cover sheet, document control, figures and copyright footer."),
     ("1.1", "2026-09-04", "Ugence Labs", "Partner evaluation edition: confidentiality wording aligned to distribution to prospective clients and partners."),
     ("2.0", "2026-09-07", "Ugence Labs", "Re-audit at commit cabd218e: 24 capabilities added (46 to 69), 14 existing rows updated, minimum path and figures revised, Appendix C.4 update record."),
+    ("2.1", "2026-09-09", "Ugence Labs", "Correctness re-audit at commit 6ef1f724: capability 70 added, one moved path corrected, 13 versions and 9 test counts refreshed, B.5 recomputed, Appendix C.5 update record."),
 ]:
     row = rev.add_row()
     for ci, v in enumerate(vals):

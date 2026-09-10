@@ -7,7 +7,7 @@
 
 This document explains how the enterprise AI governance capabilities found under the repository's `packages/` directory fit into one understandable operating sequence. It is intended for business leaders, governance teams, architects, risk officers and engineers.
 
-The inspected repository snapshot (default branch at commit `cabd218e`, 7 September 2026) contains **71 installable packages**. This document intentionally excludes the two packaged business-solution examples and covers the remaining **69 platform capabilities**. Cloud-scaling packages remain included because they are capability and integration modules that demonstrate how the general governance architecture can govern a consequential operational domain.
+The inspected repository snapshot (default branch at commit `6ef1f724`, 9 September 2026) contains **72 installable packages**. This document intentionally excludes the two packaged business-solution examples and covers the remaining **70 platform capabilities**. Cloud-scaling packages remain included because they are capability and integration modules that demonstrate how the general governance architecture can govern a consequential operational domain.
 
 Capability identifiers are stable across revisions. Revision 1.1 numbered the 45 capabilities present on 4 September 2026 in sequence order; revision 2.0 adds the 24 packages merged since as capabilities 46 to 69, each placed in the stage section it belongs to, so numbering inside a section is no longer contiguous. The module map published on 6 September 2026 counted 66 packages including the two products; five further packages landed between that map and this snapshot (Authoritative Policy Compilation, Procurement Policy Compilation, Reasoning-Method Result Attestation, Clearance Export and Console API). Appendix C.4 cross-references every capability to that map's module identifiers.
 
@@ -273,6 +273,18 @@ These packages do not represent a single business step. They provide the common 
 1. Keeps the compiler a leaf with no Policy Authority coupling and keeps the product from inverting the boundary.
 2. Refuses rather than drops unknown content, so a pack never governs less than the policy says.
 3. Never authors an authoritative source; a builder that supplied one would be refused.
+
+### 70. Workflow Converters
+
+**Package:** `packages/tooling/workflow-converters`  
+**Sequence alignment:** **Define**, ahead of the Policy Workflow Compiler.  
+**Pipeline role:** Converts a third-party workflow export offline into a DRAFT policy pack, a content-addressed conversion report and a preview Workflow IR labelled `PREVIEW_UNAPPROVED`. It is tooling, not a governance authority, and makes exactly one claim: constructs were translated per the mapping table and nothing more.
+
+**Why it is necessary:**
+
+1. Gives an organization already running workflows elsewhere an entry path that does not begin by hand-rewriting them, without letting the import assert governance it never had.
+2. Records what did **not** translate — unsupported constructs, semantic-loss codes and governance gaps such as `CONSEQUENTIAL_ACTION_WITHOUT_AUTHORITY` and `HUMAN_STEP_WITHOUT_AUTHORITY` — so the gaps a foreign export leaves are visible before review rather than after deployment.
+3. Fabricates nothing: an action whose authority the export does not declare yields no `ActionConstraint`, and code-defined workflows are deferred rather than imported, because converting them would mean executing customer code.
 
 ## 6. Propose — prepare advice, plans and candidates
 
@@ -880,7 +892,7 @@ These packages do not represent a single business step. They provide the common 
 
 ### 44. Agent Value Readiness
 
-**Package:** `packages/capabilities/agent-value-readiness`  
+**Package:** `packages/agent-value-readiness`  
 **Sequence alignment:** **Define → Verify → Measure**.  
 **Pipeline role:** Produces a deterministic, advisory and non-financial readiness determination across intelligence fitness, capability readiness and adoption readiness, under governed policy and system-binding context.
 
@@ -904,7 +916,7 @@ These packages do not represent a single business step. They provide the common 
 
 ## 14. End-to-end interpretation
 
-The 69 capabilities form four complementary layers:
+The 70 capabilities form four complementary layers:
 
 1. **Governance definition layer:** establishes policies, constitutions, identities, benchmarks and machine-readable workflow rules.
 2. **Governed proposal layer:** prepares candidates, teams, admitted reasoning-method advice, model selection, context and domain recommendations as typed inputs that own no authority.
@@ -953,7 +965,7 @@ Readiness and governed value inform the next policy cycle
 
 ## A.1 Purpose of the appendix
 
-This appendix tests the architecture against one concrete enterprise situation rather than assuming that all 69 capabilities must participate in every transaction. Its purpose is to show:
+This appendix tests the architecture against one concrete enterprise situation rather than assuming that all 70 capabilities must participate in every transaction. Its purpose is to show:
 
 - which capabilities are essential to the live governance path;
 - which are specifically required by the cloud-scaling domain;
@@ -1098,7 +1110,7 @@ flowchart TD
 | **Evaluation only** | Used in design, testing, readiness or retrospective analysis rather than every live scaling transaction. |
 | **Not applicable** | Unnecessary for the stated single-agent, fixed-execution scenario; it becomes relevant only if the scenario changes. |
 
-## A.5 Complete 69-capability applicability matrix
+## A.5 Complete 70-capability applicability matrix
 
 | # | Capability | Primary stage | Applicability | How it contributes—or why it is not needed |
 |---:|---|---|---|---|
@@ -1154,6 +1166,7 @@ flowchart TD
 | 50 | Vendor Dependency | Define | Evaluation only | Declares the cloud provider, ArgoCD and model vendors the pilot depends on for the audit record. |
 | 51 | Authoritative Policy Compilation | Define | Core required | Binds the compiled scaling workflow to the exact resolved capacity policy rather than to a caller-supplied reference. |
 | 52 | Procurement Policy Compilation | Define | Not applicable | Procurement-family mapping; the cloud-scaling family would need its own builder. |
+| 70 | Workflow Converters | Define | Not applicable | Offline import path for foreign workflow exports; the scaling scenario's policy is authored in the platform, not imported. |
 | 53 | Agent Assurance Evidence | Verify | Optional enhancement | Records red-team or injection findings against the scaling agent as evidence for Risk Authority once a probe runner exists. |
 | 54 | Reasoning-Method Result Attestation | Verify | Evaluation only | Attests the comparison evidence behind any reasoning-method advisory used at design time. |
 | 55 | Approval Workflow | Decide | Core required | Holds the executive approval needed above 200 replicas and the exception path when the controller escalates. |
@@ -1796,6 +1809,14 @@ Required supporting foundations are Governance Contracts, Governance Provider Fr
 
 **Competitor analogue:** [immudb](https://immudb.io/) and the discontinued [Amazon QLDB](https://docs.aws.amazon.com/qldb/latest/developerguide/what-is.html) provide cryptographically verifiable append-only journals; the Ugence root is a minimal, standard-library chain scoped to governance receipts.
 
+### A.7.70 Workflow Converters
+
+**The problem:** An organization's existing automations live in n8n, BPMN and agent frameworks, and adopting governed workflow usually means rewriting them by hand — or importing them in a way that silently claims governance the original never had.
+
+**What it solves:** An offline, refusing converter that emits a DRAFT pack plus a report naming every unsupported construct, semantic loss and governance gap, and that declines to convert code-defined workflows rather than executing customer code to read them.
+
+**Competitor analogue:** [Camunda](https://camunda.com/) and [n8n](https://n8n.io/) import and execute their own formats, and migration tooling between orchestrators is common; the distinguishing property here is that the output is explicitly unapproved and the report enumerates what the source failed to declare.
+
 ## A.8 Essential deployment stack versus later enhancements
 
 ### A.8.1 Essential platform controls
@@ -1890,7 +1911,7 @@ The cited products demonstrate that parts of the Ugence architecture have market
 
 The comparison should not claim that a blank competitor field proves uniqueness. It means only that no sufficiently close analogue was established from the limited official-source review used for this appendix, as supplemented by the cross-check in Appendix C. The more defensible Ugence distinction is architectural: the repository separates proposal, assertion verification, binding business decision, risk-derived machine authority, exact-action authorization, operational clearance, execution coordination, runtime assurance, effect reconciliation and governed-value measurement into explicit non-collapsible responsibilities.
 
-# Appendix B — Development Status of the 69 Capabilities
+# Appendix B — Development Status of the 70 Capabilities
 
 ## B.1 Purpose and evidence basis
 
@@ -1898,7 +1919,7 @@ This appendix answers one question per capability: **where does development stan
 
 Evidence labels follow the repository working agreement: `[V]` verified against the package itself, `[I]` inferred from adjacent repository material. Unless a row is marked `[I]`, every statement in it is `[V]` from the package's README and metadata.
 
-The single most important finding is stated first: **no package among the 69 declares itself pilot-validated or production-certified.** Nine of the packages added since revision 1.1 declare themselves shadow-only by name (`REFERENCE_GRADE_SHADOW_ONLY`), which is a posture, not a deployment. Many READMEs disclaim it explicitly; the rest simply make no such claim. The closest pilot evidence in the repository sits outside these packages: the legacy Enterprise Validation Pilot (Phase 5I, `docs/ENTERPRISE_VALIDATION_PILOT.md`) exercised the predecessor distributions of Decision Authority, TAP and ActionGate together, and the excluded AI Hiring product declares `PACKAGE_READY_FOR_CONTROLLED_PILOT`. Both are noted as `[I]` where relevant.
+The single most important finding is stated first: **no package among the 70 declares itself pilot-validated or production-certified.** Nine of the packages added since revision 1.1 declare themselves shadow-only by name (`REFERENCE_GRADE_SHADOW_ONLY`), which is a posture, not a deployment. Many READMEs disclaim it explicitly; the rest simply make no such claim. The closest pilot evidence in the repository sits outside these packages: the legacy Enterprise Validation Pilot (Phase 5I, `docs/ENTERPRISE_VALIDATION_PILOT.md`) exercised the predecessor distributions of Decision Authority, TAP and ActionGate together, and the excluded AI Hiring product declares `PACKAGE_READY_FOR_CONTROLLED_PILOT`. Both are noted as `[I]` where relevant.
 
 Revision 2.0 re-audited every package at commit `cabd218e` (7 September 2026): 24 packages were added as capabilities 46 to 69, 14 existing rows changed version or status, and 31 were unchanged. The changes are itemised in Appendix C.4.
 
@@ -1966,7 +1987,7 @@ flowchart LR
 
 How to read it against the table in B.4:
 
-- **Bands 1–3 hold all 69 capabilities.** Nothing has crossed into band 4, which is the finding stated in B.1.
+- **Bands 1–3 hold all 70 capabilities.** Nothing has crossed into band 4, which is the finding stated in B.1.
 - **Band 2 is where a package's own phase ladder lives.** "Phase in progress" and "Last phase done" describe position on that ladder; "Core implemented" means the package has no ladder left inside it. The cloud-scaling thread is the clearest example of a ladder that spans several packages: Phases 1 to 5D and 5X are landed across eleven packages, Risk Authority's Phase 5 issuance and 5C admission seams are production-reachable, and only Phase 6 effect verification remains unbuilt.
 - **Band 3 is now the largest band after the kernel.** The Risk Authority runtimes, the human-approval packages, reservation, the ledger and the attestation packages are all reference-grade, meaning the logic is operative but reference adapters are refused in production and production adapters are delegated; CI-verified, pilot pending means the README itself names pilot or production validation as the next step.
 - **Band 4 has two rungs.** Pilot-ready means the package declares fitness to start a controlled pilot with a client. Pilot-validated means a pilot has run and its results are recorded. The legacy Enterprise Validation Pilot sits near the second rung but ran over predecessor distributions, so it is cited as inferred and not counted.
@@ -1978,18 +1999,18 @@ Test counts are `def test_` occurrences under each package's `tests/` tree at th
 
 | # | Capability | Version | Stage tag | Phase position | Where development stands | Tests |
 |---:|---|---|---|---|---|---:|
-| 1 | Governance Contracts | 0.8.0 | Core implemented | Extraction, GV-2E-a, M-3R.3 and canonicalization done; contract-evolution phase active with G4, G7, G8, DE-5, VR-5 and AE-5 landed | Neutral contracts now carry five further families (idempotency and validity, audit reference, data-classification, vendor-risk and assurance-finding labels); authenticity fields stay permanently `STRUCTURAL_UNVERIFIED` and the contract version is pinned at 1.0.0. | 197 |
+| 1 | Governance Contracts | 0.9.0 | Core implemented | Extraction, GV-2E-a, M-3R.3 and canonicalization done; contract-evolution phase active with G4, G7, G8, DE-5, VR-5 and AE-5 landed | Neutral contracts now carry five further families (idempotency and validity, audit reference, data-classification, vendor-risk and assurance-finding labels); authenticity fields stay permanently `STRUCTURAL_UNVERIFIED` and the contract version is pinned at 1.0.0. | 198 |
 | 2 | Governance Provider Framework | 0.1.0 | Core implemented | Contract version 1.0.0; no phase ladder | Provider registry, resolution and conformance mechanics are in place with reference providers for framework validation only; the README makes no maturity statement. Predecessor distribution was exercised by the legacy Enterprise Validation Pilot `[I]`. | 57 |
 | 3 | JSON Canonicalization Scheme | 0.2.0 | Core implemented | Alpha; extracted from `cer_v0_3/cleanroom` | Byte-exact RFC 8785 canonicalizer with a single consumer; README states alpha, not pilot-validated, not production-certified, and other packages' canonicalizers are not yet converged on it. | 31 |
 | 4 | Benchmark Registry Contracts | 0.1.0 | Contract-only | BR-1 done; BR-2 (registry, trusted resolver, revocation) not started | Digest-bound benchmark identities and typed refusals exist; every identity reports `trusted_resolution_performed = False` until BR-2 lands. | 242 |
-| 5 | UVI Policy Contracts | 0.1.0 | Contract-only | M-2C.1 done; authority, registry and evaluator milestones deferred | Immutable policy and assessment-context shapes with structural fail-closed binding; lifecycle labels and digests remain caller-supplied inputs until a registry exists. | 76 |
-| 6 | Policy Authority | 0.3.1 | Core implemented | ADR P-1 to P-11 ratified; §15.7 single-node durable registry closed under D-3; distributed concurrency deferred | SQLite registry with write-ahead logging, append-only tables whose update and delete are refused by triggers, and a hash-linked ledger with chain verification; distributed concurrency remains deferred. | 291 |
-| 7 | Policy Workflow Compiler | 0.2.0 | Phase in progress | Phase 1 and 2 complete; P3A diff-driven review, `policy_pack.v2` with authoritative-source carriage, P3B binding conformance and P3C offline simulation landed with no version bump | Compiler now reviews, validates and simulates offline with deterministic replay across two reference domains; `pilot_validated` is false, simulation grants no authorization and authoritative-source verification is not implemented. | 283 |
-| 8 | Agent Constitution Policy | 0.2.0 | Phase in progress | First-slice family half done (ACC-S1); first release stated to await the OD-C1=B ballot | Constitutions are issuable, signable and resolvable; README says end-to-end conformance is not yet made true, although Agentic Proposer 0.4.0 already records the OD-C1=B binding `[I]`. | 120 |
+| 5 | UVI Policy Contracts | 0.2.0 | Contract-only | M-2C.1 done; authority, registry and evaluator milestones deferred | Immutable policy and assessment-context shapes with structural fail-closed binding; lifecycle labels and digests remain caller-supplied inputs until a registry exists. | 76 |
+| 6 | Policy Authority | 0.5.0 | Core implemented | ADR P-1 to P-11 ratified; §15.7 single-node durable registry closed under D-3; distributed concurrency deferred | SQLite registry with write-ahead logging, append-only tables whose update and delete are refused by triggers, and a hash-linked ledger with chain verification; distributed concurrency remains deferred. | 341 |
+| 7 | Policy Workflow Compiler | 0.2.0 | Phase in progress | Phase 1 and 2 complete; P3A diff-driven review, `policy_pack.v2` with authoritative-source carriage, P3B binding conformance and P3C offline simulation landed with no version bump | Compiler now reviews, validates and simulates offline with deterministic replay across two reference domains; `pilot_validated` is false, simulation grants no authorization and authoritative-source verification is not implemented. | 282 |
+| 8 | Agent Constitution Policy | 0.3.0 | Phase in progress | First-slice family half done (ACC-S1); first release stated to await the OD-C1=B ballot | Constitutions are issuable, signable and resolvable; README says end-to-end conformance is not yet made true, although Agentic Proposer 0.4.0 already records the OD-C1=B binding `[I]`. | 120 |
 | 9 | Agent Constitution Activation | 0.2.0 | Core implemented | ACC-IA-1 to ACC-IA-5 done; 0.2.0 adds `DerivedReferenceMap` and the ACC-COUPLING rule | Activation root now accepts only the reference map it derived, a narrowing not a closure since the conformance package's own resolver still accepts any mapping; no signing key or trust root exists in the repository. | 93 |
 | 10 | Cloud Scaling Capacity-Bounds Policy | 0.1.0 | Core implemented | Family adapter and rejection vocabulary done; reconciliation against Phase 5A candidates deferred | Capacity ceilings are issuable and resolvable through Policy Authority, but no composition root calls the family yet; it is not wired into any runtime path. | 70 |
 | 11 | Strategy-Permission Policy | 0.1.0 | Core implemented | Artifact half done; concrete resolver shipped separately as capability 14 | Signed strategy-permission family issued and resolved across a package boundary; a resolution proves integrity, not provenance, and authorizes no runtime action. | 81 |
-| 12 | Agent Constitution Conformance | 0.1.0 | Phase in progress | Second ACC-S1-Q2 change set done; first release awaits the OD-C1=B round | Resolver and structural verifier run end to end with the family package; reference-map population remains a disclosed ungoverned gap. | 103 |
+| 12 | Agent Constitution Conformance | 0.2.0 | Phase in progress | Second ACC-S1-Q2 change set done; first release awaits the OD-C1=B round | Resolver and structural verifier run end to end with the family package; reference-map population remains a disclosed ungoverned gap. | 103 |
 | 13 | Agentic Proposer | 0.6.0 | Core implemented | S0 to S2-B and constitution binding done; 0.5.0 adds reasoning-method advisory input (RM-3); 0.6.0 cites the signed-result receipt (SCR-1) | Typed advisory candidates with deterministic identity; an admitted reasoning-method advisory enters as typed input and never as authority; concrete evaluators still outside the package. | 529 |
 | 14 | Strategy-Permission Runtime Resolver | 0.1.0 | Core implemented | Ratified surface under owner rulings SURFACE=B and ROLE_LOOKUP=A | Resolves the exact signed strategy policy end to end, verified in a clean offline venv against a genuinely issued policy; role lookup exemption is test-tree-only. | 90 |
 | 15 | Agent Workforce Composer | 0.2.1 | Core implemented | P1, P2 and P2.1 done; permission granting, scheduling and runtime adapters listed as next phases | Eligibility, ranking, bounded team composition and least-privilege proposals implemented offline; README records `pilot_validated=false`, `production_certified=false`. | 178 |
@@ -1997,32 +2018,32 @@ Test counts are `def test_` occurrences under each package's `tests/` tree at th
 | 17 | Reasoning Method Advisor | 0.3.0 | Core implemented | Slice 2 advisor; slice 3 product entry (admission, validation, one-way proposer bridge) with a signed-result receipt requirement at 0.3.0 | Deterministic rule-derived advisor whose advisories remain research-only; an advisory reaches the Agentic Proposer only through an admission backed by comparison evidence, of which none real exists yet. | 79 |
 | 18 | Readiness Comparison | 0.2.0 | Research-only | Slice 1 engine done; spec correction 30 applied | Pure comparison function with no I/O; every result is requester-asserted and research-scoped, nothing approval-bearing. | 45 |
 | 19 | Trusted Workflow-Fit Pilot | 0.1.0 | Research-only | Phase 4A shipped; Phase 4C revisions 27 to 31 landed, G1 and G2 ratified and closed, governed canonicaliser added | Preregistered research pilot with separate-process capture and recomputed telemetry; preregistration and evaluator independence remain `DECLARED_UNVERIFIED` and approval status is the constant NONE. | 144 |
-| 20 | Model Selection | 0.1.0 | Core implemented | Model Authority rename and contract migration done; quality-floor gap from audit still open | Deterministic eligibility and selection kernel; the release is a behavior-preserving migration whose evidence remains primarily synthetic. | 18 |
+| 20 | Model Selection | 0.2.0 | Core implemented | Model Authority rename and contract migration done; quality-floor gap from audit still open | Deterministic eligibility and selection kernel; the release is a behavior-preserving migration whose evidence remains primarily synthetic. | 65 |
 | 21 | LLM Steering Controller | 0.1.0 | Core implemented | No phase ladder; provider execution outside the distribution | Advisory routing recommendations with hard-constraint filtering and reproducible evidence; README makes no claim of routing performance or production readiness. | 85 |
 | 22 | Context Minimization | 0.2.0 | Core implemented | v0.1 core plus CM-TA1 token accounting done; Agent Runtime wiring in a separate package | Structural and oracle-verified minimization modes with fail-closed equivalence; carries no live-enterprise validation claim. | 199 |
 | 23 | StoryGraph | 2.0.0 | Frozen | Frozen-but-working; legacy shim removal targeted for 3.0.0 | Sequence-risk analysis with one implemented harmful graph domain; synthetic-only validation and advisory findings only. | 304 |
 | 24 | Cloud Scaling Controller | 0.4.0 | Phase in progress | Phases 1–3 done in shadow mode; Phases 4–6 assigned to other packages | Canonical, predictive and cost-aware recommendations that never feed a live controller; not live-cluster validated, not production-certified. | 788 |
 | 25 | TAP Assertion Governance Provider | 0.1.0 | Core implemented | Beta classifier; outcome-safety release gate in place | Working assertion-governance provider whose uncertainty-never-promoted invariant is CI-enforced; README says not production certified. Predecessor distribution was exercised by the legacy Enterprise Validation Pilot `[I]`. | 60 |
-| 26 | Trusted Evidence Authority | 0.6.0 | Core implemented | TEV-1 and TEV-2 done; 0.5.0 signed-snapshot trust-anchor resolver as a production-shaped candidate; consumers now include cloud scaling, effect attestation and reasoning-method result attestation; DD-10 persistence and HSM deferred | Verification authority with trust anchors, key validity, revocation and independently re-verifiable receipts; production persistence and HSM or KMS custody remain deferred. | 550 |
+| 26 | Trusted Evidence Authority | 0.6.0 | Core implemented | TEV-1 and TEV-2 done; 0.5.0 signed-snapshot trust-anchor resolver as a production-shaped candidate; consumers now include cloud scaling, effect attestation and reasoning-method result attestation; DD-10 persistence and HSM deferred | Verification authority with trust anchors, key validity, revocation and independently re-verifiable receipts; production persistence and HSM or KMS custody remain deferred. | 562 |
 | 27 | Benchmark Registry Authority | 0.3.0rc1 | Contract-only | BR-2A, BR-2B and BR-2C-0 done; BR-2C candidate verifier at 0.3.0rc1 awaiting owner review and external cryptographic audit; BR-2D and BR-2E blocked | Lifecycle contracts and pure validation plus a candidate verifier of one envelope against one anchor revision; no admission engine, store, resolver or composition root, and every result still derives `authority_verified is False`. | 608 |
 | 28 | Risk Authority Evidence Runtime | 0.1.0 | Reference-grade | RA-5 complete; RA-6 to RA-8 out of this milestone | Production implementations behind Risk Authority's two ports with explicit reference versus production mode; caller-supplied PASS is inert in production mode, and HSM/KMS is excluded. | 67 |
 | 29 | Cloud Scaling Producer Attestation | 0.2.0 | Last phase done | Phase 5B-0A complete; policy authenticity handed to 5B-0B | Producer attestations are mintable and verifiable with a gate-removal mutation sweep; `production_mode` defaults to `False` everywhere and only a reference signer ships. | 324 |
-| 30 | Cloud Scaling Policy Authenticity | 0.9.0 | Phase in progress | 5B-0B, 5B-1, 5B-2 (parts 1 and 2) and 5B-3 done; R-2 closed as narrowed by gate 13 | Verifies the exact trusted capacity policy for tenant, scope and time; the instant stays a recorded fact by ruling, bounded by gate 13 and attested only by Risk Authority Phase 5 envelope issuance. | 309 |
+| 30 | Cloud Scaling Policy Authenticity | 0.11.0 | Phase in progress | 5B-0B, 5B-1, 5B-2 (parts 1 and 2) and 5B-3 done; R-2 closed as narrowed by gate 13 | Verifies the exact trusted capacity policy for tenant, scope and time; the instant stays a recorded fact by ruling, bounded by gate 13 and attested only by Risk Authority Phase 5 envelope issuance. | 309 |
 | 31 | Decision Authority | 1.0.0 | Frozen | Public API, lifecycle, serialization and hashes frozen at 1.0.0 | Bounded binding-decision kernel with no maturity caveat in its README; its legacy `decision_governance` lineage was exercised end to end by the Enterprise Validation Pilot `[I]`. | 33 |
-| 32 | Risk Authority | 0.8.0 | Phase in progress | RA-1 to RA-4 spine, Phase 4A/4B, Phase 5 issuance seam (0.6.0), SQLite durable persistence (0.7.0) and Phase 5C admission seam (0.8.0) done; Phase 6 not implemented | Production issuance and admission are reachable only through the production seams composed by capabilities 59 and 60; the legacy case-based `issue_envelope` and `authorize_action` still raise `ProductionContainmentError`, and `executable` is permanently false. | 392 |
+| 32 | Risk Authority | 0.9.0 | Phase in progress | RA-1 to RA-4 spine, Phase 4A/4B, Phase 5 issuance seam (0.6.0), SQLite durable persistence (0.7.0) and Phase 5C admission seam (0.8.0) done; Phase 6 not implemented | Production issuance and admission are reachable only through the production seams composed by capabilities 59 and 60; the legacy case-based `issue_envelope` and `authorize_action` still raise `ProductionContainmentError`, and `executable` is permanently false. | 415 |
 | 33 | Cloud Scaling Risk Integration | 0.1.0 | Last phase done | Phase 4C complete; Phase 5 and 6 excluded | One-way projection into Risk Authority with recommendation-content authenticity; a fully self-consistent forgery still passes because it is not a signature. | 248 |
 | 34 | Cloud Scaling Authorization Contracts | 0.7.0 | Phase in progress | Phase 5A done; 5B-4, 5C, 5X and 5D shipped as separate packages (59, 60, 65, 66); Phase 6 not implemented | Non-authoritative capacity-action candidate with measured mutation coverage; live mutation is now gated by bounded execution and the credential broker rather than structurally blocked. | 309 |
-| 35 | Risk Authority Runtime Composition | 0.1.0 | CI-verified, pilot pending | RA-4.5 composition implemented; F-D enforcement open as issue #1397 | Fail-closed composition of Risk Authority, Decision Authority and ActionGate; README states production deployment validation remains pending. | 62 |
+| 35 | Risk Authority Runtime Composition | 0.2.0 | CI-verified, pilot pending | RA-4.5 composition implemented; F-D enforcement open as issue #1397 | Fail-closed composition of Risk Authority, Decision Authority and ActionGate; README states production deployment validation remains pending. | 76 |
 | 36 | ActionGate | 0.1.0 | Core implemented | Beta classifier; outcome-safety release gate in place | Exact-action authorization provider with CI-enforced authority invariants; README says not production certified. Predecessor distribution was exercised by the legacy Enterprise Validation Pilot `[I]`. | 57 |
 | 37 | Action Clearance | 0.1.0 | Core implemented | v0.1 core; next phases documented under the package `docs/` | Stateless pure-function clearance with CLEAR, HOLD, ESCALATE and BLOCK; no persistence, execution, network or domain adapters yet. | 67 |
 | 38 | Agent Runtime | 0.7.0 | CI-verified, pilot pending | H22-A through H22-D done through 0.6.0; 0.7.0 current | `IMPLEMENTED_AND_CI_VERIFIED` lifecycle, coordination, durability and bounded concurrency; README states not live-verified, pilot-validated, distributed-safe or production-ready. | 339 |
 | 39 | Cloud Scaling Operations | 0.2.0 | Core implemented | No phase ladder; 0.2.0 orchestrator containment under its own ADR | Kubernetes and ArgoCD executors behind a dry-run default; after containment the legacy actuators discover no credentials and hold no ArgoCD token, the service entrypoint refuses any mode but dry-run, and nothing is cluster-validated. | 146 |
-| 40 | Risk Authority Status Runtime | 0.1.0 | Reference-grade | RA-6 operative against the ratified spec; Postgres persistence and signal transport delegated | Revocation and epoch propagation work in-process with a reference in-memory adapter; not globally consistent or zero-window revocation. | 72 |
+| 40 | Risk Authority Status Runtime | 0.2.0 | Reference-grade | RA-6 operative against the ratified spec; Postgres persistence and signal transport delegated | Revocation and epoch propagation work in-process with a reference in-memory adapter; not globally consistent or zero-window revocation. | 73 |
 | 41 | Risk Authority Runtime Assurance | 0.1.0 | Reference-grade | RA-7 done with as-built record; RA-8 handled by capability 42 | Event-driven trajectory assurance that mints nothing and blocks the hot path only when opted in; reference authenticator and evaluator are refused in production mode. | 96 |
 | 42 | Risk Authority Execution Assurance | 0.3.0 | Reference-grade | RA-8 done; 0.2.0 attested ingress over effect attestation (RI-1 to RI-5); 0.3.0 trust-state refusals | Reconciles authorized action, execution record and observed effect; the attested path admits only verified signed attestations while unsigned observations remain under the reference posture. | 176 |
 | 43 | Context-Minimization Token-Accounting Runtime | 0.1.0 | Core implemented | CM-TA1 integration; no numbered successor | One-way bridge from Agent Runtime telemetry to accounting records and budget settlement; no real provider adapter and only an in-memory reference sink. | 65 |
 | 44 | Agent Value Readiness | 0.4.1 | Experimental kernel | M-3R.1 to M-3R.3 done plus Trusted Readiness Orchestration; ROI, forecasting and deployment authorization deferred | Deterministic three-dimension readiness determination marked experimental, internal, advisory and non-financial; no allow-all verifier ships by design. | 542 |
-| 45 | Governed Value | 0.3.0 | Experimental kernel | GV-0 and GV-1 done; GV-2 observation carriage landed in 0.3.0; GV-3 and GV-4 pending | Scores caller-reported inputs and now binds metric observations to the case, carried outside every monetary term; every figure stays `REPORTED` / `UNVERIFIED` with no authority binding. | 53 |
+| 45 | Governed Value | 0.3.0 | Experimental kernel | GV-0 and GV-1 done; GV-2 observation carriage landed in 0.3.0; GV-3 and GV-4 pending | Scores caller-reported inputs and now binds metric observations to the case, carried outside every monetary term; every figure stays `REPORTED` / `UNVERIFIED` with no authority binding. | 63 |
 | 46 | Console API | 0.2.0 | Reference-grade | CP-1 to CP-5 ratified and packaged; durable audit store left to a later ruling | Shadow-only, reference-grade service with an in-memory audit store; two shadow writes and two audit reads are public, six routes withheld under CP-3. | 30 |
 | 47 | Authority Directory | 0.1.0 | Reference-grade | Grants, delegation, committees and the eligibility adapter done; Risk Authority label resolver deferred to 0.2.0 | Reference-grade, shadow-only, not enforcement-ready; the in-memory directory is refused in production and there is no console surface. | 65 |
 | 48 | AI System Registry | 0.2.0 | Contract-only | Contracts plus one SQLite store (front-door FD-9.2); operational registry and connectors post-v1 under D-5 | Contracts only, not an operational registry; authenticity is permanently structural-unverified and the classification vocabulary is unratified. | 54 |
@@ -2033,9 +2054,9 @@ Test counts are `def test_` occurrences under each package's `tests/` tree at th
 | 53 | Agent Assurance Evidence | 0.1.0 | Contract-only | AE-1 to AE-5 ratified; neither consumer route (control-evidence record, TAP request) is built | Contracts only, reference-grade ceiling; enforcement disabled and no composition root consumes it. | 48 |
 | 54 | Reasoning-Method Result Attestation | 0.1.0 | Reference-grade | SCR-1 slice done with one comparison-engine role; independent-verifier role and production signer are later slices | Reference-grade, not production-ready; no comparison-engine key exists in the repository and the first study runs unsigned. | 109 |
 | 55 | Approval Workflow | 0.2.0 | Reference-grade | State machine, expiry, exception path, once-only consumption and SQLite store done; enterprise mirrors not shipped | Reference-grade, shadow-only, not enforcement-ready; single-node durability, no mirror, no console surface, signs nothing. | 75 |
-| 56 | Approver Identity | 0.1.0 | Reference-grade | Local validation under IA-1 to IA-4 done; no composition root wires it and no owner-provisioned issuer exists | Reference-grade, shadow-only; validation against a real enterprise identity provider is unproven. | 49 |
-| 57 | Governed Review | 0.3.0 | Reference-grade | GAS-7 step HR-A done; HR-E linkage contract at 0.2.0 | Reference-grade, shadow-only; enforcement disabled, no credential broker or identity provider integration, recorded approver is a presented reference. | 47 |
-| 58 | Governed Review Service | 0.6.0 | Reference-grade | HR-C, HE-1 and HE-5 done; identity proof adapter is a fixture until an issuer exists | Reference-grade, shadow-only; identity proof presented-unproven, every decision feeds fixture providers. | 84 |
+| 56 | Approver Identity | 0.1.1 | Reference-grade | Local validation under IA-1 to IA-4 done; no composition root wires it and no owner-provisioned issuer exists | Reference-grade, shadow-only; validation against a real enterprise identity provider is unproven. | 49 |
+| 57 | Governed Review | 0.3.1 | Reference-grade | GAS-7 step HR-A done; HR-E linkage contract at 0.2.0 | Reference-grade, shadow-only; enforcement disabled, no credential broker or identity provider integration, recorded approver is a presented reference. | 47 |
+| 58 | Governed Review Service | 0.6.1 | Reference-grade | HR-C, HE-1 and HE-5 done; identity proof adapter is a fixture until an issuer exists | Reference-grade, shadow-only; identity proof presented-unproven, every decision feeds fixture providers. | 84 |
 | 59 | Cloud Scaling Envelope Issuance | 0.1.0 | Last phase done | 5B-4 complete over the 5B-0A and 5B-0B verifiers; next is 5C admission | Composition package owning no authority and no key; production posture refuses reference signers and applications. | 55 |
 | 60 | Cloud Scaling Action Admission | 0.1.0 | Last phase done | 5C gate over 5B-4 envelopes complete; 5X credentials and reservation still required before anything runs | Composition package with a production-authoritative gate; no credential, reservation, dispatch or cloud call. | 52 |
 | 61 | Agent Runtime Governance Hook | 0.1.0 | Core implemented | GAS-3 complete with the adversarial suite; HOLD, DEFER, ESCALATE and MANUAL_REVIEW sinks arrived later with GAS-7 | Core implemented, not pilot-validated; Risk Authority production mode still contains issuance outside the 5B-4 path. | 48 |
@@ -2047,12 +2068,13 @@ Test counts are `def test_` occurrences under each package's `tests/` tree at th
 | 67 | Risk Authority Effect Attestation | 0.2.0 | Reference-grade | SE-1 to SE-5 ratified with strict point validation; resolver wiring and RA-8 integration are later steps | Reference-grade, not production-ready and not wired into execution assurance; no clock and no Third-Party Gateway. | 98 |
 | 68 | Incident Response | 0.1.0 | Contract-only | Wave 3 scoping ratified; the wave's only new package; durability is the audit reference | Records only; not enforcement-ready and not an operational incident system. | 66 |
 | 69 | Control-Plane Root | 0.2.0 | Reference-grade | Wave 3 root ratified and shipped; consumed by the review service's linkage append; console adoption left to a later ruling | Reference-grade, standard-library-only composition root; tamper-evident, and it never says tamper-proof. | 47 |
+| 70 | Workflow Converters | 0.1.0 | Core implemented | Bring Your Workflow phase 2; n8n and BPMN 2.0 implemented, code-defined frameworks deferred by ruling CV-1 to CV-5 | Offline converter emitting a DRAFT pack, a content-addressed conversion report and an unapproved preview IR; refuses rather than fabricates, and never inspects code-defined workflows. | 47 |
 
 ## B.5 Distribution by stage
 
 | Stage tag | Count | Capabilities |
 |---|---:|---|
-| Core implemented | 24 | 1, 2, 3, 6, 9, 10, 11, 13, 14, 15, 17, 20, 21, 22, 25, 26, 36, 37, 39, 43, 51, 52, 61, 64 |
+| Core implemented | 25 | 1, 2, 3, 6, 9, 10, 11, 13, 14, 15, 17, 20, 21, 22, 25, 26, 36, 37, 39, 43, 51, 52, 61, 64, 70 |
 | Reference-grade | 14 | 28, 40, 41, 42, 46, 47, 54, 55, 56, 57, 58, 62, 67, 69 |
 | Contract-only | 10 | 4, 5, 16, 27, 48, 49, 50, 53, 63, 68 |
 | Phase in progress | 7 | 7, 8, 12, 24, 30, 32, 34 |
@@ -2155,3 +2177,22 @@ Revision 2.0 (7 September 2026) re-audited the repository at commit `cabd218e`. 
 | 23 | StoryGraph | M3 | 46 | Console API | M12* | 69 | Control-Plane Root | M12 |
 
 *Assigned by this document; the package post-dates the 6 September module map.
+
+## C.5 Revision 2.1 update record
+
+Revision 2.1 (9 September 2026) re-audited the repository at commit `6ef1f724`, 107 commits after revision 2.0's snapshot `cabd218e`. It is a correctness pass, not an expansion: no stage tag was re-argued and no competitor claim was revisited. Every figure below was recomputed from package source at `6ef1f724` rather than carried forward.
+
+**Scope.** The package count moved from 71 to 72 and the capability count from 69 to 70. The two business-solution products stay excluded.
+
+**One capability was missing.** `packages/tooling/workflow-converters` 0.1.0 existed at revision 2.0's own snapshot and was not covered. It is added as capability 70 in the Define stage, beside the Policy Workflow Compiler whose input it produces.
+
+**One package had moved.** `agent-value-readiness` is a top-level leaf at `packages/agent-value-readiness`, no longer under `packages/capabilities/`, following the ratification of UVI ADR §26.6. The path in capability 44 is corrected; nothing else about that capability changed.
+
+**Thirteen versions had drifted:** Governance Contracts 0.8.0 → 0.9.0; UVI Policy Contracts 0.1.0 → 0.2.0; Policy Authority 0.3.1 → 0.5.0; Agent Constitution Policy 0.2.0 → 0.3.0; Agent Constitution Conformance 0.1.0 → 0.2.0; Model Selection 0.1.0 → 0.2.0; Cloud Scaling Policy Authenticity 0.9.0 → 0.11.0; Risk Authority 0.8.0 → 0.9.0; Risk Authority Runtime Composition 0.1.0 → 0.2.0; Risk Authority Status Runtime 0.1.0 → 0.2.0; Approver Identity 0.1.0 → 0.1.1; Governed Review 0.3.0 → 0.3.1; Governed Review Service 0.6.0 → 0.6.1.
+
+**Nine test counts had drifted**, all upward except one: Policy Authority 291 → 341; Model Selection 18 → 65; Risk Authority 392 → 415; Risk Authority Runtime Composition 62 → 76; Trusted Evidence Authority 550 → 562; Governed Value 53 → 63; Governance Contracts 197 → 198; Risk Authority Status Runtime 72 → 73; Policy Workflow Compiler 283 → 282.
+
+**B.5 recomputed.** Core implemented moves from 24 to 25 with capability 70 added; every other stage count is unchanged, and the distribution sums to 70.
+
+**What did not change.** No stage tag was reassigned, no applicability classification was revised, no competitor analogue was altered, and the B.1 finding stands: no package among the 70 declares itself pilot-validated or production-certified.
+
