@@ -62,6 +62,39 @@ backend/
 └── tests/
 ```
 
+## Recording seams need a vocabulary configured (breaking, from this change)
+
+The registry, data-use and vendor seams record governed labels, and since those packages
+took their vocabulary bindings (`VV-A` to `VV-E`, authorized by `PUB-2`) a label on a new
+record must name the published vocabulary it was written against. `PUB-2` forbids
+defaulting an absent reference to the current vocabulary, so this app does not invent
+one.
+
+`build_studio_context` therefore takes four more optional dependencies:
+
+| Parameter | Seam | Vocabulary |
+|---|---|---|
+| `system_classification_vocabulary` | registry | `eu-ai-act-system-classification` |
+| `data_classification_vocabulary` | data use | `data-classification` |
+| `data_use_purpose_vocabulary` | data use | `data-use-purpose` |
+| `vendor_posture_vocabulary` | vendor | `vendor-dependency-assessment-state` |
+
+Each is the *package's own* `VocabularyBinding(vocabulary, version,
+specification_digest)`. Data use needs **both** of its two: `VV-D` makes them
+independent, so a deployment that configures one and not the other has configured
+neither.
+
+**A deployment that upgrades without configuring these keeps working and stops
+recording.** A seam handed a store but no vocabulary reports itself unavailable and names
+the gap, exactly as it already does when handed no store — reads are unaffected. That is
+this app's existing rule applied to a new dependency, not a new one: a service handed
+nothing never substitutes a stub.
+
+The vocabulary is deployment configuration rather than a request field. The v2 contract
+is frozen, and which taxonomy an organization records against belongs to the deployment
+rather than to the call; whether an administrator should be able to override it per
+request is a product question and is not settled here.
+
 ## Determinism & boundaries
 
 Identical logical inputs always produce identical AWC results and fingerprints.

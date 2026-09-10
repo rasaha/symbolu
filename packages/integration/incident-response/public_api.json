@@ -3,7 +3,7 @@
   "distribution": "ugence-incident-response",
   "namespace": "ugence_incident_response",
   "note": "Machine-readable snapshot of the curated public API (ugence_incident_response.__all__). tests/packaging/test_packaging.py asserts this file equals the live package surface. Regenerate with scripts/generate_public_api.py when the curated API changes deliberately.",
-  "package_version": "0.1.0",
+  "package_version": "0.2.0",
   "symbols": {
     "AuditReference": {
       "fields": [
@@ -18,7 +18,7 @@
     },
     "CONTRACT_VERSION": {
       "kind": "constant",
-      "value": "incident_response.v1"
+      "value": "incident_response.v2"
     },
     "ContainmentLift": {
       "fields": [
@@ -89,6 +89,8 @@
         "evidence",
         "opened_at",
         "opened_by",
+        "severity_vocabulary",
+        "record_version",
         "state",
         "containment",
         "containment_request",
@@ -111,6 +113,10 @@
         "REMEDIATION_PROPOSED",
         "CLOSED"
       ]
+    },
+    "LEGACY_CONTRACT_VERSION": {
+      "kind": "constant",
+      "value": "incident_response.v1"
     },
     "LEGAL_TRANSITIONS": {
       "keys": [
@@ -201,9 +207,24 @@
         "IncidentState.CLOSED"
       ]
     },
+    "VocabularyBinding": {
+      "fields": [
+        "vocabulary",
+        "version",
+        "specification_digest"
+      ],
+      "kind": "dataclass"
+    },
+    "VocabularyBindingState": {
+      "kind": "enum",
+      "values": [
+        "BOUND",
+        "UNVERSIONED_LEGACY"
+      ]
+    },
     "__version__": {
       "kind": "constant",
-      "value": "0.1.0"
+      "value": "0.2.0"
     },
     "canonical_instant": {
       "kind": "function",
@@ -282,6 +303,19 @@
         "change_type",
         "source_version",
         "correlation_id"
+      ]
+    },
+    "vocabulary_binding_from_dict": {
+      "kind": "function",
+      "parameters": [
+        "value",
+        "name"
+      ]
+    },
+    "vocabulary_binding_to_dict": {
+      "kind": "function",
+      "parameters": [
+        "binding"
       ]
     }
   }

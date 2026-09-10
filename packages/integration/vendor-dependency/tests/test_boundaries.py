@@ -134,7 +134,7 @@ def test_pyproject_declares_the_ratified_dependency_set():
                       "decision-authority", "model-selection", "benchmark-registry",
                       "pydantic", "sqlalchemy", "requests", "httpx"):
         assert forbidden not in joined, forbidden
-    assert pkg.__version__ == "0.2.0"
+    assert pkg.__version__ == "0.3.0"
 
 
 def test_no_clock_is_read_anywhere():
@@ -268,11 +268,20 @@ def test_no_field_could_carry_an_address_or_a_credential():
 
     names = [f.name for f in dataclasses.fields(pkg.VendorDependencyDeclaration)]
     assert names == ["declaration_id", "tenant_id", "binding", "vendor_ref", "risk_posture",
-                     "policy_ref", "validity", "supersedes", "declared_by", "correlation_id",
-                     "notes"]
+                     "policy_ref", "validity", "posture_vocabulary", "record_version",
+                     "supersedes", "declared_by", "correlation_id", "notes"]
     for forbidden in ("url", "endpoint", "address", "api_key", "token", "credential", "secret",
                       "contact", "email", "score", "grade", "registration_id", "registration"):
         assert forbidden not in names, forbidden
+
+    # The binding added in 0.3.0 names a published vocabulary, and a vocabulary is not
+    # somewhere an address or a credential could hide either: three short strings, each
+    # structurally validated, and nothing that could hold a document or a secret.
+    binding_names = [f.name for f in dataclasses.fields(pkg.VocabularyBinding)]
+    assert binding_names == ["vocabulary", "version", "specification_digest"]
+    for forbidden in ("url", "endpoint", "address", "api_key", "token", "credential",
+                      "secret", "contact", "email", "score", "grade", "eligibility"):
+        assert forbidden not in binding_names, forbidden
 
 
 def test_the_declaration_cannot_be_mutated_after_construction():

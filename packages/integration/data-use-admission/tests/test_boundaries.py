@@ -128,7 +128,7 @@ def test_pyproject_declares_the_ratified_dependency_set():
                       "policy-authority", "benchmark-registry", "pydantic", "sqlalchemy",
                       "requests", "httpx"):
         assert forbidden not in joined, forbidden
-    assert pkg.__version__ == "0.2.0"
+    assert pkg.__version__ == "0.3.0"
 
 
 def test_no_clock_is_read_anywhere():
@@ -245,11 +245,21 @@ def test_no_field_could_carry_a_payload():
 
     names = [f.name for f in dataclasses.fields(pkg.DataUseDeclaration)]
     assert names == ["declaration_id", "tenant_id", "binding", "data_ref", "classification",
-                     "purpose_label", "validity", "residency_label", "supersedes",
+                     "purpose_label", "validity", "classification_vocabulary",
+                     "purpose_vocabulary", "record_version", "residency_label", "supersedes",
                      "declared_by", "correlation_id", "notes"]
     for forbidden in ("data", "payload", "content", "body", "record", "value", "text",
                       "sample", "rows", "bytes", "blob"):
         assert forbidden not in names, forbidden
+
+    # The bindings added in 0.3.0 name a *published vocabulary*, and a vocabulary is not
+    # a place data could hide either: three short strings, each structurally validated,
+    # and no field that could hold a document rather than a reference to one.
+    binding_names = [f.name for f in dataclasses.fields(pkg.VocabularyBinding)]
+    assert binding_names == ["vocabulary", "version", "specification_digest"]
+    for forbidden in ("data", "payload", "content", "body", "record", "value", "text",
+                      "sample", "rows", "bytes", "blob", "document", "specification"):
+        assert forbidden not in binding_names, forbidden
 
 
 def test_the_declaration_cannot_be_mutated_after_construction():

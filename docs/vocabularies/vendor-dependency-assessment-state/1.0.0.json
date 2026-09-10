@@ -1,0 +1,62 @@
+{
+  "authority": {
+    "issued_by_policy_authority": false,
+    "repository_published": true,
+    "statement": "This specification establishes the canonical content of the vocabulary. It is not issuance by Policy Authority, and no part of the repository may describe it as an issued or signed organizational policy. Production authority still requires an issued Policy Authority coordinate (PUB-1)."
+  },
+  "binding_status": "Not implemented. PUB-2 authorizes a distinct record-local reference for this vocabulary and determined that policy_ref may not carry it: VR-4 rules policy_ref an opaque string the package must not resolve, verify, interpret or fetch, and a string forbidden to be interpreted cannot normatively identify a vocabulary. VV-C puts the binding in the derived declaration id, because risk_posture already participates in identity there.",
+  "content_digest": "sha256:43fd5b7c37899890afe92a3e908303fcadbbcd225d8c2c155f1364e282206458",
+  "eligibility": null,
+  "eligibility_note": "This vocabulary confers nothing. VR-3 forbids implied eligibility, and LV-C refused a permission ladder (APPROVED, CONDITIONAL, BLOCKED) on the ground that such a member would be read as a permission by every human who saw it, whatever the type said. The members record what was done; what it permits is Policy Authority's to say, and no member here anticipates that answer. A future permission vocabulary would be a different vocabulary requiring its own ballot, and VR-3 would have to move first; PUB-1a reserves none.",
+  "further_rulings": [
+    "LV-A",
+    "VR-3",
+    "VR-5",
+    "PUB-1",
+    "PUB-1a"
+  ],
+  "governing_documents": [
+    "docs/architecture/GOVERNANCE_LABEL_VOCABULARY_BALLOT.md",
+    "docs/architecture/LV1_VOCABULARY_PUBLICATION_RULINGS.md",
+    "docs/architecture/ADR_UGENCE_VENDOR_RISK_SCOPING.md"
+  ],
+  "governing_ruling": "LV-C",
+  "immutable": true,
+  "intended_binding": "VendorDependencyDeclaration.risk_posture (ugence-vendor-dependency)",
+  "interpretation_rules": null,
+  "members": [
+    {
+      "citation": null,
+      "definition": "No due-diligence exercise has been performed.",
+      "member": "NOT_ASSESSED"
+    },
+    {
+      "citation": null,
+      "definition": "An exercise completed and raised nothing.",
+      "member": "ASSESSED_NO_FINDINGS"
+    },
+    {
+      "citation": null,
+      "definition": "An exercise completed and raised findings; the findings, not this label, say what they are.",
+      "member": "ASSESSED_WITH_FINDINGS"
+    },
+    {
+      "citation": null,
+      "definition": "An exercise completed once, and the interval the organization set has since passed.",
+      "member": "ASSESSMENT_LAPSED"
+    },
+    {
+      "citation": null,
+      "definition": "The vendor declined to be assessed, or the exercise could not complete.",
+      "member": "ASSESSMENT_REFUSED"
+    }
+  ],
+  "ordering": null,
+  "ordering_note": "The members are names, not ranks. VR-3 rules the label carries no grade, enum, taxonomy, ordering, severity, score or dominance, and nothing here establishes one: ASSESSED_WITH_FINDINGS is not \"worse\" than ASSESSED_NO_FINDINGS in any sense a program may act on.",
+  "scope": "Organization-wide, not tenant-scoped. Records what due-diligence exercise was performed on a vendor dependency, and nothing about what that exercise permits. Named for its members by PUB-1a: the earlier proposal, vendor-dependency-permission, named semantics these members refuse and VR-3 forbids.",
+  "shape": "closed",
+  "tenant": null,
+  "title": "Vendor dependency assessment state",
+  "version": "1.0.0",
+  "vocabulary": "vendor-dependency-assessment-state"
+}

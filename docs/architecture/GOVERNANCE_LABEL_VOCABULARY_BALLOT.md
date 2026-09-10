@@ -11,7 +11,13 @@ while three are neutral contract types, an asymmetry no decision explains; and n
 package owns the interpreting layer.** This ballot rules on those three things and
 does not disturb `D-2`, `DE-3`, `VR-3` or `AE-3`.
 
-**Status: RATIFIED on `LV-A` to `LV-E`. `LV-F` is OPEN.**
+**Status: RATIFIED on `LV-A` to `LV-F`.** `LV-A` to `LV-E` were ratified
+2026-09-09; `LV-F` was ruled the same day by `PUB-3`
+(`docs/architecture/LV1_VOCABULARY_PUBLICATION_RULINGS.md`), which also adopted the
+Act's article citations (`PUB-5`) and removed `REGULATED` from the data-classification
+ladder (`PUB-4`). Those three rulings are recorded in full there and reflected in §3
+here; this ballot's own text below is left as ruled, with each superseded passage
+marked at the point it was superseded rather than rewritten out.
 Ratified 2026-09-09. `LV-A`, `LV-C`, `LV-D` and `LV-E` were ruled on the owner's
 instruction to rule them and record each with its ground: the owner named the
 options and directed the ruling, and each resolved to the recommendation §3 and §5
@@ -28,8 +34,10 @@ that matters: the withdrawal was not a change of mind about the analysis, and th
 ruling is not a return to the withdrawn one — it is the same proposal, with two
 defects corrected, carried this time by an authority entitled to carry it.
 
-**`LV-F` is opened by that ruling and is not decided.** The tiers classify AI
-*systems*; the Act governs general-purpose AI *models* separately. See §3.1.
+**`LV-F` was opened by that ruling and is now decided by `PUB-3`:** general-purpose
+AI models are a different regulated object, governed by Chapter V, and get a separate
+`GeneralPurposeAIModelRegistration` record rather than a member here. The five members
+are unchanged. See §3.1.
 
 **Documentation only.** Ratification settles *what the vocabularies are and who owns
 them*. It authorizes **no implementation**: no enum, no new neutral type, no package
@@ -153,21 +161,26 @@ obligations* on those systems rather than naming a "limited risk" tier. A set wh
 whole ground is that it tracks the regime must use the regime's vocabulary, so the
 member is `TRANSPARENCY_OBLIGATIONS`.
 
-`[R]` **Article citations are not yet verified.** The tiers correspond to the Act's
-prohibited practices, its high-risk classification, its transparency duties and the
-unregulated remainder. This ballot deliberately cites no article numbers: they were
-renumbered between draft and adopted text, and nothing here has been checked against
-the Official Journal. Whoever publishes the vocabulary under `LV-1` should add the
-citations from the official text, not from this document.
+**Article citations, adopted by `PUB-5`** (`docs/architecture/LV1_VOCABULARY_PUBLICATION_RULINGS.md`):
+`PROHIBITED` — Article 5; `HIGH_RISK` — Article 6 with Annexes I and III;
+`TRANSPARENCY_OBLIGATIONS` — Article 50. **`MINIMAL_RISK` and `UNCLASSIFIED` are
+deliberately uncited**: "minimal or no risk" is the Commission's explanatory
+description of systems the Act subjects to no specific rules rather than a
+classification article, and `UNCLASSIFIED` is an internal registry state with no
+statutory counterpart. Both stay uncited because that is accurate, not because
+anything is missing.
 
-`[R]` **`LV-F` — general-purpose AI models are outside this set, and nothing covers
-them.** These five members classify AI *systems*. The Act governs general-purpose AI
-*models* on a separate axis, with its own sub-tier for models posing systemic risk,
-and a registry whose subject is "AI systems" has no member for either. Three
-answers are open and none is taken here: extend this set with GPAI members; rule
-that `ai-system-registry` records systems only and models belong to a different
-record; or rule the distinction immaterial for a label nobody interprets. Raised
-by the `LV-B` ruling rather than settled by it.
+**`LV-F` is ruled by `PUB-3`** (`docs/architecture/LV1_VOCABULARY_PUBLICATION_RULINGS.md`): general-purpose
+AI models get a **separate record**, not a member here. A general-purpose AI model
+and an AI system are different regulated objects under the Act — GPAI is governed
+by Chapter V, and Articles 51, 53 and 55 attach to the model rather than to any
+system rung — so a `GeneralPurposeAIModelRegistration` is to be scoped,
+distinguishing the object's GPAI status from whether it is designated as presenting
+systemic risk. **These five members are unchanged**, and remain a classification of
+AI *systems* only.
+
+`[R]` **Until that record exists, GPAI models are uncovered, and this disclosure is
+retained deliberately** rather than closed on paper.
 
 ### 3.2 Data classification — `data-use-admission`
 
@@ -180,14 +193,18 @@ under `DE-5` `[V]`. No move proposed.
 | `INTERNAL` | For employees and contracted parties; disclosure is unwanted but not damaging. |
 | `CONFIDENTIAL` | Disclosure causes commercial, contractual or reputational harm. |
 | `RESTRICTED` | Disclosure causes serious harm to a person or the organization; access is individually granted. |
-| `REGULATED` | Carries a statutory handling regime (personal data, health, payment, export-controlled) that overrides the tiers above. |
 
-`[R]` **Not covered by any `LV` letter, so it stays open.** `REGULATED` is proposed
-as an orthogonal member rather than a fifth rung
-because regulation is a different axis from sensitivity — regulated data can be
-low-sensitivity. If the owner prefers strict rungs, `REGULATED` should instead
-become a separate flag on the declaration, which is a contract change and out of
-this ballot's scope.
+**`REGULATED` was removed from this ladder by `PUB-4`** (`docs/architecture/LV1_VOCABULARY_PUBLICATION_RULINGS.md`).
+Regulatory applicability **coexists with** any sensitivity classification rather than
+displacing one — regulated data can be low-sensitivity, which is precisely why a rung
+was the wrong shape. It is to be scoped as a **separate status**, and preferably not a
+Boolean: `REGULATED`, `NOT_REGULATED`, `UNDETERMINED`, carrying the applicable legal or
+policy references, because a Boolean cannot express "nobody has assessed this" — the
+state most records are in.
+
+`[R]` That separate status is a contract change and needs its own implementation
+authorization; until it exists, this package records no regulatory applicability at
+all.
 
 ### 3.3 Purpose — `data-use-admission`
 
@@ -227,6 +244,13 @@ approval and no onboarding status" (`README.md`, maturity ceiling). The set abov
 records what was *done*, leaving what it *permits* to Policy Authority. It is
 harder to read and it is the honest option; the owner may prefer the ladder and
 accept the conflation.
+
+**The vocabulary is named `vendor-dependency-assessment-state`** — `PUB-1a`, resolved
+under owner delegation, 2026-09-09. `PUB-1` had proposed `vendor-dependency-permission`,
+which named the very semantics these members refuse and `VR-3` forbids; naming the
+vocabulary after its members removes that conflation at its source. Nothing about the
+members changed. It is **authorized for publication and not yet published**, unlike
+the other four.
 
 ### 3.5 Incident severity — `incident-response`
 
@@ -297,13 +321,14 @@ the member set is written.
 |---|---|---|---|
 | `LV-A` | Adopt `LV-1` — vocabularies ratified as Policy-Authority-owned documentation, never as enums in the recording packages or `governance-contracts`? | **`ADOPT_LV_1`.** | It closes the real gap — no member set written down anywhere — without disturbing `D-2`, `DE-3`, `VR-3` or `AE-3`. No type surface moves and no `CONTRACT_VERSION` moves, so no recording package becomes a classifier, which is the single ground all four existing rulings gave. The alternative — enums in the packages — would overturn four rulings to solve a documentation problem. |
 | `LV-B` | Do the system-classification tiers track the EU AI Act, or an organization-internal set? | **`TRACK_THE_REGIME_CORRECTED`** — ruled by the owner, 2026-09-09, from four stated options. `PROHIBITED`, `HIGH_RISK`, `TRANSPARENCY_OBLIGATIONS`, `MINIMAL_RISK`, `UNCLASSIFIED`. | An internal set creates a mapping to an external regime that must be maintained forever and re-argued at every audit; tracking the regime makes the mapping the identity. Two defects in the withdrawn draft are corrected: `LIMITED_RISK` was commentary shorthand and becomes `TRANSPARENCY_OBLIGATIONS`, the Act's own framing; and the general-purpose-model gap is raised as `LV-F` rather than papered over with an invented tier. `UNCLASSIFIED` is ratified because `D-2` guarantees no refusal for an unrecognized label, so without it the first registration of an unassessed system would force a false claim. **History:** ruled without an owner selection, withdrawn the same day as an authority this repository does not hold, then ruled by the owner. |
-| `LV-F` | Do general-purpose AI models belong in the system-classification set, in a separate record, or nowhere? | **`OPEN`.** `[R]` | Opened by the `LV-B` ruling, not settled by it. The five members classify AI *systems*; the Act governs general-purpose AI *models* separately, with its own systemic-risk sub-tier, and no member covers either. Extending the set, ruling models out of `ai-system-registry` entirely, or ruling the distinction immaterial for an uninterpreted label are all open. See §3.1. |
+| `LV-F` | Do general-purpose AI models belong in the system-classification set, in a separate record, or nowhere? | **`SEPARATE_RECORD`** — ruled by the owner as `PUB-3`, 2026-09-09 (`docs/architecture/LV1_VOCABULARY_PUBLICATION_RULINGS.md`). No GPAI member is added here; a `GeneralPurposeAIModelRegistration` record is to be scoped, distinguishing the object's GPAI status from whether it is designated as presenting systemic risk. | A general-purpose AI model and an AI system are different regulated objects under the Act — GPAI is governed by Chapter V, with Articles 51, 53 and 55 attaching to the model — so flattening them into one ladder would misdescribe both. `[R]` Scoping and implementation each need their own authorization, and until the record exists the disclosure that GPAI models are uncovered is retained rather than closed on paper. |
 | `LV-C` | Vendor posture: the assessment-state set proposed in §3.4, or a permission ladder (`APPROVED` / `CONDITIONAL` / `BLOCKED`)? | **`ASSESSMENT_STATE_SET`.** `NOT_ASSESSED`, `ASSESSED_NO_FINDINGS`, `ASSESSED_WITH_FINDINGS`, `ASSESSMENT_LAPSED`, `ASSESSMENT_REFUSED`. | `VR-3` rules the label carries "no implied eligibility". A member reading `APPROVED` would be read as a permission by every human who saw it, whatever the type says, and `vendor-dependency` "confers no approval and no onboarding status". The assessment-state set records what was *done* and leaves what it *permits* to Policy Authority. It is harder to read; that is the cost of not conflating a record with a permission. |
 | `LV-D` | Incident severity: (a) opaque and unordered, (b) a distinct ordered kind, or (c) an explicit rank field? | **`(a)_OPAQUE_AND_UNORDERED` now; `(b)` when an operational surface needs the query. `(c)` is refused.** | (a) is consistent with every existing ruling and costs only that "all incidents at or above SEV2" is unanswerable in this repository — a query nothing today asks. (b) stays available because severity genuinely *is* ranked, and when a surface needs that it deserves its own ruling rather than an extension of `DE-3`. (c) is refused as the false compromise: it makes the package carry an ordering it must not interpret, and creates two sources of truth about one incident. |
 | `LV-E` | Purpose: open shape as recommended, or closed set? | **`OPEN_SHAPE`.** A purpose label names an activity and its beneficiary; a governance document lists worked examples without closing the set. | Purpose describes an intent, and intents are generative. Every closed purpose set in practice grows a member named `OTHER`, which is the set admitting it should not have been closed. A closed set here would also collide with the lawful-basis and purpose-limitation vocabularies a privacy regime already imposes, which this repository does not own. |
 
-**What ratification did not decide.** `LV-F`, opened above; and the Act's article
-citations, which §3.1 marks unverified. Placement for system classification, purpose
+**What ratification did not decide.** `LV-F` and the article citations were both
+open when this ballot was ratified and are now closed by `PUB-3` and `PUB-5`; what
+neither settles is any implementation. Placement for system classification, purpose
 and severity stays deferred to wave 5 with `LP-5` (§4) — these five rulings fix
 *which names exist and who owns them*, never *what type carries them*. The three
 fields stay bare `str`, and nothing in §6 is authorized.
@@ -314,9 +339,10 @@ fields stay bare `str`, and nothing in §6 is authorized.
 
 Not authorized by it, and each is a separate change:
 
-1. Correct the five READMEs' gap bullets — "unratified, until an owner fixes a
-   taxonomy" is not what `D-2`, `DE-3`, `VR-3` and `AE-3` say.
+1. ~~Correct the five READMEs' gap bullets~~ — **done**, merged in PR #1729.
 2. Add the vocabulary-version field named in §2 condition 4 to whichever records
-   the owner wants interpretable, as a contract change with its own ruling.
+   the owner wants interpretable, as a contract change with its own ruling. **Scoped
+   and ruled** in `VOCABULARY_VERSION_FIELD_SCOPING.md` (`VV-A` to `VV-E`) and
+   **authorized** by `PUB-2`, sequenced behind vocabulary publication by `PUB-1`.
 3. Carry `LP-5` the finding in §4: three further one-field labels now exist, which
    strengthens the shared-base option it flagged.

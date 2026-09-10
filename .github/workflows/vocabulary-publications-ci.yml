@@ -1,0 +1,62 @@
+name: vocabulary-publications-ci
+
+# A published LV-1 vocabulary is immutable, and this is what makes that true.
+#
+# PUB-1 publishes each vocabulary as a separate, immutable specification carrying an
+# authoritative content digest. A digest nothing recomputes is decoration: it records
+# that somebody once hashed something, and it keeps reading correct after the file it
+# describes has been edited underneath it. So the digest is recomputed here, and an
+# edit to a published version fails this job — which is the whole mechanism by which
+# "immutable" is a property of the repository rather than a sentence in a document.
+#
+# The gate also holds each closed vocabulary's members to the ballot section that
+# ratified them (publication and ratification are two inventories of one set, and the
+# only thing worth checking about two inventories is that they agree), refuses a
+# mutable `latest` in any form, and refuses any file claiming Policy Authority
+# issuance — repository publication establishes canonical content and nothing more.
+#
+# What it does not check: whether the content is right. That is an owner ruling and,
+# for the Act's citations, a legal determination. Neither is settled by a script.
+
+concurrency:
+  # A superseded run proves nothing about the commit that replaced it. Cancel
+  # in-flight runs for the same ref on pull requests; never on a branch push,
+  # where each commit's run is the evidence that commit was green.
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+on:
+  pull_request:
+    paths:
+      - "docs/vocabularies/**"
+      - "docs/architecture/GOVERNANCE_LABEL_VOCABULARY_BALLOT.md"
+      - "scripts/check_vocabulary_publications.py"
+      - "tests/boundaries/test_vocabulary_publications.py"
+      - ".github/workflows/vocabulary-publications-ci.yml"
+  push:
+    branches:
+      - "claude/**"
+
+jobs:
+  vocabulary-publications:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: requirements.txt
+
+      - name: Install test dependencies
+        # The checker itself is stdlib-only; pytest is for the guard's own tests.
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest
+
+      - name: Published vocabularies are intact (blocking)
+        run: python scripts/check_vocabulary_publications.py
+
+      - name: Guard tests — the checker must actually catch a tampered publication
+        run: python -m pytest tests/boundaries/test_vocabulary_publications.py -q

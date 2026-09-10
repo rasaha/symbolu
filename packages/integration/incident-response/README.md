@@ -32,7 +32,8 @@ name, and `orchestrat` from appearing in the code at all.
 
 ## The records
 
-- **`IncidentRecord`** — tenant, subject, an uninterpreted `severity_label`, and **at
+- **`IncidentRecord`** — tenant, subject, an uninterpreted `severity_label`, the
+  `severity_vocabulary` that label was written against (since 0.2.0), and **at
   least one `AuditReference`** (from G4) naming where to read what was observed. It
   carries no diagnosis and no cause. The id is derived from the evidence and the
   instant, so re-recording the same observation is the same incident, and a
@@ -47,6 +48,38 @@ name, and `orchestrat` from appearing in the code at all.
 All four are frozen and digest-bound. **No clock is read anywhere** — an incident is
 opened *at* an instant somebody observed, never at the instant the record happened
 to be constructed — asserted over the AST of every source file.
+
+## Which vocabulary the severity label was read under (0.2.0, `VV-A` to `VV-E`)
+
+`severity_vocabulary` names the published vocabulary `severity_label` was written
+against — `VocabularyBinding(vocabulary, version, specification_digest)`, **required**
+on a current record (`VV-E`). Before it, a record said *what* somebody called the
+severity and left *under what taxonomy* unrecorded, so an old incident silently re-read
+under a new vocabulary.
+
+**It does not smuggle the ordering back.** `SEV1` to `SEV4` look ranked; `LV-D` ruled
+them opaque and unordered anyway, and accepted by name that "every incident at or above
+SEV2" is unanswerable here. The binding says which taxonomy was in force, never what a
+member outranks — and the published specification records the unordering explicitly
+rather than leaving it to be inferred from four names that look like a scale.
+
+**In the digest, and out of the identity** (`VV-B`, `VV-C`). The binding is covered by
+`record_digest()` and deliberately absent from the derived `incident_id`: an incident's
+identity is its tenant, subject, evidence and instant, and the severity label never took
+part in it. So every incident id written before 0.2.0 is unchanged.
+
+**A reference, not a resolution.** Three named parts naming one immutable published
+document and no other; the digest is required, because a version alone is a claim about
+*a* document. Nobody here resolves it — this package never opens `docs/vocabularies/`,
+and a test asserts the code contains no call that could.
+
+**Records whose digests were taken before it stay verifiable** (`VV-E`). No store ships
+here (D-4), so an incident's durability is its `AuditReference` into somebody else's
+store — which is exactly why the v1 projection has to keep reproducing. A record marked
+with the historical version projects the v1 keys and reports `UNVERSIONED_LEGACY`, which
+says the taxonomy is **unknown** and is never resolved to a published vocabulary. The
+rule is re-run by `__setstate__` with every other invariant, so a record cannot be
+serialised, stripped of its binding in transit, and revived without one.
 
 ## The asymmetry, and why it is the point
 
@@ -145,6 +178,13 @@ products and applications may import it; no capability package may, enforced by
   runbook, never in code. The cost is accepted and stated: "every incident at or
   above SEV2" is a question this repository cannot answer. A distinct ordered kind
   waits for an operational surface that needs it, and gets its own ruling then; a
-  rank field beside the label was considered and refused.
+  rank field beside the label was considered and refused. The vocabulary is
+  **published** as an immutable specification at
+  `docs/vocabularies/incident-severity/1.0.0.json`, which records the unordering
+  explicitly rather than leaving it to be inferred from four names that look ranked.
+  It is canonical content, **not** issued Policy Authority policy, and since 0.2.0 an
+  incident **cites it**. What still does not exist is the interpreting layer: no owner
+  has ruled what each member *entails*, and no package permitted to decide has been
+  given the vocabulary.
 - The control plane the wave 3 rows assume still does not exist, so nothing here
   composes into an operational surface.

@@ -31,6 +31,7 @@ from _fixtures import (
     OTHER_VENDOR,
     POLICY,
     POSTURE,
+    POSTURE_VOCABULARY,
     T1,
     T2,
     TENANT,
@@ -167,7 +168,8 @@ def test_the_chain_reconstructs_history_and_is_not_filtered_by_instant():
 
 
 def test_a_cycle_terminates_rather_than_looping():
-    b_id = declaration_id_for(binding(), VENDOR, OTHER_POSTURE, POLICY, window())
+    b_id = declaration_id_for(binding(), VENDOR, OTHER_POSTURE, POLICY, window(),
+                              POSTURE_VOCABULARY)
     a = declaration(posture=POSTURE, supersedes=b_id)
     b_decl = declaration(posture=OTHER_POSTURE, supersedes=a.declaration_id)
     assert b_decl.declaration_id == b_id

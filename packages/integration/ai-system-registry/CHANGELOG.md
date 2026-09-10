@@ -1,5 +1,40 @@
 # Changelog — ugence-ai-system-registry
 
+## 0.3.0 — a registration names the vocabulary its classification label was written against
+
+`CONTRACT_VERSION` moves to `ai_system_registry.v2` and `SCHEMA_VERSION` to
+`ai_system_registry.sqlite.v2`. `ugence-governance-contracts` is untouched and its
+`CONTRACT_VERSION` does not move, which is `VV-A` working as intended.
+
+**The ruling that shapes this package is `VV-C`, and it says no.** The binding goes into
+`record_digest()` and deliberately **not** into the derived `registration_id`: this
+record's identity is the system binding, the owner and the window, and the label never
+took part in it. `VV-C` rejected the binary framing that would have given all four
+packages one answer — the binding follows the label, and here the label is descriptive.
+So every existing registration id is unchanged, and two registrations differing only in
+vocabulary version share an id and differ in digest.
+
+- `VocabularyBinding(vocabulary, version, specification_digest)` — one published
+  vocabulary, named exactly. Package-local by `VV-A`, and copied from
+  `data-use-admission` rather than shared, exactly as `_canon.py` is: four identical
+  copies is the price `VV-A` chose in exchange for `governance-contracts` gaining no
+  type and `LP-5` not being pre-empted.
+- `SystemRegistration.classification_vocabulary` is **required** on a v2 record
+  (`VV-E`). `""`, `latest` and `current` are refused by name.
+- **Records written before this still read.** A record with no stored version is v1 by
+  construction, projects the v1 keys, and keeps the digest it was stored with; it
+  reports `UNVERSIONED_LEGACY` and is never resolved to a published vocabulary. A v1
+  file opens read-only, **permanently**: `MIG-5` ruled migration out of scope
+  (`docs/architecture/VOCABULARY_BINDING_MIGRATION_SCOPING.md`), because every vocabulary was published after every record a v1
+  file can hold, so a binding asserted for one would be false rather than merely
+  unverifiable. A deployment holding v1 records keeps two files and reads both.
+
+**Still nothing interpreted.** Naming a vocabulary is not reading one. `D-2` is
+untouched: no taxonomy, no ordering, no severity, no recognized set. The binding is
+recorded and never resolved — this package does not open `docs/vocabularies/`, and a
+test asserts it cannot.
+
+
 ## [Unreleased] — public_api.json no longer records the interpreter it was generated on
 
 No API change: every exported symbol, kind, field list and version is identical. The

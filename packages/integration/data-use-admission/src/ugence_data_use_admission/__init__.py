@@ -28,6 +28,13 @@ only: no taxonomy, no ordering, no comparison, no admission.
   no taxonomy, ordering or compatibility anywhere.
 * DE-5 — ``DataClassificationLabel`` and ``AssessedSystemBinding`` are re-exported
   from governance-contracts, never redefined.
+* VV-A to VV-E, authorized by PUB-2 — since 0.3.0 a declaration names the published
+  vocabulary each of its two labels was written against, as **two independent**
+  bindings (VV-D), covered by the record digest (VV-B) and by the derived id (VV-C).
+  ``VocabularyBinding`` is local to this package: VV-A ruled the binding onto the
+  record precisely so that no new neutral type lands in governance-contracts, and
+  ``CONTRACT_VERSION`` there does not move. Naming a vocabulary is not interpreting a
+  label: DE-3 is untouched, and nothing here knows what a member means.
 
 A declaration is a record, not a permission. Storing one changes nothing about that.
 """
@@ -53,7 +60,7 @@ from .declaration import (
     validity_from_dict,
     validity_to_dict,
 )
-from .durable import SCHEMA_VERSION, SqliteDataUseDeclarations
+from .durable import LEGACY_SCHEMA_VERSION, SCHEMA_VERSION, SqliteDataUseDeclarations
 from .errors import (
     ContractViolation,
     CrossTenantRefused,
@@ -77,12 +84,20 @@ from .version import (
     CONTRACT_MATURITY,
     CONTRACT_VERSION,
     ENFORCEMENT_ENABLED,
+    LEGACY_CONTRACT_VERSION,
     MATURITY,
     __version__,
 )
+from .vocabulary import (
+    VocabularyBinding,
+    VocabularyBindingState,
+    vocabulary_binding_from_dict,
+    vocabulary_binding_to_dict,
+)
 
 __all__ = [
-    "__version__", "CONTRACT_VERSION", "MATURITY", "CONTRACT_MATURITY", "ENFORCEMENT_ENABLED",
+    "__version__", "CONTRACT_VERSION", "LEGACY_CONTRACT_VERSION", "MATURITY",
+    "CONTRACT_MATURITY", "ENFORCEMENT_ENABLED",
     # the system identity and the label, re-exported and never redefined
     "AssessedSystemBinding", "SystemBindingAuthenticityStatus", "DataClassificationLabel",
     # the record
@@ -90,12 +105,15 @@ __all__ = [
     "supersession_refusals", "require_admissible_supersession",
     "validity_to_dict", "validity_from_dict",
     "binding_to_dict", "binding_from_dict", "declaration_record", "declaration_from_record",
+    # which published vocabulary each label was written against (VV-A to VV-E)
+    "VocabularyBinding", "VocabularyBindingState",
+    "vocabulary_binding_to_dict", "vocabulary_binding_from_dict",
     # the read seam and its pure selectors
     "DataUseDeclarationPort", "declared_at", "select_for_tenant", "select_for_data",
     "select_for_system", "select_by_classification", "select_by_purpose",
     "supersession_chain",
     # the one ruled durable home (FD-12.2): declare is its only write (FD-12.5)
-    "SqliteDataUseDeclarations", "SCHEMA_VERSION",
+    "SqliteDataUseDeclarations", "SCHEMA_VERSION", "LEGACY_SCHEMA_VERSION",
     # errors
     "DataUseAdmissionError", "ContractViolation", "DeclarationSupersessionError",
     "DeclarationStorageError", "DeclarationProductionModeError",

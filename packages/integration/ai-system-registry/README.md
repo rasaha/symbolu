@@ -66,7 +66,8 @@ consumer has to reach past the record to discover that nothing here is attested.
 ## The registration
 
 `SystemRegistration(registration_id, binding, owner_ref, classification_label,
-validity, supersedes, registered_by, notes)`.
+validity, classification_vocabulary, record_version, supersedes, registered_by,
+notes)`.
 
 - **`owner_ref`** is a non-secret directory handle. Never a credential, never an
   authenticated identity, and never proof that anyone accepted the role.
@@ -78,11 +79,57 @@ validity, supersedes, registered_by, notes)`.
   document under ballot `LV-1`, never as an enum here, so nothing in this package
   can recognize a member. There is no
   `severity`, `risk_level`, `tier` or `is_high_risk` anywhere on the record.
+- **`classification_vocabulary`** names *which published vocabulary the label was
+  written against* — `VocabularyBinding(vocabulary, version, specification_digest)`,
+  since 0.3.0. **Required** (`VV-E`); `""`, `latest` and `current` are refused, because
+  a record citing a moving reference records nothing durable — what it meant changes
+  the next time somebody publishes.
+- **`record_version`** says which record shape this is, and a caller never chooses it
+  for new work.
 - **`registration_id`** is derived from the binding's own canonical digest, the
   owner and the window — no UUID, no clock — and the record **verifies** it at
   construction, so an id is never chosen by a caller. That is what makes the
   collision-freedom real: a different configuration, version, owner or window is a
   different id, so a collection keyed by id can never silently lose a registration.
+
+## Which vocabulary the label was read under (0.3.0, `VV-A` to `VV-E`)
+
+Before this, a registration recorded *what* an administrator called the system and left
+*under what taxonomy* unrecorded — so an old registration silently re-read under a new
+vocabulary. The binding closes that, and **`VV-C` is the ruling that shapes it here, by
+saying no.**
+
+The binding is covered by `record_digest()` and is deliberately **absent from the
+derived id**. This record's identity is the system binding, the owner and the window;
+the label never took part in it, so neither does the label's vocabulary. `VV-C`
+rejected the binary framing that would have given all four packages one answer: the
+binding follows the label, and two of the four records bind a label into identity while
+this one does not. **Every registration id written before 0.3.0 is therefore unchanged**,
+and two registrations differing only in vocabulary version share an id and differ in
+digest.
+
+**It is a reference, not a resolution.** Three named parts — identifier, exact version
+and the specification's digest — naming one immutable published document and no other.
+The digest is required rather than encouraged: a version alone is a claim about *a*
+document, a version and a digest are a claim about *this* one. And nobody here resolves
+it: this package never opens `docs/vocabularies/`, never fetches, and never checks that
+a digest belongs to a document that exists. A test asserts the code contains no call
+that could.
+
+**Records written before it still read** (`VV-E`). A stored record with no version is v1
+by construction, projects the v1 keys, and keeps the digest it was stored with; it
+reports `UNVERSIONED_LEGACY`, which is a statement that the taxonomy is **unknown** and
+never an invitation to assume the current one. A v1 file opens read-only, **permanently**:
+`MIG-5` ruled migration out of scope (`docs/architecture/VOCABULARY_BINDING_MIGRATION_SCOPING.md`), because
+every vocabulary was published after every record a v1 file can hold, so a binding
+asserted for one would be false rather than merely unverifiable. This package is why the
+ruling was cheap: its derived id does not carry the vocabulary, so a migrated registration
+would collide with the record it migrates, and `D-3` refuses a supersession binding the
+same system identity — which a migration always does. `D-3` therefore stands untouched.
+
+**Naming a vocabulary is not interpreting a label.** `D-2` is untouched: no taxonomy, no
+ordering, no severity, and `governance-contracts` gained no type and did not move its
+`CONTRACT_VERSION` — which is `VV-A` working as intended.
 
 ## The window
 
@@ -164,9 +211,22 @@ roots, products and applications may import it; no capability package may — en
   uninterpreted anyway, and by ruling rather than by omission: `D-2` makes it a
   non-empty opaque value, and `LV-1` puts the vocabulary in a Policy-Authority
   document rather than an enum here, so this package still records and never
-  classifies. A blank label is refused; an unrecognized one is not.
-- The ratified set covers AI **systems** only. General-purpose AI models, which the
-  regime governs on a separate axis, have no member — open as ballot `LV-F`.
+  classifies. A blank label is refused; an unrecognized one is not. The vocabulary
+  is **published** as an immutable specification at
+  `docs/vocabularies/eu-ai-act-system-classification/1.0.0.json` — canonical content,
+  and explicitly **not** issued Policy Authority policy — and since 0.3.0 a
+  registration **cites it**. What still does not exist is the interpreting layer: no
+  owner has ruled what each member *entails*, and no package permitted to decide has
+  been given the vocabulary. The binding makes interpretation possible later; it makes
+  this package an interpreter never.
+- The ratified set covers AI **systems** only, and now by ruling rather than by
+  omission: `LV-F` is decided (`PUB-3`) — general-purpose AI models are a
+  **different regulated object**, governed separately under Chapter V, and no GPAI
+  member is added to this vocabulary. A separate `GeneralPurposeAIModelRegistration`
+  record is to be scoped, distinguishing the model's status from whether it presents
+  systemic risk. **Until that record exists, GPAI models remain uncovered by this
+  package**, and this disclosure is retained deliberately so the gap stays visible
+  rather than closed on paper.
 - (Closed for static imports) The repository now enforces "no capability package
   may import it" repository-wide, in `scripts/check_package_import_boundaries.py`.
   A dynamic `importlib.import_module(name)` cannot be caught by any static

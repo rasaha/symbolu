@@ -36,6 +36,7 @@ from _fixtures import (
     OTHER_VENDOR,
     POLICY,
     POSTURE,
+    POSTURE_VOCABULARY,
     T1,
     TENANT,
     VENDOR,
@@ -172,19 +173,21 @@ def test_declaration_id_for_refuses_look_alikes_and_blanks():
 
 def test_the_id_is_derived_and_a_chosen_one_is_refused():
     b, v = binding(), window()
-    derived = declaration_id_for(b, VENDOR, POSTURE, POLICY, v)
+    vocabulary = dict(posture_vocabulary=POSTURE_VOCABULARY)
+    derived = declaration_id_for(b, VENDOR, POSTURE, POLICY, v, POSTURE_VOCABULARY)
     VendorDependencyDeclaration(declaration_id=derived, tenant_id=TENANT, binding=b,
                                 vendor_ref=VENDOR, risk_posture=POSTURE, policy_ref=POLICY,
-                                validity=v)
+                                validity=v, **vocabulary)
     with pytest.raises(ContractViolation, match="must be the derived id"):
         VendorDependencyDeclaration(declaration_id="vdd_chosen", tenant_id=TENANT, binding=b,
                                     vendor_ref=VENDOR, risk_posture=POSTURE, policy_ref=POLICY,
-                                    validity=v)
+                                    validity=v, **vocabulary)
     with pytest.raises(ContractViolation, match="must be the derived id"):
         VendorDependencyDeclaration(
-            declaration_id=declaration_id_for(b, OTHER_VENDOR, POSTURE, POLICY, v),
+            declaration_id=declaration_id_for(b, OTHER_VENDOR, POSTURE, POLICY, v,
+                                              POSTURE_VOCABULARY),
             tenant_id=TENANT, binding=b, vendor_ref=VENDOR, risk_posture=POSTURE,
-            policy_ref=POLICY, validity=v)
+            policy_ref=POLICY, validity=v, **vocabulary)
 
 
 def test_two_declarations_can_never_share_an_id():

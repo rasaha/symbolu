@@ -41,6 +41,13 @@ from ._canon import (
     require_tzaware,
 )
 from .errors import ContractViolation, RegistrationSupersessionError
+from .version import CONTRACT_VERSION, LEGACY_CONTRACT_VERSION
+from .vocabulary import (
+    VocabularyBinding,
+    VocabularyBindingState,
+    vocabulary_binding_from_dict,
+    vocabulary_binding_to_dict,
+)
 
 __all__ = [
     "SystemRegistration", "REGISTRATION_ID_PREFIX", "registration_id_for",
@@ -122,7 +129,12 @@ def registration_record(registration: "SystemRegistration") -> dict:
 
 def registration_from_record(record: dict) -> "SystemRegistration":
     """Rebuild a registration from :func:`registration_record`. The derived id is
-    re-verified at construction, so a tampered record cannot reconstruct."""
+    re-verified at construction, so a tampered record cannot reconstruct.
+
+    A record written before the binding still reads: its version is discovered from the
+    record itself, it projects the v1 keys, and it comes back ``UNVERSIONED_LEGACY``
+    rather than quietly upgraded to the current vocabulary (``VV-E``).
+    """
     if not isinstance(record, dict) or "registration" not in record or "binding" not in record:
         raise ContractViolation("a registration record carries 'registration' and 'binding'")
     reg = record["registration"]
@@ -132,11 +144,18 @@ def registration_from_record(record: dict) -> "SystemRegistration":
     validity = validity_from_dict(reg.get("validity"))
     if validity is None:
         raise ContractViolation("registration.validity is required")
+    # A record with no stored version predates the field, so it is v1 by construction —
+    # inferred from its own absence rather than from the reader's current contract,
+    # which is what would silently reinterpret an old record.
+    record_version = reg.get("record_version") or LEGACY_CONTRACT_VERSION
     try:
         return SystemRegistration(
             registration_id=reg.get("registration_id", ""), binding=binding,
             owner_ref=reg.get("owner_ref", ""), classification_label=reg.get("classification_label", ""),
-            validity=validity, supersedes=reg.get("supersedes", ""),
+            validity=validity,
+            classification_vocabulary=vocabulary_binding_from_dict(
+                reg.get("classification_vocabulary"), "registration.classification_vocabulary"),
+            record_version=record_version, supersedes=reg.get("supersedes", ""),
             registered_by=reg.get("registered_by", ""), notes=reg.get("notes", ""))
     except ContractViolation:
         raise
@@ -176,6 +195,14 @@ class SystemRegistration:
     #: unrecognized one is not, because there is no recognized set.
     classification_label: str
     validity: Validity
+    #: The published vocabulary ``classification_label`` was written against. Required
+    #: on a v2 record (``VV-E``); ``""``, ``latest`` and ``current`` are refused, since
+    #: a moving reference records nothing durable.
+    classification_vocabulary: Optional[VocabularyBinding] = None
+    #: Which record shape this is. A caller never chooses it for new work — it defaults
+    #: to the current contract, and the only other accepted value reconstructs a
+    #: historical record that already exists.
+    record_version: str = CONTRACT_VERSION
     #: The registration this one replaces (D-3). A new system version is registered
     #: afresh; the prior record is never edited.
     supersedes: str = ""
@@ -196,6 +223,7 @@ class SystemRegistration:
         if not isinstance(self.validity, Validity):
             raise ContractViolation(
                 "SystemRegistration.validity must be a governance-contracts Validity")
+        self._require_vocabulary_binding()
         # The id is *derived*, never chosen. Checking it here is what makes the
         # collision-freedom real: two registrations of different systems, versions,
         # owners or windows cannot share an id, so a collection keyed by id can
@@ -206,6 +234,54 @@ class SystemRegistration:
                 f"SystemRegistration.registration_id must be the derived id "
                 f"{expected!r}; ids are derived from the binding, owner and window, "
                 "never chosen by the caller")
+
+    def _require_vocabulary_binding(self) -> None:
+        """``VV-E``: required on a new record version, absent only on a historical one.
+
+        The two cases are exclusive by construction, so there is no third shape and no
+        way to write a current record without naming the vocabulary its label was read
+        under.
+        """
+
+        if self.record_version not in (CONTRACT_VERSION, LEGACY_CONTRACT_VERSION):
+            raise ContractViolation(
+                f"SystemRegistration.record_version {self.record_version!r} is neither "
+                f"the current contract {CONTRACT_VERSION!r} nor the historical "
+                f"{LEGACY_CONTRACT_VERSION!r}")
+        if (self.classification_vocabulary is not None
+                and not isinstance(self.classification_vocabulary, VocabularyBinding)):
+            raise ContractViolation(
+                "SystemRegistration.classification_vocabulary must be a VocabularyBinding")
+        if self.record_version == LEGACY_CONTRACT_VERSION:
+            if self.classification_vocabulary is not None:
+                raise ContractViolation(
+                    f"a {LEGACY_CONTRACT_VERSION} registration carries no vocabulary "
+                    "binding; a record that names a vocabulary is a current record, and "
+                    "its digest is taken under the current projection")
+            return
+        if self.classification_vocabulary is None:
+            raise ContractViolation(
+                "SystemRegistration requires classification_vocabulary: a governed label "
+                "on a current record names the published vocabulary it was written "
+                "against (VV-E). An absent reference is never defaulted to the current "
+                "vocabulary")
+
+    # ------------------------------------------------------------------ #
+    @property
+    def vocabulary_state(self) -> VocabularyBindingState:
+        """Whether this record names its vocabulary, or predates the requirement.
+
+        ``UNVERSIONED_LEGACY`` says the taxonomy is **unknown**, and ``VV-E`` forbids
+        resolving it to any published vocabulary.
+        """
+
+        return (VocabularyBindingState.BOUND
+                if self.classification_vocabulary is not None
+                else VocabularyBindingState.UNVERSIONED_LEGACY)
+
+    @property
+    def is_current_record(self) -> bool:
+        return self.record_version == CONTRACT_VERSION
 
     # ------------------------------------------------------------------ #
     @property
@@ -245,7 +321,13 @@ class SystemRegistration:
 
     # ------------------------------------------------------------------ #
     def to_dict(self) -> dict:
-        return {
+        """The canonical projection, from an explicit key list rather than ``asdict``.
+
+        A v1 record projects the v1 keys and nothing else, so its stored digest still
+        verifies byte for byte; a v2 record adds the binding and the record version.
+        """
+
+        projected = {
             "registration_id": self.registration_id,
             "binding_digest": self.binding.canonical_digest(),
             "tenant_id": self.binding.tenant_id, "system_id": self.binding.system_id,
@@ -254,8 +336,22 @@ class SystemRegistration:
             "validity": validity_to_dict(self.validity), "supersedes": self.supersedes,
             "registered_by": self.registered_by, "notes": self.notes,
         }
+        if self.record_version == LEGACY_CONTRACT_VERSION:
+            return projected
+        projected["record_version"] = self.record_version
+        projected["classification_vocabulary"] = vocabulary_binding_to_dict(
+            self.classification_vocabulary)
+        return projected
 
     def record_digest(self) -> str:
+        """The digest of the whole projection, the vocabulary included on a v2 record.
+
+        ``VV-B``: a digest excluding the taxonomy would prove the *bytes* of a label
+        while failing to prove what that label meant. **The derived id is untouched**
+        — ``VV-C`` keeps this record's identity semantics exactly as they were, because
+        the label never took part in them.
+        """
+
         return domain_digest("registration", self.to_dict())
 
 

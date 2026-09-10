@@ -25,12 +25,14 @@ from ugence_data_use_admission import (
 from _fixtures import (
     AFTER_WINDOW,
     BEFORE_WINDOW,
+    CLASSIFICATION_VOCABULARY,
     DATA,
     LABEL,
     OTHER_DATA,
     OTHER_LABEL,
     OTHER_PURPOSE,
     PURPOSE,
+    PURPOSE_VOCABULARY,
     T1,
     T2,
     TENANT,
@@ -173,7 +175,8 @@ def test_the_chain_reconstructs_history_and_is_not_filtered_by_instant():
 
 def test_a_cycle_terminates_rather_than_looping():
     a_label, b_label = LABEL, OTHER_LABEL
-    b_id = declaration_id_for(binding(), DATA, b_label, PURPOSE, window())
+    b_id = declaration_id_for(binding(), DATA, b_label, PURPOSE, window(),
+                              CLASSIFICATION_VOCABULARY, PURPOSE_VOCABULARY)
     a = declaration(label=a_label, supersedes=b_id)
     b_decl = declaration(label=b_label, supersedes=a.declaration_id)
     assert b_decl.declaration_id == b_id

@@ -16,6 +16,7 @@ anywhere else in this deployment.
 from __future__ import annotations
 
 from ugence_vendor_dependency import (
+    VocabularyBinding,
     CrossTenantRefused,
     DeclarationStorageError,
     SqliteVendorDeclarations,
@@ -24,11 +25,25 @@ from ugence_vendor_dependency import (
 from . import DEPLOYMENT_NAME, DEPLOYMENT_VERSION
 from .config import DeploymentConfigError
 
-__all__ = ["open_vendor_declarations", "VENDOR_RECORDED_BY"]
+__all__ = ["open_vendor_declarations", "VENDOR_RECORDED_BY", "VENDOR_POSTURE_VOCABULARY"]
 
 #: FD-13.2: the composition every vendor declaration this deployment records was
 #: recorded by.
 VENDOR_RECORDED_BY = f"{DEPLOYMENT_NAME}/{DEPLOYMENT_VERSION}"
+
+#: The published vocabulary this image records vendor postures against
+#: (``VV-E``, authorized by ``PUB-2``). Pinned at build time, like the recording
+#: composition above and for the same reason: which taxonomy this image's screens write
+#: under is a property of the image, not of a caller or of a runtime setting. Named for
+#: its members by ``PUB-1a`` — citing it confers nothing, since ``VR-3`` forbids implied
+#: eligibility. Recorded here and resolved by nobody: this deployment never opens
+#: ``docs/vocabularies/``.
+VENDOR_POSTURE_VOCABULARY = VocabularyBinding(
+    vocabulary="vendor-dependency-assessment-state",
+    version="1.0.0",
+    specification_digest=(
+        "sha256:43fd5b7c37899890afe92a3e908303fcadbbcd225d8c2c155f1364e282206458"),
+)
 
 
 def open_vendor_declarations(path: str, *, tenant_id: str,

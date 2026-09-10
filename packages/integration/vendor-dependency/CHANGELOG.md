@@ -1,5 +1,40 @@
 # Changelog — ugence-vendor-dependency
 
+## 0.3.0 — a declaration names the vocabulary its posture was written against
+
+`CONTRACT_VERSION` moves to `vendor_dependency.v2` and `SCHEMA_VERSION` to
+`vendor_dependency.sqlite.v2`. `ugence-governance-contracts` is untouched and its
+`CONTRACT_VERSION` does not move, which is `VV-A` working as intended.
+
+**`policy_ref` is the shape to copy, not the carrier.** `PUB-2` authorized reusing it
+for the vocabulary reference only if it normatively identified the exact vocabulary, and
+`VR-4` forbids this package from resolving, verifying, interpreting or fetching it — so
+it references *some* policy with no guarantee which. `posture_vocabulary` is a separate
+field beside it, and the refusal a caller sees when they omit the binding says why.
+
+- `VendorDependencyDeclaration.posture_vocabulary` —
+  `VocabularyBinding(vocabulary, version, specification_digest)`, **required** on a v2
+  record (`VV-E`). `""`, `latest` and `current` are refused by name.
+- In `record_digest()` (`VV-B`) **and in the derived `declaration_id`** (`VV-C`), because
+  `risk_posture` already participates in this record's identity. One of the two records
+  where `VV-C` answers yes, and it answers yes for that reason rather than by default.
+- In `declared_terms()`, so re-declaring the same posture under a revised vocabulary is
+  an admissible supersession: the words are identical and what they were read to mean is
+  not.
+- **Records written before this still read.** A record with no stored version is v1 by
+  construction, projects the v1 keys, and keeps the id and digest it was stored with; it
+  reports `UNVERSIONED_LEGACY` and is never resolved to a published vocabulary. A v1
+  file opens read-only, **permanently**: `MIG-5` ruled migration out of scope
+  (`docs/architecture/VOCABULARY_BINDING_MIGRATION_SCOPING.md`), because every vocabulary was published after every record a v1
+  file can hold, so a binding asserted for one would be false rather than merely
+  unverifiable. A deployment holding v1 records keeps two files and reads both.
+
+**Citing a vocabulary confers nothing.** `VR-3` forbids implied eligibility, `LV-C`
+refused a permission ladder for it, and `PUB-1a` renamed the vocabulary from
+`…-permission` to `vendor-dependency-assessment-state` for the same reason. The record
+gains no approval, grade or onboarding surface, and a test asserts it.
+
+
 ## [Unreleased] — public_api.json no longer records the interpreter it was generated on
 
 No API change: every exported symbol, kind, field list and version is identical. The

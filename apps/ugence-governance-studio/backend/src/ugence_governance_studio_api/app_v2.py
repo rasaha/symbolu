@@ -75,9 +75,13 @@ def build_studio_context(
     review_service_base_url: Optional[str] = None,
     system_registry: Any = None,
     registered_by: str = "",
+    system_classification_vocabulary: Any = None,
     data_use_declarations: Any = None,
     recorded_by: str = "",
+    data_classification_vocabulary: Any = None,
+    data_use_purpose_vocabulary: Any = None,
     vendor_declarations: Any = None,
+    vendor_posture_vocabulary: Any = None,
     received_clearances: Any = None,
     deployment_report: Any = None,
 ) -> V2Context:
@@ -87,6 +91,22 @@ def build_studio_context(
     reports itself unavailable and names the gap; none of them substitutes a stub. That
     is the difference between a screen that says "no trust root is configured" and one
     that shows a green tick over an ephemeral key.
+
+    **The four vocabulary parameters follow the same rule, and have to.** Since the
+    record packages took their vocabulary bindings (``VV-A`` to ``VV-E``, authorized by
+    ``PUB-2``), a governed label on a new record must name the published vocabulary it
+    was written against — and ``PUB-2`` forbids defaulting an absent reference to the
+    current one. So a deployment that has not said which taxonomy its administrators
+    record against cannot record, and the seam says exactly that rather than stamping a
+    vocabulary nobody chose. Each is the *package's own* ``VocabularyBinding``: four
+    identical types, because ``VV-A`` put the binding on the record precisely so no new
+    neutral type entered ``governance-contracts``.
+
+    The alternative — carrying the vocabulary in each request payload — was not taken:
+    the v2 contract is frozen, and a new required request field would break every
+    existing client to record a fact that belongs to the deployment rather than to the
+    call. Whether an administrator should be able to override it per request is a
+    product question, not settled here.
     """
     console = ConsoleClient(console_base_url) if console_base_url else None
     review = ReviewServiceClient(review_service_base_url) if review_service_base_url else None
@@ -106,11 +126,16 @@ def build_studio_context(
         publish=PublishService(console=console),
         observe=ObserveService(console=console),
         review=ReviewRelayService(review=review),
-        registry=RegistryService(registry=system_registry, registered_by=registered_by),
-        data_use=DeclarationService(declarations=data_use_declarations,
-                                    recorded_by=recorded_by),
-        vendor=VendorDeclarationService(declarations=vendor_declarations,
-                                        recorded_by=recorded_by),
+        registry=RegistryService(
+            registry=system_registry, registered_by=registered_by,
+            classification_vocabulary=system_classification_vocabulary),
+        data_use=DeclarationService(
+            declarations=data_use_declarations, recorded_by=recorded_by,
+            classification_vocabulary=data_classification_vocabulary,
+            purpose_vocabulary=data_use_purpose_vocabulary),
+        vendor=VendorDeclarationService(
+            declarations=vendor_declarations, recorded_by=recorded_by,
+            posture_vocabulary=vendor_posture_vocabulary),
         clearance_export=ClearanceExportService(
             source=received_clearances,
             tenant_id=getattr(received_clearances, "tenant_id", "")),

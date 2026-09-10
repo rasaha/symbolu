@@ -8,9 +8,11 @@ from datetime import datetime, timedelta, timezone
 from ugence_governance_contracts.api import Validity
 
 from ugence_data_use_admission import (
+    LEGACY_CONTRACT_VERSION,
     AssessedSystemBinding,
     DataClassificationLabel,
     DataUseDeclaration,
+    VocabularyBinding,
     declaration_id_for,
 )
 
@@ -21,6 +23,17 @@ LABEL = DataClassificationLabel("confidential")
 OTHER_LABEL = DataClassificationLabel("public")
 PURPOSE = "candidate-screening"
 OTHER_PURPOSE = "analytics"
+
+#: The two published vocabularies a current declaration cites. The digests are
+#: fixture-shaped rather than the real published ones on purpose: this package never
+#: resolves a binding, so a test that used the real digests would look like it was
+#: checking something it is forbidden to check.
+CLASSIFICATION_VOCABULARY = VocabularyBinding(
+    vocabulary="data-classification", version="1.0.0", specification_digest="sha256:" + "1a" * 32)
+PURPOSE_VOCABULARY = VocabularyBinding(
+    vocabulary="data-use-purpose", version="1.0.0", specification_digest="sha256:" + "2b" * 32)
+NEXT_CLASSIFICATION_VOCABULARY = VocabularyBinding(
+    vocabulary="data-classification", version="2.0.0", specification_digest="sha256:" + "3c" * 32)
 
 T0 = datetime(2026, 3, 1, 9, 0, tzinfo=timezone.utc)
 T1 = T0 + timedelta(minutes=5)
@@ -51,11 +64,36 @@ def declaration(bound: AssessedSystemBinding | None = None, *, tenant: str | Non
                 data_ref: str = DATA, label: DataClassificationLabel = LABEL,
                 purpose: str = PURPOSE, validity: Validity | None = None,
                 residency: str = "", supersedes: str = "",
-                declared_by: str = "admin-1") -> DataUseDeclaration:
+                declared_by: str = "admin-1",
+                classification_vocabulary: VocabularyBinding | None = None,
+                purpose_vocabulary: VocabularyBinding | None = None) -> DataUseDeclaration:
+    b = bound or binding()
+    v = validity or window()
+    cv = classification_vocabulary or CLASSIFICATION_VOCABULARY
+    pv = purpose_vocabulary or PURPOSE_VOCABULARY
+    return DataUseDeclaration(
+        declaration_id=declaration_id_for(b, data_ref, label, purpose, v, cv, pv),
+        tenant_id=tenant if tenant is not None else b.tenant_id, binding=b,
+        data_ref=data_ref, classification=label, purpose_label=purpose, validity=v,
+        classification_vocabulary=cv, purpose_vocabulary=pv,
+        residency_label=residency, supersedes=supersedes, declared_by=declared_by)
+
+
+def legacy_declaration(bound: AssessedSystemBinding | None = None, *,
+                       data_ref: str = DATA, label: DataClassificationLabel = LABEL,
+                       purpose: str = PURPOSE, validity: Validity | None = None,
+                       declared_by: str = "admin-1") -> DataUseDeclaration:
+    """A record of the shape written before the bindings, for the read path only.
+
+    Nothing constructs one of these in anger — the store refuses to write it. It exists
+    so the v1 projection can be exercised against records that really do predate the
+    field, rather than against a simulation of them.
+    """
+
     b = bound or binding()
     v = validity or window()
     return DataUseDeclaration(
         declaration_id=declaration_id_for(b, data_ref, label, purpose, v),
-        tenant_id=tenant if tenant is not None else b.tenant_id, binding=b,
-        data_ref=data_ref, classification=label, purpose_label=purpose, validity=v,
-        residency_label=residency, supersedes=supersedes, declared_by=declared_by)
+        tenant_id=b.tenant_id, binding=b, data_ref=data_ref, classification=label,
+        purpose_label=purpose, validity=v, record_version=LEGACY_CONTRACT_VERSION,
+        declared_by=declared_by)

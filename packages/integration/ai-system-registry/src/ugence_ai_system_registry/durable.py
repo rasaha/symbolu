@@ -33,6 +33,7 @@ from .errors import (
     RegistryProductionModeError,
     RegistryStorageError,
 )
+from .version import CONTRACT_VERSION
 from .registration import (
     SystemRegistration,
     registration_from_record,
@@ -46,9 +47,22 @@ from .registry import (
     select_for_tenant,
 )
 
-__all__ = ["SqliteSystemRegistry", "SCHEMA_VERSION"]
+__all__ = ["SqliteSystemRegistry", "SCHEMA_VERSION", "LEGACY_SCHEMA_VERSION"]
 
-SCHEMA_VERSION = "ai_system_registry.sqlite.v1"
+#: Moved to v2 in 0.3.0. The *table* is unchanged — the vocabulary binding travels in
+#: ``record_json`` with the rest of the record — but a v2 file holds a shape a v1 file
+#: never held, and the meta row is the only thing that can say which.
+SCHEMA_VERSION = "ai_system_registry.sqlite.v2"
+
+#: Files written before the binding. They stay **readable**, and are closed to writes
+#: **permanently**: appending a v2 record to a v1 file would make its own schema row a
+#: lie, and MIG-5 ruled that no migration follows
+#: (docs/architecture/VOCABULARY_BINDING_MIGRATION_SCOPING.md), so this is the end state
+#: rather than a waiting room. This package is the reason the ruling was cheap: its
+#: derived id does not carry the vocabulary, so a migrated registration would collide
+#: with the record it migrates, and D-3 refuses a supersession binding the same system
+#: identity — which a migration always does.
+LEGACY_SCHEMA_VERSION = "ai_system_registry.sqlite.v1"
 
 _SCHEMA = (
     "CREATE TABLE IF NOT EXISTS registrations ("
@@ -99,6 +113,20 @@ class SqliteSystemRegistry:
             self._conn.execute(
                 "INSERT OR IGNORE INTO registry_meta(key, value) VALUES ('tenant_id', ?)",
                 (self.tenant_id,))
+            # OR IGNORE leaves an existing file's own version in place, so this reads
+            # what the file says rather than what this build would have written.
+            self.schema_version = self._conn.execute(
+                "SELECT value FROM registry_meta WHERE key = 'schema_version'").fetchone()[0]
+            if self.schema_version not in (SCHEMA_VERSION, LEGACY_SCHEMA_VERSION):
+                self._conn.close()
+                self._conn = None
+                raise RegistryStorageError(
+                    f"this registry file records schema {self.schema_version!r}, which this "
+                    f"build does not know; it reads {SCHEMA_VERSION!r} and "
+                    f"{LEGACY_SCHEMA_VERSION!r}")
+            #: A v1 file is readable and closed to writes. Stated as a field so a
+            #: composition root can see the posture without provoking a refusal.
+            self.accepts_writes = self.schema_version == SCHEMA_VERSION
             bound = self._conn.execute(
                 "SELECT value FROM registry_meta WHERE key = 'tenant_id'").fetchone()[0]
             if bound != self.tenant_id:
@@ -153,6 +181,21 @@ class SqliteSystemRegistry:
         if not isinstance(registration, SystemRegistration):
             raise ContractViolation("register takes a SystemRegistration")
         self._require_tenant(registration.tenant_id)
+        if not self.accepts_writes:
+            raise RegistryStorageError(
+                f"this file is {self.schema_version!r} and holds records written before "
+                "the vocabulary binding; it stays readable and takes no new records. "
+                "It is closed permanently: MIG-5 ruled migration out of scope "
+                "(docs/architecture/VOCABULARY_BINDING_MIGRATION_SCOPING.md), because a "
+                "binding asserted for a record written before any vocabulary was "
+                "published would be false rather than merely unverifiable. Open a "
+                "current file for new records and read this one alongside it")
+        if registration.record_version != CONTRACT_VERSION:
+            raise ContractViolation(
+                f"register takes a {CONTRACT_VERSION} registration; "
+                f"{registration.record_version!r} is a historical shape that can be read "
+                "and not written, so a new record cannot reach the file without naming "
+                "the vocabulary its label was written against")
         with self._lock:
             existing = {r.registration_id: r for r in self._rows()}
             if registration.registration_id in existing:

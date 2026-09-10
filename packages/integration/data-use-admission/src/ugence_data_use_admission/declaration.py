@@ -55,6 +55,13 @@ from ._canon import (
     require_tzaware,
 )
 from .errors import ContractViolation, DeclarationSupersessionError
+from .version import CONTRACT_VERSION, LEGACY_CONTRACT_VERSION
+from .vocabulary import (
+    VocabularyBinding,
+    VocabularyBindingState,
+    vocabulary_binding_from_dict,
+    vocabulary_binding_to_dict,
+)
 
 __all__ = [
     "DataUseDeclaration", "DECLARATION_ID_PREFIX", "declaration_id_for",
@@ -90,13 +97,26 @@ def validity_from_dict(d: Optional[dict]) -> Optional[Validity]:
 
 def declaration_id_for(binding: AssessedSystemBinding, data_ref: str,
                        classification: DataClassificationLabel, purpose_label: str,
-                       validity: Validity) -> str:
+                       validity: Validity,
+                       classification_vocabulary: Optional[VocabularyBinding] = None,
+                       purpose_vocabulary: Optional[VocabularyBinding] = None) -> str:
     """Deterministic declaration id: no UUID, no clock.
 
     Derived from the binding's own canonical digest, the data reference, the
     label's digest, the purpose and the window, so two loads of the same
     declaration are the same declaration, and a different system, different data,
     a different label or a different purpose can never share an id.
+
+    **Since v2 the two vocabulary bindings are part of it** (``VV-C``): a label already
+    participates in this record's identity, so the taxonomy the label was read under
+    participates too. Two declarations naming the same member of two different
+    vocabulary versions are two declarations, not one.
+
+    **The v1 preimage is reproduced exactly when no binding is given** — the two keys
+    are added rather than the shape rewritten — so a historical record still derives
+    the id it was stored under (``VV-B``: historical digests are never recomputed under
+    the new projection). Passing exactly one binding is refused: it would be a third
+    preimage nothing ratified.
     """
 
     if not isinstance(binding, AssessedSystemBinding):
@@ -106,13 +126,22 @@ def declaration_id_for(binding: AssessedSystemBinding, data_ref: str,
             "declaration_id_for.classification must be a DataClassificationLabel")
     if not isinstance(validity, Validity):
         raise ContractViolation("declaration_id_for.validity must be a governance-contracts Validity")
-    return DECLARATION_ID_PREFIX + domain_digest("declaration_id", {
+    preimage = {
         "binding": binding.canonical_digest(),
         "data_ref": require_nonempty(data_ref, "data_ref"),
         "classification": classification.canonical_digest(),
         "purpose_label": require_nonempty(purpose_label, "purpose_label"),
         "validity": validity_to_dict(validity),
-    })[:32]
+    }
+    if (classification_vocabulary is None) != (purpose_vocabulary is None):
+        raise ContractViolation(
+            "declaration_id_for takes both vocabulary bindings or neither; one binding "
+            "would derive an id under a record shape that does not exist")
+    if classification_vocabulary is not None and purpose_vocabulary is not None:
+        preimage["classification_vocabulary"] = vocabulary_binding_to_dict(
+            classification_vocabulary)
+        preimage["purpose_vocabulary"] = vocabulary_binding_to_dict(purpose_vocabulary)
+    return DECLARATION_ID_PREFIX + domain_digest("declaration_id", preimage)[:32]
 
 
 @dataclass(frozen=True)
@@ -134,6 +163,19 @@ class DataUseDeclaration:
     #: What the declarer said the data is for. Uninterpreted in the same way.
     purpose_label: str
     validity: Validity
+    #: The published vocabulary ``classification`` was written against. Required on a
+    #: v2 record (``VV-E``), and **independent** of the purpose binding below: two
+    #: vocabularies, two references, neither borrowed from the other (``VV-D``).
+    classification_vocabulary: Optional[VocabularyBinding] = None
+    #: The published vocabulary ``purpose_label`` was written against. Required on a v2
+    #: record even though ``LV-E`` ruled purpose an *open shape*: open means the
+    #: platform closes no member set, never that purpose terminology is timeless or
+    #: anonymously sourced (``VV-D``).
+    purpose_vocabulary: Optional[VocabularyBinding] = None
+    #: Which record shape this is. A caller never chooses it for new work — it defaults
+    #: to the current contract, and the only other accepted value reconstructs a
+    #: historical record that already exists.
+    record_version: str = CONTRACT_VERSION
     #: Declared residency metadata, recorded and never evaluated (DE-2).
     residency_label: str = ""
     #: The declaration this one replaces. A changed declaration is made afresh;
@@ -166,17 +208,78 @@ class DataUseDeclaration:
                 f"DataUseDeclaration.tenant_id {self.tenant_id!r} does not match the "
                 f"binding's tenant {self.binding.tenant_id!r}; a declaration never "
                 "crosses tenants")
+        self._require_vocabulary_bindings()
         # The id is *derived*, never chosen. Checking it here is what makes the
         # collision-freedom real: two declarations of different systems, data,
         # labels, purposes or windows cannot share an id, so a collection keyed by
         # id can never silently lose one.
         expected = declaration_id_for(self.binding, self.data_ref, self.classification,
-                                      self.purpose_label, self.validity)
+                                      self.purpose_label, self.validity,
+                                      self.classification_vocabulary,
+                                      self.purpose_vocabulary)
         if self.declaration_id != expected:
             raise ContractViolation(
                 f"DataUseDeclaration.declaration_id must be the derived id "
                 f"{expected!r}; ids are derived from the binding, data, label, purpose "
                 "and window, never chosen by the caller")
+
+    def _require_vocabulary_bindings(self) -> None:
+        """``VV-E``: required on a new record version, absent only on a historical one.
+
+        The two cases are exclusive by construction rather than by convention, so there
+        is no third shape and no way to write a current record without the bindings:
+        a v2 record refuses a missing one, and a v1 record refuses a present one.
+        """
+
+        if self.record_version not in (CONTRACT_VERSION, LEGACY_CONTRACT_VERSION):
+            raise ContractViolation(
+                f"DataUseDeclaration.record_version {self.record_version!r} is neither "
+                f"the current contract {CONTRACT_VERSION!r} nor the historical "
+                f"{LEGACY_CONTRACT_VERSION!r}")
+
+        for name in ("classification_vocabulary", "purpose_vocabulary"):
+            value = getattr(self, name)
+            if value is not None and not isinstance(value, VocabularyBinding):
+                raise ContractViolation(
+                    f"DataUseDeclaration.{name} must be a VocabularyBinding")
+
+        present = (self.classification_vocabulary is not None,
+                   self.purpose_vocabulary is not None)
+        if self.record_version == LEGACY_CONTRACT_VERSION:
+            if any(present):
+                raise ContractViolation(
+                    f"a {LEGACY_CONTRACT_VERSION} declaration carries no vocabulary "
+                    "binding; a record that names a vocabulary is a current record, and "
+                    "its digest and id are derived under the current projection")
+            return
+        if not all(present):
+            missing = [name for name, ok in
+                       zip(("classification_vocabulary", "purpose_vocabulary"), present)
+                       if not ok]
+            raise ContractViolation(
+                f"DataUseDeclaration requires {' and '.join(missing)}: every governed "
+                "label on a current record names the published vocabulary it was "
+                "written against (VV-E). An absent reference is never defaulted to the "
+                "current vocabulary")
+
+    # ------------------------------------------------------------------ #
+    @property
+    def vocabulary_state(self) -> VocabularyBindingState:
+        """Whether this record names its vocabularies, or predates the requirement.
+
+        ``UNVERSIONED_LEGACY`` is a statement that the taxonomy is **unknown**, and
+        ``VV-E`` forbids resolving it to any published vocabulary. A consumer that
+        wants to know what a legacy label meant has to find that out elsewhere; this
+        package will not guess on its behalf.
+        """
+
+        return (VocabularyBindingState.BOUND
+                if self.classification_vocabulary is not None
+                else VocabularyBindingState.UNVERSIONED_LEGACY)
+
+    @property
+    def is_current_record(self) -> bool:
+        return self.record_version == CONTRACT_VERSION
 
     # ------------------------------------------------------------------ #
     @property
@@ -222,6 +325,11 @@ class DataUseDeclaration:
 
         This is what a supersession must change: the same system, data, label,
         purpose and residency re-declared is an unchanged declaration.
+
+        **The vocabularies are part of the terms.** Re-declaring the same label under a
+        new vocabulary version *is* a change, and a substantive one: the words are
+        identical and what they were read to mean is not. Leaving the bindings out here
+        would refuse exactly the supersession a vocabulary revision exists to record.
         """
 
         return {
@@ -230,10 +338,21 @@ class DataUseDeclaration:
             "classification": self.classification.canonical_digest(),
             "purpose_label": self.purpose_label,
             "residency_label": self.residency_label,
+            "classification_vocabulary": vocabulary_binding_to_dict(
+                self.classification_vocabulary),
+            "purpose_vocabulary": vocabulary_binding_to_dict(self.purpose_vocabulary),
         }
 
     def to_dict(self) -> dict:
-        return {
+        """The canonical projection, from an explicit key list rather than ``asdict``.
+
+        The list is explicit precisely so that adding a field is a deliberate act with a
+        version behind it. A v1 record projects the v1 keys and nothing else, so its
+        stored digest still verifies byte for byte; a v2 record adds the two bindings and
+        the record version, and ``record_digest`` therefore covers them (``VV-B``).
+        """
+
+        projected = {
             "declaration_id": self.declaration_id,
             "tenant_id": self.tenant_id,
             "binding_digest": self.binding.canonical_digest(),
@@ -249,8 +368,24 @@ class DataUseDeclaration:
             "correlation_id": self.correlation_id,
             "notes": self.notes,
         }
+        if self.record_version == LEGACY_CONTRACT_VERSION:
+            return projected
+        projected["record_version"] = self.record_version
+        projected["classification_vocabulary"] = vocabulary_binding_to_dict(
+            self.classification_vocabulary)
+        projected["purpose_vocabulary"] = vocabulary_binding_to_dict(
+            self.purpose_vocabulary)
+        return projected
 
     def record_digest(self) -> str:
+        """The digest of the whole projection, vocabularies included on a v2 record.
+
+        ``VV-B`` accepted the compatibility consequence deliberately: a digest that
+        excluded the taxonomy would prove the *bytes* of a label while failing to prove
+        what that label meant, and two otherwise identical records written under
+        different vocabulary versions must not collide.
+        """
+
         return domain_digest("declaration", self.to_dict())
 
 
@@ -309,7 +444,15 @@ def declaration_record(declaration: DataUseDeclaration) -> dict:
 
 def declaration_from_record(record: dict) -> DataUseDeclaration:
     """Rebuild a declaration from :func:`declaration_record`. The derived id is
-    re-verified at construction, so an altered record cannot reconstruct."""
+    re-verified at construction, so an altered record cannot reconstruct.
+
+    **A record written before the bindings still reads.** Its version is discovered
+    from the record itself — a stored ``record_version`` if it has one, the historical
+    contract if it does not — so a v1 file reconstructs under the v1 projection and
+    verifies against the id and digest it was actually stored with (``VV-B``). It comes
+    back as ``UNVERSIONED_LEGACY``, which is a statement that the taxonomy is unknown;
+    it is never quietly upgraded to the current vocabulary (``VV-E``).
+    """
 
     if not isinstance(record, dict) or "declaration" not in record or "binding" not in record:
         raise ContractViolation("a declaration record carries 'declaration' and 'binding'")
@@ -320,6 +463,10 @@ def declaration_from_record(record: dict) -> DataUseDeclaration:
     validity = validity_from_dict(declared.get("validity"))
     if validity is None:
         raise ContractViolation("declaration.validity is required")
+    # A record with no stored version predates the field, so it is v1 by construction —
+    # inferred from its own absence rather than assumed, and never from the reader's
+    # current contract, which is what would silently reinterpret an old record.
+    record_version = declared.get("record_version") or LEGACY_CONTRACT_VERSION
     try:
         return DataUseDeclaration(
             declaration_id=declared.get("declaration_id", ""),
@@ -327,6 +474,12 @@ def declaration_from_record(record: dict) -> DataUseDeclaration:
             data_ref=declared.get("data_ref", ""),
             classification=DataClassificationLabel(declared.get("classification_label", "")),
             purpose_label=declared.get("purpose_label", ""), validity=validity,
+            classification_vocabulary=vocabulary_binding_from_dict(
+                declared.get("classification_vocabulary"),
+                "declaration.classification_vocabulary"),
+            purpose_vocabulary=vocabulary_binding_from_dict(
+                declared.get("purpose_vocabulary"), "declaration.purpose_vocabulary"),
+            record_version=record_version,
             residency_label=declared.get("residency_label", ""),
             supersedes=declared.get("supersedes", ""),
             declared_by=declared.get("declared_by", ""),

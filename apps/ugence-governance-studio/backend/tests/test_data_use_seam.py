@@ -20,7 +20,7 @@ from datetime import datetime
 import pytest
 from fastapi.testclient import TestClient
 
-from ugence_data_use_admission import SqliteDataUseDeclarations
+from ugence_data_use_admission import SqliteDataUseDeclarations, VocabularyBinding
 from ugence_governance_studio_api.app_v2 import build_studio_context, create_v2_app
 from ugence_governance_studio_api.services.studio_v2 import (
     DECLARATION_CONFERS,
@@ -35,6 +35,18 @@ _APP = os.path.abspath(os.path.join(_HERE, "..", ".."))
 
 TENANT = "tenant-1"
 RECORDED_BY = "governance-studio-private-hosted/0.9.0"
+
+#: The published vocabulary this test deployment records against. A real deployment
+#: configures its own; what matters here is that one is configured at all, because a
+#: seam handed none refuses to record rather than stamping a vocabulary nobody chose.
+CLASSIFICATION_VOCABULARY = VocabularyBinding(
+    vocabulary="data-classification", version="1.0.0",
+    specification_digest="sha256:" + "1a" * 32)
+#: Independent of the classification binding by VV-D, so it is configured separately
+#: and never derived from it.
+PURPOSE_VOCABULARY = VocabularyBinding(
+    vocabulary="data-use-purpose", version="1.0.0",
+    specification_digest="sha256:" + "2b" * 32)
 D = "b" * 64
 PATH = "/api/v2/data-use/declarations"
 
@@ -69,7 +81,10 @@ def declarations(tmp_path):
 
 @pytest.fixture()
 def client(declarations):
-    studio = build_studio_context(data_use_declarations=declarations, recorded_by=RECORDED_BY)
+    studio = build_studio_context(
+        data_use_declarations=declarations, recorded_by=RECORDED_BY,
+        data_classification_vocabulary=CLASSIFICATION_VOCABULARY,
+        data_use_purpose_vocabulary=PURPOSE_VOCABULARY)
     return TestClient(create_v2_app(ApiSettings(environment="test"), studio=studio))
 
 
@@ -262,3 +277,25 @@ def test_the_v2_contract_carries_exactly_the_two_ruled_operations_and_the_amendm
         committed = fh.read()
     assert hashlib.sha256(committed).hexdigest() == previous
     assert committed == canonical_v2_openapi_bytes()
+
+
+def test_two_vocabularies_are_required_independently(declarations):
+    """VV-D makes them independent, so configuring one and not the other configures neither.
+
+    A deployment that named a data-classification vocabulary and no purpose vocabulary
+    would otherwise record a purpose label under a taxonomy borrowed from classification,
+    which is exactly what VV-D refuses.
+    """
+
+    for kwargs, missing in (
+        ({}, "data-classification"),
+        ({"data_classification_vocabulary": CLASSIFICATION_VOCABULARY}, "data-use-purpose"),
+        ({"data_use_purpose_vocabulary": PURPOSE_VOCABULARY}, "data-classification"),
+    ):
+        studio = build_studio_context(data_use_declarations=declarations,
+                                      recorded_by=RECORDED_BY, **kwargs)
+        client = TestClient(create_v2_app(ApiSettings(environment="test"), studio=studio))
+        result = _result(_declare(client, _declaration()))
+        assert result["available"] is False and result["result"] is None
+        assert missing in result["reason"], (missing, result["reason"])
+    assert declarations.count() == 0

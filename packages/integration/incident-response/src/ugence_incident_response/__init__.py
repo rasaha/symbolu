@@ -61,10 +61,26 @@ from .states import (
     is_legal_transition,
     require_transition,
 )
-from .version import CONTRACT_VERSION, ENFORCEMENT_ENABLED, MATURITY, __version__
+from .version import (
+    CONTRACT_VERSION,
+    ENFORCEMENT_ENABLED,
+    LEGACY_CONTRACT_VERSION,
+    MATURITY,
+    __version__,
+)
+from .vocabulary import (
+    VocabularyBinding,
+    VocabularyBindingState,
+    vocabulary_binding_from_dict,
+    vocabulary_binding_to_dict,
+)
 
 __all__ = [
-    "__version__", "CONTRACT_VERSION", "MATURITY", "ENFORCEMENT_ENABLED",
+    "__version__", "CONTRACT_VERSION", "LEGACY_CONTRACT_VERSION", "MATURITY",
+    "ENFORCEMENT_ENABLED",
+    # which published vocabulary the severity label was written against (VV-A to VV-E)
+    "VocabularyBinding", "VocabularyBindingState",
+    "vocabulary_binding_to_dict", "vocabulary_binding_from_dict",
     # the audit reference an incident cites, re-exported and never redefined
     "AuditReference",
     # records

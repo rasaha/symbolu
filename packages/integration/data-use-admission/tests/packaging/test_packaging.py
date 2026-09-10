@@ -17,8 +17,11 @@ PUBLIC_API = PROJECT / "public_api.json"
 def test_the_distribution_is_named_and_versioned_exactly():
     text = PYPROJECT.read_text(encoding="utf-8")
     assert 'name = "ugence-data-use-admission"' in text
-    assert PKG_DIR.name == "ugence_data_use_admission" and pkg.__version__ == "0.2.0"
-    assert pkg.CONTRACT_VERSION == "data_use_admission.v1"
+    assert PKG_DIR.name == "ugence_data_use_admission" and pkg.__version__ == "0.3.0"
+    assert pkg.CONTRACT_VERSION == "data_use_admission.v2"
+    # The historical shape is named, not deleted: records written under it stay readable
+    # and keep the digests and ids they were stored with (VV-B).
+    assert pkg.LEGACY_CONTRACT_VERSION == "data_use_admission.v1"
 
 
 def test_the_public_api_manifest_equals_the_live_package_surface():

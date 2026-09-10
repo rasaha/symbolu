@@ -14,7 +14,7 @@ from datetime import datetime, timezone
 import pytest
 from fastapi.testclient import TestClient
 
-from ugence_ai_system_registry import SqliteSystemRegistry
+from ugence_ai_system_registry import SqliteSystemRegistry, VocabularyBinding
 from ugence_governance_studio_api.app_v2 import build_studio_context, create_v2_app
 from ugence_governance_studio_api.services.studio_v2 import OWNER_REF_STATUS, RegistryService
 from ugence_governance_studio_api.settings import ApiSettings
@@ -24,6 +24,13 @@ _APP = os.path.abspath(os.path.join(_HERE, "..", ".."))
 
 TENANT = "tenant-1"
 REGISTERED_BY = "governance-studio-private-hosted/0.6.0"
+
+#: The published vocabulary this test deployment records against. A real deployment
+#: configures its own; what matters here is that one is configured at all, because a
+#: seam handed none refuses to record rather than stamping a vocabulary nobody chose.
+CLASSIFICATION_VOCABULARY = VocabularyBinding(
+    vocabulary="eu-ai-act-system-classification", version="1.0.0",
+    specification_digest="sha256:" + "1a" * 32)
 D = "a" * 64
 
 
@@ -54,7 +61,8 @@ def registry(tmp_path):
 
 @pytest.fixture()
 def client(registry):
-    studio = build_studio_context(system_registry=registry, registered_by=REGISTERED_BY)
+    studio = build_studio_context(system_registry=registry, registered_by=REGISTERED_BY,
+                                  system_classification_vocabulary=CLASSIFICATION_VOCABULARY)
     return TestClient(create_v2_app(ApiSettings(environment="test"), studio=studio))
 
 
@@ -207,3 +215,14 @@ def test_the_v2_contract_carries_exactly_the_two_ruled_operations_and_the_amendm
         committed = fh.read()
     assert hashlib.sha256(committed).hexdigest() == previous
     assert committed == canonical_v2_openapi_bytes()
+
+
+def test_a_registry_without_a_vocabulary_refuses_to_record_rather_than_stamping_one(registry):
+    """VV-E and PUB-2: an absent vocabulary reference is never defaulted."""
+
+    studio = build_studio_context(system_registry=registry, registered_by=REGISTERED_BY)
+    client = TestClient(create_v2_app(ApiSettings(environment="test"), studio=studio))
+    result = _result(_register(client, _body()))
+    assert result["available"] is False and result["result"] is None
+    assert "vocabulary" in result["reason"]
+    assert registry.count() == 0

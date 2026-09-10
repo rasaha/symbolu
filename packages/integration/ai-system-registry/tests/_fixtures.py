@@ -8,8 +8,10 @@ from datetime import datetime, timedelta, timezone
 from ugence_governance_contracts.api import Validity
 
 from ugence_ai_system_registry import (
+    LEGACY_CONTRACT_VERSION,
     AssessedSystemBinding,
     SystemRegistration,
+    VocabularyBinding,
     registration_id_for,
 )
 
@@ -17,6 +19,17 @@ TENANT = "tenant-a"
 OWNER = "directory://people/system-owner-1"
 LABEL = "high-risk"
 OTHER_LABEL = "limited-risk"
+
+#: The published vocabulary a current registration cites. The digest is fixture-shaped
+#: rather than the real published one on purpose: this package never resolves a binding,
+#: so a test using the real digest would look like it was checking something it is
+#: forbidden to check.
+CLASSIFICATION_VOCABULARY = VocabularyBinding(
+    vocabulary="eu-ai-act-system-classification", version="1.0.0",
+    specification_digest="sha256:" + "1a" * 32)
+NEXT_CLASSIFICATION_VOCABULARY = VocabularyBinding(
+    vocabulary="eu-ai-act-system-classification", version="2.0.0",
+    specification_digest="sha256:" + "3c" * 32)
 
 T0 = datetime(2026, 3, 1, 9, 0, tzinfo=timezone.utc)
 T1 = T0 + timedelta(minutes=5)
@@ -45,10 +58,31 @@ def window(issued: datetime = T0, *, days: int = 365) -> Validity:
 
 def registration(bound: AssessedSystemBinding | None = None, *, owner: str = OWNER,
                  label: str = LABEL, validity: Validity | None = None,
-                 supersedes: str = "", registered_by: str = "admin-1") -> SystemRegistration:
+                 supersedes: str = "", registered_by: str = "admin-1",
+                 classification_vocabulary: VocabularyBinding | None = None,
+                 ) -> SystemRegistration:
     b = bound or binding()
     v = validity or window()
     return SystemRegistration(
         registration_id=registration_id_for(b, owner, v), binding=b, owner_ref=owner,
-        classification_label=label, validity=v, supersedes=supersedes,
+        classification_label=label, validity=v,
+        classification_vocabulary=classification_vocabulary or CLASSIFICATION_VOCABULARY,
+        supersedes=supersedes, registered_by=registered_by)
+
+
+def legacy_registration(bound: AssessedSystemBinding | None = None, *, owner: str = OWNER,
+                        label: str = LABEL, validity: Validity | None = None,
+                        registered_by: str = "admin-1") -> SystemRegistration:
+    """A record of the shape written before the binding, for the read path only.
+
+    Nothing constructs one of these in anger — the store refuses to write it. It exists
+    so the v1 projection can be exercised against records that really do predate the
+    field.
+    """
+
+    b = bound or binding()
+    v = validity or window()
+    return SystemRegistration(
+        registration_id=registration_id_for(b, owner, v), binding=b, owner_ref=owner,
+        classification_label=label, validity=v, record_version=LEGACY_CONTRACT_VERSION,
         registered_by=registered_by)
