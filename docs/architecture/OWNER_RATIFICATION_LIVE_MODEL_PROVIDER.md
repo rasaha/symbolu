@@ -1,10 +1,12 @@
 # Owner ratification — a live model-calling provider
 
-**Status:** D-1, D-2, D-3 and D-4 **RATIFIED 2026-09-10**, together with §3's direction, a
-CR-5 clarification recorded in the composition-root ADR, and three transport rulings — a
+**Status:** D-1 through D-5 **all RATIFIED 2026-09-10**, together with §3's direction, a
+CR-5 clarification recorded in the composition-root ADR, three transport rulings — a
 worker-owned reconciliation driver, a dedicated exchange schema under least privilege, and
-`OUTCOME_UNKNOWN` as a terminal outcome — recorded in `SPEC_MODEL_EGRESS_UNIT.md` §3.3-§3.5.
-D-5 open. Nothing is
+`OUTCOME_UNKNOWN` as a terminal outcome — recorded in `SPEC_MODEL_EGRESS_UNIT.md` §3.3-§3.5,
+and the exchange grants and tenancy ruling in
+`OWNER_RATIFICATION_MEU_EXCHANGE_TENANCY.md`. **No design question remains open**; what
+remains is unbuilt mechanism and one owner decision on retention. Nothing is
 implemented. No exchange table is designed and no exchange exists. No gate identifier is
 marked satisfied and no ratified pin, gate record or evidence manifest is modified by this
 document. The implementation specification opened by these rulings is
@@ -202,7 +204,56 @@ kind-specific schema exists the rule is stated and unpoliced. And **the grace pe
 maximum retention duration are owner decisions withheld from engineering** `[R]`: until they
 are set, no content may be held at all. Recorded in full at `SPEC_MODEL_EGRESS_UNIT.md` §4.4.
 
-### D-5 — Do concentration limits carry into execution?
+### D-5 — Do concentration limits carry into execution? — **RATIFIED: `BIND_AT_AUTHORIZATION`**
+
+> **D-5 — BIND_AT_AUTHORIZATION.** Any enforceable model-vendor mix requirement is evaluated
+> by Model Authority before an authorized request is written to the model-egress exchange.
+> `PLANNING_ONLY` is insufficient for a binding organizational limit, and `BIND_AT_THE_MEU` is
+> rejected because it would give the MEU governance authority expressly denied by the
+> architecture.
+>
+> The existing `AgentProfile.provider_id` concentration limit concerns suppliers of assigned
+> agent roles and must not be interpreted as a model-invocation vendor limit. Before
+> vendor-mix enforcement can operate, Policy Authority must define the invocation quantity,
+> scope, tenant, measurement window, denominator, policy reference/version/digest, and
+> treatment of refused, failed and uncertain outcomes. A durable, idempotent per-vendor
+> reservation/counter owned by the authorization side is also required. Record both as `[G]`.
+>
+> When an applicable vendor-mix policy exists, Model Authority must durably reserve capacity
+> before the request is admitted to the exchange. Its authorization must bind tenant, selected
+> vendor, selected model, policy identity and reservation identity. If the applicable policy or
+> durable counter cannot be resolved, authorization fails closed and no request is dispatched.
+>
+> The MEU does not calculate concentration, choose policy or update governance limits. It only
+> verifies that the requested vendor and model match the authorization binding. A mismatch uses
+> the existing/general authorization-binding refusal rather than a new D-5 vendor-mix refusal.
+> Remove §6's D-5 refusal placeholder.
+>
+> A request reaching `OUTCOME_UNKNOWN` after possible provider dispatch is conservatively
+> counted as consumed until an independently authorized reconciliation proves otherwise. Lease
+> expiry alone never releases the reservation or permits another billed call.
+> — owner, 2026-09-10
+
+**The ruling took the audit's finding and made it a prohibition.** This document observed that
+the composer's limit measures role assignments rather than invocations; the ruling turns that
+from a discrepancy into a rule — the existing limit **must not be interpreted** as a
+model-invocation vendor limit. A future implementer who finds `provider_concentration_limit_pct`
+and reaches for it is now doing something forbidden rather than something plausible.
+
+**Two additions the audit did not reach, and both close real holes.** *Fail closed on an
+unresolvable policy or counter*: the audit argued where the check belongs and left unstated
+what happens when the mechanism is present but unreadable — silence there would have defaulted
+to allow. And *`OUTCOME_UNKNOWN` counts as consumed*: §3.5 already made that outcome terminal
+for the request, but a reservation is a different object, and without this rule an ambiguous
+dispatch would have quietly returned capacity that may well have been spent. Lease expiry
+releasing a reservation would have reintroduced, at the quota layer, exactly the duplicate
+billed call §3.5 exists to prevent.
+
+**What the ruling does not do is start the work.** Both prerequisites stay `[G]`, and neither
+is designed here: the policy quantity is Policy Authority's to define, and the reservation
+counter is the authorization side's to build.
+
+
 
 **Audit first, because the question contains an assumption the repository does not support.**
 D-5 asks whether "the vendor mix a plan promised" binds at execution. There is no such

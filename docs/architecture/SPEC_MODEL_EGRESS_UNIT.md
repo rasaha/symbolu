@@ -5,17 +5,18 @@
 
 **Also opened by** §3 `MEU_PULLS_AUTHORIZED_WORK_ASYNCHRONOUSLY`, D-3
 `NO_CREDENTIAL_IN_THIS_DEPLOYMENT`, D-4 `EXCHANGE_IS_THE_TEMPORARY_CONTENT_PLANE` (§4.4),
-the CR-5 clarification of 2026-09-10 recorded in
+D-5 `BIND_AT_AUTHORIZATION` (§4.1), the CR-5 clarification of 2026-09-10 recorded in
 `ADR_UGENCE_REVIEW_SERVICE_COMPOSITION_ROOT_SCOPING.md`, the three transport rulings of
 2026-09-10 recorded in §3.3, §3.4 and §3.5 below, and the exchange grants and tenancy ruling
 of 2026-09-10 recorded in `OWNER_RATIFICATION_MEU_EXCHANGE_TENANCY.md` §4.
 
-**Scope of this revision.** Architecture, boundary, interface and deployment, the D-4 ruling
-of 2026-09-10 recorded in §4.4, and the exchange grants and tenancy ruling of the same day,
-recorded in §3.4, §5.2 and §6. **D-5** (concentration limits at execution) remains the one
-open decision, and the section that depends on it says so rather than assuming an answer.
-Every other item in §8 is an unbuilt mechanism or an owner decision withheld from
-engineering, not an unanswered design question.
+**Scope of this revision.** Architecture, boundary, interface and deployment, and every
+ruling of 2026-09-10: D-4 in §4.4, exchange grants and tenancy in §3.4, §5.2 and §6, and D-5
+`BIND_AT_AUTHORIZATION` in §4.1, §4.3, §6 and §7. **No design question remains open.** Every
+item in §8 is an unbuilt mechanism or the one owner decision on retention withheld from
+engineering. Nothing here is implemented, no provider SDK is introduced, no real network call
+is specified, no exchange table is designed, and no gate identifier of P3E-CTR or GRW-CTR is
+marked satisfied.
 Nothing here is implemented, no provider SDK is introduced, no real network call is
 specified, no exchange table is designed, and no gate identifier of P3E-CTR or GRW-CTR is
 marked satisfied.
@@ -342,6 +343,25 @@ minimized — never before. Its identity is immutable:
 The MEU **may not** modify, broaden or reinterpret any of these. Claiming work confers no
 authority over what was claimed.
 
+**D-5 `BIND_AT_AUTHORIZATION` decides what happens before this record is written** (ruled
+2026-09-10). Where an enforceable model-vendor mix requirement applies, **Model Authority
+evaluates it and durably reserves capacity before the request is admitted to the exchange**,
+and its authorization binds tenant, selected vendor, selected model, policy identity and
+reservation identity. If the applicable policy or the durable counter **cannot be resolved,
+authorization fails closed and no request is dispatched** — an unreadable mechanism is a
+refusal, never a default to allow.
+
+So `model_ref` and `parameters` above are not merely what the authorization named; they are
+what a reservation was taken against. The MEU verifies the match and nothing more (§7).
+
+**`[G]` — neither prerequisite exists, and neither is designed here.** Policy Authority must
+first define the invocation quantity, scope, tenant, measurement window, denominator, policy
+reference/version/digest, and the treatment of refused, failed and uncertain outcomes. A
+durable, idempotent per-vendor reservation counter owned by the authorization side must then
+exist. **The `AgentProfile.provider_id` concentration limit is not it** and must not be
+interpreted as a model-invocation vendor limit: it measures suppliers of assigned agent roles
+(`agent-workforce-composer/…/composition.py:38, 177-183`) `[V]`.
+
 ### 4.2 — The correlated result
 
 Written by the MEU. Carries the same `request_id`, `request_digest` and `correlation_id`,
@@ -369,6 +389,14 @@ on whether dispatch may have occurred (§3.5):
 |---|---|
 | Before dispatch | The request becomes claimable again. No call was made. |
 | After possible dispatch | **Nothing.** The request becomes `OUTCOME_UNKNOWN`, terminal. It does not return to `PENDING`, and its authorization and clearance are spent. |
+
+**A vendor-mix reservation is a third object, and the expiry does not touch it either** (D-5,
+2026-09-10). A request reaching `OUTCOME_UNKNOWN` after possible dispatch is **conservatively
+counted as consumed** until an independently authorized reconciliation proves otherwise;
+**lease expiry alone never releases the reservation or permits another billed call.** Releasing
+capacity on an ambiguous outcome would reintroduce at the quota layer precisely the duplicate
+billed inference §3.5 exists to prevent — the reservation would come back while the vendor's
+invoice did not.
 
 The `request_id` plus `request_digest` pair is the durable dedup key: **a request already
 served is never served twice**. Because the digest binds the exact minimized text and not
@@ -618,16 +646,14 @@ reconciliation driver observes them like any answered result and the instance ad
 them (§3.3, §3.5). An instance parked forever because nothing came back is a failure of
 this design, not an acceptable degradation.
 
-**D-5 may or may not add a refusal here, and the audit of 2026-09-10 argues it should not**
-`[R]`. `OWNER_RATIFICATION_LIVE_MODEL_PROVIDER.md` D-5 establishes that the repository's
-concentration limit measures **role assignments in a team**, not model invocations
-(`agent-workforce-composer/…/composition.py:38, 177-183`) `[V]`, that neither the composer
-nor model-selection reaches the runtime `[V]`, and that the exchange cannot hold the counter a
-mix check needs — §4.4's tombstone drops `model_ref` and provenance at purge, so the
-denominator resets at the retention horizon `[V]`. The recommendation is therefore to bind the
-limit **before the authorized request is written**, where `ModelAuthority` already issues a
-binding decision `[V]`, and to add **no refusal to this list**: a refusal on grounds the
-authorization did not settle is the authority §7 denies the MEU. Unruled either way.
+**D-5 adds no refusal to this list, and the placeholder that reserved one is removed**
+(ruled `BIND_AT_AUTHORIZATION`, 2026-09-10). A vendor-mix breach is refused by Model Authority
+before the request is written (§4.1), so it never reaches the MEU. Where the requested vendor
+or model does not match the authorization binding, the MEU refuses under the **existing**
+third condition above — the requested model or parameters differ from what the authorization
+named — not under a new vendor-mix refusal. The distinction is not bookkeeping: a
+vendor-mix refusal would require the MEU to know a policy, a window and a denominator, and
+that is the governance authority the architecture denies it.
 
 ## 7 — What the rulings do not authorize
 
@@ -637,7 +663,10 @@ authorization did not settle is the authority §7 denies the MEU. Unruled either
 - **The MEU has no authority surface.** It cannot grant, clear, approve or execute. AP-4's
   read-only posture on the authority plane is untouched and stays untouched `[V]`.
 - **The MEU is not a second governance layer.** It performs one call and returns one
-  result, as RA-7 observes without owning authority consequences `[V]`.
+  result, as RA-7 observes without owning authority consequences `[V]`. Under D-5 it
+  **does not calculate concentration, choose policy or update governance limits**; it verifies
+  that the requested vendor and model match the authorization binding, and that is the whole of
+  its part in vendor-mix governance `[V]`.
 - **No schema, authorization or tenancy change to the outbox is authorized here.** Those
   were ratified separately (`OWNER_RATIFICATION_MEU_EXCHANGE_TENANCY.md` §4) `[V]`, which
   lifted §4.4's gate on designing an exchange table and replaced it with five implementation
@@ -649,9 +678,8 @@ authorization did not settle is the authority §7 denies the MEU. Unruled either
 
 | Decision | Blocks |
 |---|---|
-**Every open item is now a gap or an owner decision, not an unanswered design question.**
-D-4 (§4.4) and exchange grants and tenancy
-(`OWNER_RATIFICATION_MEU_EXCHANGE_TENANCY.md` §4) were both ratified on 2026-09-10. What
+**No design question remains open.** D-1 through D-5, the three transport rulings, the CR-5
+clarification and the exchange grants and tenancy ruling were all settled by 2026-09-10. What
 they left behind is work, and one decision engineering may not make.
 
 | Open item | Blocks |
@@ -665,11 +693,14 @@ they left behind is work, and one decision engineering may not make.
 | **Credential custody** `[G]` | §4.4, §5.2. None exists — for the provider credential D-3 keeps out, nor for the runtime and migration identities the tenancy ruling requires `[V]` |
 | **The MEU ledger-kind schema** `[G]` | §4.4's ledger rule has no enforcement: `LedgerEntry.payload` accepts any canonical dict (`entry.py:52-61`). Unbuilt, and not built here |
 | **The deployed DBOS version** `[G]` | §3.6 — `UNKNOWN` until a constrained image is built and inspected; blocked on the mirror (RW-2) |
-| **D-5** concentration limits `[R]` | §6. Audited 2026-09-10; the recommendation is that the limit binds at authorization and the MEU gains **no** refusal. Two things would have to be built first, neither licensed by ruling D-5: a vendor-mix quantity over invocations rather than role assignments `[G]`, and a durable per-vendor counter with a database-enforced ceiling, shaped like `PostgresBudgetLedger` `[G]` |
+| **Vendor-mix policy quantity** `[G]` | §4.1. D-5 binds at authorization, and Policy Authority must first define the invocation quantity, scope, tenant, measurement window, denominator, policy reference/version/digest, and the treatment of refused, failed and uncertain outcomes. `AgentProfile.provider_id`'s limit is **not** it and may not be read as it `[V]` |
+| **Per-vendor reservation counter** `[G]` | §4.1. Durable and idempotent, owned by the authorization side. Nothing like it exists; the nearest shape in the repository is `PostgresBudgetLedger`, whose ceiling is a database `CHECK` constraint `[V]` |
 
-**A ratification implements nothing.** Both rulings of 2026-09-10 decided how the exchange
-must work; neither created a table, a role, a policy or a credential, and this document
-creates none either.
+**A ratification implements nothing.** The rulings of 2026-09-10 decided how the exchange
+must work; none created a table, a role, a policy, a counter or a credential, and this
+document creates none either. The design is settled and the mechanism is absent — those are
+different sentences, and this specification is careful never to let the first stand in for the
+second.
 
 
 ## 9 — What exists to build on
