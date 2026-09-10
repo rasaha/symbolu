@@ -33,6 +33,7 @@ from datetime import datetime
 from typing import List, Optional
 
 from ._canon import require_nonempty
+from .version import CONTRACT_VERSION
 from .declaration import (
     VendorDependencyDeclaration,
     declaration_from_record,
@@ -54,9 +55,18 @@ from .selectors import (
     select_for_vendor,
 )
 
-__all__ = ["SqliteVendorDeclarations", "SCHEMA_VERSION"]
+__all__ = ["SqliteVendorDeclarations", "SCHEMA_VERSION", "LEGACY_SCHEMA_VERSION"]
 
-SCHEMA_VERSION = "vendor_dependency.sqlite.v1"
+#: Moved to v2 in 0.3.0. The *table* is unchanged — the vocabulary binding travels in
+#: ``record_json`` with the rest of the record — but a v2 file holds a shape a v1 file
+#: never held, and the meta row is the only thing that can say which.
+SCHEMA_VERSION = "vendor_dependency.sqlite.v2"
+
+#: Files written before the binding. They stay **readable**, and are closed to writes:
+#: appending a v2 record to a v1 file would make its own schema row a lie, and VV-E
+#: rules that migration needs its own process rather than happening as a side effect of
+#: the next append.
+LEGACY_SCHEMA_VERSION = "vendor_dependency.sqlite.v1"
 
 _SCHEMA = (
     "CREATE TABLE IF NOT EXISTS declarations ("
@@ -109,6 +119,21 @@ class SqliteVendorDeclarations:
             self._db_handle.execute(
                 "INSERT OR IGNORE INTO declarations_meta(key, value) VALUES ('tenant_id', ?)",
                 (self.tenant_id,))
+            # OR IGNORE leaves an existing file's own version in place, so this reads
+            # what the file says rather than what this build would have written.
+            self.schema_version = self._db_handle.execute(
+                "SELECT value FROM declarations_meta WHERE key = 'schema_version'"
+            ).fetchone()[0]
+            if self.schema_version not in (SCHEMA_VERSION, LEGACY_SCHEMA_VERSION):
+                self._db_handle.close()
+                self._db_handle = None
+                raise DeclarationStorageError(
+                    f"this declarations file records schema {self.schema_version!r}, which "
+                    f"this build does not know; it reads {SCHEMA_VERSION!r} and "
+                    f"{LEGACY_SCHEMA_VERSION!r}")
+            #: A v1 file is readable and closed to writes. Stated as a field so a
+            #: composition root can see the posture without provoking a refusal.
+            self.accepts_writes = self.schema_version == SCHEMA_VERSION
             bound = self._db_handle.execute(
                 "SELECT value FROM declarations_meta WHERE key = 'tenant_id'").fetchone()[0]
             if bound != self.tenant_id:
@@ -164,6 +189,17 @@ class SqliteVendorDeclarations:
         if not isinstance(declaration, VendorDependencyDeclaration):
             raise ContractViolation("declare takes a VendorDependencyDeclaration")
         self._require_tenant(declaration.tenant_id)
+        if not self.accepts_writes:
+            raise DeclarationStorageError(
+                f"this file is {self.schema_version!r} and holds records written before "
+                "the vocabulary binding; it stays readable and takes no new records. "
+                "Migrating it needs its own ruled process (VV-E), not an append")
+        if declaration.record_version != CONTRACT_VERSION:
+            raise ContractViolation(
+                f"declare takes a {CONTRACT_VERSION} declaration; "
+                f"{declaration.record_version!r} is a historical shape that can be read "
+                "and not written, so a new record cannot reach the file without naming "
+                "the vocabulary its posture was written against")
         with self._lock:
             existing = {d.declaration_id: d for d in self._rows()}
             if declaration.declaration_id in existing:

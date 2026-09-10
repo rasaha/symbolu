@@ -80,7 +80,8 @@ the posture a declarer *assigned*, never a measure of risk.
 ## The declaration
 
 `VendorDependencyDeclaration(declaration_id, tenant_id, binding, vendor_ref,
-risk_posture, policy_ref, validity, supersedes, declared_by, correlation_id, notes)`.
+risk_posture, policy_ref, validity, posture_vocabulary, record_version, supersedes,
+declared_by, correlation_id, notes)`.
 
 - **`tenant_id`** must agree with the binding's tenant. A mismatch is **refused** at
   construction, never resolved either way; a declaration never crosses tenants.
@@ -91,11 +92,58 @@ risk_posture, policy_ref, validity, supersedes, declared_by, correlation_id, not
   now ratified, but as a Policy-Authority document under ballot `LV-1`, never as an
   enum here, so nothing in this package can recognize a member.
 - **`policy_ref`** is recorded and compared as text, and never resolved (VR-4).
+  **It does not carry the vocabulary reference below** — see the next section.
+- **`posture_vocabulary`** names *which published vocabulary `risk_posture` was
+  written against* — `VocabularyBinding(vocabulary, version, specification_digest)`,
+  since 0.3.0. **Required** (`VV-E`); `""`, `latest` and `current` are refused,
+  because a record citing a moving reference records nothing durable.
+- **`record_version`** says which record shape this is, and a caller never chooses it
+  for new work.
 - **`declaration_id`** is derived from the binding's digest, the vendor reference,
-  the label's digest, the policy reference and the window — no UUID, no clock — and
-  the record **verifies** it at construction, so an id is never chosen by a caller.
-  A different system, vendor, posture, policy or window is a different id, so a
-  collection keyed by id can never silently lose a declaration.
+  the label's digest, the policy reference, the window **and the posture vocabulary**
+  — no UUID, no clock — and the record **verifies** it at construction, so an id is
+  never chosen by a caller. A different system, vendor, posture, policy, window or
+  vocabulary version is a different id, so a collection keyed by id can never
+  silently lose a declaration.
+
+## Which vocabulary the posture was read under (0.3.0, `VV-A` to `VV-E`)
+
+Two rulings landed on this package specifically, and both are worth knowing before
+reading the field.
+
+**`PUB-2` decided the shape of the whole programme by examining `policy_ref` here.**
+Reusing it for the vocabulary reference was authorized *only if* it normatively
+identified the exact vocabulary — and `VR-4` forbids this package from resolving,
+verifying, interpreting or fetching it, so it references *some* policy with no
+guarantee which. An opaque string nobody may interpret identifies nothing in
+particular. So `posture_vocabulary` is a **separate field beside it**: `policy_ref` is
+the shape to copy, not the carrier. The refusal a caller sees when they omit the
+binding says so, rather than only saying no.
+
+**`VV-C` says yes here**, unlike in `ai-system-registry` and `incident-response`.
+`risk_posture` already participates in the derived declaration id, so the vocabulary it
+was read under participates too — two declarations naming the same member of two
+different vocabulary versions are two declarations. The binding is also in
+`record_digest()` (`VV-B`) and in `declared_terms()`, which makes re-declaring the same
+posture under a revised vocabulary an admissible **supersession**: the words are
+identical and what they were read to mean is not.
+
+**Citing a vocabulary still confers nothing.** `VR-3` forbids implied eligibility, which
+is why `LV-C` refused a permission ladder and why `PUB-1a` renamed the vocabulary from
+`…-permission` to `vendor-dependency-assessment-state`. The published specification
+records `ordering` and `eligibility` as explicitly absent. Naming it here adds no
+approval, no grade and no onboarding status, and a test asserts the record gained no
+such surface.
+
+**And nobody here resolves it.** A package forbidden to resolve `policy_ref` is not
+about to resolve this: it never opens `docs/vocabularies/`, never fetches, and never
+checks that a digest belongs to a document that exists. A test asserts the code contains
+no call that could.
+
+**Records written before it still read** (`VV-E`). A stored record with no version is v1
+by construction, projects the v1 keys, derives the id it was stored under, and reports
+`UNVERSIONED_LEGACY` — a statement that the taxonomy is **unknown**, never an invitation
+to assume the current one. A v1 file opens read-only.
 
 ## The window
 
@@ -181,9 +229,11 @@ authorizes an engine.
   `docs/vocabularies/vendor-dependency-assessment-state/1.0.0.json` — named for its
   members by `PUB-1a`, and recording `ordering` and `eligibility` as explicitly
   absent, which is the two things `VR-3` forbids stated rather than left to be
-  inferred. It is canonical content, **not** issued Policy Authority policy, and **no
-  field here cites it**: `PUB-2` authorizes a distinct reference and determined that
-  `policy_ref` may not carry it, but nothing is implemented.
+  inferred. It is canonical content, **not** issued Policy Authority policy, and since
+  0.3.0 a declaration **cites it** — through `posture_vocabulary`, not `policy_ref`,
+  for the reason `PUB-2` gave. What still does not exist is the interpreting layer: no
+  owner has ruled what each member *entails*, and no package permitted to decide has
+  been given the vocabulary.
 - A `policy_ref` that names nothing is indistinguishable here from one that names a
   real version; only Policy Authority can tell, and it is never asked.
 - A dynamic `importlib.import_module(name)` cannot be caught by any static checker;

@@ -53,6 +53,13 @@ from ._canon import (
     require_tzaware,
 )
 from .errors import ContractViolation, DeclarationSupersessionError
+from .version import CONTRACT_VERSION, LEGACY_CONTRACT_VERSION
+from .vocabulary import (
+    VocabularyBinding,
+    VocabularyBindingState,
+    vocabulary_binding_from_dict,
+    vocabulary_binding_to_dict,
+)
 
 __all__ = [
     "VendorDependencyDeclaration", "DECLARATION_ID_PREFIX", "declaration_id_for",
@@ -88,13 +95,25 @@ def validity_from_dict(d: Optional[dict]) -> Optional[Validity]:
 
 def declaration_id_for(binding: AssessedSystemBinding, vendor_ref: str,
                        risk_posture: VendorRiskLabel, policy_ref: str,
-                       validity: Validity) -> str:
+                       validity: Validity,
+                       posture_vocabulary: Optional[VocabularyBinding] = None) -> str:
     """Deterministic declaration id: no UUID, no clock.
 
     Derived from the binding's own canonical digest, the vendor reference, the
     label's digest, the policy reference and the window, so two loads of the same
     declaration are the same declaration, and a different system, vendor, posture
     or policy can never share an id.
+
+    **Since v2 the posture vocabulary is part of it** (``VV-C``). The posture already
+    participates in this record's identity, so the vocabulary it was read under
+    participates too: two declarations naming the same member of two different
+    vocabulary versions are two declarations. This is one of the two records where
+    ``VV-C`` answers yes, and it answers yes for that reason rather than by default.
+
+    **The v1 preimage is reproduced exactly when no binding is given** — the key is
+    added rather than the shape rewritten — so a historical record still derives the id
+    it was stored under (``VV-B``: historical digests are never recomputed under the new
+    projection).
     """
 
     if not isinstance(binding, AssessedSystemBinding):
@@ -103,13 +122,16 @@ def declaration_id_for(binding: AssessedSystemBinding, vendor_ref: str,
         raise ContractViolation("declaration_id_for.risk_posture must be a VendorRiskLabel")
     if not isinstance(validity, Validity):
         raise ContractViolation("declaration_id_for.validity must be a governance-contracts Validity")
-    return DECLARATION_ID_PREFIX + domain_digest("declaration_id", {
+    preimage = {
         "binding": binding.canonical_digest(),
         "vendor_ref": require_nonempty(vendor_ref, "vendor_ref"),
         "risk_posture": risk_posture.canonical_digest(),
         "policy_ref": require_nonempty(policy_ref, "policy_ref"),
         "validity": validity_to_dict(validity),
-    })[:32]
+    }
+    if posture_vocabulary is not None:
+        preimage["posture_vocabulary"] = vocabulary_binding_to_dict(posture_vocabulary)
+    return DECLARATION_ID_PREFIX + domain_digest("declaration_id", preimage)[:32]
 
 
 @dataclass(frozen=True)
@@ -129,8 +151,22 @@ class VendorDependencyDeclaration:
     #: records it and reasons about it never.
     risk_posture: VendorRiskLabel
     #: One opaque Policy Authority reference (VR-4). Recorded, never resolved.
+    #:
+    #: **It does not carry the vocabulary reference below, and PUB-2 says why.** That
+    #: reuse was authorized only if ``policy_ref`` normatively identified the exact
+    #: vocabulary, and VR-4 forbids this package from resolving or interpreting it at
+    #: all — so it references *some* policy, with no guarantee which. Two fields, two
+    #: jobs.
     policy_ref: str
     validity: Validity
+    #: The published vocabulary ``risk_posture`` was written against. Required on a v2
+    #: record (``VV-E``); ``""``, ``latest`` and ``current`` are refused, since a moving
+    #: reference records nothing durable.
+    posture_vocabulary: Optional[VocabularyBinding] = None
+    #: Which record shape this is. A caller never chooses it for new work — it defaults
+    #: to the current contract, and the only other accepted value reconstructs a
+    #: historical record that already exists.
+    record_version: str = CONTRACT_VERSION
     #: The declaration this one replaces. A changed declaration is made afresh;
     #: the prior record is never edited.
     supersedes: str = ""
@@ -164,17 +200,68 @@ class VendorDependencyDeclaration:
                 f"VendorDependencyDeclaration.tenant_id {self.tenant_id!r} does not match "
                 f"the binding's tenant {self.binding.tenant_id!r}; a declaration never "
                 "crosses tenants")
+        self._require_vocabulary_binding()
         # The id is *derived*, never chosen. Checking it here is what makes the
         # collision-freedom real: two declarations of different systems, vendors,
         # postures, policies or windows cannot share an id, so a collection keyed
         # by id can never silently lose one.
         expected = declaration_id_for(self.binding, self.vendor_ref, self.risk_posture,
-                                      self.policy_ref, self.validity)
+                                      self.policy_ref, self.validity,
+                                      self.posture_vocabulary)
         if self.declaration_id != expected:
             raise ContractViolation(
                 f"VendorDependencyDeclaration.declaration_id must be the derived id "
                 f"{expected!r}; ids are derived from the binding, vendor, posture, policy "
                 "and window, never chosen by the caller")
+
+    def _require_vocabulary_binding(self) -> None:
+        """``VV-E``: required on a new record version, absent only on a historical one.
+
+        The two cases are exclusive by construction, so there is no third shape and no
+        way to write a current record without naming the vocabulary its posture was read
+        under.
+        """
+
+        if self.record_version not in (CONTRACT_VERSION, LEGACY_CONTRACT_VERSION):
+            raise ContractViolation(
+                f"VendorDependencyDeclaration.record_version {self.record_version!r} is "
+                f"neither the current contract {CONTRACT_VERSION!r} nor the historical "
+                f"{LEGACY_CONTRACT_VERSION!r}")
+        if (self.posture_vocabulary is not None
+                and not isinstance(self.posture_vocabulary, VocabularyBinding)):
+            raise ContractViolation(
+                "VendorDependencyDeclaration.posture_vocabulary must be a VocabularyBinding")
+        if self.record_version == LEGACY_CONTRACT_VERSION:
+            if self.posture_vocabulary is not None:
+                raise ContractViolation(
+                    f"a {LEGACY_CONTRACT_VERSION} declaration carries no vocabulary "
+                    "binding; a record that names a vocabulary is a current record, and "
+                    "its digest and id are derived under the current projection")
+            return
+        if self.posture_vocabulary is None:
+            raise ContractViolation(
+                "VendorDependencyDeclaration requires posture_vocabulary: a governed "
+                "label on a current record names the published vocabulary it was written "
+                "against (VV-E). policy_ref does not stand in for it — VR-4 makes that "
+                "string opaque, and PUB-2 ruled that an opaque reference identifies no "
+                "vocabulary in particular. An absent reference is never defaulted to the "
+                "current vocabulary")
+
+    # ------------------------------------------------------------------ #
+    @property
+    def vocabulary_state(self) -> VocabularyBindingState:
+        """Whether this record names its vocabulary, or predates the requirement.
+
+        ``UNVERSIONED_LEGACY`` says the taxonomy is **unknown**, and ``VV-E`` forbids
+        resolving it to any published vocabulary.
+        """
+
+        return (VocabularyBindingState.BOUND if self.posture_vocabulary is not None
+                else VocabularyBindingState.UNVERSIONED_LEGACY)
+
+    @property
+    def is_current_record(self) -> bool:
+        return self.record_version == CONTRACT_VERSION
 
     # ------------------------------------------------------------------ #
     @property
@@ -220,6 +307,11 @@ class VendorDependencyDeclaration:
 
         This is what a supersession must change: the same system, vendor, posture
         and policy re-declared is an unchanged declaration.
+
+        **The vocabulary is part of the terms.** Re-declaring the same posture under a
+        new vocabulary version *is* a change: the words are identical and what they were
+        read to mean is not. Leaving the binding out here would refuse exactly the
+        supersession a vocabulary revision exists to record.
         """
 
         return {
@@ -227,10 +319,17 @@ class VendorDependencyDeclaration:
             "vendor_ref": self.vendor_ref,
             "risk_posture": self.risk_posture.canonical_digest(),
             "policy_ref": self.policy_ref,
+            "posture_vocabulary": vocabulary_binding_to_dict(self.posture_vocabulary),
         }
 
     def to_dict(self) -> dict:
-        return {
+        """The canonical projection, from an explicit key list rather than ``asdict``.
+
+        A v1 record projects the v1 keys and nothing else, so its stored digest still
+        verifies byte for byte; a v2 record adds the binding and the record version.
+        """
+
+        projected = {
             "declaration_id": self.declaration_id,
             "tenant_id": self.tenant_id,
             "binding_digest": self.binding.canonical_digest(),
@@ -245,8 +344,20 @@ class VendorDependencyDeclaration:
             "correlation_id": self.correlation_id,
             "notes": self.notes,
         }
+        if self.record_version == LEGACY_CONTRACT_VERSION:
+            return projected
+        projected["record_version"] = self.record_version
+        projected["posture_vocabulary"] = vocabulary_binding_to_dict(self.posture_vocabulary)
+        return projected
 
     def record_digest(self) -> str:
+        """The digest of the whole projection, the vocabulary included on a v2 record.
+
+        ``VV-B``: a digest excluding the taxonomy would prove the *bytes* of a label
+        while failing to prove what that label meant, and two otherwise identical
+        records written under different vocabulary versions must not collide.
+        """
+
         return domain_digest("declaration", self.to_dict())
 
 
@@ -305,7 +416,12 @@ def declaration_record(declaration: VendorDependencyDeclaration) -> dict:
 
 def declaration_from_record(record: dict) -> VendorDependencyDeclaration:
     """Rebuild a declaration from :func:`declaration_record`. The derived id is
-    re-verified at construction, so an altered record cannot reconstruct."""
+    re-verified at construction, so an altered record cannot reconstruct.
+
+    A record written before the binding still reads: its version is discovered from the
+    record itself, it projects the v1 keys, it derives the id it was stored under, and
+    it comes back ``UNVERSIONED_LEGACY`` rather than quietly upgraded (``VV-E``).
+    """
 
     if not isinstance(record, dict) or "declaration" not in record or "binding" not in record:
         raise ContractViolation("a declaration record carries 'declaration' and 'binding'")
@@ -316,6 +432,10 @@ def declaration_from_record(record: dict) -> VendorDependencyDeclaration:
     validity = validity_from_dict(declared.get("validity"))
     if validity is None:
         raise ContractViolation("declaration.validity is required")
+    # A record with no stored version predates the field, so it is v1 by construction —
+    # inferred from its own absence rather than from the reader's current contract,
+    # which is what would silently reinterpret an old record.
+    record_version = declared.get("record_version") or LEGACY_CONTRACT_VERSION
     try:
         return VendorDependencyDeclaration(
             declaration_id=declared.get("declaration_id", ""),
@@ -323,6 +443,9 @@ def declaration_from_record(record: dict) -> VendorDependencyDeclaration:
             vendor_ref=declared.get("vendor_ref", ""),
             risk_posture=VendorRiskLabel(declared.get("risk_posture_label", "")),
             policy_ref=declared.get("policy_ref", ""), validity=validity,
+            posture_vocabulary=vocabulary_binding_from_dict(
+                declared.get("posture_vocabulary"), "declaration.posture_vocabulary"),
+            record_version=record_version,
             supersedes=declared.get("supersedes", ""),
             declared_by=declared.get("declared_by", ""),
             correlation_id=declared.get("correlation_id", ""), notes=declared.get("notes", ""))

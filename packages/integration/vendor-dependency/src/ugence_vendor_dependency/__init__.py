@@ -56,7 +56,7 @@ from .declaration import (
     validity_from_dict,
     validity_to_dict,
 )
-from .durable import SCHEMA_VERSION, SqliteVendorDeclarations
+from .durable import LEGACY_SCHEMA_VERSION, SCHEMA_VERSION, SqliteVendorDeclarations
 from .errors import (
     ContractViolation,
     CrossTenantRefused,
@@ -76,16 +76,23 @@ from .selectors import (
     select_for_vendor,
     supersession_chain,
 )
+from .vocabulary import (
+    VocabularyBinding,
+    VocabularyBindingState,
+    vocabulary_binding_from_dict,
+    vocabulary_binding_to_dict,
+)
 from .version import (
     CONTRACT_MATURITY,
     CONTRACT_VERSION,
+    LEGACY_CONTRACT_VERSION,
     ENFORCEMENT_ENABLED,
     MATURITY,
     __version__,
 )
 
 __all__ = [
-    "__version__", "CONTRACT_VERSION", "MATURITY", "CONTRACT_MATURITY", "ENFORCEMENT_ENABLED",
+    "__version__", "CONTRACT_VERSION", "LEGACY_CONTRACT_VERSION", "MATURITY", "CONTRACT_MATURITY", "ENFORCEMENT_ENABLED",
     # the system identity and the label, re-exported and never redefined
     "AssessedSystemBinding", "SystemBindingAuthenticityStatus", "VendorRiskLabel",
     # the record
@@ -98,7 +105,10 @@ __all__ = [
     "select_for_system", "select_by_risk_posture", "select_by_policy_ref",
     "supersession_chain",
     # the one ruled durable home (FD-13.2): declare is its only write (FD-13.4)
-    "SqliteVendorDeclarations", "SCHEMA_VERSION",
+    "SqliteVendorDeclarations", "SCHEMA_VERSION", "LEGACY_SCHEMA_VERSION",
+    # which published vocabulary the risk posture was written against (VV-A to VV-E)
+    "VocabularyBinding", "VocabularyBindingState",
+    "vocabulary_binding_to_dict", "vocabulary_binding_from_dict",
     # errors
     "VendorDependencyError", "ContractViolation", "DeclarationSupersessionError",
     "DeclarationStorageError", "DeclarationProductionModeError",
