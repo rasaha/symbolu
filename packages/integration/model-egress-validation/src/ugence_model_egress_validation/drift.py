@@ -18,15 +18,29 @@ from .rows import ROWS
 __all__ = ["records_directory", "load_records", "check_drift"]
 
 
+_RECORDS_SUBPATH = pathlib.Path("packages") / "integration" / "model-egress-unit"
+
+
 def records_directory() -> pathlib.Path:
     """The directory holding ``MEU_LIVE_PROVIDER_DESIGNATION.json`` and
-    ``MEU_LIVE_VALIDATION.json``: the unit's package root in a source checkout."""
+    ``MEU_LIVE_VALIDATION.json``.
+
+    In a source checkout that is the unit's package root beside its ``src``. When the
+    unit is installed into site-packages (CI installs all three distributions), the
+    records are not beside it, so the checkout is located by walking up from the
+    working directory to the repository that contains ``packages/integration/model-egress-unit``.
+    """
 
     here = pathlib.Path(meu.__file__).resolve().parent
-    for candidate in (here.parents[1], here.parent, here):
-        if (candidate / "MEU_LIVE_VALIDATION.json").exists():
+    candidates = [here.parents[1], here.parent, here]
+    cwd = pathlib.Path.cwd().resolve()
+    candidates.extend(parent / _RECORDS_SUBPATH for parent in (cwd, *cwd.parents))
+    for candidate in candidates:
+        if (candidate / "MEU_LIVE_VALIDATION.json").exists() and (candidate / "MEU_LIVE_PROVIDER_DESIGNATION.json").exists():
             return candidate
-    raise FileNotFoundError("the live-provider records were not found beside the unit; run from a source checkout")
+    raise FileNotFoundError(
+        "the live-provider records were not found beside the unit or in a checkout above the working "
+        "directory; pass --records <dir> or run from the repository")
 
 
 def load_records(directory: pathlib.Path = None) -> Dict[str, Any]:
