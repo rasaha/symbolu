@@ -109,15 +109,27 @@ def test_the_record_is_designated_ruled_and_pending_not_met():
     # rows carry their in-process classification and nothing more
     rows = record["validation_matrix"]
     assert len(rows) == 16
-    assert all(r["evidence_class"] == "LIVE_CLOUDFLARE_EVIDENCE_REQUIRED" for r in rows[:13])
-    # rows 1 to 4 and 8 to 12 passed the owner's live cryptographic run; 5 to 7 and 13 did not run
+    assert all(r["evidence_class"] == "LIVE_CLOUDFLARE_EVIDENCE_REQUIRED" for n, r in enumerate(rows[:13], start=1)
+               if n not in (5, 6, 7, 13))
+    # rows 1 to 4 and 8 to 12 passed the owner's live cryptographic run; 5 to 7 and 13 are
+    # filled under AP3-D6 from in-process evidence, 14 to 16 under AP3-D5
     passed_live = {1, 2, 3, 4, 8, 9, 10, 11, 12}
-    for n, row in enumerate(rows[:13], start=1):
+    for n, row in enumerate(rows, start=1):
+        assert row["result"] == row["required"] and row["executed_at"] == "2026-09-11", n
         if n in passed_live:
-            assert row["result"] == row["required"] and row["executed_at"] == "2026-09-11", n
             assert "ap3_live_verify.py" in row["evidence"] and row["observed"], n
-        else:
-            assert row["result"] is None and row["observed"].startswith("BLOCKED"), n
+        elif n <= 13:
+            assert row["ruling"] == "AP3-D6" and row["evidence_class"] == "IN_PROCESS_CONFORMANCE_SUFFICIENT", n
+            assert "test_ap3_designation_conformance.py::test_row" in row["evidence"], n
+    assert "AP3-D6" in record["rulings_applied"] and "rows_5_to_7_and_13" in record["rulings_applied"]["evidence_classification"]
+    assert d["validated_application_hostname"] == "ap3-validation-endpoint.rakeshmohan888.workers.dev"
+    assert d["planned_custom_hostname"].startswith("ap3-validation.ugence.ai (planned")
+    assert "not live-validated" in d["ap3_enterprise_issuer"] and "human identities" in d["production_validation_scope"]
+    # the exposed token: revocation attested, not yet evidenced, so acceptance is still open
+    rev = record["evidence"]["exposed_token_revocation"]
+    assert rev["status"] == "OWNER_ATTESTED_NOT_YET_EVIDENCED" and rev["evidence"] is None
+    assert record["evidence"]["accepting_owner_designate"].startswith("Rakesh Mohan — Founder, Ugence Labs")
+    assert record["evidence"]["acceptance_report"].startswith("deployment/governed-runtime-worker/AP3_ACCEPTANCE_REPORT.md")
     run = record["evidence"]["live_verification_runs"][0]
     assert run["summary"] == {"PASS": 9, "FAIL": 0, "BLOCKED": 4, "IN_PROCESS": 3}
     assert run["capture"]["typ"] is None and run["capture"]["signature_verified_by_the_adapter"] is True
@@ -155,7 +167,8 @@ def test_the_record_is_designated_ruled_and_pending_not_met():
     assert any(a.startswith("DONE 2026-09-11: the exposed token was revoked") for a in actions)
     assert any(a.startswith("DONE 2026-09-11: AP3-D1 amended") for a in actions)
     assert any(a.startswith("DONE 2026-09-11: ci/ap3_live_verify.py run by the owner") for a in actions)
-    assert any(a.startswith("RULE rows 5 to 7") for a in actions) and any(a.startswith("RULE row 13") for a in actions)
+    assert any(a.startswith("DONE 2026-09-11: AP3-D6 ruled") for a in actions)
+    assert any(a.startswith("EVIDENCE the revocation") for a in actions) and any(a.startswith("ACCEPT:") for a in actions)
     assert len(record["evidence"]["required_owner_actions"]) >= 3
     assert "a test-only authorizer described as production AX-5" in record["must_never_contain"]
 
@@ -184,7 +197,7 @@ def test_the_harness_block_names_every_matrix_row_and_claims_only_the_live_passe
         if n in {1, 2, 3, 4, 8, 9, 10, 11, 12}:
             assert row["live_result"] == "PASSED_LIVE_2026-09-11" and row["blocked_by"] == [], row["scenario"]
         else:
-            assert row["live_result"] == "BLOCKED" and row["blocked_by"], row["scenario"]
+            assert row["live_result"] == "NOT_REQUIRED_BY_AP3-D6" and row["blocked_by"] == [], row["scenario"]
     for row in harness["rows"][13:]:
         assert row["live_result"] == "NOT_REQUIRED_BY_AP3-D5" and row["blocked_by"] == [], row["scenario"]
     assert "test_ap3_designation_conformance.py" in harness["harness"]
@@ -740,3 +753,25 @@ def test_the_live_verifier_drives_the_rows_a_login_can_drive_and_never_prints_th
                         "--unavailable-jwks-url", "http://127.0.0.1:1/certs"])
     out = capsys.readouterr().out
     assert code == 1 and json.loads(out)["rows"][0]["status"] == "FAIL"
+
+
+def test_the_acceptance_report_is_rendered_from_the_record_and_is_not_accepted():
+    """The canonical acceptance artifact is AP3_ACCEPTANCE_REPORT.md, rendered by
+    ci/ap3_acceptance_report.py from the record; it may not drift, and while the record's
+    accepting_owner is null it says NOT ACCEPTED and carries the statement to be issued."""
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location("ap3_acceptance_report", PKG / "ci" / "ap3_acceptance_report.py")
+    mod = importlib.util.module_from_spec(spec)
+    assert spec.loader is not None
+    spec.loader.exec_module(mod)
+    record = _record()
+    rendered = mod.render(record)
+    committed = (PKG / "AP3_ACCEPTANCE_REPORT.md").read_text(encoding="utf-8")
+    assert committed == rendered, "re-render with: python ci/ap3_acceptance_report.py --write"
+    assert mod.ACCEPTOR == "Rakesh Mohan — Founder, Ugence Labs"
+    assert "**Status:** `PENDING_VALIDATION`" in committed and "**Accepted:** NOT ACCEPTED" in committed
+    assert "I, Rakesh Mohan, Founder, Ugence Labs, accept" in committed
+    assert committed.count("| `") >= 16 and "`null`" not in committed, "every row carries a result"
+    assert not re.search(r"eyJ[A-Za-z0-9_-]{10,}\.", committed)
+    assert mod.main(["--check"]) == 0

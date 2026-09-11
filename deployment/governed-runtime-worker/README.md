@@ -169,7 +169,9 @@ through `compose(config, clock=, workload=)` from its own entrypoint.
   fresh token only through `cloudflared` (output filtered), verifies it with the real
   adapter against the live JWKS, drives the matrix rows a human login can drive, and
   prints only redacted evidence and per-row PASS/FAIL/BLOCKED; it aborts rather than
-  print anything token-shaped.
+  print anything token-shaped. `AP3_ACCEPTANCE_REPORT.md` is the canonical acceptance
+  artifact, rendered from the record by `ci/ap3_acceptance_report.py` and pinned by the
+  harness; it says `NOT ACCEPTED` until the owner's statement is recorded.
 - `tests/test_authority_plane_contract.py`, `tests/test_authority_reads.py`,
   `tests/test_authority_writes.py` — the plane's contract (no write served while AP-3
   is not `MET`), the four reads, and the two implemented writes behind the AW-5 gate.

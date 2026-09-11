@@ -605,7 +605,7 @@ one real enterprise identity issuer" (§18) means in evidence, so that AP-3 cann
 declared met by choosing an identity provider, writing an OIDC adapter, or running a
 fixture. Its current status line is the only status the repository may claim.
 
-**AP-3 status: `PENDING_VALIDATION`** (designated 2026-09-11, §20.6; rulings AP3-D1 to AP3-D5 applied the same day, AP3-D1 amended on live evidence, §20.7; rows 1 to 4 and 8 to 12 passed the owner's live cryptographic run on 2026-09-11, rows 14 to 16 in-process; rows 5 to 7 and 13 await a service token, a token without email, or an observed rotation, or a ruling; not met).
+**AP-3 status: `PENDING_VALIDATION`** (designated 2026-09-11, §20.6; rulings AP3-D1 to AP3-D5 applied the same day, AP3-D1 amended on live evidence, §20.7; rows 1 to 4 and 8 to 12 passed the owner's live cryptographic run on 2026-09-11, rows 14 to 16 in-process; rows 5 to 7 and 13 under AP3-D6; every row carries a result; not met: the owner has not accepted and the exposed token's revocation is attested, not evidenced).
 
 The enterprise issuer is designated (§20.6) and no row of the matrix has run against
 it. The in-process issuer used by the worker's tests is implementation and conformance
@@ -813,7 +813,24 @@ line was suppressed by the tool and the token was never displayed. The record no
 between the record and `MET`: rows 5 to 7 need a Cloudflare service token and a human
 token without email, or an owner ruling that their in-process evidence suffices as
 AP3-D5 ruled for rows 14 to 16; row 13 needs an observed rotation or the same kind of
-ruling; and `ci_run_or_signed_report` and `accepting_owner` are still null. The capture also observed the application answering on
+ruling; and `ci_run_or_signed_report` and `accepting_owner` are still null.
+
+**AP3-D6 (owner, 2026-09-11) `[V]`.** (1) Rows 5, 6, 7 and 13 are satisfied by in-process
+conformance evidence exercising the real adapter under the `cloudflare-access` profile,
+recorded as AP3-D5 records rows 14 to 16; every row now carries a result. (2) The
+validated application hostname is `ap3-validation-endpoint.rakeshmohan888.workers.dev`;
+`ap3-validation.ugence.ai` is a planned custom hostname, blocked by DNS/zone
+configuration, and is not described as operational or live-validated anywhere. (3) The
+present production-validation scope is human identities authenticated through the
+designated Google Workspace group; Cloudflare service identities are not commissioned
+for production, and their token-shape handling stays covered by conformance tests.
+(4) The canonical acceptance artifact is
+`deployment/governed-runtime-worker/AP3_ACCEPTANCE_REPORT.md`, rendered from the record by
+`ci/ap3_acceptance_report.py` and pinned by the harness, prepared for acceptance by
+Rakesh Mohan, Founder, Ugence Labs. (5) The exposed token's revocation is owner-attested
+and not yet independently evidenced; it is recorded as a remaining blocker. `ap3_status`
+stays `PENDING_VALIDATION`: nothing is `MET` until the acceptor issues the statement the
+report carries, and no live LLM-provider activation begins on this record. The capture also observed the application answering on
 `ap3-validation-endpoint.rakeshmohan888.workers.dev`, not the designated
 `ap3-validation.ugence.ai`; the owner confirms or corrects the hostname. The raw token was
 printed by `cloudflared access login` and appeared in a screenshot shared outside the
