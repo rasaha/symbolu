@@ -32,7 +32,7 @@ both were ruled elsewhere (MA-1, MS-1) and are not reopened here.
 |---|---|---|
 | `packages/integration/authority-directory` | 0.1.0, `REFERENCE_GRADE_SHADOW_ONLY`, `ENFORCEMENT_ENABLED = False` | `SqliteAuthorityDirectory` with `put_grant` and `revoke_grant` over an append-only event ledger of `GRANTED` and `REVOKED` (`grants.py:189-195`; `sqlite.py:211-225`); one-hop delegation; committee reports; `DirectoryApproverEligibility`. Its own ADR records the gap this plane fills: "a grant is what an administrator loaded" and nothing proves it should exist (`ADR_UGENCE_AUTHORITY_DIRECTORY_SCOPING.md:126-130`). |
 | `packages/integration/approval-workflow` | 0.2.0, same labels | The approval state machine, `ReviewDecision.GRANT / REJECT / REQUEST_CHANGES` (`states.py:54-59`), a sqlite store with hash-linked events, once-only consumption. Ruled never to approve, authenticate, mint authority or execute (`ADR_UGENCE_APPROVAL_WORKFLOW_SCOPING.md:169-171`). |
-| `packages/integration/approver-identity-jwt` | 0.1.0, `ISSUER_VALIDATION = IN_PROCESS_ISSUER_ONLY` | Local RFC 9068 token validation under IA-1 to IA-5. Validation against a real enterprise issuer is unproven (`ADR_UGENCE_APPROVER_IDENTITY_ADAPTER_SCOPING.md:100-104`). |
+| `packages/integration/approver-identity-jwt` | 0.1.0, `ISSUER_VALIDATION = IN_PROCESS_ISSUER_ONLY` (at the time; 0.1.4 carries the scoped Cloudflare label, §20.7) | Local RFC 9068 token validation under IA-1 to IA-5. Validation against a real enterprise issuer is unproven (`ADR_UGENCE_APPROVER_IDENTITY_ADAPTER_SCOPING.md:100-104`). |
 | `deployment/governed-runtime-worker` | composition root | Composes the sqlite directory, the sqlite approval store and the JWT adapter (`composition.py:34-36,206`); `preflight` refuses a fixture identity or fixture eligibility in production posture (`:149-156`). The adapter ADR's sentence that "no deployment composes the review service" predates this and is stale `[I]`. |
 
 ## 3 — What a human decision does today `[V]`
@@ -462,7 +462,8 @@ was added: the writes ride on the identity port the worker already composes from
 
 **Not proven here.** The adapter against a real enterprise issuer: `issuer_validation`
 still reads `IN_PROCESS_ISSUER_ONLY` on every write answer, and the maturity of every
-package on the plane is unchanged. Step 4 of §11 remains the owner's.
+package on the plane is unchanged. Step 4 of §11 remains the owner's. (Closed on
+2026-09-11 by §20.7's acceptance; adapter 0.1.4 carries the scoped label.)
 
 ## 18 — Owner ruling: AW-1 reversed, AP-3 controlling (owner, 2026-09-07)
 
@@ -605,12 +606,12 @@ one real enterprise identity issuer" (§18) means in evidence, so that AP-3 cann
 declared met by choosing an identity provider, writing an OIDC adapter, or running a
 fixture. Its current status line is the only status the repository may claim.
 
-**AP-3 status: `BLOCKED_PENDING_OWNER-PROVISIONED_ENTERPRISE_IDP_TEST_TENANT`.**
+**AP-3 status: `MET`** (accepted 2026-09-11 by Rakesh Mohan, Founder, Ugence Labs, on `AP3_ACCEPTANCE_REPORT.md` at commit `fb373ce9`; §20.6, §20.7; scope: human identities through the designated Google Workspace group on the validated hostname; `SERVED_WRITES` stays empty until a write is named served with its own record, §18.3, §20.5).
 
-No real enterprise issuer has been designated. The in-process issuer used by the
-worker's tests is implementation and conformance evidence only (§18). A self-signed
-fixture or a local mock is not a substitute and must never be recorded as satisfying
-this gate.
+The enterprise issuer is designated (§20.6) and no row of the matrix has run against
+it. The in-process issuer used by the worker's tests is implementation and conformance
+evidence only (§18). A self-signed fixture or a local mock is not a substitute and must
+never be recorded as satisfying this gate.
 
 ### 20.1 — What the owner supplies
 
@@ -698,6 +699,173 @@ executes without skips and passes; otherwise report `NOT_MET` and stop.
    own record.
 
 Identity validation stays ahead of every authority-plane mutation, as §19 intends.
+
+### 20.6 — Designation record (owner, 2026-09-11) and what stands between it and `MET` `[V]`
+
+The owner designated the enterprise issuer in the terms below and recorded them in
+`deployment/governed-runtime-worker/AP3_ENTERPRISE_ISSUER_VALIDATION.json`; the
+record's status moved from `BLOCKED_PENDING_OWNER-PROVISIONED_ENTERPRISE_IDP_TEST_TENANT`
+to `PENDING_VALIDATION`, and nothing else in §18 to §20 moves.
+
+| Term | Designation |
+|---|---|
+| Issuer | Cloudflare Access, team `ugence`: `iss` exactly `https://ugence.cloudflareaccess.com`; Google Workspace (`ugence.ai`) is the login method behind Access, never the application JWT issuer |
+| Audience | the non-production Access application "AP3 Enterprise Issuer Validation" on `ap3-validation.ugence.ai`, AUD `24b3008e…5b12b3` |
+| JWKS trust | `https://ugence.cloudflareaccess.com/cdn-cgi/access/certs`, configured, no discovery (IA-3) |
+| Test principal | `ap3-test@ugence.ai`, admitted by the Access policy "Google Workspace group" (Allow) for `ugence-ap3-test@ugence.ai` |
+| Principal claim | `sub`; `email` is the verified display and directory-binding attribute, not the key |
+| Directory binding | `percent-encoded(iss)|percent-encoded(sub)` (ID-2); the Access group policy is admission evidence, never a role grant (AX-5) |
+
+**Not met, and why.** Every matrix row's `result` is null. The record's
+`conformance_harness` block, asserted by
+`deployment/governed-runtime-worker/tests/test_ap3_designation_conformance.py`, states
+per row what the ratified adapter and the plane's write gate do today when configured
+with the designated issuer and audience and driven by in-process tokens shaped like
+Cloudflare Access tokens; it is implementation evidence only and marks every live row
+`BLOCKED`. Five things block execution, each an owner matter, none a code default:
+
+1. **IA-1 `typ`.** The adapter admits only `at+jwt`; a Cloudflare Access token is
+   expected to carry `typ: JWT` `[I]`. Confirming the header and, if so, amending
+   IA-1 for this issuer is a ruling.
+2. **IA-4 actor type.** `HUMAN` is an exact match of one configured claim against one
+   configured value and is never inferred from `sub`. The owner's mapping (human =
+   non-empty `sub` plus verified `email`; service = `common_name` with empty `sub`;
+   `type=app` decides nothing) is an inference the ruling forbids. Either Cloudflare
+   injects a marker claim or IA-4 is amended for this issuer; a ruling either way.
+3. **Tenant mapping.** The adapter reads one top-level claim as presented; Access
+   tokens carry no tenant claim `[I]`, and the owner's "exact `ugence.ai` email
+   domain" rule is a derivation. Same two options, same need for a ruling.
+4. **Proof header.** The plane reads `X-Ugence-Approver-Proof` (AW-3); Cloudflare
+   injects `Cf-Access-Jwt-Assertion` at the origin. Admitting the second is a ruling.
+5. **Rows 14 to 16.** They need the AX-5 `WriterAuthorizer`, which §19.5 composes
+   after AP-3 is met. Executing them requires ruling that a conformance-mode
+   authorizer may exist in the validation slice.
+
+**Evidence not yet held.** The validation slice's execution environment refused egress
+to `ugence.cloudflareaccess.com`, so no JWKS key identifier is recorded;
+`deployment/governed-runtime-worker/ci/ap3_jwks_probe.py` fetches and prints only
+`kid`, `kty`, `alg`, `use` and the document digest for the owner to run from a host
+with egress. No live Access token was obtained and none is ever stored; a redacted
+header and claim-name capture from the test principal's login is the evidence that
+settles items 1 to 3. `EXTERNAL_DEPLOYMENT_EVIDENCE.json` now names the JWKS host.
+
+### 20.7 — Owner rulings AP3-D1 to AP3-D5 (owner, 2026-09-11) `[V]`
+
+The five items §20.6 named as blocking are ruled. Each ruling is narrow, each is applied
+in code the same day, and none moves the status: AP-3 stays `PENDING_VALIDATION` until
+the live evidence in the last paragraph of this section is recorded.
+
+| # | Ruling | Applied where |
+|---|---|---|
+| **AP3-D1** | **Cloudflare token type.** IA-1 is not weakened or replaced globally. The adapter gains one narrowly scoped profile, `AdapterConfig.issuer_profile = "cloudflare-access"`, structurally limited to an issuer of exactly `https://<team>.cloudflareaccess.com` and that team's `/cdn-cgi/access/certs`. Under it, and only under it, the JOSE header `typ` must be exactly `JWT`; the IA-2 asymmetric allowlist, the exact issuer, the exact audience, the signature from the designated JWKS and every temporal check are unchanged. A missing `typ`, any other `typ` (including `at+jwt`), algorithm substitution, an unsigned token or any signature, issuer, audience or temporal failure is refused. `at+jwt` remains the rule for every other issuer profile. The live token header is confirmed from a redacted capture before row 1 is marked passed. | `packages/integration/approver-identity-jwt` 0.1.2: `config.py`, `adapter.py` (`Refusal.TYP_NOT_PROFILE_TYPE`); adapter ADR §8 |
+| **AP3-D2** | **Tenant binding.** Cloudflare Access supplies no top-level tenant claim and none is invented. For this profile only, `tenant_id = ugence.ai` (`AdapterConfig.bound_tenant`), selected by the exact trusted pair `iss = https://ugence.cloudflareaccess.com` and `aud` containing `24b3008e…5b12b3`, and accepted only when the verified `email`, after NFC normalization and trimming, has the domain exactly `ugence.ai` (`verified_email_domain`; domain compared case-insensitively, local part as presented). The email suffix corroborates the binding and is not the source of the tenant; a wrong issuer, wrong audience, absent email or non-`ugence.ai` email fails closed. This is a static issuer-to-tenant mapping, not permission to derive tenants from email domains. The designation record's `tenant_claim` field carries it as `STATIC_ISSUER_AUDIENCE_MAPPING`. | adapter `config.py`, `adapter.py` (`Refusal.EMAIL_DOMAIN_MISMATCH`); record `designation.tenant_claim` |
+| **AP3-D3** | **Actor-type mapping.** For this profile, an explicit claim-shape mapping: `HUMAN` iff the signature and every token constraint hold, `sub` is present and non-empty, `email` is present and under the verified domain, and no service-token marker (`common_name`) is present; service token (the port's non-human kind, `SYSTEM`, subject = `common_name`, no tenant bound) iff `common_name` is present with an empty or absent `sub` and no `email` `[I]`; any mixed, incomplete, conflicting or ambiguous shape is refused (`ACTOR_SHAPE_AMBIGUOUS`). This is an owner-ratified adapter mapping, not an inference from `sub`; Cloudflare's `type: app` names the application-token class and never classifies the actor. IA-4's rule stands for every other profile. | adapter `adapter.py::_cloudflare_shape`; record `designation.actor_type_claim_or_mapping` |
+| **AP3-D4** | **External header boundary.** AW-3 stands: the write gate reads `X-Ugence-Approver-Proof` first and unchanged. `Cf-Access-Jwt-Assertion` is the Cloudflare-facing transport header only. `governed_runtime_worker.cloudflare_access_boundary.CloudflareAccessProofBoundary` reads it through an adapter configured with the `cloudflare-access` profile, validates the token completely and emits the plane's normalized `ApproverIdentity`; the raw header never reaches the gate, is never copied into `X-Ugence-Approver-Proof`, and is never stored or echoed. The boundary is a default-off argument of `build_authority_writes`; `composition.py` does not construct it. Production wiring of the translation is explicitly deferred to AX-1. | worker 0.5.2: `cloudflare_access_boundary.py`, `authority_writes.py` (`transport_boundary`, `proof_channel`) |
+| **AP3-D5** | **Rows 14 to 16 and AX-5 sequencing.** The sixteen-row matrix is preserved. Rows 14 to 16 may use a deterministic, test-only `WriterAuthorizer` conforming to the RA-6 seam so that the real adapter and the real write gate are exercised; this does not authorize production AX-5, and the test-only authorizer is never labelled AX-5. Evidence classification: issuer, JWKS and token rows (1 to 13) require live Cloudflare evidence where specified; write-gate integration rows (14 to 16) accept deterministic in-process conformance evidence when it exercises the real adapter boundary and the real write gate. A live-dependent row is never marked passed with a fabricated token. | `authority_writes.py` (`writer_authorizer`, `WRITE_CAPABILITIES`, `VerifiedPrincipalContext`, 403 `REFUSED_UNAUTHORIZED`, reference authorizer refused under `production=True`); `tests/_conformance_authorizer.py`; record rows 14 to 16 |
+
+**What the record now says.** `designation.tenant_claim` and
+`designation.actor_type_claim_or_mapping` are no longer `UNRULED`; three fields were
+added (`token_type_profile`, `transport_header_boundary`,
+`writer_authorizer_for_rows_14_to_16`) and a `rulings_applied` block names the five
+rulings and the evidence classification. Rows 1 to 13 carry
+`evidence_class: LIVE_CLOUDFLARE_EVIDENCE_REQUIRED` and `result: null`. Rows 14 to 16
+carry `evidence_class: IN_PROCESS_CONFORMANCE_SUFFICIENT` and their required result,
+executed by `deployment/governed-runtime-worker/tests/test_ap3_designation_conformance.py`
+over the real adapter under the profile, the real gate, the real
+`SqliteAuthorityDirectory`, both proof channels and the test-only authorizer: a valid
+identity without a grant is 403 `REFUSED_UNAUTHORIZED` with nothing recorded; a grant
+held in another tenant is invisible; the correct scoped grant permits the grant-role
+capability and not the revoke capability. `conformance_harness` rows 1 to 13 still say
+`live_result: BLOCKED`; rows 14 to 16 say `NOT_REQUIRED_BY_AP3-D5`.
+
+**What this does not authorize.** AX-1, AX-2 and production AX-5 are not implemented;
+`composition.py` composes neither seam; `SERVED_WRITES` stays empty; `ISSUER_VALIDATION`
+stayed `IN_PROCESS_ISSUER_ONLY` until the acceptance below (adapter 0.1.4 then moved it
+to the scoped label); nothing here weakens IA-1 to IA-4 for any other issuer.
+The service-token claim shape is stated from Cloudflare's documentation `[I]`, not from
+a captured token, and is confirmed or amended from the redacted capture like the header.
+
+**Evidence still required for `MET`, all owner-supplied, none of it a secret:** (1) the
+designated JWKS's key identifiers and document digest from `ci/ap3_jwks_probe.py`, run
+from a host with egress — **held since 2026-09-11 `[V]`**: the owner ran the probe from a
+Windows host; two RSA `RS256` signing keys and the document digest are recorded in
+`evidence.jwks_key_identifiers` and `evidence.jwks_document_sha256`, transcribed from the
+owner's terminal output; (2) **held since 2026-09-11 `[V]`, and it refutes an expectation**:
+the owner's redacted capture (`evidence.live_token_capture`) shows `alg: RS256`, a `kid`
+matching the probed JWKS, the designated `iss` and `aud`, a non-empty `sub`, `email`
+present, no `common_name`, `type: app`, and **no `typ` header at all**. §20.6's "expected
+to carry `typ: JWT` `[I]`" was wrong. AP3-D1 as ratified rejects a missing `typ`, so the
+profile as first ratified refused every live Access token. **AP3-D1 was amended by the
+owner the same day, narrowly** `[V]`: under the `cloudflare-access` profile only, an
+absent `typ` is admitted; a present `typ` must be exactly `JWT`; `alg` must be exactly
+`RS256`; a recognized `kid`, signature verification against the designated JWKS, exact
+issuer, exact audience and every temporal check remain required; the absent `typ` is
+never permission for `none`, an unsigned token, another algorithm or a missing or
+unknown `kid`; the default profile and every non-Cloudflare profile are unchanged.
+Adapter 0.1.3 applies it and pins each of those refusals on the live header shape.
+`ci/ap3_live_verify.py` is the owner's on-machine verifier: it obtains a fresh token only
+through `cloudflared` (output captured and filtered so the bearer token is never
+displayed), verifies it cryptographically with the real adapter against the live JWKS,
+drives rows 1 to 4 and 8 to 12 with that token, reports 5 to 7 and 13 as `BLOCKED` and
+14 to 16 as `IN_PROCESS`, and prints only redacted evidence. **The owner ran it on
+2026-09-11 at 10:26 UTC `[V]`**: 9 PASS, 0 FAIL, 4 BLOCKED, 3 IN_PROCESS; the login token
+line was suppressed by the tool and the token was never displayed. The record now carries
+`result == required` for rows 1 to 4 and 8 to 12 with that run as evidence
+(`evidence.live_verification_runs`), and `null` for rows 5 to 7 and 13. What still stands
+between the record and `MET`: rows 5 to 7 need a Cloudflare service token and a human
+token without email, or an owner ruling that their in-process evidence suffices as
+AP3-D5 ruled for rows 14 to 16; row 13 needs an observed rotation or the same kind of
+ruling; and `ci_run_or_signed_report` and `accepting_owner` are still null.
+
+**AP3-D6 (owner, 2026-09-11) `[V]`.** (1) Rows 5, 6, 7 and 13 are satisfied by in-process
+conformance evidence exercising the real adapter under the `cloudflare-access` profile,
+recorded as AP3-D5 records rows 14 to 16; every row now carries a result. (2) The
+validated application hostname is `ap3-validation-endpoint.rakeshmohan888.workers.dev`;
+`ap3-validation.ugence.ai` is a planned custom hostname, blocked by DNS/zone
+configuration, and is not described as operational or live-validated anywhere. (3) The
+present production-validation scope is human identities authenticated through the
+designated Google Workspace group; Cloudflare service identities are not commissioned
+for production, and their token-shape handling stays covered by conformance tests.
+(4) The canonical acceptance artifact is
+`deployment/governed-runtime-worker/AP3_ACCEPTANCE_REPORT.md`, rendered from the record by
+`ci/ap3_acceptance_report.py` and pinned by the harness, prepared for acceptance by
+Rakesh Mohan, Founder, Ugence Labs. (5) The exposed token's revocation was first owner-attested
+and then evidenced the same day by the Zero Trust admin activity log's explicit "Revoke
+application tokens" event at 15:32 IST (10:02 UTC), after the exposure and before the
+live verification run, so that blocker is closed; the sole open item is the owner's
+acceptance. `ap3_status`
+stayed `PENDING_VALIDATION` until the acceptor issued the statement the report carries.
+
+**Acceptance (owner, 2026-09-11) `[V]`.** Rakesh Mohan, Founder, Ugence Labs, issued the
+acceptance statement (recorded verbatim in `evidence.acceptance_statement`) on the basis
+of `AP3_ACCEPTANCE_REPORT.md` at commit `fb373ce9`; `ci_run_or_signed_report` and
+`accepting_owner` are filled and **`ap3_status` is `MET`**. What `MET` means, exactly:
+the AP-3 gate of §18 is satisfied for the designated issuer, within the AP3-D6 scope
+(human identities through the designated Google Workspace group, on
+`ap3-validation-endpoint.rakeshmohan888.workers.dev`). What it does not do: it serves no
+write (`SERVED_WRITES` stays empty until the owner names a write served with its own
+record, §18.3, §20.5); it implements nothing under AX-1, AX-2 or AX-5; it does not move the
+adapter's `ISSUER_VALIDATION` label, which is a package release of its own; and it begins
+no live LLM-provider activation. That release followed the same day: adapter 0.1.4 sets
+`ISSUER_VALIDATION = CLOUDFLARE_ACCESS_HUMAN_WORKSPACE_GROUP_NONPROD_VALIDATED_2026_09_11_AP3_D6`
+with `ISSUER_VALIDATION_SCOPE` beside it (issuer Cloudflare Access; identities human via
+the designated Google Workspace group; application non-production; ruling AP3-D6;
+service identities not commissioned; `production_certified: False`); `MATURITY` and
+`ENFORCEMENT_ENABLED` are unchanged, and every worker answer now carries the scoped
+label in `issuer_validation`. §20.5's sequence is now eligible to start, act by act,
+each with its own record. The capture also observed the application answering on
+`ap3-validation-endpoint.rakeshmohan888.workers.dev`, not the designated
+`ap3-validation.ugence.ai`; the owner confirms or corrects the hostname. The raw token was
+printed by `cloudflared access login` and appeared in a screenshot shared outside the
+owner's machine; the owner revoked it the same day; it is recorded as exposed and revoked
+and is never used as evidence beyond the redacted capture; originally (2) a locally produced, redacted capture of one live Access
+token for `ap3-test@ugence.ai` holding only `alg`, `typ`, `kid`, the payload key names,
+`iss`, `aud`, whether `sub` is non-empty, and `type`, confirming AP3-D1 to AP3-D3 as
+written; (3) execution of rows 1 to 13 against the live issuer with `test_timestamp`,
+`ci_run_or_signed_report` and `accepting_owner` filled. The record lists these as
+`evidence.required_owner_actions`. No token, cookie, client secret, private key or
+authorization code is ever placed in the repository, a terminal, a log, a fixture, a
+commit or a pull request.
 
 ## 21 — Ruling on the two questions raised by the enterprise-readiness evaluation (2026-09-07)
 

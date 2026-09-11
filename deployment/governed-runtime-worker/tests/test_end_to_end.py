@@ -407,7 +407,7 @@ def test_the_authority_reads_are_served_by_the_composed_worker_and_no_write_is(w
             assert body["tenant_id"] == TENANT and body["as_of"] == worker.clock.now.isoformat()
             assert body["read_authenticated"] is False
             assert body["decision_identity_proof"] == IDP_AUTHENTICATED, "an identity port is composed"
-            assert body["issuer_validation"] == "IN_PROCESS_ISSUER_ONLY"
+            assert body["issuer_validation"] == "CLOUDFLARE_ACCESS_HUMAN_WORKSPACE_GROUP_NONPROD_VALIDATED_2026_09_11_AP3_D6"
             assert "administrator loaded" in body["provenance"]
             assert body["maturity"] == "REFERENCE_GRADE_SHADOW_ONLY"
         return body
@@ -539,7 +539,7 @@ def test_the_composed_worker_serves_no_write_while_the_implementation_conforms_o
     recorded = post("/authority/grants", load, 200, headers={PROOF_HEADER: admin_token})
     assert recorded["result"] == "RECORDED" and recorded["recorded"] is True and recorded["event"] == "GRANTED"
     assert recorded["identity_proof"] == IDP_AUTHENTICATED and recorded["subject"] == subject_ref("root-admin")
-    assert recorded["issuer_validation"] == "IN_PROCESS_ISSUER_ONLY" and recorded["ruling"] == "AW-1"
+    assert recorded["issuer_validation"] == "CLOUDFLARE_ACCESS_HUMAN_WORKSPACE_GROUP_NONPROD_VALIDATED_2026_09_11_AP3_D6" and recorded["ruling"] == "AW-1"
     admin_claims = worker.identity_port.authenticate(admin_token).claims
     assert recorded["authentication_reference"] == authentication_reference(admin_claims)
     grant_id = recorded["grant"]["grant_id"]

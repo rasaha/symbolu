@@ -15,8 +15,9 @@ decision route reads is not read here.
 (``read_authenticated: false``). What the answer carries is the identity proof the
 deployment can give on a *decision*: ``IDP_AUTHENTICATED`` when an identity port is
 composed, ``PRESENTED_UNPROVEN`` otherwise, beside the adapter's own
-``issuer_validation`` label, which stays ``IN_PROCESS_ISSUER_ONLY`` until AI-C is
-validated against a real issuer. A grant shown here is what an administrator loaded;
+``issuer_validation`` label, which names the one validation the adapter package holds
+(since adapter 0.1.4 the scoped Cloudflare Access label of AP3-D6; ``IN_PROCESS_ISSUER_ONLY``
+before) and describes the package, never this deployment's composition. A grant shown here is what an administrator loaded;
 the directory's ADR says so, and so does every answer.
 
 **What is not here.** No write. The four AP-3 operations stay unserved until the

@@ -104,4 +104,4 @@ def test_an_outage_message_names_the_failure_kind_and_nothing_from_the_wire(issu
 def test_the_refusal_vocabulary_is_closed_and_carries_no_free_text():
     for member in Refusal:
         assert member.value == member.name and member.value.isupper()
-    assert len(Refusal) == 14
+    assert len(Refusal) == 17

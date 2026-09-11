@@ -1,7 +1,7 @@
 {
   "schema": "governed-runtime-worker.external-deployment-evidence.v1",
   "deployment": "governed-runtime-worker",
-  "deployment_version": "0.5.1",
+  "deployment_version": "0.5.3",
   "maturity": "REFERENCE_GRADE_SHADOW_ONLY",
   "ruling": "CR-5 ALLOWLISTED_JWKS_HOST (ADR_UGENCE_REVIEW_SERVICE_COMPOSITION_ROOT_SCOPING.md, section 5), as clarified 2026-09-10: internal connectivity is not vendor egress, but it must still be declared.",
   "evidence_class": "EXTERNAL_DEPLOYMENT_EVIDENCE",
@@ -9,8 +9,8 @@
   "permitted_egress": [
     {
       "purpose": "JWKS retrieval by the approver identity adapter (AI-C, IA-3)",
-      "host": null,
-      "host_note": "the host component of UGENCE_REVIEW_IDENTITY_JWKS_URL, filled in by the owner when the issuer is provisioned; null until then",
+      "host": "ugence.cloudflareaccess.com",
+      "host_note": "the host component of UGENCE_REVIEW_IDENTITY_JWKS_URL: designated by the owner on 2026-09-11 as the Cloudflare Access team domain (AP3_ENTERPRISE_ISSUER_VALIDATION.json designation.jwks_trust); recorded here as the one permitted JWKS host and enforced by platform configuration, not by the application",
       "scheme": "https",
       "verification": "default TLS verification; never disabled"
     },
@@ -43,7 +43,7 @@
     "listener": "one private TLS listener, UGENCE_REVIEW_BIND_HOST:UGENCE_REVIEW_PORT (default 8444)",
     "reachable_from": "the Governance Studio's network segment only (CR-3)",
     "authentication": "no gate of its own; an identity port is mandatory in production and every decision requires a proof (CR-3, AI-A)",
-    "routes": "the review service's six routes: four reads, the decision relay, and since 0.2.0 the start relay POST /review/runs (front-door ruling FD-10.2), which starts this deployment's own shadow workflow under its own definition digest and takes nothing from the caller but a typed correlation id (FD-10.3); since 0.3.0 also the ledger read GET /review/audit/{correlation_id} (front-door ruling FD-11.3), which returns this deployment's own tenant's audit-ledger rows for one correlation id, raw and in chain order, with the chain verification as a typed field; a chain that does not verify is a typed refusal with the entries withheld; since 0.4.0 also the authority plane's four reads under /authority/ (ADR_UGENCE_AUTHORITY_PLANE_SCOPING.md AP-5 READS_FIRST): grants for a principal, holders of a role, a committee report and a grant's event history, each for this deployment's own tenant, unauthenticated, labelled with the decision proof the deployment can give; no write of the plane is served: the two directory writes POST /authority/grants and POST /authority/grants/{grant_id}/revoke are implemented since 0.5.0 (section 16, AW-2 to AW-5: recorded only for an IDP_AUTHENTICATED human subject of this tenant presented on X-Ugence-Approver-Proof, refused with a typed reason otherwise) and since 0.5.1 are not registered on the composed app (section 18: the owner reversed AW-1; AP-3 controls, and no write is served until the identity adapter is validated end to end against a real enterprise issuer); the in-process issuer evidence is implementation and conformance evidence only; a write path answers 405 or 404; activate and issue are never served"
+    "routes": "the review service's six routes: four reads, the decision relay, and since 0.2.0 the start relay POST /review/runs (front-door ruling FD-10.2), which starts this deployment's own shadow workflow under its own definition digest and takes nothing from the caller but a typed correlation id (FD-10.3); since 0.3.0 also the ledger read GET /review/audit/{correlation_id} (front-door ruling FD-11.3), which returns this deployment's own tenant's audit-ledger rows for one correlation id, raw and in chain order, with the chain verification as a typed field; a chain that does not verify is a typed refusal with the entries withheld; since 0.4.0 also the authority plane's four reads under /authority/ (ADR_UGENCE_AUTHORITY_PLANE_SCOPING.md AP-5 READS_FIRST): grants for a principal, holders of a role, a committee report and a grant's event history, each for this deployment's own tenant, unauthenticated, labelled with the decision proof the deployment can give; no write of the plane is served: the two directory writes POST /authority/grants and POST /authority/grants/{grant_id}/revoke are implemented since 0.5.0 (section 16, AW-2 to AW-5: recorded only for an IDP_AUTHENTICATED human subject of this tenant presented on X-Ugence-Approver-Proof, refused with a typed reason otherwise) and since 0.5.1 are not registered on the composed app (section 18: the owner reversed AW-1; AP-3 controls, and no write is served until the identity adapter is validated end to end against a real enterprise issuer); the in-process issuer evidence is implementation and conformance evidence only; a write path answers 405 or 404; activate and issue are never served; since 0.5.2 the write gate carries two default-off seams for the AP-3 validation slice (section 20.7, AP3-D4 and AP3-D5): a Cloudflare transport boundary that reads Cf-Access-Jwt-Assertion through the identity adapter's cloudflare-access profile and emits the plane's normalized identity, and an AX-5 writer-authorizer stage; composition.py constructs neither, so the composed app is unchanged and still serves no write"
   },
   "secrets_held": [
     "UGENCE_REVIEW_APP_DATABASE_URL",

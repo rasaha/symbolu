@@ -90,7 +90,7 @@ def test_pyproject_declares_exactly_the_ratified_bounded_dependency_set():
     floors = {re.split(r"[\[><=]", d)[0]: d for d in deps}
     assert floors["ugence-governed-review-service"] == "ugence-governed-review-service>=0.6.1"
     assert set(data["project"].get("optional-dependencies", {})) <= {"test"}
-    assert pkg.__version__ == "0.1.1"
+    assert pkg.__version__ == "0.1.4"
 
 
 def test_no_clock_is_read_anywhere():
@@ -133,7 +133,14 @@ def test_the_package_is_not_an_issuer_and_holds_no_private_material():
 def test_public_api_and_honest_labels():
     assert isinstance(pkg.JwtApproverIdentityAdapter, type)
     assert pkg.MATURITY == "REFERENCE_GRADE_SHADOW_ONLY"
-    assert pkg.ISSUER_VALIDATION == "IN_PROCESS_ISSUER_ONLY"
+    assert pkg.ISSUER_VALIDATION == "CLOUDFLARE_ACCESS_HUMAN_WORKSPACE_GROUP_NONPROD_VALIDATED_2026_09_11_AP3_D6"
+    assert re.fullmatch(r"[A-Z0-9_]+", pkg.ISSUER_VALIDATION), "stable and machine-readable"
+    assert "PROD" not in pkg.ISSUER_VALIDATION.replace("NONPROD", ""), "never a production claim"
+    scope = pkg.ISSUER_VALIDATION_SCOPE
+    assert scope["issuer_kind"] == "CLOUDFLARE_ACCESS" and scope["validated_on"] == "2026-09-11"
+    assert scope["ruling_scope"] == "AP3-D6" and scope["identities"] == "HUMAN_VIA_DESIGNATED_GOOGLE_WORKSPACE_GROUP"
+    assert scope["application"] == "NON_PRODUCTION" and scope["service_identities"] == "NOT_COMMISSIONED"
+    assert scope["production_certified"] is False and scope["accepted_by"].startswith("Rakesh Mohan")
     assert pkg.ENFORCEMENT_ENABLED is False
     assert not hasattr(pkg.JwtApproverIdentityAdapter, "NON_PRODUCTION"), \
         "this is the real adapter; the fixture flag belongs to the static one"
@@ -141,10 +148,12 @@ def test_public_api_and_honest_labels():
                           "Grant", "Authorization", "Envelope", "Permit", "Connector")
     assert [n for n in pkg.__all__ if n.endswith(forbidden_suffixes)] == []
     assert set(pkg.__all__) == {
-        "__version__", "MATURITY", "ISSUER_VALIDATION", "ENFORCEMENT_ENABLED",
+        "__version__", "MATURITY", "ISSUER_VALIDATION", "ISSUER_VALIDATION_SCOPE", "ENFORCEMENT_ENABLED",
         "JwtApproverIdentityAdapter", "JwtApproverIdentity", "Refusal",
         "ALGORITHMS", "ACCESS_TOKEN_TYPES", "REQUIRED_CLAIMS",
-        "AdapterConfig", "LOOPBACK_HOSTS", "JwksKeyCache", "MAX_JWKS_BYTES",
+        "CLOUDFLARE_ACCESS_TOKEN_TYPE", "CLOUDFLARE_ALGORITHMS", "CLOUDFLARE_REQUIRED_CLAIMS",
+        "AdapterConfig", "LOOPBACK_HOSTS", "ISSUER_PROFILES", "RFC9068_PROFILE",
+        "CLOUDFLARE_ACCESS_PROFILE", "JwksKeyCache", "MAX_JWKS_BYTES",
         "KeyRetrievalFailed", "AdapterConfigurationError",
     }
     assert issubclass(pkg.KeyRetrievalFailed, __import__(

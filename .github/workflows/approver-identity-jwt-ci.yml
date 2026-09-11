@@ -91,6 +91,11 @@ jobs:
           cd packages/integration/approver-identity-jwt
           python -m pytest tests/test_redaction.py -o addopts= -v --no-header
 
+      - name: Cloudflare Access issuer profile (AP3-D1 to AP3-D3, in-process issuer only)
+        run: |
+          cd packages/integration/approver-identity-jwt
+          python -m pytest tests/test_cloudflare_access_profile.py -o addopts= -v --no-header
+
       - name: Behind the real review service (real SQLite ledger)
         run: |
           cd packages/integration/approver-identity-jwt

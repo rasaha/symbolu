@@ -147,7 +147,7 @@ def _post(client, path, body, *, proof=ADMIN, expect):
     assert r.status_code == expect, r.text
     answer = r.json()
     assert answer["plane"] == "authority" and "maturity" in answer
-    assert answer["issuer_validation"] == "IN_PROCESS_ISSUER_ONLY"
+    assert answer["issuer_validation"] == "CLOUDFLARE_ACCESS_HUMAN_WORKSPACE_GROUP_NONPROD_VALIDATED_2026_09_11_AP3_D6"
     for secret in (ADMIN, FOREIGN_ADMIN, NOBODY, PRESENTED, SERVICE, EXPIRED, AMBIGUOUS, UNTENANTED):
         assert secret not in r.text, "a proof is never echoed"
     if expect == 200:
