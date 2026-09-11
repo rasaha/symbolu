@@ -57,7 +57,7 @@ from ..records import (
     ResultOutcome,
     purge_deadline,
 )
-from .schema import SCHEMA_NAME, TENANT_SETTING
+from .schema import BUDGET_TABLE, RESERVATION_TABLE, SCHEMA_NAME, TENANT_SETTING
 
 __all__ = [
     "ExchangeError",
@@ -373,8 +373,9 @@ class Exchange:
                             (tenant_id, request_id, correlation_id, recorded_at, trust,
                              outcome, refusal_reason, adapter_id, provenance_kind,
                              genuine_call, provenance, payload, content_digest,
-                             content_created_at, response_digest)
-                            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
+                             content_created_at, response_digest,
+                             custody_lease_id, custody_authority_id)
+                            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
                         (
                             str(result.tenant_id), str(result.request_id),
                             str(result.correlation_id), result.recorded_at,
@@ -386,9 +387,96 @@ class Exchange:
                             result.content_digest,
                             result.recorded_at,  # the payload's own creation clock
                             digest,
+                            result.custody_lease_id, result.custody_authority_id,
                         ),
                     )
         return digest
+
+    # -- LP-5: the durable, non-compensatory reservation (migration 2) --------
+
+    def reserve_commissioning_call(self, tenant_id: UUID, request_id: UUID, *,
+                                   estimated_cents: int, now: datetime) -> int:
+        """Reserve one genuine call before dispatch, or raise :class:`BudgetExhausted`.
+
+        One transaction: the budget row is created if absent, the counters are
+        advanced under the table's own CHECK ceilings and the concurrency ceiling,
+        and the reservation row is written. A refusal leaves nothing behind. The
+        counters never come down: the trigger refuses a decrement, the unit has no
+        DELETE, and ``release_in_flight`` lowers ``in_flight`` alone. Returns the
+        call number, 1 to 10.
+        """
+
+        from ..limits import COMMISSIONING_LIMITS, BudgetExhausted
+
+        if not isinstance(estimated_cents, int) or isinstance(estimated_cents, bool) or estimated_cents < 0:
+            raise BudgetExhausted("an estimate must be a non-negative integer of cents")
+        limits = COMMISSIONING_LIMITS
+        with self._connect() as conn:
+            self.require_scopable(conn)
+            with conn.transaction():
+                self._scoped(conn, tenant_id)
+                with conn.cursor() as cur:
+                    cur.execute(
+                        f"""INSERT INTO {SCHEMA_NAME}.{BUDGET_TABLE} (tenant_id) VALUES (%s)
+                            ON CONFLICT (tenant_id) DO NOTHING""", (str(tenant_id),))
+                    cur.execute(
+                        f"""UPDATE {SCHEMA_NAME}.{BUDGET_TABLE}
+                            SET calls_reserved = calls_reserved + 1,
+                                cents_reserved = cents_reserved + %s,
+                                in_flight = in_flight + 1
+                            WHERE tenant_id = %s
+                              AND calls_reserved < %s
+                              AND cents_reserved + %s <= %s
+                              AND in_flight < %s
+                            RETURNING tenant_id, calls_reserved""",
+                        (estimated_cents, str(tenant_id), limits.max_genuine_calls,
+                         estimated_cents, limits.budget_usd_cents, limits.concurrency))
+                    rows = cur.fetchall()
+                    if not rows:
+                        raise BudgetExhausted(
+                            f"the tenant's commissioning budget refuses this reservation "
+                            f"({limits.max_genuine_calls} calls, {limits.budget_usd_cents} cents, "
+                            f"concurrency {limits.concurrency})")
+                    self._check_tenant(rows, 0, tenant_id)
+                    call_number = int(rows[0][1])
+                    cur.execute(
+                        f"""INSERT INTO {SCHEMA_NAME}.{RESERVATION_TABLE}
+                            (tenant_id, request_id, reserved_at, estimated_cents, call_number)
+                            VALUES (%s, %s, %s, %s, %s)""",
+                        (str(tenant_id), str(request_id), now, estimated_cents, call_number))
+        return call_number
+
+    def release_in_flight(self, tenant_id: UUID) -> None:
+        """The call ended, in any outcome. Nothing else is given back."""
+
+        with self._connect() as conn:
+            self.require_scopable(conn)
+            with conn.transaction():
+                self._scoped(conn, tenant_id)
+                with conn.cursor() as cur:
+                    cur.execute(
+                        f"""UPDATE {SCHEMA_NAME}.{BUDGET_TABLE} SET in_flight = in_flight - 1
+                            WHERE tenant_id = %s AND in_flight > 0 RETURNING tenant_id""",
+                        (str(tenant_id),))
+                    self._check_tenant(cur.fetchall(), 0, tenant_id)
+
+    def commissioning_budget(self, tenant_id: UUID) -> Optional[dict]:
+        with self._connect() as conn:
+            self.require_scopable(conn)
+            with conn.transaction():
+                self._scoped(conn, tenant_id)
+                with conn.cursor() as cur:
+                    cur.execute(
+                        f"""SELECT tenant_id, calls_reserved, cents_reserved, in_flight
+                            FROM {SCHEMA_NAME}.{BUDGET_TABLE} WHERE tenant_id = %s""",
+                        (str(tenant_id),))
+                    rows = cur.fetchall()
+                    if not rows:
+                        return None
+                    self._check_tenant(rows, 0, tenant_id)
+                    row = rows[0]
+                    return {"tenant_id": str(row[0]), "calls_reserved": row[1],
+                            "cents_reserved": row[2], "in_flight": row[3]}
 
     # -- retention ------------------------------------------------------------
 

@@ -36,7 +36,17 @@ import hashlib
 from dataclasses import dataclass
 from typing import Sequence
 
-from .schema import OWNER_ROLE, SCHEMA_NAME, TENANT_SETTING, UNIT_ROLE, WORKER_ROLE
+from .schema import (
+    BINDING_TABLE,
+    BUDGET_TABLE,
+    MIGRATOR_ROLE,
+    OWNER_ROLE,
+    RESERVATION_TABLE,
+    SCHEMA_NAME,
+    TENANT_SETTING,
+    UNIT_ROLE,
+    WORKER_ROLE,
+)
 
 __all__ = ["Migration", "MIGRATIONS", "LEDGER_DDL", "migration_digest", "statements"]
 
@@ -293,10 +303,156 @@ RESET ROLE;
 """
 
 
+_0002 = f"""
+-- Migration 2 (2026-09-11; ADR_UGENCE_LIVE_MODEL_PROVIDER_COMMISSIONING.md, LP-6 step 4,
+-- LP-2b, LP-5). Four things, all additive, none touching a digest preimage, a canonical
+-- field set, a serialization, a field meaning or the wire schema. The exchange contract
+-- stays exchange/v1; existing rows and their digests remain valid.
+
+-- 1. The separately controlled migration identity. NOLOGIN here for the same reason
+--    the runtime roles are: credential custody for database identities is provisioned
+--    by the deployment, never by this package. NOINHERIT: a migrator holds no privilege
+--    until it SET ROLEs to the owner during a reviewed migration, and it is never the
+--    identity a runtime starts with.
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = '{MIGRATOR_ROLE}') THEN
+        CREATE ROLE {MIGRATOR_ROLE} NOLOGIN NOSUPERUSER NOBYPASSRLS NOCREATEDB NOCREATEROLE NOINHERIT;
+    END IF;
+END
+$$;
+GRANT {OWNER_ROLE} TO {MIGRATOR_ROLE};
+GRANT SELECT, INSERT ON public.meu_schema_version TO {MIGRATOR_ROLE};
+
+SET ROLE {OWNER_ROLE};
+
+-- 2. Tenant-bound runtime identities. A runtime role listed here is bound to one
+--    tenant; the policy below then ignores what the session claims. A role that is
+--    not listed keeps the session-scoped behaviour of migration 1, which is the
+--    reference path. Readable by the runtime roles (it is a mapping, not a secret);
+--    writable only as the owner, i.e. only during a reviewed migration or by the
+--    provisioning step a migrator performs.
+CREATE TABLE IF NOT EXISTS {SCHEMA_NAME}.{BINDING_TABLE} (
+    role_name   text PRIMARY KEY,
+    tenant_id   uuid NOT NULL,
+    bound_at    timestamptz NOT NULL DEFAULT now()
+);
+GRANT SELECT ON {SCHEMA_NAME}.{BINDING_TABLE} TO {WORKER_ROLE}, {UNIT_ROLE};
+
+-- SECURITY INVOKER on purpose: inside a SECURITY DEFINER function current_user is
+-- the definer, which would bind every caller to the owner's (absent) tenant.
+CREATE OR REPLACE FUNCTION {SCHEMA_NAME}.effective_tenant_id() RETURNS uuid
+LANGUAGE sql STABLE
+AS $$
+    SELECT COALESCE(
+        (SELECT b.tenant_id FROM {SCHEMA_NAME}.{BINDING_TABLE} b WHERE b.role_name = current_user),
+        current_setting('{TENANT_SETTING}')::uuid)
+$$;
+REVOKE ALL ON FUNCTION {SCHEMA_NAME}.effective_tenant_id() FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION {SCHEMA_NAME}.effective_tenant_id() TO {WORKER_ROLE}, {UNIT_ROLE};
+
+-- RESTRICTIVE: ANDed with migration 1's session policy, never ORed. A bound identity
+-- must therefore satisfy both its binding and its session claim, and a session claim
+-- for another tenant yields no rows and no writes.
+CREATE POLICY identity_binding ON {SCHEMA_NAME}.egress_request AS RESTRICTIVE
+    USING (tenant_id = {SCHEMA_NAME}.effective_tenant_id())
+    WITH CHECK (tenant_id = {SCHEMA_NAME}.effective_tenant_id());
+CREATE POLICY identity_binding ON {SCHEMA_NAME}.egress_result AS RESTRICTIVE
+    USING (tenant_id = {SCHEMA_NAME}.effective_tenant_id())
+    WITH CHECK (tenant_id = {SCHEMA_NAME}.effective_tenant_id());
+
+-- 3. LP-2b: a result may carry genuine_call = true only when it names the custody
+--    lease and authority it was produced under. Two nullable columns outside every
+--    digest body; the reference-slice restriction that forced every row non-genuine
+--    is replaced, not removed. The application gate (records.py) keeps refusing a
+--    genuine result until commissioning is MET; this is the database's half.
+ALTER TABLE {SCHEMA_NAME}.egress_result
+    ADD COLUMN IF NOT EXISTS custody_lease_id text,
+    ADD COLUMN IF NOT EXISTS custody_authority_id text;
+ALTER TABLE {SCHEMA_NAME}.egress_result
+    DROP CONSTRAINT IF EXISTS egress_result_no_genuine_call;
+ALTER TABLE {SCHEMA_NAME}.egress_result
+    ADD CONSTRAINT egress_result_genuine_call_requires_custody CHECK (
+        genuine_call = false
+        OR (custody_lease_id IS NOT NULL AND custody_authority_id IS NOT NULL
+            AND provenance_kind = 'RESPONSE'));
+
+-- 4. LP-5: the durable, non-compensatory reservation. One budget row per tenant with
+--    the owner's ceilings as CHECKs; one reservation row per request; a trigger that
+--    refuses any decrement of calls or cents (in_flight alone may fall). Reserve
+--    before dispatch, in its own transaction, so a restart or a second replica sees
+--    the same count.
+CREATE TABLE IF NOT EXISTS {SCHEMA_NAME}.{BUDGET_TABLE} (
+    tenant_id       uuid PRIMARY KEY,
+    calls_reserved  integer NOT NULL DEFAULT 0,
+    cents_reserved  integer NOT NULL DEFAULT 0,
+    in_flight       integer NOT NULL DEFAULT 0,
+    CONSTRAINT commissioning_budget_calls_ceiling CHECK (calls_reserved BETWEEN 0 AND 10),
+    CONSTRAINT commissioning_budget_cents_ceiling CHECK (cents_reserved BETWEEN 0 AND 2500),
+    CONSTRAINT commissioning_budget_concurrency CHECK (in_flight BETWEEN 0 AND 1)
+);
+CREATE TABLE IF NOT EXISTS {SCHEMA_NAME}.{RESERVATION_TABLE} (
+    tenant_id        uuid NOT NULL,
+    request_id       uuid NOT NULL,
+    reserved_at      timestamptz NOT NULL,
+    estimated_cents  integer NOT NULL,
+    call_number      integer NOT NULL,
+    PRIMARY KEY (tenant_id, request_id),
+    CONSTRAINT commissioning_reservation_cents_non_negative CHECK (estimated_cents >= 0),
+    CONSTRAINT commissioning_reservation_call_number CHECK (call_number BETWEEN 1 AND 10)
+);
+
+CREATE OR REPLACE FUNCTION {SCHEMA_NAME}.refuse_budget_refund() RETURNS trigger
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    IF NEW.calls_reserved < OLD.calls_reserved OR NEW.cents_reserved < OLD.cents_reserved THEN
+        RAISE EXCEPTION 'commissioning_budget_exhausted: a reservation is never refunded (LP-5)'
+            USING ERRCODE = 'check_violation';
+    END IF;
+    IF NEW.tenant_id <> OLD.tenant_id THEN
+        RAISE EXCEPTION 'a budget row never changes tenant' USING ERRCODE = 'check_violation';
+    END IF;
+    RETURN NEW;
+END
+$$;
+DROP TRIGGER IF EXISTS commissioning_budget_no_refund ON {SCHEMA_NAME}.{BUDGET_TABLE};
+CREATE TRIGGER commissioning_budget_no_refund
+    BEFORE UPDATE ON {SCHEMA_NAME}.{BUDGET_TABLE}
+    FOR EACH ROW EXECUTE FUNCTION {SCHEMA_NAME}.refuse_budget_refund();
+
+ALTER TABLE {SCHEMA_NAME}.{BUDGET_TABLE} ENABLE ROW LEVEL SECURITY;
+ALTER TABLE {SCHEMA_NAME}.{BUDGET_TABLE} FORCE ROW LEVEL SECURITY;
+ALTER TABLE {SCHEMA_NAME}.{RESERVATION_TABLE} ENABLE ROW LEVEL SECURITY;
+ALTER TABLE {SCHEMA_NAME}.{RESERVATION_TABLE} FORCE ROW LEVEL SECURITY;
+CREATE POLICY tenant_isolation ON {SCHEMA_NAME}.{BUDGET_TABLE}
+    USING (tenant_id = current_setting('{TENANT_SETTING}')::uuid)
+    WITH CHECK (tenant_id = current_setting('{TENANT_SETTING}')::uuid);
+CREATE POLICY identity_binding ON {SCHEMA_NAME}.{BUDGET_TABLE} AS RESTRICTIVE
+    USING (tenant_id = {SCHEMA_NAME}.effective_tenant_id())
+    WITH CHECK (tenant_id = {SCHEMA_NAME}.effective_tenant_id());
+CREATE POLICY tenant_isolation ON {SCHEMA_NAME}.{RESERVATION_TABLE}
+    USING (tenant_id = current_setting('{TENANT_SETTING}')::uuid)
+    WITH CHECK (tenant_id = current_setting('{TENANT_SETTING}')::uuid);
+CREATE POLICY identity_binding ON {SCHEMA_NAME}.{RESERVATION_TABLE} AS RESTRICTIVE
+    USING (tenant_id = {SCHEMA_NAME}.effective_tenant_id())
+    WITH CHECK (tenant_id = {SCHEMA_NAME}.effective_tenant_id());
+
+-- The unit reserves and releases in-flight; nobody deletes; the worker may read.
+GRANT SELECT, INSERT, UPDATE (calls_reserved, cents_reserved, in_flight)
+    ON {SCHEMA_NAME}.{BUDGET_TABLE} TO {UNIT_ROLE};
+GRANT SELECT, INSERT ON {SCHEMA_NAME}.{RESERVATION_TABLE} TO {UNIT_ROLE};
+GRANT SELECT ON {SCHEMA_NAME}.{BUDGET_TABLE}, {SCHEMA_NAME}.{RESERVATION_TABLE} TO {WORKER_ROLE};
+
+RESET ROLE;
+"""
+
+
 #: Every migration, in apply order. Append only: editing an applied migration is
 #: refused at startup by the digest check, and the fix is a new migration.
 MIGRATIONS: Sequence[Migration] = (
     Migration(version=1, name="exchange_roles_tables_and_rls", sql=_0001),
+    Migration(version=2, name="migrator_identity_tenant_binding_custody_and_reservation", sql=_0002),
 )
 
 

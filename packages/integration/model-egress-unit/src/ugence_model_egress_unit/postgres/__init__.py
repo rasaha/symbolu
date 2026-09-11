@@ -25,7 +25,12 @@ from .transport import (
     require_transport_protection,
     sslmode_of,
 )
+from .provision import bind_identity, identity_name, identity_report, identity_statements
 from .schema import (
+    BINDING_TABLE,
+    BUDGET_TABLE,
+    MIGRATOR_ROLE,
+    RESERVATION_TABLE,
     OWNER_ROLE,
     ROLE_NAMES,
     SCHEMA_NAME,
@@ -40,7 +45,15 @@ __all__ = [
     "sslmode_of",
     "require_transport_protection",
     "protected_connect",
+    "identity_name",
+    "identity_statements",
+    "bind_identity",
+    "identity_report",
     "SCHEMA_NAME",
+    "MIGRATOR_ROLE",
+    "BINDING_TABLE",
+    "BUDGET_TABLE",
+    "RESERVATION_TABLE",
     "OWNER_ROLE",
     "WORKER_ROLE",
     "UNIT_ROLE",

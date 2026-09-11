@@ -118,8 +118,103 @@ credential and reaches nothing.
    the ratified precondition needs a second exchange migration; #1749's "no
    `exchange.v2`" was about the digest construction and does not forbid a migration that
    changes a constraint, but the owner should confirm that reading before step 6 lands.
+   **Confirmed by the owner on 2026-09-11 (§0.3, item 2), under six conditions; migration 2
+   of the unit (0.3.0) is that constraint-only migration and §0.3 records each condition
+   against it.**
 5. **The model snapshot.** `gpt-5.4-mini-2026-03-17` is recorded as designated; nothing
    here verifies that the vendor lists it, and the verifier of step 7 will.
+
+### 0.3 — The owner's confirmation of the recorded interpretations (2026-09-11), verbatim
+
+> Owner confirmation for PR #1750:
+>
+> 1. LP-5 and D-5
+>
+> Confirm LP-5 as a two-layer, non-compensatory control:
+>
+> * The authorization side remains the authoritative policy and reservation authority under D-5.
+> * The MEU additionally enforces an independent, fixed, fail-closed safety ceiling before dispatch.
+> * The MEU does not select, increase, waive or reinterpret the limits.
+> * A request must satisfy both layers; approval by either layer cannot compensate for refusal by the other.
+>
+> The current in-memory MEU counter is acceptable for unit tests and fake-transport development only. It is not sufficient for a genuine validation call because restart or replica changes could reset or fragment its state. Before genuine_call: true is possible, implement the already identified durable reservation/consumption record with atomic reserve-before-dispatch behavior and no refund after possible dispatch.
+>
+> 2. Constraint-only exchange migration
+>
+> Permit a constraint-only database migration that allows the existing genuine_call field to carry true, provided that:
+>
+> * genuine_call already belongs to the ratified exchange-v1 contract;
+> * no canonical field set, digest preimage, serialization, field meaning or wire schema changes;
+> * no exchange.v2 is introduced;
+> * existing rows and digests remain valid;
+> * the migration merely lifts the reference-slice database restriction that forced all calls to remain non-genuine;
+> * application and deployment gates continue to refuse genuine calls until commissioning reaches MET.
+>
+> The "no exchange.v2" ruling in #1749 concerned the request-digest construction. It does not prohibit this narrowly scoped database constraint migration.
+>
+> If any of those conditions is false, stop before migrating and report the exact contract change that would require a new version.
+>
+> 3. Other recorded interpretations
+>
+> Confirm the remaining interpretations with these qualifications:
+>
+> * Retry is allowed only when the transport can prove that no request bytes were dispatched. Any ambiguous dispatch state receives no automatic retry.
+> * Apply tenant-bound identities before the first genuine call, even though the earlier tenancy ruling required them only before multi-tenancy.
+> * The model snapshot is designated but remains unverified. Fake-transport tests must not mark vendor availability or any infrastructure-dependent validation row as passed.
+>
+> 4. Proceed
+>
+> Proceed on the same branch with LP-6 steps 4 and 6:
+>
+> * production role provisioning;
+> * separate controlled-migration identity;
+> * tenant-bound runtime database identities;
+> * tests proving runtime roles cannot perform DDL, bypass RLS or assume migration privileges;
+> * the OpenAI adapter as a separate MEU-only distribution;
+> * injected fake transport only;
+> * exact destination and request-shape enforcement;
+> * no credential access and no live network path.
+>
+> Add fresh-install and upgrade-path tests for the constraint migration. Keep the validation matrix at BLOCKED_PENDING_INFRASTRUCTURE_DESIGNATIONS; fake evidence cannot satisfy live rows.
+>
+> Run all locally available gates and allow the PostgreSQL suites and container gates to complete in CI. Push as a separate commit and update draft PR #1750.
+>
+> Report:
+>
+> 1. changed files and commit;
+> 2. role and migration-identity boundaries;
+> 3. migration compatibility results;
+> 4. package-boundary proof for the provider adapter;
+> 5. local and CI gate results;
+> 6. every remaining step-7 and step-8 blocker.
+>
+> Do not create or request a credential, make a live call, enable live vendor egress, mark commissioning MET, merge, or begin production use.
+
+#### 0.3.1 — The six conditions of item 2, checked against migration 2 before it was written
+
+| Condition | Holds? | Where |
+| --- | --- | --- |
+| `genuine_call` already belongs to the ratified exchange-v1 contract | yes | `EgressResult.provenance["genuine_call"]` and the `egress_result.genuine_call` column both exist since migration 1; `CONTRACT_VERSION` unchanged at `model_egress_unit.exchange.v1` |
+| no canonical field set, digest preimage, serialization, field meaning or wire schema changes | yes | `canonical.py` and `EgressResult.digest_body()` untouched; the two new columns (`custody_lease_id`, `custody_authority_id`) are outside every digest body; `tests/test_digest_vectors.py` frozen vectors unchanged and passing |
+| no `exchange.v2` is introduced | yes | `EXCHANGE_SCHEMA_VERSION` and `MEU_CANONICALIZATION_VERSION` unchanged; migration 2 is `meu_schema_version` row 2 of the same contract |
+| existing rows and digests remain valid | yes | `test_the_upgrade_path_keeps_existing_rows_and_digests_valid` seeds rows under migration 1 and reads them back unchanged after migration 2 |
+| the migration merely lifts the reference-slice restriction | yes | `CHECK egress_result_no_genuine_call` is dropped and replaced by `CHECK egress_result_genuine_call_requires_custody`: `genuine_call = false OR (custody_lease_id IS NOT NULL AND custody_authority_id IS NOT NULL AND provenance_kind = 'RESPONSE')` |
+| application and deployment gates continue to refuse genuine calls until `MET` | yes | `EgressResult.__post_init__` refuses `genuine_call: true` unless `COMMISSIONING_STATUS == "MET"`, a release constant of the unit; the OpenAI adapter refuses a production posture and raises on a transport claiming a genuine response; `MEU_LIVE_VALIDATION.json` stays `BLOCKED_PENDING_INFRASTRUCTURE_DESIGNATIONS` |
+
+No condition was false, so the migration proceeded and no contract version change is required.
+
+#### 0.3.2 — What the same commit delivered against item 4
+
+| Ask | Delivered | Proof |
+| --- | --- | --- |
+| production role provisioning | `postgres/provision.py`: `identity_statements` emits `CREATE ROLE … LOGIN NOSUPERUSER NOBYPASSRLS NOCREATEDB NOCREATEROLE … IN ROLE <group>` with **no password**, plus the binding row written as the owner; the group roles stay `NOLOGIN`; executing the statements is an operator's act on a designated cluster | `test_migration_2_identities_and_reservation.py` |
+| separate controlled-migration identity | `meu_migrator` (`NOLOGIN NOINHERIT`), a member of the owner that holds nothing until `SET ROLE meu_exchange_owner`; `SELECT, INSERT` on the migration ledger only | `test_the_migrator_holds_nothing_until_it_assumes_the_owner` |
+| tenant-bound runtime database identities | `role_tenant_binding` and the `RESTRICTIVE` policy `identity_binding` on every tenant table, keyed on `current_user`; a bound login is refused every other tenant whatever its session setting claims | `test_a_bound_identity_is_refused_every_other_tenant_whatever_its_session_claims` |
+| runtime roles cannot DDL, bypass RLS or assume migration privileges | fourteen statements, each `InsufficientPrivilege` from a genuine `LOGIN` probe in each runtime group | `test_a_runtime_identity_cannot_ddl_disable_rls_drop_a_policy_or_assume_a_privileged_role` |
+| durable reservation, atomic reserve-before-dispatch, no refund | `commissioning_budget` and `commissioning_reservation`, one `UPDATE … RETURNING` under the LP-5 ceilings, a `BEFORE UPDATE` trigger that raises on any decrement, no `DELETE` grant | `test_the_reservation_is_taken_before_dispatch_and_never_refunded`, `test_a_reservation_is_tenant_scoped` |
+| OpenAI adapter as a separate MEU-only distribution, injected fake transport only, exact destination and request shape, no credential access, no live network path | `packages/integration/model-egress-provider-openai` 0.1.0 | its `tests/test_boundaries.py`, `test_transport.py`, `test_provider.py`; the unit's `test_the_unit_never_imports_the_openai_adapter_distribution` |
+| fresh-install and upgrade-path tests | both, plus an all-or-nothing upgrade test | `test_a_fresh_install_applies_both_migrations_and_migration_one_is_byte_identical`, `test_the_upgrade_path_keeps_existing_rows_and_digests_valid`, `test_the_upgrade_is_all_or_nothing` |
+| validation matrix stays blocked; fake evidence cannot satisfy live rows | every row `result: null`; `FakeTransport` refuses a scripted `genuine` outcome at construction | `test_live_records.py`; `test_the_fake_transport_refuses_to_be_scripted_with_a_genuine_response` |
 
 ## 1 — The finding that shapes this record
 

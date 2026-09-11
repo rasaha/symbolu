@@ -120,6 +120,7 @@ from .records import (
 )
 from .unit import EgressUnit, UnitPass
 from .version import (
+    COMMISSIONING_STATUS,
     CONTRACT_VERSION,
     ENFORCEMENT_ENABLED,
     LIVE_VENDOR_EGRESS,
@@ -130,6 +131,7 @@ from .version import (
 __all__ = [
     "__version__",
     "CONTRACT_VERSION",
+    "COMMISSIONING_STATUS",
     "MATURITY",
     "ENFORCEMENT_ENABLED",
     "LIVE_VENDOR_EGRESS",

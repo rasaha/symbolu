@@ -9,15 +9,14 @@
     "NOT_MET",
     "MET"
   ],
-  "status_note": "LP-1 to LP-6 are ratified. No row can execute: the GCP project, workload identity, secret-version resource, IAM binding, audit-log evidence, rotation procedure and OpenAI organization/project identifiers are undesignated (LP-6 step 8); the OpenAI adapter distribution, the owner-run verifier, the acceptance-report generator, the durable reservation row and the genuine_call contract amendment are unbuilt (LP-6 steps 4, 6, 7); no credential is commissioned (step 9). Rows are executed only on the owner's machine by a verifier that never prints the credential or the full request content, and MET is reached only by the owner's separate acceptance statement; a successful HTTP response alone is insufficient (LP-4).",
+  "status_note": "LP-1 to LP-6 are ratified and the owner's confirmation of 2026-09-11 is recorded (ADR §0.3). Steps 4 and 6 are built (unit 0.3.0: migration 2, migrator identity, tenant-bound identities, durable reservation; adapter 0.1.0 with an injected fake transport only). No row can execute: the GCP project, workload identity, secret-version resource, IAM binding, audit-log evidence, rotation procedure and OpenAI organization/project identifiers are undesignated (step 8); the live transport, the owner-run verifier and the acceptance-report generator are unbuilt (step 7); no credential is commissioned (step 9). Fake-transport tests pass in CI and mark no row here: fake evidence cannot satisfy a live row. Rows are executed only on the owner's machine by a verifier that never prints the credential or the full request content, and MET is reached only by the owner's separate acceptance statement; a successful HTTP response alone is insufficient (LP-4).",
   "blocked_by": [
-    "LP-6 step 4: production role provisioning, controlled migrations, tenant-bound database identities",
-    "LP-6 step 6: the OpenAI adapter as a separate MEU-only distribution",
-    "LP-6 step 7: owner-run verifier and acceptance-report generator",
-    "LP-2b: exchange migration lifting CHECK egress_result_no_genuine_call under the ratified precondition, and the durable reservation row for LP-5",
-    "LP-6 step 8: GCP project ID, MEU workload identity, secret-version resource, IAM binding, audit-log evidence, rotation procedure, OpenAI organization/project identifiers",
-    "LP-6 step 9: the credential commissioned manually by the custody owner",
-    "LP-1: CR-1 amended (DONE 2026-09-11); the MEU deployment unit itself not yet built"
+    "LP-6 step 8: GCP project ID, MEU workload identity, secret-version resource, IAM binding, Secret Manager Data Access audit-log evidence, rotation procedure, OpenAI organization/project identifiers — all UNDESIGNATED",
+    "LP-6 step 7: the live transport (TLS-verified, proof of no-bytes-dispatched on transient failure), the unit wired to reserve against commissioning_budget before every dispatch, the owner-run verifier and the acceptance-report generator — NOT STARTED, blocked on step 8",
+    "LP-6 step 9: the credential commissioned manually by the custody owner through Secret Manager — no credential exists",
+    "LP-4: genuine_call True stays refused by EgressResult while COMMISSIONING_STATUS is BLOCKED_PENDING_INFRASTRUCTURE_DESIGNATIONS; only the owner's separate MET statement, released as a new version of the unit, changes that (migration 2 lifted the database restriction only, ADR §0.3.1)",
+    "LP-1: CR-1 amended (DONE 2026-09-11); the MEU deployment unit itself is not yet built or composed",
+    "LP-3: the model snapshot gpt-5.4-mini-2026-03-17 is designated, not verified; fake-transport evidence marks no row"
   ],
   "validation_matrix": [
     {

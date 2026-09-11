@@ -1,0 +1,56 @@
+# Ugence Model Egress Provider — OpenAI Responses (LP-3, LP-6 step 6).
+#
+#   THIS DISTRIBUTION CANNOT REACH api.openai.com.
+#   NO HTTP CLIENT, NO VENDOR SDK, NO CREDENTIAL READER, NO LIVE TRANSPORT.
+#   THE ONLY TRANSPORT IT SHIPS IS AN INJECTED FAKE THAT NEVER LEAVES THE PROCESS.
+#
+# What it carries: the OpenAI Responses adapter that the Model Egress Unit (MEU)
+# will run behind once commissioning reaches MET — the exact request shape, the
+# exact destination, the LP-5 ceiling enforced before dispatch, the LP-5 retry rule
+# (one retry, only with transport proof that no bytes were dispatched), and the
+# provenance rule that a fake transport can never yield `genuine_call: true`.
+#
+# Dependency direction (one-way; the MEU never imports this package):
+#     ugence-model-egress-unit  (the port, the records, the limits, the destination)
+#         ▲
+#     ugence-model-egress-provider-openai (this package)
+#
+# LP-6 step 6 ordered this as a separate distribution so the MEU's own
+# "cannot call a model vendor" claim stays intact and so a live transport, when
+# one is commissioned, lands in *another* release and not in a configuration flag.
+#
+# Build:   python -m build packages/integration/model-egress-provider-openai
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ugence-model-egress-provider-openai"
+dynamic = ["version"]
+description = "Ugence Model Egress Provider for the OpenAI Responses endpoint: the MEU-only adapter with exact destination and request-shape enforcement, LP-5 pre-dispatch limits, proof-gated retry and an injected fake transport. Ships no HTTP client, no vendor SDK, no credential reader and no live network path."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "Proprietary" }
+authors = [{ name = "Rakesh Mohan" }]
+keywords = ["governance", "egress", "model", "openai", "responses", "ugence"]
+classifiers = ["Typing :: Typed"]
+dependencies = [
+    "ugence-model-egress-unit>=0.3.0",
+]
+
+[project.optional-dependencies]
+test = ["pytest>=7.0"]
+
+[tool.setuptools.dynamic]
+version = { attr = "ugence_model_egress_provider_openai.version.__version__" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["ugence_model_egress_provider_openai*"]
+
+[tool.setuptools.package-data]
+ugence_model_egress_provider_openai = ["py.typed"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"

@@ -850,6 +850,17 @@ pinned-version adapter, the destination policy and the limits. The rows of §8 t
 remain open are those LP-6 sequences after step 3, plus the durable LP-5 reservation
 row and the LP-2b record-contract amendment, both named in `MEU_LIVE_VALIDATION.json`.
 
+Release 0.3.0 (same day, under the owner's confirmation in that ADR's §0.3) carries
+LP-6 step 4 as migration 2: the controlled-migration identity, tenant-bound runtime
+identities with a restrictive binding policy, the constraint-only lifting of the
+reference-slice `genuine_call` restriction (custody identifiers required at the
+database; `EgressResult` still refuses it until `MET`), and the durable LP-5 reservation
+with trigger-enforced no-refund. LP-6 step 6 is the separate distribution
+`ugence-model-egress-provider-openai` 0.1.0, which this unit never imports. What §8
+still leaves open is step 7 (the live transport, the unit reserving durably before each
+dispatch, the verifier and the report generator), step 8 (the infrastructure
+designations) and step 9 (the credential).
+
 ## 9 — What exists to build on
 
 | | |

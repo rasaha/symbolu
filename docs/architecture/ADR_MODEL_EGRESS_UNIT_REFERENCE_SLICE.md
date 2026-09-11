@@ -198,3 +198,28 @@ deployment unit, no credential, no vendor SDK, no destination.
 rather than decided here.** LP-2a: how the unit authenticates to Google Secret Manager
 without a long-lived key in the deployment. LP-2b: the record-contract amendment under
 which a result may carry `genuine_call: True`.
+
+## Addendum, 0.3.0 (2026-09-11): migration 2 — the migrator identity, tenant-bound identities, the custody columns and the durable reservation
+
+Under the owner's confirmation recorded in `ADR_UGENCE_LIVE_MODEL_PROVIDER_COMMISSIONING.md`
+§0.3 (LP-6 steps 4 and 6), and with the six conditions of §0.3.1 each checked before the
+migration was written. The contract stays `model_egress_unit.exchange.v1`; no digest
+preimage, canonical field set or frozen vector changed.
+
+| Added | Where | What it closes |
+| --- | --- | --- |
+| `meu_migrator` (`NOLOGIN NOINHERIT`, member of `meu_exchange_owner`, `SELECT, INSERT` on the ledger only) | migration 2 | **Controlled migrations** `[G]` → a separately controlled migration identity that holds nothing until it assumes the owner during a reviewed migration `[V]` |
+| `role_tenant_binding`, `effective_tenant_id()`, the `RESTRICTIVE` policy `identity_binding` on every tenant table | migration 2 | **Tenant-bound database identities** `[G]` → a login identity bound to one tenant is refused every other tenant whatever its session claims; the unbound reference roles behave as before `[V]` |
+| `postgres/provision.py`: `identity_name`, `identity_statements`, `bind_identity`, `identity_report` | package | **Role provisioning in production** `[G]` → statements for a per-tenant `LOGIN` member of each runtime group, with no password and no credential anywhere; a report of every login member and whether it is bound. Executing them is an operator's act on a designated cluster, not this package's `[V]` |
+| `custody_lease_id`, `custody_authority_id` on `egress_result`; `CHECK egress_result_genuine_call_requires_custody` replacing `CHECK egress_result_no_genuine_call` | migration 2 | LP-2b under §0.3.1: the database admits `genuine_call = true` only with both custody identifiers and `RESPONSE` provenance. `EgressResult` still refuses it while `COMMISSIONING_STATUS` is not `MET` `[V]` |
+| `commissioning_budget`, `commissioning_reservation`, trigger `refuse_budget_refund`; `Exchange.reserve_commissioning_call`, `release_in_flight`, `commissioning_budget` | migration 2, `postgres/exchange.py` | LP-5's durable twin, previously `[G]`: one `UPDATE … RETURNING` under the ceilings (10 calls, 2,500 cents, concurrency 1), reserved before dispatch, never decremented (the trigger raises), never deleted (no grant) `[V]`. Wiring the unit to reserve here before every dispatch is step 7 |
+| fourteen refused statements from a genuine `LOGIN` probe in each runtime group | `tests/test_migration_2_identities_and_reservation.py` | DDL, `DISABLE`/`NO FORCE ROW LEVEL SECURITY`, `DROP POLICY`, `DROP CONSTRAINT`, `DROP TRIGGER`, a binding write, a budget delete, a ledger write, `SET ROLE` to the owner or the migrator, `CREATE ROLE`, `ALTER ROLE … BYPASSRLS` — each `InsufficientPrivilege` `[V]` |
+| fresh-install, upgrade-path and failing-upgrade tests | same file | A blank cluster applies `[1, 2]`; rows and digests written under migration 1 read back unchanged after 2; a broken upgrade leaves migration 1 intact with the ledger at `[1]` `[V]` |
+| `ugence-model-egress-provider-openai` 0.1.0 | `packages/integration/model-egress-provider-openai` | LP-6 step 6: the adapter as a separate distribution depending on this unit and nothing else; this unit never imports it (`test_the_unit_never_imports_the_openai_adapter_distribution`). Injected fake transport only; exact destination and request shape at construction; the secret visible only inside `CredentialLease.use`; one retry only with transport proof of no dispatch; `OUTCOME_UNKNOWN` for every ambiguous path; never `genuine_call: true` `[V]` |
+
+Still recorded rather than papered over: the live transport, the unit's use of the
+durable reservation, the owner-run verifier and the acceptance-report generator (step 7,
+behind the step 8 designations); the credential (step 9, the custody owner's act); the
+deployment unit itself (LP-1 amended CR-1, nothing composes the unit yet); and
+verification that the designated model snapshot exists.
+

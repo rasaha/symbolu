@@ -34,8 +34,8 @@
     "never_placed_in": "source code, repository files, container layers, environment-variable configuration, GitHub Actions secrets, logs or evidence reports"
   },
   "record_contract": {
-    "genuine_call": "EgressResult and the exchange schema (CHECK egress_result_no_genuine_call) refuse genuine_call other than False and stay so until LP-2b's amendment is implemented: genuine_call True admitted only for a result produced under a production posture by a provider adapter holding a CredentialLease whose is_production_authoritative is True, recording the lease id and custody authority; this needs a second exchange migration and is LP-6 step 6/7 work",
-    "provider_adapter": "ugence_model_egress_unit.provider.EgressProvider; the OpenAI adapter is a separate MEU-only distribution (LP-6 step 6) that does not exist yet; when it does it may build a request only from the EgressRequest's minimized context, may reach https://api.openai.com/v1/responses and no other URL (egress_policy.check_destination), takes its credential only through CredentialLease.use, honours limits.check_request and CallBudget, and labels every answer UNTRUSTED_EVIDENCE under D-1"
+    "genuine_call": "Migration 2 (0.3.0) replaced CHECK egress_result_no_genuine_call with CHECK egress_result_genuine_call_requires_custody, under the owner's confirmation of 2026-09-11 (ADR §0.3): the database admits genuine_call True only with a custody lease id, a custody authority id and RESPONSE provenance. The application gate is unchanged in effect: EgressResult refuses genuine_call other than False while COMMISSIONING_STATUS is not MET, so genuine_call True admitted only for a result produced under a production posture by a provider adapter holding a CredentialLease whose is_production_authoritative is True, recording the lease id and custody authority, after the owner's separate MET statement is released as a new version of the unit",
+    "provider_adapter": "ugence_model_egress_unit.provider.EgressProvider; the OpenAI adapter is the separate MEU-only distribution ugence-model-egress-provider-openai 0.1.0 (LP-6 step 6, DONE): it builds a request only from the EgressRequest's minimized context, accepts exactly https://api.openai.com/v1/responses and no other URL (egress_policy.check_destination at PreparedRequest construction), takes its credential only through CredentialLease.use inside the one transport call, honours limits.check_request and CallBudget before dispatch, retries once only with transport proof that no bytes were dispatched, records OUTCOME_UNKNOWN for every ambiguous dispatch, and labels every answer UNTRUSTED_EVIDENCE under D-1. Its only transport is an injected fake; a live transport is step 7 work behind step 8"
   },
   "must_never_contain": [
     "an API key, OAuth token, service-account key or any credential",
@@ -57,11 +57,11 @@
   "order": [
     "1 record the rulings and amend CR-1 (DONE 2026-09-11)",
     "2 ledger-kind schema and content-bearing-key refusals (DONE 0.2.0)",
-    "3 TLS-protected database transport (DONE as policy, 0.2.0) and provider transport verification (destination policy DONE 0.2.0; TLS verification is the adapter's, step 6)",
-    "4 production role provisioning, controlled migrations and tenant-bound database identities (NOT STARTED)",
+    "3 TLS-protected database transport (DONE as policy, 0.2.0) and provider transport verification (destination policy DONE 0.2.0; TLS verification belongs to the live transport, which does not exist: step 7)",
+    "4 production role provisioning, controlled migrations and tenant-bound database identities (DONE 0.3.0: migration 2, meu_migrator, role_tenant_binding, postgres/provision.py; no login identity is created by the migration and no password exists anywhere)",
     "5 Google Secret Manager custody port, fake/emulator path only (DONE 0.2.0: PinnedSecretVersionCustodyAdapter over an injected reader)",
-    "6 OpenAI provider as a separate MEU-only distribution (NOT STARTED)",
-    "7 validation matrix (DONE, blocked), owner-run verifier and acceptance-report generator (NOT STARTED)",
+    "6 OpenAI provider as a separate MEU-only distribution (DONE 0.1.0 of ugence-model-egress-provider-openai: injected fake transport only, exact destination and request shape, no credential access, no live network path)",
+    "7 validation matrix (DONE, blocked), durable LP-5 reservation (DONE 0.3.0, not yet wired in front of the adapter), owner-run verifier, acceptance-report generator and the live transport (NOT STARTED; blocked on step 8)",
     "8 stop and request the exact GCP and OpenAI project designations",
     "9 commission the credential manually through Secret Manager (owner)",
     "10 synthetic validation run after every prerequisite gate passes",

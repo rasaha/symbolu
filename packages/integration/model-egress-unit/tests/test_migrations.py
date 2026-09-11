@@ -77,13 +77,15 @@ def test_the_schema_the_migration_claims_to_build_is_the_one_it_builds(blank):
         tables = {r[0] for r in conn.execute(
             "SELECT tablename FROM pg_tables WHERE schemaname = %s",
             (SCHEMA_NAME,)).fetchall()}
-        assert tables == {"egress_request", "egress_result"}
+        assert tables == {"egress_request", "egress_result", "role_tenant_binding",
+                          "commissioning_budget", "commissioning_reservation"}
 
         forced = dict(conn.execute(
             "SELECT relname, relforcerowsecurity FROM pg_class "
             "WHERE relnamespace = (SELECT oid FROM pg_namespace WHERE nspname = %s) "
             "AND relkind = 'r'", (SCHEMA_NAME,)).fetchall())
-        assert forced == {"egress_request": True, "egress_result": True}
+        assert forced == {"egress_request": True, "egress_result": True, "role_tenant_binding": False,
+                          "commissioning_budget": True, "commissioning_reservation": True}
 
 
 # --- drift -------------------------------------------------------------------

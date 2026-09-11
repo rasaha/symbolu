@@ -426,6 +426,11 @@ class EgressResult:
     content_digest: Optional[str]
     refusal_reason: Optional[RefusalReason] = None
     trust: str = TRUST_LEVEL
+    #: LP-2b (migration 2). Outside every digest body: which custody lease and
+    #: authority a genuine result was produced under. ``None`` for every result in
+    #: this distribution, which makes no genuine call.
+    custody_lease_id: Optional[str] = None
+    custody_authority_id: Optional[str] = None
 
     def __post_init__(self) -> None:
         if self.trust != TRUST_LEVEL:
@@ -441,11 +446,25 @@ class EgressResult:
                 f"a {self.outcome.value} result must not carry a refusal reason")
         if self.outcome is not ResultOutcome.ANSWERED and self.payload is not None:
             raise ValueError(f"a {self.outcome.value} result has no payload to carry")
-        if self.provenance.get("genuine_call") is not False:
-            raise ValueError(
-                "this distribution makes no genuine provider call, so no result may "
-                "record one; a provenance record mistakable for provider evidence is "
-                "the failure this check exists to prevent")
+        genuine = self.provenance.get("genuine_call")
+        if genuine is not False:
+            # LP-2b: the application half of the gate. A genuine result needs the
+            # custody lease and authority it was produced under, a RESPONSE
+            # provenance, and a commissioning record that reached MET; the last is
+            # a release constant, so no configuration can admit one.
+            from .version import COMMISSIONING_STATUS  # local: version imports nothing
+
+            if genuine is not True:
+                raise ValueError("genuine_call is a boolean")
+            if COMMISSIONING_STATUS != "MET":
+                raise ValueError(
+                    f"no result may record a genuine call while commissioning is "
+                    f"{COMMISSIONING_STATUS}; a provenance record mistakable for "
+                    f"provider evidence is the failure this check exists to prevent")
+            if not self.custody_lease_id or not self.custody_authority_id:
+                raise ValueError("a genuine result names the custody lease and authority it ran under")
+            if self.provenance.get("kind") != ProvenanceKind.RESPONSE.value:
+                raise ValueError("only a RESPONSE provenance can record a genuine call")
 
     @property
     def provenance_kind(self) -> ProvenanceKind:

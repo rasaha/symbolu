@@ -62,6 +62,18 @@ def test_no_module_imports_anything_that_could_reach_a_vendor(path):
         f"(OWNER_RATIFICATION_LIVE_MODEL_PROVIDER.md, D-2), not a dependency.")
 
 
+def test_the_unit_never_imports_the_openai_adapter_distribution():
+    """LP-6 step 6: the adapter depends on the unit, never the reverse. The unit's
+    dependency set is the database driver alone; a provider distribution that the
+    unit imported would put vendor egress one import away from this package."""
+
+    for path in SOURCES:
+        imported = _imported_roots(path)
+        assert "ugence_model_egress_provider_openai" not in imported, path.name
+    pyproject = (SRC.parent.parent / "pyproject.toml").read_text(encoding="utf-8")
+    assert "ugence-model-egress-provider-openai" not in pyproject
+
+
 def test_the_declared_posture_matches_the_source():
     assert meu.LIVE_VENDOR_EGRESS is False
     assert meu.ENFORCEMENT_ENABLED is False

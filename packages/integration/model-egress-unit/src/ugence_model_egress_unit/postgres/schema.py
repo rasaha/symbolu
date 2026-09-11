@@ -42,8 +42,12 @@ __all__ = [
     "OWNER_ROLE",
     "WORKER_ROLE",
     "UNIT_ROLE",
+    "MIGRATOR_ROLE",
     "TENANT_SETTING",
     "ROLE_NAMES",
+    "BINDING_TABLE",
+    "BUDGET_TABLE",
+    "RESERVATION_TABLE",
 ]
 
 #: This package's own schema. Nothing here lives in ``public``: a dedicated
@@ -64,4 +68,19 @@ UNIT_ROLE = "meu_unit"
 #: an unset session fails closed rather than reading an empty exchange.
 TENANT_SETTING = "ugence.tenant_id"
 
-ROLE_NAMES = (OWNER_ROLE, WORKER_ROLE, UNIT_ROLE)
+#: The separately controlled migration identity (migration 2). NOINHERIT member of
+#: the owner: it holds nothing until it ``SET ROLE``s to the owner during a reviewed
+#: migration, and it is never the identity a runtime starts with.
+MIGRATOR_ROLE = "meu_migrator"
+
+ROLE_NAMES = (OWNER_ROLE, WORKER_ROLE, UNIT_ROLE, MIGRATOR_ROLE)
+
+#: Migration 2: which runtime identity is bound to which tenant. A bound identity
+#: is refused every row of any other tenant by a policy that ignores the session
+#: setting; an identity with no binding behaves as before (the session decides),
+#: which is the reference path and never a production one.
+BINDING_TABLE = "role_tenant_binding"
+
+#: Migration 2: the durable LP-5 reservation, one row per tenant, non-compensatory.
+BUDGET_TABLE = "commissioning_budget"
+RESERVATION_TABLE = "commissioning_reservation"
