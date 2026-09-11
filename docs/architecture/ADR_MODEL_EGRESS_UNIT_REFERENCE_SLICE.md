@@ -1,7 +1,9 @@
 # ADR — Model Egress Unit, reference vertical slice
 
-**Status:** implemented under delegated authority, and **conformed to the rulings of
-2026-09-10**. Ratifies nothing.
+**Status:** implemented under delegated authority, **conformed to the rulings of
+2026-09-10**, and **merged (#1743)**. Its one open divergence — what the request
+digest binds — was **ratified by the owner on 2026-09-11** and is closed below.
+This ADR ratifies nothing itself; it records what was ruled and what is built.
 **Package:** `packages/integration/model-egress-unit` (`ugence-model-egress-unit` 0.1.0)
 **Maturity:** `REFERENCE_GRADE_SHADOW_ONLY` · `ENFORCEMENT_ENABLED = False` · `LIVE_VENDOR_EGRESS = False`
 
@@ -71,7 +73,7 @@ means in D-2 and why that option preserved CR-5 rather than amending it.
 | §5.3 no credential | The unit composes, claims, validates and refuses with `CREDENTIAL_NOT_COMMISSIONED` — never a generic error, never a fabricated answer |
 | Tenancy §4 cross-tenant | Reads and leases indistinguishable from unknown; writes rejected by the database and mapped internally to `TENANT_SCOPE_REFUSED` without disclosing whether another tenant's row exists |
 
-## Decisions taken, and two divergences named
+## Decisions taken, and two divergences — both now closed
 
 **A bespoke digest-pinned migration runner rather than Alembic.** A migration is
 identified by the digest of its own text, and an already-applied migration whose
@@ -88,20 +90,50 @@ anywhere, so a v2 migration would leave a shape in history that no database ever
 had. The digest pin exists to prevent editing an *applied* migration, and this one
 is not.
 
-**Divergence, flagged for the owner rather than decided: the request digest binds a
-content digest, not the inline text.** D-4's letter says "ordered minimized unit
-identifiers and exact text". Inlining would make the request digest unrecomputable
-the moment content is purged, leaving a tombstone whose central claim could no
-longer be checked — the same reasoning the retention ruling itself uses. Binding a
-content digest satisfies the intent (a substituted prompt still fails verification,
-and this is tested) while diverging from the letter. **This is the owner's call.**
+**Closed, ratified 2026-09-11: the request digest binds a content digest, not the
+inline text.** This was carried as an open divergence from D-4's letter — "ordered
+minimized unit identifiers and exact text" — and referred to the owner. The owner
+ratified the merged construction as satisfying D-4, on the reading that it is a
+**composed cryptographic commitment to the exact text** rather than an
+identifiers-only commitment, which is what D-4's "not merely unit identifiers"
+(`SPEC_MODEL_EGRESS_UNIT.md:425`) forbids `[V]`. Inlining plaintext into the outer
+preimage is **not required**, and **no `model_egress_unit.exchange.v2` is
+authorized**.
+
+The ratification carries four conditions. Each is met, and each is now pinned:
+
+| Condition | Where it holds |
+| --- | --- |
+| 1 — preimage is the canonical, ordered `[unit_id, exact_text]` sequence | `canonical.py:216`, `entries = [[u.unit_id, u.text] for u in units]`, never reordered `[V]` |
+| 2 — encoding, ordering, hash algorithm and schema/version pinned | Rules in the `canonical` module docstring; `MEU_CANONICALIZATION_VERSION` and `EXCHANGE_SCHEMA_VERSION` bound into the preimages; **frozen vectors** in `tests/test_digest_vectors.py` `[V]` |
+| 3 — bound in a domain-separated, unambiguous field | `digest_body()["content_digest"]`, framed under `EGRESS_REQUEST_DIGEST_DOMAIN` and type `EgressRequest` `[V]` |
+| 4 — identifiers alone can never satisfy it | Substituted text under unchanged identifiers moves both the context digest and the request digest `[V]` |
+
+**What a tombstone can and cannot do after purge.** Recorded explicitly, because
+the earlier wording overclaimed it. The tombstone can verify the **integrity and
+linkage of the retained digest chain** — the request digest recomputes from the
+surviving fields and commits to the recorded content digest — and it can test a
+*candidate* context a reader already holds. It **cannot** reconstruct the deleted
+plaintext, and it cannot independently re-prove what that plaintext was to a reader
+holding no candidate. Post-purge plaintext verification is not claimed and is not
+available.
 
 **Divergence, resolved: `submitted_at` is inside the digest.** D-4 excludes "mutable
 lease, claim, attempt and processing timestamps". A creation instant is none of
 those and never changes, so it stays bound; the four mutable ones are excluded and
 a test asserts their absence.
 
-## Two findings the tests produced, from the earlier revision
+## Three findings the tests produced
+
+**Every digest test was a relative comparison, so the encoder was unpinned.**
+Found while verifying ratification condition 2. The suite asserted only that
+changing a *field* moves a digest; nothing pinned the bytes. Measured: changing
+`EXCHANGE_CONTENT_DIGEST_DOMAIN` from `…/v1` to `…/v9` moves every content and
+context digest in the exchange, and the pre-existing **150 tests pass clean** `[V]`.
+The domain tag is the mechanism that stops a content digest validating as a request
+digest, and it could have been altered silently. Frozen vectors now pin it, and a
+positive control (reordering must move the vector) stops a constant-returning
+encoder from satisfying them. The two findings below are from the earlier revision.
 
 **`CREATE SCHEMA ... AUTHORIZATION` does not own the tables.** It sets the schema's
 owner and nothing else. The migrating superuser owned them, so `FORCE ROW LEVEL

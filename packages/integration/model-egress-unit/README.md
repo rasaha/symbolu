@@ -57,10 +57,15 @@ never reached a vendor will therefore be recorded as unknown and need
 re-submitting. That is the trade, taken deliberately.
 
 **Content is digested separately from the record.** The request digest covers a
-*content digest*, not the content. That is what keeps a purged row verifiable: the
-tombstone still answers "was it this?" for a reader holding a candidate, and still
-cannot answer "what was it?" for anyone. This diverges from D-4's letter, which says
-the digest binds the exact text; the ADR flags it for the owner.
+*content digest* whose preimage is the ordered `[unit_id, exact_text]` pairs — a
+composed commitment to the exact text, not an identifiers-only one. **The owner
+ratified this on 2026-09-11 as satisfying D-4**; inlining plaintext into the outer
+digest is not required and no `v2` is authorized.
+
+After a purge the tombstone can verify the integrity and linkage of the retained
+digest chain, and can answer "was it this?" for a reader who already holds a
+candidate. It cannot reconstruct the deleted plaintext or re-prove what it was to
+anyone holding no candidate — the chain survives, the content does not.
 
 **The reservation is never released.** Neither lease expiry nor content purging
 releases the vendor allocation an `OUTCOME_UNKNOWN` conservatively consumed —
