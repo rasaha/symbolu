@@ -785,7 +785,10 @@ a captured token, and is confirmed or amended from the redacted capture like the
 
 **Evidence still required for `MET`, all owner-supplied, none of it a secret:** (1) the
 designated JWKS's key identifiers and document digest from `ci/ap3_jwks_probe.py`, run
-from a host with egress; (2) a locally produced, redacted capture of one live Access
+from a host with egress — **held since 2026-09-11 `[V]`**: the owner ran the probe from a
+Windows host; two RSA `RS256` signing keys and the document digest are recorded in
+`evidence.jwks_key_identifiers` and `evidence.jwks_document_sha256`, transcribed from the
+owner's terminal output; (2) a locally produced, redacted capture of one live Access
 token for `ap3-test@ugence.ai` holding only `alg`, `typ`, `kid`, the payload key names,
 `iss`, `aud`, whether `sub` is non-empty, and `type`, confirming AP3-D1 to AP3-D3 as
 written; (3) execution of rows 1 to 13 against the live issuer with `test_timestamp`,

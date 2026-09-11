@@ -117,8 +117,14 @@ def test_the_record_is_designated_ruled_and_pending_not_met():
     assert record["evidence"]["accepting_owner"] is None
     assert record["evidence"]["test_timestamp"] is None
     assert "no egress" in record["evidence"]["validation_environment_limitations"]
-    assert record["evidence"]["jwks_key_identifiers"] == []
-    assert record["evidence"]["jwks_document_sha256"] is None
+    # evidence item 1 is held: the owner ran the probe from a host with egress on 2026-09-11
+    kids = record["evidence"]["jwks_key_identifiers"]
+    assert len(kids) == 2 and all(set(k) == {"kid", "kty", "alg", "use"} for k in kids)
+    assert all(k["kty"] == "RSA" and k["alg"] == "RS256" and k["use"] == "sig" for k in kids)
+    assert all(re.fullmatch(r"[0-9a-f]{64}", k["kid"]) for k in kids), "a kid, never key material"
+    assert re.fullmatch(r"[0-9a-f]{64}", record["evidence"]["jwks_document_sha256"])
+    assert "owner" in record["evidence"]["jwks_probe_run"] and "no key material" in record["evidence"]["jwks_probe_run"]
+    assert record["evidence"]["required_owner_actions"][0].startswith("DONE 2026-09-11: ci/ap3_jwks_probe.py")
     assert len(record["evidence"]["required_owner_actions"]) >= 3
     assert "a test-only authorizer described as production AX-5" in record["must_never_contain"]
 
