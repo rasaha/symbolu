@@ -67,9 +67,31 @@ is not amended by this package.
 
 `AdapterConfig(issuer, audience, jwks_url, tenant_claim=None, actor_type_claim=None,
 human_actor_type_value=None, max_proof_bytes=8192, fetch_timeout_s=5.0,
-production=False)`. The first three are required and have no defaults; the claim
-names have no defaults and the two actor fields are set together or not at all. With
-`production=True` a loopback or plain-HTTP JWKS URL is refused.
+production=False, issuer_profile="rfc9068", bound_tenant=None,
+verified_email_domain=None)`. The first three are required and have no defaults; the
+claim names have no defaults and the two actor fields are set together or not at all.
+With `production=True` a loopback or plain-HTTP JWKS URL is refused.
+
+### Issuer profiles (AP3-D1 to AP3-D3)
+
+`issuer_profile` is `rfc9068` by default: IA-1 to IA-4 exactly as ratified, and
+nothing in this section applies. The one other value, `cloudflare-access`, is the
+narrowly scoped profile the owner ratified on 2026-09-11 for the designated AP-3
+issuer (`ADR_UGENCE_AUTHORITY_PLANE_SCOPING.md` §20.7). It is selected only by name,
+and under it, and only under it:
+
+| Ruling | What the profile does |
+|---|---|
+| AP3-D1 | the JOSE header `typ` must be exactly `JWT` (`at+jwt` is refused here; every other header, signature, issuer, audience and temporal check is unchanged) |
+| AP3-D2 | `tenant_claim` must be unset; the tenant is the configured `bound_tenant`, selected by the exact issuer-and-audience pair the decoder verified and corroborated by a verified `email` whose domain (NFC, trimmed, compared case-insensitively) is exactly `verified_email_domain`; a wrong domain is `EMAIL_DOMAIN_MISMATCH`, an absent email is refused, and nothing is derived from the email |
+| AP3-D3 | `actor_type_claim` must be unset; `HUMAN` is the shape non-empty `sub` + `email` + no `common_name`; the service-token shape (`common_name`, empty or absent `sub`, no `email`) is `SYSTEM` with its `common_name` as subject and no tenant bound; every mixed or incomplete shape is `ACTOR_SHAPE_AMBIGUOUS`; Cloudflare's `type: app` decides nothing |
+
+The profile is structurally tied to one Access team: `issuer` must be exactly
+`https://<team>.cloudflareaccess.com` and `jwks_url` exactly that team's
+`/cdn-cgi/access/certs` (a loopback URL is accepted outside production for the
+conformance harness only). The answer records `issuer_profile`. None of this changes
+`ISSUER_VALIDATION`, which stays `IN_PROCESS_ISSUER_ONLY` until the owner records
+AP-3 as MET.
 
 `deployment/governed-runtime-worker` wires the adapter: `build_identity_port` builds
 it from the worker's configuration and passes it to `ReviewService`
@@ -121,9 +143,12 @@ approval ledger, directory, durable engine, studio or HTTP client library.
 
 ## Known gaps `[G]`
 
-- Unvalidated against a real enterprise issuer; no issuer, test tenant or key
-  rotation policy is provisioned. This is the gap that keeps the package
-  `ISSUER_VALIDATION = "IN_PROCESS_ISSUER_ONLY"`.
+- Unvalidated against a real enterprise issuer. The owner designated Cloudflare
+  Access (2026-09-11) and the `cloudflare-access` profile implements the ratified
+  mapping, but no live token or JWKS has been validated; this is the gap that keeps
+  the package `ISSUER_VALIDATION = "IN_PROCESS_ISSUER_ONLY"`. The profile's
+  service-token shape (`common_name`, empty `sub`) is stated from Cloudflare's
+  documentation `[I]`, not from a captured token.
 - `nbf` is checked only at authentication (above).
 - No assurance policy or gate exists (AI-E): the adapter records `acr`/`amr` and the
   service carries them, and nothing anywhere requires a level of assurance.

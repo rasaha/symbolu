@@ -7,6 +7,10 @@ IA-1 to IA-5, ``docs/architecture/ADR_UGENCE_APPROVER_IDENTITY_ADAPTER_SCOPING.m
 
 Maturity ``REFERENCE_GRADE_SHADOW_ONLY``: validated against this package's in-process
 test issuer only; validation against a real enterprise issuer remains unproven.
+
+Since 0.1.2 the adapter carries one narrowly scoped issuer profile beyond the RFC 9068
+default: ``cloudflare-access`` (owner rulings AP3-D1 to AP3-D3), selected only by
+explicit configuration and changing nothing for any other issuer.
 """
 
 from __future__ import annotations
@@ -14,12 +18,20 @@ from __future__ import annotations
 from .adapter import (
     ACCESS_TOKEN_TYPES,
     ALGORITHMS,
+    CLOUDFLARE_ACCESS_TOKEN_TYPE,
+    CLOUDFLARE_REQUIRED_CLAIMS,
     REQUIRED_CLAIMS,
     JwtApproverIdentity,
     JwtApproverIdentityAdapter,
     Refusal,
 )
-from .config import LOOPBACK_HOSTS, AdapterConfig
+from .config import (
+    CLOUDFLARE_ACCESS_PROFILE,
+    ISSUER_PROFILES,
+    LOOPBACK_HOSTS,
+    RFC9068_PROFILE,
+    AdapterConfig,
+)
 from .errors import AdapterConfigurationError, KeyRetrievalFailed
 from .keys import MAX_JWKS_BYTES, JwksKeyCache
 from .version import ENFORCEMENT_ENABLED, ISSUER_VALIDATION, MATURITY, __version__
@@ -28,7 +40,9 @@ __all__ = [
     "__version__", "MATURITY", "ISSUER_VALIDATION", "ENFORCEMENT_ENABLED",
     "JwtApproverIdentityAdapter", "JwtApproverIdentity", "Refusal",
     "ALGORITHMS", "ACCESS_TOKEN_TYPES", "REQUIRED_CLAIMS",
-    "AdapterConfig", "LOOPBACK_HOSTS",
+    "CLOUDFLARE_ACCESS_TOKEN_TYPE", "CLOUDFLARE_REQUIRED_CLAIMS",
+    "AdapterConfig", "LOOPBACK_HOSTS", "ISSUER_PROFILES", "RFC9068_PROFILE",
+    "CLOUDFLARE_ACCESS_PROFILE",
     "JwksKeyCache", "MAX_JWKS_BYTES",
     "KeyRetrievalFailed", "AdapterConfigurationError",
 ]

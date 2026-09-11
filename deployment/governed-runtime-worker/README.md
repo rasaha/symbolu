@@ -149,15 +149,22 @@ through `compose(config, clock=, workload=)` from its own entrypoint.
   adapter's in-process issuer: park, list, decide over HTTP with a signed proof
   (`IDP_AUTHENTICATED`, `authentication_reference`), re-arm, consume, run once, link,
   and no DSN or token in any answer or output (row 8).
-- `tests/test_ap3_designation_conformance.py` — AP-3 (ADR §20.6): the committed
+- `tests/test_ap3_designation_conformance.py` — AP-3 (ADR §20.6, §20.7): the committed
   designation record is the owner's (Cloudflare Access team `ugence` backed by Google
-  Workspace, `PENDING_VALIDATION`, every live matrix row null), holds nothing token- or
-  secret-shaped, and its `conformance_harness` block says exactly what the ratified
-  adapter and the write gate do with in-process tokens shaped like Cloudflare Access
-  tokens under the designated issuer and audience. Implementation and conformance
-  evidence only; an in-process issuer never satisfies AP-3. `ci/ap3_jwks_probe.py`
-  prints the designated JWKS's key identifiers and nothing else, for the owner to run
-  from a host with egress.
+  Workspace, `PENDING_VALIDATION`), the five mapping fields carry rulings AP3-D1 to
+  AP3-D5 and none is `UNRULED`, the file holds nothing token- or secret-shaped, and its
+  `conformance_harness` block says exactly what the adapter under the `cloudflare-access`
+  profile, the write gate, the `Cf-Access-Jwt-Assertion` boundary
+  (`cloudflare_access_boundary.py`, AP3-D4) and the test-only authorizer
+  (`tests/_conformance_authorizer.py`, AP3-D5, not AX-5) do with in-process tokens
+  shaped like Cloudflare Access tokens. Rows 1 to 13 are implementation evidence only
+  and stay null until live Cloudflare evidence is recorded; rows 14 to 16 take their
+  result from this suite under AP3-D5's evidence classification. `ci/ap3_jwks_probe.py`
+  prints the designated JWKS's key identifiers and document digest and nothing else,
+  for the owner to run from a host with egress.
+- `tests/test_authority_plane_contract.py`, `tests/test_authority_reads.py`,
+  `tests/test_authority_writes.py` — the plane's contract (no write served while AP-3
+  is not `MET`), the four reads, and the two implemented writes behind the AW-5 gate.
 
 ## Container image and gate set (step 4)
 

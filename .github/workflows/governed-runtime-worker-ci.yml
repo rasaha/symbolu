@@ -122,6 +122,13 @@ jobs:
           cd deployment/governed-runtime-worker
           python -m pytest tests/test_maturity_and_boundaries.py -o addopts= -v --no-header
 
+      - name: Authority plane contract, reads, gated writes and the AP-3 conformance harness (ADR sections 18 to 20)
+        run: |
+          cd deployment/governed-runtime-worker
+          python -m pytest tests/test_authority_plane_contract.py tests/test_authority_reads.py \
+            tests/test_authority_writes.py tests/test_ap3_designation_conformance.py \
+            -o addopts= -v --no-header
+
       - name: End to end over a real PostgreSQL with the in-process issuer
         run: |
           cd deployment/governed-runtime-worker

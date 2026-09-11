@@ -90,7 +90,7 @@ def test_pyproject_declares_exactly_the_ratified_bounded_dependency_set():
     floors = {re.split(r"[\[><=]", d)[0]: d for d in deps}
     assert floors["ugence-governed-review-service"] == "ugence-governed-review-service>=0.6.1"
     assert set(data["project"].get("optional-dependencies", {})) <= {"test"}
-    assert pkg.__version__ == "0.1.1"
+    assert pkg.__version__ == "0.1.2"
 
 
 def test_no_clock_is_read_anywhere():
@@ -144,7 +144,9 @@ def test_public_api_and_honest_labels():
         "__version__", "MATURITY", "ISSUER_VALIDATION", "ENFORCEMENT_ENABLED",
         "JwtApproverIdentityAdapter", "JwtApproverIdentity", "Refusal",
         "ALGORITHMS", "ACCESS_TOKEN_TYPES", "REQUIRED_CLAIMS",
-        "AdapterConfig", "LOOPBACK_HOSTS", "JwksKeyCache", "MAX_JWKS_BYTES",
+        "CLOUDFLARE_ACCESS_TOKEN_TYPE", "CLOUDFLARE_REQUIRED_CLAIMS",
+        "AdapterConfig", "LOOPBACK_HOSTS", "ISSUER_PROFILES", "RFC9068_PROFILE",
+        "CLOUDFLARE_ACCESS_PROFILE", "JwksKeyCache", "MAX_JWKS_BYTES",
         "KeyRetrievalFailed", "AdapterConfigurationError",
     }
     assert issubclass(pkg.KeyRetrievalFailed, __import__(

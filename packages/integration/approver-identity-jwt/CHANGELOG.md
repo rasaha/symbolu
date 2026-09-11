@@ -1,5 +1,32 @@
 # Changelog — ugence-approver-identity-jwt
 
+## 0.1.2 — 2026-09-11 — the Cloudflare Access issuer profile (AP3-D1 to AP3-D3)
+
+One narrowly scoped issuer profile, selected only by explicit configuration; the
+`rfc9068` default and every other issuer are unchanged. The package stays
+`REFERENCE_GRADE_SHADOW_ONLY`, `ISSUER_VALIDATION = "IN_PROCESS_ISSUER_ONLY"`: the
+profile is conformance-tested against the in-process issuer only, and AP-3 is not met.
+
+- `AdapterConfig.issuer_profile` (`rfc9068` | `cloudflare-access`), `bound_tenant`,
+  `verified_email_domain`. The Cloudflare profile requires an issuer of exactly
+  `https://<team>.cloudflareaccess.com`, that team's `/cdn-cgi/access/certs` as the
+  JWKS URL (loopback outside production only), both binding fields, and none of the
+  IA-4 claim-name fields.
+- AP3-D1: under the profile the header `typ` must be exactly `JWT`; anything else,
+  including `at+jwt`, is the new `Refusal.TYP_NOT_PROFILE_TYPE`. IA-1 is unchanged
+  for the `rfc9068` profile.
+- AP3-D2: the tenant is the configured static binding, selected by the verified
+  issuer-and-audience pair and corroborated by the verified email's domain (NFC,
+  trimmed, domain case-insensitive); `Refusal.EMAIL_DOMAIN_MISMATCH` otherwise.
+- AP3-D3: the ratified claim-shape mapping; `Refusal.ACTOR_SHAPE_AMBIGUOUS` for any
+  mixed or incomplete shape; `type: app` is never read; `sub` is not required at
+  decode time under the profile (`CLOUDFLARE_REQUIRED_CLAIMS`) because the shape
+  mapping decides what its absence means.
+- `JwtApproverIdentity.issuer_profile` records which profile judged the proof.
+- Exports: `ISSUER_PROFILES`, `RFC9068_PROFILE`, `CLOUDFLARE_ACCESS_PROFILE`,
+  `CLOUDFLARE_ACCESS_TOKEN_TYPE`, `CLOUDFLARE_REQUIRED_CLAIMS`. `Refusal` grows from
+  14 to 17 members. `tests/test_cloudflare_access_profile.py` is the profile's suite.
+
 ## 0.1.1 — 2026-09-08 — declared floor corrected
 
 Metadata only: no source, claim-mapping or behaviour change; the package stays

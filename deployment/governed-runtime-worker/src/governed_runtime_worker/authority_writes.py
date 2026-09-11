@@ -34,12 +34,24 @@ the owner validates the adapter against a real issuer. Nothing here can claim mo
 else; the worker derives ``grant_id`` so a replayed identical load answers
 ``ALREADY_LOADED`` with the standing grant instead of a second one. No proof, DSN or
 credential is echoed in any answer.
+
+**Two default-off seams for the AP-3 validation slice (§20.7).** ``transport_boundary``
+(AP3-D4) lets the gate accept an identity the Cloudflare boundary derived from
+``Cf-Access-Jwt-Assertion`` when ``X-Ugence-Approver-Proof`` is absent; the gate never
+reads that header itself and never trusts anything but the adapter's answer.
+``writer_authorizer`` (AP3-D5) adds the AX-5 stage after the identity gate: the
+verified principal context plus the exact capability the write needs, answered by the
+composed ``WriterAuthorizer``; ``AUTHENTICATED_BUT_UNAUTHORIZED`` is a 403 with the
+authorizer's reasons and nothing recorded. Neither seam is composed by
+``composition.py``: production wiring is deferred to AX-1 and AX-5 and a reference
+authorizer is refused under ``production=True`` (the RA-6 F-1 pattern).
 """
 
 from __future__ import annotations
 
 import json
 import unicodedata
+from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any, Callable, Mapping, Optional
 
@@ -70,9 +82,11 @@ from .version import MATURITY
 
 __all__ = [
     "WRITE_OPERATIONS",
+    "WRITE_CAPABILITIES",
     "LOAD_BODY_KEYS",
     "PRINCIPAL_KEYS",
     "REVOKE_BODY_KEYS",
+    "VerifiedPrincipalContext",
     "build_authority_writes",
 ]
 
@@ -86,6 +100,16 @@ WRITE_OPERATIONS: tuple[PlaneOperation, ...] = tuple(
 RULING_GATE = "AW-5"
 RULING_INTAKE = "AW-4"
 RULING_WRITE = "AW-1"
+RULING_AUTHORIZE = "AX-5"
+RULING_TRANSPORT = "AP3-D4"
+
+#: AX-5: the exact capability each write needs, named here for the conformance slice
+#: (AP3-D5) so an authorizer can permit one and only one; AX-1's composition may
+#: rename them, and nothing about the directory's role vocabulary is decided here.
+WRITE_CAPABILITIES: Mapping[str, str] = {
+    "authority_grant_role": "authority.directory.grant_role",
+    "authority_revoke_grant": "authority.directory.revoke_grant",
+}
 
 #: AW-4: the load body carries these keys and no other.
 LOAD_BODY_KEYS = frozenset({
@@ -96,6 +120,23 @@ REVOKE_BODY_KEYS = frozenset({"reason"})
 
 MAX_TOKEN = 256
 MAX_TEXT = 1024
+
+
+@dataclass(frozen=True)
+class VerifiedPrincipalContext:
+    """What the identity gate hands the AX-5 authorizer: the proven subject and tenant,
+    and nothing that could pass for authority. Field-compatible with the RA-6
+    ``WriterPrincipal`` (``principal_id``, ``tenant_id``, ``capabilities``,
+    ``is_reference``); ``capabilities`` is always empty because an identity proves who
+    decided and grants nothing (§20.2), so an authorizer that trusts declared
+    capabilities permits nothing here."""
+
+    principal_id: str
+    tenant_id: str
+    actor_type: str
+    authentication_reference: str
+    capabilities: frozenset = field(default_factory=frozenset)
+    is_reference: bool = False
 
 
 class _Refused(Exception):
@@ -186,17 +227,40 @@ def build_authority_writes(
     clock: Callable[[], datetime],
     identity_port: Optional[Any],
     serve: tuple[str, ...] = SERVED_WRITES,
+    transport_boundary: Optional[Any] = None,
+    writer_authorizer: Optional[Any] = None,
+    production: bool = False,
 ) -> Any:
     """A FastAPI router over one directory, for one tenant, at one clock, behind one
     identity port, registering exactly the writes ``serve`` names. The default is the
     contract's ``SERVED_WRITES``, empty under AP-3 until enterprise issuer validation is
     recorded, so the composed worker registers nothing. ``identity_port`` may be
-    ``None``: every write is then refused (AW-5), never recorded as presented."""
+    ``None``: every write is then refused (AW-5), never recorded as presented.
+
+    ``transport_boundary`` and ``writer_authorizer`` are the two default-off seams of
+    the AP-3 validation slice (module docstring); ``production=True`` refuses a
+    reference authorizer outright."""
     if not _is_typed(tenant_id):
         raise ValueError("tenant_id must be a typed token")
     unknown = sorted(set(serve) - set(IMPLEMENTED_WRITES))
     if unknown:
         raise ValueError(f"not implemented here: {unknown}")
+    if transport_boundary is not None:
+        if identity_port is None:
+            raise ValueError("a transport boundary without an identity port composes nothing (AW-5)")
+        for attr in ("header", "presented", "identity_from"):
+            if not hasattr(transport_boundary, attr):
+                raise ValueError("transport_boundary must expose header, presented and identity_from")
+        if transport_boundary.header == PROOF_HEADER:
+            raise ValueError("the transport boundary never reads the plane's own proof header (AW-3)")
+    if writer_authorizer is not None:
+        if not callable(getattr(writer_authorizer, "authorize", None)) \
+                or not isinstance(getattr(writer_authorizer, "is_reference_authorizer", None), bool):
+            raise ValueError("writer_authorizer must implement the RA-6 WriterAuthorizer seam "
+                             "(authorize(...) and is_reference_authorizer)")
+        if production and writer_authorizer.is_reference_authorizer:
+            raise ValueError("a reference WriterAuthorizer is refused in production (RA-6 F-1; AP3-D5 "
+                             "authorizes a conformance authorizer for the validation slice only)")
     router = APIRouter(tags=["authority"])
     by_id = {op.operation_id: op for op in WRITE_OPERATIONS}
     grant_op, revoke_op = by_id["authority_grant_role"], by_id["authority_revoke_grant"]
@@ -210,29 +274,46 @@ def build_authority_writes(
         return JSONResponse(status_code=exc.status, content=content)
 
     def recorded(op: PlaneOperation, identity: ApproverIdentity, as_of: datetime,
-                 grant: RoleGrant, event: str) -> dict:
+                 grant: RoleGrant, event: str, channel: str) -> dict:
         assert identity.claims is not None
-        return {
+        answer = {
             "result": "RECORDED", "recorded": True, "plane": "authority", "ruling": RULING_WRITE,
             "operation": op.operation_id, "tenant_id": tenant_id, "as_of": as_of.isoformat(),
             "identity_proof": identity.proof, "subject": identity.actor_id,
             "authentication_reference": authentication_reference(identity.claims),
-            "issuer_validation": ISSUER_VALIDATION,
+            "issuer_validation": ISSUER_VALIDATION, "proof_channel": channel,
             "provenance": "what an administrator loaded; the directory attests nothing about whether it should exist",
             "maturity": MATURITY, "event": event, "grant": grant.to_dict(),
         }
+        if writer_authorizer is not None:
+            answer["authorization"] = {
+                "ruling": RULING_AUTHORIZE, "capability": WRITE_CAPABILITIES[op.operation_id],
+                "authorizer_is_reference": bool(writer_authorizer.is_reference_authorizer),
+            }
+        return answer
 
-    def resolve(proof: str, as_of: datetime) -> ApproverIdentity:
-        """AW-5. The proven human subject of this tenant, or a typed refusal."""
+    def resolve(op: PlaneOperation, headers: Mapping[str, str], as_of: datetime) -> tuple[ApproverIdentity, str]:
+        """AW-5. The proven human subject of this tenant, or a typed refusal; then, when
+        an authorizer is composed, AX-5's stage over the verified principal context."""
         if identity_port is None:
             raise _Refused(409, "REFUSED_NO_IDENTITY_PORT",
                            "no identity port is composed; a write is never recorded as presented",
                            RULING_GATE)
-        if not proof:
-            raise _Refused(409, "REFUSED_UNAUTHENTICATED",
-                           f"no proof was presented on {PROOF_HEADER}", RULING_GATE)
+        proof = headers.get(PROOF_HEADER, "")
         try:
-            identity = identity_port.authenticate(proof)
+            if proof:
+                channel = PROOF_HEADER
+                identity = identity_port.authenticate(proof)
+            elif transport_boundary is not None and transport_boundary.presented(headers):
+                # AP3-D4: the boundary validates through the adapter; the raw assertion is
+                # never seen here and never becomes the plane's proof.
+                channel = transport_boundary.header
+                identity = transport_boundary.identity_from(headers)
+            else:
+                raise _Refused(409, "REFUSED_UNAUTHENTICATED",
+                               f"no proof was presented on {PROOF_HEADER}", RULING_GATE)
+        except _Refused:
+            raise
         except Exception as exc:  # noqa: BLE001 - fail closed on any failure to answer
             raise _Refused(409, "REFUSED_IDENTITY_UNAVAILABLE",
                            f"the identity port could not answer: {type(exc).__name__}", RULING_GATE)
@@ -257,7 +338,33 @@ def build_authority_writes(
         if claims[0] != tenant_id:
             raise _Refused(409, "REFUSED_TENANT_MISMATCH",
                            "the proof's tenant is not this worker's tenant", RULING_GATE)
-        return identity
+        if writer_authorizer is not None:
+            authorize(op, identity)
+        return identity, channel
+
+    def authorize(op: PlaneOperation, identity: ApproverIdentity) -> None:
+        """AX-5 (conformance seam under AP3-D5): a valid identity is authenticated and
+        grants nothing; the composed authorizer must permit the exact capability for
+        this tenant, or the write is refused with its reasons and records nothing."""
+        assert identity.claims is not None
+        context = VerifiedPrincipalContext(
+            principal_id=identity.actor_id, tenant_id=identity.claims.tenant_claims[0],
+            actor_type=identity.actor_type.value,
+            authentication_reference=authentication_reference(identity.claims))
+        capability = WRITE_CAPABILITIES[op.operation_id]
+        try:
+            verdict = writer_authorizer.authorize(principal=context, tenant_id=tenant_id,
+                                                  operation=op.operation_id, capability=capability)
+            permitted, reasons = verdict
+            reasons = tuple(str(r) for r in reasons)
+        except Exception as exc:  # noqa: BLE001 - fail closed on any failure to answer
+            raise _Refused(409, "REFUSED_AUTHORIZER_UNAVAILABLE",
+                           f"the writer authorizer could not answer: {type(exc).__name__}",
+                           RULING_AUTHORIZE)
+        if permitted is not True:
+            raise _Refused(403, "REFUSED_UNAUTHORIZED",
+                           "authenticated but unauthorized: " + ("; ".join(reasons) or "no reason given"),
+                           RULING_AUTHORIZE, capability=capability, subject=identity.actor_id)
 
     async def parse(request: Request, allowed: frozenset[str], what: str) -> Mapping[str, Any]:
         raw = await request.body()
@@ -270,7 +377,7 @@ def build_authority_writes(
     async def grant_role(request: Request) -> Any:
         try:
             as_of = clock()
-            identity = resolve(request.headers.get(PROOF_HEADER, ""), as_of)
+            identity, channel = resolve(grant_op, request.headers, as_of)
             body = await parse(request, LOAD_BODY_KEYS, "load")
             principal = _principal(body)
             role, scope = _typed(body, "role"), _typed(body, "scope")
@@ -297,12 +404,12 @@ def build_authority_writes(
                 raise _Refused(422, "REFUSED_UNTYPED", str(exc), RULING_INTAKE)
         except _Refused as exc:
             return refusal(grant_op, exc)
-        return recorded(grant_op, identity, as_of, stored, "GRANTED")
+        return recorded(grant_op, identity, as_of, stored, "GRANTED", channel)
 
     async def revoke_grant(grant_id: str, request: Request) -> Any:
         try:
             as_of = clock()
-            identity = resolve(request.headers.get(PROOF_HEADER, ""), as_of)
+            identity, channel = resolve(revoke_op, request.headers, as_of)
             if not _is_typed(grant_id):
                 raise _Refused(422, "REFUSED_UNTYPED", "grant_id must be a typed token", RULING_INTAKE)
             body = await parse(request, REVOKE_BODY_KEYS, "revoke")
@@ -324,7 +431,7 @@ def build_authority_writes(
                 raise _Refused(422, "REFUSED_UNTYPED", str(exc), RULING_INTAKE)
         except _Refused as exc:
             return refusal(revoke_op, exc)
-        return recorded(revoke_op, identity, as_of, revoked, "REVOKED")
+        return recorded(revoke_op, identity, as_of, revoked, "REVOKED", channel)
 
     # Registration is the one place the contract's served set is consulted: an
     # implemented write that the contract does not name is not reachable.

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-__version__ = "0.1.1"
+__version__ = "0.1.2"
 
 #: Honest label. The adapter validates real signatures with a real cryptographic
 #: backend, but the only issuer it has ever been run against is the in-process test
@@ -11,7 +11,9 @@ __version__ = "0.1.1"
 #: production-certified.
 MATURITY = "REFERENCE_GRADE_SHADOW_ONLY"
 
-#: What has and has not been proven about the issuer side.
+#: What has and has not been proven about the issuer side. The Cloudflare Access
+#: profile (AP3-D1 to AP3-D3) is implemented and conformance-tested against the
+#: in-process issuer only; this label moves when the owner records AP-3 as MET.
 ISSUER_VALIDATION = "IN_PROCESS_ISSUER_ONLY"
 
 ENFORCEMENT_ENABLED = False

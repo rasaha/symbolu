@@ -77,7 +77,7 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
   CMD ["python", "/app/container-healthcheck.py"]
 
 LABEL org.opencontainers.image.title="governed-runtime-worker" \
-      org.opencontainers.image.version="0.5.1" \
+      org.opencontainers.image.version="0.5.2" \
       org.opencontainers.image.description="Governed runtime worker: the governed review service composition root over the DBOS engine, behind one private TLS listener. Reference-grade, shadow-only; production mode is a posture, not a certification. No LIVE execution." \
       org.opencontainers.image.source="https://github.com/rasaha/symbolu" \
       org.opencontainers.image.licenses="UNLICENSED"
