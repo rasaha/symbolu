@@ -9,14 +9,17 @@ rulings IA-1 to IA-5, `docs/architecture/ADR_UGENCE_APPROVER_IDENTITY_ADAPTER_SC
 
 ## Maturity — read this before citing the package
 
-`REFERENCE_GRADE_SHADOW_ONLY`, `ISSUER_VALIDATION = "IN_PROCESS_ISSUER_ONLY"`,
-`ENFORCEMENT_ENABLED = False`. Signatures are verified with the ratified `cryptography`
-backend through PyJWT, but the only issuer this adapter has ever been run against is
-the in-process test issuer in its own suite. **Validation against a real enterprise
-identity provider is unproven.** A decision it authenticates is labelled
-`IDP_AUTHENTICATED` by the review service at reference grade; the roadmap's v1
-criterion 2 stays unmet until an owner-provisioned issuer exists. Nothing is
-pilot-validated or production-certified.
+`REFERENCE_GRADE_SHADOW_ONLY`, `ENFORCEMENT_ENABLED = False`, both unchanged, and since
+0.1.4 `ISSUER_VALIDATION = "CLOUDFLARE_ACCESS_HUMAN_WORKSPACE_GROUP_NONPROD_VALIDATED_2026_09_11_AP3_D6"`.
+Read the label as five scope limits, not as a certification: the issuer is Cloudflare
+Access (team `ugence`); the identities are humans authenticated through the designated
+Google Workspace group; the application is non-production; the owner accepted the AP-3
+record on 2026-09-11; and AP3-D6 fixed that scope, with Cloudflare service identities
+not commissioned. `ISSUER_VALIDATION_SCOPE` carries the same facts as fields. Signatures
+are verified with the ratified `cryptography` backend through PyJWT, and the one live
+validation is the owner's run recorded in
+`deployment/governed-runtime-worker/AP3_ENTERPRISE_ISSUER_VALIDATION.json`. Nothing is
+pilot-validated or production-certified, and no enforcement hangs on this package.
 
 ## What it does
 
@@ -89,9 +92,9 @@ and under it, and only under it:
 The profile is structurally tied to one Access team: `issuer` must be exactly
 `https://<team>.cloudflareaccess.com` and `jwks_url` exactly that team's
 `/cdn-cgi/access/certs` (a loopback URL is accepted outside production for the
-conformance harness only). The answer records `issuer_profile`. None of this changes
-`ISSUER_VALIDATION`, which stays `IN_PROCESS_ISSUER_ONLY` until the owner records
-AP-3 as MET.
+conformance harness only). The answer records `issuer_profile`. `ISSUER_VALIDATION` moved
+off `IN_PROCESS_ISSUER_ONLY` in 0.1.4, when the owner recorded AP-3 as `MET`, to the
+scoped label in the Maturity section.
 
 `deployment/governed-runtime-worker` wires the adapter: `build_identity_port` builds
 it from the worker's configuration and passes it to `ReviewService`
@@ -143,12 +146,12 @@ approval ledger, directory, durable engine, studio or HTTP client library.
 
 ## Known gaps `[G]`
 
-- Unvalidated against a real enterprise issuer. The owner designated Cloudflare
-  Access (2026-09-11) and the `cloudflare-access` profile implements the ratified
-  mapping, but no live token or JWKS has been validated; this is the gap that keeps
-  the package `ISSUER_VALIDATION = "IN_PROCESS_ISSUER_ONLY"`. The profile's
-  service-token shape (`common_name`, empty `sub`) is stated from Cloudflare's
-  documentation `[I]`, not from a captured token.
+- Validated against one real enterprise issuer only, within the AP3-D6 scope named by
+  `ISSUER_VALIDATION`: Cloudflare Access, human identities through one Google Workspace
+  group, a non-production application. Any other issuer, any service identity, and any
+  production application are unvalidated. The profile's service-token shape
+  (`common_name`, empty `sub`) is stated from Cloudflare's documentation `[I]`, not
+  from a captured token; service identities are not commissioned (AP3-D6).
 - `nbf` is checked only at authentication (above).
 - No assurance policy or gate exists (AI-E): the adapter records `acr`/`amr` and the
   service carries them, and nothing anywhere requires a level of assurance.

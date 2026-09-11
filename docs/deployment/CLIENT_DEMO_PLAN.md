@@ -109,7 +109,7 @@ fetch('/api/authority/grants', {method:'POST'}).then(r => console.log(r.status))
 > refused."
 
 Then **Grants**, any typed token, and read the banner rather than the result:
-`read_authenticated: false`, `PRESENTED_UNPROVEN`, `IN_PROCESS_ISSUER_ONLY`.
+`read_authenticated: false`, `PRESENTED_UNPROVEN`, and the adapter's scoped issuer-validation label (`CLOUDFLARE_ACCESS_HUMAN_WORKSPACE_GROUP_NONPROD_VALIDATED_2026_09_11_AP3_D6` since adapter 0.1.4).
 
 > "This distinguishes a presented identity from an enterprise-verified one. No identity
 > provider is connected, and rather than presenting the read as trusted, it says so on

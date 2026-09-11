@@ -1,5 +1,22 @@
 # Changelog — ugence-approver-identity-jwt
 
+## 0.1.4 — 2026-09-11 — `ISSUER_VALIDATION` moved off `IN_PROCESS_ISSUER_ONLY`
+
+Label only: no source path, claim mapping or refusal changes. `MATURITY` stays
+`REFERENCE_GRADE_SHADOW_ONLY` and `ENFORCEMENT_ENABLED` stays `False`.
+
+- `ISSUER_VALIDATION` is now `CLOUDFLARE_ACCESS_HUMAN_WORKSPACE_GROUP_NONPROD_VALIDATED_2026_09_11_AP3_D6`,
+  because the owner accepted the AP-3 record on 2026-09-11
+  (`deployment/governed-runtime-worker/AP3_ACCEPTANCE_REPORT.md@fb373ce9`). Every token
+  of the label is a scope limit: Cloudflare Access; human identities authenticated
+  through the designated Google Workspace group; a non-production application; the
+  acceptance date; ruling AP3-D6. Service identities are not commissioned. It is not a
+  production certification and says so by omission.
+- New `ISSUER_VALIDATION_SCOPE`: the same facts as fields, including
+  `production_certified: False`, the record and report paths and the acceptor.
+- `tests/test_boundaries.py` pins the label's shape, the scope fields and the absence of
+  any production claim.
+
 ## 0.1.3 — 2026-09-11 — AP3-D1 amended on live evidence
 
 The owner's redacted capture of a live Cloudflare Access token (2026-09-11) showed a

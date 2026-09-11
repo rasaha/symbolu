@@ -1,7 +1,7 @@
 {
   "schema": "governed-runtime-worker.external-deployment-evidence.v1",
   "deployment": "governed-runtime-worker",
-  "deployment_version": "0.5.2",
+  "deployment_version": "0.5.3",
   "maturity": "REFERENCE_GRADE_SHADOW_ONLY",
   "ruling": "CR-5 ALLOWLISTED_JWKS_HOST (ADR_UGENCE_REVIEW_SERVICE_COMPOSITION_ROOT_SCOPING.md, section 5), as clarified 2026-09-10: internal connectivity is not vendor egress, but it must still be declared.",
   "evidence_class": "EXTERNAL_DEPLOYMENT_EVIDENCE",

@@ -27,8 +27,9 @@ the issuer-qualified subject reference (ID-2), never the proof.
 
 **What the answer says, honestly (AW-1).** A recorded write carries
 ``identity_proof: IDP_AUTHENTICATED``, the subject, the authentication reference, and
-the adapter's ``issuer_validation`` label, which stays ``IN_PROCESS_ISSUER_ONLY`` until
-the owner validates the adapter against a real issuer. Nothing here can claim more.
+the adapter's ``issuer_validation`` label, ``IN_PROCESS_ISSUER_ONLY`` until the owner
+validated the adapter against a real issuer and the scoped Cloudflare Access label of
+AP3-D6 since adapter 0.1.4. Nothing here can claim more than that label's scope.
 
 **The intake (AW-4).** The load body carries ``RoleGrant``'s typed fields and nothing
 else; the worker derives ``grant_id`` so a replayed identical load answers

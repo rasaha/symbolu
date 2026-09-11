@@ -127,9 +127,14 @@ in release 0.1.2 as one issuer profile, and they change nothing for any other is
 | AP3-D2 | IA-4 (tenant) | Under the profile `tenant_claim` must be unset; the tenant is the configured `bound_tenant`, selected by the verified issuer-and-audience pair and corroborated by a verified `email` whose domain (NFC, trimmed, case-insensitive) is exactly `verified_email_domain` (`Refusal.EMAIL_DOMAIN_MISMATCH`). A static mapping, never a derivation; no top-level claim is read. |
 | AP3-D3 | IA-4 (actor type) | Under the profile `actor_type_claim` must be unset; `HUMAN` is the shape non-empty `sub` + verified-domain `email` + no `common_name`; the service-token shape (`common_name`, empty or absent `sub`, no `email`) is `SYSTEM` with `common_name` as subject and no tenant; everything else is `Refusal.ACTOR_SHAPE_AMBIGUOUS`. `type: app` decides nothing. `sub` is therefore not a decode-time requirement under the profile (`CLOUDFLARE_REQUIRED_CLAIMS`); the shape mapping decides what its absence means. |
 
-The §5 prohibitions stand in full. `ISSUER_VALIDATION` stays `IN_PROCESS_ISSUER_ONLY`:
-the profile is conformance-tested in `tests/test_cloudflare_access_profile.py` and in
-the worker's AP-3 harness against the in-process issuer only, and moves only when the
-owner records AP-3 as `MET`. The service-token shape is stated from Cloudflare's
+The §5 prohibitions stand in full. `ISSUER_VALIDATION` stayed `IN_PROCESS_ISSUER_ONLY`
+while the profile was conformance-tested in `tests/test_cloudflare_access_profile.py` and
+in the worker's AP-3 harness against the in-process issuer only. The owner accepted the
+AP-3 record on 2026-09-11 (`ADR_UGENCE_AUTHORITY_PLANE_SCOPING.md` §20.7), and release
+0.1.4 moved the label to `CLOUDFLARE_ACCESS_HUMAN_WORKSPACE_GROUP_NONPROD_VALIDATED_2026_09_11_AP3_D6`
+with `ISSUER_VALIDATION_SCOPE` beside it: Cloudflare Access; human identities through the
+designated Google Workspace group; a non-production application; AP3-D6; service
+identities not commissioned; `production_certified: False`. `MATURITY` and
+`ENFORCEMENT_ENABLED` are unchanged. The service-token shape is stated from Cloudflare's
 documentation `[I]` and is confirmed or amended from the owner's redacted live-token
 capture before any live row is marked passed.

@@ -24,8 +24,8 @@ Four read-only screens over the four AP-5 reads the governed runtime worker serv
 Every answer is shown under an identity banner that repeats what the worker said:
 the read was not authenticated; the decision proof the deployment can give
 (`PRESENTED_UNPROVEN` until an identity port is composed, `IDP_AUTHENTICATED` then);
-the adapter's issuer validation, which stays `IN_PROCESS_ISSUER_ONLY` until AI-C is
-validated against a real issuer; and the directory's own provenance sentence, that a
+the adapter's issuer validation label (`IN_PROCESS_ISSUER_ONLY` until AI-C was validated
+against a real issuer; the scoped Cloudflare Access label since adapter 0.1.4, 2026-09-11); and the directory's own provenance sentence, that a
 grant is what an administrator loaded. An empty list, a typed refusal and an
 unreachable worker are shown differently, on purpose.
 

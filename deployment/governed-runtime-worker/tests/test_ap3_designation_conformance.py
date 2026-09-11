@@ -378,7 +378,8 @@ def test_row_1_a_cloudflare_shaped_token_is_accepted_under_the_profile_over_both
     status, body = s.load(token)
     assert status == 200 and body["result"] == "RECORDED" and body["identity_proof"] == "IDP_AUTHENTICATED"
     assert body["subject"] == s.subject_reference() and body["proof_channel"] == PROOF_HEADER
-    assert body["issuer_validation"] == "IN_PROCESS_ISSUER_ONLY", "nothing here claims enterprise validation"
+    assert body["issuer_validation"] == "CLOUDFLARE_ACCESS_HUMAN_WORKSPACE_GROUP_NONPROD_VALIDATED_2026_09_11_AP3_D6", \
+        "the answer names the one validation held and its scope, nothing wider"
     # and over Cloudflare's transport header, through the boundary (an identical load replays)
     status, body = s.load(cf=token)
     assert status == 409 and body["result"] == "ALREADY_LOADED", "same identity, same grant, replayed"

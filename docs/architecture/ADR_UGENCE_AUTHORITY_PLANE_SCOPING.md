@@ -32,7 +32,7 @@ both were ruled elsewhere (MA-1, MS-1) and are not reopened here.
 |---|---|---|
 | `packages/integration/authority-directory` | 0.1.0, `REFERENCE_GRADE_SHADOW_ONLY`, `ENFORCEMENT_ENABLED = False` | `SqliteAuthorityDirectory` with `put_grant` and `revoke_grant` over an append-only event ledger of `GRANTED` and `REVOKED` (`grants.py:189-195`; `sqlite.py:211-225`); one-hop delegation; committee reports; `DirectoryApproverEligibility`. Its own ADR records the gap this plane fills: "a grant is what an administrator loaded" and nothing proves it should exist (`ADR_UGENCE_AUTHORITY_DIRECTORY_SCOPING.md:126-130`). |
 | `packages/integration/approval-workflow` | 0.2.0, same labels | The approval state machine, `ReviewDecision.GRANT / REJECT / REQUEST_CHANGES` (`states.py:54-59`), a sqlite store with hash-linked events, once-only consumption. Ruled never to approve, authenticate, mint authority or execute (`ADR_UGENCE_APPROVAL_WORKFLOW_SCOPING.md:169-171`). |
-| `packages/integration/approver-identity-jwt` | 0.1.0, `ISSUER_VALIDATION = IN_PROCESS_ISSUER_ONLY` | Local RFC 9068 token validation under IA-1 to IA-5. Validation against a real enterprise issuer is unproven (`ADR_UGENCE_APPROVER_IDENTITY_ADAPTER_SCOPING.md:100-104`). |
+| `packages/integration/approver-identity-jwt` | 0.1.0, `ISSUER_VALIDATION = IN_PROCESS_ISSUER_ONLY` (at the time; 0.1.4 carries the scoped Cloudflare label, §20.7) | Local RFC 9068 token validation under IA-1 to IA-5. Validation against a real enterprise issuer is unproven (`ADR_UGENCE_APPROVER_IDENTITY_ADAPTER_SCOPING.md:100-104`). |
 | `deployment/governed-runtime-worker` | composition root | Composes the sqlite directory, the sqlite approval store and the JWT adapter (`composition.py:34-36,206`); `preflight` refuses a fixture identity or fixture eligibility in production posture (`:149-156`). The adapter ADR's sentence that "no deployment composes the review service" predates this and is stale `[I]`. |
 
 ## 3 — What a human decision does today `[V]`
@@ -462,7 +462,8 @@ was added: the writes ride on the identity port the worker already composes from
 
 **Not proven here.** The adapter against a real enterprise issuer: `issuer_validation`
 still reads `IN_PROCESS_ISSUER_ONLY` on every write answer, and the maturity of every
-package on the plane is unchanged. Step 4 of §11 remains the owner's.
+package on the plane is unchanged. Step 4 of §11 remains the owner's. (Closed on
+2026-09-11 by §20.7's acceptance; adapter 0.1.4 carries the scoped label.)
 
 ## 18 — Owner ruling: AW-1 reversed, AP-3 controlling (owner, 2026-09-07)
 
@@ -779,7 +780,8 @@ capability and not the revoke capability. `conformance_harness` rows 1 to 13 sti
 
 **What this does not authorize.** AX-1, AX-2 and production AX-5 are not implemented;
 `composition.py` composes neither seam; `SERVED_WRITES` stays empty; `ISSUER_VALIDATION`
-stays `IN_PROCESS_ISSUER_ONLY`; nothing here weakens IA-1 to IA-4 for any other issuer.
+stayed `IN_PROCESS_ISSUER_ONLY` until the acceptance below (adapter 0.1.4 then moved it
+to the scoped label); nothing here weakens IA-1 to IA-4 for any other issuer.
 The service-token claim shape is stated from Cloudflare's documentation `[I]`, not from
 a captured token, and is confirmed or amended from the redacted capture like the header.
 
@@ -844,7 +846,13 @@ the AP-3 gate of §18 is satisfied for the designated issuer, within the AP3-D6 
 write (`SERVED_WRITES` stays empty until the owner names a write served with its own
 record, §18.3, §20.5); it implements nothing under AX-1, AX-2 or AX-5; it does not move the
 adapter's `ISSUER_VALIDATION` label, which is a package release of its own; and it begins
-no live LLM-provider activation. §20.5's sequence is now eligible to start, act by act,
+no live LLM-provider activation. That release followed the same day: adapter 0.1.4 sets
+`ISSUER_VALIDATION = CLOUDFLARE_ACCESS_HUMAN_WORKSPACE_GROUP_NONPROD_VALIDATED_2026_09_11_AP3_D6`
+with `ISSUER_VALIDATION_SCOPE` beside it (issuer Cloudflare Access; identities human via
+the designated Google Workspace group; application non-production; ruling AP3-D6;
+service identities not commissioned; `production_certified: False`); `MATURITY` and
+`ENFORCEMENT_ENABLED` are unchanged, and every worker answer now carries the scoped
+label in `issuer_validation`. §20.5's sequence is now eligible to start, act by act,
 each with its own record. The capture also observed the application answering on
 `ap3-validation-endpoint.rakeshmohan888.workers.dev`, not the designated
 `ap3-validation.ugence.ai`; the owner confirms or corrects the hostname. The raw token was

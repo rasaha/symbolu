@@ -1,7 +1,7 @@
 {
   "schema": "governed-runtime-worker.railway-hosting-decision.v1",
   "deployment": "governed-runtime-worker",
-  "deployment_version": "0.5.2",
+  "deployment_version": "0.5.3",
   "ruling": "ADR_UGENCE_REVIEW_SERVICE_COMPOSITION_ROOT_SCOPING.md section 8, RW-1 to RW-6 (owner, 2026-09-08); CR-3 PRIVATE_NETWORK_TLS_IDENTITY_MANDATORY, CR-4 ONE_DEPLOYMENT_MODE_SWITCH and CR-5 ALLOWLISTED_JWKS_HOST controlling; AP-3 IDP_VALIDATED_FIRST controlling on identity",
   "ratification_status": "RULED_NOT_IMPLEMENTED",
   "ratification_note": "The owner answered six questions about hosting this deployment on Railway. This file records the answers and how each stands against what the repository enforces today; it changes no code, no configuration and no ruling of CR-1 to CR-5. Where an answer requires behaviour the repository does not implement, the entry says so under contradicts_repository_today and no gate, test or check below is marked satisfied on that account.",
@@ -65,7 +65,7 @@
       "subject": "the identity port in production mode",
       "ruling": "CR-3, CR-5, AP-3",
       "answer": "Production requires validation against a genuine HTTPS JWKS issuer, including issuer, audience, signature and key rotation, tenant and actor-type claims, with fail-closed behaviour. No Railway-specific identity exception is authorized. Test mode is permitted only for controlled demonstrations over synthetic data and must remain labelled PRESENTED_UNPROVEN.",
-      "repository_today": "config.py:172-181 requires issuer, audience and JWKS URL in production and requires the JWKS URL to be https (CR-5); composition.py:149-150 refuses composition without an identity port. Every authority read carries decision_identity_proof PRESENTED_UNPROVEN and issuer_validation IN_PROCESS_ISSUER_ONLY until AP-3's validation is recorded.",
+      "repository_today": "config.py:172-181 requires issuer, audience and JWKS URL in production and requires the JWKS URL to be https (CR-5); composition.py:149-150 refuses composition without an identity port. Every authority read carries decision_identity_proof PRESENTED_UNPROVEN and issuer_validation the adapter's ISSUER_VALIDATION label (IN_PROCESS_ISSUER_ONLY when written; the scoped Cloudflare Access label of AP3-D6 since adapter 0.1.4, describing the package, not this deployment) until AP-3's validation is recorded.",
       "contradicts_repository_today": false,
       "depends_on": "AP3_ENTERPRISE_ISSUER_VALIDATION.json, MET (accepted 2026-09-11 by the owner on AP3_ACCEPTANCE_REPORT.md at commit fb373ce9; ADR sections 20.6 and 20.7); serving a write remains a separate owner act with its own record (section 18.3)"
     },
