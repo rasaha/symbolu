@@ -1,20 +1,23 @@
 {
   "schema": "model-egress-unit.live-validation.v1",
-  "ruling": "ADR_UGENCE_LIVE_MODEL_PROVIDER_COMMISSIONING.md LP-4 (pending); the AP-3 pattern of ADR_UGENCE_AUTHORITY_PLANE_SCOPING.md section 20",
-  "meu_live_status": "BLOCKED_PENDING_OWNER_RULINGS",
+  "ruling": "ADR_UGENCE_LIVE_MODEL_PROVIDER_COMMISSIONING.md LP-4 (RATIFIED 2026-09-11); the AP-3 pattern of ADR_UGENCE_AUTHORITY_PLANE_SCOPING.md section 20",
+  "meu_live_status": "BLOCKED_PENDING_INFRASTRUCTURE_DESIGNATIONS",
   "status_vocabulary": [
     "BLOCKED_PENDING_OWNER_RULINGS",
+    "BLOCKED_PENDING_INFRASTRUCTURE_DESIGNATIONS",
     "PENDING_VALIDATION",
     "NOT_MET",
     "MET"
   ],
-  "status_note": "No row can execute: CR-1 admits no MEU deployment unit (LP-1), no custody is commissioned (LP-2), the model, account and custody owner are undesignated (LP-2, LP-3), and the record contract refuses genuine_call True (LP-2b). Rows are executed only on the owner's machine by a verifier that prints redacted evidence, as ci/ap3_live_verify.py does for AP-3, and MET is reached only by the owner's acceptance statement on a rendered acceptance report.",
+  "status_note": "LP-1 to LP-6 are ratified. No row can execute: the GCP project, workload identity, secret-version resource, IAM binding, audit-log evidence, rotation procedure and OpenAI organization/project identifiers are undesignated (LP-6 step 8); the OpenAI adapter distribution, the owner-run verifier, the acceptance-report generator, the durable reservation row and the genuine_call contract amendment are unbuilt (LP-6 steps 4, 6, 7); no credential is commissioned (step 9). Rows are executed only on the owner's machine by a verifier that never prints the credential or the full request content, and MET is reached only by the owner's separate acceptance statement; a successful HTTP response alone is insufficient (LP-4).",
   "blocked_by": [
-    "LP-1 CR-1 amendment",
-    "LP-2 custody commissioning and the LP-2a identity question",
-    "LP-2b record-contract amendment for genuine_call",
-    "LP-3 model, account, terms and region",
-    "LP-6 transport protection on the MEU DSNs and the ledger-kind schema (built in 0.2.0; not yet composed anywhere)"
+    "LP-6 step 4: production role provisioning, controlled migrations, tenant-bound database identities",
+    "LP-6 step 6: the OpenAI adapter as a separate MEU-only distribution",
+    "LP-6 step 7: owner-run verifier and acceptance-report generator",
+    "LP-2b: exchange migration lifting CHECK egress_result_no_genuine_call under the ratified precondition, and the durable reservation row for LP-5",
+    "LP-6 step 8: GCP project ID, MEU workload identity, secret-version resource, IAM binding, audit-log evidence, rotation procedure, OpenAI organization/project identifiers",
+    "LP-6 step 9: the credential commissioned manually by the custody owner",
+    "LP-1: CR-1 amended (DONE 2026-09-11); the MEU deployment unit itself not yet built"
   ],
   "validation_matrix": [
     {
@@ -25,14 +28,14 @@
     },
     {
       "row": 2,
-      "scenario": "credential never in any log, ledger row, exchange row or answer",
+      "scenario": "credential never in any log, ledger row, exchange row, evidence report or answer",
       "required": "NO_OCCURRENCE",
       "result": null
     },
     {
       "row": 3,
-      "scenario": "egress to any host but the designated one",
-      "required": "REFUSED",
+      "scenario": "egress to any URL but https://api.openai.com/v1/responses",
+      "required": "REFUSED_DESTINATION_NOT_PERMITTED",
       "result": null
     },
     {
@@ -43,44 +46,86 @@
     },
     {
       "row": 5,
-      "scenario": "the live answer's provenance",
-      "required": "GENUINE_CALL_TRUE_AND_TRUST_UNTRUSTED_EVIDENCE",
+      "scenario": "model identifier is the floating alias, not the pinned snapshot",
+      "required": "REFUSED_MODEL_NOT_PINNED",
       "result": null
     },
     {
       "row": 6,
-      "scenario": "TAP verification of the answer; INDETERMINATE",
-      "required": "TYPED_REFUSAL_NOT_DEGRADED_RESULT",
+      "scenario": "input over 8,192 tokens",
+      "required": "REFUSED_REQUEST_LIMIT_EXCEEDED",
       "result": null
     },
     {
       "row": 7,
-      "scenario": "purge replaces content with a tombstone on schedule",
-      "required": "TOMBSTONE_WITH_DIGESTS_ONLY",
+      "scenario": "max_output_tokens over 1,024",
+      "required": "REFUSED_REQUEST_LIMIT_EXCEEDED",
       "result": null
     },
     {
       "row": 8,
-      "scenario": "lease expiry after dispatch",
-      "required": "OUTCOME_UNKNOWN_NEVER_A_SECOND_BILLED_CALL",
+      "scenario": "streaming, store, tools, background or a previous response requested",
+      "required": "REFUSED_REQUEST_LIMIT_EXCEEDED",
       "result": null
     },
     {
       "row": 9,
-      "scenario": "request over the bound token ceiling",
-      "required": "REFUSED_BEFORE_DISPATCH",
+      "scenario": "eleventh genuine call, or a reservation over USD 25, or a second concurrent request",
+      "required": "REFUSED_COMMISSIONING_BUDGET_EXHAUSTED",
       "result": null
     },
     {
       "row": 10,
-      "scenario": "vendor error, timeout and malformed answer",
-      "required": "TYPED_OUTCOMES_FAILED_OR_OUTCOME_UNKNOWN",
+      "scenario": "secret version named as latest, or a service-account-key identity",
+      "required": "REFUSED_AT_CONSTRUCTION",
       "result": null
     },
     {
       "row": 11,
       "scenario": "custody lease expired at use",
       "required": "REFUSED_CUSTODY_UNAVAILABLE",
+      "result": null
+    },
+    {
+      "row": 12,
+      "scenario": "the live answer's provenance",
+      "required": "GENUINE_CALL_TRUE_LEASE_PRODUCTION_AUTHORITATIVE_TRUST_UNTRUSTED_EVIDENCE",
+      "result": null
+    },
+    {
+      "row": 13,
+      "scenario": "TAP verification of the answer; INDETERMINATE",
+      "required": "TYPED_REFUSAL_NOT_DEGRADED_RESULT",
+      "result": null
+    },
+    {
+      "row": 14,
+      "scenario": "purge replaces content with a tombstone on schedule",
+      "required": "TOMBSTONE_WITH_DIGESTS_ONLY",
+      "result": null
+    },
+    {
+      "row": 15,
+      "scenario": "lease expiry after dispatch",
+      "required": "OUTCOME_UNKNOWN_NEVER_A_SECOND_BILLED_CALL",
+      "result": null
+    },
+    {
+      "row": 16,
+      "scenario": "retry after a transient failure before dispatch",
+      "required": "AT_MOST_ONE_RETRY_THEN_FAILED",
+      "result": null
+    },
+    {
+      "row": 17,
+      "scenario": "vendor error, timeout and malformed answer",
+      "required": "TYPED_OUTCOMES_FAILED_OR_OUTCOME_UNKNOWN",
+      "result": null
+    },
+    {
+      "row": 18,
+      "scenario": "Secret Manager Data Access audit log shows the read of the pinned version",
+      "required": "AUDIT_LOG_EVIDENCE_PRESENT",
       "result": null
     }
   ],

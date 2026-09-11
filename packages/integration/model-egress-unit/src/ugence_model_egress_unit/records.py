@@ -160,6 +160,16 @@ class RefusalReason(str, enum.Enum):
     #: cross-tenant reads are indistinguishable from unknown — but named
     #: internally so the refusal is not a generic database error.
     TENANT_SCOPE_REFUSED = "tenant_scope_refused"
+    #: LP-5: outside the commissioning limits bound into the request (tokens,
+    #: streaming, store, tools, background). Terminal for the request as written.
+    REQUEST_LIMIT_EXCEEDED = "request_limit_exceeded"
+    #: LP-5: the call count, budget or concurrency reservation would be exceeded.
+    #: Non-compensatory: nothing refunds it.
+    COMMISSIONING_BUDGET_EXHAUSTED = "commissioning_budget_exhausted"
+    #: LP-3: the authorized model is a floating alias, not a dated snapshot.
+    MODEL_NOT_PINNED = "model_not_pinned"
+    #: LP-1, LP-3: a URL other than the one designated destination.
+    DESTINATION_NOT_PERMITTED = "destination_not_permitted"
 
 
 @dataclass(frozen=True)

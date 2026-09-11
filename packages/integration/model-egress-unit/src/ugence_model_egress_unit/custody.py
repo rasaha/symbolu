@@ -51,6 +51,10 @@ __all__ = [
     "CustodyAuditEvent",
     "ModelCredentialCustodyPort",
     "ReferenceCustodyAdapter",
+    "CustodyIdentity",
+    "IDENTITY_KINDS",
+    "is_pinned_secret_version",
+    "PinnedSecretVersionCustodyAdapter",
     "materialize_with_audit",
 ]
 
@@ -358,3 +362,106 @@ def materialize_with_audit(
     if sink is not None:
         sink(event)
     return lease, event
+
+
+#: LP-2: how the unit proves who it is to the secret manager. A long-lived
+#: service-account key is refused at construction, not discouraged in prose.
+IDENTITY_KINDS = ("workload_identity_federation", "application_default_credentials",
+                  "fake_emulator", "service_account_key")
+
+
+@dataclass(frozen=True)
+class CustodyIdentity:
+    kind: str
+    principal: str
+
+    def __post_init__(self) -> None:
+        if self.kind not in IDENTITY_KINDS:
+            raise ValueError(f"unknown identity kind {self.kind!r}")
+        if self.kind == "service_account_key":
+            raise ValueError(
+                "a long-lived service-account key is itself a credential in the deployment "
+                "and is refused (LP-2); use workload identity federation")
+        if not self.principal:
+            raise ValueError("an identity names its principal")
+
+
+def is_pinned_secret_version(resource: str) -> bool:
+    """``projects/<p>/secrets/<s>/versions/<n>`` with a numeric ``<n>``. ``latest`` is
+    never pinned (LP-2), and a resource that resolves at execution time is not one a
+    record can pin."""
+
+    if not isinstance(resource, str):
+        return False
+    parts = resource.split("/")
+    return (len(parts) == 6 and parts[0] == "projects" and parts[2] == "secrets"
+            and parts[4] == "versions" and all(parts[i] for i in (1, 3))
+            and parts[5].isdigit())
+
+
+class PinnedSecretVersionCustodyAdapter:
+    """The Google Secret Manager custody adapter's *shape*, over an injected reader.
+
+    LP-6 step 5 authorizes the fake/emulator path only: ``reader`` is whatever returns
+    the payload of one pinned secret version, and in this distribution it is always a
+    test double. The real client (Secret Manager over workload identity federation)
+    is a separate distribution, because this package refuses network imports. What is
+    real here and pinned by tests: the resource must be an exact version, never
+    ``latest``; the identity may never be a service-account key; the adapter is
+    production-authoritative only under workload identity federation and never on the
+    fake path; a reader failure is ``CUSTODY_UNAVAILABLE`` without its message; the
+    lease names the exact version it came from.
+    """
+
+    NON_PRODUCTION = True
+    maturity = "FIXTURE_ONLY"
+
+    def __init__(self, *, custody_authority_id: str, credential_profile: str, vendor: str,
+                 secret_version_resource: str, identity: CustodyIdentity,
+                 reader: Callable[[str], str], lease_ttl: timedelta = timedelta(minutes=5),
+                 max_credential_age: timedelta = timedelta(days=90),
+                 production_authoritative: bool = False) -> None:
+        if not is_pinned_secret_version(secret_version_resource):
+            raise ValueError(
+                "the secret version must be pinned as projects/<p>/secrets/<s>/versions/<n>; "
+                "'latest' is never resolved during execution (LP-2)")
+        if max_credential_age > timedelta(days=90):
+            raise ValueError("rotation is at least every 90 days (LP-2)")
+        if production_authoritative and identity.kind != "workload_identity_federation":
+            raise ValueError("only workload identity federation may be production-authoritative (LP-2)")
+        self.custody_authority_id = custody_authority_id
+        self.credential_profile = credential_profile
+        self.vendor = vendor
+        self.secret_version_resource = secret_version_resource
+        self.identity = identity
+        self.lease_ttl = lease_ttl
+        self.max_credential_age = max_credential_age
+        self.is_production_authoritative = bool(production_authoritative)
+        self._reader = reader
+
+    def materialize(self, request: CredentialRequest, *, now: datetime,
+                    production: bool = False) -> CredentialLease:
+        if production and not self.is_production_authoritative:
+            raise CustodyRefusedInProduction(self.custody_authority_id)
+        if request.credential_profile != self.credential_profile or request.vendor != self.vendor:
+            raise CustodyRefused(
+                CustodyRefusal.PROFILE_MISMATCH,
+                f"{self.custody_authority_id} holds {self.vendor}/{self.credential_profile}, "
+                f"not {request.vendor}/{request.credential_profile}")
+        try:
+            payload = self._reader(self.secret_version_resource)
+        except Exception:  # noqa: BLE001 - the manager's words never reach a record
+            raise CustodyRefused(CustodyRefusal.CUSTODY_UNAVAILABLE,
+                                 f"{self.secret_version_resource} could not be read") from None
+        if not isinstance(payload, str) or not payload.strip():
+            raise CustodyRefused(CustodyRefusal.CUSTODY_UNAVAILABLE,
+                                 f"{self.secret_version_resource} is empty")
+        lease_id = canonical_digest(CUSTODY_AUDIT_DOMAIN, "PinnedVersionLease", {
+            "request_digest": request.digest(), "custody_authority_id": self.custody_authority_id,
+            "secret_version_resource": self.secret_version_resource, "issued_at": now})
+        return CredentialLease(
+            lease_id=lease_id, custody_authority_id=self.custody_authority_id,
+            credential_profile=self.credential_profile, vendor=self.vendor,
+            tenant_id=request.tenant_id, secret_version_ref=self.secret_version_resource,
+            issued_at=now, expires_at=now + self.lease_ttl,
+            is_production_authoritative=self.is_production_authoritative, _secret=payload)

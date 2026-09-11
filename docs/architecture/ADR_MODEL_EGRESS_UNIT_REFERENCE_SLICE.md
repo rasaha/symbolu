@@ -185,6 +185,10 @@ lists as unbuilt mechanism with no decision pending.
 | `require_transport_protection`, `protected_connect`, `sslmode_of` | `postgres/transport.py` | Spec §4.4's transport protection, previously `sslmode` set nowhere `[G]` → a production DSN without `sslmode=verify-full` is refused `[V]`. Not yet composed by any deployment, because none exists (CR-1) |
 | `MEU_LIVE_PROVIDER_DESIGNATION.json`, `MEU_LIVE_VALIDATION.json` | beside the package | The owner's designations of 2026-09-11 (vendor OpenAI, host `api.openai.com`; custody Google Secret Manager) with every other field `UNDESIGNATED`, and an eleven-row validation matrix at `BLOCKED_PENDING_OWNER_RULINGS`, pinned by `tests/test_live_records.py` |
 
+| `COMMISSIONING_LIMITS`, `check_request`, `CallBudget`, `is_pinned_snapshot` | `limits.py` | LP-5 bound and enforced before dispatch, non-compensatorily; LP-3's pinned snapshot; four new `RefusalReason` members (`REQUEST_LIMIT_EXCEEDED`, `COMMISSIONING_BUDGET_EXHAUSTED`, `MODEL_NOT_PINNED`, `DESTINATION_NOT_PERMITTED`). The durable reservation row stays unbuilt `[G]` |
+| `DesignatedDestination`, `OPENAI_RESPONSES`, `check_destination` | `egress_policy.py` | LP-1 and LP-3: exactly `https://api.openai.com/v1/responses`, checked as a string; the future adapter imports its permission from here |
+| `CustodyIdentity`, `is_pinned_secret_version`, `PinnedSecretVersionCustodyAdapter` | `custody.py` | LP-2 and LP-6 step 5: the Secret Manager adapter's shape over an injected reader (fake path only); a service-account-key identity and `latest` are refused at construction; rotation over 90 days refused; production-authoritative only under workload identity federation and never on the fake path |
+
 **What stays exactly as it was.** `LIVE_VENDOR_EGRESS = False`; the boundary tests;
 `EgressResult`'s refusal of `genuine_call` other than `False`; `MATURITY`;
 `ENFORCEMENT_ENABLED`; the exchange schema and every digest vector of #1749. No

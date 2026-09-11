@@ -44,16 +44,20 @@ boundary is specified while its commissioning as a running unit is not.
 | Migrations | ordered, digest-pinned, all-or-nothing; a drifted schema is refused |
 | Custody port (0.2.0) | `ModelCredentialCustodyPort` mirroring the credential broker's port; a `CredentialLease` whose secret is reachable only through `use(consumer, now=…)`, absent from `repr`, records, equality and pickling; every materialization audited as identifiers and digests; the only adapter shipped is the inert `ReferenceCustodyAdapter`, never production-authoritative, refused in production |
 | Ledger kinds (0.2.0) | five `meu.*` kinds with allowlists; `ledger_payload` refuses unknown keys, content- or credential-bearing keys at any depth, and strings long enough to be content (D-4) |
+| Limits (0.2.0) | LP-5 as constants: 8,192 input tokens, 1,024 output tokens, 10 genuine calls, USD 25, concurrency 1, one retry only before dispatch, no streaming; `check_request` refuses a request outside them, an unpinned model, `store`, tools or background; `CallBudget` reserves before dispatch and refunds nothing |
+| Destination (0.2.0) | `OPENAI_RESPONSES`: exactly `https://api.openai.com/v1/responses`; `check_destination` refuses every other URL |
+| Pinned-version custody (0.2.0) | `PinnedSecretVersionCustodyAdapter` over an injected reader (fake path only): refuses `latest`, a service-account-key identity and a rotation over 90 days; production-authoritative only under workload identity federation |
 | Transport protection (0.2.0) | `require_transport_protection` refuses a production DSN without `sslmode=verify-full`; `protected_connect` applies it before the driver is imported; the error never echoes the DSN |
 
 ## What 0.2.0 adds, and what it still cannot do
 
-The owner designated OpenAI as the vendor and Google Secret Manager as the custody
-store on 2026-09-11 (`MEU_LIVE_PROVIDER_DESIGNATION.json`, beside this file). The
-ballot that commissions them (`ADR_UGENCE_LIVE_MODEL_PROVIDER_COMMISSIONING.md`,
-LP-1 to LP-6) is not yet ruled, so this release carries only what D-3 already permits:
-the custody **port** with an inert reference, the ledger-kind schema and transport
-protection. There is still no HTTP client, no vendor SDK, no credential reader and no
+The owner ratified the commissioning rulings LP-1 to LP-6 on 2026-09-11
+(`ADR_UGENCE_LIVE_MODEL_PROVIDER_COMMISSIONING.md` §0): OpenAI `gpt-5.4-mini-2026-03-17`
+at `/v1/responses`, Google Cloud Secret Manager as custody, the LP-5 limits and an
+eleven-step order. This release carries the steps that order authorizes before any
+credential exists: the ledger-kind schema, transport protection, the custody port with
+an inert reference and a fake-path pinned-version adapter, the destination policy and
+the limits (`MEU_LIVE_PROVIDER_DESIGNATION.json`, beside this file). There is still no HTTP client, no vendor SDK, no credential reader and no
 destination configuration; `tests/test_boundaries.py` still fails the package if one
 appears. `EgressResult` still refuses any provenance with `genuine_call` other than
 `False`, and `MEU_LIVE_VALIDATION.json` is `BLOCKED_PENDING_OWNER_RULINGS` with every

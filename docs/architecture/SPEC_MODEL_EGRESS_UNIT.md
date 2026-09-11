@@ -838,6 +838,18 @@ different sentences, and this specification is careful never to let the first st
 second.
 
 
+### 8.1 — Commissioning rulings of 2026-09-11
+
+`ADR_UGENCE_LIVE_MODEL_PROVIDER_COMMISSIONING.md` §0 records the owner's LP-1 to LP-6:
+CR-1 amended to admit the unit; Google Cloud Secret Manager as custody with a named
+custody owner; OpenAI `gpt-5.4-mini-2026-03-17` at `/v1/responses` under a
+non-production project; the AP-3-shaped validation process; the LP-5 limits; and the
+eleven-step order. Release 0.2.0 of the package carries the ledger-kind schema (§4.4's
+gap, now built), transport protection for the DSNs, the custody port with a fake-path
+pinned-version adapter, the destination policy and the limits. The rows of §8 that
+remain open are those LP-6 sequences after step 3, plus the durable LP-5 reservation
+row and the LP-2b record-contract amendment, both named in `MEU_LIVE_VALIDATION.json`.
+
 ## 9 — What exists to build on
 
 | | |

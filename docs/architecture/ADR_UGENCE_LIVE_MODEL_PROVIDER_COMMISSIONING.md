@@ -1,8 +1,8 @@
 # ADR — Commissioning a live model provider: what AP-3 unblocked, what it did not, and the ballot LP-1 to LP-6
 
-**Status:** ballot, documentation only. Nothing is implemented, configured, credentialed,
-composed or activated by this record. Recommended defaults are listed first and apply only
-once the owner ratifies them, as the repository's standing practice provides.
+**Status:** LP-1 to LP-6 **RATIFIED by the owner on 2026-09-11** (§0, verbatim). The ballot
+below is retained as put. Nothing here creates a credential, makes a live call, enables
+live vendor egress or commissions the provider.
 
 **Date:** 2026-09-11. **Prompted by:** the owner's instruction, after AP-3 was accepted and
 merged (`ADR_UGENCE_AUTHORITY_PLANE_SCOPING.md` §20.7, PR #1748), to configure a live LLM
@@ -17,6 +17,109 @@ are `UNDESIGNATED`, and two questions the designations raise are added below as 
 and LP-2b. Model Egress Unit 0.2.0 carries the custody port, the ledger-kind schema and
 transport protection (`ADR_MODEL_EGRESS_UNIT_REFERENCE_SLICE.md`, addendum); it holds no
 credential and reaches nothing.
+
+## 0 — The rulings (owner, 2026-09-11) — **RATIFIED**, recorded verbatim
+
+> **LP-1 — Deployment boundary.** Ratify as recommended. Amend CR-1 to admit the Model
+> Egress Unit (MEU) as the second named companion deployment unit. The governed-runtime
+> worker retains its existing egress restriction. Only the MEU may contact the designated
+> model-provider host. This ruling does not admit arbitrary additional deployment units or
+> destinations.
+>
+> **LP-2 — Credential custody.** Designate Google Cloud Secret Manager as the initial
+> external credential-custody system. Custody owner: Rakesh Mohan — Founder, Ugence Labs.
+> Requirements: use a dedicated MEU workload identity and least-privilege secret-version
+> access; prefer workload identity federation; do not introduce a long-lived Google
+> service-account key; never place the provider credential in source code, repository
+> files, container layers, environment-variable configuration, GitHub Actions secrets, logs
+> or evidence reports; enable and verify Secret Manager Data Access audit logging for
+> credential reads; pin the exact secret-version resource used by a deployment, do not
+> silently resolve latest during execution; establish rotation at least every 90 days and
+> immediately following suspected exposure; record rotation, disablement and destruction
+> of superseded versions; keep live invocation blocked until the GCP project ID, workload
+> identity, secret resource identifier, IAM binding, audit-log evidence and rotation
+> procedure are designated and accepted. Selection of Google Cloud Secret Manager
+> authorizes implementation of the custody port and its tests. It does not authorize
+> creating, entering, retrieving or exercising a provider credential through Claude or CI.
+>
+> **LP-3 — First provider designation.** Vendor: OpenAI. Model: gpt-5.4-mini-2026-03-17.
+> API host: api.openai.com. Endpoint: /v1/responses. Account scope: a dedicated
+> non-production OpenAI API project named ugence-meu-validation. Content scope:
+> synthetic, non-sensitive validation content only. The exact OpenAI organization/project
+> identifiers must be recorded before the validation run. Never record the API key.
+> Permit only the designated host and HTTPS endpoint. Disable provider-hosted tools, web
+> search, file retrieval, MCP, code execution and background execution. Set store=false;
+> nevertheless, treat the provider as potentially retaining abuse-monitoring data and
+> therefore send no genuine enterprise, personal, confidential or credential-bearing
+> content. The model snapshot is pinned. The floating gpt-5.4-mini alias is not permitted.
+>
+> **LP-4 — Validation and acceptance.** Ratify the recommended AP-3-shaped commissioning
+> process: machine-readable validation matrix; negative and failure-path tests; owner-run
+> verifier that never prints the credential or full request content; redacted evidence
+> report; explicit accepting owner; status remains PENDING_VALIDATION until every mandatory
+> row passes; status becomes MET only through a separate owner-acceptance statement. A
+> successful HTTP response alone is insufficient.
+>
+> **LP-5 — Cost and request limits.** For the non-production commissioning scope, bind
+> these limits into the authorized request and enforce them non-compensatorily: maximum
+> input tokens per request 8,192; maximum output tokens per request 1,024; maximum genuine
+> validation calls 10; total commissioning budget USD 25; concurrency 1; retries at most 1,
+> and only for an explicitly classified transient failure; streaming disabled. Configure
+> the narrowest available vendor-project budget or spend control as defense in depth. If
+> the vendor control is advisory rather than a true hard stop, the MEU reservation ledger
+> must enforce the hard limit before issuing a request. Cost limits cannot be overridden by
+> the model adapter.
+>
+> **LP-6 — Required order.** (1) Record these rulings and amend CR-1. (2) Implement the
+> ledger-kind schema and content-bearing-key refusals. (3) Implement TLS-protected database
+> and provider transport verification. (4) Implement production role provisioning,
+> controlled migrations and tenant-bound database identities. (5) Implement the Google
+> Secret Manager custody port using a fake/emulator path only. (6) Implement the OpenAI
+> provider as a separate MEU-only distribution; do not place its SDK or networking code in
+> an existing socket-prohibited package. (7) Produce the validation matrix, owner-run
+> verifier and acceptance-report generator. (8) Stop and request the exact GCP and OpenAI
+> project designations. (9) Commission the credential manually through Google Cloud Secret
+> Manager. (10) Perform the synthetic validation run only after all prerequisite gates
+> pass. (11) Keep genuine enterprise content and production use blocked behind a later,
+> separate commissioning record. Throughout, the model response remains untrusted evidence
+> under D-1. It receives no decision authority, execution authority or served-write
+> capability.
+> — owner, 2026-09-11
+
+### 0.1 — Where each ruling now lives
+
+| Ruling | Applied |
+|---|---|
+| LP-1 | CR-1 amended in `ADR_UGENCE_REVIEW_SERVICE_COMPOSITION_ROOT_SCOPING.md` §5 (2026-09-11); the worker's egress record unchanged; `egress_policy.OPENAI_RESPONSES` is the one destination |
+| LP-2 | `MEU_LIVE_PROVIDER_DESIGNATION.json` `custody`; `custody.CustodyIdentity` refuses a service-account key; `custody.is_pinned_secret_version` refuses `latest`; adapters refuse a rotation over 90 days; `PinnedSecretVersionCustodyAdapter` is the fake-path shape (LP-6 step 5); every materialization audited as identifiers and digests |
+| LP-3 | `MEU_LIVE_PROVIDER_DESIGNATION.json` `vendor`; `limits.is_pinned_snapshot` refuses the alias; `limits.FORBIDDEN_REQUEST_FEATURES` and `store=false` enforced by `limits.check_request` |
+| LP-4 | `MEU_LIVE_VALIDATION.json`: an eighteen-row matrix at `BLOCKED_PENDING_INFRASTRUCTURE_DESIGNATIONS`; verifier and acceptance-report generator are LP-6 step 7 |
+| LP-5 | `limits.COMMISSIONING_LIMITS` (constants), `limits.check_request`, `limits.CallBudget` (non-compensatory, before dispatch, concurrency 1, one retry only for `TRANSIENT_BEFORE_DISPATCH`); the durable reservation row in the exchange is unbuilt `[G]` |
+| LP-6 | Steps 1, 2, 3 (database side and destination policy), 5 and the matrix of 7: done in Model Egress Unit 0.2.0. Steps 4, 6, the verifier and generator of 7: not started. Steps 8 to 11: the owner's |
+
+### 0.2 — Divergences between these rulings and the merged specifications, named
+
+1. **LP-5's MEU-side hard stop and D-5.** D-5 places the per-vendor reservation counter
+   on the authorization side and denies the MEU governance authority; the spec (§7) says
+   the MEU "does not calculate concentration, choose policy or update governance limits".
+   LP-5 has the MEU refuse a request that would exceed a fixed budget. Read here as a
+   fail-closed *ceiling* the MEU enforces on itself, not a policy it chooses: the numbers
+   are owner constants the adapter cannot change, and refusal is the MEU's one permitted
+   act. Recorded so the owner can say otherwise.
+2. **LP-5's single retry and spec §3.5.** §3.5 makes `OUTCOME_UNKNOWN` terminal after a
+   possible dispatch and forbids a second billed call. The retry LP-5 allows is therefore
+   confined to a failure *known to precede dispatch* (`TRANSIENT_BEFORE_DISPATCH`); a
+   timeout after the request left is never retried. `CallBudget.may_retry` encodes that.
+3. **LP-6 step 4 and the tenancy ruling.** The tenancy ruling requires tenant-bound
+   database identities "before multi-tenancy"; LP-6 requires them before the validation
+   run in a single-tenant scope. Stricter than the spec, not contrary to it; followed.
+4. **LP-2b, the record contract.** `EgressResult` and the exchange schema
+   (`CHECK egress_result_no_genuine_call`) refuse `genuine_call: true`. Admitting it under
+   the ratified precondition needs a second exchange migration; #1749's "no
+   `exchange.v2`" was about the digest construction and does not forbid a migration that
+   changes a constraint, but the owner should confirm that reading before step 6 lands.
+5. **The model snapshot.** `gpt-5.4-mini-2026-03-17` is recorded as designated; nothing
+   here verifies that the vendor lists it, and the verifier of step 7 will.
 
 ## 1 — The finding that shapes this record
 
