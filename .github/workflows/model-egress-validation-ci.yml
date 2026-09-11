@@ -1,0 +1,102 @@
+name: model-egress-validation-ci
+
+# Scoped CI for ugence-model-egress-validation (LP-7 ruling 11): the offline harness,
+# the redacted report, the drift checks and the secret-shape scan. The suite needs no
+# database and no network, and CI proves the second: socket connections are patched
+# to raise for the whole run. The final steps run the offline command against the
+# records in the checkout and prove the report carries no prompt, marker or credential.
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+on:
+  pull_request:
+    paths:
+      - "packages/integration/model-egress-validation/**"
+      - "packages/integration/model-egress-provider-openai/**"
+      - "packages/integration/model-egress-unit/**"
+      - ".github/workflows/model-egress-validation-ci.yml"
+  push:
+    branches:
+      - "claude/**"
+    paths:
+      - "packages/integration/model-egress-validation/**"
+      - "packages/integration/model-egress-provider-openai/**"
+      - "packages/integration/model-egress-unit/**"
+      - ".github/workflows/model-egress-validation-ci.yml"
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  offline-suite:
+    name: Offline harness suite (py${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.11", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+          cache-dependency-path: requirements.txt
+      - name: Install the three distributions from source, without a database driver
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest tomli
+          pip install --no-deps packages/integration/model-egress-unit
+          pip install --no-deps packages/integration/model-egress-provider-openai
+          pip install --no-deps packages/integration/model-egress-validation
+      - name: Suite, with every socket refused
+        run: |
+          cd packages/integration/model-egress-validation
+          python - <<'PY'
+          import socket, sys, pytest
+          def refuse(*a, **k):
+              raise AssertionError("the validation suite opened a socket")
+          socket.socket.connect = refuse
+          socket.create_connection = refuse
+          sys.exit(pytest.main(["-o", "addopts=", "-v", "--no-header",
+                                "--junitxml=/tmp/meu-validation.xml", "tests"]))
+          PY
+      - name: Fail if any test was skipped
+        run: |
+          python - <<'PY'
+          import sys, xml.etree.ElementTree as ET
+          root = ET.parse("/tmp/meu-validation.xml").getroot()
+          skipped = [tc.get("name") for tc in root.iter("testcase") if tc.find("skipped") is not None]
+          total = len(list(root.iter("testcase")))
+          if total == 0:
+              print("No tests were collected at all — that is not a pass."); sys.exit(1)
+          if skipped:
+              print("A skipped row is NOT a passing row. Skipped:"); [print(f"  - {n}") for n in skipped]; sys.exit(1)
+          print(f"{total} tests, none skipped.")
+          PY
+      - name: The offline command against the checkout's records, sockets refused
+        run: |
+          python - <<'PY'
+          import json, socket, sys, pathlib
+          def refuse(*a, **k):
+              raise AssertionError("the offline command opened a socket")
+          socket.socket.connect = refuse
+          socket.create_connection = refuse
+          from ugence_model_egress_validation.cli import main
+          records = pathlib.Path("packages/integration/model-egress-unit")
+          rc = main(["offline", "--report", "/tmp/meu-offline-report.json", "--records", str(records)])
+          assert rc == 0, f"offline command exited {rc}"
+          report = json.loads(pathlib.Path("/tmp/meu-offline-report.json").read_text())
+          assert report["live_pass_claimed"] is False and report["network_opened"] is False
+          assert report["infrastructure_dependent_rows_not_executed"] == [12, 18]
+          assert all(r["status"] != "OFFLINE_CONFORMANT" for r in report["rows"] if r["infrastructure_dependent"])
+          text = pathlib.Path("/tmp/meu-offline-report.json").read_text()
+          for forbidden in ("quick brown fox", "MARKER-HARNESS", "NOT A MODEL RESPONSE", "sk-", "AIza", "eyJ"):
+              assert forbidden not in text, forbidden
+          rc = main(["live", "--records", str(records)])
+          assert rc == 2, f"live must refuse with exit 2, got {rc}"
+          print("offline report written; live refused")
+          PY

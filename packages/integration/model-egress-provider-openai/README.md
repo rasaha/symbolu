@@ -1,6 +1,6 @@
 # Ugence Model Egress Provider — OpenAI Responses
 
-**Version:** 0.1.0
+**Version:** 0.1.1
 **Maturity:** `REFERENCE_GRADE_SHADOW_ONLY` · `ENFORCEMENT_ENABLED = False` · `LIVE_VENDOR_EGRESS = False`
 **Ruling basis:** LP-1, LP-3, LP-5 and LP-6 step 6 (`docs/architecture/ADR_UGENCE_LIVE_MODEL_PROVIDER_COMMISSIONING.md`, §0)
 

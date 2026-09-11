@@ -223,3 +223,10 @@ behind the step 8 designations); the credential (step 9, the custody owner's act
 deployment unit itself (LP-1 amended CR-1, nothing composes the unit yet); and
 verification that the designated model snapshot exists.
 
+## Addendum, 0.4.0 (2026-09-11): the step-8 designation shape (LP-7, non-production)
+
+| Added | Where | What it closes |
+| --- | --- | --- |
+| `Step8Designation`, `WorkloadIdentityFederation`, `NativeGcpWorkloadIdentity`, `check_step8_designation`, `STEP8_REQUIRED_VALUES`, `PLACEHOLDER_MARKERS`, `CREDENTIAL_SHAPE_PREFIXES`, `looks_like_a_credential`, `OPENAI_KEY_SCOPE`, `SPEND_CONTROL_CLASSIFICATIONS`, `IDENTITY_MECHANISMS` | `infrastructure.py` | LP-7 ruling 12 as refusals: every one of the seventeen values required; a placeholder, alias or synthesized token refused in any field; a credential-shaped value refused in any field without being echoed; `latest` and every non-numeric version refused; a human, default-compute, foreign-project or key-file identity refused; an unconstrained principal refused; a project-level binding refused; a key scope other than `api.responses.write` refused; an unclassified spend control refused; the model name offered as availability evidence refused; a production environment refused; an unverified record refused. Supplies no value, changes no status `[V]` |
+| `ROTATION_SEQUENCE` (eight steps), `check_rotation_plan`, `rollback_permitted`, `MAX_ROTATION_INTERVAL` | `infrastructure.py` | LP-7 ruling 6 as a checked order; destruction refused during initial commissioning and, later, anywhere but after the complete sequence; rollback only with both versions valid and owner-authorized `[V]` |
+| `step8_required_values` in `MEU_LIVE_PROVIDER_DESIGNATION.json` | beside the package | the seventeen values, each `UNDESIGNATED`, with `independently_checked_by: null`, the live-validation authorization recorded as not given and the production record as none |

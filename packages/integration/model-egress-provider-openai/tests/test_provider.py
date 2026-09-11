@@ -287,3 +287,47 @@ def test_a_budget_shared_across_adapters_is_still_one_budget(custody):
         b.execute(make_request(), now=NOW)
     assert b.execute(make_request(), now=NOW).refusal_reason is RefusalReason.COMMISSIONING_BUDGET_EXHAUSTED
     assert uuid.UUID(budget.history[0]["request_id"])
+
+
+# --- validation row 11: a lease expired at use --------------------------------------
+
+def test_a_lease_expired_at_use_is_a_custody_refusal_before_any_dispatch(transport, budget):
+    from datetime import timedelta as _td
+    from ugence_model_egress_unit import CredentialLease, CustodyRefused
+
+    class ExpiredLeaseCustody(MarkerCustody):
+        def materialize(self, request, *, now, production=False):
+            self.requests.append(request)
+            return CredentialLease(
+                lease_id="lease-expired", custody_authority_id=self.custody_authority_id,
+                credential_profile=self.credential_profile, vendor="openai", tenant_id=request.tenant_id,
+                secret_version_ref="projects/p/secrets/s/versions/3", issued_at=now - _td(minutes=10),
+                expires_at=now - _td(minutes=5), is_production_authoritative=False, _secret=SECRET)
+
+    custody = ExpiredLeaseCustody()
+    p = OpenAIResponsesProvider(transport=transport, custody=custody, budget=budget, credential_profile=PROFILE)
+    result = p.execute(make_request(), now=NOW)
+    assert result.outcome is ResultOutcome.REFUSED and result.refusal_reason is RefusalReason.CREDENTIAL_NOT_COMMISSIONED
+    assert transport.dispatches == [] and budget.calls_reserved == 0
+
+    # and a lease whose use() itself refuses (expiry between the check and the use) is
+    # refused before the transport sees the secret: still no dispatch, reservation kept
+    from ugence_model_egress_unit import CustodyRefusal
+
+    class LeaseRefusingAtUse(CredentialLease):
+        def use(self, consumer, *, now):
+            raise CustodyRefused(CustodyRefusal.CUSTODY_UNAVAILABLE, "expired between check and use")
+
+    class RefusingAtUse(MarkerCustody):
+        def materialize(self, request, *, now, production=False):
+            self.requests.append(request)
+            return LeaseRefusingAtUse(
+                lease_id="lease-refusing", custody_authority_id=self.custody_authority_id,
+                credential_profile=self.credential_profile, vendor="openai", tenant_id=request.tenant_id,
+                secret_version_ref="projects/p/secrets/s/versions/3", issued_at=now,
+                expires_at=now + _td(minutes=5), is_production_authoritative=False, _secret=SECRET)
+
+    p = OpenAIResponsesProvider(transport=transport, custody=RefusingAtUse(), budget=budget, credential_profile=PROFILE)
+    result = p.execute(make_request(), now=NOW)
+    assert result.refusal_reason is RefusalReason.CREDENTIAL_NOT_COMMISSIONED
+    assert transport.dispatches == [] and budget.calls_reserved == 1

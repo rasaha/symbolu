@@ -42,6 +42,7 @@ from ugence_model_egress_unit import (
     CredentialLease,
     CredentialRequest,
     CustodyAuditEvent,
+    CustodyRefused,
     DispatchAttempt,
     EgressRequest,
     EgressResult,
@@ -213,6 +214,10 @@ class OpenAIResponsesProvider:
             return self._refused(request, now, RefusalReason.CREDENTIAL_NOT_COMMISSIONED)
         if lease.is_production_authoritative and COMMISSIONING_STATUS != "MET":
             return self._refused(request, now, RefusalReason.LIVE_EGRESS_NOT_AVAILABLE)
+        if lease.expired(now):
+            # Validation row 11: a lease expired at use is a custody refusal, decided
+            # before any reservation and before any dispatch.
+            return self._refused(request, now, RefusalReason.CREDENTIAL_NOT_COMMISSIONED)
 
         try:
             self._budget.reserve(estimated_cents=ESTIMATED_CENTS_PER_CALL, now=now,
@@ -221,6 +226,10 @@ class OpenAIResponsesProvider:
             return self._refused(request, now, RefusalReason.COMMISSIONING_BUDGET_EXHAUSTED)
         try:
             outcome = self._dispatch(prepared, lease, now)
+        except CustodyRefused:
+            # ``CredentialLease.use`` refused before handing the secret to the transport:
+            # nothing was dispatched. The reservation is kept (non-compensatory).
+            return self._refused(request, now, RefusalReason.CREDENTIAL_NOT_COMMISSIONED)
         except Exception:  # noqa: BLE001 — a raising transport is an ambiguous dispatch
             return self._unknown(request, now, "transport raised during dispatch; state ambiguous")
         finally:

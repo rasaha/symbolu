@@ -216,6 +216,241 @@ No condition was false, so the migration proceeded and no contract version chang
 | fresh-install and upgrade-path tests | both, plus an all-or-nothing upgrade test | `test_a_fresh_install_applies_both_migrations_and_migration_one_is_byte_identical`, `test_the_upgrade_path_keeps_existing_rows_and_digests_valid`, `test_the_upgrade_is_all_or_nothing` |
 | validation matrix stays blocked; fake evidence cannot satisfy live rows | every row `result: null`; `FakeTransport` refuses a scripted `genuine` outcome at construction | `test_live_records.py`; `test_the_fake_transport_refuses_to_be_scripted_with_a_genuine_response` |
 
+### 0.4 — LP-7 / Step-8 non-production infrastructure design rulings (owner, 2026-09-11), verbatim
+
+The owner issued an earlier same-day LP-7 draft and superseded it with the text below before
+either was committed; only this text is recorded and operative.
+
+> LP-7 / Step-8 Non-Production Infrastructure Design Rulings
+>
+> These rulings govern the first non-production Model Egress Unit commissioning only. They do not commission or approve a production provider deployment.
+>
+> 1. GCP project
+>
+> Use a dedicated non-production GCP project for MEU provider validation. It must not share a project with production, general development, public demonstrations, CI or unrelated Ugence workloads.
+>
+> A later production GCP project requires a separate owner designation and commissioning record.
+>
+> 2. GCP workload identity
+>
+> The MEU must run under a dedicated, nonhuman GCP service account. No human identity, default compute identity, downloadable service-account key or shared runtime identity is permitted.
+>
+> Record the deployment platform and its identity mechanism:
+>
+> * If the MEU runs outside Google Cloud, designate the OIDC issuer, audience, subject constraints, Workload Identity Pool, provider and exact principal binding.
+> * If it runs on Google Cloud, record the native workload-identity path and evidence that no static service-account key is used.
+>
+> The workload identity must not have project-wide privileges unrelated to retrieving the designated secret.
+>
+> 3. Secret resource
+>
+> Store the OpenAI validation credential in Google Secret Manager under a dedicated MEU secret.
+>
+> Runtime configuration must reference the full immutable numeric version resource:
+>
+> projects/<project-number-or-id>/secrets/<secret-name>/versions/<number>
+>
+> The latest alias and every nonnumeric version reference are prohibited.
+>
+> Do not record the secret value, a reversible encoding, or a digest that could be used as credential-verification material.
+>
+> 4. GCP IAM binding
+>
+> Grant roles/secretmanager.secretAccessor only:
+>
+> * to the dedicated MEU workload identity;
+> * on the designated secret resource;
+> * without a project-level accessor grant.
+>
+> Human users, CI identities, other workloads and the database migrator identity receive no runtime-secret-read authority.
+>
+> Administrative authority to add, disable or destroy secret versions must remain separate from runtime read authority. No operator receives secret-read permission merely because that operator manages rotation.
+>
+> 5. Secret Manager audit evidence
+>
+> Enable and retain Secret Manager Data Access audit logs before any credential materialization.
+>
+> Commissioning evidence must demonstrate:
+>
+> * the IAM policy on the exact secret;
+> * a successful access event by the designated MEU workload identity;
+> * the immutable numeric secret version accessed;
+> * within a precisely defined commissioning time window, no secret-access event by an identity outside the approved set;
+> * correlation of the access event to the MEU validation attempt using non-secret identifiers, workload identity and bounded timestamps.
+>
+> Do not claim universal "absence of unauthorized access." Report only what the defined audit query and retention window demonstrate.
+>
+> The evidence must contain no credential, prompt text or model-response content.
+>
+> 6. Rotation procedure
+>
+> Rotation must:
+>
+> 1. create a new project-scoped OpenAI service-account credential;
+> 2. store it as a new Google Secret Manager version;
+> 3. designate that immutable numeric version as a candidate;
+> 4. run offline/fake-transport conformance checks;
+> 5. separately authorize a controlled validation using the candidate;
+> 6. accept and activate the candidate version;
+> 7. verify successful operation;
+> 8. revoke the superseded OpenAI credential and disable the corresponding Secret Manager version.
+>
+> Rollback to the preceding version is allowed only while both its Secret Manager version and corresponding OpenAI credential remain valid and owner-authorized.
+>
+> Destruction requires separately retained audit evidence and explicit authorization. No old version may be destroyed during initial commissioning.
+>
+> The maximum normal rotation interval remains 90 days, with immediate rotation following suspected exposure.
+>
+> 7. OpenAI tenancy and identity
+>
+> Use a dedicated non-production OpenAI project within the Ugence OpenAI organization for this commissioning.
+>
+> Use an OpenAI project-owned service account—not a human user's API key—with:
+>
+> * a custom project role containing only api.responses.write;
+> * an API key scoped only to api.responses.write;
+> * access only to the designated model;
+> * the previously ratified request and expenditure ceilings.
+>
+> The credential must be unavailable to browsers, developers, CI jobs, other Ugence services and repository automation.
+>
+> A separate OpenAI production project and production credential require later owner approval.
+>
+> 8. Model and endpoint
+>
+> The designated model remains:
+>
+> gpt-5.4-mini-2026-03-17
+>
+> The only permitted vendor destination remains exactly:
+>
+> https://api.openai.com/v1/responses
+>
+> No floating model alias, wildcard host, alternate endpoint, redirect, proxy, hosted tool, background operation, fallback model or fallback provider is authorized.
+>
+> Before live validation, independently verify that the designated snapshot is available to the designated OpenAI project. Recording the model name is not availability evidence.
+>
+> 9. Spend and data controls
+>
+> Before live validation, record:
+>
+> * the configured OpenAI project spend control;
+> * whether it is a true enforcement stop or only an alert;
+> * evidence that the MEU's durable USD 25 ceiling remains the controlling hard stop;
+> * the applicable OpenAI data-processing terms;
+> * the approved processing/data-residency region;
+> * confirmation that validation content remains synthetic and non-sensitive;
+> * confirmation that store=false is enforced.
+>
+> Vendor-side limits are defense in depth and do not replace the durable authorization-side reservation or MEU safety ceiling.
+>
+> 10. Provisioning boundary
+>
+> Infrastructure provisioning, OpenAI service-account creation and credential creation are controlled operator actions outside the application repository.
+>
+> Repository implementation must not create, retrieve, transmit, display, log or test a real credential. Infrastructure-as-code may describe non-secret identities and policies only if separately authorized and if no credential is placed in configuration, state or output.
+>
+> 11. Remaining Step 7 work
+>
+> Offline Step 7 preparation may proceed before the infrastructure values are supplied:
+>
+> * validation harness;
+> * fake-transport cases;
+> * negative-test matrix;
+> * redacted report generator;
+> * drift checks;
+> * secret-shape scanning.
+>
+> This work must not open a network connection or mark an infrastructure-dependent matrix row as passed.
+>
+> The owner-run live verifier may not execute until every mandatory Step 8 designation is supplied and independently checked.
+>
+> 12. Commissioning state
+>
+> Keep the provider at:
+>
+> BLOCKED_PENDING_INFRASTRUCTURE_DESIGNATIONS
+>
+> until these exact externally verified values and evidence references are recorded:
+>
+> * GCP project ID;
+> * GCP project number;
+> * MEU GCP service-account resource name;
+> * deployment-platform identity mechanism;
+> * WIF pool/provider and constrained principal binding, or the documented native GCP equivalent;
+> * full numeric Secret Manager version resource;
+> * secret-level IAM-policy evidence reference;
+> * Data Access audit-log configuration and retention reference;
+> * approved rotation-runbook reference;
+> * OpenAI organization ID;
+> * OpenAI project ID;
+> * OpenAI project service-account ID;
+> * OpenAI role and API-key scope evidence;
+> * vendor spend-control evidence and hard-stop/advisory classification;
+> * designated-model availability evidence;
+> * applicable data-processing-terms reference;
+> * approved processing/data-residency region.
+>
+> These values must not be guessed, synthesized, represented as completed by placeholders or inferred from naming conventions.
+>
+> Supplying and verifying them closes only the infrastructure-designation blocker. It does not authorize a genuine call.
+>
+> After all designations pass, stop and return the completed designation record, validation matrix and exact owner-run command. The first live synthetic validation requires a separate, explicit owner authorization. Production use requires another commissioning record.
+>
+> Record this ruling without creating infrastructure or credentials. Proceed only with the remaining offline Step 7 artifacts. Do not make a live call, enable live vendor egress, mark commissioning MET, or merge any new change without separate instruction.
+
+#### 0.4.1 — Where each LP-7 ruling lives
+
+LP-7 designs the non-production infrastructure and supplies no value. The repository
+carries the *shape* each value must have and the refusals that keep a placeholder, an
+alias, a forbidden identity, a secret-shaped string or an unverified value from ever being
+accepted as a designation (`ugence_model_egress_unit.infrastructure`, unit 0.4.0), and the
+offline step-7 artifacts ruling 11 permits (`ugence-model-egress-validation` 0.1.0).
+Everything else is an operator's act outside the repository (ruling 10).
+
+| Ruling | Repository mechanism | Outside the repository |
+| --- | --- | --- |
+| 1 dedicated non-production GCP project | `Step8Designation.environment` must read `non-production`; the project ID and number are required, well-formed, and never judged by name (ruling 12 forbids inference from naming conventions) | the project, and evidence it hosts nothing else; a later production project is a separate designation |
+| 2 dedicated non-human service account; recorded identity mechanism | `meu_service_account` must be `projects/<project>/serviceAccounts/<name>@<project>.iam.gserviceaccount.com` in the designated project; the default compute identity, a human principal and a key file are refused; `workload_identity_binding` is either `WorkloadIdentityFederation` (issuer, audience, subject constraints, pool, provider, principal binding, all required) or `NativeGcpWorkloadIdentity` (path plus no-static-key evidence) | the account and binding, with no key ever created; least privilege beyond the secret |
+| 3 dedicated secret, immutable numeric version; no secret value, encoding or digest recorded | `secret_version` must satisfy `custody.is_pinned_secret_version` in the designated project (by ID or number); every field of the record is scanned for credential shapes and refused without echoing the value; no field of any record holds a credential digest | the secret and its version |
+| 4 secret-scoped accessor grant; no runtime read for humans, CI, other workloads or the migrator; administrative authority separate | `iam_policy_evidence_ref` required; `iam_binding_scope` must read `secret`; migration 2's `meu_migrator` holds only the exchange owner and the ledger, and no Secret Manager binding is expressible in the repository | the IAM policy on the exact secret; the separation of rotation authority from read authority |
+| 5 Data Access audit logs before any materialization; five demonstrations; no universal claim | `audit_log_config_and_retention_ref` required; the harness report carries only non-secret identifiers, workload identity and bounded timestamps for correlation and never claims absence beyond a stated query and window (report field `audit_query_window`) | the configuration, retained logs and evidence |
+| 6 eight-step rotation; rollback conditions; no destruction during initial commissioning; 90 days | `ROTATION_SEQUENCE` (eight steps in the owner's order) and `check_rotation_plan`; `rollback_permitted` requires both the previous Secret Manager version and OpenAI credential valid and owner-authorized; `MAX_ROTATION_INTERVAL = 90 days`, matching `custody` | the runbook, its approval, each rotation's evidence |
+| 7 dedicated non-production OpenAI project; project-owned service account; `api.responses.write` only; designated model only; ratified ceilings | `openai_organization_id` (`org-…`), `openai_project_id` (`proj_…`), `openai_service_account_id` and `openai_role_and_key_scope_evidence_ref` required; `openai_key_scope` must be exactly `api.responses.write`; the adapter's request shape is closed to the one Responses call | the organization, project, service account, role, key scope, model access and limits |
+| 8 model and endpoint; availability verified before live validation | already enforced: `limits.is_pinned_snapshot`, `egress_policy.OPENAI_RESPONSES`, the adapter's `PreparedRequest`; `model_availability_evidence_ref` required and refused when it is merely the model name | the availability check against the designated project |
+| 9 spend and data controls | `vendor_spend_control_evidence_ref` and `vendor_spend_control_classification` (`hard_stop` or `advisory`) required; `data_processing_terms_ref` and `processing_region` required; the durable USD 25 ceiling stays `commissioning_budget`'s CHECK and the adapter's `CallBudget`; `store=false` is enforced at `PreparedRequest` construction; content stays synthetic by the harness's fixture set | the vendor configuration and its evidence |
+| 10 provisioning boundary | no repository code creates, retrieves, transmits, displays, logs or tests a real credential; both boundary suites and the validation package's fail on any import that could; no infrastructure-as-code exists | the operator's acts |
+| 11 offline step-7 artifacts | `ugence-model-egress-validation`: harness over the 18 rows with injected fake components, fake-transport cases, negative-test matrix, redacted report generator, drift checks, secret-shape scanning; the suite runs with sockets refused and infrastructure-dependent rows can only be `NOT_EXECUTABLE_OFFLINE` | the owner-run live verifier's execution, after step 8 |
+| 12 blocked until seventeen exact values | `STEP8_REQUIRED_VALUES` names them; `check_step8_designation` refuses any missing, placeholder, secret-shaped, mis-shaped or unverified value; `COMMISSIONING_STATUS` unchanged; the `live` verifier command refuses to run and names each undesignated value | the values, their independent check, the separate live-validation authorization, and a further record for production |
+
+#### 0.4.2 — The seventeen values, each `UNDESIGNATED`
+
+| # | Value (ruling 12) | Record field | Shape accepted |
+| --- | --- | --- | --- |
+| 1 | GCP project ID | `gcp_project_id` | 6–30 chars, lowercase letters, digits, hyphens, starting with a letter |
+| 2 | GCP project number | `gcp_project_number` | digits only |
+| 3 | MEU GCP service-account resource name | `meu_service_account` | `projects/<project>/serviceAccounts/<name>@<project>.iam.gserviceaccount.com` |
+| 4 | deployment-platform identity mechanism | `deployment_platform_identity_mechanism` | `workload_identity_federation` or `native_gcp_workload_identity` |
+| 5 | WIF pool/provider and constrained principal binding, or the native equivalent | `workload_identity_binding` | `WorkloadIdentityFederation(oidc_issuer, audience, subject_constraints, pool, provider, principal_binding)` or `NativeGcpWorkloadIdentity(path, no_static_key_evidence_ref)`, matching field 4 |
+| 6 | full numeric Secret Manager version resource | `secret_version` | `projects/<project-id-or-number>/secrets/<secret>/versions/<n>`, numeric `<n>` |
+| 7 | secret-level IAM-policy evidence reference | `iam_policy_evidence_ref` plus `iam_binding_scope = secret` | non-empty |
+| 8 | Data Access audit-log configuration and retention reference | `audit_log_config_and_retention_ref` | non-empty |
+| 9 | approved rotation-runbook reference | `rotation_runbook_ref` | non-empty |
+| 10 | OpenAI organization ID | `openai_organization_id` | `org-` prefix |
+| 11 | OpenAI project ID | `openai_project_id` | `proj_` prefix |
+| 12 | OpenAI project service-account ID | `openai_service_account_id` | non-empty |
+| 13 | OpenAI role and API-key scope evidence | `openai_role_and_key_scope_evidence_ref` plus `openai_key_scope = api.responses.write` | non-empty; scope exact |
+| 14 | vendor spend-control evidence and classification | `vendor_spend_control_evidence_ref`, `vendor_spend_control_classification` | non-empty; `hard_stop` or `advisory` |
+| 15 | designated-model availability evidence | `model_availability_evidence_ref` | non-empty and not the model name |
+| 16 | applicable data-processing-terms reference | `data_processing_terms_ref` | non-empty |
+| 17 | approved processing/data-residency region | `processing_region` | non-empty |
+
+Every field is refused when it carries a placeholder token, whitespace padding or a
+credential shape, and the record is refused unless `environment` reads `non-production`
+and `verified_by` and `verified_at` name the independent check. Supplying all seventeen
+closes only the infrastructure-designation blocker: the first live synthetic validation
+needs the owner's separate explicit authorization, and production use another record.
+
 ## 1 — The finding that shapes this record
 
 **AP-3 did not gate the live model provider, and its acceptance unblocks none of the

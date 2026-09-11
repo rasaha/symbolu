@@ -861,6 +861,20 @@ still leaves open is step 7 (the live transport, the unit reserving durably befo
 dispatch, the verifier and the report generator), step 8 (the infrastructure
 designations) and step 9 (the credential).
 
+LP-7 (same day, that ADR's §0.4) designed the *non-production* step-8 infrastructure —
+a dedicated non-production GCP project, a dedicated non-human service account with a
+recorded identity mechanism, a dedicated secret at an immutable numeric version, a
+secret-scoped IAM binding, Data Access audit evidence within a defined window, an
+eight-step rotation procedure, a dedicated non-production OpenAI project with a
+project-owned service account scoped to `api.responses.write`, the one model and endpoint
+with availability verified, spend and data controls, the operator provisioning boundary —
+and supplied no value. Release 0.4.0 carries those designs as shape checks
+(`infrastructure.py`); the seventeen exact values stay `UNDESIGNATED`. The offline step-7
+artifacts ruling 11 permits live in `ugence-model-egress-validation`, which opens no
+network connection and can mark no infrastructure-dependent row. The first live synthetic
+validation stays behind a separate explicit owner authorization; production behind another
+commissioning record.
+
 ## 9 — What exists to build on
 
 | | |
