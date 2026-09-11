@@ -605,7 +605,7 @@ one real enterprise identity issuer" (§18) means in evidence, so that AP-3 cann
 declared met by choosing an identity provider, writing an OIDC adapter, or running a
 fixture. Its current status line is the only status the repository may claim.
 
-**AP-3 status: `PENDING_VALIDATION`** (designated 2026-09-11, §20.6; rulings AP3-D1 to AP3-D5 applied the same day, §20.7; rows 1 to 13 await live Cloudflare evidence; not met).
+**AP-3 status: `PENDING_VALIDATION`** (designated 2026-09-11, §20.6; rulings AP3-D1 to AP3-D5 applied the same day, AP3-D1 amended on live evidence, §20.7; rows 1 to 4 and 8 to 12 passed the owner's live cryptographic run on 2026-09-11, rows 14 to 16 in-process; rows 5 to 7 and 13 await a service token, a token without email, or an observed rotation, or a ruling; not met).
 
 The enterprise issuer is designated (§20.6) and no row of the matrix has run against
 it. The in-process issuer used by the worker's tests is implementation and conformance
@@ -805,7 +805,15 @@ Adapter 0.1.3 applies it and pins each of those refusals on the live header shap
 through `cloudflared` (output captured and filtered so the bearer token is never
 displayed), verifies it cryptographically with the real adapter against the live JWKS,
 drives rows 1 to 4 and 8 to 12 with that token, reports 5 to 7 and 13 as `BLOCKED` and
-14 to 16 as `IN_PROCESS`, and prints only redacted evidence. The capture also observed the application answering on
+14 to 16 as `IN_PROCESS`, and prints only redacted evidence. **The owner ran it on
+2026-09-11 at 10:26 UTC `[V]`**: 9 PASS, 0 FAIL, 4 BLOCKED, 3 IN_PROCESS; the login token
+line was suppressed by the tool and the token was never displayed. The record now carries
+`result == required` for rows 1 to 4 and 8 to 12 with that run as evidence
+(`evidence.live_verification_runs`), and `null` for rows 5 to 7 and 13. What still stands
+between the record and `MET`: rows 5 to 7 need a Cloudflare service token and a human
+token without email, or an owner ruling that their in-process evidence suffices as
+AP3-D5 ruled for rows 14 to 16; row 13 needs an observed rotation or the same kind of
+ruling; and `ci_run_or_signed_report` and `accepting_owner` are still null. The capture also observed the application answering on
 `ap3-validation-endpoint.rakeshmohan888.workers.dev`, not the designated
 `ap3-validation.ugence.ai`; the owner confirms or corrects the hostname. The raw token was
 printed by `cloudflared access login` and appeared in a screenshot shared outside the

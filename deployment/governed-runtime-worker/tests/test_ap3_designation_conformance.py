@@ -109,14 +109,26 @@ def test_the_record_is_designated_ruled_and_pending_not_met():
     # rows carry their in-process classification and nothing more
     rows = record["validation_matrix"]
     assert len(rows) == 16
-    assert [r["result"] for r in rows[:13]] == [None] * 13
     assert all(r["evidence_class"] == "LIVE_CLOUDFLARE_EVIDENCE_REQUIRED" for r in rows[:13])
+    # rows 1 to 4 and 8 to 12 passed the owner's live cryptographic run; 5 to 7 and 13 did not run
+    passed_live = {1, 2, 3, 4, 8, 9, 10, 11, 12}
+    for n, row in enumerate(rows[:13], start=1):
+        if n in passed_live:
+            assert row["result"] == row["required"] and row["executed_at"] == "2026-09-11", n
+            assert "ap3_live_verify.py" in row["evidence"] and row["observed"], n
+        else:
+            assert row["result"] is None and row["observed"].startswith("BLOCKED"), n
+    run = record["evidence"]["live_verification_runs"][0]
+    assert run["summary"] == {"PASS": 9, "FAIL": 0, "BLOCKED": 4, "IN_PROCESS": 3}
+    assert run["capture"]["typ"] is None and run["capture"]["signature_verified_by_the_adapter"] is True
+    assert re.fullmatch(r"[0-9a-f]{64}", run["capture"]["token_sha256"]) and "never displayed" in run["capture"]["token_status"]
+    assert {k for k, v in run["rows"].items() if v["status"] == "PASS"} == {str(n) for n in passed_live}
     assert [r["scenario"] for r in rows[13:]] == list(SCENARIOS_14_16)
     assert all(r["result"] == r["required"] and r["evidence_class"] == "IN_PROCESS_CONFORMANCE_SUFFICIENT"
                and "test_ap3_designation_conformance.py" in r["evidence"] for r in rows[13:])
     assert record["evidence"]["ci_run_or_signed_report"] is None
     assert record["evidence"]["accepting_owner"] is None
-    assert record["evidence"]["test_timestamp"] is None
+    assert record["evidence"]["test_timestamp"].startswith("2026-09-11T10:26:39Z")
     assert "no egress" in record["evidence"]["validation_environment_limitations"]
     # evidence item 1 is held: the owner ran the probe from a host with egress on 2026-09-11
     kids = record["evidence"]["jwks_key_identifiers"]
@@ -138,12 +150,12 @@ def test_the_record_is_designated_ruled_and_pending_not_met():
     assert any(f.startswith("AP3-D1 CONFLICT") and "AMENDED 2026-09-11" in f for f in cap["findings"])
     assert "AMENDED" in record["designation"]["token_type_profile"] and "absent" in record["designation"]["token_type_profile"]
     row1 = record["conformance_harness"]["rows"][0]
-    assert not any("amendment" in b for b in row1["blocked_by"])
-    assert any("ap3_live_verify.py" in b for b in row1["blocked_by"])
+    assert row1["blocked_by"] == [] and row1["live_result"] == "PASSED_LIVE_2026-09-11"
     actions = record["evidence"]["required_owner_actions"]
     assert any(a.startswith("DONE 2026-09-11: the exposed token was revoked") for a in actions)
     assert any(a.startswith("DONE 2026-09-11: AP3-D1 amended") for a in actions)
-    assert any(a.startswith("RUN ci/ap3_live_verify.py") for a in actions)
+    assert any(a.startswith("DONE 2026-09-11: ci/ap3_live_verify.py run by the owner") for a in actions)
+    assert any(a.startswith("RULE rows 5 to 7") for a in actions) and any(a.startswith("RULE row 13") for a in actions)
     assert len(record["evidence"]["required_owner_actions"]) >= 3
     assert "a test-only authorizer described as production AX-5" in record["must_never_contain"]
 
@@ -162,14 +174,17 @@ def test_the_record_and_the_egress_evidence_hold_no_secret_and_agree_on_the_host
     assert jwks[0]["scheme"] == "https" and "never disabled" in jwks[0]["verification"]
 
 
-def test_the_harness_block_names_every_matrix_row_and_no_live_row_claims_a_pass():
+def test_the_harness_block_names_every_matrix_row_and_claims_only_the_live_passes_the_owner_ran():
     record = _record()
     scenarios = [r["scenario"] for r in record["validation_matrix"]]
     harness = record["conformance_harness"]
     assert harness["label"] == "IMPLEMENTATION_AND_CONFORMANCE_EVIDENCE_ONLY"
     assert [r["scenario"] for r in harness["rows"]] == scenarios
-    for row in harness["rows"][:13]:
-        assert row["live_result"] == "BLOCKED" and row["blocked_by"], row["scenario"]
+    for n, row in enumerate(harness["rows"][:13], start=1):
+        if n in {1, 2, 3, 4, 8, 9, 10, 11, 12}:
+            assert row["live_result"] == "PASSED_LIVE_2026-09-11" and row["blocked_by"] == [], row["scenario"]
+        else:
+            assert row["live_result"] == "BLOCKED" and row["blocked_by"], row["scenario"]
     for row in harness["rows"][13:]:
         assert row["live_result"] == "NOT_REQUIRED_BY_AP3-D5" and row["blocked_by"] == [], row["scenario"]
     assert "test_ap3_designation_conformance.py" in harness["harness"]

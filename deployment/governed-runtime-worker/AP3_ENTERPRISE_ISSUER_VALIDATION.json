@@ -26,80 +26,111 @@
     {
       "scenario": "correct issuer, audience, tenant and human actor",
       "required": "ACCEPTED",
-      "result": null,
-      "evidence_class": "LIVE_CLOUDFLARE_EVIDENCE_REQUIRED"
+      "result": "ACCEPTED",
+      "evidence_class": "LIVE_CLOUDFLARE_EVIDENCE_REQUIRED",
+      "observed": "ACCEPTED actor=HUMAN tenant=['ugence.ai'] profile=cloudflare-access",
+      "evidence": "owner run 2026-09-11T10:26:39Z of ci/ap3_live_verify.py on the owner's Windows host (evidence.live_verification_runs[0])",
+      "executed_at": "2026-09-11"
     },
     {
       "scenario": "wrong issuer",
       "required": "REFUSED",
-      "result": null,
-      "evidence_class": "LIVE_CLOUDFLARE_EVIDENCE_REQUIRED"
+      "result": "REFUSED",
+      "evidence_class": "LIVE_CLOUDFLARE_EVIDENCE_REQUIRED",
+      "observed": "REFUSED_ISSUER_MISMATCH",
+      "evidence": "owner run 2026-09-11T10:26:39Z of ci/ap3_live_verify.py on the owner's Windows host (evidence.live_verification_runs[0])",
+      "executed_at": "2026-09-11"
     },
     {
       "scenario": "wrong audience",
       "required": "REFUSED",
-      "result": null,
-      "evidence_class": "LIVE_CLOUDFLARE_EVIDENCE_REQUIRED"
+      "result": "REFUSED",
+      "evidence_class": "LIVE_CLOUDFLARE_EVIDENCE_REQUIRED",
+      "observed": "REFUSED_AUDIENCE_MISMATCH",
+      "evidence": "owner run 2026-09-11T10:26:39Z of ci/ap3_live_verify.py on the owner's Windows host (evidence.live_verification_runs[0])",
+      "executed_at": "2026-09-11"
     },
     {
       "scenario": "wrong tenant",
       "required": "REFUSED",
-      "result": null,
-      "evidence_class": "LIVE_CLOUDFLARE_EVIDENCE_REQUIRED"
+      "result": "REFUSED",
+      "evidence_class": "LIVE_CLOUDFLARE_EVIDENCE_REQUIRED",
+      "observed": "REFUSED_EMAIL_DOMAIN_MISMATCH",
+      "evidence": "owner run 2026-09-11T10:26:39Z of ci/ap3_live_verify.py on the owner's Windows host (evidence.live_verification_runs[0])",
+      "executed_at": "2026-09-11"
     },
     {
       "scenario": "missing tenant claim",
       "required": "REFUSED",
       "result": null,
-      "evidence_class": "LIVE_CLOUDFLARE_EVIDENCE_REQUIRED"
+      "evidence_class": "LIVE_CLOUDFLARE_EVIDENCE_REQUIRED",
+      "observed": "BLOCKED: not executable with a human login (rows 5 to 7) or no rotation observed (row 13); see conformance_harness.rows"
     },
     {
       "scenario": "workload identity presented as human",
       "required": "REFUSED",
       "result": null,
-      "evidence_class": "LIVE_CLOUDFLARE_EVIDENCE_REQUIRED"
+      "evidence_class": "LIVE_CLOUDFLARE_EVIDENCE_REQUIRED",
+      "observed": "BLOCKED: not executable with a human login (rows 5 to 7) or no rotation observed (row 13); see conformance_harness.rows"
     },
     {
       "scenario": "missing actor-type evidence",
       "required": "REFUSED",
       "result": null,
-      "evidence_class": "LIVE_CLOUDFLARE_EVIDENCE_REQUIRED"
+      "evidence_class": "LIVE_CLOUDFLARE_EVIDENCE_REQUIRED",
+      "observed": "BLOCKED: not executable with a human login (rows 5 to 7) or no rotation observed (row 13); see conformance_harness.rows"
     },
     {
       "scenario": "expired or not-yet-valid token",
       "required": "REFUSED",
-      "result": null,
-      "evidence_class": "LIVE_CLOUDFLARE_EVIDENCE_REQUIRED"
+      "result": "REFUSED",
+      "evidence_class": "LIVE_CLOUDFLARE_EVIDENCE_REQUIRED",
+      "observed": "REFUSED_EXPIRED; REFUSED_ISSUED_IN_FUTURE",
+      "evidence": "owner run 2026-09-11T10:26:39Z of ci/ap3_live_verify.py on the owner's Windows host (evidence.live_verification_runs[0])",
+      "executed_at": "2026-09-11"
     },
     {
       "scenario": "invalid signature",
       "required": "REFUSED",
-      "result": null,
-      "evidence_class": "LIVE_CLOUDFLARE_EVIDENCE_REQUIRED"
+      "result": "REFUSED",
+      "evidence_class": "LIVE_CLOUDFLARE_EVIDENCE_REQUIRED",
+      "observed": "REFUSED_SIGNATURE_INVALID",
+      "evidence": "owner run 2026-09-11T10:26:39Z of ci/ap3_live_verify.py on the owner's Windows host (evidence.live_verification_runs[0])",
+      "executed_at": "2026-09-11"
     },
     {
       "scenario": "unknown signing-key id",
       "required": "REFUSED",
-      "result": null,
-      "evidence_class": "LIVE_CLOUDFLARE_EVIDENCE_REQUIRED"
+      "result": "REFUSED",
+      "evidence_class": "LIVE_CLOUDFLARE_EVIDENCE_REQUIRED",
+      "observed": "REFUSED_KEY_UNKNOWN",
+      "evidence": "owner run 2026-09-11T10:26:39Z of ci/ap3_live_verify.py on the owner's Windows host (evidence.live_verification_runs[0])",
+      "executed_at": "2026-09-11"
     },
     {
       "scenario": "malformed token",
       "required": "REFUSED",
-      "result": null,
-      "evidence_class": "LIVE_CLOUDFLARE_EVIDENCE_REQUIRED"
+      "result": "REFUSED",
+      "evidence_class": "LIVE_CLOUDFLARE_EVIDENCE_REQUIRED",
+      "observed": "not-a-token: REFUSED_MALFORMED; two segments: REFUSED_MALFORMED; alg none: REFUSED_ALG_NOT_PERMITTED; alg ES256: REFUSED_ALG_NOT_PERMITTED; typ at+jwt: REFUSED_TYP_NOT_PROFILE_TYPE; kid removed: REFUSED_KID_MISSING",
+      "evidence": "owner run 2026-09-11T10:26:39Z of ci/ap3_live_verify.py on the owner's Windows host (evidence.live_verification_runs[0])",
+      "executed_at": "2026-09-11"
     },
     {
       "scenario": "JWKS unavailable with no safely cached key",
       "required": "REFUSED",
-      "result": null,
-      "evidence_class": "LIVE_CLOUDFLARE_EVIDENCE_REQUIRED"
+      "result": "REFUSED",
+      "evidence_class": "LIVE_CLOUDFLARE_EVIDENCE_REQUIRED",
+      "observed": "IDENTITY_UNAVAILABLE (KeyRetrievalFailed)",
+      "evidence": "owner run 2026-09-11T10:26:39Z of ci/ap3_live_verify.py on the owner's Windows host (evidence.live_verification_runs[0])",
+      "executed_at": "2026-09-11"
     },
     {
       "scenario": "signing-key rotation",
       "required": "NEW_VALID_KEY_ACCEPTED_AFTER_CONTROLLED_REFRESH",
       "result": null,
-      "evidence_class": "LIVE_CLOUDFLARE_EVIDENCE_REQUIRED"
+      "evidence_class": "LIVE_CLOUDFLARE_EVIDENCE_REQUIRED",
+      "observed": "BLOCKED: not executable with a human login (rows 5 to 7) or no rotation observed (row 13); see conformance_harness.rows"
     },
     {
       "scenario": "valid identity without a directory grant",
@@ -134,35 +165,27 @@
       {
         "scenario": "correct issuer, audience, tenant and human actor",
         "harness_result": "ACCEPTED at the adapter (typ absent per the live shape, alg RS256, HUMAN by claim shape, tenant ugence.ai by the static binding); RECORDED at the gate over X-Ugence-Approver-Proof and, through the boundary, over Cf-Access-Jwt-Assertion (proof_channel recorded)",
-        "live_result": "BLOCKED",
-        "blocked_by": [
-          "live cryptographic execution via ci/ap3_live_verify.py (the redacted capture shows the live shape is now admitted)"
-        ],
+        "live_result": "PASSED_LIVE_2026-09-11",
+        "blocked_by": [],
         "live_capture_note": "2026-09-11: alg RS256, typ absent, kid probed, iss/aud designated, sub non-empty, email present, no common_name (evidence.live_token_capture)"
       },
       {
         "scenario": "wrong issuer",
         "harness_result": "REFUSED_ISSUER_MISMATCH",
-        "live_result": "BLOCKED",
-        "blocked_by": [
-          "live cryptographic execution via ci/ap3_live_verify.py"
-        ]
+        "live_result": "PASSED_LIVE_2026-09-11",
+        "blocked_by": []
       },
       {
         "scenario": "wrong audience",
         "harness_result": "REFUSED_AUDIENCE_MISMATCH",
-        "live_result": "BLOCKED",
-        "blocked_by": [
-          "live cryptographic execution via ci/ap3_live_verify.py"
-        ]
+        "live_result": "PASSED_LIVE_2026-09-11",
+        "blocked_by": []
       },
       {
         "scenario": "wrong tenant",
         "harness_result": "REFUSED_EMAIL_DOMAIN_MISMATCH at the adapter for a verified email outside ugence.ai (the static binding is not corroborated); REFUSED_TENANT_MISMATCH at a gate whose tenant is not the bound one",
-        "live_result": "BLOCKED",
-        "blocked_by": [
-          "live cryptographic execution via ci/ap3_live_verify.py"
-        ]
+        "live_result": "PASSED_LIVE_2026-09-11",
+        "blocked_by": []
       },
       {
         "scenario": "missing tenant claim",
@@ -191,42 +214,32 @@
       {
         "scenario": "expired or not-yet-valid token",
         "harness_result": "REFUSED_EXPIRED; REFUSED_NOT_YET_VALID",
-        "live_result": "BLOCKED",
-        "blocked_by": [
-          "live cryptographic execution via ci/ap3_live_verify.py"
-        ]
+        "live_result": "PASSED_LIVE_2026-09-11",
+        "blocked_by": []
       },
       {
         "scenario": "invalid signature",
         "harness_result": "REFUSED_SIGNATURE_INVALID (foreign key under a published kid)",
-        "live_result": "BLOCKED",
-        "blocked_by": [
-          "live cryptographic execution via ci/ap3_live_verify.py"
-        ]
+        "live_result": "PASSED_LIVE_2026-09-11",
+        "blocked_by": []
       },
       {
         "scenario": "unknown signing-key id",
         "harness_result": "REFUSED_KEY_UNKNOWN after exactly one JWKS refresh",
-        "live_result": "BLOCKED",
-        "blocked_by": [
-          "live cryptographic execution via ci/ap3_live_verify.py"
-        ]
+        "live_result": "PASSED_LIVE_2026-09-11",
+        "blocked_by": []
       },
       {
         "scenario": "malformed token",
         "harness_result": "REFUSED_MALFORMED without touching the JWKS; REFUSED_TYP_NOT_PROFILE_TYPE for at+jwt or any present typ other than JWT under this profile (an absent typ is the live shape and is admitted, AP3-D1 as amended); REFUSED_ALG_NOT_PERMITTED for none, HMAC, ES256 or EdDSA under this profile; a missing proof is REFUSED_UNAUTHENTICATED at the gate; a malformed Cf-Access-Jwt-Assertion is refused through the boundary and never becomes a proof",
-        "live_result": "BLOCKED",
-        "blocked_by": [
-          "live cryptographic execution via ci/ap3_live_verify.py"
-        ]
+        "live_result": "PASSED_LIVE_2026-09-11",
+        "blocked_by": []
       },
       {
         "scenario": "JWKS unavailable with no safely cached key",
         "harness_result": "IDENTITY_UNAVAILABLE at the adapter; the write gate refuses (the port could not answer) and records nothing",
-        "live_result": "BLOCKED",
-        "blocked_by": [
-          "live cryptographic execution via ci/ap3_live_verify.py"
-        ]
+        "live_result": "PASSED_LIVE_2026-09-11",
+        "blocked_by": []
       },
       {
         "scenario": "signing-key rotation",
@@ -286,9 +299,10 @@
     "identity_provider_classification": "Google Workspace Base (ugence.ai) as enterprise identity source; Cloudflare Access (team 'ugence') as application gateway and JWT issuer; Ugence Authority Directory as authorization, role and tenant binding",
     "test_tenant_classification": "non-production; one test principal ap3-test@ugence.ai in Google group ugence-ap3-test@ugence.ai; no production data; the Google Workspace identity-provider test in Cloudflare succeeded and returned the principal with that group membership (owner-reported, 2026-09-11)",
     "claim_mapping_decisions": "iss exact = https://ugence.cloudflareaccess.com; aud must contain the designated application audience; exp and iat required, nbf honoured when present, all judged against the injected clock; alg within the IA-2 allowlist (RS256 expected [I]); kid required, unknown kid refused after one refresh. Ruled 2026-09-11 (AP3-D1 to AP3-D5, rulings_applied): header typ exactly JWT under the cloudflare-access profile only; tenant = static binding ugence.ai corroborated by the verified email domain; actor type by claim shape (human / service token / ambiguous = refuse); Cf-Access-Jwt-Assertion translated by the boundary, never read by the gate; rows 14 to 16 by in-process conformance with a test-only authorizer. JWKS key identifiers and digest HELD (2026-09-11); redacted live-token capture HELD (2026-09-11) and it REFUTES the typ JWT expectation: the header carries no typ. AP3-D1 AMENDED 2026-09-11 (absent typ admitted; present typ JWT; alg RS256). STILL OPEN: the application hostname; live cryptographic execution of rows 1 to 13 via ci/ap3_live_verify.py",
-    "test_timestamp": null,
+    "test_timestamp": "2026-09-11T10:26:39Z (rows 1 to 4 and 8 to 12, live; rows 14 to 16, in-process in CI; rows 5 to 7 and 13 not executed)",
     "token_fingerprints_or_redacted_fixture_ids": [
-      "sha256:cda7677fef4fcf2a791267e7117991c993ff1ac1362daeb1d484f3e1665f9a22 (live capture 1, 2026-09-11, exposed and to be revoked)"
+      "sha256:cda7677fef4fcf2a791267e7117991c993ff1ac1362daeb1d484f3e1665f9a22 (live capture 1, 2026-09-11, exposed and to be revoked)",
+      "sha256:c6ba7d44bb2eaa5093426c290f8e8fcfc9aa886538aaf078043abce16307661b (live verification run 1, 2026-09-11, never displayed)"
     ],
     "jwks_key_identifiers": [
       {
@@ -312,9 +326,11 @@
       "DONE 2026-09-11: redacted live-token capture recorded in evidence.live_token_capture (alg RS256, no typ, kid matches the probed JWKS, iss and aud designated, sub non-empty, human shape)",
       "DONE 2026-09-11: the exposed token was revoked through Cloudflare by the owner",
       "DONE 2026-09-11: AP3-D1 amended by the owner (typ absent admitted, present typ must be JWT, alg RS256, cloudflare-access profile only) and applied in adapter 0.1.3",
+      "DONE 2026-09-11: ci/ap3_live_verify.py run by the owner; rows 1 to 4 and 8 to 12 PASS with cryptographic verification against the live JWKS, 0 FAIL; recorded in evidence.live_verification_runs",
       "CONFIRM the application hostname: the token was obtained from ap3-validation-endpoint.rakeshmohan888.workers.dev while the designation names ap3-validation.ugence.ai; state whether both are configured on the application or correct the record",
-      "RUN ci/ap3_live_verify.py --app <application URL> --login from the owner's machine (obtains a fresh token through cloudflared, verifies it cryptographically against the live JWKS with the real adapter, prints only redacted evidence and per-row PASS/FAIL/BLOCKED) and paste its output; rows 5 to 7 need a service token or a token without email and stay BLOCKED until the owner provisions one or rules them covered in-process; row 13 needs an observed rotation",
-      "FILL result, test_timestamp, ci_run_or_signed_report and accepting_owner for the rows the live run passed; AP-3 stays PENDING_VALIDATION until every mandatory row passes with cryptographic verification"
+      "RULE rows 5 to 7: either provision a Cloudflare service token for the application (a token with common_name and empty sub) and a way to obtain a human token without email, then re-run the verifier with them, or rule that the in-process conformance evidence for these three rows is sufficient, as AP3-D5 did for rows 14 to 16",
+      "RULE row 13: either observe a Cloudflare signing-key rotation (Cloudflare rotates Access keys on its own schedule [I]; a manual rotation can be triggered in Zero Trust) with the verifier run before and after it, or rule that the in-process rotation evidence (one refresh, the withdrawn key gone) is sufficient",
+      "ACCEPT: once every mandatory row has a result, fill ci_run_or_signed_report (a signed or CI-produced report of the live run) and accepting_owner; only then may ap3_status move to MET"
     ],
     "jwks_document_sha256": "99668380e52847ea736886e9e7dda09d5ad1a478ea85b4633b330c40cd363305",
     "jwks_probe_run": "ci/ap3_jwks_probe.py run by the owner (Rakesh Mohan) on 2026-09-11 from a Windows host with egress, against the designated URL https://ugence.cloudflareaccess.com/cdn-cgi/access/certs; outcome EVIDENCE; two RSA RS256 signing keys published (Cloudflare's current and next key [I]); values transcribed from the owner's terminal output and to be confirmed against a re-run; public key identifiers only, no key material",
@@ -356,7 +372,116 @@
         "HOSTNAME: the Access application answers on ap3-validation-endpoint.rakeshmohan888.workers.dev; the designation prose names ap3-validation.ugence.ai"
       ]
     },
-    "live_verification_tool": "ci/ap3_live_verify.py: obtains a fresh token only through cloudflared (its output captured and filtered so the bearer token is never displayed), verifies it with the real adapter under the cloudflare-access profile against the live JWKS, drives rows 1 to 4 and 8 to 12 with the real token (rows 2 to 4 by changing the adapter's expectation over the same live keys; row 8 by the injected clock; rows 9 to 11 by tampering a copy; row 12 by a cold cache against an endpoint that does not answer), reports 5 to 7 and 13 BLOCKED and 14 to 16 IN_PROCESS, and prints only redacted evidence; it aborts rather than print anything token-shaped. Why ap3_token_capture.py reports signature_verified false: it decodes only, fetches nothing and holds no key by design, so it cannot verify; verification is the adapter's job and this tool's"
+    "live_verification_tool": "ci/ap3_live_verify.py: obtains a fresh token only through cloudflared (its output captured and filtered so the bearer token is never displayed), verifies it with the real adapter under the cloudflare-access profile against the live JWKS, drives rows 1 to 4 and 8 to 12 with the real token (rows 2 to 4 by changing the adapter's expectation over the same live keys; row 8 by the injected clock; rows 9 to 11 by tampering a copy; row 12 by a cold cache against an endpoint that does not answer), reports 5 to 7 and 13 BLOCKED and 14 to 16 IN_PROCESS, and prints only redacted evidence; it aborts rather than print anything token-shaped. Why ap3_token_capture.py reports signature_verified false: it decodes only, fetches nothing and holds no key by design, so it cannot verify; verification is the adapter's job and this tool's",
+    "live_verification_runs": [
+      {
+        "ran_at": "2026-09-11T10:26:39.216350+00:00",
+        "ran_by": "Rakesh Mohan, on the owner's Windows host with egress; output pasted by the owner (not a CI run, not signed)",
+        "tool": "ci/ap3_live_verify.py --app https://ap3-validation-endpoint.rakeshmohan888.workers.dev --login",
+        "adapter_version": "0.1.3",
+        "issuer_profile": "cloudflare-access",
+        "issuer": "https://ugence.cloudflareaccess.com",
+        "audience": "24b3008ed1910d53caebbaffb3358aa801bd9dc5cf9f5af8aa7ada87335b12b3",
+        "jwks_url": "https://ugence.cloudflareaccess.com/cdn-cgi/access/certs",
+        "jwks_kids_seen": [
+          "10f9ce4091b745de49aad528f4b59b2104248686527a8c4cae08a65b6ffa599c",
+          "bd0b1ac89731d202f9f673d391d1aff31282c71a91acd9e15e1ee3cfab40b9eb"
+        ],
+        "capture": {
+          "alg": "RS256",
+          "typ": null,
+          "kid": "10f9ce4091b745de49aad528f4b59b2104248686527a8c4cae08a65b6ffa599c",
+          "payload_keys": [
+            "aud",
+            "country",
+            "email",
+            "exp",
+            "h_INTERNAL_DO_NOT_USE",
+            "iat",
+            "identity_nonce",
+            "iss",
+            "nbf",
+            "policy_id",
+            "sub",
+            "type"
+          ],
+          "iss": "https://ugence.cloudflareaccess.com",
+          "aud": [
+            "24b3008ed1910d53caebbaffb3358aa801bd9dc5cf9f5af8aa7ada87335b12b3"
+          ],
+          "sub_non_empty": true,
+          "type": "app",
+          "token_sha256": "c6ba7d44bb2eaa5093426c290f8e8fcfc9aa886538aaf078043abce16307661b",
+          "signature_verified_by_the_adapter": true,
+          "token_status": "never displayed (the login line was suppressed by the tool), never retained"
+        },
+        "rows": {
+          "1": {
+            "status": "PASS",
+            "observed": "ACCEPTED actor=HUMAN tenant=['ugence.ai'] profile=cloudflare-access"
+          },
+          "2": {
+            "status": "PASS",
+            "observed": "REFUSED_ISSUER_MISMATCH"
+          },
+          "3": {
+            "status": "PASS",
+            "observed": "REFUSED_AUDIENCE_MISMATCH"
+          },
+          "4": {
+            "status": "PASS",
+            "observed": "REFUSED_EMAIL_DOMAIN_MISMATCH"
+          },
+          "8": {
+            "status": "PASS",
+            "observed": "REFUSED_EXPIRED; REFUSED_ISSUED_IN_FUTURE"
+          },
+          "9": {
+            "status": "PASS",
+            "observed": "REFUSED_SIGNATURE_INVALID"
+          },
+          "10": {
+            "status": "PASS",
+            "observed": "REFUSED_KEY_UNKNOWN"
+          },
+          "11": {
+            "status": "PASS",
+            "observed": "not-a-token: REFUSED_MALFORMED; two segments: REFUSED_MALFORMED; alg none: REFUSED_ALG_NOT_PERMITTED; alg ES256: REFUSED_ALG_NOT_PERMITTED; typ at+jwt: REFUSED_TYP_NOT_PROFILE_TYPE; kid removed: REFUSED_KID_MISSING"
+          },
+          "12": {
+            "status": "PASS",
+            "observed": "IDENTITY_UNAVAILABLE (KeyRetrievalFailed)"
+          },
+          "5": {
+            "status": "BLOCKED"
+          },
+          "6": {
+            "status": "BLOCKED"
+          },
+          "7": {
+            "status": "BLOCKED"
+          },
+          "13": {
+            "status": "BLOCKED"
+          },
+          "14": {
+            "status": "IN_PROCESS"
+          },
+          "15": {
+            "status": "IN_PROCESS"
+          },
+          "16": {
+            "status": "IN_PROCESS"
+          }
+        },
+        "summary": {
+          "PASS": 9,
+          "FAIL": 0,
+          "BLOCKED": 4,
+          "IN_PROCESS": 3
+        }
+      }
+    ]
   },
   "must_never_contain": [
     "a live token",
