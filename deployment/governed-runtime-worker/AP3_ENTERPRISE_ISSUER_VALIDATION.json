@@ -1,52 +1,289 @@
 {
   "schema": "governed-runtime-worker.ap3-enterprise-issuer-validation.v1",
   "ruling": "ADR_UGENCE_AUTHORITY_PLANE_SCOPING.md AP-3 IDP_VALIDATED_FIRST (controlling, section 18); protocol and status in section 20",
-  "ap3_status": "BLOCKED_PENDING_OWNER-PROVISIONED_ENTERPRISE_IDP_TEST_TENANT",
-  "status_note": "No real enterprise issuer has been designated. The worker's in-process issuer is implementation and conformance evidence only and never satisfies this gate. A self-signed fixture or local mock must not be recorded here. Every field below is configuration, never a secret: client secrets, private keys and test tokens stay in the identity provider, the CI secret store or approved runtime custody.",
+  "ap3_status": "PENDING_VALIDATION",
+  "status_note": "Designated 2026-09-11 by the owner: Cloudflare Access (team 'ugence') backed by Google Workspace (ugence.ai) is the enterprise issuer; the non-production Access application 'AP3 Enterprise Issuer Validation' on ap3-validation.ugence.ai admits the Google group ugence-ap3-test@ugence.ai, test principal ap3-test@ugence.ai. AP-3 is NOT met: no row of the validation matrix has been executed against the real issuer (every 'result' below is null), and the conformance_harness block records why each row is still blocked. The worker's in-process issuer is implementation and conformance evidence only and never satisfies this gate. Every field below is configuration, never a secret: client secrets, private keys, cookies and test tokens stay in the identity provider, Cloudflare, the CI secret store or approved runtime custody.",
   "designation": {
-    "ap3_enterprise_issuer": null,
-    "issuer": null,
-    "audience": null,
-    "jwks_trust": null,
-    "tenant_claim": null,
-    "principal_claim": null,
-    "actor_type_claim_or_mapping": null,
+    "ap3_enterprise_issuer": "Cloudflare Access, team 'ugence', backed by Google Workspace (Workspace domain ugence.ai); non-production Access application 'AP3 Enterprise Issuer Validation' protecting ap3-validation.ugence.ai; policy 'Google Workspace group' (Allow) admitting ugence-ap3-test@ugence.ai; test principal ap3-test@ugence.ai. accounts.google.com is the login method behind Access, not the application JWT issuer",
+    "issuer": "https://ugence.cloudflareaccess.com",
+    "audience": "24b3008ed1910d53caebbaffb3358aa801bd9dc5cf9f5af8aa7ada87335b12b3",
+    "jwks_trust": "configured JWKS endpoint https://ugence.cloudflareaccess.com/cdn-cgi/access/certs (IA-3: no OIDC discovery; default TLS verification; keys cached by kid, refreshed once on an unknown kid, then fail closed)",
+    "tenant_claim": "UNRULED: the owner's mapping is 'ugence.ai, accepted only when issuer and audience validate and the verified email belongs to the exact ugence.ai domain'. The ratified adapter (IA-4) reads one top-level claim as presented and derives nothing; a Cloudflare Access user token carries no tenant claim [I]. Requires an owner ruling (a Cloudflare-injected claim, or an IA-4 amendment admitting a derived tenant for this issuer) before any tenant row can execute",
+    "principal_claim": "sub (the Access user's stable issuer-scoped identifier); email is the IdP-verified human-readable address and a directory-binding attribute, never the key",
+    "actor_type_claim_or_mapping": "UNRULED: the owner's mapping is human = non-empty sub plus verified email; service = common_name present with empty sub; ambiguous = deny. The ratified adapter (IA-4) marks HUMAN only on an exact match of one configured claim against one configured value and never infers HUMAN from sub; type=app is not that claim. Requires an owner ruling (a Cloudflare-injected marker claim, or an IA-4 amendment for this issuer) before the human-actor rows can execute",
     "allowed_actor_type": "HUMAN",
-    "directory_binding": null,
+    "directory_binding": "the Authority Directory principal_id is the issuer-qualified subject reference percent-encoded(iss)|percent-encoded(sub) (ID-2); the verified email is recorded as the display and binding attribute; the Cloudflare Access Google-group policy is admission evidence, never a substitute for an internal role grant (AX-5)",
     "failure_behaviour": "FAIL_CLOSED",
-    "jwks_rotation_behaviour": null,
+    "jwks_rotation_behaviour": "Cloudflare publishes the current and next signing keys at the certs endpoint and rotates them on its own schedule [I]; the adapter refreshes the JWKS exactly once on an unknown kid and retries verification once, then refuses KEY_UNKNOWN; a JWKS that cannot be fetched is IdentityUnavailable, never an unauthenticated answer; an unsigned payload is never decoded",
     "validation_environment": "NON_PRODUCTION",
-    "designated_by": null,
-    "designated_at": null
+    "designated_by": "Rakesh Mohan",
+    "designated_at": "2026-09-11"
   },
   "validation_matrix": [
-    {"scenario": "correct issuer, audience, tenant and human actor", "required": "ACCEPTED", "result": null},
-    {"scenario": "wrong issuer", "required": "REFUSED", "result": null},
-    {"scenario": "wrong audience", "required": "REFUSED", "result": null},
-    {"scenario": "wrong tenant", "required": "REFUSED", "result": null},
-    {"scenario": "missing tenant claim", "required": "REFUSED", "result": null},
-    {"scenario": "workload identity presented as human", "required": "REFUSED", "result": null},
-    {"scenario": "missing actor-type evidence", "required": "REFUSED", "result": null},
-    {"scenario": "expired or not-yet-valid token", "required": "REFUSED", "result": null},
-    {"scenario": "invalid signature", "required": "REFUSED", "result": null},
-    {"scenario": "unknown signing-key id", "required": "REFUSED", "result": null},
-    {"scenario": "malformed token", "required": "REFUSED", "result": null},
-    {"scenario": "JWKS unavailable with no safely cached key", "required": "REFUSED", "result": null},
-    {"scenario": "signing-key rotation", "required": "NEW_VALID_KEY_ACCEPTED_AFTER_CONTROLLED_REFRESH", "result": null},
-    {"scenario": "valid identity without a directory grant", "required": "AUTHENTICATED_BUT_UNAUTHORIZED", "result": null},
-    {"scenario": "valid identity with a wrong-tenant grant", "required": "UNAUTHORIZED", "result": null},
-    {"scenario": "valid identity with the correct scoped grant", "required": "WRITER_AUTHORIZER_PERMITS_ONLY_THE_NAMED_CAPABILITY", "result": null}
+    {
+      "scenario": "correct issuer, audience, tenant and human actor",
+      "required": "ACCEPTED",
+      "result": null
+    },
+    {
+      "scenario": "wrong issuer",
+      "required": "REFUSED",
+      "result": null
+    },
+    {
+      "scenario": "wrong audience",
+      "required": "REFUSED",
+      "result": null
+    },
+    {
+      "scenario": "wrong tenant",
+      "required": "REFUSED",
+      "result": null
+    },
+    {
+      "scenario": "missing tenant claim",
+      "required": "REFUSED",
+      "result": null
+    },
+    {
+      "scenario": "workload identity presented as human",
+      "required": "REFUSED",
+      "result": null
+    },
+    {
+      "scenario": "missing actor-type evidence",
+      "required": "REFUSED",
+      "result": null
+    },
+    {
+      "scenario": "expired or not-yet-valid token",
+      "required": "REFUSED",
+      "result": null
+    },
+    {
+      "scenario": "invalid signature",
+      "required": "REFUSED",
+      "result": null
+    },
+    {
+      "scenario": "unknown signing-key id",
+      "required": "REFUSED",
+      "result": null
+    },
+    {
+      "scenario": "malformed token",
+      "required": "REFUSED",
+      "result": null
+    },
+    {
+      "scenario": "JWKS unavailable with no safely cached key",
+      "required": "REFUSED",
+      "result": null
+    },
+    {
+      "scenario": "signing-key rotation",
+      "required": "NEW_VALID_KEY_ACCEPTED_AFTER_CONTROLLED_REFRESH",
+      "result": null
+    },
+    {
+      "scenario": "valid identity without a directory grant",
+      "required": "AUTHENTICATED_BUT_UNAUTHORIZED",
+      "result": null
+    },
+    {
+      "scenario": "valid identity with a wrong-tenant grant",
+      "required": "UNAUTHORIZED",
+      "result": null
+    },
+    {
+      "scenario": "valid identity with the correct scoped grant",
+      "required": "WRITER_AUTHORIZER_PERMITS_ONLY_THE_NAMED_CAPABILITY",
+      "result": null
+    }
   ],
+  "conformance_harness": {
+    "label": "IMPLEMENTATION_AND_CONFORMANCE_EVIDENCE_ONLY",
+    "note": "Section 20: an in-process issuer never satisfies AP-3. This block records, per matrix row, what the ratified adapter and the plane's write gate do today when configured with the designated issuer and audience and driven by in-process tokens shaped like Cloudflare Access tokens, and why the live row is still blocked. It is asserted by deployment/governed-runtime-worker/tests/test_ap3_designation_conformance.py so it cannot drift from the code. It changes no matrix result.",
+    "harness": "deployment/governed-runtime-worker/tests/test_ap3_designation_conformance.py over the approver-identity-jwt in-process issuer (loopback JWKS), AdapterConfig(issuer=designation.issuer, audience=designation.audience, tenant_claim=None, actor_type_claim=None) and build_authority_writes(serve=IMPLEMENTED_WRITES) in test mode",
+    "rows": [
+      {
+        "scenario": "correct issuer, audience, tenant and human actor",
+        "harness_result": "REFUSED_TYP_NOT_ACCESS_TOKEN with typ JWT; REFUSED_NOT_HUMAN with typ at+jwt and no actor mapping",
+        "live_result": "BLOCKED",
+        "blocked_by": [
+          "IA-1 typ ruling",
+          "IA-4 actor-type mapping ruling",
+          "tenant mapping ruling",
+          "live token evidence"
+        ]
+      },
+      {
+        "scenario": "wrong issuer",
+        "harness_result": "REFUSED_ISSUER_MISMATCH",
+        "live_result": "BLOCKED",
+        "blocked_by": [
+          "live token evidence"
+        ]
+      },
+      {
+        "scenario": "wrong audience",
+        "harness_result": "REFUSED_AUDIENCE_MISMATCH",
+        "live_result": "BLOCKED",
+        "blocked_by": [
+          "live token evidence"
+        ]
+      },
+      {
+        "scenario": "wrong tenant",
+        "harness_result": "NOT_RUN: no tenant claim is ruled for this issuer",
+        "live_result": "BLOCKED",
+        "blocked_by": [
+          "tenant mapping ruling",
+          "live token evidence"
+        ]
+      },
+      {
+        "scenario": "missing tenant claim",
+        "harness_result": "REFUSED_NO_TENANT_CLAIM at the write gate (AW-5: configuration never fills the gap)",
+        "live_result": "BLOCKED",
+        "blocked_by": [
+          "live token evidence"
+        ]
+      },
+      {
+        "scenario": "workload identity presented as human",
+        "harness_result": "REFUSED_CLAIM_MALFORMED for the service-token shape (common_name, empty sub); REFUSED_NOT_HUMAN for a non-empty sub without a ruled human marker",
+        "live_result": "BLOCKED",
+        "blocked_by": [
+          "IA-4 actor-type mapping ruling",
+          "live service-token evidence"
+        ]
+      },
+      {
+        "scenario": "missing actor-type evidence",
+        "harness_result": "REFUSED_NOT_HUMAN (SYSTEM by default; HUMAN is never inferred)",
+        "live_result": "BLOCKED",
+        "blocked_by": [
+          "live token evidence"
+        ]
+      },
+      {
+        "scenario": "expired or not-yet-valid token",
+        "harness_result": "REFUSED_EXPIRED; REFUSED_NOT_YET_VALID",
+        "live_result": "BLOCKED",
+        "blocked_by": [
+          "live token evidence"
+        ]
+      },
+      {
+        "scenario": "invalid signature",
+        "harness_result": "REFUSED_SIGNATURE_INVALID (foreign key under a published kid)",
+        "live_result": "BLOCKED",
+        "blocked_by": [
+          "live token evidence"
+        ]
+      },
+      {
+        "scenario": "unknown signing-key id",
+        "harness_result": "REFUSED_KEY_UNKNOWN after exactly one JWKS refresh",
+        "live_result": "BLOCKED",
+        "blocked_by": [
+          "live token evidence"
+        ]
+      },
+      {
+        "scenario": "malformed token",
+        "harness_result": "REFUSED_MALFORMED without touching the JWKS; a missing proof is REFUSED_NO_PROOF at the write gate",
+        "live_result": "BLOCKED",
+        "blocked_by": [
+          "live token evidence"
+        ]
+      },
+      {
+        "scenario": "JWKS unavailable with no safely cached key",
+        "harness_result": "IDENTITY_UNAVAILABLE at the adapter; the write gate refuses (the port could not answer) and records nothing",
+        "live_result": "BLOCKED",
+        "blocked_by": [
+          "live JWKS evidence"
+        ]
+      },
+      {
+        "scenario": "signing-key rotation",
+        "harness_result": "NEW_VALID_KEY_ACCEPTED_AFTER_ONE_REFRESH; the withdrawn key is gone after the refresh",
+        "live_result": "BLOCKED",
+        "blocked_by": [
+          "live JWKS evidence across a Cloudflare rotation"
+        ]
+      },
+      {
+        "scenario": "valid identity without a directory grant",
+        "harness_result": "NOT_RUN: no WriterAuthorizer is composed (AX-5 is sequenced after AP-3, section 19.5)",
+        "live_result": "BLOCKED",
+        "blocked_by": [
+          "AX-5 WriterAuthorizer sequencing ruling",
+          "live token evidence"
+        ]
+      },
+      {
+        "scenario": "valid identity with a wrong-tenant grant",
+        "harness_result": "NOT_RUN: no WriterAuthorizer is composed (AX-5 is sequenced after AP-3, section 19.5)",
+        "live_result": "BLOCKED",
+        "blocked_by": [
+          "AX-5 WriterAuthorizer sequencing ruling",
+          "tenant mapping ruling",
+          "live token evidence"
+        ]
+      },
+      {
+        "scenario": "valid identity with the correct scoped grant",
+        "harness_result": "NOT_RUN: no WriterAuthorizer is composed (AX-5 is sequenced after AP-3, section 19.5)",
+        "live_result": "BLOCKED",
+        "blocked_by": [
+          "AX-5 WriterAuthorizer sequencing ruling",
+          "IA-1 typ ruling",
+          "IA-4 actor-type mapping ruling",
+          "tenant mapping ruling",
+          "live token evidence"
+        ]
+      }
+    ],
+    "owner_requested_rows_beyond_the_sixteen": [
+      {
+        "scenario": "missing token",
+        "harness_result": "REFUSED_NO_PROOF at the write gate (AW-5)"
+      },
+      {
+        "scenario": "missing or empty sub",
+        "harness_result": "REFUSED_CLAIM_MISSING (absent) or REFUSED_CLAIM_MALFORMED (empty)"
+      },
+      {
+        "scenario": "missing email",
+        "harness_result": "NOT_A_CHECK_TODAY: the ratified adapter does not read email; becomes a check only under an IA-4 amendment"
+      },
+      {
+        "scenario": "wrong email domain",
+        "harness_result": "NOT_A_CHECK_TODAY: the ratified adapter does not read email; becomes a check only under a ruled tenant mapping"
+      },
+      {
+        "scenario": "ambiguous actor type",
+        "harness_result": "REFUSED_NOT_HUMAN (fail closed; never inferred)"
+      },
+      {
+        "scenario": "JWKS rotation/refetch behaviour",
+        "harness_result": "one refresh on an unknown kid, one retry, then KEY_UNKNOWN; a failed refresh is IDENTITY_UNAVAILABLE"
+      }
+    ]
+  },
   "evidence": {
-    "identity_provider_classification": null,
-    "test_tenant_classification": null,
-    "claim_mapping_decisions": null,
+    "identity_provider_classification": "Google Workspace Base (ugence.ai) as enterprise identity source; Cloudflare Access (team 'ugence') as application gateway and JWT issuer; Ugence Authority Directory as authorization, role and tenant binding",
+    "test_tenant_classification": "non-production; one test principal ap3-test@ugence.ai in Google group ugence-ap3-test@ugence.ai; no production data; the Google Workspace identity-provider test in Cloudflare succeeded and returned the principal with that group membership (owner-reported, 2026-09-11)",
+    "claim_mapping_decisions": "iss exact = https://ugence.cloudflareaccess.com; aud must contain the designated application audience; sub required non-empty (adapter REQUIRED_CLAIMS); exp and iat required, nbf honoured when present, all judged against the injected clock; alg RS256 within the IA-2 allowlist; kid required, unknown kid refused after one refresh. OPEN, needing an owner ruling before execution: (1) IA-1 requires header typ at+jwt and a Cloudflare Access token is expected to carry typ JWT [I]; (2) the tenant mapping (see designation.tenant_claim); (3) the actor-type mapping (see designation.actor_type_claim_or_mapping); (4) the proof header: the plane reads X-Ugence-Approver-Proof (AW-3, WRITE_PROOF_HEADER), while Cloudflare injects Cf-Access-Jwt-Assertion at the origin; (5) matrix rows 14 to 16 need the AX-5 WriterAuthorizer, which section 19.5 sequences after AP-3",
     "test_timestamp": null,
     "token_fingerprints_or_redacted_fixture_ids": [],
     "jwks_key_identifiers": [],
     "ci_run_or_signed_report": null,
     "accepting_owner": null,
-    "validation_environment_limitations": null
+    "validation_environment_limitations": "the validation slice's execution environment (2026-09-11) has no egress to ugence.cloudflareaccess.com (CONNECT refused by its proxy), so the live JWKS was not fetched and no kid is recorded; no live Access token was obtained and none will ever be stored; the conformance harness below ran against the worker's in-process issuer configured with the designated issuer string and audience, over a loopback JWKS, and is implementation evidence only"
   },
   "must_never_contain": [
     "a live token",

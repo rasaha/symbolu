@@ -9,8 +9,8 @@
   "permitted_egress": [
     {
       "purpose": "JWKS retrieval by the approver identity adapter (AI-C, IA-3)",
-      "host": null,
-      "host_note": "the host component of UGENCE_REVIEW_IDENTITY_JWKS_URL, filled in by the owner when the issuer is provisioned; null until then",
+      "host": "ugence.cloudflareaccess.com",
+      "host_note": "the host component of UGENCE_REVIEW_IDENTITY_JWKS_URL: designated by the owner on 2026-09-11 as the Cloudflare Access team domain (AP3_ENTERPRISE_ISSUER_VALIDATION.json designation.jwks_trust); recorded here as the one permitted JWKS host and enforced by platform configuration, not by the application",
       "scheme": "https",
       "verification": "default TLS verification; never disabled"
     },

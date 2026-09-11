@@ -605,12 +605,12 @@ one real enterprise identity issuer" (§18) means in evidence, so that AP-3 cann
 declared met by choosing an identity provider, writing an OIDC adapter, or running a
 fixture. Its current status line is the only status the repository may claim.
 
-**AP-3 status: `BLOCKED_PENDING_OWNER-PROVISIONED_ENTERPRISE_IDP_TEST_TENANT`.**
+**AP-3 status: `PENDING_VALIDATION`** (designated 2026-09-11, §20.6; not met).
 
-No real enterprise issuer has been designated. The in-process issuer used by the
-worker's tests is implementation and conformance evidence only (§18). A self-signed
-fixture or a local mock is not a substitute and must never be recorded as satisfying
-this gate.
+The enterprise issuer is designated (§20.6) and no row of the matrix has run against
+it. The in-process issuer used by the worker's tests is implementation and conformance
+evidence only (§18). A self-signed fixture or a local mock is not a substitute and must
+never be recorded as satisfying this gate.
 
 ### 20.1 — What the owner supplies
 
@@ -698,6 +698,55 @@ executes without skips and passes; otherwise report `NOT_MET` and stop.
    own record.
 
 Identity validation stays ahead of every authority-plane mutation, as §19 intends.
+
+### 20.6 — Designation record (owner, 2026-09-11) and what stands between it and `MET` `[V]`
+
+The owner designated the enterprise issuer in the terms below and recorded them in
+`deployment/governed-runtime-worker/AP3_ENTERPRISE_ISSUER_VALIDATION.json`; the
+record's status moved from `BLOCKED_PENDING_OWNER-PROVISIONED_ENTERPRISE_IDP_TEST_TENANT`
+to `PENDING_VALIDATION`, and nothing else in §18 to §20 moves.
+
+| Term | Designation |
+|---|---|
+| Issuer | Cloudflare Access, team `ugence`: `iss` exactly `https://ugence.cloudflareaccess.com`; Google Workspace (`ugence.ai`) is the login method behind Access, never the application JWT issuer |
+| Audience | the non-production Access application "AP3 Enterprise Issuer Validation" on `ap3-validation.ugence.ai`, AUD `24b3008e…5b12b3` |
+| JWKS trust | `https://ugence.cloudflareaccess.com/cdn-cgi/access/certs`, configured, no discovery (IA-3) |
+| Test principal | `ap3-test@ugence.ai`, admitted by the Access policy "Google Workspace group" (Allow) for `ugence-ap3-test@ugence.ai` |
+| Principal claim | `sub`; `email` is the verified display and directory-binding attribute, not the key |
+| Directory binding | `percent-encoded(iss)|percent-encoded(sub)` (ID-2); the Access group policy is admission evidence, never a role grant (AX-5) |
+
+**Not met, and why.** Every matrix row's `result` is null. The record's
+`conformance_harness` block, asserted by
+`deployment/governed-runtime-worker/tests/test_ap3_designation_conformance.py`, states
+per row what the ratified adapter and the plane's write gate do today when configured
+with the designated issuer and audience and driven by in-process tokens shaped like
+Cloudflare Access tokens; it is implementation evidence only and marks every live row
+`BLOCKED`. Five things block execution, each an owner matter, none a code default:
+
+1. **IA-1 `typ`.** The adapter admits only `at+jwt`; a Cloudflare Access token is
+   expected to carry `typ: JWT` `[I]`. Confirming the header and, if so, amending
+   IA-1 for this issuer is a ruling.
+2. **IA-4 actor type.** `HUMAN` is an exact match of one configured claim against one
+   configured value and is never inferred from `sub`. The owner's mapping (human =
+   non-empty `sub` plus verified `email`; service = `common_name` with empty `sub`;
+   `type=app` decides nothing) is an inference the ruling forbids. Either Cloudflare
+   injects a marker claim or IA-4 is amended for this issuer; a ruling either way.
+3. **Tenant mapping.** The adapter reads one top-level claim as presented; Access
+   tokens carry no tenant claim `[I]`, and the owner's "exact `ugence.ai` email
+   domain" rule is a derivation. Same two options, same need for a ruling.
+4. **Proof header.** The plane reads `X-Ugence-Approver-Proof` (AW-3); Cloudflare
+   injects `Cf-Access-Jwt-Assertion` at the origin. Admitting the second is a ruling.
+5. **Rows 14 to 16.** They need the AX-5 `WriterAuthorizer`, which §19.5 composes
+   after AP-3 is met. Executing them requires ruling that a conformance-mode
+   authorizer may exist in the validation slice.
+
+**Evidence not yet held.** The validation slice's execution environment refused egress
+to `ugence.cloudflareaccess.com`, so no JWKS key identifier is recorded;
+`deployment/governed-runtime-worker/ci/ap3_jwks_probe.py` fetches and prints only
+`kid`, `kty`, `alg`, `use` and the document digest for the owner to run from a host
+with egress. No live Access token was obtained and none is ever stored; a redacted
+header and claim-name capture from the test principal's login is the evidence that
+settles items 1 to 3. `EXTERNAL_DEPLOYMENT_EVIDENCE.json` now names the JWKS host.
 
 ## 21 — Ruling on the two questions raised by the enterprise-readiness evaluation (2026-09-07)
 

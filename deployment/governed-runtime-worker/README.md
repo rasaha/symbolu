@@ -149,6 +149,15 @@ through `compose(config, clock=, workload=)` from its own entrypoint.
   adapter's in-process issuer: park, list, decide over HTTP with a signed proof
   (`IDP_AUTHENTICATED`, `authentication_reference`), re-arm, consume, run once, link,
   and no DSN or token in any answer or output (row 8).
+- `tests/test_ap3_designation_conformance.py` — AP-3 (ADR §20.6): the committed
+  designation record is the owner's (Cloudflare Access team `ugence` backed by Google
+  Workspace, `PENDING_VALIDATION`, every live matrix row null), holds nothing token- or
+  secret-shaped, and its `conformance_harness` block says exactly what the ratified
+  adapter and the write gate do with in-process tokens shaped like Cloudflare Access
+  tokens under the designated issuer and audience. Implementation and conformance
+  evidence only; an in-process issuer never satisfies AP-3. `ci/ap3_jwks_probe.py`
+  prints the designated JWKS's key identifiers and nothing else, for the owner to run
+  from a host with egress.
 
 ## Container image and gate set (step 4)
 
