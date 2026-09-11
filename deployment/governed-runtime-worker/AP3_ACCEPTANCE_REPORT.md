@@ -61,11 +61,11 @@ It holds no token, cookie, secret, private key or authorization code.
   - document SHA-256 `99668380e52847ea736886e9e7dda09d5ad1a478ea85b4633b330c40cd363305`
 - Redacted capture (2026-09-11): alg `RS256`, typ `None`, kid `10f9ce4091b745de49aad528f4b59b2104248686527a8c4cae08a65b6ffa599c`, payload keys `aud`, `country`, `email`, `exp`, `h_INTERNAL_DO_NOT_USE`, `iat`, `identity_nonce`, `iss`, `nbf`, `policy_id`, `sub`, `type`, iss `https://ugence.cloudflareaccess.com`, aud `24b3008ed1910d53caebbaffb3358aa801bd9dc5cf9f5af8aa7ada87335b12b3`, sub non-empty `True`, type `app`.
 - Live verification run at 2026-09-11T10:26:39.216350+00:00 by Rakesh Mohan, on the owner's Windows host with egress; output pasted by the owner (not a CI run, not signed): PASS 9, FAIL 0, BLOCKED 4, IN_PROCESS 3; token fingerprint `c6ba7d44bb2eaa5093426c290f8e8fcfc9aa886538aaf078043abce16307661b`; never displayed (the login line was suppressed by the tool), never retained.
-- Exposed token `sha256:cda7677fef4fcf2a791267e7117991c993ff1ac1362daeb1d484f3e1665f9a22`: revocation attested by Rakesh Mohan on 2026-09-11; status `OWNER_ATTESTED_NOT_YET_EVIDENCED`; evidence: none recorded.
+- Exposed token `sha256:cda7677fef4fcf2a791267e7117991c993ff1ac1362daeb1d484f3e1665f9a22`: revocation attested by Rakesh Mohan on 2026-09-11; status `OWNER_ATTESTED_WITH_TIME_CORRELATED_AUDIT_EVENT_NOT_EXPLICIT`; evidence: none recorded.
 
 ## 5 — Remaining owner actions
 
-- EVIDENCE the revocation of the exposed token (evidence.exposed_token_revocation.evidence_required); until recorded, AP-3 stays PENDING_VALIDATION
+- CLOSE the revocation blocker by one of the three paths in evidence.exposed_token_revocation.determination; until then AP-3 stays PENDING_VALIDATION
 - ACCEPT: issue the owner-acceptance statement prepared in AP3_ACCEPTANCE_REPORT.md; on acceptance ci_run_or_signed_report is set to the report path at the accepted commit and accepting_owner to 'Rakesh Mohan — Founder, Ugence Labs'; only then does ap3_status move to MET, by the owner's word
 
 ## 6 — Acceptance

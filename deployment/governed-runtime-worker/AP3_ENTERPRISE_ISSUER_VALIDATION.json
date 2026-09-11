@@ -338,7 +338,7 @@
       "DONE 2026-09-11: AP3-D1 amended by the owner (typ absent admitted, present typ must be JWT, alg RS256, cloudflare-access profile only) and applied in adapter 0.1.3",
       "DONE 2026-09-11: ci/ap3_live_verify.py run by the owner; rows 1 to 4 and 8 to 12 PASS with cryptographic verification against the live JWKS, 0 FAIL; recorded in evidence.live_verification_runs",
       "DONE 2026-09-11: AP3-D6 ruled; rows 5, 6, 7 and 13 filled from in-process conformance evidence; hostname confirmed as ap3-validation-endpoint.rakeshmohan888.workers.dev; scope limited to human identities through the Google Workspace group",
-      "EVIDENCE the revocation of the exposed token (evidence.exposed_token_revocation.evidence_required); until recorded, AP-3 stays PENDING_VALIDATION",
+      "CLOSE the revocation blocker by one of the three paths in evidence.exposed_token_revocation.determination; until then AP-3 stays PENDING_VALIDATION",
       "ACCEPT: issue the owner-acceptance statement prepared in AP3_ACCEPTANCE_REPORT.md; on acceptance ci_run_or_signed_report is set to the report path at the accepted commit and accepting_owner to 'Rakesh Mohan — Founder, Ugence Labs'; only then does ap3_status move to MET, by the owner's word"
     ],
     "jwks_document_sha256": "99668380e52847ea736886e9e7dda09d5ad1a478ea85b4633b330c40cd363305",
@@ -498,16 +498,18 @@
       "revoked_attested_at": "2026-09-11",
       "evidence": null,
       "evidence_required": "the audit-log entry for POST /accounts/<account>/access/apps/d456abec-2b6b-4b44-918e-ac825e2e83ca/revoke_tokens (the application's 'Revoke existing tokens' action), or a user-level revocation entry for ap3-test@ugence.ai, with its time; paste as text without the actor IP address; contains no secret",
-      "status": "OWNER_ATTESTED_NOT_YET_EVIDENCED",
+      "status": "OWNER_ATTESTED_WITH_TIME_CORRELATED_AUDIT_EVENT_NOT_EXPLICIT",
       "evidence_reviewed": [
         {
           "reviewed_at": "2026-09-11",
           "source": "Cloudflare account audit log, resource product access, entry id 01a08fe6-8265-7352-b978-3e34ef2f4dd1",
           "what_it_shows": "PUT /accounts/<account>/access/apps/d456abec-2b6b-4b44-918e-ac825e2e83ca at 2026-09-11T09:57:23Z, 'Update an Access application', result success, actor the owner via the dashboard",
-          "verdict": "NOT_REVOCATION_EVIDENCE: an application-settings update; a token revocation is POST .../access/apps/<app>/revoke_tokens and is logged as its own entry"
+          "verdict": "TIME_CORRELATED_BUT_NOT_EXPLICIT: an application update (PUT, HTTP 200) at the instant the owner attests the revocation was performed; the entry's content is a settings update and does not itself name a token revocation, so it corroborates the attestation without independently evidencing it"
         }
       ],
-      "fallback": "if no revocation is performed, the exposed token expires on its own exp (the application's session duration, at most 24 hours from issue [I]); expiry is not revocation and only an owner ruling could accept it in place of the required evidence"
+      "fallback": "if no revocation is performed, the exposed token expires on its own exp (the application's session duration, at most 24 hours from issue [I]); expiry is not revocation and only an owner ruling could accept it in place of the required evidence",
+      "owner_attestation": "2026-09-11: 'I confirm that I clicked Revoke existing tokens for the AP3 Enterprise Issuer Validation application at approximately 2026-09-11 15:27 IST' (Rakesh Mohan); the audit event 01a08fe6-8265-7352-b978-3e34ef2f4dd1 at 2026-09-11T09:57:23.685Z (15:27:23 IST) was generated immediately on that action, per the owner",
+      "determination": "Does not satisfy the evidence requirement as recorded (an entry that itself shows the revocation). It is the owner's to close by one of: (a) an explicit entry, POST .../access/apps/d456abec-2b6b-4b44-918e-ac825e2e83ca/revoke_tokens, if Cloudflare logs it; (b) an independent observation that a token issued before 09:57:24Z is refused at the application while a later one is admitted; (c) an owner ruling accepting attestation plus the time-correlated audit event as the standard for this non-production validation. Note: the plane's adapter validates signature, issuer, audience and time and does not consult Cloudflare's revocation state, which applies at the Access edge; for the adapter the exposed token is bounded by its own exp, and the plane serves no write in any case"
     },
     "acceptance_report": "deployment/governed-runtime-worker/AP3_ACCEPTANCE_REPORT.md (canonical; rendered from this record by ci/ap3_acceptance_report.py and pinned by the harness)",
     "accepting_owner_designate": "Rakesh Mohan — Founder, Ugence Labs (designated to accept; has not accepted)"

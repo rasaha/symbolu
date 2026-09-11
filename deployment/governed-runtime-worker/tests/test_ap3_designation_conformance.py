@@ -127,7 +127,8 @@ def test_the_record_is_designated_ruled_and_pending_not_met():
     assert "not live-validated" in d["ap3_enterprise_issuer"] and "human identities" in d["production_validation_scope"]
     # the exposed token: revocation attested, not yet evidenced, so acceptance is still open
     rev = record["evidence"]["exposed_token_revocation"]
-    assert rev["status"] == "OWNER_ATTESTED_NOT_YET_EVIDENCED" and rev["evidence"] is None
+    assert rev["status"] == "OWNER_ATTESTED_WITH_TIME_CORRELATED_AUDIT_EVENT_NOT_EXPLICIT" and rev["evidence"] is None
+    assert rev["evidence_reviewed"][0]["verdict"].startswith("TIME_CORRELATED_BUT_NOT_EXPLICIT") and "2401:" not in json.dumps(rev)
     assert record["evidence"]["accepting_owner_designate"].startswith("Rakesh Mohan — Founder, Ugence Labs")
     assert record["evidence"]["acceptance_report"].startswith("deployment/governed-runtime-worker/AP3_ACCEPTANCE_REPORT.md")
     run = record["evidence"]["live_verification_runs"][0]
@@ -168,7 +169,7 @@ def test_the_record_is_designated_ruled_and_pending_not_met():
     assert any(a.startswith("DONE 2026-09-11: AP3-D1 amended") for a in actions)
     assert any(a.startswith("DONE 2026-09-11: ci/ap3_live_verify.py run by the owner") for a in actions)
     assert any(a.startswith("DONE 2026-09-11: AP3-D6 ruled") for a in actions)
-    assert any(a.startswith("EVIDENCE the revocation") for a in actions) and any(a.startswith("ACCEPT:") for a in actions)
+    assert any(a.startswith("CLOSE the revocation blocker") for a in actions) and any(a.startswith("ACCEPT:") for a in actions)
     assert len(record["evidence"]["required_owner_actions"]) >= 3
     assert "a test-only authorizer described as production AX-5" in record["must_never_contain"]
 
