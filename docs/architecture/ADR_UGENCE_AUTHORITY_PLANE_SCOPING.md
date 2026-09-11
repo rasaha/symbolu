@@ -605,7 +605,7 @@ one real enterprise identity issuer" (§18) means in evidence, so that AP-3 cann
 declared met by choosing an identity provider, writing an OIDC adapter, or running a
 fixture. Its current status line is the only status the repository may claim.
 
-**AP-3 status: `PENDING_VALIDATION`** (designated 2026-09-11, §20.6; rulings AP3-D1 to AP3-D5 applied the same day, AP3-D1 amended on live evidence, §20.7; rows 1 to 4 and 8 to 12 passed the owner's live cryptographic run on 2026-09-11, rows 14 to 16 in-process; rows 5 to 7 and 13 under AP3-D6; every row carries a result; not met: the owner has not accepted and the exposed token's revocation is attested, not evidenced).
+**AP-3 status: `PENDING_VALIDATION`** (designated 2026-09-11, §20.6; rulings AP3-D1 to AP3-D5 applied the same day, AP3-D1 amended on live evidence, §20.7; rows 1 to 4 and 8 to 12 passed the owner's live cryptographic run on 2026-09-11, rows 14 to 16 in-process; rows 5 to 7 and 13 under AP3-D6; every row carries a result and the exposed token's revocation is evidenced; not met: the owner has not accepted).
 
 The enterprise issuer is designated (§20.6) and no row of the matrix has run against
 it. The in-process issuer used by the worker's tests is implementation and conformance
@@ -827,8 +827,11 @@ for production, and their token-shape handling stays covered by conformance test
 (4) The canonical acceptance artifact is
 `deployment/governed-runtime-worker/AP3_ACCEPTANCE_REPORT.md`, rendered from the record by
 `ci/ap3_acceptance_report.py` and pinned by the harness, prepared for acceptance by
-Rakesh Mohan, Founder, Ugence Labs. (5) The exposed token's revocation is owner-attested
-and not yet independently evidenced; it is recorded as a remaining blocker. `ap3_status`
+Rakesh Mohan, Founder, Ugence Labs. (5) The exposed token's revocation was first owner-attested
+and then evidenced the same day by the Zero Trust admin activity log's explicit "Revoke
+application tokens" event at 15:32 IST (10:02 UTC), after the exposure and before the
+live verification run, so that blocker is closed; the sole open item is the owner's
+acceptance. `ap3_status`
 stays `PENDING_VALIDATION`: nothing is `MET` until the acceptor issues the statement the
 report carries, and no live LLM-provider activation begins on this record. The capture also observed the application answering on
 `ap3-validation-endpoint.rakeshmohan888.workers.dev`, not the designated
