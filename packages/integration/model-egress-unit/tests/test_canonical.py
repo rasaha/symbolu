@@ -223,7 +223,7 @@ def test_only_an_answer_carries_a_payload():
 def test_no_result_may_claim_a_genuine_call():
     """The provenance check, in the record rather than only in the database."""
 
-    with pytest.raises(ValueError, match="no genuine provider call"):
+    with pytest.raises(ValueError, match="genuine call"):
         EgressResult(
             request_id=RID, tenant_id=TID, correlation_id=CID, recorded_at=NOW,
             outcome=ResultOutcome.FAILED, adapter_id="p",

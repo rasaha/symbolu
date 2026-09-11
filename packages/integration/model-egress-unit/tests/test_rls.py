@@ -281,10 +281,8 @@ def test_the_exchange_tables_are_owned_by_the_non_login_role(database):
             (SCHEMA_NAME,),
         ).fetchall())
 
-    assert owners == {
-        "egress_request": OWNER_ROLE,
-        "egress_result": OWNER_ROLE,
-    }, owners
+    assert set(owners) >= {"egress_request", "egress_result"}
+    assert set(owners.values()) == {OWNER_ROLE}, owners
 
 
 def test_the_owner_role_cannot_log_in(database):

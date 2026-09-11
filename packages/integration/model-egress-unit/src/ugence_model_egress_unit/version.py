@@ -6,7 +6,7 @@ wheel never has to import the package (and thus its dependencies).
 
 from __future__ import annotations
 
-__version__ = "0.1.0"
+__version__ = "0.3.0"
 
 #: Frozen identity of the exchange contract this package reads and writes.
 CONTRACT_VERSION = "model_egress_unit.exchange.v1"
@@ -25,6 +25,12 @@ MATURITY = "REFERENCE_GRADE_SHADOW_ONLY"
 #: what could not be determined. Authority over whether a request may be made at
 #: all belongs upstream, and is deliberately not wired here — see the ADR.
 ENFORCEMENT_ENABLED = False
+
+#: The commissioning record's status, as a release constant (LP-4). Pinned by a test to
+#: ``MEU_LIVE_VALIDATION.json``. ``EgressResult`` refuses ``genuine_call: true`` unless
+#: this reads ``MET``, so no configuration and no adapter can admit a genuine result
+#: before the owner's separate acceptance statement, which is itself a release.
+COMMISSIONING_STATUS = "BLOCKED_PENDING_INFRASTRUCTURE_DESIGNATIONS"
 
 #: No live vendor egress exists in this distribution, and none is configurable.
 #: Asserted structurally by ``tests/test_boundaries.py`` over the whole source

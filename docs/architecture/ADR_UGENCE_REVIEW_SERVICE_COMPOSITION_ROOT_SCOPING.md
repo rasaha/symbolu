@@ -125,7 +125,7 @@ bundle. The same switch never enables LIVE execution: `ENFORCEMENT_ENABLED` stay
 
 | # | Ruling |
 |---|---|
-| **CR-1** | **`SEPARATE_WORKER_UNIT`.** A companion deployment unit, the governed runtime worker, hosts the DBOS engine, the runtime host, the three SQLite stores and the review service. The P3E container is not extended and the studio backend composes nothing. |
+| **CR-1** | **`SEPARATE_WORKER_UNIT`.** A companion deployment unit, the governed runtime worker, hosts the DBOS engine, the runtime host, the three SQLite stores and the review service. The P3E container is not extended and the studio backend composes nothing. **Amended 2026-09-11 under `ADR_UGENCE_LIVE_MODEL_PROVIDER_COMMISSIONING.md` LP-1:** two named companion deployment units, the governed runtime worker and the Model Egress Unit; see the CR-1 amendment block below. |
 | **CR-2** | **`AMEND_P3E_SERVE_V2`.** The P3E profile gains one configuration value, `UGENCE_STUDIO_REVIEW_SERVICE_URL`, and serves the combined v1 and v2 application under its existing gate; `approved-runtime-config` and its freeze test are amended to say so. **Amended 2026-09-06 under `ADR_UGENCE_STUDIO_FRONT_DOOR_SCOPING.md` FD-10.4 (`ONE_STEP_AMENDMENT`):** the permitted route set over that one destination is six, the five review routes plus `POST /review/runs`, the relayed start of the worker's own shadow run (FD-10.1 to FD-10.3); the egress record, its freeze test, the studio's review client and the frontend manifest name all six; no second configuration value, credential or destination. **Amended again 2026-09-06 under FD-11.5 (`READ_ONLY_ONE_STEP_AMENDMENT`):** seven routes, the seventh `GET /review/audit/{correlation_id}`, a raw read of the worker's own tenant's audit-ledger rows by correlation id with the worker's chain verification (FD-11.3); read-only, no write route; still one destination, no configuration value, credential or package. |
 | **CR-3** | **`PRIVATE_NETWORK_TLS_IDENTITY_MANDATORY`.** The worker's listener binds the private segment only, over TLS, and in production mode an identity port is mandatory. No second access gate and no second credential. |
 | **CR-4** | **`ONE_DEPLOYMENT_MODE_SWITCH`.** `UGENCE_REVIEW_DEPLOYMENT_MODE=production` sets every production switch together and refuses any fixture adapter, in-memory store or non-authoritative bundle at composition. It certifies nothing and enables no LIVE execution. **Amended 2026-09-10 under `OWNER_RATIFICATION_LIVE_MODEL_PROVIDER.md` D-2 (`SEPARATE_EGRESS_UNIT`):** the mode continues to certify nothing and to enable no LIVE execution, and that is unchanged by the existence of a Model Egress Unit; setting it does not commission an MEU, admit a model-provider credential to any unit, or authorize a genuine provider call. The switch governs the worker's composition only — it is not a deployment-wide LIVE switch and must not be implemented or documented as one. A genuine provider call stays blocked by D-3 until credential custody, rotation, an audit trail and a named custody owner are separately commissioned, and by §6's ceiling until AI-E, the external security review and the mirror are cleared. |
@@ -252,6 +252,21 @@ second unit.
 >
 > Two units, two records, one rule: a boundary is narrowed by naming what crosses, never by
 > renaming it.
+
+##### CR-1 amendment, as ratified (2026-09-11)
+
+> **Amended 2026-09-11 under `ADR_UGENCE_LIVE_MODEL_PROVIDER_COMMISSIONING.md` LP-1:**
+> CR-1 admits exactly **two** named companion deployment units: the governed runtime
+> worker, as before, and the **Model Egress Unit**. Each carries its own egress record,
+> image, credentials and gate set. The worker retains its existing egress restriction
+> without change. Only the Model Egress Unit may contact the designated model-provider
+> host, `api.openai.com`, at the designated endpoint, and only where a credential has
+> been commissioned for it under LP-2. This amendment admits no other deployment unit and
+> no other destination; a third unit or a further destination requires a further
+> CR-family amendment on the same terms.
+
+This closes the `[G]` named above: the MEU's existence is now admitted as well as its
+boundary. It builds, commissions and credentials nothing.
 
 ##### What ratifying these did and did not do
 

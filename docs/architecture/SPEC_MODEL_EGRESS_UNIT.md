@@ -838,6 +838,29 @@ different sentences, and this specification is careful never to let the first st
 second.
 
 
+### 8.1 — Commissioning rulings of 2026-09-11
+
+`ADR_UGENCE_LIVE_MODEL_PROVIDER_COMMISSIONING.md` §0 records the owner's LP-1 to LP-6:
+CR-1 amended to admit the unit; Google Cloud Secret Manager as custody with a named
+custody owner; OpenAI `gpt-5.4-mini-2026-03-17` at `/v1/responses` under a
+non-production project; the AP-3-shaped validation process; the LP-5 limits; and the
+eleven-step order. Release 0.2.0 of the package carries the ledger-kind schema (§4.4's
+gap, now built), transport protection for the DSNs, the custody port with a fake-path
+pinned-version adapter, the destination policy and the limits. The rows of §8 that
+remain open are those LP-6 sequences after step 3, plus the durable LP-5 reservation
+row and the LP-2b record-contract amendment, both named in `MEU_LIVE_VALIDATION.json`.
+
+Release 0.3.0 (same day, under the owner's confirmation in that ADR's §0.3) carries
+LP-6 step 4 as migration 2: the controlled-migration identity, tenant-bound runtime
+identities with a restrictive binding policy, the constraint-only lifting of the
+reference-slice `genuine_call` restriction (custody identifiers required at the
+database; `EgressResult` still refuses it until `MET`), and the durable LP-5 reservation
+with trigger-enforced no-refund. LP-6 step 6 is the separate distribution
+`ugence-model-egress-provider-openai` 0.1.0, which this unit never imports. What §8
+still leaves open is step 7 (the live transport, the unit reserving durably before each
+dispatch, the verifier and the report generator), step 8 (the infrastructure
+designations) and step 9 (the credential).
+
 ## 9 — What exists to build on
 
 | | |

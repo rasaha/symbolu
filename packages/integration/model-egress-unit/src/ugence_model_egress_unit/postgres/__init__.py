@@ -18,7 +18,19 @@ from .exchange import (
 )
 from .migrate import MigrationDrift, applied_versions, migrate
 from .migrations import MIGRATIONS, Migration, migration_digest, statements
+from .transport import (
+    REQUIRED_SSLMODE,
+    TransportUnprotected,
+    protected_connect,
+    require_transport_protection,
+    sslmode_of,
+)
+from .provision import bind_identity, identity_name, identity_report, identity_statements
 from .schema import (
+    BINDING_TABLE,
+    BUDGET_TABLE,
+    MIGRATOR_ROLE,
+    RESERVATION_TABLE,
     OWNER_ROLE,
     ROLE_NAMES,
     SCHEMA_NAME,
@@ -28,7 +40,20 @@ from .schema import (
 )
 
 __all__ = [
+    "REQUIRED_SSLMODE",
+    "TransportUnprotected",
+    "sslmode_of",
+    "require_transport_protection",
+    "protected_connect",
+    "identity_name",
+    "identity_statements",
+    "bind_identity",
+    "identity_report",
     "SCHEMA_NAME",
+    "MIGRATOR_ROLE",
+    "BINDING_TABLE",
+    "BUDGET_TABLE",
+    "RESERVATION_TABLE",
     "OWNER_ROLE",
     "WORKER_ROLE",
     "UNIT_ROLE",

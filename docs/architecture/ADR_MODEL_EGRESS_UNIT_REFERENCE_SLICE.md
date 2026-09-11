@@ -170,3 +170,56 @@ It marks no gate identifier satisfied and changes no ratified pin.
 
 It is not production-capable, and it does not make live egress closer to
 authorized — only better prepared for, if it ever is.
+
+## Addendum, 0.2.0 (2026-09-11): the custody port, the ledger kinds, transport protection
+
+Documentation-only record of what release 0.2.0 adds; it ratifies nothing and depends
+on no ruling that has not been made. Each piece is inside what D-3 expressly permits
+("provider-adapter interfaces using deterministic fakes") or what the specification
+lists as unbuilt mechanism with no decision pending.
+
+| Added | Where | What it closes |
+|---|---|---|
+| `ModelCredentialCustodyPort`, `CredentialRequest`, `CredentialLease`, `CustodyAuditEvent`, `ReferenceCustodyAdapter`, `materialize_with_audit` | `custody.py` | The shape of D-3's commissioned custody, mirroring `cloud-scaling-credential-broker`'s port. The secret in a lease is reachable only through `use`, never from `repr`, records, equality, pickling or the audit event. The reference adapter leases an inert marker outside production and refuses a production posture. Not a credential, not a secret manager, not commissioning `[V]` |
+| `MEU_LEDGER_KINDS`, `ledger_payload`, `result_ledger_payload` | `ledger_kinds.py` | Spec §4.4's "kind-specific schema that refuses content-bearing keys", previously recorded as unbuilt `[G]` → built `[V]`. The control plane's `LedgerEntry` is unchanged; the refusal happens before an entry is made |
+| `require_transport_protection`, `protected_connect`, `sslmode_of` | `postgres/transport.py` | Spec §4.4's transport protection, previously `sslmode` set nowhere `[G]` → a production DSN without `sslmode=verify-full` is refused `[V]`. Not yet composed by any deployment, because none exists (CR-1) |
+| `MEU_LIVE_PROVIDER_DESIGNATION.json`, `MEU_LIVE_VALIDATION.json` | beside the package | The owner's designations of 2026-09-11 (vendor OpenAI, host `api.openai.com`; custody Google Secret Manager) with every other field `UNDESIGNATED`, and an eleven-row validation matrix at `BLOCKED_PENDING_OWNER_RULINGS`, pinned by `tests/test_live_records.py` |
+
+| `COMMISSIONING_LIMITS`, `check_request`, `CallBudget`, `is_pinned_snapshot` | `limits.py` | LP-5 bound and enforced before dispatch, non-compensatorily; LP-3's pinned snapshot; four new `RefusalReason` members (`REQUEST_LIMIT_EXCEEDED`, `COMMISSIONING_BUDGET_EXHAUSTED`, `MODEL_NOT_PINNED`, `DESTINATION_NOT_PERMITTED`). The durable reservation row stays unbuilt `[G]` |
+| `DesignatedDestination`, `OPENAI_RESPONSES`, `check_destination` | `egress_policy.py` | LP-1 and LP-3: exactly `https://api.openai.com/v1/responses`, checked as a string; the future adapter imports its permission from here |
+| `CustodyIdentity`, `is_pinned_secret_version`, `PinnedSecretVersionCustodyAdapter` | `custody.py` | LP-2 and LP-6 step 5: the Secret Manager adapter's shape over an injected reader (fake path only); a service-account-key identity and `latest` are refused at construction; rotation over 90 days refused; production-authoritative only under workload identity federation and never on the fake path |
+
+**What stays exactly as it was.** `LIVE_VENDOR_EGRESS = False`; the boundary tests;
+`EgressResult`'s refusal of `genuine_call` other than `False`; `MATURITY`;
+`ENFORCEMENT_ENABLED`; the exchange schema and every digest vector of #1749. No
+deployment unit, no credential, no vendor SDK, no destination.
+
+**Two questions the designations raise, put to the owner in the commissioning ballot
+rather than decided here.** LP-2a: how the unit authenticates to Google Secret Manager
+without a long-lived key in the deployment. LP-2b: the record-contract amendment under
+which a result may carry `genuine_call: True`.
+
+## Addendum, 0.3.0 (2026-09-11): migration 2 — the migrator identity, tenant-bound identities, the custody columns and the durable reservation
+
+Under the owner's confirmation recorded in `ADR_UGENCE_LIVE_MODEL_PROVIDER_COMMISSIONING.md`
+§0.3 (LP-6 steps 4 and 6), and with the six conditions of §0.3.1 each checked before the
+migration was written. The contract stays `model_egress_unit.exchange.v1`; no digest
+preimage, canonical field set or frozen vector changed.
+
+| Added | Where | What it closes |
+| --- | --- | --- |
+| `meu_migrator` (`NOLOGIN NOINHERIT`, member of `meu_exchange_owner`, `SELECT, INSERT` on the ledger only) | migration 2 | **Controlled migrations** `[G]` → a separately controlled migration identity that holds nothing until it assumes the owner during a reviewed migration `[V]` |
+| `role_tenant_binding`, `effective_tenant_id()`, the `RESTRICTIVE` policy `identity_binding` on every tenant table | migration 2 | **Tenant-bound database identities** `[G]` → a login identity bound to one tenant is refused every other tenant whatever its session claims; the unbound reference roles behave as before `[V]` |
+| `postgres/provision.py`: `identity_name`, `identity_statements`, `bind_identity`, `identity_report` | package | **Role provisioning in production** `[G]` → statements for a per-tenant `LOGIN` member of each runtime group, with no password and no credential anywhere; a report of every login member and whether it is bound. Executing them is an operator's act on a designated cluster, not this package's `[V]` |
+| `custody_lease_id`, `custody_authority_id` on `egress_result`; `CHECK egress_result_genuine_call_requires_custody` replacing `CHECK egress_result_no_genuine_call` | migration 2 | LP-2b under §0.3.1: the database admits `genuine_call = true` only with both custody identifiers and `RESPONSE` provenance. `EgressResult` still refuses it while `COMMISSIONING_STATUS` is not `MET` `[V]` |
+| `commissioning_budget`, `commissioning_reservation`, trigger `refuse_budget_refund`; `Exchange.reserve_commissioning_call`, `release_in_flight`, `commissioning_budget` | migration 2, `postgres/exchange.py` | LP-5's durable twin, previously `[G]`: one `UPDATE … RETURNING` under the ceilings (10 calls, 2,500 cents, concurrency 1), reserved before dispatch, never decremented (the trigger raises), never deleted (no grant) `[V]`. Wiring the unit to reserve here before every dispatch is step 7 |
+| fourteen refused statements from a genuine `LOGIN` probe in each runtime group | `tests/test_migration_2_identities_and_reservation.py` | DDL, `DISABLE`/`NO FORCE ROW LEVEL SECURITY`, `DROP POLICY`, `DROP CONSTRAINT`, `DROP TRIGGER`, a binding write, a budget delete, a ledger write, `SET ROLE` to the owner or the migrator, `CREATE ROLE`, `ALTER ROLE … BYPASSRLS` — each `InsufficientPrivilege` `[V]` |
+| fresh-install, upgrade-path and failing-upgrade tests | same file | A blank cluster applies `[1, 2]`; rows and digests written under migration 1 read back unchanged after 2; a broken upgrade leaves migration 1 intact with the ledger at `[1]` `[V]` |
+| `ugence-model-egress-provider-openai` 0.1.0 | `packages/integration/model-egress-provider-openai` | LP-6 step 6: the adapter as a separate distribution depending on this unit and nothing else; this unit never imports it (`test_the_unit_never_imports_the_openai_adapter_distribution`). Injected fake transport only; exact destination and request shape at construction; the secret visible only inside `CredentialLease.use`; one retry only with transport proof of no dispatch; `OUTCOME_UNKNOWN` for every ambiguous path; never `genuine_call: true` `[V]` |
+
+Still recorded rather than papered over: the live transport, the unit's use of the
+durable reservation, the owner-run verifier and the acceptance-report generator (step 7,
+behind the step 8 designations); the credential (step 9, the custody owner's act); the
+deployment unit itself (LP-1 amended CR-1, nothing composes the unit yet); and
+verification that the designated model snapshot exists.
+
