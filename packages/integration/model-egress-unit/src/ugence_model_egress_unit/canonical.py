@@ -40,14 +40,22 @@ filesystem or network. ``astimezone`` is always called with an explicit
 
 Why content is hashed separately
 --------------------------------
-The request digest covers a *content digest*, not the content itself. That is
-what makes a purged row still verifiable: after the prompt and the response are
-destroyed, the tombstone still carries both digests, and the request digest can
-still be recomputed from the surviving fields and checked. A reader who holds a
-candidate prompt can still prove whether it was the one — and a reader who does
-not, learns nothing. Inlining the content would have made the request digest
-unrecomputable the moment the content was purged, which would leave a tombstone
-whose central claim could no longer be checked.
+The request digest covers a *content digest*, not the content itself. This is a
+**composed cryptographic commitment to the exact text** — the inner digest's
+preimage is the ordered ``[unit_id, exact_text]`` pairs — ratified by the owner
+on 2026-09-11 as satisfying D-4. It is not an identifiers-only commitment, which
+D-4 forbids: substituting text under unchanged identifiers moves the digest.
+
+Inlining the content into the outer preimage would have made the request digest
+unrecomputable the moment the content was purged.
+
+**What a tombstone can and cannot do.** After purge it can verify the integrity
+and linkage of the retained digest chain — that the request digest recomputes
+from the surviving fields, and that it commits to the recorded content digest. It
+can also test a *candidate* context a reader already holds. It **cannot**
+reconstruct the deleted plaintext, and it cannot independently re-prove what that
+plaintext was to a reader who does not hold a candidate. The chain is verifiable;
+the destroyed content is gone, and no digest brings it back.
 """
 
 from __future__ import annotations
@@ -209,8 +217,9 @@ def minimized_context_digest(units) -> str:
     otherwise make the content unverifiable for a reason that has nothing to do
     with the content.
 
-    This is the value the request digest binds, and the value that lets a purged
-    request still be checked against a candidate context.
+    This is the value the request digest binds. After a purge it lets a reader
+    who *already holds* a candidate context test that candidate; it does not let
+    anyone recover the context that was destroyed.
     """
 
     entries = [[u.unit_id, u.text] for u in units]

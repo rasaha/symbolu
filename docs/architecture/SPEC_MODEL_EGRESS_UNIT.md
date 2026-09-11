@@ -449,6 +449,34 @@ tenant that could make two tenants' requests one identity.
 > or implemented.
 > — owner, 2026-09-10
 
+#### 4.4.1 — How `request_digest` binds the exact text — **RATIFIED 2026-09-11**
+
+The clause above was read two ways: does "ordered minimized unit identifiers and exact text"
+require the plaintext in the outer preimage, or may the outer digest commit to it through an
+inner digest? The owner ruled:
+
+> Ratify the merged construction as satisfying D-4. The `request_digest` may bind the
+> complete immutable inference request through a collision-resistant
+> `minimized_context_digest`, provided that: (1) the `minimized_context_digest` preimage is
+> the canonical, ordered sequence of `[unit_id, exact_text]` pairs; (2) the canonical
+> encoding, ordering rules, hash algorithm and relevant schema/version are pinned; (3) the
+> `request_digest` binds the resulting digest in a domain-separated, unambiguous field;
+> (4) identifiers alone can never satisfy the contract.
+>
+> This is a composed cryptographic commitment to the exact text, not an identifiers-only
+> commitment. Directly inlining plaintext into the outer digest is not required, and no
+> `model_egress_unit.exchange.v2` change is authorized.
+>
+> After plaintext purge, the tombstone may verify the integrity and linkage of the retained
+> digest chain, but it cannot independently reconstruct or re-prove the deleted plaintext.
+> Record that limitation explicitly and do not overclaim post-purge plaintext verification.
+> — owner, 2026-09-11
+
+The prohibition the clause carries is therefore against an **identifiers-only** commitment,
+which remains forbidden. Conformance of the reference implementation against all four
+conditions is recorded in `ADR_MODEL_EGRESS_UNIT_REFERENCE_SLICE.md`, and condition 2 is
+enforced by frozen digest vectors rather than by prose `[V]`.
+
 **Two planes, and the line between them is deletability.** The ballot offered three options
 that each assumed one store — record the full exchange, record digests only, or record a
 minimized exchange. The ruling declines that framing: content and record are different
