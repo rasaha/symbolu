@@ -93,7 +93,8 @@ def test_the_record_is_designated_ruled_and_pending_not_met():
     assert d["validation_environment"] == "NON_PRODUCTION"
     # AP3-D1 to AP3-D5: the five fields are ruled, and none is UNRULED any more
     assert "UNRULED" not in json.dumps(d)
-    assert d["token_type_profile"].startswith("AP3-D1") and "typ exactly 'JWT'" in d["token_type_profile"]
+    assert d["token_type_profile"].startswith("AP3-D1") and "AMENDED 2026-09-11" in d["token_type_profile"]
+    assert "typ absent" in d["token_type_profile"] and "alg exactly RS256" in d["token_type_profile"]
     assert d["tenant_claim"].startswith("AP3-D2 STATIC_ISSUER_AUDIENCE_MAPPING")
     assert f"tenant_id = '{BOUND_TENANT}'" in d["tenant_claim"] and "not the source" in d["tenant_claim"]
     assert d["actor_type_claim_or_mapping"].startswith("AP3-D3 CLAIM_SHAPE_MAPPING")
@@ -134,12 +135,15 @@ def test_the_record_is_designated_ruled_and_pending_not_met():
     assert "email" in cap["payload_keys"] and "common_name" not in cap["payload_keys"]
     assert not any("tenant" in k.lower() for k in cap["payload_keys"]), "no tenant claim exists (AP3-D2)"
     assert re.fullmatch(r"[0-9a-f]{64}", cap["token_sha256"]) and cap["token_status"].startswith("EXPOSED")
-    assert any(f.startswith("AP3-D1 CONFLICT") for f in cap["findings"])
-    assert "AP3-D1" in record["designation"]["token_type_profile"].split("LIVE FINDING")[1]
+    assert any(f.startswith("AP3-D1 CONFLICT") and "AMENDED 2026-09-11" in f for f in cap["findings"])
+    assert "AMENDED" in record["designation"]["token_type_profile"] and "absent" in record["designation"]["token_type_profile"]
     row1 = record["conformance_harness"]["rows"][0]
-    assert any(b.startswith("AP3-D1 amendment") for b in row1["blocked_by"])
-    assert any(a.startswith("RULE an amendment of AP3-D1") for a in record["evidence"]["required_owner_actions"])
-    assert any(a.startswith("REVOKE the exposed token") for a in record["evidence"]["required_owner_actions"])
+    assert not any("amendment" in b for b in row1["blocked_by"])
+    assert any("ap3_live_verify.py" in b for b in row1["blocked_by"])
+    actions = record["evidence"]["required_owner_actions"]
+    assert any(a.startswith("DONE 2026-09-11: the exposed token was revoked") for a in actions)
+    assert any(a.startswith("DONE 2026-09-11: AP3-D1 amended") for a in actions)
+    assert any(a.startswith("RUN ci/ap3_live_verify.py") for a in actions)
     assert len(record["evidence"]["required_owner_actions"]) >= 3
     assert "a test-only authorizer described as production AX-5" in record["must_never_contain"]
 
@@ -363,20 +367,32 @@ def test_the_identity_stage_alone_records_when_no_authorizer_is_composed(tmp_pat
     assert status == 409 and body["result"] == "REFUSED_UNAUTHENTICATED" and PROOF_HEADER in body["reason"]
 
 
-def test_the_live_header_shape_is_refused_by_the_profile_as_ratified_until_ap3_d1_is_amended(slice_, issuer):
-    """evidence.live_token_capture (2026-09-11): the real Access token carries alg, kid and
-    no typ. AP3-D1 as ratified rejects a missing typ, so today the profile refuses the
-    live shape. This test pins that fact so the record's finding and the code agree; it
-    is not weakened here, it is ruled on."""
+def test_the_live_header_shape_is_admitted_under_ap3_d1_as_amended_and_relaxes_nothing_else(slice_, issuer):
+    """evidence.live_token_capture (2026-09-11): the real Access token carries alg RS256,
+    a kid and no typ. AP3-D1 as amended admits the absent typ under this profile only;
+    a present typ must be JWT, alg must be RS256, and the signature path is unchanged."""
+    import jwt as pyjwt
+
     live_shape = _mint(issuer, _cf_claims(issuer, nbf=int((NOW - timedelta(seconds=60)).timestamp()),
                                           country="IN", policy_id="p", h_INTERNAL_DO_NOT_USE="x"),
                        typ=None, headers={"typ": None})
-    import jwt as pyjwt
     assert "typ" not in pyjwt.get_unverified_header(live_shape)
     answer = slice_.adapter.authenticate(live_shape)
-    assert answer.authenticated is False and answer.refusal == "TYP_NOT_PROFILE_TYPE"
+    assert answer.authenticated and answer.actor_type.value == "HUMAN" and answer.claims.tenant_claims == (BOUND_TENANT,)
+    slice_.hold(GRANT_ROLE)
     status, body = slice_.load(cf=live_shape)
-    assert status == 409 and body["result"] == "REFUSED_UNAUTHENTICATED"
+    assert status == 200 and body["result"] == "RECORDED" and body["proof_channel"] == CLOUDFLARE_TRANSPORT_HEADER
+    # nothing else relaxed
+    assert slice_.adapter.authenticate(_mint(issuer, _cf_claims(issuer), typ="at+jwt")).refusal == "TYP_NOT_PROFILE_TYPE"
+    es_kid = issuer.add_key("ES256", kid="cf-es-1")
+    assert slice_.adapter.authenticate(_mint(issuer, _cf_claims(issuer), kid=es_kid, typ=None,
+                                             headers={"typ": None})).refusal == "ALG_NOT_PERMITTED"
+    assert slice_.adapter.authenticate(_mint(issuer, _cf_claims(issuer), typ=None, headers={"typ": None},
+                                             pem=issuer.foreign_pem())).refusal == "SIGNATURE_INVALID"
+    assert slice_.adapter.authenticate(_mint(issuer, _cf_claims(issuer), typ=None,
+                                             headers={"typ": None, "kid": "cf-rsa-never"})).refusal == "KEY_UNKNOWN"
+    assert slice_.adapter.authenticate(issuer.mint_unsigned(_cf_claims(issuer), kid=KID, typ="JWT")).refusal \
+        == "ALG_NOT_PERMITTED"
 
 
 def test_rows_2_and_3_wrong_issuer_and_wrong_audience_are_refused(slice_, issuer):
@@ -461,8 +477,7 @@ def test_rows_9_10_11_signature_kid_malformed_and_a_missing_proof(slice_, issuer
         assert adapter.authenticate(malformed).refusal == "MALFORMED"
     assert adapter.authenticate(issuer.mint_unsigned(_cf_claims(issuer), kid=KID, typ="JWT")).refusal == "ALG_NOT_PERMITTED"
     assert adapter.authenticate(issuer.mint_hmac(_cf_claims(issuer), kid=KID, typ="JWT")).refusal == "ALG_NOT_PERMITTED"
-    assert adapter.authenticate(_mint(issuer, _cf_claims(issuer), typ=None, headers={"typ": None})).refusal \
-        == "TYP_NOT_PROFILE_TYPE"
+    assert adapter.authenticate(_mint(issuer, _cf_claims(issuer), typ="at+jwt")).refusal == "TYP_NOT_PROFILE_TYPE"
     status, body = slice_.load(None)
     assert status == 409 and body["result"] == "REFUSED_UNAUTHENTICATED" and "no proof" in body["reason"]
     # a garbage or forged assertion on Cloudflare's header is refused through the boundary
@@ -664,3 +679,49 @@ def test_the_token_capture_prints_only_the_redacted_fields_and_never_the_token(i
     bad = subprocess.run([sys.executable, str(PKG / "ci" / "ap3_token_capture.py")], input="garbage",
                          capture_output=True, text=True, check=False)
     assert bad.returncode == 3 and "garbage" not in bad.stdout + bad.stderr
+
+
+def test_the_live_verifier_drives_the_rows_a_login_can_drive_and_never_prints_the_token(issuer, monkeypatch, capsys):
+    """ci/ap3_live_verify.py over the in-process issuer (loopback JWKS, the designated
+    issuer and audience): rows 1 to 4 and 8 to 12 PASS with a genuinely verified token,
+    5 to 7 and 13 are BLOCKED, 14 to 16 are IN_PROCESS, and no token segment is printed."""
+    import io
+    import importlib.util
+    from datetime import datetime, timezone
+
+    spec = importlib.util.spec_from_file_location("ap3_live_verify", PKG / "ci" / "ap3_live_verify.py")
+    verify = importlib.util.module_from_spec(spec)
+    assert spec.loader is not None
+    spec.loader.exec_module(verify)
+    now = datetime.now(timezone.utc)
+    claims = _cf_claims(issuer, iat=int((now - timedelta(seconds=60)).timestamp()),
+                        nbf=int((now - timedelta(seconds=60)).timestamp()),
+                        exp=int((now + timedelta(hours=1)).timestamp()), country="IN", policy_id="p")
+    token = _mint(issuer, claims, typ=None, headers={"typ": None})
+    monkeypatch.setattr("sys.stdin", io.StringIO(token + "\n"))
+    code = verify.main(["--token-stdin", "--jwks-url", issuer.jwks_url,
+                        "--unavailable-jwks-url", "http://127.0.0.1:1/certs"])
+    out = capsys.readouterr().out
+    assert code == 0, out
+    for part in token.split("."):
+        assert part not in out
+    assert TEST_PRINCIPAL not in out and TEST_SUB not in out
+    result = json.loads(out)
+    assert result["outcome"] == "LIVE_VERIFICATION" and result["capture"]["typ"] is None
+    assert result["capture"]["kid"] == KID and result["jwks_kids_seen"] == [KID]
+    status = {r["row"]: r["status"] for r in result["rows"]}
+    assert [r["row"] for r in result["rows"]] == list(range(1, 17))
+    assert {n for n, s in status.items() if s == "PASS"} == {1, 2, 3, 4, 8, 9, 10, 11, 12}
+    assert {n for n, s in status.items() if s == "BLOCKED"} == {5, 6, 7, 13}
+    assert {n for n, s in status.items() if s == "IN_PROCESS"} == {14, 15, 16}
+    assert result["summary"] == {"PASS": 9, "FAIL": 0, "BLOCKED": 4, "IN_PROCESS": 3}
+    assert "declares nothing MET" in result["claims"]
+    # the login filter drops any token-shaped line
+    assert verify.filtered_lines("Successfully fetched your token:\n" + token + "\nbye") == [
+        "Successfully fetched your token:", "(a line carrying a token was suppressed)", "bye"]
+    # a tampered token fails row 9's expectation the other way round: FAIL is reported, never hidden
+    monkeypatch.setattr("sys.stdin", io.StringIO(verify.tamper_signature(token)))
+    code = verify.main(["--token-stdin", "--jwks-url", issuer.jwks_url,
+                        "--unavailable-jwks-url", "http://127.0.0.1:1/certs"])
+    out = capsys.readouterr().out
+    assert code == 1 and json.loads(out)["rows"][0]["status"] == "FAIL"

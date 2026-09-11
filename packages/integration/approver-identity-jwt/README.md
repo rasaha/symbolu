@@ -82,7 +82,7 @@ and under it, and only under it:
 
 | Ruling | What the profile does |
 |---|---|
-| AP3-D1 | the JOSE header `typ` must be exactly `JWT` (`at+jwt` is refused here; every other header, signature, issuer, audience and temporal check is unchanged) |
+| AP3-D1 (amended 2026-09-11) | the JOSE header may omit `typ`, as the live Access token does; when present it must be exactly `JWT` (`at+jwt` is refused here); `alg` must be exactly `RS256`; every other header, signature, issuer, audience and temporal check is unchanged, and an absent `typ` admits nothing else |
 | AP3-D2 | `tenant_claim` must be unset; the tenant is the configured `bound_tenant`, selected by the exact issuer-and-audience pair the decoder verified and corroborated by a verified `email` whose domain (NFC, trimmed, compared case-insensitively) is exactly `verified_email_domain`; a wrong domain is `EMAIL_DOMAIN_MISMATCH`, an absent email is refused, and nothing is derived from the email |
 | AP3-D3 | `actor_type_claim` must be unset; `HUMAN` is the shape non-empty `sub` + `email` + no `common_name`; the service-token shape (`common_name`, empty or absent `sub`, no `email`) is `SYSTEM` with its `common_name` as subject and no tenant bound; every mixed or incomplete shape is `ACTOR_SHAPE_AMBIGUOUS`; Cloudflare's `type: app` decides nothing |
 

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-__version__ = "0.1.2"
+__version__ = "0.1.3"
 
 #: Honest label. The adapter validates real signatures with a real cryptographic
 #: backend, but the only issuer it has ever been run against is the in-process test

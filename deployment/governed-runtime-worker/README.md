@@ -164,7 +164,12 @@ through `compose(config, clock=, workload=)` from its own entrypoint.
   for the owner to run from a host with egress; `ci/ap3_token_capture.py` reads one
   token on standard input and prints only the redacted capture the record needs
   (`alg`, `typ`, `kid`, payload key names, `iss`, `aud`, whether `sub` is non-empty,
-  `type`, a SHA-256 fingerprint), never the token or any other value.
+  `type`, a SHA-256 fingerprint), never the token or any other value; it verifies nothing,
+  by design. `ci/ap3_live_verify.py` is the verifier: on the owner's machine it obtains a
+  fresh token only through `cloudflared` (output filtered), verifies it with the real
+  adapter against the live JWKS, drives the matrix rows a human login can drive, and
+  prints only redacted evidence and per-row PASS/FAIL/BLOCKED; it aborts rather than
+  print anything token-shaped.
 - `tests/test_authority_plane_contract.py`, `tests/test_authority_reads.py`,
   `tests/test_authority_writes.py` — the plane's contract (no write served while AP-3
   is not `MET`), the four reads, and the two implemented writes behind the AW-5 gate.

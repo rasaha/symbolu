@@ -5,7 +5,8 @@
     validation against Cloudflare, and AP-3 stays PENDING_VALIDATION regardless.
 
 Three things are proven: the profile is selected only by explicit configuration and is
-structurally tied to one Access team; under it ``typ`` is exactly ``JWT``, the tenant
+structurally tied to one Access team; under it ``typ`` is absent or exactly ``JWT`` and
+``alg`` is exactly ``RS256`` (AP3-D1 as amended 2026-09-11 on live evidence), the tenant
 is the configured static binding corroborated by the verified email's domain, and the
 actor type is the ratified claim-shape mapping; and the ``rfc9068`` profile is
 unchanged by any of it.
@@ -18,8 +19,10 @@ from datetime import timedelta
 import pytest
 
 from ugence_approver_identity_jwt import (
+    ALGORITHMS,
     CLOUDFLARE_ACCESS_PROFILE,
     CLOUDFLARE_ACCESS_TOKEN_TYPE,
+    CLOUDFLARE_ALGORITHMS,
     CLOUDFLARE_REQUIRED_CLAIMS,
     ISSUER_PROFILES,
     RFC9068_PROFILE,
@@ -97,6 +100,7 @@ def adapter_for(issuer, clock, **over) -> JwtApproverIdentityAdapter:
 def test_the_profile_vocabulary_is_closed_and_the_default_is_rfc9068(issuer):
     assert ISSUER_PROFILES == (RFC9068_PROFILE, CLOUDFLARE_ACCESS_PROFILE)
     assert CLOUDFLARE_ACCESS_TOKEN_TYPE == "JWT"
+    assert CLOUDFLARE_ALGORITHMS == ("RS256",) and set(CLOUDFLARE_ALGORITHMS) < set(ALGORITHMS)
     assert CLOUDFLARE_REQUIRED_CLAIMS == ("iss", "aud", "exp", "iat")
     cfg = AdapterConfig(issuer=issuer.issuer, audience=issuer.audience, jwks_url=issuer.jwks_url)
     assert cfg.issuer_profile == RFC9068_PROFILE
@@ -159,22 +163,77 @@ def test_the_rfc9068_profile_is_unchanged(issuer, clock):
 
 
 # --------------------------------------------------------------------------- #
-# AP3-D1: typ JWT, and every other check unchanged
+# AP3-D1 as amended: typ absent or JWT, alg RS256, and every other check unchanged
 # --------------------------------------------------------------------------- #
-@pytest.mark.parametrize("typ", [None, "at+jwt", "application/at+jwt", "id_token", "jwt+at", 7, ""])
-def test_d1_only_typ_jwt_is_admitted_under_the_profile(cf_issuer, cf_clock, typ):
+def _live_shape(cf_issuer, claims=None, **mint):
+    """The header the live Access token carries: alg and kid, no typ (PyJWT writes typ
+    JWT unless the header names a falsy typ, which it then drops)."""
+    mint.setdefault("kid", KID)
+    headers = {"typ": None}
+    headers.update(mint.pop("headers", None) or {})
+    return cf_issuer.mint(claims or human(cf_issuer), typ=None, headers=headers, **mint)
+
+
+def test_d1_an_absent_typ_is_the_live_shape_and_is_admitted_under_the_profile_only(cf_issuer, cf_clock, issuer, clock):
+    import jwt as pyjwt
+    from conftest import config_for
+
+    token = _live_shape(cf_issuer)
+    assert "typ" not in pyjwt.get_unverified_header(token)
+    ok = adapter_for(cf_issuer, cf_clock).authenticate(token)
+    assert ok.authenticated and ok.actor_type is ActorKind.HUMAN and ok.claims.tenant_claims == (TENANT,)
+    # the rfc9068 profile still refuses an absent typ (IA-1 unchanged)
+    rfc = JwtApproverIdentityAdapter(config_for(issuer), clock=clock.datetime)
+    untyped = issuer.mint(base_claims(issuer), kid="rsa-1", typ=None, headers={"typ": None})
+    assert rfc.authenticate(untyped).refusal == Refusal.TYP_NOT_ACCESS_TOKEN.value
+
+
+@pytest.mark.parametrize("typ", ["at+jwt", "application/at+jwt", "id_token", "jwt+at", 7, "", "JWT "])
+def test_d1_a_present_typ_must_be_exactly_jwt_under_the_profile(cf_issuer, cf_clock, typ):
     adapter = adapter_for(cf_issuer, cf_clock)
-    if typ is None:
-        # PyJWT writes typ JWT unless the header names a falsy typ, which it then drops:
-        # this is the genuinely absent header.
-        token = cf_issuer.mint(human(cf_issuer), kid=KID, typ=None, headers={"typ": None})
-    elif isinstance(typ, str):
+    if isinstance(typ, str) and typ:
         token = cf_issuer.mint(human(cf_issuer), kid=KID, typ=typ)
     else:
         token = cf_issuer.mint(human(cf_issuer), kid=KID, typ=None, headers={"typ": typ})
     import jwt as pyjwt
-    assert pyjwt.get_unverified_header(token).get("typ") == (None if typ in (None, "") else typ)
+    header_typ = pyjwt.get_unverified_header(token).get("typ")
+    if header_typ is None:
+        pytest.skip("PyJWT dropped the falsy typ; the absent case is tested above")
     assert adapter.authenticate(token).refusal == Refusal.TYP_NOT_PROFILE_TYPE.value
+
+
+def test_d1_the_absent_typ_relaxes_nothing_about_the_signature_path(cf_issuer, cf_clock):
+    """The amendment admits a missing typ and nothing else: alg none, HMAC, an IA-2
+    algorithm other than RS256, a foreign key, a missing or unknown kid are all still
+    refused on the live header shape."""
+    adapter = adapter_for(cf_issuer, cf_clock)
+    assert adapter.authenticate(cf_issuer.mint_unsigned(human(cf_issuer), kid=KID, typ="JWT")).refusal \
+        == Refusal.ALG_NOT_PERMITTED.value
+    assert adapter.authenticate(cf_issuer.mint_hmac(human(cf_issuer), kid=KID, typ="JWT")).refusal \
+        == Refusal.ALG_NOT_PERMITTED.value
+    es_kid = cf_issuer.add_key("ES256", kid="cf-es-1")
+    es_token = _live_shape(cf_issuer, kid=es_kid)
+    assert adapter.authenticate(es_token).refusal == Refusal.ALG_NOT_PERMITTED.value, "RS256 only under the profile"
+    assert adapter.authenticate(_live_shape(cf_issuer, pem=cf_issuer.foreign_pem())).refusal \
+        == Refusal.SIGNATURE_INVALID.value
+    assert adapter.authenticate(_live_shape(cf_issuer, headers={"kid": ""})).refusal \
+        == Refusal.KID_MISSING.value
+    assert adapter.authenticate(_live_shape(cf_issuer, headers={"kid": "cf-rsa-never"})).refusal \
+        == Refusal.KEY_UNKNOWN.value
+    # an unsigned token that also omits typ is refused for its algorithm, never admitted
+    import jwt as pyjwt
+    header = {"alg": "none", "kid": KID}
+    unsigned = pyjwt.encode(human(cf_issuer), None, algorithm="none", headers=header) if hasattr(pyjwt, "encode") else ""
+    if unsigned:
+        assert adapter.authenticate(unsigned).refusal == Refusal.ALG_NOT_PERMITTED.value
+
+
+def test_d1_es256_stays_admitted_under_the_rfc9068_profile(issuer, clock):
+    from conftest import config_for
+
+    rfc = JwtApproverIdentityAdapter(config_for(issuer), clock=clock.datetime)
+    es_kid = issuer.add_key("ES256", kid="es-1")
+    assert rfc.authenticate(issuer.mint(base_claims(issuer), kid=es_kid)).authenticated is True
 
 
 def test_d1_a_well_formed_access_token_is_accepted_and_every_other_gate_still_refuses(cf_issuer, cf_clock):

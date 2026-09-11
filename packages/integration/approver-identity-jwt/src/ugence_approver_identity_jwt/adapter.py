@@ -24,9 +24,11 @@ which.
 What it does not decide: subject binding, expiry at the write, tenant policy,
 eligibility, replay. Those are the review service's (AI-A) and the directory's.
 
-One profile beyond the default (AP3-D1 to AP3-D3, ``ADR_UGENCE_AUTHORITY_PLANE_SCOPING.md``
-§20.7): under ``AdapterConfig.issuer_profile == "cloudflare-access"``, and only there,
-the header type must be exactly ``JWT``; the tenant is the configured ``bound_tenant``,
+One profile beyond the default (AP3-D1 as amended, AP3-D2, AP3-D3;
+``ADR_UGENCE_AUTHORITY_PLANE_SCOPING.md`` §20.7): under
+``AdapterConfig.issuer_profile == "cloudflare-access"``, and only there, the header may
+omit ``typ`` (the live Access token does) and, when present, ``typ`` must be exactly
+``JWT``; ``alg`` must be exactly ``RS256``; the tenant is the configured ``bound_tenant``,
 selected by the exact issuer-and-audience pair and corroborated by a verified email
 under the configured domain; and the actor type is the owner's ratified claim-shape
 mapping in ``_cloudflare_shape``. The ``rfc9068`` profile is unchanged.
@@ -61,6 +63,7 @@ __all__ = [
     "ACCESS_TOKEN_TYPES",
     "REQUIRED_CLAIMS",
     "CLOUDFLARE_ACCESS_TOKEN_TYPE",
+    "CLOUDFLARE_ALGORITHMS",
     "CLOUDFLARE_REQUIRED_CLAIMS",
     "JwtApproverIdentity",
     "JwtApproverIdentityAdapter",
@@ -76,10 +79,17 @@ ACCESS_TOKEN_TYPES = ("at+jwt", "application/at+jwt")
 #: Claims a proof must carry to be considered at all.
 REQUIRED_CLAIMS = ("iss", "sub", "aud", "exp", "iat")
 
-#: AP3-D1: under the Cloudflare Access profile, and only there, the header type is
-#: exactly this (compared case-insensitively per RFC 7515 §4.1.9). A missing ``typ``
-#: or any other value is refused; ``at+jwt`` is not accepted under that profile either.
+#: AP3-D1 as amended 2026-09-11: under the Cloudflare Access profile, and only there,
+#: ``typ`` may be absent (the live Access token carries none, per the owner's redacted
+#: capture) and, when present, must be exactly this value (compared case-insensitively
+#: per RFC 7515 §4.1.9). Any other present value, ``at+jwt`` included, is refused. The
+#: absence of ``typ`` relaxes nothing else: ``alg``, ``kid``, signature, issuer,
+#: audience and time are checked exactly as before.
 CLOUDFLARE_ACCESS_TOKEN_TYPE = "JWT"
+
+#: AP3-D1 as amended: the one algorithm the Cloudflare Access profile admits, narrower
+#: than IA-2's allowlist, which stays the rule for every other profile.
+CLOUDFLARE_ALGORITHMS = ("RS256",)
 
 #: AP3-D3: ``sub`` is not required at decode time under the Cloudflare Access profile,
 #: because the service-token shape carries an empty or absent ``sub`` and the ratified
@@ -105,7 +115,7 @@ class Refusal(str, Enum):
     EXPIRED = "EXPIRED"
     ISSUED_IN_FUTURE = "ISSUED_IN_FUTURE"
     NOT_YET_VALID = "NOT_YET_VALID"
-    #: AP3-D1: the header type is not the one the selected issuer profile admits.
+    #: AP3-D1 as amended: a present ``typ`` is not the value the profile admits.
     TYP_NOT_PROFILE_TYPE = "TYP_NOT_PROFILE_TYPE"
     #: AP3-D3: the claim shape is neither the human nor the service-token shape.
     ACTOR_SHAPE_AMBIGUOUS = "ACTOR_SHAPE_AMBIGUOUS"
@@ -162,11 +172,15 @@ class JwtApproverIdentityAdapter:
         alg = header.get("alg")
         if alg not in ALGORITHMS:
             return _refused(Refusal.ALG_NOT_PERMITTED)
-        typ = header.get("typ")
         cloudflare = cfg.issuer_profile == CLOUDFLARE_ACCESS_PROFILE
+        if cloudflare and alg not in CLOUDFLARE_ALGORITHMS:
+            return _refused(Refusal.ALG_NOT_PERMITTED)
+        typ = header.get("typ")
         if cloudflare:
-            # AP3-D1: exactly JWT for this one designated profile; nothing else, ever.
-            if not isinstance(typ, str) or typ.lower() != CLOUDFLARE_ACCESS_TOKEN_TYPE.lower():
+            # AP3-D1 as amended: absent is the live shape and is admitted; present must
+            # be exactly JWT. Nothing about the signature path is relaxed by this.
+            if typ is not None and (not isinstance(typ, str)
+                                    or typ.lower() != CLOUDFLARE_ACCESS_TOKEN_TYPE.lower()):
                 return _refused(Refusal.TYP_NOT_PROFILE_TYPE)
         elif not isinstance(typ, str) or typ.lower() not in ACCESS_TOKEN_TYPES:
             return _refused(Refusal.TYP_NOT_ACCESS_TOKEN)

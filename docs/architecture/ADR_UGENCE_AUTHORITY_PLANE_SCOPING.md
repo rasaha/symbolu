@@ -793,16 +793,24 @@ the owner's redacted capture (`evidence.live_token_capture`) shows `alg: RS256`,
 matching the probed JWKS, the designated `iss` and `aud`, a non-empty `sub`, `email`
 present, no `common_name`, `type: app`, and **no `typ` header at all**. §20.6's "expected
 to carry `typ: JWT` `[I]`" was wrong. AP3-D1 as ratified rejects a missing `typ`, so the
-profile refuses every live Access token; row 1 and every human-actor row now wait on an
-**AP3-D1 amendment** (admit an absent `typ`, and only `JWT` when present, under this
-profile only; or keep the ruling and record `NOT_MET`). The code is not weakened ahead of
-that ruling, and `test_the_live_header_shape_is_refused_by_the_profile_as_ratified_until_ap3_d1_is_amended`
-pins the present behaviour. The capture also observed the application answering on
+profile as first ratified refused every live Access token. **AP3-D1 was amended by the
+owner the same day, narrowly** `[V]`: under the `cloudflare-access` profile only, an
+absent `typ` is admitted; a present `typ` must be exactly `JWT`; `alg` must be exactly
+`RS256`; a recognized `kid`, signature verification against the designated JWKS, exact
+issuer, exact audience and every temporal check remain required; the absent `typ` is
+never permission for `none`, an unsigned token, another algorithm or a missing or
+unknown `kid`; the default profile and every non-Cloudflare profile are unchanged.
+Adapter 0.1.3 applies it and pins each of those refusals on the live header shape.
+`ci/ap3_live_verify.py` is the owner's on-machine verifier: it obtains a fresh token only
+through `cloudflared` (output captured and filtered so the bearer token is never
+displayed), verifies it cryptographically with the real adapter against the live JWKS,
+drives rows 1 to 4 and 8 to 12 with that token, reports 5 to 7 and 13 as `BLOCKED` and
+14 to 16 as `IN_PROCESS`, and prints only redacted evidence. The capture also observed the application answering on
 `ap3-validation-endpoint.rakeshmohan888.workers.dev`, not the designated
 `ap3-validation.ugence.ai`; the owner confirms or corrects the hostname. The raw token was
 printed by `cloudflared access login` and appeared in a screenshot shared outside the
-owner's machine; it is recorded as exposed, is to be revoked, and is never used as
-evidence beyond the redacted capture; originally (2) a locally produced, redacted capture of one live Access
+owner's machine; the owner revoked it the same day; it is recorded as exposed and revoked
+and is never used as evidence beyond the redacted capture; originally (2) a locally produced, redacted capture of one live Access
 token for `ap3-test@ugence.ai` holding only `alg`, `typ`, `kid`, the payload key names,
 `iss`, `aud`, whether `sub` is non-empty, and `type`, confirming AP3-D1 to AP3-D3 as
 written; (3) execution of rows 1 to 13 against the live issuer with `test_timestamp`,

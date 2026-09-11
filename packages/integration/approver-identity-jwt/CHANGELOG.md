@@ -1,5 +1,20 @@
 # Changelog — ugence-approver-identity-jwt
 
+## 0.1.3 — 2026-09-11 — AP3-D1 amended on live evidence
+
+The owner's redacted capture of a live Cloudflare Access token (2026-09-11) showed a
+header with `alg` and `kid` and **no `typ`**. AP3-D1 was amended the same day, narrowly,
+and this release applies it. Nothing changes for the `rfc9068` profile; the package
+stays `REFERENCE_GRADE_SHADOW_ONLY`, `ISSUER_VALIDATION = "IN_PROCESS_ISSUER_ONLY"`.
+
+- Under `cloudflare-access` only: an absent `typ` is admitted; a present `typ` must be
+  exactly `JWT` (`TYP_NOT_PROFILE_TYPE` otherwise); `alg` must be exactly `RS256`
+  (`CLOUDFLARE_ALGORITHMS`; `ALG_NOT_PERMITTED` for ES256 or EdDSA under this profile).
+- The absence of `typ` relaxes nothing else: `none`, HMAC, a foreign key, a missing or
+  unknown `kid`, wrong issuer, wrong audience and every temporal check are refused as
+  before, and the suite pins each on the live header shape.
+- Export `CLOUDFLARE_ALGORITHMS`.
+
 ## 0.1.2 — 2026-09-11 — the Cloudflare Access issuer profile (AP3-D1 to AP3-D3)
 
 One narrowly scoped issuer profile, selected only by explicit configuration; the
