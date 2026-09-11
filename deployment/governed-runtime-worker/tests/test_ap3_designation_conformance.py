@@ -125,6 +125,21 @@ def test_the_record_is_designated_ruled_and_pending_not_met():
     assert re.fullmatch(r"[0-9a-f]{64}", record["evidence"]["jwks_document_sha256"])
     assert "owner" in record["evidence"]["jwks_probe_run"] and "no key material" in record["evidence"]["jwks_probe_run"]
     assert record["evidence"]["required_owner_actions"][0].startswith("DONE 2026-09-11: ci/ap3_jwks_probe.py")
+    # evidence item 2 is held, redacted, and it refutes the typ expectation
+    cap = record["evidence"]["live_token_capture"]
+    assert cap["alg"] == "RS256" and cap["typ"] is None and cap["signature_verified"] is False
+    assert cap["kid"] in {k["kid"] for k in kids} and cap["kid_matches_probed_jwks"] is True
+    assert cap["iss"] == DESIGNATED_ISSUER and cap["aud"] == [DESIGNATED_AUDIENCE]
+    assert cap["sub_non_empty"] is True and cap["type"] == "app" and cap["common_name_present"] is False
+    assert "email" in cap["payload_keys"] and "common_name" not in cap["payload_keys"]
+    assert not any("tenant" in k.lower() for k in cap["payload_keys"]), "no tenant claim exists (AP3-D2)"
+    assert re.fullmatch(r"[0-9a-f]{64}", cap["token_sha256"]) and cap["token_status"].startswith("EXPOSED")
+    assert any(f.startswith("AP3-D1 CONFLICT") for f in cap["findings"])
+    assert "AP3-D1" in record["designation"]["token_type_profile"].split("LIVE FINDING")[1]
+    row1 = record["conformance_harness"]["rows"][0]
+    assert any(b.startswith("AP3-D1 amendment") for b in row1["blocked_by"])
+    assert any(a.startswith("RULE an amendment of AP3-D1") for a in record["evidence"]["required_owner_actions"])
+    assert any(a.startswith("REVOKE the exposed token") for a in record["evidence"]["required_owner_actions"])
     assert len(record["evidence"]["required_owner_actions"]) >= 3
     assert "a test-only authorizer described as production AX-5" in record["must_never_contain"]
 
@@ -346,6 +361,22 @@ def test_the_identity_stage_alone_records_when_no_authorizer_is_composed(tmp_pat
     # without the boundary, Cloudflare's header alone is no proof at all
     status, body = s.load(cf=token, body=dict(_load_body(), role="x"))
     assert status == 409 and body["result"] == "REFUSED_UNAUTHENTICATED" and PROOF_HEADER in body["reason"]
+
+
+def test_the_live_header_shape_is_refused_by_the_profile_as_ratified_until_ap3_d1_is_amended(slice_, issuer):
+    """evidence.live_token_capture (2026-09-11): the real Access token carries alg, kid and
+    no typ. AP3-D1 as ratified rejects a missing typ, so today the profile refuses the
+    live shape. This test pins that fact so the record's finding and the code agree; it
+    is not weakened here, it is ruled on."""
+    live_shape = _mint(issuer, _cf_claims(issuer, nbf=int((NOW - timedelta(seconds=60)).timestamp()),
+                                          country="IN", policy_id="p", h_INTERNAL_DO_NOT_USE="x"),
+                       typ=None, headers={"typ": None})
+    import jwt as pyjwt
+    assert "typ" not in pyjwt.get_unverified_header(live_shape)
+    answer = slice_.adapter.authenticate(live_shape)
+    assert answer.authenticated is False and answer.refusal == "TYP_NOT_PROFILE_TYPE"
+    status, body = slice_.load(cf=live_shape)
+    assert status == 409 and body["result"] == "REFUSED_UNAUTHENTICATED"
 
 
 def test_rows_2_and_3_wrong_issuer_and_wrong_audience_are_refused(slice_, issuer):

@@ -788,7 +788,21 @@ designated JWKS's key identifiers and document digest from `ci/ap3_jwks_probe.py
 from a host with egress — **held since 2026-09-11 `[V]`**: the owner ran the probe from a
 Windows host; two RSA `RS256` signing keys and the document digest are recorded in
 `evidence.jwks_key_identifiers` and `evidence.jwks_document_sha256`, transcribed from the
-owner's terminal output; (2) a locally produced, redacted capture of one live Access
+owner's terminal output; (2) **held since 2026-09-11 `[V]`, and it refutes an expectation**:
+the owner's redacted capture (`evidence.live_token_capture`) shows `alg: RS256`, a `kid`
+matching the probed JWKS, the designated `iss` and `aud`, a non-empty `sub`, `email`
+present, no `common_name`, `type: app`, and **no `typ` header at all**. §20.6's "expected
+to carry `typ: JWT` `[I]`" was wrong. AP3-D1 as ratified rejects a missing `typ`, so the
+profile refuses every live Access token; row 1 and every human-actor row now wait on an
+**AP3-D1 amendment** (admit an absent `typ`, and only `JWT` when present, under this
+profile only; or keep the ruling and record `NOT_MET`). The code is not weakened ahead of
+that ruling, and `test_the_live_header_shape_is_refused_by_the_profile_as_ratified_until_ap3_d1_is_amended`
+pins the present behaviour. The capture also observed the application answering on
+`ap3-validation-endpoint.rakeshmohan888.workers.dev`, not the designated
+`ap3-validation.ugence.ai`; the owner confirms or corrects the hostname. The raw token was
+printed by `cloudflared access login` and appeared in a screenshot shared outside the
+owner's machine; it is recorded as exposed, is to be revoked, and is never used as
+evidence beyond the redacted capture; originally (2) a locally produced, redacted capture of one live Access
 token for `ap3-test@ugence.ai` holding only `alg`, `typ`, `kid`, the payload key names,
 `iss`, `aud`, whether `sub` is non-empty, and `type`, confirming AP3-D1 to AP3-D3 as
 written; (3) execution of rows 1 to 13 against the live issuer with `test_timestamp`,
