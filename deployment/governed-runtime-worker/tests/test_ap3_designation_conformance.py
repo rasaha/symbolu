@@ -593,3 +593,37 @@ def test_the_jwks_probe_reports_kids_only_and_refuses_symmetric_keys(issuer):
     with pytest.raises(ValueError, match="IA-2"):
         probe.probe(issuer.jwks_url)
     assert probe.main(["--url", "http://127.0.0.1:1/certs"]) == 3, "a plain-http URL is refused"
+
+
+def test_the_token_capture_prints_only_the_redacted_fields_and_never_the_token(issuer, clock):
+    import importlib.util
+    import subprocess
+    import sys
+
+    spec = importlib.util.spec_from_file_location("ap3_token_capture", PKG / "ci" / "ap3_token_capture.py")
+    module = importlib.util.module_from_spec(spec)
+    assert spec.loader is not None
+    spec.loader.exec_module(module)
+    token = _mint(issuer, _cf_claims(issuer))
+    out = module.capture(token)
+    assert tuple(out) == module.CAPTURE_FIELDS
+    assert out["alg"] == "RS256" and out["typ"] == "JWT" and out["kid"] == KID
+    assert out["payload_keys"] == sorted(_cf_claims(issuer))
+    assert out["iss"] == DESIGNATED_ISSUER and out["aud"] == [DESIGNATED_AUDIENCE]
+    assert out["sub_non_empty"] is True and out["type"] == "app" and out["signature_verified"] is False
+    text = json.dumps(out)
+    for part in token.split("."):
+        assert part not in text
+    for secret in (TEST_SUB, TEST_PRINCIPAL, "n0nce"):
+        assert secret not in text
+    assert module.capture(_mint(issuer, _service_claims(issuer)))["sub_non_empty"] is False
+    with pytest.raises(ValueError):
+        module.capture("not-a-token")
+    # the CLI reads stdin only and its stdout carries no token segment either
+    run = subprocess.run([sys.executable, str(PKG / "ci" / "ap3_token_capture.py")], input=token + "\n",
+                         capture_output=True, text=True, check=False)
+    assert run.returncode == 0 and '"outcome": "REDACTED_CAPTURE"' in run.stdout
+    assert all(part not in run.stdout + run.stderr for part in token.split("."))
+    bad = subprocess.run([sys.executable, str(PKG / "ci" / "ap3_token_capture.py")], input="garbage",
+                         capture_output=True, text=True, check=False)
+    assert bad.returncode == 3 and "garbage" not in bad.stdout + bad.stderr
