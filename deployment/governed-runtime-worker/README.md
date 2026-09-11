@@ -151,7 +151,7 @@ through `compose(config, clock=, workload=)` from its own entrypoint.
   and no DSN or token in any answer or output (row 8).
 - `tests/test_ap3_designation_conformance.py` — AP-3 (ADR §20.6, §20.7): the committed
   designation record is the owner's (Cloudflare Access team `ugence` backed by Google
-  Workspace, `PENDING_VALIDATION`), the five mapping fields carry rulings AP3-D1 to
+  Workspace, `MET` since the owner's acceptance of 2026-09-11), the five mapping fields carry rulings AP3-D1 to
   AP3-D5 and none is `UNRULED`, the file holds nothing token- or secret-shaped, and its
   `conformance_harness` block says exactly what the adapter under the `cloudflare-access`
   profile, the write gate, the `Cf-Access-Jwt-Assertion` boundary
@@ -171,7 +171,7 @@ through `compose(config, clock=, workload=)` from its own entrypoint.
   prints only redacted evidence and per-row PASS/FAIL/BLOCKED; it aborts rather than
   print anything token-shaped. `AP3_ACCEPTANCE_REPORT.md` is the canonical acceptance
   artifact, rendered from the record by `ci/ap3_acceptance_report.py` and pinned by the
-  harness; it says `NOT ACCEPTED` until the owner's statement is recorded.
+  harness; it records the owner's acceptance statement as issued.
 - `tests/test_authority_plane_contract.py`, `tests/test_authority_reads.py`,
   `tests/test_authority_writes.py` — the plane's contract (no write served while AP-3
   is not `MET`), the four reads, and the two implemented writes behind the AW-5 gate.

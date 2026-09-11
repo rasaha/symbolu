@@ -98,7 +98,11 @@ def render(record: dict) -> str:
     w("## 6 — Acceptance")
     w("")
     if accepted:
-        w(f"Accepted by {accepted}. Report reference: {e.get('ci_run_or_signed_report')}.")
+        w(f"Accepted by {accepted}. Report reference: `{e.get('ci_run_or_signed_report')}`.")
+        w("")
+        w("Statement as issued:")
+        w("")
+        w("> " + e["acceptance_statement"])
     else:
         w("Not accepted. The statement below is the one the designated acceptor issues once every")
         w("remaining action in section 5 is closed; on its issue the record's `accepting_owner` and")

@@ -67,7 +67,7 @@
       "answer": "Production requires validation against a genuine HTTPS JWKS issuer, including issuer, audience, signature and key rotation, tenant and actor-type claims, with fail-closed behaviour. No Railway-specific identity exception is authorized. Test mode is permitted only for controlled demonstrations over synthetic data and must remain labelled PRESENTED_UNPROVEN.",
       "repository_today": "config.py:172-181 requires issuer, audience and JWKS URL in production and requires the JWKS URL to be https (CR-5); composition.py:149-150 refuses composition without an identity port. Every authority read carries decision_identity_proof PRESENTED_UNPROVEN and issuer_validation IN_PROCESS_ISSUER_ONLY until AP-3's validation is recorded.",
       "contradicts_repository_today": false,
-      "depends_on": "AP3_ENTERPRISE_ISSUER_VALIDATION.json, currently PENDING_VALIDATION (designated 2026-09-11 and rulings AP3-D1 to AP3-D5 applied the same day; rows 1 to 13 await live Cloudflare evidence; not met; ADR sections 20.6 and 20.7)"
+      "depends_on": "AP3_ENTERPRISE_ISSUER_VALIDATION.json, MET (accepted 2026-09-11 by the owner on AP3_ACCEPTANCE_REPORT.md at commit fb373ce9; ADR sections 20.6 and 20.7); serving a write remains a separate owner act with its own record (section 18.3)"
     },
     "RW-5": {
       "name": "ONE_POSTGRES_SERVICE_TWO_LOGICAL_DATABASES",

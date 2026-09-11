@@ -5,12 +5,12 @@ Rendered from `deployment/governed-runtime-worker/AP3_ENTERPRISE_ISSUER_VALIDATI
 `ci/ap3_acceptance_report.py`; the worker's harness fails if this file drifts from the record.
 It holds no token, cookie, secret, private key or authorization code.
 
-**Status:** `PENDING_VALIDATION`
+**Status:** `MET`
 
 **Designated acceptor:** Rakesh Mohan — Founder, Ugence Labs
 
-**Accepted:** NOT ACCEPTED
-**Signed or CI report:** none recorded
+**Accepted:** Rakesh Mohan — Founder, Ugence Labs (2026-09-11)
+**Signed or CI report:** deployment/governed-runtime-worker/AP3_ACCEPTANCE_REPORT.md@fb373ce9
 
 ## 1 — Designation
 
@@ -65,22 +65,12 @@ It holds no token, cookie, secret, private key or authorization code.
 
 ## 5 — Remaining owner actions
 
-- ACCEPT: issue the owner-acceptance statement prepared in AP3_ACCEPTANCE_REPORT.md; on acceptance ci_run_or_signed_report is set to the report path at the accepted commit and accepting_owner to 'Rakesh Mohan — Founder, Ugence Labs'; only then does ap3_status move to MET, by the owner's word
 
 ## 6 — Acceptance
 
-Not accepted. The statement below is the one the designated acceptor issues once every
-remaining action in section 5 is closed; on its issue the record's `accepting_owner` and
-`ci_run_or_signed_report` are filled, this report is re-rendered, and `ap3_status` moves to `MET`.
+Accepted by Rakesh Mohan — Founder, Ugence Labs (2026-09-11). Report reference: `deployment/governed-runtime-worker/AP3_ACCEPTANCE_REPORT.md@fb373ce9`.
 
-> I, Rakesh Mohan, Founder, Ugence Labs, accept the AP-3 Enterprise Issuer Validation for the
-> Cloudflare Access issuer `https://ugence.cloudflareaccess.com`, audience `24b3008ed1910d53caebbaffb3358aa801bd9dc5cf9f5af8aa7ada87335b12b3`, validated on the
-> application hostname `ap3-validation-endpoint.rakeshmohan888.workers.dev`, scoped to human identities
-> authenticated through the designated Google Workspace group, on the basis of
-> `deployment/governed-runtime-worker/AP3_ACCEPTANCE_REPORT.md` at commit `<hash>`: rows 1 to 4 and
-> 8 to 12 by my live cryptographic run of 2026-09-11, rows 5 to 7 and 13 under AP3-D6 and rows 14 to
-> 16 under AP3-D5 by in-process conformance evidence. The exposed token is revoked and evidenced.
-> Set `ci_run_or_signed_report` to `deployment/governed-runtime-worker/AP3_ACCEPTANCE_REPORT.md@<hash>`,
-> set `accepting_owner` to `Rakesh Mohan — Founder, Ugence Labs (2026-09-11)`, move `ap3_status` to
-> `MET`, re-render the report, update draft PR #1748, and do not merge.
+Statement as issued:
+
+> I, Rakesh Mohan, Founder, Ugence Labs, accept the AP-3 Enterprise Issuer Validation for the Cloudflare Access issuer https://ugence.cloudflareaccess.com, audience 24b3008ed1910d53caebbaffb3358aa801bd9dc5cf9f5af8aa7ada87335b12b3, validated on the application hostname ap3-validation-endpoint.rakeshmohan888.workers.dev, scoped to human identities authenticated through the designated Google Workspace group, on the basis of deployment/governed-runtime-worker/AP3_ACCEPTANCE_REPORT.md at commit fb373ce9: rows 1 to 4 and 8 to 12 by my live cryptographic run of 2026-09-11, rows 5 to 7 and 13 under AP3-D6 and rows 14 to 16 under AP3-D5 by in-process conformance evidence. The exposed token is revoked and evidenced. Set ci_run_or_signed_report to deployment/governed-runtime-worker/AP3_ACCEPTANCE_REPORT.md@fb373ce9, set accepting_owner to "Rakesh Mohan — Founder, Ugence Labs (2026-09-11)", move ap3_status to MET, re-render the report, update draft PR #1748, and do not merge.
 

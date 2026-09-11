@@ -1,8 +1,8 @@
 {
   "schema": "governed-runtime-worker.ap3-enterprise-issuer-validation.v1",
   "ruling": "ADR_UGENCE_AUTHORITY_PLANE_SCOPING.md AP-3 IDP_VALIDATED_FIRST (controlling, section 18); protocol and status in section 20",
-  "ap3_status": "PENDING_VALIDATION",
-  "status_note": "Designated 2026-09-11 by the owner: Cloudflare Access (team 'ugence') backed by Google Workspace (ugence.ai) is the enterprise issuer; the non-production Access application 'AP3 Enterprise Issuer Validation' on ap3-validation.ugence.ai admits the Google group ugence-ap3-test@ugence.ai, test principal ap3-test@ugence.ai. On the same day the owner ratified rulings AP3-D1 to AP3-D5 (rulings_applied below; ADR section 20.7), which resolve the five open mapping items and classify the evidence each row needs. AP-3 is NOT met: every row now carries a result (rows 1 to 4 and 8 to 12 from the owner's live cryptographic run of 2026-09-11; rows 5 to 7 and 13 under AP3-D6 and rows 14 to 16 under AP3-D5 from in-process conformance evidence), and the exposed token's revocation is evidenced, but the owner has not accepted (accepting_owner and ci_run_or_signed_report are null). The worker's in-process issuer never satisfies a live row. Every field below is configuration, never a secret: client secrets, private keys, cookies and test tokens stay in the identity provider, Cloudflare, the CI secret store or approved runtime custody.",
+  "ap3_status": "MET",
+  "status_note": "MET, accepted 2026-09-11 by Rakesh Mohan — Founder, Ugence Labs, on the basis of AP3_ACCEPTANCE_REPORT.md at commit fb373ce9 (evidence.acceptance_statement). Designated 2026-09-11: Cloudflare Access (team 'ugence') backed by Google Workspace (ugence.ai) is the enterprise issuer; the non-production Access application 'AP3 Enterprise Issuer Validation' on the validated hostname ap3-validation-endpoint.rakeshmohan888.workers.dev admits the Google group ugence-ap3-test@ugence.ai, test principal ap3-test@ugence.ai. Rulings AP3-D1 (amended) to AP3-D6 applied the same day. Every one of the sixteen rows carries result == required: rows 1 to 4 and 8 to 12 from the owner's live cryptographic run (real adapter, live JWKS, token never displayed), rows 5 to 7 and 13 under AP3-D6 and rows 14 to 16 under AP3-D5 from in-process conformance evidence. Scope: human identities through the designated Google Workspace group; Cloudflare service identities are not commissioned. MET satisfies the AP-3 gate and nothing else: SERVED_WRITES stays empty until the owner names a write served with its own record (section 18.3, 20.5); AX-1, AX-2 and production AX-5 are not implemented; no live LLM-provider activation follows. Every field here is configuration or evidence, never a secret.",
   "designation": {
     "ap3_enterprise_issuer": "Cloudflare Access, team 'ugence', backed by Google Workspace (Workspace domain ugence.ai); non-production Access application 'AP3 Enterprise Issuer Validation' on the validated hostname ap3-validation-endpoint.rakeshmohan888.workers.dev (ap3-validation.ugence.ai is a planned custom hostname, currently blocked by DNS/zone configuration, not operational and not live-validated; AP3-D6); policy 'Google Workspace group' (Allow) admitting ugence-ap3-test@ugence.ai; test principal ap3-test@ugence.ai. accounts.google.com is the login method behind Access, not the application JWT issuer",
     "issuer": "https://ugence.cloudflareaccess.com",
@@ -328,8 +328,8 @@
         "use": "sig"
       }
     ],
-    "ci_run_or_signed_report": null,
-    "accepting_owner": null,
+    "ci_run_or_signed_report": "deployment/governed-runtime-worker/AP3_ACCEPTANCE_REPORT.md@fb373ce9",
+    "accepting_owner": "Rakesh Mohan — Founder, Ugence Labs (2026-09-11)",
     "validation_environment_limitations": "the validation slice's execution environment (2026-09-11) has no egress to ugence.cloudflareaccess.com (CONNECT refused by its proxy), so the live JWKS was not fetched and no kid is recorded; no live Access token was obtained and none will ever be stored; the conformance harness ran against the worker's in-process issuer configured with the designated issuer string and audience under the cloudflare-access profile, over a loopback JWKS; it is implementation evidence for rows 1 to 13 and, under AP3-D5, the accepted evidence for rows 14 to 16",
     "required_owner_actions": [
       "DONE 2026-09-11: ci/ap3_jwks_probe.py run from a host with egress; kids and document digest recorded in jwks_key_identifiers and jwks_document_sha256 (confirm the transcription against a re-run)",
@@ -339,7 +339,7 @@
       "DONE 2026-09-11: ci/ap3_live_verify.py run by the owner; rows 1 to 4 and 8 to 12 PASS with cryptographic verification against the live JWKS, 0 FAIL; recorded in evidence.live_verification_runs",
       "DONE 2026-09-11: AP3-D6 ruled; rows 5, 6, 7 and 13 filled from in-process conformance evidence; hostname confirmed as ap3-validation-endpoint.rakeshmohan888.workers.dev; scope limited to human identities through the Google Workspace group",
       "DONE 2026-09-11: the exposed token's revocation is evidenced by the Zero Trust admin activity log ('Revoke application tokens', 15:32 IST and 16:58 IST)",
-      "ACCEPT: issue the owner-acceptance statement prepared in AP3_ACCEPTANCE_REPORT.md; on acceptance ci_run_or_signed_report is set to the report path at the accepted commit and accepting_owner to 'Rakesh Mohan — Founder, Ugence Labs'; only then does ap3_status move to MET, by the owner's word"
+      "DONE 2026-09-11: accepted by Rakesh Mohan — Founder, Ugence Labs (evidence.acceptance_statement); ap3_status MET"
     ],
     "jwks_document_sha256": "99668380e52847ea736886e9e7dda09d5ad1a478ea85b4633b330c40cd363305",
     "jwks_probe_run": "ci/ap3_jwks_probe.py run by the owner (Rakesh Mohan) on 2026-09-11 from a Windows host with egress, against the designated URL https://ugence.cloudflareaccess.com/cdn-cgi/access/certs; outcome EVIDENCE; two RSA RS256 signing keys published (Cloudflare's current and next key [I]); values transcribed from the owner's terminal output and to be confirmed against a re-run; public key identifiers only, no key material",
@@ -541,7 +541,9 @@
       "determination": "SATISFIED on 2026-09-11 by path (a): the Zero Trust admin activity log records the explicit 'Revoke application tokens' event at 15:32 IST (10:02 UTC), after the exposure and before the live verification run, and again at 16:58 IST (11:28 UTC). The account audit log's PUT event of 15:27 IST was a policy update and is retained only as context. Note: the plane's adapter validates signature, issuer, audience and time and does not consult Cloudflare's revocation state, which applies at the Access edge; for the adapter the exposed token is bounded by its own exp, and the plane serves no write in any case"
     },
     "acceptance_report": "deployment/governed-runtime-worker/AP3_ACCEPTANCE_REPORT.md (canonical; rendered from this record by ci/ap3_acceptance_report.py and pinned by the harness)",
-    "accepting_owner_designate": "Rakesh Mohan — Founder, Ugence Labs (designated to accept; has not accepted)"
+    "accepting_owner_designate": "Rakesh Mohan — Founder, Ugence Labs (designated to accept; has not accepted)",
+    "acceptance_statement": "I, Rakesh Mohan, Founder, Ugence Labs, accept the AP-3 Enterprise Issuer Validation for the Cloudflare Access issuer https://ugence.cloudflareaccess.com, audience 24b3008ed1910d53caebbaffb3358aa801bd9dc5cf9f5af8aa7ada87335b12b3, validated on the application hostname ap3-validation-endpoint.rakeshmohan888.workers.dev, scoped to human identities authenticated through the designated Google Workspace group, on the basis of deployment/governed-runtime-worker/AP3_ACCEPTANCE_REPORT.md at commit fb373ce9: rows 1 to 4 and 8 to 12 by my live cryptographic run of 2026-09-11, rows 5 to 7 and 13 under AP3-D6 and rows 14 to 16 under AP3-D5 by in-process conformance evidence. The exposed token is revoked and evidenced. Set ci_run_or_signed_report to deployment/governed-runtime-worker/AP3_ACCEPTANCE_REPORT.md@fb373ce9, set accepting_owner to \"Rakesh Mohan — Founder, Ugence Labs (2026-09-11)\", move ap3_status to MET, re-render the report, update draft PR #1748, and do not merge.",
+    "accepted_at": "2026-09-11"
   },
   "must_never_contain": [
     "a live token",

@@ -605,7 +605,7 @@ one real enterprise identity issuer" (§18) means in evidence, so that AP-3 cann
 declared met by choosing an identity provider, writing an OIDC adapter, or running a
 fixture. Its current status line is the only status the repository may claim.
 
-**AP-3 status: `PENDING_VALIDATION`** (designated 2026-09-11, §20.6; rulings AP3-D1 to AP3-D5 applied the same day, AP3-D1 amended on live evidence, §20.7; rows 1 to 4 and 8 to 12 passed the owner's live cryptographic run on 2026-09-11, rows 14 to 16 in-process; rows 5 to 7 and 13 under AP3-D6; every row carries a result and the exposed token's revocation is evidenced; not met: the owner has not accepted).
+**AP-3 status: `MET`** (accepted 2026-09-11 by Rakesh Mohan, Founder, Ugence Labs, on `AP3_ACCEPTANCE_REPORT.md` at commit `fb373ce9`; §20.6, §20.7; scope: human identities through the designated Google Workspace group on the validated hostname; `SERVED_WRITES` stays empty until a write is named served with its own record, §18.3, §20.5).
 
 The enterprise issuer is designated (§20.6) and no row of the matrix has run against
 it. The in-process issuer used by the worker's tests is implementation and conformance
@@ -832,8 +832,20 @@ and then evidenced the same day by the Zero Trust admin activity log's explicit 
 application tokens" event at 15:32 IST (10:02 UTC), after the exposure and before the
 live verification run, so that blocker is closed; the sole open item is the owner's
 acceptance. `ap3_status`
-stays `PENDING_VALIDATION`: nothing is `MET` until the acceptor issues the statement the
-report carries, and no live LLM-provider activation begins on this record. The capture also observed the application answering on
+stayed `PENDING_VALIDATION` until the acceptor issued the statement the report carries.
+
+**Acceptance (owner, 2026-09-11) `[V]`.** Rakesh Mohan, Founder, Ugence Labs, issued the
+acceptance statement (recorded verbatim in `evidence.acceptance_statement`) on the basis
+of `AP3_ACCEPTANCE_REPORT.md` at commit `fb373ce9`; `ci_run_or_signed_report` and
+`accepting_owner` are filled and **`ap3_status` is `MET`**. What `MET` means, exactly:
+the AP-3 gate of §18 is satisfied for the designated issuer, within the AP3-D6 scope
+(human identities through the designated Google Workspace group, on
+`ap3-validation-endpoint.rakeshmohan888.workers.dev`). What it does not do: it serves no
+write (`SERVED_WRITES` stays empty until the owner names a write served with its own
+record, §18.3, §20.5); it implements nothing under AX-1, AX-2 or AX-5; it does not move the
+adapter's `ISSUER_VALIDATION` label, which is a package release of its own; and it begins
+no live LLM-provider activation. §20.5's sequence is now eligible to start, act by act,
+each with its own record. The capture also observed the application answering on
 `ap3-validation-endpoint.rakeshmohan888.workers.dev`, not the designated
 `ap3-validation.ugence.ai`; the owner confirms or corrects the hostname. The raw token was
 printed by `cloudflared access login` and appeared in a screenshot shared outside the

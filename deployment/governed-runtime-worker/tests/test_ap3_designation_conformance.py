@@ -76,9 +76,9 @@ def _record() -> dict:
 # --------------------------------------------------------------------------- #
 # the record: designated, ruled, pending, secret-free
 # --------------------------------------------------------------------------- #
-def test_the_record_is_designated_ruled_and_pending_not_met():
+def test_the_record_is_designated_ruled_and_accepted_met():
     record = _record()
-    assert record["ap3_status"] == "PENDING_VALIDATION"
+    assert record["ap3_status"] == "MET"
     d = record["designation"]
     assert d["issuer"] == DESIGNATED_ISSUER
     assert d["audience"] == DESIGNATED_AUDIENCE
@@ -140,8 +140,11 @@ def test_the_record_is_designated_ruled_and_pending_not_met():
     assert [r["scenario"] for r in rows[13:]] == list(SCENARIOS_14_16)
     assert all(r["result"] == r["required"] and r["evidence_class"] == "IN_PROCESS_CONFORMANCE_SUFFICIENT"
                and "test_ap3_designation_conformance.py" in r["evidence"] for r in rows[13:])
-    assert record["evidence"]["ci_run_or_signed_report"] is None
-    assert record["evidence"]["accepting_owner"] is None
+    assert record["evidence"]["ci_run_or_signed_report"] == "deployment/governed-runtime-worker/AP3_ACCEPTANCE_REPORT.md@fb373ce9"
+    assert record["evidence"]["accepting_owner"] == "Rakesh Mohan — Founder, Ugence Labs (2026-09-11)"
+    assert record["evidence"]["acceptance_statement"].startswith("I, Rakesh Mohan, Founder, Ugence Labs, accept")
+    assert "fb373ce9" in record["evidence"]["acceptance_statement"] and "do not merge" in record["evidence"]["acceptance_statement"]
+    assert record["status_note"].startswith("MET, accepted 2026-09-11") and "SERVED_WRITES stays empty" in record["status_note"]
     assert record["evidence"]["test_timestamp"].startswith("2026-09-11T10:26:39Z")
     assert "no egress" in record["evidence"]["validation_environment_limitations"]
     # evidence item 1 is held: the owner ran the probe from a host with egress on 2026-09-11
@@ -171,7 +174,8 @@ def test_the_record_is_designated_ruled_and_pending_not_met():
     assert any(a.startswith("DONE 2026-09-11: ci/ap3_live_verify.py run by the owner") for a in actions)
     assert any(a.startswith("DONE 2026-09-11: AP3-D6 ruled") for a in actions)
     assert any(a.startswith("DONE 2026-09-11: the exposed token's revocation is evidenced") for a in actions)
-    assert [a for a in actions if not a.startswith("DONE")] == [a for a in actions if a.startswith("ACCEPT:")], "acceptance is the only open action"
+    assert all(a.startswith("DONE") for a in actions), "no owner action is open"
+    assert actions[-1].startswith("DONE 2026-09-11: accepted by Rakesh Mohan")
     assert len(record["evidence"]["required_owner_actions"]) >= 3
     assert "a test-only authorizer described as production AX-5" in record["must_never_contain"]
 
@@ -758,10 +762,10 @@ def test_the_live_verifier_drives_the_rows_a_login_can_drive_and_never_prints_th
     assert code == 1 and json.loads(out)["rows"][0]["status"] == "FAIL"
 
 
-def test_the_acceptance_report_is_rendered_from_the_record_and_is_not_accepted():
+def test_the_acceptance_report_is_rendered_from_the_record_and_records_the_acceptance():
     """The canonical acceptance artifact is AP3_ACCEPTANCE_REPORT.md, rendered by
     ci/ap3_acceptance_report.py from the record; it may not drift, and while the record's
-    accepting_owner is null it says NOT ACCEPTED and carries the statement to be issued."""
+    accepting_owner is set it records the acceptance and the statement as issued."""
     import importlib.util
 
     spec = importlib.util.spec_from_file_location("ap3_acceptance_report", PKG / "ci" / "ap3_acceptance_report.py")
@@ -773,8 +777,8 @@ def test_the_acceptance_report_is_rendered_from_the_record_and_is_not_accepted()
     committed = (PKG / "AP3_ACCEPTANCE_REPORT.md").read_text(encoding="utf-8")
     assert committed == rendered, "re-render with: python ci/ap3_acceptance_report.py --write"
     assert mod.ACCEPTOR == "Rakesh Mohan — Founder, Ugence Labs"
-    assert "**Status:** `PENDING_VALIDATION`" in committed and "**Accepted:** NOT ACCEPTED" in committed
-    assert "I, Rakesh Mohan, Founder, Ugence Labs, accept" in committed
+    assert "**Status:** `MET`" in committed and "**Accepted:** Rakesh Mohan — Founder, Ugence Labs (2026-09-11)" in committed
+    assert "Statement as issued:" in committed and "I, Rakesh Mohan, Founder, Ugence Labs, accept" in committed
     assert committed.count("| `") >= 16 and "`null`" not in committed, "every row carries a result"
     assert not re.search(r"eyJ[A-Za-z0-9_-]{10,}\.", committed)
     assert mod.main(["--check"]) == 0
