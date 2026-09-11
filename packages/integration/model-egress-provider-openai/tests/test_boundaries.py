@@ -87,10 +87,24 @@ def test_no_module_reads_the_environment_a_clock_or_a_file(path):
     assert not used & forbidden, (path.name, sorted(used & forbidden))
 
 
+def _unit_declared_requirements() -> list:
+    """From the installed distribution's metadata when the unit is installed (CI
+    installs it into site-packages), else from the source tree's manifest."""
+
+    import importlib.metadata as metadata
+    try:
+        return list(metadata.requires("ugence-model-egress-unit") or [])
+    except metadata.PackageNotFoundError:
+        pyproject = MEU_SRC.parent.parent / "pyproject.toml"
+        assert pyproject.exists(), "neither an installed unit nor its source manifest was found"
+        return [pyproject.read_text(encoding="utf-8")]
+
+
 def test_the_unit_never_imports_this_package():
     for path in MEU_SOURCES:
         assert not any(name.startswith("ugence_model_egress_provider_openai") for name in _imports(path)), path
-    assert "ugence_model_egress_provider_openai" not in (MEU_SRC.parent.parent / "pyproject.toml").read_text()
+    for requirement in _unit_declared_requirements():
+        assert "model-egress-provider-openai" not in requirement.replace("_", "-"), requirement
 
 
 def test_the_declared_posture_matches_the_source():
