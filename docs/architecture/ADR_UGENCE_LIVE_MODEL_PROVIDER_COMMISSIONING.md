@@ -8,6 +8,16 @@ once the owner ratifies them, as the repository's standing practice provides.
 merged (`ADR_UGENCE_AUTHORITY_PLANE_SCOPING.md` §20.7, PR #1748), to configure a live LLM
 provider.
 
+**Designations received (owner, 2026-09-11):** vendor **OpenAI** (host `api.openai.com`);
+custody store **Google Secret Manager**. Recorded in
+`packages/integration/model-egress-unit/MEU_LIVE_PROVIDER_DESIGNATION.json`. They answer
+the *names* LP-2 and LP-3 ask for and nothing else: LP-1 to LP-6 are still unruled, the
+model, account, terms, region, project, secret name, rotation policy and custody owner
+are `UNDESIGNATED`, and two questions the designations raise are added below as LP-2a
+and LP-2b. Model Egress Unit 0.2.0 carries the custody port, the ledger-kind schema and
+transport protection (`ADR_MODEL_EGRESS_UNIT_REFERENCE_SLICE.md`, addendum); it holds no
+credential and reaches nothing.
+
 ## 1 — The finding that shapes this record
 
 **AP-3 did not gate the live model provider, and its acceptance unblocks none of the
@@ -62,14 +72,34 @@ the validation slice. Recommended option first.
 | `PLATFORM_ENVIRONMENT_VARIABLE` | Rejected by D-3; not reopened here |
 | `DEFER_CUSTODY` | No genuine call |
 
-The owner also names the secret manager. This record does not choose one; the port is the
-same whichever is named, and the choice is a procurement and operations decision.
+The owner named **Google Secret Manager** on 2026-09-11. The port is in 0.2.0. Two
+questions follow from the name and are the owner's:
+
+**LP-2a — how the unit authenticates to Google Secret Manager.** Reading a secret from
+Secret Manager needs a Google identity. A long-lived service-account key held on the
+hosting platform is itself a credential in the deployment, of exactly the kind D-3
+refuses; it would move the problem, not solve it. Options: (recommended)
+`WORKLOAD_IDENTITY_FEDERATION`, the unit presents an OIDC identity the hosting platform
+issues and exchanges it for a short-lived Google token, which requires the platform to
+issue one and a Google Cloud workload identity pool bound to it; `OWNER_OPERATED_HOST`,
+the custody adapter runs on a host the owner operates with application-default
+credentials, as the AP-3 verifier ran on the owner's machine, acceptable for the
+validation call and not for production; `SERVICE_ACCOUNT_KEY_ON_PLATFORM`, refused.
+
+**LP-2b — the record contract.** `EgressResult` refuses any provenance with
+`genuine_call` other than `False`, and that refusal is what keeps a fixture from
+passing for a provider. The amendment, when ruled: `genuine_call: True` is admitted only
+for a result produced under a production posture by a provider adapter holding a
+`CredentialLease` whose `is_production_authoritative` is `True`, and the result records
+the lease id and the custody authority; every other combination stays refused. This is a
+one-line contract change with a ratified precondition, and it is not made before the
+ruling.
 
 ### LP-3 — Vendor, model and account designation
 
 | Option | Consequence |
 |---|---|
-| **`ONE_VENDOR_ONE_MODEL_NONPROD_ACCOUNT`** (recommended) | The owner designates exactly one vendor, one model identifier, one API host (the MEU's only vendor destination), one non-production account with a hard spending cap set at the vendor, the data-processing terms accepted, and the region. Recorded in `deployment/model-egress-unit/MEU_LIVE_PROVIDER_DESIGNATION.json`, the way AP-3's designation was recorded, and read by the MEU's egress record |
+| **`ONE_VENDOR_ONE_MODEL_NONPROD_ACCOUNT`** (recommended) | The owner designates exactly one vendor, one model identifier, one API host (the MEU's only vendor destination), one non-production account with a hard spending cap set at the vendor, the data-processing terms accepted, and the region. Recorded in `packages/integration/model-egress-unit/MEU_LIVE_PROVIDER_DESIGNATION.json` (beside the package rather than under `deployment/`, because no MEU deployment unit exists to hold it), the way AP-3's designation was recorded. **Vendor designated 2026-09-11: OpenAI, `api.openai.com`.** The model identifier, account, terms and region are still `UNDESIGNATED` |
 | `SEVERAL_VENDORS_AT_ONCE` | Requires D-5's policy quantity and reservation counter first; deferred |
 
 ### LP-4 — The validation protocol before the first genuine call (`MEU_LIVE_STATUS`)
@@ -95,9 +125,9 @@ same whichever is named, and the choice is a procurement and operations decision
 
 ## 4 — Sequence, once LP-1 to LP-6 are ruled
 
-1. **Records first.** CR-1 amendment text in the composition-root ADR; `MEU_LIVE_PROVIDER_DESIGNATION.json` with the owner's designation; `MEU_LIVE_VALIDATION.json` at `BLOCKED_PENDING_OWNER_RULINGS`.
-2. **Custody port and audit** in the MEU, with the inert reference adapter, tests that the port never surfaces a secret, and the ledger-kind schema.
-3. **Transport protection** on the MEU DSNs.
+1. **Records first.** CR-1 amendment text in the composition-root ADR (waits on LP-1); `MEU_LIVE_PROVIDER_DESIGNATION.json` (**done in part**, 2026-09-11); `MEU_LIVE_VALIDATION.json` at `BLOCKED_PENDING_OWNER_RULINGS` (**done**).
+2. **Custody port and audit** in the MEU, with the inert reference adapter, tests that the port never surfaces a secret, and the ledger-kind schema (**done**, 0.2.0).
+3. **Transport protection** on the MEU DSNs (**done** as a policy, 0.2.0; composed by no deployment yet).
 4. **The vendor adapter**, in its own distribution (`packages/integration/model-egress-provider-<vendor>`), because the MEU's boundary tests rightly refuse sockets in the MEU itself; it implements `EgressProvider`, takes its credential only from the custody port, sends only the minimized context, and labels every answer untrusted. Its own boundary tests pin the single permitted host.
 5. **The production custody adapter** for the named secret manager, in its own distribution.
 6. **The verifier and the matrix run** on the owner's machine, then the acceptance report and the owner's statement, exactly as AP-3 was closed.

@@ -1,0 +1,153 @@
+"""The custody seam holds no credential, leaks no secret, and refuses honestly.
+
+No database, no clock, no environment: every instant is a literal and every adapter
+is the inert reference.
+"""
+
+from __future__ import annotations
+
+import copy
+import json
+import pickle
+import uuid
+from datetime import datetime, timedelta, timezone
+
+import pytest
+
+from ugence_model_egress_unit import (
+    REFERENCE_CUSTODY_MARKER,
+    CredentialLease,
+    CredentialRequest,
+    CustodyAuditEvent,
+    CustodyRefusal,
+    CustodyRefused,
+    CustodyRefusedInProduction,
+    ModelCredentialCustodyPort,
+    ReferenceCustodyAdapter,
+    canonical_bytes,
+    ledger_payload,
+    materialize_with_audit,
+)
+
+NOW = datetime(2026, 9, 11, 12, 0, tzinfo=timezone.utc)
+TENANT = uuid.UUID("00000000-0000-4000-8000-000000000001")
+
+
+def request(**over) -> CredentialRequest:
+    fields = dict(request_id=uuid.UUID("00000000-0000-4000-8000-000000000009"), tenant_id=TENANT,
+                  vendor="reference-vendor", credential_profile="reference-profile", requested_at=NOW)
+    fields.update(over)
+    return CredentialRequest(**fields)
+
+
+def test_the_reference_adapter_is_the_port_and_is_never_production_authoritative():
+    adapter = ReferenceCustodyAdapter()
+    assert isinstance(adapter, ModelCredentialCustodyPort)
+    assert adapter.is_production_authoritative is False and adapter.maturity == "FIXTURE_ONLY"
+    assert adapter.NON_PRODUCTION is True
+    with pytest.raises(CustodyRefusedInProduction) as excinfo:
+        adapter.materialize(request(), now=NOW, production=True)
+    assert excinfo.value.reason is CustodyRefusal.REFERENCE_IN_PRODUCTION
+
+
+def test_a_lease_exposes_its_secret_only_to_one_consumer_and_nowhere_else():
+    lease = ReferenceCustodyAdapter().materialize(request(), now=NOW)
+    assert lease.is_production_authoritative is False and lease.secret_version_ref == "reference/0"
+    assert lease.expires_at == NOW + timedelta(minutes=5)
+    seen = lease.use(lambda secret: secret, now=NOW)
+    assert seen == REFERENCE_CUSTODY_MARKER
+    for surface in (repr(lease), str(lease), json.dumps(lease.as_record()), canonical_bytes(
+            "d", "t", lease.as_record()).decode()):
+        assert REFERENCE_CUSTODY_MARKER not in surface and "_secret" not in surface
+    assert "secret" not in {k for k in lease.as_record()}
+    with pytest.raises(TypeError):
+        pickle.dumps(lease)
+    with pytest.raises(TypeError):
+        copy.deepcopy(lease)
+    # expired at use: refused, and the consumer never runs
+    with pytest.raises(CustodyRefused) as excinfo:
+        lease.use(lambda secret: pytest.fail("the consumer ran on an expired lease"),
+                  now=NOW + timedelta(minutes=6))
+    assert excinfo.value.reason is CustodyRefusal.CUSTODY_UNAVAILABLE
+    assert REFERENCE_CUSTODY_MARKER not in str(excinfo.value)
+
+
+def test_leases_never_compare_by_content_and_refuse_to_be_built_empty():
+    a = ReferenceCustodyAdapter().materialize(request(), now=NOW)
+    b = ReferenceCustodyAdapter().materialize(request(), now=NOW)
+    assert a != b and a.lease_id == b.lease_id, "same deterministic id, never equal objects"
+    with pytest.raises(ValueError, match="carries a credential"):
+        CredentialLease(lease_id="x", custody_authority_id="c", credential_profile="p", vendor="v",
+                        tenant_id=TENANT, secret_version_ref="r", issued_at=NOW,
+                        expires_at=NOW + timedelta(minutes=1), is_production_authoritative=False)
+    with pytest.raises(ValueError, match="expire after"):
+        CredentialLease(lease_id="x", custody_authority_id="c", credential_profile="p", vendor="v",
+                        tenant_id=TENANT, secret_version_ref="r", issued_at=NOW, expires_at=NOW,
+                        is_production_authoritative=False, _secret="s")
+
+
+def test_a_profile_or_vendor_mismatch_is_a_typed_refusal():
+    adapter = ReferenceCustodyAdapter()
+    with pytest.raises(CustodyRefused) as excinfo:
+        adapter.materialize(request(vendor="openai"), now=NOW)
+    assert excinfo.value.reason is CustodyRefusal.PROFILE_MISMATCH
+    with pytest.raises(CustodyRefused) as excinfo:
+        adapter.materialize(request(credential_profile="prod"), now=NOW)
+    assert excinfo.value.reason is CustodyRefusal.PROFILE_MISMATCH
+
+
+def test_every_materialization_is_audited_as_identifiers_and_digests_only():
+    events = []
+    lease, event = materialize_with_audit(ReferenceCustodyAdapter(), request(), now=NOW, sink=events.append)
+    assert lease is not None and events == [event]
+    assert event.outcome == "LEASED" and event.lease_id == lease.lease_id
+    assert event.request_digest == request().digest() and event.is_production_authoritative is False
+    record = event.as_record()
+    assert record["kind"] == "meu.credential_leased"
+    assert REFERENCE_CUSTODY_MARKER not in json.dumps(record)
+    assert ledger_payload("meu.credential_leased", record) == record, "the audit event fits the ledger kind"
+    assert len(event.digest()) == 64
+    # refused, the same shape
+    lease, event = materialize_with_audit(ReferenceCustodyAdapter(), request(vendor="openai"), now=NOW)
+    assert lease is None and event.outcome == "REFUSED" and event.refusal is CustodyRefusal.PROFILE_MISMATCH
+    assert ledger_payload("meu.credential_refused", event.as_record())["refusal"] == "custody_profile_mismatch"
+    lease, event = materialize_with_audit(ReferenceCustodyAdapter(), request(), now=NOW, production=True)
+    assert lease is None and event.refusal is CustodyRefusal.REFERENCE_IN_PRODUCTION
+
+
+def test_a_port_that_raises_or_overreaches_is_recorded_as_unavailable_without_its_words():
+    class Talkative:
+        custody_authority_id = "talkative"
+        credential_profile = "p"
+        is_production_authoritative = True
+        max_credential_age = timedelta(days=1)
+
+        def materialize(self, request, *, now, production=False):
+            raise RuntimeError("secret manager said: the key is MARKER-THIS-MUST-NOT-LEAK")
+
+    lease, event = materialize_with_audit(Talkative(), request(), now=NOW)
+    assert lease is None and event.refusal is CustodyRefusal.CUSTODY_UNAVAILABLE
+    assert "MARKER-THIS" not in json.dumps(event.as_record())
+
+    # a lease longer than the adapter's own rotation policy allows is refused, not trusted
+    overlong = ReferenceCustodyAdapter(max_credential_age=timedelta(seconds=1))
+    lease, event = materialize_with_audit(overlong, request(), now=NOW)
+    assert lease is None and event.refusal is CustodyRefusal.CUSTODY_UNAVAILABLE
+
+
+def test_the_request_is_identifiers_only_and_complete():
+    with pytest.raises(ValueError):
+        request(vendor="")
+    with pytest.raises(ValueError):
+        request(requested_at=datetime(2026, 9, 11, 12, 0))
+    assert set(request().digest_body()) == {"request_id", "tenant_id", "vendor", "credential_profile",
+                                            "requested_at", "purpose"}
+
+
+def test_no_audit_event_can_claim_a_lease_without_naming_it():
+    with pytest.raises(ValueError):
+        CustodyAuditEvent(request_digest="d" * 64, tenant_id=TENANT, vendor="v", credential_profile="p",
+                          custody_authority_id="c", observed_at=NOW, outcome="LEASED")
+    with pytest.raises(ValueError):
+        CustodyAuditEvent(request_digest="d" * 64, tenant_id=TENANT, vendor="v", credential_profile="p",
+                          custody_authority_id="c", observed_at=NOW, outcome="REFUSED")

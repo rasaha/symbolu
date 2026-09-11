@@ -16,6 +16,16 @@ against those rulings. What remains unauthorized is a *live* provider: D-3 keeps
 provider custody out of this deployment, and CR-1 still admits only one companion
 deployment unit, so the MEU's boundary is specified while its commissioning as a
 running unit is not `[G]`.
+
+Since 0.2.0 (2026-09-11) the package carries the three pieces of mechanism the
+commissioning ballot (``ADR_UGENCE_LIVE_MODEL_PROVIDER_COMMISSIONING.md``) can carry
+before the owner rules: the provider-credential custody **port** with an inert
+reference adapter (``custody``), the ledger-kind schema that refuses content-bearing
+keys (``ledger_kinds``), and transport protection for the exchange's own DSNs
+(``postgres.transport``). None of them holds, reads or reaches a credential; the
+owner's designations (OpenAI; Google Secret Manager) live in
+``MEU_LIVE_PROVIDER_DESIGNATION.json`` beside the package, and
+``MEU_LIVE_VALIDATION.json`` stays ``BLOCKED_PENDING_OWNER_RULINGS``.
 """
 
 from __future__ import annotations
@@ -32,12 +42,34 @@ from .canonical import (
     minimized_context_digest,
     payload_digest,
 )
+from .custody import (
+    CUSTODY_AUDIT_DOMAIN,
+    CUSTODY_REQUEST_DOMAIN,
+    REFERENCE_CUSTODY_MARKER,
+    CredentialLease,
+    CredentialRequest,
+    CustodyAuditEvent,
+    CustodyRefusal,
+    CustodyRefused,
+    CustodyRefusedInProduction,
+    ModelCredentialCustodyPort,
+    ReferenceCustodyAdapter,
+    materialize_with_audit,
+)
 from .errors import (
     ExchangeError,
     RequestNotClaimable,
     ResultNotAcknowledgeable,
     TenantMismatch,
     UnscopableConnection,
+)
+from .ledger_kinds import (
+    CONTENT_BEARING_KEYS,
+    MAX_LEDGER_STRING,
+    MEU_LEDGER_KINDS,
+    LedgerKindViolation,
+    ledger_payload,
+    result_ledger_payload,
 )
 from .provider import (
     REFERENCE_CLEARANCE_DOMAIN,
@@ -111,6 +143,24 @@ __all__ = [
     "TenantMismatch",
     "RequestNotClaimable",
     "ResultNotAcknowledgeable",
+    "CUSTODY_AUDIT_DOMAIN",
+    "CUSTODY_REQUEST_DOMAIN",
+    "REFERENCE_CUSTODY_MARKER",
+    "CredentialRequest",
+    "CredentialLease",
+    "CustodyAuditEvent",
+    "CustodyRefusal",
+    "CustodyRefused",
+    "CustodyRefusedInProduction",
+    "ModelCredentialCustodyPort",
+    "ReferenceCustodyAdapter",
+    "materialize_with_audit",
+    "MEU_LEDGER_KINDS",
+    "CONTENT_BEARING_KEYS",
+    "MAX_LEDGER_STRING",
+    "LedgerKindViolation",
+    "ledger_payload",
+    "result_ledger_payload",
     "EgressProvider",
     "DeterministicFakeProvider",
     "LiveEgressUnavailableProvider",

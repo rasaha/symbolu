@@ -18,6 +18,13 @@ from .exchange import (
 )
 from .migrate import MigrationDrift, applied_versions, migrate
 from .migrations import MIGRATIONS, Migration, migration_digest, statements
+from .transport import (
+    REQUIRED_SSLMODE,
+    TransportUnprotected,
+    protected_connect,
+    require_transport_protection,
+    sslmode_of,
+)
 from .schema import (
     OWNER_ROLE,
     ROLE_NAMES,
@@ -28,6 +35,11 @@ from .schema import (
 )
 
 __all__ = [
+    "REQUIRED_SSLMODE",
+    "TransportUnprotected",
+    "sslmode_of",
+    "require_transport_protection",
+    "protected_connect",
     "SCHEMA_NAME",
     "OWNER_ROLE",
     "WORKER_ROLE",

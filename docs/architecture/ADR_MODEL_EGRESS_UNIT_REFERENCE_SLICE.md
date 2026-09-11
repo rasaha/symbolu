@@ -170,3 +170,27 @@ It marks no gate identifier satisfied and changes no ratified pin.
 
 It is not production-capable, and it does not make live egress closer to
 authorized — only better prepared for, if it ever is.
+
+## Addendum, 0.2.0 (2026-09-11): the custody port, the ledger kinds, transport protection
+
+Documentation-only record of what release 0.2.0 adds; it ratifies nothing and depends
+on no ruling that has not been made. Each piece is inside what D-3 expressly permits
+("provider-adapter interfaces using deterministic fakes") or what the specification
+lists as unbuilt mechanism with no decision pending.
+
+| Added | Where | What it closes |
+|---|---|---|
+| `ModelCredentialCustodyPort`, `CredentialRequest`, `CredentialLease`, `CustodyAuditEvent`, `ReferenceCustodyAdapter`, `materialize_with_audit` | `custody.py` | The shape of D-3's commissioned custody, mirroring `cloud-scaling-credential-broker`'s port. The secret in a lease is reachable only through `use`, never from `repr`, records, equality, pickling or the audit event. The reference adapter leases an inert marker outside production and refuses a production posture. Not a credential, not a secret manager, not commissioning `[V]` |
+| `MEU_LEDGER_KINDS`, `ledger_payload`, `result_ledger_payload` | `ledger_kinds.py` | Spec §4.4's "kind-specific schema that refuses content-bearing keys", previously recorded as unbuilt `[G]` → built `[V]`. The control plane's `LedgerEntry` is unchanged; the refusal happens before an entry is made |
+| `require_transport_protection`, `protected_connect`, `sslmode_of` | `postgres/transport.py` | Spec §4.4's transport protection, previously `sslmode` set nowhere `[G]` → a production DSN without `sslmode=verify-full` is refused `[V]`. Not yet composed by any deployment, because none exists (CR-1) |
+| `MEU_LIVE_PROVIDER_DESIGNATION.json`, `MEU_LIVE_VALIDATION.json` | beside the package | The owner's designations of 2026-09-11 (vendor OpenAI, host `api.openai.com`; custody Google Secret Manager) with every other field `UNDESIGNATED`, and an eleven-row validation matrix at `BLOCKED_PENDING_OWNER_RULINGS`, pinned by `tests/test_live_records.py` |
+
+**What stays exactly as it was.** `LIVE_VENDOR_EGRESS = False`; the boundary tests;
+`EgressResult`'s refusal of `genuine_call` other than `False`; `MATURITY`;
+`ENFORCEMENT_ENABLED`; the exchange schema and every digest vector of #1749. No
+deployment unit, no credential, no vendor SDK, no destination.
+
+**Two questions the designations raise, put to the owner in the commissioning ballot
+rather than decided here.** LP-2a: how the unit authenticates to Google Secret Manager
+without a long-lived key in the deployment. LP-2b: the record-contract amendment under
+which a result may carry `genuine_call: True`.

@@ -1,6 +1,6 @@
 # Ugence Model Egress Unit
 
-**Version:** 0.1.0
+**Version:** 0.2.0
 **Maturity:** `REFERENCE_GRADE_SHADOW_ONLY` · `ENFORCEMENT_ENABLED = False` · `LIVE_VENDOR_EGRESS = False`
 
 The reference exchange between the governance worker and a model call, as a
@@ -42,6 +42,23 @@ boundary is specified while its commissioning as a running unit is not.
 | Retention | per artifact, the earlier of ack + 1h and creation + 24h, failing closed at the hard deadline |
 | Purge | content destroyed on both sides; the approved tombstone survives |
 | Migrations | ordered, digest-pinned, all-or-nothing; a drifted schema is refused |
+| Custody port (0.2.0) | `ModelCredentialCustodyPort` mirroring the credential broker's port; a `CredentialLease` whose secret is reachable only through `use(consumer, now=…)`, absent from `repr`, records, equality and pickling; every materialization audited as identifiers and digests; the only adapter shipped is the inert `ReferenceCustodyAdapter`, never production-authoritative, refused in production |
+| Ledger kinds (0.2.0) | five `meu.*` kinds with allowlists; `ledger_payload` refuses unknown keys, content- or credential-bearing keys at any depth, and strings long enough to be content (D-4) |
+| Transport protection (0.2.0) | `require_transport_protection` refuses a production DSN without `sslmode=verify-full`; `protected_connect` applies it before the driver is imported; the error never echoes the DSN |
+
+## What 0.2.0 adds, and what it still cannot do
+
+The owner designated OpenAI as the vendor and Google Secret Manager as the custody
+store on 2026-09-11 (`MEU_LIVE_PROVIDER_DESIGNATION.json`, beside this file). The
+ballot that commissions them (`ADR_UGENCE_LIVE_MODEL_PROVIDER_COMMISSIONING.md`,
+LP-1 to LP-6) is not yet ruled, so this release carries only what D-3 already permits:
+the custody **port** with an inert reference, the ledger-kind schema and transport
+protection. There is still no HTTP client, no vendor SDK, no credential reader and no
+destination configuration; `tests/test_boundaries.py` still fails the package if one
+appears. `EgressResult` still refuses any provenance with `genuine_call` other than
+`False`, and `MEU_LIVE_VALIDATION.json` is `BLOCKED_PENDING_OWNER_RULINGS` with every
+row unexecuted. The Google Secret Manager adapter and the OpenAI adapter are separate
+distributions that do not exist yet.
 
 ## The three decisions worth knowing
 

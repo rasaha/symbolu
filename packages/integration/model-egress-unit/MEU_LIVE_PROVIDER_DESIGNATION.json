@@ -1,0 +1,38 @@
+{
+  "schema": "model-egress-unit.live-provider-designation.v1",
+  "ruling": "ADR_UGENCE_LIVE_MODEL_PROVIDER_COMMISSIONING.md ballot LP-1 to LP-6 (PENDING the owner's rulings); OWNER_RATIFICATION_LIVE_MODEL_PROVIDER.md D-1 to D-5 (ratified 2026-09-10, standing)",
+  "status": "DESIGNATED_IN_PART_RULINGS_PENDING",
+  "status_note": "On 2026-09-11 the owner designated the vendor (OpenAI) and the secret manager (Google Secret Manager). The rulings LP-1 to LP-6 have not been issued, the remaining designations are UNDESIGNATED, and nothing below commissions anything: no credential exists in any Ugence deployment, no MEU deployment unit exists (CR-1), and MEU_LIVE_VALIDATION.json is BLOCKED_PENDING_OWNER_RULINGS. Every field here is configuration or a placeholder, never a secret.",
+  "designated_by": "Rakesh Mohan",
+  "designated_at": "2026-09-11",
+  "vendor": {
+    "name": "OpenAI",
+    "api_host": "api.openai.com",
+    "permitted_egress": "https://api.openai.com only, from the Model Egress Unit deployment unit once CR-1 admits it (LP-1); the governed runtime worker's egress record is unchanged and names no vendor host",
+    "model": "UNDESIGNATED (LP-3: exactly one model identifier; the adapter reads authorized_model from the authorization binding and hardcodes none)",
+    "account": "UNDESIGNATED (LP-3: a non-production account with a hard spending cap set at the vendor; recorded as a reference, never as a key)",
+    "data_processing_terms": "UNDESIGNATED (LP-3: acceptance recorded by reference)",
+    "region": "UNDESIGNATED"
+  },
+  "custody": {
+    "secret_manager": "Google Secret Manager",
+    "api_host": "secretmanager.googleapis.com",
+    "gcp_project": "UNDESIGNATED",
+    "secret_name": "UNDESIGNATED (a reference of the form projects/<project>/secrets/<name>; versions are leased by number and recorded as secret_version_ref)",
+    "rotation_policy": "UNDESIGNATED (LP-2: a maximum credential age and rotation on any suspected exposure, asserted by the custody adapter as max_credential_age)",
+    "audit_trail": "every materialization, granted or refused, is a CustodyAuditEvent of identifiers and digests appended under meu.credential_leased / meu.credential_refused (ledger_kinds.py); the secret is never a field of any record",
+    "custody_owner": "UNDESIGNATED (LP-2: a named person)",
+    "meu_identity_to_secret_manager": "UNRULED (LP-2a): how the Model Egress Unit authenticates to Google Secret Manager. A long-lived service-account key held on the hosting platform is itself a credential in the deployment and is refused under D-3; the candidate is workload identity federation from an identity the hosting platform issues, which the platform must support; failing that, the custody adapter runs on an owner-operated host, as the AP-3 verifier did",
+    "port": "ugence_model_egress_unit.custody.ModelCredentialCustodyPort; the only adapter in this distribution is ReferenceCustodyAdapter (FIXTURE_ONLY, never production-authoritative, leases an inert marker, refuses a production posture); the Google Secret Manager adapter is a separate distribution that does not exist yet"
+  },
+  "record_contract": {
+    "genuine_call": "EgressResult refuses any provenance with genuine_call other than False (records.py) and stays so until LP-2b is ruled: genuine_call True admitted only for a result produced by a provider adapter that holds a lease whose is_production_authoritative is True, under a production posture, and never from a fixture",
+    "provider_adapter": "ugence_model_egress_unit.provider.EgressProvider; the OpenAI adapter is a separate distribution that does not exist yet and, when it does, may build a request only from the EgressRequest's minimized context, may reach api.openai.com and no other host, takes its credential only through CredentialLease.use, and labels every answer UNTRUSTED_EVIDENCE"
+  },
+  "must_never_contain": [
+    "an API key, OAuth token, service-account key or any credential",
+    "a Google Cloud secret payload",
+    "a prompt, response or any customer content",
+    "a fixture recorded as a commissioned adapter"
+  ]
+}

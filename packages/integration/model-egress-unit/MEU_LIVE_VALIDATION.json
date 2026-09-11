@@ -1,0 +1,99 @@
+{
+  "schema": "model-egress-unit.live-validation.v1",
+  "ruling": "ADR_UGENCE_LIVE_MODEL_PROVIDER_COMMISSIONING.md LP-4 (pending); the AP-3 pattern of ADR_UGENCE_AUTHORITY_PLANE_SCOPING.md section 20",
+  "meu_live_status": "BLOCKED_PENDING_OWNER_RULINGS",
+  "status_vocabulary": [
+    "BLOCKED_PENDING_OWNER_RULINGS",
+    "PENDING_VALIDATION",
+    "NOT_MET",
+    "MET"
+  ],
+  "status_note": "No row can execute: CR-1 admits no MEU deployment unit (LP-1), no custody is commissioned (LP-2), the model, account and custody owner are undesignated (LP-2, LP-3), and the record contract refuses genuine_call True (LP-2b). Rows are executed only on the owner's machine by a verifier that prints redacted evidence, as ci/ap3_live_verify.py does for AP-3, and MET is reached only by the owner's acceptance statement on a rendered acceptance report.",
+  "blocked_by": [
+    "LP-1 CR-1 amendment",
+    "LP-2 custody commissioning and the LP-2a identity question",
+    "LP-2b record-contract amendment for genuine_call",
+    "LP-3 model, account, terms and region",
+    "LP-6 transport protection on the MEU DSNs and the ledger-kind schema (built in 0.2.0; not yet composed anywhere)"
+  ],
+  "validation_matrix": [
+    {
+      "row": 1,
+      "scenario": "custody absent",
+      "required": "REFUSED_CREDENTIAL_NOT_COMMISSIONED",
+      "result": null
+    },
+    {
+      "row": 2,
+      "scenario": "credential never in any log, ledger row, exchange row or answer",
+      "required": "NO_OCCURRENCE",
+      "result": null
+    },
+    {
+      "row": 3,
+      "scenario": "egress to any host but the designated one",
+      "required": "REFUSED",
+      "result": null
+    },
+    {
+      "row": 4,
+      "scenario": "request digest binds the minimized context; a substituted prompt",
+      "required": "REFUSED_CONTENT_DIGEST_MISMATCH",
+      "result": null
+    },
+    {
+      "row": 5,
+      "scenario": "the live answer's provenance",
+      "required": "GENUINE_CALL_TRUE_AND_TRUST_UNTRUSTED_EVIDENCE",
+      "result": null
+    },
+    {
+      "row": 6,
+      "scenario": "TAP verification of the answer; INDETERMINATE",
+      "required": "TYPED_REFUSAL_NOT_DEGRADED_RESULT",
+      "result": null
+    },
+    {
+      "row": 7,
+      "scenario": "purge replaces content with a tombstone on schedule",
+      "required": "TOMBSTONE_WITH_DIGESTS_ONLY",
+      "result": null
+    },
+    {
+      "row": 8,
+      "scenario": "lease expiry after dispatch",
+      "required": "OUTCOME_UNKNOWN_NEVER_A_SECOND_BILLED_CALL",
+      "result": null
+    },
+    {
+      "row": 9,
+      "scenario": "request over the bound token ceiling",
+      "required": "REFUSED_BEFORE_DISPATCH",
+      "result": null
+    },
+    {
+      "row": 10,
+      "scenario": "vendor error, timeout and malformed answer",
+      "required": "TYPED_OUTCOMES_FAILED_OR_OUTCOME_UNKNOWN",
+      "result": null
+    },
+    {
+      "row": 11,
+      "scenario": "custody lease expired at use",
+      "required": "REFUSED_CUSTODY_UNAVAILABLE",
+      "result": null
+    }
+  ],
+  "evidence": {
+    "verifier": null,
+    "runs": [],
+    "test_timestamp": null,
+    "ci_run_or_signed_report": null,
+    "accepting_owner": null
+  },
+  "must_never_contain": [
+    "a credential",
+    "a prompt or response",
+    "a fixture result recorded as a live pass"
+  ]
+}
