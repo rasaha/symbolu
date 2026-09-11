@@ -497,8 +497,17 @@
       "revoked_attested_by": "Rakesh Mohan",
       "revoked_attested_at": "2026-09-11",
       "evidence": null,
-      "evidence_required": "a Cloudflare Zero Trust audit-log excerpt (Logs > Audit logs) showing the revoke-tokens action on the application 'AP3 Enterprise Issuer Validation' or the user ap3-test@ugence.ai on 2026-09-11, or the application's 'Revoke existing tokens' confirmation; contains no secret; paste as text",
-      "status": "OWNER_ATTESTED_NOT_YET_EVIDENCED"
+      "evidence_required": "the audit-log entry for POST /accounts/<account>/access/apps/d456abec-2b6b-4b44-918e-ac825e2e83ca/revoke_tokens (the application's 'Revoke existing tokens' action), or a user-level revocation entry for ap3-test@ugence.ai, with its time; paste as text without the actor IP address; contains no secret",
+      "status": "OWNER_ATTESTED_NOT_YET_EVIDENCED",
+      "evidence_reviewed": [
+        {
+          "reviewed_at": "2026-09-11",
+          "source": "Cloudflare account audit log, resource product access, entry id 01a08fe6-8265-7352-b978-3e34ef2f4dd1",
+          "what_it_shows": "PUT /accounts/<account>/access/apps/d456abec-2b6b-4b44-918e-ac825e2e83ca at 2026-09-11T09:57:23Z, 'Update an Access application', result success, actor the owner via the dashboard",
+          "verdict": "NOT_REVOCATION_EVIDENCE: an application-settings update; a token revocation is POST .../access/apps/<app>/revoke_tokens and is logged as its own entry"
+        }
+      ],
+      "fallback": "if no revocation is performed, the exposed token expires on its own exp (the application's session duration, at most 24 hours from issue [I]); expiry is not revocation and only an owner ruling could accept it in place of the required evidence"
     },
     "acceptance_report": "deployment/governed-runtime-worker/AP3_ACCEPTANCE_REPORT.md (canonical; rendered from this record by ci/ap3_acceptance_report.py and pinned by the harness)",
     "accepting_owner_designate": "Rakesh Mohan — Founder, Ugence Labs (designated to accept; has not accepted)"
