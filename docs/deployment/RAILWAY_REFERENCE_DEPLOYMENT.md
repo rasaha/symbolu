@@ -733,15 +733,17 @@ records the two gaps and their closure. This walkthrough has not been run on Rai
    mutating request of both clients (`client.ts` and `client-v2.ts` route all requests through
    it) and to no read `[V]`, covered by `tests/deployment-header.test.ts`.
 
-   *One condition, decided during implementation and worth the owner's eye.* The header is
-   sent only when the API origin is the page's own origin. The ratification prompt asked
-   whether it may go unconditionally; it may not: the plain `studio-api` allowlists
-   `Content-Type` alone (`ugence_governance_studio_api/app.py:129`), so an extra request
-   header from `studio-web` would fail its CORS preflight and break every POST of the
-   explorer deployed in parts 1 to 4. Same-origin is exactly and only the hosted profile's
-   shape, whose CSP is `connect-src 'self'` and whose middleware is the only consumer of the
-   header. Neither change touches the frozen OpenAPI documents or the P3E security model,
-   which required the header all along.
+   *The header condition, owner-ratified 2026-09-12 (amending the earlier ratification).*
+   `client.ts` and `client-v2.ts` send `X-Ugence-Request: GovernanceStudio` on every
+   mutating request whose resolved API origin exactly equals `window.location.origin`,
+   scheme, hostname and effective port included. Read requests and cross-origin requests
+   do not carry it. The ruling accepts the implementation at commit `fd23f540`. It does not
+   add the header to the plain `studio-api` CORS allowlist (`ugence_governance_studio_api/app.py:129`
+   admits `Content-Type` alone, so an unconditional header would fail `studio-web`'s
+   preflight and break every POST of parts 1 to 4) and authorizes no broader CORS change.
+   The header is a hosted-profile request marker, not an authentication credential and not
+   a general authorization mechanism. Neither change touches the frozen OpenAPI documents or
+   the P3E security model, which required the header all along.
 
    *Evidence, 2026-09-12, outside Railway `[V]`.* Frontend: 306 vitest tests pass across
    29 files, lint, type-check and both API-boundary verifiers pass. Deployment profile:
@@ -806,11 +808,14 @@ RAILWAY_RUN_UID=0
 VITE_API_BASE_URL=https://<proxy-host>:<port>
 ```
 
-`VITE_API_BASE_URL` is the one build-time variable: the origin the browser addresses the
-listener by, scheme, host and port, with no path and no trailing slash, and it must equal
-the page's origin exactly or the SPA neither reaches the API (CSP `connect-src 'self'`) nor
-sends the request header (9.0). Its value is the TCP proxy address that 9.6 assigns, so the
-first deploy runs without it; set it once the proxy exists and redeploy to rebuild `[I]`.
+`VITE_API_BASE_URL` is the one build-time variable. Its value is the complete TCP-proxy
+HTTPS origin exactly as the browser's location bar shows it once 9.6 is done:
+`https://<name>.proxy.rlwy.net:<port>`, the assigned port included, no path, no trailing
+slash. It must equal `window.location.origin` character for character, or the SPA neither
+reaches the API (CSP `connect-src 'self'`) nor sends the request header (9.0); `config.ts`
+silently replaces a relative value such as `/api` with the loopback default `[V]`. Because
+9.6 assigns the address after the first deploy, the first deploy runs without this variable;
+set it once the proxy exists and redeploy to rebuild `[I]`.
 
 `validate()` accepts exactly this set in production mode `[V]` (`config.py:175-258`): the
 three record paths and the registry path require the tenant; the policy identities require
@@ -832,14 +837,24 @@ sh -c "mkdir -p /tmp/tls && openssl req -x509 -newkey rsa:2048 -nodes -days 30 \
 
 `openssl` is present in the base image through `ca-certificates` `[I]`; the tests generate
 their certificates the same way (`tests/conftest.py:36-49`). The gate checks the file exists,
-is readable and is not expired; it does not check the issuer `[V]`.
+is readable and is not expired; it does not check the issuer `[V]`. This certificate is
+self-signed and publicly untrusted: it is not production-grade TLS and Railway manages no
+part of it. It gives the listener the TLS it insists on, and nothing more.
 
 **9.6 Networking.** Railway's HTTP edge forwards plain HTTP to the container `[I]`, which this
 listener refuses. Use **Settings → Networking → TCP Proxy** on port `8443`; Railway assigns
-`<name>.proxy.rlwy.net:<port>`. Put that host in `UGENCE_STUDIO_ALLOWED_HOSTS` (the host
-only; `_host_only` strips the port `[V]`). Leave the HTTP healthcheck path empty: Railway's
-healthcheck speaks HTTP and would fail against TLS. The browser will warn on the self-signed
-certificate; accept it once.
+`<name>.proxy.rlwy.net:<port>` `[I]`. Generate no Railway HTTP domain for this service. The
+TCP proxy is the sole public origin for `studio-hosted`: the browser loads the SPA from it
+and the SPA sends its `/api/*` requests to it, and both reach the same uvicorn TLS listener
+in the container (`app.py:185-215` serves `index.html`, `/assets/*` and `/api/*` from one
+listener `[V]`). There is no cross-origin hop and no CORS preflight.
+
+Raw TCP passthrough carries the container's own TLS unchanged `[I]`; Railway terminates no
+TLS on this path and provides no browser-trusted certificate. What the browser sees is the
+self-signed certificate from 9.5, so it shows an interstitial on first load and the operator
+accepts it once for that host and port `[I]`. Put the host in `UGENCE_STUDIO_ALLOWED_HOSTS`
+(the host only; `_host_only` strips the port `[V]`). Leave the HTTP healthcheck path empty:
+Railway's healthcheck speaks HTTP and would fail against TLS `[I]`.
 
 **9.7 Check.** The deploy log ends with the integrity gate passing and uvicorn on 8443; a
 failure prints `DEPLOYMENT_CONFIG_INVALID:` or `STARTUP_INTEGRITY_FAILED:` with every reason
