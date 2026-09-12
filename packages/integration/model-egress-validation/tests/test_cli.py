@@ -15,6 +15,17 @@ from ugence_model_egress_validation.cli import main
 from ugence_model_egress_validation.drift import records_directory
 
 
+@pytest.fixture(autouse=True)
+def _not_a_ci_runner(monkeypatch):
+    """The suite itself runs in CI. LP-8 makes ``live`` refuse a CI runner before anything
+    else, so every test starts with the CI markers cleared and the two tests that exercise
+    the CI-runner refusal set a marker themselves."""
+
+    from ugence_model_egress_unit import CI_ENVIRONMENT_MARKERS
+    for marker in CI_ENVIRONMENT_MARKERS:
+        monkeypatch.delenv(marker, raising=False)
+
+
 def _digests(directory: pathlib.Path) -> dict:
     return {name: hashlib.sha256((directory / name).read_bytes()).hexdigest()
             for name in ("MEU_LIVE_PROVIDER_DESIGNATION.json", "MEU_LIVE_VALIDATION.json")}
@@ -110,10 +121,7 @@ def test_a_command_is_required():
 
 # --- LP-8 (2026-09-12): a CI runner may not possess or exercise the credential -------
 
-def test_live_names_the_deployed_meu_instance_as_the_only_execution_posture(capsys, monkeypatch):
-    from ugence_model_egress_unit import CI_ENVIRONMENT_MARKERS
-    for marker in CI_ENVIRONMENT_MARKERS:
-        monkeypatch.delenv(marker, raising=False)
+def test_live_names_the_deployed_meu_instance_as_the_only_execution_posture(capsys):
     assert main(["live"]) == 2
     out = capsys.readouterr().out
     assert "execution posture (LP-8): only the DEPLOYED_MEU_INSTANCE may execute the validation (instance: UNDESIGNATED)" in out
@@ -123,10 +131,7 @@ def test_live_names_the_deployed_meu_instance_as_the_only_execution_posture(caps
 @pytest.mark.parametrize("marker", ["CI", "GITHUB_ACTIONS", "GITLAB_CI", "BUILDKITE"])
 def test_live_refuses_first_of_all_inside_a_ci_runner_before_reading_a_record(marker, capsys, monkeypatch, tmp_path):
     import ugence_model_egress_validation.cli as cli
-    from ugence_model_egress_unit import CI_ENVIRONMENT_MARKERS
 
-    for m in CI_ENVIRONMENT_MARKERS:
-        monkeypatch.delenv(m, raising=False)
     monkeypatch.setenv(marker, "true")
 
     def boom(*a, **k):
