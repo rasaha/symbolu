@@ -701,6 +701,162 @@ looks nothing like a rotation. Update both variables by hand, keeping `/railway`
 
 ---
 
+## Part 9 — Turning the studio's record screens on (the private hosted profile)
+
+**What this part is for.** On the studio deployed in parts 1 to 4, ten Governed Agent Studio
+screens answer a typed gap because `create_combined_app` composes no seam. The seams are
+composed only by the private hosted profile, `deployment/governance-studio` (P3E): one image,
+one HTTPS listener, Basic-auth gate, sqlite record files under a runtime volume. Deploying
+that image on Railway turns on Registration, Data use, Vendor dependencies, Constitution
+preflight, Authority, Simulate path A and Status. **Do not enter anything in Postgres for
+this**: no screen reads Postgres; the studio's records are sqlite files under
+`UGENCE_STUDIO_RUNTIME_DIR`, and the worker's Postgres holds only the durable engine's state.
+
+**Read 9.0 first.** As committed, the profile cannot be driven from a browser, and this
+walkthrough was not run on Railway. Steps 9.1 to 9.7 are what the source accepts `[V]` and
+what Railway's documentation says `[I]`; the two items in 9.0 are `[G]` until the owner
+ratifies them.
+
+**9.0 Two gaps in the profile's own frontend, both `[V]` from source.**
+
+1. *The packaged SPA is built without an API origin.* The Dockerfile's frontend stage runs
+   `npm run build` with no `VITE_API_BASE_URL`, and `config.ts:6-25` then compiles the default
+   `http://127.0.0.1:8000` into the bundle. Served from the profile, the SPA calls a port
+   nothing listens on and shows the *API is not compatible* screen. The profile's own e2e
+   (`ci/packaged_e2e.py`) never loads the SPA; it drives `/api` directly.
+2. *The SPA never sends the deployment request header.* `middleware.py:55-84` returns 403 on
+   every mutating `/api` request that lacks `X-Ugence-Request: GovernanceStudio`. The profile's
+   tests and `packaged_e2e.py` add that header themselves; `client.ts` and `client-v2.ts` send
+   only `Accept` and `Content-Type`. Every Register, Declare, Validate, Compile and Run press
+   would be refused.
+
+   The smallest change that closes both, for ratification and not applied here: a
+   `VITE_API_BASE_URL` build argument in the Dockerfile's frontend stage (Railway exposes
+   service variables to a Dockerfile build as `ARG`s `[I]`), and one header entry in the two
+   clients' mutating-request `init` objects. Neither touches the frozen OpenAPI document.
+
+**9.1 Add a service** from `rasaha/symbolu`; rename it `studio-hosted`. Settings → Source:
+
+```
+Branch:           <the repository default branch>
+Root Directory:   /
+Dockerfile Path:  deployment/governance-studio/Dockerfile
+Watch Paths:      deployment/governance-studio/**
+                  apps/ugence-governance-studio/**
+                  packages/**
+```
+
+The build context is the repository root; `Dockerfile.dockerignore` beside the Dockerfile
+carries the exclusion set, and `verify_build_context.py --root-build` asserts every `COPY`
+source resolves `[V]`. Leave the start command blank for now.
+
+**9.2 Attach a volume** from the project canvas, mount path `/var/run/ugence-studio`. Every
+record file must lie under that directory (`config.py:_path_errors`) and the startup gate
+refuses a path whose directory is not writable, reporting the seam `unwritable` `[V]`.
+
+The image runs as uid 10001 and Railway mounts the volume root-owned, so the gate will report
+every configured seam `unwritable` and refuse to bind. The studio image has no privilege
+drop of its own (its entrypoint runs the gate and the server, nothing else), so the only
+platform fix is `RAILWAY_RUN_UID=0` `[I]`: the process runs as root for the demo's lifetime.
+Part 7 explains why the worker avoids this; the studio cannot yet.
+
+**9.3 Generate a password hash** locally, once (Argon2id; the password is never printed):
+
+```bash
+pip install argon2-cffi ./deployment/governance-studio
+python -m governance_studio_deployment.generate_password_hash
+```
+
+**9.4 Variables.** The image already sets the packaged paths (`FRONTEND_DIR`,
+`SCENARIOS_ROOT`, `MANIFEST`, `OPENAPI`, `APPROVED_OPS`, `RUNTIME_DIR`, `PORT=8443`).
+
+```
+UGENCE_STUDIO_DEPLOYMENT_MODE=production
+UGENCE_STUDIO_USERNAME=<operator>
+UGENCE_STUDIO_PASSWORD_HASH=<the $argon2id$ line from 9.3>
+UGENCE_STUDIO_ALLOWED_HOSTS=<studio-hosted domain from 9.6>
+UGENCE_STUDIO_TLS_CERT_FILE=/tmp/tls/server.crt
+UGENCE_STUDIO_TLS_KEY_FILE=/tmp/tls/server.key
+UGENCE_STUDIO_TENANT_ID=tenant-demo
+UGENCE_STUDIO_SYSTEM_REGISTRY_PATH=/var/run/ugence-studio/system-registry.sqlite3
+UGENCE_STUDIO_DATA_USE_DECLARATIONS_PATH=/var/run/ugence-studio/data-use.sqlite3
+UGENCE_STUDIO_VENDOR_DECLARATIONS_PATH=/var/run/ugence-studio/vendor.sqlite3
+UGENCE_STUDIO_CONSTITUTION_REGISTRY_PATH=/var/run/ugence-studio/policy-registry.sqlite3
+UGENCE_STUDIO_POLICY_IDENTITIES=agent_governance.agent_constitution|agent-constitution-baseline|TENANT
+UGENCE_STUDIO_SIMULATION_PROVIDER=1
+RAILWAY_RUN_UID=0
+```
+
+`validate()` accepts exactly this set in production mode `[V]` (`config.py:175-258`): the
+three record paths and the registry path require the tenant; the policy identities require
+the registry path and the tenant; the simulation flag must be exactly `1`. Do **not** set
+`UGENCE_STUDIO_REVIEW_SERVICE_URL`: production mode requires `https`, the worker serves plain
+`http` under RW-3, and test mode allows `http` only on loopback `[V]`. Review Queue, Run
+Detail, Simulate path B and Observe source A therefore stay typed gaps on Railway until the
+worker has a CA-issued certificate; no variable changes that.
+
+**9.5 Start command.** The listener is HTTPS-only (`server.py:60-66`, no plaintext mode `[V]`)
+and the image ships no certificate. Generate a self-signed pair at start, then run the
+entrypoint:
+
+```bash
+sh -c "mkdir -p /tmp/tls && openssl req -x509 -newkey rsa:2048 -nodes -days 30 \
+  -subj /CN=studio-hosted -keyout /tmp/tls/server.key -out /tmp/tls/server.crt \
+  && python /app/entrypoint.py"
+```
+
+`openssl` is present in the base image through `ca-certificates` `[I]`; the tests generate
+their certificates the same way (`tests/conftest.py:36-49`). The gate checks the file exists,
+is readable and is not expired; it does not check the issuer `[V]`.
+
+**9.6 Networking.** Railway's HTTP edge forwards plain HTTP to the container `[I]`, which this
+listener refuses. Use **Settings → Networking → TCP Proxy** on port `8443`; Railway assigns
+`<name>.proxy.rlwy.net:<port>`. Put that host in `UGENCE_STUDIO_ALLOWED_HOSTS` (the host
+only; `_host_only` strips the port `[V]`). Leave the HTTP healthcheck path empty: Railway's
+healthcheck speaks HTTP and would fail against TLS. The browser will warn on the self-signed
+certificate; accept it once.
+
+**9.7 Check.** The deploy log ends with the integrity gate passing and uvicorn on 8443; a
+failure prints `DEPLOYMENT_CONFIG_INVALID:` or `STARTUP_INTEGRITY_FAILED:` with every reason
+and never binds `[V]`. Then, with the operator credentials:
+
+```bash
+curl -k -u <operator> https://<proxy-host>:<port>/readyz
+curl -k -u <operator> https://<proxy-host>:<port>/api/v2/observe/deployment
+```
+
+Pass condition: `/readyz` 200, and the deployment report lists `system_registry`,
+`data_use_declarations`, `vendor_declarations`, `constitution_registry` and
+`simulation_provider` as `configured` and `authority_reads` as `configured`. Until 9.0 is
+ratified and shipped, that is as far as a browser can go: open `/studio/status` and the six
+chips render, but Register and Declare return 403.
+
+Once 9.0 is shipped, the screen guide's values apply verbatim: registering
+`hiring-screener` (`docs/UGENCE_SCREEN_EXPLAINER.md`, screen 14) answers
+`registry_kind SqliteSystemRegistry` and the record persists across a redeploy, which is the
+volume test of 8.2 applied to the studio.
+
+**9.8 What this changes for the demo.** `studio-hosted` replaces `studio-web` and `studio-api`
+for the Governed Agent Studio segment; the explorer screens work on both. The console and the
+authority plane are untouched. Nothing here grants, issues, activates or executes: the record
+screens record what an administrator typed, the preflight still fails its approval row
+against the deny-all verifier, and Simulate still blocks on the runtime's default hook.
+
+**Next step.** Ratify 9.0, then build.
+
+> Read `docs/deployment/RAILWAY_REFERENCE_DEPLOYMENT.md` part 9.0. Rule on two changes to the
+> Governance Studio frontend and its deployment Dockerfile: (1) add `ARG VITE_API_BASE_URL` to
+> the frontend build stage of `deployment/governance-studio/Dockerfile` and pass it through to
+> `npm run build`; (2) send `X-Ugence-Request: GovernanceStudio` from
+> `apps/ugence-governance-studio/frontend/src/api/client.ts` and `client-v2.ts` on POST
+> requests only. State whether either touches the frozen `governance_studio.api.v1` OpenAPI
+> document or the P3E security model (`apps/ugence-governance-studio/docs/p3e/SECURITY_MODEL.md`),
+> and whether the header may be sent unconditionally or only when the API base is
+> same-origin. If ratified, implement both with tests that build the image and drive one
+> Register from the served SPA, then run part 9 on Railway and replace every `[I]` in it with
+> `[V]` or `[G]`. Documentation labels stay as defined in the file. Max 600 words for the
+> ruling.
+
 ## The four variables, in one place
 
 | Variable | Set on | Value | When it takes effect |
