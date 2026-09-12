@@ -854,12 +854,28 @@ Release 0.3.0 (same day, under the owner's confirmation in that ADR's §0.3) car
 LP-6 step 4 as migration 2: the controlled-migration identity, tenant-bound runtime
 identities with a restrictive binding policy, the constraint-only lifting of the
 reference-slice `genuine_call` restriction (custody identifiers required at the
-database; `EgressResult` still refuses it until `MET`), and the durable LP-5 reservation
+database; `EgressResult` refuses it without the verified admission of the owner's typed,
+consumed live-validation authorization, that ADR's §0.6, MET being the outcome and never
+the prerequisite), and the durable LP-5 reservation
 with trigger-enforced no-refund. LP-6 step 6 is the separate distribution
 `ugence-model-egress-provider-openai` 0.1.0, which this unit never imports. What §8
 still leaves open is step 7 (the live transport, the unit reserving durably before each
 dispatch, the verifier and the report generator), step 8 (the infrastructure
 designations) and step 9 (the credential).
+
+LP-7 (same day, that ADR's §0.4) designed the *non-production* step-8 infrastructure —
+a dedicated non-production GCP project, a dedicated non-human service account with a
+recorded identity mechanism, a dedicated secret at an immutable numeric version, a
+secret-scoped IAM binding, Data Access audit evidence within a defined window, an
+eight-step rotation procedure, a dedicated non-production OpenAI project with a
+project-owned service account scoped to `api.responses.write`, the one model and endpoint
+with availability verified, spend and data controls, the operator provisioning boundary —
+and supplied no value. Release 0.4.0 carries those designs as shape checks
+(`infrastructure.py`); the seventeen exact values stay `UNDESIGNATED`. The offline step-7
+artifacts ruling 11 permits live in `ugence-model-egress-validation`, which opens no
+network connection and can mark no infrastructure-dependent row. The first live synthetic
+validation stays behind a separate explicit owner authorization; production behind another
+commissioning record.
 
 ## 9 — What exists to build on
 

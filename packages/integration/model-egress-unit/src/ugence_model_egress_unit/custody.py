@@ -22,6 +22,14 @@ What the port promises
   result that claims a genuine call. The reference adapter below is never
   production-authoritative and refuses a production posture outright.
 
+  The word describes the **lease's authority under the real custody contract**: the
+  credential was materialized by the commissioned custody path (Google Secret Manager,
+  the pinned numeric version, the designated workload identity), not by a fake,
+  emulator or reference path. It says nothing about the deployment the lease serves:
+  a production-authoritative lease is exactly what the first live synthetic validation
+  uses *within the non-production commissioning scope* (LP-7), and it authorizes no
+  production deployment, which needs its own commissioning record.
+
 What it does not decide
 -----------------------
 Which secret manager, which account, which rotation policy and who the custody
@@ -153,6 +161,9 @@ class CredentialLease:
     secret_version_ref: str
     issued_at: datetime
     expires_at: datetime
+    #: The lease's authority under the real custody contract (materialized by the
+    #: commissioned custody path, not a fake or reference one). Not a statement about
+    #: a production deployment: the non-production validation call uses such a lease.
     is_production_authoritative: bool
     _secret: str = field(repr=False, compare=False, default="")
 

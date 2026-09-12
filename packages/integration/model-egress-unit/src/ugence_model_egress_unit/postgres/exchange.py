@@ -57,7 +57,8 @@ from ..records import (
     ResultOutcome,
     purge_deadline,
 )
-from .schema import BUDGET_TABLE, RESERVATION_TABLE, SCHEMA_NAME, TENANT_SETTING
+from .schema import (AUTHORIZATION_TABLE, BUDGET_TABLE, CONSUMPTION_TABLE, RESERVATION_TABLE,
+                     SCHEMA_NAME, TENANT_SETTING)
 
 __all__ = [
     "ExchangeError",
@@ -374,8 +375,8 @@ class Exchange:
                              outcome, refusal_reason, adapter_id, provenance_kind,
                              genuine_call, provenance, payload, content_digest,
                              content_created_at, response_digest,
-                             custody_lease_id, custody_authority_id)
-                            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
+                             custody_lease_id, custody_authority_id, authorization_consumption_id)
+                            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
                         (
                             str(result.tenant_id), str(result.request_id),
                             str(result.correlation_id), result.recorded_at,
@@ -388,6 +389,7 @@ class Exchange:
                             result.recorded_at,  # the payload's own creation clock
                             digest,
                             result.custody_lease_id, result.custody_authority_id,
+                            result.admission.consumption_id if result.admission is not None else None,
                         ),
                     )
         return digest
@@ -690,3 +692,104 @@ class Exchange:
                         return False
                     self._check_tenant(rows, 0, tenant_id)
         return True
+
+
+class ExchangeAuthorizationLedger:
+    """The durable :class:`~ugence_model_egress_unit.authorization.AuthorizationLedger`:
+    nonce, consumption and LP-5 capacity in the exchange's own tables, one transaction
+    per attempt, consumed before dispatch and never given back (migration 3)."""
+
+    NON_PRODUCTION = False  # this is the real ledger; it is what the live verifier uses
+
+    def __init__(self, exchange: "Exchange") -> None:
+        self._exchange = exchange
+
+    def capacity(self, *, tenant_id: UUID) -> tuple:
+        from ..limits import COMMISSIONING_LIMITS
+        budget = self._exchange.commissioning_budget(tenant_id) or {"calls_reserved": 0, "cents_reserved": 0}
+        return (COMMISSIONING_LIMITS.max_genuine_calls - budget["calls_reserved"],
+                COMMISSIONING_LIMITS.budget_usd_cents - budget["cents_reserved"])
+
+    def consume(self, authorization, *, tenant_id: UUID, request_id: UUID, request_digest: str,
+                estimated_cents: int, now: datetime) -> tuple:
+        import psycopg
+        from ..authorization import AuthorizationRefusal as R, AuthorizationRefused
+        from ..limits import COMMISSIONING_LIMITS, BudgetExhausted
+
+        digest = authorization.digest()
+        ex = self._exchange
+        with ex._connect() as conn:
+            ex.require_scopable(conn)
+            with conn.transaction():
+                ex._scoped(conn, tenant_id)
+                with conn.cursor() as cur:
+                    cur.execute(f"SELECT authorization_digest FROM {SCHEMA_NAME}.{AUTHORIZATION_TABLE} WHERE nonce = %s",
+                                (authorization.nonce,))
+                    held = cur.fetchone()
+                    if held is not None and held[0] != digest:
+                        raise AuthorizationRefused(R.NONCE_REPLAYED, "this nonce already backs a different authorization")
+                    if held is None:
+                        cur.execute(
+                            f"""INSERT INTO {SCHEMA_NAME}.{AUTHORIZATION_TABLE}
+                                (nonce, authorization_digest, max_calls, calls_consumed, expires_at, first_consumed_at)
+                                VALUES (%s, %s, %s, 0, %s, %s)""",
+                            (authorization.nonce, digest, authorization.max_calls, authorization.expires_at, now))
+                    cur.execute(
+                        f"""UPDATE {SCHEMA_NAME}.{AUTHORIZATION_TABLE}
+                            SET calls_consumed = calls_consumed + 1
+                            WHERE nonce = %s AND authorization_digest = %s
+                              AND calls_consumed < max_calls AND expires_at > %s
+                            RETURNING calls_consumed""",
+                        (authorization.nonce, digest, now))
+                    row = cur.fetchone()
+                    if row is None:
+                        cur.execute(f"SELECT calls_consumed, max_calls, expires_at FROM {SCHEMA_NAME}.{AUTHORIZATION_TABLE} WHERE nonce = %s",
+                                    (authorization.nonce,))
+                        state = cur.fetchone()
+                        if state is not None and state[2] <= now:
+                            raise AuthorizationRefused(R.EXPIRED)
+                        raise AuthorizationRefused(R.CALLS_EXHAUSTED, f"{authorization.max_calls} authorized calls consumed")
+                    call_number = int(row[0])
+                    try:
+                        cur.execute(
+                            f"""INSERT INTO {SCHEMA_NAME}.{CONSUMPTION_TABLE}
+                                (tenant_id, authorization_digest, request_id, request_digest, call_number, consumed_at)
+                                VALUES (%s, %s, %s, %s, %s, %s) RETURNING consumption_id""",
+                            (str(tenant_id), digest, str(request_id), request_digest, call_number, now))
+                    except psycopg.errors.UniqueViolation:
+                        raise AuthorizationRefused(R.ALREADY_CONSUMED, "this request was already consumed under this authorization")
+                    consumption_id = str(cur.fetchone()[0])
+                    # LP-5's durable reservation, in the same transaction: a refusal here
+                    # rolls the consumption back too, so nothing is consumed without capacity.
+                    limits = COMMISSIONING_LIMITS
+                    cur.execute(
+                        f"""INSERT INTO {SCHEMA_NAME}.{BUDGET_TABLE} (tenant_id) VALUES (%s)
+                            ON CONFLICT (tenant_id) DO NOTHING""", (str(tenant_id),))
+                    cur.execute(
+                        f"""UPDATE {SCHEMA_NAME}.{BUDGET_TABLE}
+                            SET calls_reserved = calls_reserved + 1, cents_reserved = cents_reserved + %s,
+                                in_flight = in_flight + 1
+                            WHERE tenant_id = %s AND calls_reserved < %s AND cents_reserved + %s <= %s AND in_flight < %s
+                            RETURNING calls_reserved""",
+                        (estimated_cents, str(tenant_id), limits.max_genuine_calls, estimated_cents,
+                         limits.budget_usd_cents, limits.concurrency))
+                    reserved = cur.fetchone()
+                    if reserved is None:
+                        raise AuthorizationRefused(R.CAPACITY_EXHAUSTED, "the durable reservation ledger has no remaining capacity")
+                    cur.execute(
+                        f"""INSERT INTO {SCHEMA_NAME}.{RESERVATION_TABLE}
+                            (tenant_id, request_id, reserved_at, estimated_cents, call_number)
+                            VALUES (%s, %s, %s, %s, %s)""",
+                        (str(tenant_id), str(request_id), now, estimated_cents, int(reserved[0])))
+        return consumption_id, call_number
+
+    def authorization_state(self, nonce: str) -> Optional[dict]:
+        ex = self._exchange
+        with ex._connect() as conn:
+            with conn.cursor() as cur:
+                cur.execute(f"SELECT nonce, authorization_digest, max_calls, calls_consumed, expires_at FROM {SCHEMA_NAME}.{AUTHORIZATION_TABLE} WHERE nonce = %s", (nonce,))
+                row = cur.fetchone()
+        if row is None:
+            return None
+        return {"nonce": row[0], "authorization_digest": row[1], "max_calls": row[2], "calls_consumed": row[3], "expires_at": row[4]}
+

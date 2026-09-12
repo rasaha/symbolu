@@ -1,11 +1,11 @@
 # Ugence Model Egress Provider — OpenAI Responses
 
-**Version:** 0.1.0
+**Version:** 0.2.0
 **Maturity:** `REFERENCE_GRADE_SHADOW_ONLY` · `ENFORCEMENT_ENABLED = False` · `LIVE_VENDOR_EGRESS = False`
 **Ruling basis:** LP-1, LP-3, LP-5 and LP-6 step 6 (`docs/architecture/ADR_UGENCE_LIVE_MODEL_PROVIDER_COMMISSIONING.md`, §0)
 
-The OpenAI Responses adapter that the Model Egress Unit (MEU) will run behind once
-commissioning reaches `MET`, shipped as a **separate, MEU-only distribution** so the
+The OpenAI Responses adapter that the Model Egress Unit (MEU) will run behind once a genuine call is admitted (ADR §0.6: the
+owner's typed, consumed `LiveSyntheticValidationAuthorization`, presented to `execute` as a verified `GenuineCallAdmission`; `MET` is the outcome, never the prerequisite), shipped as a **separate, MEU-only distribution** so the
 unit's own "cannot call a model vendor" claim stays intact.
 
 ## This distribution cannot reach api.openai.com
@@ -19,7 +19,7 @@ module and fails if one imports anything that could open a socket, reads the
 environment, a clock or a file, or reaches into the unit's `postgres` subpackage.
 
 Every record this package can produce carries `genuine_call: false`. A transport
-that reports a genuine vendor response while commissioning is not `MET` is an
+that reports a genuine vendor response without a verified admission and a production-authoritative lease is an
 invariant violation: the adapter raises `GenuineResponseNotRecordable` rather than
 write either a refusal (which would misstate a billed call) or a genuine record
 (which the unit's release gate refuses). Fake-transport evidence therefore cannot
@@ -59,7 +59,7 @@ One first-party dependency, no third-party one. The unit never imports this pack
 
 - a live transport (LP-6 step 7, after the infrastructure designations);
 - any credential, credential reader or Secret Manager client (LP-2);
-- a `genuine_call: true` record (LP-4: only the owner's separate `MET` statement,
+- a `genuine_call: true` record without a `GenuineCallAdmission` (ADR §0.6: only the durable consumption of the owner's typed authorization,
   released as a new version of the unit, admits one);
 - verification that the designated model snapshot exists (ADR §0.2, divergence 5).
 

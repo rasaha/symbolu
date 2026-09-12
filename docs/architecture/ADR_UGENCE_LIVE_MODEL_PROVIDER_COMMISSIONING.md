@@ -199,7 +199,7 @@ credential and reaches nothing.
 | no `exchange.v2` is introduced | yes | `EXCHANGE_SCHEMA_VERSION` and `MEU_CANONICALIZATION_VERSION` unchanged; migration 2 is `meu_schema_version` row 2 of the same contract |
 | existing rows and digests remain valid | yes | `test_the_upgrade_path_keeps_existing_rows_and_digests_valid` seeds rows under migration 1 and reads them back unchanged after migration 2 |
 | the migration merely lifts the reference-slice restriction | yes | `CHECK egress_result_no_genuine_call` is dropped and replaced by `CHECK egress_result_genuine_call_requires_custody`: `genuine_call = false OR (custody_lease_id IS NOT NULL AND custody_authority_id IS NOT NULL AND provenance_kind = 'RESPONSE')` |
-| application and deployment gates continue to refuse genuine calls until `MET` | yes | `EgressResult.__post_init__` refuses `genuine_call: true` unless `COMMISSIONING_STATUS == "MET"`, a release constant of the unit; the OpenAI adapter refuses a production posture and raises on a transport claiming a genuine response; `MEU_LIVE_VALIDATION.json` stays `BLOCKED_PENDING_INFRASTRUCTURE_DESIGNATIONS` |
+| application and deployment gates continue to refuse genuine calls until `MET` | yes, as clarified in §0.5 | `EgressResult.__post_init__` refuses `genuine_call: true` until both predecessor gates hold (`genuine_call_admitted()`: status `PENDING_VALIDATION`/`MET` and the owner's live-validation authorization, both release constants); MET is the outcome, never the validation's prerequisite; the OpenAI adapter refuses a production posture and raises on a transport claiming a genuine response; `MEU_LIVE_VALIDATION.json` stays `BLOCKED_PENDING_INFRASTRUCTURE_DESIGNATIONS` |
 
 No condition was false, so the migration proceeded and no contract version change is required.
 
@@ -215,6 +215,458 @@ No condition was false, so the migration proceeded and no contract version chang
 | OpenAI adapter as a separate MEU-only distribution, injected fake transport only, exact destination and request shape, no credential access, no live network path | `packages/integration/model-egress-provider-openai` 0.1.0 | its `tests/test_boundaries.py`, `test_transport.py`, `test_provider.py`; the unit's `test_the_unit_never_imports_the_openai_adapter_distribution` |
 | fresh-install and upgrade-path tests | both, plus an all-or-nothing upgrade test | `test_a_fresh_install_applies_both_migrations_and_migration_one_is_byte_identical`, `test_the_upgrade_path_keeps_existing_rows_and_digests_valid`, `test_the_upgrade_is_all_or_nothing` |
 | validation matrix stays blocked; fake evidence cannot satisfy live rows | every row `result: null`; `FakeTransport` refuses a scripted `genuine` outcome at construction | `test_live_records.py`; `test_the_fake_transport_refuses_to_be_scripted_with_a_genuine_response` |
+
+### 0.4 — LP-7 / Step-8 non-production infrastructure design rulings (owner, 2026-09-11), verbatim
+
+The owner issued an earlier same-day LP-7 draft and superseded it with the text below before
+either was committed; only this text is recorded and operative.
+
+> LP-7 / Step-8 Non-Production Infrastructure Design Rulings
+>
+> These rulings govern the first non-production Model Egress Unit commissioning only. They do not commission or approve a production provider deployment.
+>
+> 1. GCP project
+>
+> Use a dedicated non-production GCP project for MEU provider validation. It must not share a project with production, general development, public demonstrations, CI or unrelated Ugence workloads.
+>
+> A later production GCP project requires a separate owner designation and commissioning record.
+>
+> 2. GCP workload identity
+>
+> The MEU must run under a dedicated, nonhuman GCP service account. No human identity, default compute identity, downloadable service-account key or shared runtime identity is permitted.
+>
+> Record the deployment platform and its identity mechanism:
+>
+> * If the MEU runs outside Google Cloud, designate the OIDC issuer, audience, subject constraints, Workload Identity Pool, provider and exact principal binding.
+> * If it runs on Google Cloud, record the native workload-identity path and evidence that no static service-account key is used.
+>
+> The workload identity must not have project-wide privileges unrelated to retrieving the designated secret.
+>
+> 3. Secret resource
+>
+> Store the OpenAI validation credential in Google Secret Manager under a dedicated MEU secret.
+>
+> Runtime configuration must reference the full immutable numeric version resource:
+>
+> projects/<project-number-or-id>/secrets/<secret-name>/versions/<number>
+>
+> The latest alias and every nonnumeric version reference are prohibited.
+>
+> Do not record the secret value, a reversible encoding, or a digest that could be used as credential-verification material.
+>
+> 4. GCP IAM binding
+>
+> Grant roles/secretmanager.secretAccessor only:
+>
+> * to the dedicated MEU workload identity;
+> * on the designated secret resource;
+> * without a project-level accessor grant.
+>
+> Human users, CI identities, other workloads and the database migrator identity receive no runtime-secret-read authority.
+>
+> Administrative authority to add, disable or destroy secret versions must remain separate from runtime read authority. No operator receives secret-read permission merely because that operator manages rotation.
+>
+> 5. Secret Manager audit evidence
+>
+> Enable and retain Secret Manager Data Access audit logs before any credential materialization.
+>
+> Commissioning evidence must demonstrate:
+>
+> * the IAM policy on the exact secret;
+> * a successful access event by the designated MEU workload identity;
+> * the immutable numeric secret version accessed;
+> * within a precisely defined commissioning time window, no secret-access event by an identity outside the approved set;
+> * correlation of the access event to the MEU validation attempt using non-secret identifiers, workload identity and bounded timestamps.
+>
+> Do not claim universal "absence of unauthorized access." Report only what the defined audit query and retention window demonstrate.
+>
+> The evidence must contain no credential, prompt text or model-response content.
+>
+> 6. Rotation procedure
+>
+> Rotation must:
+>
+> 1. create a new project-scoped OpenAI service-account credential;
+> 2. store it as a new Google Secret Manager version;
+> 3. designate that immutable numeric version as a candidate;
+> 4. run offline/fake-transport conformance checks;
+> 5. separately authorize a controlled validation using the candidate;
+> 6. accept and activate the candidate version;
+> 7. verify successful operation;
+> 8. revoke the superseded OpenAI credential and disable the corresponding Secret Manager version.
+>
+> Rollback to the preceding version is allowed only while both its Secret Manager version and corresponding OpenAI credential remain valid and owner-authorized.
+>
+> Destruction requires separately retained audit evidence and explicit authorization. No old version may be destroyed during initial commissioning.
+>
+> The maximum normal rotation interval remains 90 days, with immediate rotation following suspected exposure.
+>
+> 7. OpenAI tenancy and identity
+>
+> Use a dedicated non-production OpenAI project within the Ugence OpenAI organization for this commissioning.
+>
+> Use an OpenAI project-owned service account—not a human user's API key—with:
+>
+> * a custom project role containing only api.responses.write;
+> * an API key scoped only to api.responses.write;
+> * access only to the designated model;
+> * the previously ratified request and expenditure ceilings.
+>
+> The credential must be unavailable to browsers, developers, CI jobs, other Ugence services and repository automation.
+>
+> A separate OpenAI production project and production credential require later owner approval.
+>
+> 8. Model and endpoint
+>
+> The designated model remains:
+>
+> gpt-5.4-mini-2026-03-17
+>
+> The only permitted vendor destination remains exactly:
+>
+> https://api.openai.com/v1/responses
+>
+> No floating model alias, wildcard host, alternate endpoint, redirect, proxy, hosted tool, background operation, fallback model or fallback provider is authorized.
+>
+> Before live validation, independently verify that the designated snapshot is available to the designated OpenAI project. Recording the model name is not availability evidence.
+>
+> 9. Spend and data controls
+>
+> Before live validation, record:
+>
+> * the configured OpenAI project spend control;
+> * whether it is a true enforcement stop or only an alert;
+> * evidence that the MEU's durable USD 25 ceiling remains the controlling hard stop;
+> * the applicable OpenAI data-processing terms;
+> * the approved processing/data-residency region;
+> * confirmation that validation content remains synthetic and non-sensitive;
+> * confirmation that store=false is enforced.
+>
+> Vendor-side limits are defense in depth and do not replace the durable authorization-side reservation or MEU safety ceiling.
+>
+> 10. Provisioning boundary
+>
+> Infrastructure provisioning, OpenAI service-account creation and credential creation are controlled operator actions outside the application repository.
+>
+> Repository implementation must not create, retrieve, transmit, display, log or test a real credential. Infrastructure-as-code may describe non-secret identities and policies only if separately authorized and if no credential is placed in configuration, state or output.
+>
+> 11. Remaining Step 7 work
+>
+> Offline Step 7 preparation may proceed before the infrastructure values are supplied:
+>
+> * validation harness;
+> * fake-transport cases;
+> * negative-test matrix;
+> * redacted report generator;
+> * drift checks;
+> * secret-shape scanning.
+>
+> This work must not open a network connection or mark an infrastructure-dependent matrix row as passed.
+>
+> The owner-run live verifier may not execute until every mandatory Step 8 designation is supplied and independently checked.
+>
+> 12. Commissioning state
+>
+> Keep the provider at:
+>
+> BLOCKED_PENDING_INFRASTRUCTURE_DESIGNATIONS
+>
+> until these exact externally verified values and evidence references are recorded:
+>
+> * GCP project ID;
+> * GCP project number;
+> * MEU GCP service-account resource name;
+> * deployment-platform identity mechanism;
+> * WIF pool/provider and constrained principal binding, or the documented native GCP equivalent;
+> * full numeric Secret Manager version resource;
+> * secret-level IAM-policy evidence reference;
+> * Data Access audit-log configuration and retention reference;
+> * approved rotation-runbook reference;
+> * OpenAI organization ID;
+> * OpenAI project ID;
+> * OpenAI project service-account ID;
+> * OpenAI role and API-key scope evidence;
+> * vendor spend-control evidence and hard-stop/advisory classification;
+> * designated-model availability evidence;
+> * applicable data-processing-terms reference;
+> * approved processing/data-residency region.
+>
+> These values must not be guessed, synthesized, represented as completed by placeholders or inferred from naming conventions.
+>
+> Supplying and verifying them closes only the infrastructure-designation blocker. It does not authorize a genuine call.
+>
+> After all designations pass, stop and return the completed designation record, validation matrix and exact owner-run command. The first live synthetic validation requires a separate, explicit owner authorization. Production use requires another commissioning record.
+>
+> Record this ruling without creating infrastructure or credentials. Proceed only with the remaining offline Step 7 artifacts. Do not make a live call, enable live vendor egress, mark commissioning MET, or merge any new change without separate instruction.
+
+#### 0.4.1 — Where each LP-7 ruling lives
+
+LP-7 designs the non-production infrastructure and supplies no value. The repository
+carries the *shape* each value must have and the refusals that keep a placeholder, an
+alias, a forbidden identity, a secret-shaped string or an unverified value from ever being
+accepted as a designation (`ugence_model_egress_unit.infrastructure`, unit 0.4.0), and the
+offline step-7 artifacts ruling 11 permits (`ugence-model-egress-validation` 0.1.0).
+Everything else is an operator's act outside the repository (ruling 10).
+
+| Ruling | Repository mechanism | Outside the repository |
+| --- | --- | --- |
+| 1 dedicated non-production GCP project | `Step8Designation.environment` must read `non-production`; the project ID and number are required, well-formed, and never judged by name (ruling 12 forbids inference from naming conventions) | the project, and evidence it hosts nothing else; a later production project is a separate designation |
+| 2 dedicated non-human service account; recorded identity mechanism | `meu_service_account` must be `projects/<project>/serviceAccounts/<name>@<project>.iam.gserviceaccount.com` in the designated project; the default compute identity, a human principal and a key file are refused; `workload_identity_binding` is either `WorkloadIdentityFederation` (issuer, audience, subject constraints, pool, provider, principal binding, all required) or `NativeGcpWorkloadIdentity` (path plus no-static-key evidence) | the account and binding, with no key ever created; least privilege beyond the secret |
+| 3 dedicated secret, immutable numeric version; no secret value, encoding or digest recorded | `secret_version` must satisfy `custody.is_pinned_secret_version` in the designated project (by ID or number); every field of the record is scanned for credential shapes and refused without echoing the value; no field of any record holds a credential digest | the secret and its version |
+| 4 secret-scoped accessor grant; no runtime read for humans, CI, other workloads or the migrator; administrative authority separate | `iam_policy_evidence_ref` required; `iam_binding_scope` must read `secret`; migration 2's `meu_migrator` holds only the exchange owner and the ledger, and no Secret Manager binding is expressible in the repository | the IAM policy on the exact secret; the separation of rotation authority from read authority |
+| 5 Data Access audit logs before any materialization; five demonstrations; no universal claim | `audit_log_config_and_retention_ref` required; the harness report carries only non-secret identifiers, workload identity and bounded timestamps for correlation and never claims absence beyond a stated query and window (report field `audit_query_window`) | the configuration, retained logs and evidence |
+| 6 eight-step rotation; rollback conditions; no destruction during initial commissioning; 90 days | `ROTATION_SEQUENCE` (eight steps in the owner's order) and `check_rotation_plan`; `rollback_permitted` requires both the previous Secret Manager version and OpenAI credential valid and owner-authorized; `MAX_ROTATION_INTERVAL = 90 days`, matching `custody` | the runbook, its approval, each rotation's evidence |
+| 7 dedicated non-production OpenAI project; project-owned service account; `api.responses.write` only; designated model only; ratified ceilings | `openai_organization_id` (`org-…`), `openai_project_id` (`proj_…`), `openai_service_account_id` and `openai_role_and_key_scope_evidence_ref` required; `openai_key_scope` must be exactly `api.responses.write`; the adapter's request shape is closed to the one Responses call | the organization, project, service account, role, key scope, model access and limits |
+| 8 model and endpoint; availability verified before live validation | already enforced: `limits.is_pinned_snapshot`, `egress_policy.OPENAI_RESPONSES`, the adapter's `PreparedRequest`; `model_availability_evidence_ref` required and refused when it is merely the model name | the availability check against the designated project |
+| 9 spend and data controls | `vendor_spend_control_evidence_ref` and `vendor_spend_control_classification` (`hard_stop` or `advisory`) required; `data_processing_terms_ref` and `processing_region` required; the durable USD 25 ceiling stays `commissioning_budget`'s CHECK and the adapter's `CallBudget`; `store=false` is enforced at `PreparedRequest` construction; content stays synthetic by the harness's fixture set | the vendor configuration and its evidence |
+| 10 provisioning boundary | no repository code creates, retrieves, transmits, displays, logs or tests a real credential; both boundary suites and the validation package's fail on any import that could; no infrastructure-as-code exists | the operator's acts |
+| 11 offline step-7 artifacts | `ugence-model-egress-validation`: harness over the 18 rows with injected fake components, fake-transport cases, negative-test matrix, redacted report generator, drift checks, secret-shape scanning; the suite runs with sockets refused and infrastructure-dependent rows can only be `NOT_EXECUTABLE_OFFLINE` | the owner-run live verifier's execution, after step 8 |
+| 12 blocked until seventeen exact values | `STEP8_OBLIGATIONS` names the seventeen obligations and the 23 checked fields that represent them (§0.4.2); `check_step8_designation` refuses any missing, placeholder, secret-shaped, mis-shaped or unverified value; `COMMISSIONING_STATUS` unchanged; the `live` verifier command refuses to run and names each undesignated value | the values, their independent check, the separate live-validation authorization, and a further record for production |
+
+#### 0.4.2 — The seventeen obligations of ruling 12, each `UNDESIGNATED`
+
+LP-7 ruling 12 defines **exactly seventeen mandatory designation obligations**. The
+repository represents them as **17 mandatory designation obligations represented by 23
+checked fields**: eighteen obligation-bearing fields (obligation 14 is decomposed into two
+typed fields), two derived scope subfields, and three attestation fields. No eighteenth
+obligation exists or is claimed; `ugence_model_egress_unit.infrastructure.STEP8_OBLIGATIONS`
+is this table as code and `step8_field_counts()` states the counts from the definitions.
+
+| # | Obligation (ruling 12, verbatim) | Record key (`step8_required_values.obligations`) | Checked field(s) | Shape accepted | Live-command line |
+| --- | --- | --- | --- | --- | --- |
+| 1 | GCP project ID | `gcp_project_id` | `gcp_project_id` | 6–30 chars, lowercase letters, digits, hyphens, starting with a letter; never judged by name | `gcp_project_id` |
+| 2 | GCP project number | `gcp_project_number` | `gcp_project_number` | digits only | `gcp_project_number` |
+| 3 | MEU GCP service-account resource name | `meu_gcp_service_account_resource_name` | `meu_service_account` | `projects/<project>/serviceAccounts/<name>@<project>.iam.gserviceaccount.com`; human, default-compute, foreign-project and key-file identities refused | `meu_gcp_service_account_resource_name` |
+| 4 | deployment-platform identity mechanism | `deployment_platform_identity_mechanism` | `deployment_platform_identity_mechanism` | `workload_identity_federation` or `native_gcp_workload_identity` | `deployment_platform_identity_mechanism` |
+| 5 | WIF pool/provider and constrained principal binding, or the documented native GCP equivalent | `wif_pool_provider_and_constrained_principal_binding_or_native_gcp_equivalent` | `workload_identity_binding` (structured group: `WorkloadIdentityFederation` with 6 typed subfields — issuer, audience, subject constraints, pool, provider, principal binding — or `NativeGcpWorkloadIdentity` with 2 — path, no-static-key evidence) | must match obligation 4's mechanism; https issuer; constrained principal | `wif_pool_provider_and_constrained_principal_binding_or_native_gcp_equivalent` |
+| 6 | full numeric Secret Manager version resource | `full_numeric_secret_manager_version_resource` | `secret_version` | `projects/<project-id-or-number>/secrets/<secret>/versions/<n>`, numeric `<n>`; `latest` and any non-numeric reference refused | `full_numeric_secret_manager_version_resource` |
+| 7 | secret-level IAM-policy evidence reference | `secret_level_iam_policy_evidence_reference` | `iam_policy_evidence_ref`; derived subfield `iam_binding_scope` must read `secret` (ruling 4) | non-empty; scope exact | `secret_level_iam_policy_evidence_reference` |
+| 8 | Data Access audit-log configuration and retention reference | `data_access_audit_log_configuration_and_retention_reference` | `audit_log_config_and_retention_ref` | non-empty | `data_access_audit_log_configuration_and_retention_reference` |
+| 9 | approved rotation-runbook reference | `approved_rotation_runbook_reference` | `rotation_runbook_ref` | non-empty | `approved_rotation_runbook_reference` |
+| 10 | OpenAI organization ID | `openai_organization_id` | `openai_organization_id` | `org-` prefix | `openai_organization_id` |
+| 11 | OpenAI project ID | `openai_project_id` | `openai_project_id` | `proj_` prefix | `openai_project_id` |
+| 12 | OpenAI project service-account ID | `openai_project_service_account_id` | `openai_service_account_id` | non-empty | `openai_project_service_account_id` |
+| 13 | OpenAI role and API-key scope evidence | `openai_role_and_api_key_scope_evidence` | `openai_role_and_key_scope_evidence_ref`; derived subfield `openai_key_scope` must be exactly `api.responses.write` (ruling 7) | non-empty; scope exact | `openai_role_and_api_key_scope_evidence` |
+| 14 | vendor spend-control evidence and hard-stop/advisory classification | `vendor_spend_control_evidence_and_hard_stop_or_advisory_classification` | **two typed fields:** `vendor_spend_control_evidence_ref`, `vendor_spend_control_classification` | non-empty; `hard_stop` or `advisory` | `vendor_spend_control_evidence_and_hard_stop_or_advisory_classification` |
+| 15 | designated-model availability evidence | `designated_model_availability_evidence` | `model_availability_evidence_ref` | non-empty and not the model name (ruling 8) | `designated_model_availability_evidence` |
+| 16 | applicable data-processing-terms reference | `applicable_data_processing_terms_reference` | `data_processing_terms_ref` | non-empty | `applicable_data_processing_terms_reference` |
+| 17 | approved processing/data-residency region | `approved_processing_or_data_residency_region` | `processing_region` | non-empty | `approved_processing_or_data_residency_region` |
+
+Fields that are **not obligations** and are never counted as one:
+
+| Field | Kind | Why it exists |
+| --- | --- | --- |
+| `iam_binding_scope` | derived subfield of obligation 7 | ruling 4: the accessor grant is on the secret, never project-level |
+| `openai_key_scope` | derived subfield of obligation 13 | ruling 7: the role and key carry only `api.responses.write` |
+| `environment` | attestation | LP-7 governs the first non-production commissioning only |
+| `verified_by`, `verified_at` | attestation | ruling 12: every value independently checked before step 7 |
+| record key `attestation.independently_checked_by` | attestation | the live command lists it after the seventeen obligations, as an attestation, never as an eighteenth designation |
+
+Every field is refused when it carries a placeholder token, whitespace padding or a
+credential shape, and the record is refused unless `environment` reads `non-production`
+and `verified_by` and `verified_at` name the independent check. Supplying all seventeen
+closes only the infrastructure-designation blocker: the first live synthetic validation
+needs the owner's separate explicit authorization, and production use another record.
+
+### 0.5 — Owner clarification of 2026-09-12: row 12 must not presuppose MET; "production-authoritative" is custody authority
+
+> The 17-obligation-to-23-field mapping is accepted as the correct interpretation of LP-7, subject to final green CI.
+>
+> Before finalizing PR #1751, clarify row 12's statement that live provenance "needs MET."
+>
+> If MET refers to this same live-provider commissioning status, that is circular: row 12 cannot require the final status that row 12 itself helps establish. Correct the contract so that row 12 requires:
+>
+> * all Step-8 infrastructure designations independently verified;
+> * a production-authoritative custody lease within the non-production commissioning scope;
+> * separate explicit owner authorization for the synthetic validation call;
+> * a genuine-call result carrying UNTRUSTED_EVIDENCE;
+> * correlation with the row-18 secret-access evidence.
+>
+> The successful row then contributes evidence toward the later owner decision to move commissioning to MET; it must not presuppose MET.
+>
+> If "needs MET" refers to a different predecessor gate, name that exact gate and record identifier unambiguously.
+>
+> Also clarify that "production-authoritative lease" describes the lease's authority under the real custody contract, not authorization of a production deployment. LP-7 remains strictly non-production.
+>
+> Make only the documentation, contract or test changes required to remove ambiguity. Allow all CI runs on the resulting final head to complete, update the PR body, and return: the final commit; the complete CI matrix; confirmation of 17 obligations represented by 23 checked fields; the final wording and prerequisites of row 12; confirmation that every canonical validation result remains null; any remaining blocker.
+>
+> Do not merge, create infrastructure or credentials, authorize a live call, enable live vendor egress, or mark commissioning MET.
+
+#### 0.5.1 — What "needs MET" referred to, and the correction
+
+It referred to this same commissioning status. Unit 0.3.0 implemented the sixth condition
+of §0.3 ("application and deployment gates continue to refuse genuine calls until
+commissioning reaches MET") literally: `EgressResult` refused `genuine_call: true` unless
+the release constant `COMMISSIONING_STATUS` read `MET`, and the adapter refused a
+production-authoritative lease on the same condition. Read together with LP-4 (MET is
+reached only by the owner's separate acceptance statement after the validation run) that
+is circular: the validation call that produces row 12's evidence could never be recorded.
+
+The correction (unit 0.4.1, adapter 0.1.2) names two predecessor gates and makes MET the
+outcome only:
+
+| Predecessor gate | Record identifier | Release constant of the unit | Meaning |
+| --- | --- | --- | --- |
+| G1 status admits a genuine call | `MEU_LIVE_VALIDATION.json` → `meu_live_status` = `PENDING_VALIDATION` (or, afterwards, `MET`) | `COMMISSIONING_STATUS` ∈ `GENUINE_CALL_ADMITTING_STATUSES` = (`PENDING_VALIDATION`, `MET`) | every one of the seventeen step-8 obligations independently verified (ruling 12) |
+| G2 the live synthetic validation is authorized | `MEU_LIVE_VALIDATION.json` → `live_synthetic_validation_authorization` = the digest of the owner's typed `LiveSyntheticValidationAuthorization` (today `NOT_GIVEN`) | none: the typed record itself, validated and consumed by `admit_genuine_call` (§0.6); `LIVE_SYNTHETIC_VALIDATION_AUTHORIZATION_DIGEST` only mirrors the record for drift | LP-7 ruling 12's "separate, explicit owner authorization" |
+
+As corrected in §0.6, G1 ∧ G2 is evaluated by `admit_genuine_call` against the canonical
+record and the typed authorization, and consumed durably; no constant is authority.
+`tests/test_live_authorization.py` proves each gate alone is insufficient and that `MET`
+alone admits nothing.
+
+**Row 12, final wording.** Scenario "the live answer's provenance"; required outcome
+`GENUINE_CALL_TRUE_LEASE_PRODUCTION_AUTHORITATIVE_TRUST_UNTRUSTED_EVIDENCE`; prerequisites,
+recorded in the row itself:
+
+1. all seventeen step-8 infrastructure designations independently verified
+   (`meu_live_status` = `PENDING_VALIDATION`) — G1;
+2. a production-authoritative custody lease within the non-production commissioning
+   scope: the lease's authority under the real custody contract (the commissioned Secret
+   Manager path, the pinned numeric version, the designated workload identity), not
+   authorization of a production deployment;
+3. the owner's separate explicit authorization for the synthetic validation call
+   (`live_synthetic_validation_authorization`) — G2;
+4. a genuine-call result carrying trust `UNTRUSTED_EVIDENCE`, with `custody_lease_id` and
+   `custody_authority_id`;
+5. correlation with the row-18 secret-access evidence by non-secret identifiers and
+   bounded timestamps.
+
+The successful row contributes evidence toward the owner's later decision to move
+`meu_live_status` to `MET`; it does not presuppose MET, and the drift check refuses a
+row-12 prerequisite that names MET.
+
+**"Production-authoritative", clarified.** `CredentialLease.is_production_authoritative`
+describes the lease's authority under the real custody contract: materialized by the
+commissioned custody path rather than a fake, emulator or reference one. It says nothing
+about the deployment the lease serves. The first live synthetic validation uses exactly
+such a lease within the non-production commissioning scope, and it authorizes no
+production deployment, which needs its own commissioning record (LP-7 preamble, ruling 7).
+
+### 0.6 — Owner correction of 2026-09-12: G2 is a typed, immutable, consumable authorization, never a constant
+
+> The row-12 circularity correction is accepted. Before merging PR #1751, correct the remaining G2 authorization shape.
+>
+> LIVE_SYNTHETIC_VALIDATION_AUTHORIZATION not NOT_GIVEN is insufficient as an authorization predicate. A package constant may mirror the canonical record for drift detection, but it must not itself constitute execution authority.
+>
+> Replace G2 with validation of a typed, immutable and consumable LiveSyntheticValidationAuthorization record, or keep G2 permanently closed until that record exists.
+>
+> The authorization must bind at minimum:
+>
+> * authorization ID and non-reusable nonce;
+> * authorizing owner and authority/acceptance reference;
+> * issue and expiry timestamps;
+> * NON_PRODUCTION environment;
+> * designated OpenAI organization, project and service-account IDs;
+> * exact provider, pinned model and endpoint;
+> * exact Step-8 designation-record digest;
+> * exact validation-plan digest and either the authorized request digest or an explicitly bounded set of request digests;
+> * synthetic_non_sensitive_only;
+> * maximum calls, not exceeding 10;
+> * input/output-token limits;
+> * USD 25 commissioning ceiling;
+> * concurrency and retry limits.
+>
+> genuine_call_admitted() must require:
+>
+> 1. G1 is satisfied from the canonical commissioning record;
+> 2. the typed authorization is present and valid;
+> 3. every scope field matches the proposed request and current Step-8 designations;
+> 4. the authorization is unexpired and unrevoked;
+> 5. its nonce has not been replayed;
+> 6. the durable reservation ledger proves remaining call and budget capacity.
+>
+> A nonempty string, boolean, arbitrary owner name or altered release constant must never satisfy G2.
+>
+> Authorization must be consumed durably before dispatch. An ambiguous dispatch consumes the attempt. Expiry, revocation, reaching the call limit, or transition to MET must not create or extend authorization. After the authorized validation sequence is consumed, further genuine calls remain refused unless separately authorized.
+>
+> Add negative tests for:
+>
+> * arbitrary non-NOT_GIVEN values;
+> * missing fields;
+> * wrong owner or environment;
+> * wrong organization, project, service account, provider, model or endpoint;
+> * designation-digest drift;
+> * wrong request or validation-plan digest;
+> * expired and revoked authorization;
+> * nonce replay;
+> * exhausted calls or budget;
+> * MET without a current authorization;
+> * attempted reuse after the validation sequence.
+>
+> The canonical authorization remains NOT_GIVEN, every validation row remains null, and offline fixtures must not mutate the canonical record.
+>
+> If introducing the typed authorization requires an owner decision about its canonical schema or authority protocol, stop and return that exact ballot instead of inventing it. Otherwise implement the correction, rerun the full CI matrix, update draft PR #1751 and return the final report.
+>
+> Do not merge, create infrastructure or credentials, make a live call, enable live vendor egress, or mark commissioning MET.
+
+#### 0.6.1 — What was implemented (unit 0.5.0, adapter 0.2.0, validation 0.2.0)
+
+No owner decision on schema or authority protocol was needed: the fields are the owner's
+list, and authority follows the repository's existing pattern for every ruling here —
+the owner's record, pinned by digest into the canonical commissioning record the owner
+edits. No signature scheme and no new key custody were introduced.
+
+**The typed record.** `ugence_model_egress_unit.authorization.LiveSyntheticValidationAuthorization`,
+schema `model-egress-unit.live-synthetic-validation-authorization.v1`, frozen, every
+field bound into its digest (domain `ugence.model-egress-unit/live-synthetic-validation-authorization/v1`):
+
+| Owner's obligation | Field(s) | Refused at construction when |
+| --- | --- | --- |
+| authorization ID and non-reusable nonce | `authorization_id`, `nonce` (≥16 chars) | missing, padded, placeholder or credential-shaped |
+| authorizing owner and authority/acceptance reference | `authorizing_owner`, `authority_reference` | as above |
+| issue and expiry timestamps | `issued_at`, `expires_at` | naive, or expiry not after issue |
+| NON_PRODUCTION environment | `environment` | anything but `NON_PRODUCTION` |
+| designated OpenAI organization, project, service-account IDs | `openai_organization_id`, `openai_project_id`, `openai_service_account_id` | missing or placeholder |
+| exact provider, pinned model, endpoint | `provider` (`openai`), `model` (dated snapshot), `endpoint` (exactly `OPENAI_RESPONSES`) | otherwise |
+| exact Step-8 designation-record digest | `designation_record_digest` | not a 64-hex digest |
+| exact validation-plan digest; the authorized request digest or a bounded set | `validation_plan_digest`, `authorized_request_digests` (non-empty, distinct, ≤ `max_calls`) | otherwise |
+| synthetic_non_sensitive_only | `synthetic_non_sensitive_only` | not exactly `true` |
+| maximum calls ≤ 10 | `max_calls` | outside 1..10 |
+| input/output-token limits | `max_input_tokens` ≤ 8,192, `max_output_tokens` ≤ 1,024 | beyond the ruling |
+| USD 25 ceiling | `budget_usd_cents` ≤ 2,500 | beyond the ruling |
+| concurrency and retry limits | `concurrency` = 1, `max_retries` ≤ 1 | beyond the ruling |
+
+**Canonical binding (record identifiers).** `MEU_LIVE_VALIDATION.json` →
+`live_synthetic_validation_authorization` is `NOT_GIVEN` or the record's digest;
+`revoked_authorization_digests` lists revoked digests; `authorizing_owner` is the owner
+the record must name. `LIVE_SYNTHETIC_VALIDATION_AUTHORIZATION_DIGEST` in `version.py`
+mirrors the first for drift detection only.
+
+**The gate.** `admit_genuine_call(authorization, record=CommissioningRecordView, request,
+expected=ScopeExpectation, plan_digest, now, ledger, estimated_cents)` is the only way to
+obtain a `GenuineCallAdmission`, and it holds, in order:
+
+| # | Owner's requirement | Where it is checked |
+| --- | --- | --- |
+| 1 | G1 from the canonical commissioning record | `CommissioningRecordView.status` ∈ (`PENDING_VALIDATION`, `MET`), read from the record, never a constant |
+| 2 | typed authorization present and valid | the argument is a `LiveSyntheticValidationAuthorization` whose digest equals the record's pinned digest; `NOT_GIVEN`, a string, a flag, a name or an edited copy are refused |
+| 3 | every scope field matches the request and the current designations | owner, environment, organization/project/service account, provider, model, endpoint against `ScopeExpectation` (from the designation record); the request's own binding; the designation-record digest; the plan digest; the request digest within the authorized set with its content still hashing; the request within the authorized token limits |
+| 4 | unexpired and unrevoked | `issued_at ≤ now < expires_at`; digest not in `revoked_authorization_digests` |
+| 5 | nonce not replayed | the ledger refuses a nonce already backing another digest |
+| 6 | the durable ledger proves capacity | `ledger.capacity` then `ledger.consume`, which writes the consumption and the LP-5 reservation in one transaction, before dispatch; a refusal rolls both back; nothing is ever given back, so an ambiguous dispatch keeps the consumption |
+
+The ledger is `postgres.ExchangeAuthorizationLedger` over migration 3's
+`commissioning_authorization` (nonce → one digest, `calls_consumed` only rises, `max_calls`
+and `expires_at` immutable by trigger) and `commissioning_authorization_consumption`
+(one row per consumed attempt, unique per request). `InMemoryAuthorizationLedger` is a
+fixture. The application half: `EgressResult` refuses `genuine_call: true` without a
+verified `GenuineCallAdmission` for that request; the database half: migration 3 adds
+`egress_result.authorization_consumption_id` (foreign key to the consumption) and the
+CHECK `egress_result_genuine_call_requires_custody_and_admission`. The adapter
+(`execute(..., admission=)`) refuses a production-authoritative lease without a verified
+admission for the request and records a genuine response only under one.
+
+**Negative tests** (`tests/test_live_authorization.py`, `tests/test_migration_3_authorization_ledger.py`,
+adapter `tests/test_provider.py`): arbitrary non-`NOT_GIVEN` values (strings, `True`, the
+owner's name, an altered mirror constant); every missing field; wrong owner or
+environment; wrong organization, project, service account, provider, model or endpoint;
+designation-digest drift; wrong request or plan digest and a tampered request; expired,
+not-yet-valid and revoked, including under `MET`; nonce replay (pure and durable);
+exhausted calls and budget (pure and durable, with the consumption rolled back); `MET`
+without a current authorization and `BLOCKED` with one; reuse after the sequence and of a
+consumed request. The canonical authorization stays `NOT_GIVEN`, every row stays `null`,
+and the validation package's tests hash both records before and after every command.
 
 ## 1 — The finding that shapes this record
 

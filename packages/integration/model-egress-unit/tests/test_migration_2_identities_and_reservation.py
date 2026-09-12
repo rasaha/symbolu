@@ -82,8 +82,8 @@ def _submit_and_answer(worker: Exchange, unit: Exchange, tenant):
 def test_a_fresh_install_applies_both_migrations_and_migration_one_is_byte_identical(blank):
     with psycopg.connect(blank, autocommit=True) as conn:
         applied = migrate(conn)
-        assert [m.version for m in applied] == [1, 2]
-        assert applied_versions(conn) == {1: MIGRATIONS[0].digest, 2: MIGRATIONS[1].digest}
+        assert [m.version for m in applied] == [1, 2, 3]
+        assert applied_versions(conn) == {m.version: m.digest for m in MIGRATIONS}
         assert migrate(conn) == []
     # the digest of migration 1 is the one #1743 shipped: nothing edited an applied step
     assert MIGRATIONS[0].name == "exchange_roles_tables_and_rls"
@@ -121,13 +121,13 @@ def test_the_upgrade_path_keeps_existing_rows_and_digests_valid(blank, tenant):
     before = worker.read_result(tenant, req.request_id)
     assert before is not None and before["response_digest"] == result.digest()
     with psycopg.connect(blank, autocommit=True) as conn:
-        assert [m.version for m in migrate(conn)] == [2]
+        assert [m.version for m in migrate(conn)] == [2, 3]
         with conn.cursor() as cur:
             cur.execute("SELECT conname FROM pg_constraint WHERE conrelid = %s::regclass",
                         (f"{SCHEMA_NAME}.egress_result",))
             names = {r[0] for r in cur.fetchall()}
         assert "egress_result_no_genuine_call" not in names
-        assert "egress_result_genuine_call_requires_custody" in names
+        assert "egress_result_genuine_call_requires_custody_and_admission" in names
     after = worker.read_result(tenant, req.request_id)
     assert after == before, "an existing row reads back unchanged after the upgrade"
     assert after["response_digest"] == result.digest(), "its digest still recomputes"
@@ -199,7 +199,7 @@ def _probe_forbidden_statements(conn, probe):
         f"ALTER TABLE {SCHEMA_NAME}.egress_request NO FORCE ROW LEVEL SECURITY",
         f"DROP POLICY tenant_isolation ON {SCHEMA_NAME}.egress_request",
         f"DROP POLICY identity_binding ON {SCHEMA_NAME}.egress_request",
-        f"ALTER TABLE {SCHEMA_NAME}.egress_result DROP CONSTRAINT egress_result_genuine_call_requires_custody",
+        f"ALTER TABLE {SCHEMA_NAME}.egress_result DROP CONSTRAINT egress_result_genuine_call_requires_custody_and_admission",
         f"INSERT INTO {SCHEMA_NAME}.{BINDING_TABLE} (role_name, tenant_id) VALUES ('x', gen_random_uuid())",
         f"DELETE FROM {SCHEMA_NAME}.{BUDGET_TABLE}",
         f"DROP TRIGGER commissioning_budget_no_refund ON {SCHEMA_NAME}.{BUDGET_TABLE}",
@@ -262,21 +262,25 @@ def test_a_binding_cannot_be_written_by_a_runtime_role_and_the_report_names_unbo
 
 # --- LP-2b: the custody constraint, both halves ----------------------------------
 
-def test_the_database_admits_a_genuine_row_only_with_custody_and_the_application_admits_none(database, tenant, worker_exchange, unit_exchange):
+def test_the_database_admits_a_genuine_row_only_with_custody_and_a_consumption_and_the_application_admits_none(database, tenant, worker_exchange, unit_exchange):
     req, _ = _submit_and_answer(worker_exchange, unit_exchange, tenant)
     with psycopg.connect(database, autocommit=True) as conn:
         conn.execute(f"SELECT set_config('ugence.tenant_id', %s, false)", (str(tenant),))
         with pytest.raises(psycopg.errors.CheckViolation):
             conn.execute(f"UPDATE {SCHEMA_NAME}.egress_result SET genuine_call = true WHERE request_id = %s",
                          (str(req.request_id),))
-        conn.execute(f"""UPDATE {SCHEMA_NAME}.egress_result SET genuine_call = true,
-                         custody_lease_id = 'lease-x', custody_authority_id = 'custody-x'
-                         WHERE request_id = %s""", (str(req.request_id),))
-        conn.execute(f"""UPDATE {SCHEMA_NAME}.egress_result SET genuine_call = false,
-                         custody_lease_id = NULL, custody_authority_id = NULL WHERE request_id = %s""",
-                     (str(req.request_id),))
-    # the application half: no result may claim a genuine call while commissioning is not MET
-    assert COMMISSIONING_STATUS != "MET"
+        with pytest.raises(psycopg.errors.CheckViolation):   # custody alone is no longer enough (migration 3)
+            conn.execute(f"""UPDATE {SCHEMA_NAME}.egress_result SET genuine_call = true,
+                             custody_lease_id = 'lease-x', custody_authority_id = 'custody-x'
+                             WHERE request_id = %s""", (str(req.request_id),))
+        with pytest.raises(psycopg.errors.ForeignKeyViolation):  # and a consumption must exist
+            conn.execute(f"""UPDATE {SCHEMA_NAME}.egress_result SET genuine_call = true,
+                             custody_lease_id = 'lease-x', custody_authority_id = 'custody-x',
+                             authorization_consumption_id = gen_random_uuid()
+                             WHERE request_id = %s""", (str(req.request_id),))
+    # the application half: no result may claim a genuine call without a verified admission
+    from ugence_model_egress_unit import status_admits_genuine_call
+    assert COMMISSIONING_STATUS == "BLOCKED_PENDING_INFRASTRUCTURE_DESIGNATIONS" and status_admits_genuine_call() is False
     fake = DeterministicFakeProvider().execute(_make_request(tenant), now=NOW)
     with pytest.raises(ValueError, match="while commissioning is"):
         EgressResult(request_id=fake.request_id, tenant_id=fake.tenant_id, correlation_id=fake.correlation_id,

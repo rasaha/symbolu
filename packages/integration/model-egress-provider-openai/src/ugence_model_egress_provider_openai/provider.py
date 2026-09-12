@@ -6,7 +6,7 @@ Order of operations, and why it is this order:
    this vendor and exactly the designated snapshot; the request is unexpired, its
    content still hashes to its digest, and it is inside the LP-5 ceiling
    (:func:`ugence_model_egress_unit.check_request`); the injected transport declares
-   itself non-production while commissioning is not ``MET``. The unit calls this
+   itself non-production (no live transport exists in this release). The unit calls this
    before marking dispatch, so a refusable request never looks dispatched.
 2. **Custody**: a lease is asked for, with an audit event either way. A refusal here
    is terminal and consumes nothing.
@@ -19,8 +19,11 @@ Order of operations, and why it is this order:
 4. **Retry**: once, and only for an outcome whose transport *proved* no bytes were
    dispatched. Anything ambiguous is recorded ``OUTCOME_UNKNOWN`` with a
    :class:`DispatchAttempt`, not retried.
-5. **Record**: never ``genuine_call: true``. The fake transport cannot claim it; a
-   transport that does, outside ``MET``, is an invariant violation and this adapter
+5. **Record**: ``genuine_call: true`` only under a verified :class:`GenuineCallAdmission`
+   for this request — the durable consumption of the owner's typed live-validation
+   authorization (ADR §0.6) — and a production-authoritative lease. The fake transport
+   cannot claim a genuine response; a transport that does without those is an invariant
+   violation and this adapter
    raises rather than write a record it cannot stand behind — the leased row then
    expires into ``OUTCOME_UNKNOWN`` by the unit's existing reconciliation.
 
@@ -36,12 +39,15 @@ from typing import Any, Callable, Mapping, Optional
 from ugence_model_egress_unit import (
     COMMISSIONING_LIMITS,
     COMMISSIONING_STATUS,
+    GenuineCallAdmission,
+    status_admits_genuine_call,
     BudgetExhausted,
     CallBudget,
     CommissioningLimits,
     CredentialLease,
     CredentialRequest,
     CustodyAuditEvent,
+    CustodyRefused,
     DispatchAttempt,
     EgressRequest,
     EgressResult,
@@ -167,7 +173,9 @@ class OpenAIResponsesProvider:
             return RefusalReason.REQUEST_NOT_VALID
         if request.minimized_context is None or not request.content_matches_digest():
             return RefusalReason.CONTENT_DIGEST_MISMATCH
-        if COMMISSIONING_STATUS != "MET" and getattr(self._transport, "NON_PRODUCTION", False) is not True:
+        if getattr(self._transport, "NON_PRODUCTION", False) is not True:
+            # No live transport exists in this release; a transport that does not declare
+            # itself a fake is refused before anything else.
             return RefusalReason.LIVE_EGRESS_NOT_AVAILABLE
         if (self._budget.calls_reserved >= COMMISSIONING_LIMITS.max_genuine_calls
                 or self._budget.in_flight >= COMMISSIONING_LIMITS.concurrency
@@ -192,12 +200,18 @@ class OpenAIResponsesProvider:
                                     detected_at=now, reason=reason))
 
     def execute(self, request: EgressRequest, *, now: datetime,
-                production: bool = False) -> EgressResult:
+                production: bool = False,
+                admission: Optional[GenuineCallAdmission] = None) -> EgressResult:
+        """``admission`` is the receipt of a durable consumption of the owner's typed
+        live-validation authorization for exactly this request (ADR §0.6), obtained by
+        the unit through ``admit_genuine_call`` before calling here. Without one, a
+        production-authoritative lease is refused and no genuine result can exist."""
+
         if production:
             raise ProviderRefusedInProduction(
-                f"{self.adapter_id} refuses a production posture while commissioning is "
-                f"{COMMISSIONING_STATUS}; only the owner's separate MET statement, released as "
-                f"a new version of the unit, changes that.")
+                f"{self.adapter_id} refuses a production posture in this release: no live transport "
+                f"exists, commissioning is {COMMISSIONING_STATUS}, and a genuine call is admitted only "
+                f"by a typed, consumed authorization (ADR §0.6), never by a posture flag.")
         reason = self._refusal(request, now)
         if reason is not None:
             return self._refused(request, now, reason)
@@ -211,8 +225,17 @@ class OpenAIResponsesProvider:
             now=now, production=production, sink=self._audit_sink)
         if lease is None:
             return self._refused(request, now, RefusalReason.CREDENTIAL_NOT_COMMISSIONED)
-        if lease.is_production_authoritative and COMMISSIONING_STATUS != "MET":
+        admitted = (isinstance(admission, GenuineCallAdmission) and admission.verify()
+                    and admission.request_id == request.request_id and status_admits_genuine_call())
+        if lease.is_production_authoritative and not admitted:
+            # A lease with real custody authority (not a production deployment: ADR §0.5)
+            # is usable only under a verified admission for this request — the durable
+            # consumption of the owner's typed authorization (ADR §0.6).
             return self._refused(request, now, RefusalReason.LIVE_EGRESS_NOT_AVAILABLE)
+        if lease.expired(now):
+            # Validation row 11: a lease expired at use is a custody refusal, decided
+            # before any reservation and before any dispatch.
+            return self._refused(request, now, RefusalReason.CREDENTIAL_NOT_COMMISSIONED)
 
         try:
             self._budget.reserve(estimated_cents=ESTIMATED_CENTS_PER_CALL, now=now,
@@ -221,6 +244,10 @@ class OpenAIResponsesProvider:
             return self._refused(request, now, RefusalReason.COMMISSIONING_BUDGET_EXHAUSTED)
         try:
             outcome = self._dispatch(prepared, lease, now)
+        except CustodyRefused:
+            # ``CredentialLease.use`` refused before handing the secret to the transport:
+            # nothing was dispatched. The reservation is kept (non-compensatory).
+            return self._refused(request, now, RefusalReason.CREDENTIAL_NOT_COMMISSIONED)
         except Exception:  # noqa: BLE001 — a raising transport is an ambiguous dispatch
             return self._unknown(request, now, "transport raised during dispatch; state ambiguous")
         finally:
@@ -234,9 +261,24 @@ class OpenAIResponsesProvider:
                 correlation_id=request.correlation_id, recorded_at=now,
                 adapter_id=self.adapter_id, model_ref=request.authorization.authorized_model)
         if outcome.genuine:
-            raise GenuineResponseNotRecordable(
-                f"{self.adapter_id}: the transport reported a genuine vendor response while "
-                f"commissioning is {COMMISSIONING_STATUS}; no record may carry genuine_call: true")
+            if not (admitted and lease.is_production_authoritative):
+                raise GenuineResponseNotRecordable(
+                    f"{self.adapter_id}: the transport reported a genuine vendor response without a "
+                    f"verified admission and a production-authoritative lease (commissioning "
+                    f"{COMMISSIONING_STATUS}); no record may carry genuine_call: true")
+            text = _output_text(outcome.body or {})
+            if outcome.status != 200 or text is None:
+                return EgressResult.failed(
+                    request_id=request.request_id, tenant_id=request.tenant_id,
+                    correlation_id=request.correlation_id, recorded_at=now,
+                    adapter_id=self.adapter_id, model_ref=request.authorization.authorized_model)
+            return EgressResult.answered_genuine(
+                request_id=request.request_id, tenant_id=request.tenant_id,
+                correlation_id=request.correlation_id, recorded_at=now,
+                adapter_id=self.adapter_id, payload=text,
+                model_ref=request.authorization.authorized_model,
+                custody_lease_id=lease.lease_id, custody_authority_id=lease.custody_authority_id,
+                admission=admission, token_count=_total_tokens(outcome.body or {}))
         text = _output_text(outcome.body or {})
         if outcome.status != 200 or text is None:
             return EgressResult.failed(

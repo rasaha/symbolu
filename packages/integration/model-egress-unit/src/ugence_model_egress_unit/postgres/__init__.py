@@ -8,6 +8,7 @@ imports ``psycopg``.
 from __future__ import annotations
 
 from .exchange import (
+    ExchangeAuthorizationLedger,
     ClaimedRequest,
     Exchange,
     ExchangeError,
@@ -31,6 +32,8 @@ from .schema import (
     BUDGET_TABLE,
     MIGRATOR_ROLE,
     RESERVATION_TABLE,
+    AUTHORIZATION_TABLE,
+    CONSUMPTION_TABLE,
     OWNER_ROLE,
     ROLE_NAMES,
     SCHEMA_NAME,
@@ -54,6 +57,8 @@ __all__ = [
     "BINDING_TABLE",
     "BUDGET_TABLE",
     "RESERVATION_TABLE",
+    "AUTHORIZATION_TABLE",
+    "CONSUMPTION_TABLE",
     "OWNER_ROLE",
     "WORKER_ROLE",
     "UNIT_ROLE",
@@ -67,6 +72,7 @@ __all__ = [
     "applied_versions",
     "MigrationDrift",
     "Exchange",
+    "ExchangeAuthorizationLedger",
     "ClaimedRequest",
     "ExchangeError",
     "TenantMismatch",
