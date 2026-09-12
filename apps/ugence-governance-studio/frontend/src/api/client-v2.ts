@@ -10,7 +10,7 @@
 // revokes, grants, authorizes, clears or executes, and `V2_OPERATIONS` below is the
 // closed set the boundary verifier checks against the contract.
 import { apiBaseUrl } from "@/lib/config";
-import { ApiClientError } from "./client";
+import { ApiClientError, deploymentHeaders } from "./client";
 import {
   decodeGap,
   type ConstitutionPreflightBody,
@@ -77,7 +77,8 @@ async function v2Request<T>(pathAndQuery: string, init?: RequestInit): Promise<T
   try {
     response = await fetch(`${apiBaseUrl}${pathAndQuery}`, {
       ...init,
-      headers: { Accept: "application/json", ...(init?.headers ?? {}) },
+      // the deployment request header rides every mutating request (see client.ts)
+      headers: { Accept: "application/json", ...deploymentHeaders(init?.method), ...(init?.headers ?? {}) },
     });
   } catch (err) {
     throw new ApiClientError(

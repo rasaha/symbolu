@@ -17,6 +17,12 @@ COPY apps/ugence-governance-studio/frontend/package.json apps/ugence-governance-
 RUN npm ci
 COPY apps/ugence-governance-studio/frontend/ ./
 COPY apps/ugence-governance-studio/contracts/ /build/contracts/
+# The API origin compiled into the bundle (frontend config.ts). The profile serves the
+# SPA and the API from its one listener, so this is the listener's own public origin,
+# scheme, host and port, exactly as the browser will address it. Unset, the bundle
+# keeps its loopback default and the served SPA reaches nothing.
+ARG VITE_API_BASE_URL
+ENV VITE_API_BASE_URL=${VITE_API_BASE_URL}
 RUN npm run generate:api \
  && npm run verify:openapi \
  && npm run verify:api-boundary \

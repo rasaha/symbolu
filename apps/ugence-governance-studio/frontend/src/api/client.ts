@@ -29,12 +29,41 @@ export class ApiClientError extends Error {
   }
 }
 
+/**
+ * The deployment request header (P3E §15). The private hosted profile refuses a
+ * mutating `/api` request that does not carry it: a cross-origin request constraint,
+ * not authorization. It rides every mutating request and no read, and only when the
+ * API is this page's own origin, which is the only shape the hosted profile serves
+ * (its CSP is `connect-src 'self'`). A cross-origin API such as the plain studio-api
+ * allowlists `Content-Type` alone, and an extra header there would fail its CORS
+ * preflight for nothing.
+ */
+export const DEPLOYMENT_REQUEST_HEADER = "X-Ugence-Request";
+export const DEPLOYMENT_REQUEST_VALUE = "GovernanceStudio";
+const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
+
+export function deploymentHeaders(
+  method: string | undefined,
+  pageOrigin: string | undefined = globalThis.location?.origin,
+  base: string = apiBaseUrl,
+): Record<string, string> {
+  if (SAFE_METHODS.has((method ?? "GET").toUpperCase())) return {};
+  let apiOrigin: string;
+  try {
+    apiOrigin = new URL(base).origin;
+  } catch {
+    return {};
+  }
+  if (!pageOrigin || apiOrigin !== pageOrigin) return {};
+  return { [DEPLOYMENT_REQUEST_HEADER]: DEPLOYMENT_REQUEST_VALUE };
+}
+
 async function request<T>(pathAndQuery: string, init?: RequestInit): Promise<T> {
   let response: Response;
   try {
     response = await fetch(`${apiBaseUrl}${pathAndQuery}`, {
       ...init,
-      headers: { Accept: "application/json", ...(init?.headers ?? {}) },
+      headers: { Accept: "application/json", ...deploymentHeaders(init?.method), ...(init?.headers ?? {}) },
     });
   } catch (err) {
     throw new ApiClientError(0, "network_error", "the Governance Studio API is unreachable", undefined, err);

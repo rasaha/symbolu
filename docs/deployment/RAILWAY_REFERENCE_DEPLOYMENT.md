@@ -712,28 +712,46 @@ preflight, Authority, Simulate path A and Status. **Do not enter anything in Pos
 this**: no screen reads Postgres; the studio's records are sqlite files under
 `UGENCE_STUDIO_RUNTIME_DIR`, and the worker's Postgres holds only the durable engine's state.
 
-**Read 9.0 first.** As committed, the profile cannot be driven from a browser, and this
-walkthrough was not run on Railway. Steps 9.1 to 9.7 are what the source accepts `[V]` and
-what Railway's documentation says `[I]`; the two items in 9.0 are `[G]` until the owner
-ratifies them.
+**Read 9.0 first.** Until 2026-09-12 the profile could not be driven from a browser; 9.0
+records the two gaps and their closure. This walkthrough has not been run on Railway: steps
+9.1 to 9.7 are what the source accepts `[V]` and what Railway's documentation says `[I]`.
 
-**9.0 Two gaps in the profile's own frontend, both `[V]` from source.**
+**9.0 Two gaps in the profile's own frontend, both closed on 2026-09-12 (owner-ratified).**
 
-1. *The packaged SPA is built without an API origin.* The Dockerfile's frontend stage runs
-   `npm run build` with no `VITE_API_BASE_URL`, and `config.ts:6-25` then compiles the default
-   `http://127.0.0.1:8000` into the bundle. Served from the profile, the SPA calls a port
-   nothing listens on and shows the *API is not compatible* screen. The profile's own e2e
-   (`ci/packaged_e2e.py`) never loads the SPA; it drives `/api` directly.
-2. *The SPA never sends the deployment request header.* `middleware.py:55-84` returns 403 on
-   every mutating `/api` request that lacks `X-Ugence-Request: GovernanceStudio`. The profile's
-   tests and `packaged_e2e.py` add that header themselves; `client.ts` and `client-v2.ts` send
-   only `Accept` and `Content-Type`. Every Register, Declare, Validate, Compile and Run press
-   would be refused.
+1. *The packaged SPA was built without an API origin.* The Dockerfile's frontend stage ran
+   `npm run build` with no `VITE_API_BASE_URL`, and `config.ts:6-25` compiled the default
+   `http://127.0.0.1:8000` into the bundle, so the served SPA called a port nothing listens
+   on. **Closed:** the frontend stage now declares `ARG VITE_API_BASE_URL` and exports it to
+   the build (`deployment/governance-studio/Dockerfile`, frontend stage, before
+   `npm run build`) `[V]`. The same build run outside Docker with the variable set compiles
+   the given origin into the bundle and nothing else `[V]`; that Railway hands a service
+   variable to a Dockerfile build as this `ARG` stays `[I]` until a Railway build has done it.
+2. *The SPA never sent the deployment request header.* `middleware.py:55-84` returns 403 on
+   every mutating `/api` request that lacks `X-Ugence-Request: GovernanceStudio`, and the two
+   clients sent only `Accept` and `Content-Type`. **Closed:** `deploymentHeaders` in
+   `apps/ugence-governance-studio/frontend/src/api/client.ts` adds the header to every
+   mutating request of both clients (`client.ts` and `client-v2.ts` route all requests through
+   it) and to no read `[V]`, covered by `tests/deployment-header.test.ts`.
 
-   The smallest change that closes both, for ratification and not applied here: a
-   `VITE_API_BASE_URL` build argument in the Dockerfile's frontend stage (Railway exposes
-   service variables to a Dockerfile build as `ARG`s `[I]`), and one header entry in the two
-   clients' mutating-request `init` objects. Neither touches the frozen OpenAPI document.
+   *One condition, decided during implementation and worth the owner's eye.* The header is
+   sent only when the API origin is the page's own origin. The ratification prompt asked
+   whether it may go unconditionally; it may not: the plain `studio-api` allowlists
+   `Content-Type` alone (`ugence_governance_studio_api/app.py:129`), so an extra request
+   header from `studio-web` would fail its CORS preflight and break every POST of the
+   explorer deployed in parts 1 to 4. Same-origin is exactly and only the hosted profile's
+   shape, whose CSP is `connect-src 'self'` and whose middleware is the only consumer of the
+   header. Neither change touches the frozen OpenAPI documents or the P3E security model,
+   which required the header all along.
+
+   *Evidence, 2026-09-12, outside Railway `[V]`.* Frontend: 306 vitest tests pass across
+   29 files, lint, type-check and both API-boundary verifiers pass. Deployment profile:
+   338 tests pass, 1 skipped. `ci/packaged_e2e.py` passes all 46 checks over HTTPS against a
+   live listener built from this tree. From the served SPA, a Chromium session with the
+   operator credentials opened `/studio/registration`, registered `hiring-screener` with the
+   screen guide's values, and the one POST carried `X-Ugence-Request: GovernanceStudio`,
+   answered 200 with `registry_kind SqliteSystemRegistry`, wrote one row to the sqlite
+   registry, and listed the record after a reload. The same POST without the header answers
+   403 from the same listener. No container image was built here (no Docker daemon).
 
 **9.1 Add a service** from `rasaha/symbolu`; rename it `studio-hosted`. Settings → Source:
 
@@ -785,7 +803,14 @@ UGENCE_STUDIO_CONSTITUTION_REGISTRY_PATH=/var/run/ugence-studio/policy-registry.
 UGENCE_STUDIO_POLICY_IDENTITIES=agent_governance.agent_constitution|agent-constitution-baseline|TENANT
 UGENCE_STUDIO_SIMULATION_PROVIDER=1
 RAILWAY_RUN_UID=0
+VITE_API_BASE_URL=https://<proxy-host>:<port>
 ```
+
+`VITE_API_BASE_URL` is the one build-time variable: the origin the browser addresses the
+listener by, scheme, host and port, with no path and no trailing slash, and it must equal
+the page's origin exactly or the SPA neither reaches the API (CSP `connect-src 'self'`) nor
+sends the request header (9.0). Its value is the TCP proxy address that 9.6 assigns, so the
+first deploy runs without it; set it once the proxy exists and redeploy to rebuild `[I]`.
 
 `validate()` accepts exactly this set in production mode `[V]` (`config.py:175-258`): the
 three record paths and the registry path require the tenant; the policy identities require
@@ -827,14 +852,15 @@ curl -k -u <operator> https://<proxy-host>:<port>/api/v2/observe/deployment
 
 Pass condition: `/readyz` 200, and the deployment report lists `system_registry`,
 `data_use_declarations`, `vendor_declarations`, `constitution_registry` and
-`simulation_provider` as `configured` and `authority_reads` as `configured`. Until 9.0 is
-ratified and shipped, that is as far as a browser can go: open `/studio/status` and the six
-chips render, but Register and Declare return 403.
+`simulation_provider` as `configured` and `authority_reads` as `configured`.
 
-Once 9.0 is shipped, the screen guide's values apply verbatim: registering
-`hiring-screener` (`docs/UGENCE_SCREEN_EXPLAINER.md`, screen 14) answers
-`registry_kind SqliteSystemRegistry` and the record persists across a redeploy, which is the
-volume test of 8.2 applied to the studio.
+Then from the browser, with `VITE_API_BASE_URL` compiled in: open `/studio/status` and the
+six chips render `configured`; open `/studio/registration` and register `hiring-screener`
+with the screen guide's values (`docs/UGENCE_SCREEN_EXPLAINER.md`, screen 14). The answer is
+`registry_kind SqliteSystemRegistry` and a `reg_…` id; the record persists across a
+redeploy, which is the volume test of 8.2 applied to the studio. A 403 on that press means
+the bundle was built without `VITE_API_BASE_URL` or with one that is not the page's origin
+(9.4); the *API is not compatible* screen means the same.
 
 **9.8 What this changes for the demo.** `studio-hosted` replaces `studio-web` and `studio-api`
 for the Governed Agent Studio segment; the explorer screens work on both. The console and the
@@ -842,31 +868,30 @@ authority plane are untouched. Nothing here grants, issues, activates or execute
 screens record what an administrator typed, the preflight still fails its approval row
 against the deny-all verifier, and Simulate still blocks on the runtime's default hook.
 
-**Next step.** Ratify 9.0, then build.
+**Next step.** Run part 9 on Railway, then correct this part from what the builder and the
+browser actually did.
 
-> Read `docs/deployment/RAILWAY_REFERENCE_DEPLOYMENT.md` part 9.0. Rule on two changes to the
-> Governance Studio frontend and its deployment Dockerfile: (1) add `ARG VITE_API_BASE_URL` to
-> the frontend build stage of `deployment/governance-studio/Dockerfile` and pass it through to
-> `npm run build`; (2) send `X-Ugence-Request: GovernanceStudio` from
-> `apps/ugence-governance-studio/frontend/src/api/client.ts` and `client-v2.ts` on POST
-> requests only. State whether either touches the frozen `governance_studio.api.v1` OpenAPI
-> document or the P3E security model (`apps/ugence-governance-studio/docs/p3e/SECURITY_MODEL.md`),
-> and whether the header may be sent unconditionally or only when the API base is
-> same-origin. If ratified, implement both with tests that build the image and drive one
-> Register from the served SPA, then run part 9 on Railway and replace every `[I]` in it with
-> `[V]` or `[G]`. Documentation labels stay as defined in the file. Max 600 words for the
-> ruling.
+> Part 9 of `docs/deployment/RAILWAY_REFERENCE_DEPLOYMENT.md` was run on Railway. Paste the
+> deploy log from the `studio-hosted` build and start, the `/readyz` and
+> `/api/v2/observe/deployment` answers, and what the browser showed on
+> `/studio/registration` after pressing Register. Replace every `[I]` in part 9 with `[V]`
+> or `[G]` from that evidence only: Railway passing `VITE_API_BASE_URL` to the Dockerfile
+> build, the TCP proxy on 8443, `RAILWAY_RUN_UID=0` against the volume, and `openssl` in
+> the image. Add any new failure to the *If something fails* table with its fix. Do not
+> change code; if a step failed, record it and stop. Documentation labels stay as defined
+> in the file.
 
-## The four variables, in one place
+## The five variables, in one place
 
 | Variable | Set on | Value | When it takes effect |
 |---|---|---|---|
 | `VITE_API_BASE_URL` | `studio-web` | `https://<studio-api>.up.railway.app` | build time — redeploy |
+| `VITE_API_BASE_URL` | `studio-hosted` | `https://<proxy-host>:<port>`, its own origin | build time — redeploy |
 | `VITE_CONSOLE_API_URL` | `console-web` | `https://<console-api>.up.railway.app` | build time — redeploy |
 | `UGS_API_CORS_ALLOWED_ORIGINS` | `studio-api` | `https://<studio-web>.up.railway.app` | restart |
 | `WORKER_URL` | `authority-plane` | `http://<worker's RAILWAY_PRIVATE_DOMAIN>:8444` | restart |
 
-The first two are public HTTPS domains compiled into a browser bundle. The last is a
+The first three are public HTTPS origins compiled into a browser bundle. The last is a
 private address that must never be public, and resolves only within one project and
 environment.
 
@@ -899,6 +924,8 @@ environment.
 | Committee or Grant events answers 404 on the smoke test | Nothing holds that token; a typed refusal carries no banner | 7.7 |
 | Worker logs appear red | Both startup lines go to stderr by design | 7.5 |
 | A service builds from `rasaha/demo` | That repository is a generated snapshot, not a deployment source | the note in *One repository* |
+| `studio-hosted` serves the SPA but it shows *API is not compatible* | The bundle was built without `VITE_API_BASE_URL` and calls `127.0.0.1:8000` | 9.4 — set it, redeploy |
+| Register or Declare answers 403 from the browser on `studio-hosted` | The compiled API origin is not the page's origin, so the SPA sends no `X-Ugence-Request` | 9.4 — the exact proxy origin, then redeploy |
 
 ## Verification of this document
 
