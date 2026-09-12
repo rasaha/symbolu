@@ -8,47 +8,94 @@ from __future__ import annotations
 
 import json
 import pathlib
-from typing import Any, Dict, List, Mapping
+from typing import Any, Dict, List, Mapping, Optional
 
 import ugence_model_egress_unit as meu
 from ugence_model_egress_provider_openai import DESIGNATED_MODEL, OpenAIResponsesProvider
 
 from .rows import ROWS
 
-__all__ = ["records_directory", "load_records", "check_drift"]
+__all__ = ["RecordsNotLocated", "records_directory", "load_records", "check_drift"]
 
 
 _RECORDS_SUBPATH = pathlib.Path("packages") / "integration" / "model-egress-unit"
+_RECORD_FILES = ("MEU_LIVE_PROVIDER_DESIGNATION.json", "MEU_LIVE_VALIDATION.json")
+_DESIGNATION_SCHEMA = "model-egress-unit.live-provider-designation.v1"
+
+
+class RecordsNotLocated(FileNotFoundError):
+    """No record root, or more than one: the caller passes ``--records`` explicitly."""
+
+
+def _holds_records(directory: pathlib.Path) -> bool:
+    return all((directory / name).is_file() for name in _RECORD_FILES)
+
+
+def _checkout_root(start: pathlib.Path) -> Optional[pathlib.Path]:
+    """The nearest ancestor of ``start`` (inclusive) that is a git checkout root. The walk
+    stops there: a parent, sibling or unrelated checkout is never a candidate."""
+
+    for candidate in (start, *start.parents):
+        if (candidate / ".git").exists():
+            return candidate
+    return None
+
+
+def _unit_source_records() -> Optional[pathlib.Path]:
+    """The records beside the unit when the unit is imported from a source checkout
+    (``<root>/src/ugence_model_egress_unit``); ``None`` when it is installed."""
+
+    here = pathlib.Path(meu.__file__).resolve().parent
+    if here.parent.name == "src" and _holds_records(here.parents[1]):
+        return here.parents[1]
+    return None
+
+
+def _working_directory_records() -> Optional[pathlib.Path]:
+    root = _checkout_root(pathlib.Path.cwd().resolve())
+    if root is None:
+        return None
+    candidate = root / _RECORDS_SUBPATH
+    return candidate if _holds_records(candidate) else None
 
 
 def records_directory() -> pathlib.Path:
-    """The directory holding ``MEU_LIVE_PROVIDER_DESIGNATION.json`` and
-    ``MEU_LIVE_VALIDATION.json``.
+    """The directory holding the two records, located by exactly one rule or refused.
 
-    In a source checkout that is the unit's package root beside its ``src``. When the
-    unit is installed into site-packages (CI installs all three distributions), the
-    records are not beside it, so the checkout is located by walking up from the
-    working directory to the repository that contains ``packages/integration/model-egress-unit``.
+    Candidates are (a) the records beside the unit when the unit is imported from a source
+    checkout, and (b) the records of the git checkout that contains the working directory.
+    When both exist they must be the same directory; when they differ, or when neither
+    exists, this fails closed with :class:`RecordsNotLocated` and the caller passes
+    ``--records``. A parent, sibling or unrelated checkout is never consulted.
     """
 
-    here = pathlib.Path(meu.__file__).resolve().parent
-    candidates = [here.parents[1], here.parent, here]
-    cwd = pathlib.Path.cwd().resolve()
-    candidates.extend(parent / _RECORDS_SUBPATH for parent in (cwd, *cwd.parents))
-    for candidate in candidates:
-        if (candidate / "MEU_LIVE_VALIDATION.json").exists() and (candidate / "MEU_LIVE_PROVIDER_DESIGNATION.json").exists():
-            return candidate
-    raise FileNotFoundError(
-        "the live-provider records were not found beside the unit or in a checkout above the working "
-        "directory; pass --records <dir> or run from the repository")
+    found = {p.resolve() for p in (_unit_source_records(), _working_directory_records()) if p is not None}
+    if not found:
+        raise RecordsNotLocated(
+            "the live-provider records were not located: the unit is not imported from a source checkout and the "
+            "working directory is not inside a checkout holding packages/integration/model-egress-unit; pass --records <dir>")
+    if len(found) > 1:
+        raise RecordsNotLocated(
+            "ambiguous record roots (the unit's source checkout and the working directory's checkout differ); "
+            "pass --records <dir> to name the intended one: " + ", ".join(sorted(str(p) for p in found)))
+    return found.pop()
 
 
 def load_records(directory: pathlib.Path = None) -> Dict[str, Any]:
-    directory = pathlib.Path(directory) if directory is not None else records_directory()
-    return {
-        "designation": json.loads((directory / "MEU_LIVE_PROVIDER_DESIGNATION.json").read_text(encoding="utf-8")),
-        "validation": json.loads((directory / "MEU_LIVE_VALIDATION.json").read_text(encoding="utf-8")),
-    }
+    """Read-only: the two records parsed, after checking they are the intended records
+    (the designation record's ``schema`` is the live-provider designation schema)."""
+
+    directory = pathlib.Path(directory).resolve() if directory is not None else records_directory()
+    if not _holds_records(directory):
+        raise RecordsNotLocated(f"{directory} does not hold both records")
+    designation = json.loads((directory / "MEU_LIVE_PROVIDER_DESIGNATION.json").read_text(encoding="utf-8"))
+    validation = json.loads((directory / "MEU_LIVE_VALIDATION.json").read_text(encoding="utf-8"))
+    if designation.get("schema") != _DESIGNATION_SCHEMA:
+        raise RecordsNotLocated(f"{directory} holds a designation record of schema {designation.get('schema')!r}, "
+                                f"not {_DESIGNATION_SCHEMA!r}")
+    if "validation_matrix" not in validation or "meu_live_status" not in validation:
+        raise RecordsNotLocated(f"{directory} holds a validation record without a matrix or status")
+    return {"designation": designation, "validation": validation}
 
 
 def check_drift(designation: Mapping[str, Any], validation: Mapping[str, Any]) -> List[str]:
@@ -89,7 +136,10 @@ def check_drift(designation: Mapping[str, Any], validation: Mapping[str, Any]) -
     if actual != expected:
         drift.append("the validation matrix rows or their required outcomes differ from the harness's row table")
     step8 = designation.get("step8_required_values", {})
-    undesignated = [k for k, v in step8.items() if isinstance(v, str) and v.startswith("UNDESIGNATED")]
+    obligations = step8.get("obligations", {})
+    if len(obligations) != 17 or step8.get("obligation_count") != 17:
+        drift.append("the designation record does not carry exactly seventeen step-8 obligations (LP-7 ruling 12)")
+    undesignated = [k for k, v in obligations.items() if isinstance(v, str) and v.startswith("UNDESIGNATED")]
     if undesignated and status != "BLOCKED_PENDING_INFRASTRUCTURE_DESIGNATIONS":
         drift.append(f"{len(undesignated)} step-8 values are UNDESIGNATED but the status is {status!r}")
     if status == "BLOCKED_PENDING_INFRASTRUCTURE_DESIGNATIONS":

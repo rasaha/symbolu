@@ -69,16 +69,37 @@ def _record(**overrides) -> Step8Designation:
     return Step8Designation(**dict(SHAPE, **overrides))
 
 
-def test_the_required_values_are_the_owners_seventeen_in_the_owners_order():
-    assert STEP8_REQUIRED_VALUES == (
-        "gcp_project_id", "gcp_project_number", "meu_service_account",
-        "deployment_platform_identity_mechanism", "workload_identity_binding", "secret_version",
-        "iam_policy_evidence_ref", "audit_log_config_and_retention_ref", "rotation_runbook_ref",
-        "openai_organization_id", "openai_project_id", "openai_service_account_id",
-        "openai_role_and_key_scope_evidence_ref", "vendor_spend_control_evidence_ref",
-        "vendor_spend_control_classification", "model_availability_evidence_ref",
-        "data_processing_terms_ref", "processing_region")
-    assert len(STEP8_REQUIRED_VALUES) == 18  # seventeen values; the fourteenth is two fields
+def test_ruling_12_is_seventeen_obligations_represented_by_the_checked_fields_and_nothing_claims_an_eighteenth():
+    from ugence_model_egress_unit import (
+        STEP8_ATTESTATION_FIELDS, STEP8_DERIVED_SUBFIELDS, STEP8_OBLIGATION_COUNT, STEP8_OBLIGATIONS, step8_field_counts)
+    assert STEP8_OBLIGATION_COUNT == len(STEP8_OBLIGATIONS) == 17
+    assert [n for n, _, _ in STEP8_OBLIGATIONS] == list(range(1, 18))
+    assert [t for _, t, _ in STEP8_OBLIGATIONS] == [
+        "GCP project ID", "GCP project number", "MEU GCP service-account resource name",
+        "deployment-platform identity mechanism",
+        "WIF pool/provider and constrained principal binding, or the documented native GCP equivalent",
+        "full numeric Secret Manager version resource", "secret-level IAM-policy evidence reference",
+        "Data Access audit-log configuration and retention reference", "approved rotation-runbook reference",
+        "OpenAI organization ID", "OpenAI project ID", "OpenAI project service-account ID",
+        "OpenAI role and API-key scope evidence",
+        "vendor spend-control evidence and hard-stop/advisory classification",
+        "designated-model availability evidence", "applicable data-processing-terms reference",
+        "approved processing/data-residency region"]
+    # the one decomposition: obligation 14 is two typed fields; every other obligation is one
+    assert [len(f) for _, _, f in STEP8_OBLIGATIONS] == [1] * 13 + [2] + [1] * 3
+    assert dict((n, f) for n, _, f in STEP8_OBLIGATIONS)[14] == ("vendor_spend_control_evidence_ref", "vendor_spend_control_classification")
+    assert tuple(f for _, _, fs in STEP8_OBLIGATIONS for f in fs) == STEP8_REQUIRED_VALUES
+    assert len(STEP8_REQUIRED_VALUES) == 18
+    counts = step8_field_counts()
+    assert counts["obligations"] == 17 and counts["obligation_bearing_fields"] == 18
+    assert counts["derived_subfields"] == 2 and STEP8_DERIVED_SUBFIELDS == ("iam_binding_scope", "openai_key_scope")
+    assert counts["attestation_fields"] == 3 and STEP8_ATTESTATION_FIELDS == ("environment", "verified_by", "verified_at")
+    assert counts["checked_fields"] == 23 == len(dataclasses.fields(Step8Designation))
+    assert counts["statement"] == "17 mandatory designation obligations represented by 23 checked fields"
+    assert counts["identity_binding_subfields"] == {"workload_identity_federation": 6, "native_gcp_workload_identity": 2}
+    # the derived subfields and attestation fields are never listed as obligations
+    listed = {f for _, _, fs in STEP8_OBLIGATIONS for f in fs}
+    assert not listed & set(STEP8_DERIVED_SUBFIELDS) and not listed & set(STEP8_ATTESTATION_FIELDS)
 
 
 def test_a_well_formed_verified_non_production_record_is_accepted_and_changes_no_status():

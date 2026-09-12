@@ -24,7 +24,12 @@ from typing import Optional, Sequence, Tuple, Union
 from .custody import is_pinned_secret_version
 
 __all__ = [
+    "STEP8_OBLIGATIONS",
+    "STEP8_OBLIGATION_COUNT",
+    "STEP8_DERIVED_SUBFIELDS",
+    "STEP8_ATTESTATION_FIELDS",
     "STEP8_REQUIRED_VALUES",
+    "step8_field_counts",
     "PLACEHOLDER_MARKERS",
     "CREDENTIAL_SHAPE_PREFIXES",
     "OPENAI_KEY_SCOPE",
@@ -43,8 +48,44 @@ __all__ = [
     "rollback_permitted",
 ]
 
-#: Ruling 12, in the owner's order and words, as record fields. Seventeen values; the
-#: fourteenth (spend-control evidence and classification) is two fields.
+#: Ruling 12: exactly SEVENTEEN mandatory designation obligations, in the owner's order
+#: and words, each mapped to the checked field or structured group that represents it.
+#: An obligation may be represented by more than one typed field (obligation 14 is two);
+#: the count of obligations is seventeen and nothing here adds an eighteenth.
+STEP8_OBLIGATIONS: Tuple[Tuple[int, str, Tuple[str, ...]], ...] = (
+    (1, "GCP project ID", ("gcp_project_id",)),
+    (2, "GCP project number", ("gcp_project_number",)),
+    (3, "MEU GCP service-account resource name", ("meu_service_account",)),
+    (4, "deployment-platform identity mechanism", ("deployment_platform_identity_mechanism",)),
+    (5, "WIF pool/provider and constrained principal binding, or the documented native GCP equivalent",
+     ("workload_identity_binding",)),
+    (6, "full numeric Secret Manager version resource", ("secret_version",)),
+    (7, "secret-level IAM-policy evidence reference", ("iam_policy_evidence_ref",)),
+    (8, "Data Access audit-log configuration and retention reference", ("audit_log_config_and_retention_ref",)),
+    (9, "approved rotation-runbook reference", ("rotation_runbook_ref",)),
+    (10, "OpenAI organization ID", ("openai_organization_id",)),
+    (11, "OpenAI project ID", ("openai_project_id",)),
+    (12, "OpenAI project service-account ID", ("openai_service_account_id",)),
+    (13, "OpenAI role and API-key scope evidence", ("openai_role_and_key_scope_evidence_ref",)),
+    (14, "vendor spend-control evidence and hard-stop/advisory classification",
+     ("vendor_spend_control_evidence_ref", "vendor_spend_control_classification")),
+    (15, "designated-model availability evidence", ("model_availability_evidence_ref",)),
+    (16, "applicable data-processing-terms reference", ("data_processing_terms_ref",)),
+    (17, "approved processing/data-residency region", ("processing_region",)),
+)
+STEP8_OBLIGATION_COUNT = len(STEP8_OBLIGATIONS)  # 17, by LP-7 ruling 12
+
+#: Typed subfields the checker derives from an obligation's text and validates beside it
+#: (they are not obligations): the IAM binding is on the secret (obligation 7, ruling 4);
+#: the key scope is exactly api.responses.write (obligation 13, ruling 7).
+STEP8_DERIVED_SUBFIELDS: Tuple[str, ...] = ("iam_binding_scope", "openai_key_scope")
+
+#: Attestation and scoping fields the record must carry (not obligations): the rulings
+#: govern the non-production commissioning only; every value is independently checked.
+STEP8_ATTESTATION_FIELDS: Tuple[str, ...] = ("environment", "verified_by", "verified_at")
+
+#: The obligation-bearing fields, in the owner's order: seventeen obligations represented
+#: by eighteen fields (obligation 14 decomposed). Kept as the checker's iteration order.
 STEP8_REQUIRED_VALUES: Tuple[str, ...] = (
     "gcp_project_id",
     "gcp_project_number",
@@ -195,6 +236,32 @@ class Step8Designation:
                 value = {"mechanism": value.mechanism, **{g.name: getattr(value, g.name) for g in fields(value)}}
             out[f.name] = value
         return out
+
+
+def step8_field_counts() -> dict:
+    """The obligation count and the checked-field count, from the definitions themselves.
+
+    ``obligations`` is seventeen (LP-7 ruling 12). ``checked_fields`` is every top-level
+    field of :class:`Step8Designation` the checker validates: the obligation-bearing
+    fields, the derived subfields and the attestation fields. The identity-binding group
+    carries further typed subfields inside its own record, counted separately.
+    """
+
+    obligation_fields = tuple(f for _, _, names in STEP8_OBLIGATIONS for f in names)
+    assert obligation_fields == STEP8_REQUIRED_VALUES, "the obligation map and the field order disagree"
+    top = tuple(f.name for f in fields(Step8Designation))
+    assert set(top) == set(STEP8_REQUIRED_VALUES) | set(STEP8_DERIVED_SUBFIELDS) | set(STEP8_ATTESTATION_FIELDS)
+    return {
+        "obligations": STEP8_OBLIGATION_COUNT,
+        "checked_fields": len(top),
+        "obligation_bearing_fields": len(STEP8_REQUIRED_VALUES),
+        "derived_subfields": len(STEP8_DERIVED_SUBFIELDS),
+        "attestation_fields": len(STEP8_ATTESTATION_FIELDS),
+        "identity_binding_subfields": {"workload_identity_federation": len(fields(WorkloadIdentityFederation)),
+                                       "native_gcp_workload_identity": len(fields(NativeGcpWorkloadIdentity))},
+        "statement": (f"{STEP8_OBLIGATION_COUNT} mandatory designation obligations represented by "
+                      f"{len(top)} checked fields"),
+    }
 
 
 _STRING_FIELDS = tuple(n for n in STEP8_REQUIRED_VALUES if n != "workload_identity_binding") + (

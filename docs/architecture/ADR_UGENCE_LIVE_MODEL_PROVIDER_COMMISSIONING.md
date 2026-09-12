@@ -421,29 +421,46 @@ Everything else is an operator's act outside the repository (ruling 10).
 | 9 spend and data controls | `vendor_spend_control_evidence_ref` and `vendor_spend_control_classification` (`hard_stop` or `advisory`) required; `data_processing_terms_ref` and `processing_region` required; the durable USD 25 ceiling stays `commissioning_budget`'s CHECK and the adapter's `CallBudget`; `store=false` is enforced at `PreparedRequest` construction; content stays synthetic by the harness's fixture set | the vendor configuration and its evidence |
 | 10 provisioning boundary | no repository code creates, retrieves, transmits, displays, logs or tests a real credential; both boundary suites and the validation package's fail on any import that could; no infrastructure-as-code exists | the operator's acts |
 | 11 offline step-7 artifacts | `ugence-model-egress-validation`: harness over the 18 rows with injected fake components, fake-transport cases, negative-test matrix, redacted report generator, drift checks, secret-shape scanning; the suite runs with sockets refused and infrastructure-dependent rows can only be `NOT_EXECUTABLE_OFFLINE` | the owner-run live verifier's execution, after step 8 |
-| 12 blocked until seventeen exact values | `STEP8_REQUIRED_VALUES` names them; `check_step8_designation` refuses any missing, placeholder, secret-shaped, mis-shaped or unverified value; `COMMISSIONING_STATUS` unchanged; the `live` verifier command refuses to run and names each undesignated value | the values, their independent check, the separate live-validation authorization, and a further record for production |
+| 12 blocked until seventeen exact values | `STEP8_OBLIGATIONS` names the seventeen obligations and the 23 checked fields that represent them (§0.4.2); `check_step8_designation` refuses any missing, placeholder, secret-shaped, mis-shaped or unverified value; `COMMISSIONING_STATUS` unchanged; the `live` verifier command refuses to run and names each undesignated value | the values, their independent check, the separate live-validation authorization, and a further record for production |
 
-#### 0.4.2 — The seventeen values, each `UNDESIGNATED`
+#### 0.4.2 — The seventeen obligations of ruling 12, each `UNDESIGNATED`
 
-| # | Value (ruling 12) | Record field | Shape accepted |
-| --- | --- | --- | --- |
-| 1 | GCP project ID | `gcp_project_id` | 6–30 chars, lowercase letters, digits, hyphens, starting with a letter |
-| 2 | GCP project number | `gcp_project_number` | digits only |
-| 3 | MEU GCP service-account resource name | `meu_service_account` | `projects/<project>/serviceAccounts/<name>@<project>.iam.gserviceaccount.com` |
-| 4 | deployment-platform identity mechanism | `deployment_platform_identity_mechanism` | `workload_identity_federation` or `native_gcp_workload_identity` |
-| 5 | WIF pool/provider and constrained principal binding, or the native equivalent | `workload_identity_binding` | `WorkloadIdentityFederation(oidc_issuer, audience, subject_constraints, pool, provider, principal_binding)` or `NativeGcpWorkloadIdentity(path, no_static_key_evidence_ref)`, matching field 4 |
-| 6 | full numeric Secret Manager version resource | `secret_version` | `projects/<project-id-or-number>/secrets/<secret>/versions/<n>`, numeric `<n>` |
-| 7 | secret-level IAM-policy evidence reference | `iam_policy_evidence_ref` plus `iam_binding_scope = secret` | non-empty |
-| 8 | Data Access audit-log configuration and retention reference | `audit_log_config_and_retention_ref` | non-empty |
-| 9 | approved rotation-runbook reference | `rotation_runbook_ref` | non-empty |
-| 10 | OpenAI organization ID | `openai_organization_id` | `org-` prefix |
-| 11 | OpenAI project ID | `openai_project_id` | `proj_` prefix |
-| 12 | OpenAI project service-account ID | `openai_service_account_id` | non-empty |
-| 13 | OpenAI role and API-key scope evidence | `openai_role_and_key_scope_evidence_ref` plus `openai_key_scope = api.responses.write` | non-empty; scope exact |
-| 14 | vendor spend-control evidence and classification | `vendor_spend_control_evidence_ref`, `vendor_spend_control_classification` | non-empty; `hard_stop` or `advisory` |
-| 15 | designated-model availability evidence | `model_availability_evidence_ref` | non-empty and not the model name |
-| 16 | applicable data-processing-terms reference | `data_processing_terms_ref` | non-empty |
-| 17 | approved processing/data-residency region | `processing_region` | non-empty |
+LP-7 ruling 12 defines **exactly seventeen mandatory designation obligations**. The
+repository represents them as **17 mandatory designation obligations represented by 23
+checked fields**: eighteen obligation-bearing fields (obligation 14 is decomposed into two
+typed fields), two derived scope subfields, and three attestation fields. No eighteenth
+obligation exists or is claimed; `ugence_model_egress_unit.infrastructure.STEP8_OBLIGATIONS`
+is this table as code and `step8_field_counts()` states the counts from the definitions.
+
+| # | Obligation (ruling 12, verbatim) | Record key (`step8_required_values.obligations`) | Checked field(s) | Shape accepted | Live-command line |
+| --- | --- | --- | --- | --- | --- |
+| 1 | GCP project ID | `gcp_project_id` | `gcp_project_id` | 6–30 chars, lowercase letters, digits, hyphens, starting with a letter; never judged by name | `gcp_project_id` |
+| 2 | GCP project number | `gcp_project_number` | `gcp_project_number` | digits only | `gcp_project_number` |
+| 3 | MEU GCP service-account resource name | `meu_gcp_service_account_resource_name` | `meu_service_account` | `projects/<project>/serviceAccounts/<name>@<project>.iam.gserviceaccount.com`; human, default-compute, foreign-project and key-file identities refused | `meu_gcp_service_account_resource_name` |
+| 4 | deployment-platform identity mechanism | `deployment_platform_identity_mechanism` | `deployment_platform_identity_mechanism` | `workload_identity_federation` or `native_gcp_workload_identity` | `deployment_platform_identity_mechanism` |
+| 5 | WIF pool/provider and constrained principal binding, or the documented native GCP equivalent | `wif_pool_provider_and_constrained_principal_binding_or_native_gcp_equivalent` | `workload_identity_binding` (structured group: `WorkloadIdentityFederation` with 6 typed subfields — issuer, audience, subject constraints, pool, provider, principal binding — or `NativeGcpWorkloadIdentity` with 2 — path, no-static-key evidence) | must match obligation 4's mechanism; https issuer; constrained principal | `wif_pool_provider_and_constrained_principal_binding_or_native_gcp_equivalent` |
+| 6 | full numeric Secret Manager version resource | `full_numeric_secret_manager_version_resource` | `secret_version` | `projects/<project-id-or-number>/secrets/<secret>/versions/<n>`, numeric `<n>`; `latest` and any non-numeric reference refused | `full_numeric_secret_manager_version_resource` |
+| 7 | secret-level IAM-policy evidence reference | `secret_level_iam_policy_evidence_reference` | `iam_policy_evidence_ref`; derived subfield `iam_binding_scope` must read `secret` (ruling 4) | non-empty; scope exact | `secret_level_iam_policy_evidence_reference` |
+| 8 | Data Access audit-log configuration and retention reference | `data_access_audit_log_configuration_and_retention_reference` | `audit_log_config_and_retention_ref` | non-empty | `data_access_audit_log_configuration_and_retention_reference` |
+| 9 | approved rotation-runbook reference | `approved_rotation_runbook_reference` | `rotation_runbook_ref` | non-empty | `approved_rotation_runbook_reference` |
+| 10 | OpenAI organization ID | `openai_organization_id` | `openai_organization_id` | `org-` prefix | `openai_organization_id` |
+| 11 | OpenAI project ID | `openai_project_id` | `openai_project_id` | `proj_` prefix | `openai_project_id` |
+| 12 | OpenAI project service-account ID | `openai_project_service_account_id` | `openai_service_account_id` | non-empty | `openai_project_service_account_id` |
+| 13 | OpenAI role and API-key scope evidence | `openai_role_and_api_key_scope_evidence` | `openai_role_and_key_scope_evidence_ref`; derived subfield `openai_key_scope` must be exactly `api.responses.write` (ruling 7) | non-empty; scope exact | `openai_role_and_api_key_scope_evidence` |
+| 14 | vendor spend-control evidence and hard-stop/advisory classification | `vendor_spend_control_evidence_and_hard_stop_or_advisory_classification` | **two typed fields:** `vendor_spend_control_evidence_ref`, `vendor_spend_control_classification` | non-empty; `hard_stop` or `advisory` | `vendor_spend_control_evidence_and_hard_stop_or_advisory_classification` |
+| 15 | designated-model availability evidence | `designated_model_availability_evidence` | `model_availability_evidence_ref` | non-empty and not the model name (ruling 8) | `designated_model_availability_evidence` |
+| 16 | applicable data-processing-terms reference | `applicable_data_processing_terms_reference` | `data_processing_terms_ref` | non-empty | `applicable_data_processing_terms_reference` |
+| 17 | approved processing/data-residency region | `approved_processing_or_data_residency_region` | `processing_region` | non-empty | `approved_processing_or_data_residency_region` |
+
+Fields that are **not obligations** and are never counted as one:
+
+| Field | Kind | Why it exists |
+| --- | --- | --- |
+| `iam_binding_scope` | derived subfield of obligation 7 | ruling 4: the accessor grant is on the secret, never project-level |
+| `openai_key_scope` | derived subfield of obligation 13 | ruling 7: the role and key carry only `api.responses.write` |
+| `environment` | attestation | LP-7 governs the first non-production commissioning only |
+| `verified_by`, `verified_at` | attestation | ruling 12: every value independently checked before step 7 |
+| record key `attestation.independently_checked_by` | attestation | the live command lists it after the seventeen obligations, as an attestation, never as an eighteenth designation |
 
 Every field is refused when it carries a placeholder token, whitespace padding or a
 credential shape, and the record is refused unless `environment` reads `non-production`

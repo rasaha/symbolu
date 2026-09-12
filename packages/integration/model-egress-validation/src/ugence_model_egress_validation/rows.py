@@ -30,6 +30,9 @@ class Row:
     offline: bool
     reason_if_not_offline: Optional[str] = None
     infrastructure_dependent: bool = False
+    #: For a row that is not offline-executable: the specific external evidence the
+    #: owner-run live verifier must produce before the row can carry a result.
+    external_evidence_required: Optional[str] = None
 
 
 ROWS: Tuple[Row, ...] = (
@@ -45,17 +48,33 @@ ROWS: Tuple[Row, ...] = (
     Row(10, "secret version named as latest, or a service-account-key identity", "REFUSED_AT_CONSTRUCTION", True),
     Row(11, "custody lease expired at use", "REFUSED_CUSTODY_UNAVAILABLE", True),
     Row(12, "the live answer's provenance", "GENUINE_CALL_TRUE_LEASE_PRODUCTION_AUTHORITATIVE_TRUST_UNTRUSTED_EVIDENCE", False,
-        "a genuine answer needs the live transport, the commissioned credential and MET; fake evidence cannot satisfy this row", True),
+        "a genuine answer needs the live transport, the commissioned credential and MET; fake evidence cannot satisfy this row", True,
+        "an EgressResult written by the live verifier after the separate live-validation authorization: provenance.genuine_call true, "
+        "custody_lease_id and custody_authority_id naming a lease whose is_production_authoritative is true, trust UNTRUSTED_EVIDENCE, "
+        "the response digest, and the correlated Secret Manager access event (row 18); requires COMMISSIONING_STATUS MET"),
     Row(13, "TAP verification of the answer; INDETERMINATE", "TYPED_REFUSAL_NOT_DEGRADED_RESULT", False,
-        "TAP verification is composed in the deployment unit, which does not exist yet (LP-1); not this distribution's to fake"),
+        "TAP verification is composed in the deployment unit, which does not exist yet (LP-1); not this distribution's to fake",
+        False,
+        "the deployment unit's composition record showing the TAP verifier wired behind the answer, and a verifier run on a live "
+        "answer whose INDETERMINATE result is recorded as a typed refusal, not a degraded result"),
     Row(14, "purge replaces content with a tombstone on schedule", "TOMBSTONE_WITH_DIGESTS_ONLY", False,
-        "needs the exchange on PostgreSQL; proven by the unit's own suite (tests/test_purge.py) and executed by the live verifier"),
+        "needs the exchange on PostgreSQL; proven by the unit's own suite (tests/test_purge.py) and executed by the live verifier",
+        False,
+        "the exchange row of the live request after its retention deadline, read through the worker role: content columns null, "
+        "the tombstone carrying only identifiers, digests, outcome and timestamps, captured by the live verifier"),
     Row(15, "lease expiry after dispatch", "OUTCOME_UNKNOWN_NEVER_A_SECOND_BILLED_CALL", False,
-        "needs the exchange on PostgreSQL; proven by the unit's own suite (tests/test_reconcile.py) and executed by the live verifier"),
+        "needs the exchange on PostgreSQL; proven by the unit's own suite (tests/test_reconcile.py) and executed by the live verifier",
+        False,
+        "a live request whose unit lease expired after dispatched_at was set: the reconciliation pass recording OUTCOME_UNKNOWN with "
+        "a DispatchAttempt, the commissioning_reservation row unchanged, and vendor-side usage showing no second billed call"),
     Row(16, "retry after a transient failure before dispatch", "AT_MOST_ONE_RETRY_THEN_FAILED", True),
     Row(17, "vendor error, timeout and malformed answer", "TYPED_OUTCOMES_FAILED_OR_OUTCOME_UNKNOWN", True),
     Row(18, "Secret Manager Data Access audit log shows the read of the pinned version", "AUDIT_LOG_EVIDENCE_PRESENT", False,
-        "audit-log evidence exists only in the designated GCP project after step 8; fake evidence cannot satisfy this row", True),
+        "audit-log evidence exists only in the designated GCP project after step 8; fake evidence cannot satisfy this row", True,
+        "the Secret Manager Data Access audit-log query for the designated secret over the defined commissioning window: the IAM "
+        "policy on the exact secret, one AccessSecretVersion event by the designated MEU workload identity naming the numeric "
+        "version, no event by an identity outside the approved set within the window, correlated to the MEU request by "
+        "non-secret identifiers and bounded timestamps (LP-7 ruling 5); the retention location recorded"),
 )
 
 OFFLINE_ROWS: Tuple[int, ...] = tuple(r.row for r in ROWS if r.offline)

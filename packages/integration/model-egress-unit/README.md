@@ -54,7 +54,7 @@ boundary is specified while its commissioning as a running unit is not.
 | Custody columns and the `genuine_call` constraint (0.3.0) | `custody_lease_id`, `custody_authority_id` outside every digest; `CHECK egress_result_genuine_call_requires_custody` replaces the reference-slice `CHECK egress_result_no_genuine_call` under the owner's confirmation (ADR §0.3.1). `EgressResult` still refuses `genuine_call: true` while `COMMISSIONING_STATUS` is not `MET` |
 | Durable reservation (0.3.0) | `commissioning_budget` and `commissioning_reservation`: `Exchange.reserve_commissioning_call` is one `UPDATE … RETURNING` under the LP-5 ceilings, taken before dispatch; a `BEFORE UPDATE` trigger raises on any decrement and no role may delete. The in-memory `CallBudget` remains for unit tests and fake-transport development only |
 | Migration compatibility (0.3.0) | fresh install applies `[1, 2]`; rows and digests written under migration 1 read back unchanged after migration 2; a failing upgrade leaves migration 1 intact |
-| Step-8 designation shape (0.4.0) | `infrastructure.Step8Designation` and `check_step8_designation`: the seventeen values LP-7 ruling 12 requires, each refused when missing, a placeholder, `latest` or any non-numeric version, secret-shaped, a human or default-compute identity, an unconstrained principal, a project-level binding, a key scope other than `api.responses.write`, an unclassified spend control, a model name offered as availability evidence, a production environment, or unverified; `check_rotation_plan` accepts only the owner's eight-step order and refuses destruction during initial commissioning; `rollback_permitted` needs both versions valid and owner-authorized. Supplies no value; changes no status |
+| Step-8 designation shape (0.4.0) | `infrastructure.Step8Designation` and `check_step8_designation`: the seventeen mandatory designation obligations of LP-7 ruling 12, represented by 23 checked fields (obligation 14, spend-control evidence and classification, is two typed fields; two derived scope subfields; three attestation fields; `step8_field_counts()` states the counts from the definitions), each refused when missing, a placeholder, `latest` or any non-numeric version, secret-shaped, a human or default-compute identity, an unconstrained principal, a project-level binding, a key scope other than `api.responses.write`, an unclassified spend control, a model name offered as availability evidence, a production environment, or unverified; `check_rotation_plan` accepts only the owner's eight-step order and refuses destruction during initial commissioning; `rollback_permitted` needs both versions valid and owner-authorized. Supplies no value; changes no status |
 
 ## What 0.4.0 adds, and what it still cannot do
 
@@ -62,7 +62,7 @@ LP-7 (`ADR_UGENCE_LIVE_MODEL_PROVIDER_COMMISSIONING.md` §0.4) designed the non-
 step-8 infrastructure without supplying a value. This release carries the shape checks
 (`infrastructure.py`) so that a placeholder, an alias, a forbidden identity or an
 unverified string can never be accepted as a designation, and the eight-step rotation order of
-ruling 6 as a checked sequence. Every one of the seventeen values stays `UNDESIGNATED`;
+ruling 6 as a checked sequence. Every one of the seventeen obligations stays `UNDESIGNATED`;
 `COMMISSIONING_STATUS` is unchanged; accepting a designation admits neither a live call
 nor a genuine result.
 

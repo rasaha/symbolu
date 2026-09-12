@@ -80,23 +80,36 @@ jobs:
       - name: The offline command against the checkout's records, sockets refused
         run: |
           python - <<'PY'
-          import json, socket, sys, pathlib
+          import hashlib, json, socket, sys, pathlib
           def refuse(*a, **k):
               raise AssertionError("the offline command opened a socket")
           socket.socket.connect = refuse
           socket.create_connection = refuse
           from ugence_model_egress_validation.cli import main
+          from ugence_model_egress_validation.drift import records_directory
           records = pathlib.Path("packages/integration/model-egress-unit")
+          # the installed package locates exactly this checkout's records from the working directory
+          assert records_directory() == records.resolve(), records_directory()
+          digests = {n: hashlib.sha256((records / n).read_bytes()).hexdigest()
+                     for n in ("MEU_LIVE_PROVIDER_DESIGNATION.json", "MEU_LIVE_VALIDATION.json")}
           rc = main(["offline", "--report", "/tmp/meu-offline-report.json", "--records", str(records)])
           assert rc == 0, f"offline command exited {rc}"
+          rc = main(["offline", "--report", "/tmp/meu-offline-report-2.json"])  # located, not named
+          assert rc == 0, f"offline command (located records) exited {rc}"
           report = json.loads(pathlib.Path("/tmp/meu-offline-report.json").read_text())
           assert report["live_pass_claimed"] is False and report["network_opened"] is False
           assert report["infrastructure_dependent_rows_not_executed"] == [12, 18]
           assert all(r["status"] != "OFFLINE_CONFORMANT" for r in report["rows"] if r["infrastructure_dependent"])
+          assert report["step8"]["obligations"] == 17 and report["step8"]["checked_fields"] == 23
           text = pathlib.Path("/tmp/meu-offline-report.json").read_text()
           for forbidden in ("quick brown fox", "MARKER-HARNESS", "NOT A MODEL RESPONSE", "sk-", "AIza", "eyJ"):
               assert forbidden not in text, forbidden
           rc = main(["live", "--records", str(records)])
           assert rc == 2, f"live must refuse with exit 2, got {rc}"
-          print("offline report written; live refused")
+          # neither command touched the canonical records; every row is still null
+          for n, before in digests.items():
+              assert hashlib.sha256((records / n).read_bytes()).hexdigest() == before, f"{n} was mutated"
+          matrix = json.loads((records / "MEU_LIVE_VALIDATION.json").read_text())["validation_matrix"]
+          assert all(r["result"] is None for r in matrix), "a matrix row carries a result"
+          print("offline report written; records byte-identical; every row null; live refused")
           PY

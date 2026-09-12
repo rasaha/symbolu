@@ -16,7 +16,9 @@ from typing import Any, Dict
 from ugence_model_egress_provider_openai import FAKE_RESPONSE_MARKER
 
 from .harness import OfflineRun
-from .rows import STATUS_VOCABULARY
+from ugence_model_egress_unit import STEP8_OBLIGATION_COUNT, step8_field_counts
+
+from .rows import ROWS, STATUS_VOCABULARY
 from .secret_shapes import assert_clean
 from .version import REPORT_SCHEMA
 
@@ -27,9 +29,12 @@ def build_report(run: OfflineRun) -> Dict[str, Any]:
     rows = []
     for o in run.outcomes:
         assert o.status in STATUS_VOCABULARY, o.status
+        row_def = next(r for r in ROWS if r.row == o.row)
         rows.append({"row": o.row, "scenario": o.scenario, "required": o.required, "status": o.status,
                      "observed": o.observed, "digests": list(o.digests), "reason": o.reason,
-                     "infrastructure_dependent": o.infrastructure_dependent})
+                     "infrastructure_dependent": o.infrastructure_dependent,
+                     "result_in_record": None,
+                     "external_evidence_required": row_def.external_evidence_required})
     counts = {s: sum(r["status"] == s for r in rows) for s in STATUS_VOCABULARY}
     report = {
         "schema": REPORT_SCHEMA,
@@ -44,6 +49,8 @@ def build_report(run: OfflineRun) -> Dict[str, Any]:
         "credential_present": False,
         "infrastructure_dependent_rows_not_executed": [r["row"] for r in rows if r["infrastructure_dependent"]],
         "audit_query_window": None,
+        "step8": {"statement": step8_field_counts()["statement"], "obligations": STEP8_OBLIGATION_COUNT,
+                  "checked_fields": step8_field_counts()["checked_fields"], "supplied_here": 0},
         "content_policy": "statuses, refusal names, counts, digests and versions only; no prompt text, no response text, no credential",
         "summary": counts,
         "rows": rows,

@@ -41,7 +41,7 @@ report and exits non-zero on any non-conformant row or any drift.
 python -m ugence_model_egress_validation live
 ```
 
-Refuses (exit 2), naming every undesignated step-8 value: no live transport exists in
+Refuses (exit 2) before any custody port, budget, transport or harness is touched, stating "17 mandatory designation obligations represented by 23 checked fields" and naming every undesignated obligation, then the independent-check attestation separately: no live transport exists in
 any distribution, and LP-7 ruling 12 keeps the owner-run verifier from executing until
 every designation is supplied and independently checked.
 
@@ -52,6 +52,10 @@ produce a report that carries the synthetic prompt, the leased marker, the fake
 response marker, or any credential-shaped string (`secret_shapes.scan`). It records
 `live_pass_claimed: false`, `network_opened: false`, `credential_present: false` and
 `audit_query_window: null`; only the live verifier will fill the last.
+
+## Locating the records
+
+The two records are located by exactly one rule or refused: beside the unit when it is imported from a source checkout, or in the git checkout that contains the working directory. When both exist they must be the same directory; when they differ, or neither exists, `RecordsNotLocated` is raised and `--records <dir>` names the intended one. A parent, sibling or unrelated checkout is never consulted, and a directory whose designation record is not of the live-provider schema is refused. Reads are read-only; the offline command never writes to either record.
 
 ## Drift checks
 

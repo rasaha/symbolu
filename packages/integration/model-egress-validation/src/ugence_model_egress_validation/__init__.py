@@ -9,7 +9,7 @@ step-8 designation is supplied and independently checked.
 
 from __future__ import annotations
 
-from .drift import check_drift, load_records, records_directory
+from .drift import RecordsNotLocated, check_drift, load_records, records_directory
 from .harness import SYNTHETIC_PROMPT, OfflineRun, RowOutcome, run_offline
 from .report import build_report, render, write_report
 from .rows import OFFLINE_ROWS, ROWS, STATUS_VOCABULARY, Row
@@ -21,6 +21,6 @@ __all__ = [
     "Row", "ROWS", "OFFLINE_ROWS", "STATUS_VOCABULARY",
     "SYNTHETIC_PROMPT", "RowOutcome", "OfflineRun", "run_offline",
     "build_report", "render", "write_report",
-    "records_directory", "load_records", "check_drift",
+    "RecordsNotLocated", "records_directory", "load_records", "check_drift",
     "Finding", "scan", "assert_clean",
 ]

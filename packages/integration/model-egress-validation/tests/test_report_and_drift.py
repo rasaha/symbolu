@@ -44,6 +44,11 @@ def test_the_report_claims_no_pass_opens_no_network_and_carries_no_content(repor
     assert report["infrastructure_dependent_rows_not_executed"] == [12, 18]
     assert report["summary"] == {"OFFLINE_CONFORMANT": 13, "OFFLINE_NONCONFORMANT": 0, "NOT_EXECUTABLE_OFFLINE": 5}
     assert report["commissioning_status"] == meu.COMMISSIONING_STATUS
+    assert report["step8"]["statement"] == "17 mandatory designation obligations represented by 23 checked fields"
+    for row in report["rows"]:
+        assert row["result_in_record"] is None
+        if row["status"] == "NOT_EXECUTABLE_OFFLINE":
+            assert row["external_evidence_required"], row["row"]
     text = render(report)
     assert SYNTHETIC_PROMPT not in text and FAKE_RESPONSE_MARKER not in text
     for marker in run.known_markers:
@@ -76,6 +81,9 @@ def test_the_records_beside_the_unit_show_no_drift():
     records = load_records()
     assert records_directory().name == "model-egress-unit"
     assert check_drift(records["designation"], records["validation"]) == []
+    step8 = records["designation"]["step8_required_values"]
+    assert step8["obligation_count"] == 17 and step8["checked_fields"] == 23 and len(step8["obligations"]) == 17
+    assert step8["attestation"]["independently_checked_by"] is None
 
 
 @pytest.mark.parametrize("mutate, expected", [
@@ -101,8 +109,7 @@ def test_each_named_drift_is_caught(mutate, expected):
 def test_step8_values_still_undesignated_forbid_any_status_but_blocked():
     records = load_records()
     d, v = copy.deepcopy(records["designation"]), copy.deepcopy(records["validation"])
-    assert all(val == "UNDESIGNATED" for key, val in d["step8_required_values"].items()
-               if key not in ("ruling", "independently_checked_by", "first_live_synthetic_validation_authorization", "production_commissioning_record"))
-    assert d["step8_required_values"]["independently_checked_by"] is None
+    assert all(val == "UNDESIGNATED" for val in d["step8_required_values"]["obligations"].values())
+    assert d["step8_required_values"]["attestation"]["independently_checked_by"] is None
     v["meu_live_status"] = "PENDING_VALIDATION"
     assert any("UNDESIGNATED but the status" in line for line in check_drift(d, v))
