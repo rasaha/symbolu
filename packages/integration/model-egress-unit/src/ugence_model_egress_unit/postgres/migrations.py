@@ -37,6 +37,8 @@ from dataclasses import dataclass
 from typing import Sequence
 
 from .schema import (
+    AUTHORIZATION_TABLE,
+    CONSUMPTION_TABLE,
     BINDING_TABLE,
     BUDGET_TABLE,
     MIGRATOR_ROLE,
@@ -451,9 +453,107 @@ RESET ROLE;
 
 #: Every migration, in apply order. Append only: editing an applied migration is
 #: refused at startup by the digest check, and the fix is a new migration.
+
+_0003 = f"""
+-- Migration 3 (2026-09-12; ADR_UGENCE_LIVE_MODEL_PROVIDER_COMMISSIONING.md §0.6). The
+-- durable consumption ledger of the owner's typed live-synthetic-validation
+-- authorization, and the database half of the genuine-call gate: a genuine result must
+-- reference a consumption row. Additive and constraint-only under the same six
+-- conditions as migration 2: no digest preimage, canonical field set, serialization,
+-- field meaning or wire schema changes; exchange/v1 stays; existing rows stay valid.
+
+SET ROLE {OWNER_ROLE};
+
+-- 1. One row per authorization, keyed on its nonce: a nonce backs one digest, ever.
+--    calls_consumed only rises (trigger); max_calls and expires_at never change.
+CREATE TABLE IF NOT EXISTS {SCHEMA_NAME}.{AUTHORIZATION_TABLE} (
+    nonce                 text PRIMARY KEY,
+    authorization_digest  text NOT NULL UNIQUE,
+    max_calls             integer NOT NULL,
+    calls_consumed        integer NOT NULL DEFAULT 0,
+    expires_at            timestamptz NOT NULL,
+    first_consumed_at     timestamptz NOT NULL,
+    CONSTRAINT commissioning_authorization_digest_shape CHECK (authorization_digest ~ '^[0-9a-f]{{64}}$'),
+    CONSTRAINT commissioning_authorization_max_calls CHECK (max_calls BETWEEN 1 AND 10),
+    CONSTRAINT commissioning_authorization_consumed CHECK (calls_consumed BETWEEN 0 AND max_calls)
+);
+
+-- 2. One row per consumed attempt: the same request is never consumed twice under one
+--    authorization, and one request is consumed once per tenant. Never deleted.
+CREATE TABLE IF NOT EXISTS {SCHEMA_NAME}.{CONSUMPTION_TABLE} (
+    consumption_id        uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    tenant_id             uuid NOT NULL,
+    authorization_digest  text NOT NULL REFERENCES {SCHEMA_NAME}.{AUTHORIZATION_TABLE} (authorization_digest),
+    request_id            uuid NOT NULL,
+    request_digest        text NOT NULL,
+    call_number           integer NOT NULL,
+    consumed_at           timestamptz NOT NULL,
+    CONSTRAINT commissioning_consumption_once_per_request UNIQUE (authorization_digest, request_digest),
+    CONSTRAINT commissioning_consumption_once_per_tenant_request UNIQUE (tenant_id, request_id),
+    CONSTRAINT commissioning_consumption_call_number CHECK (call_number BETWEEN 1 AND 10)
+);
+
+CREATE OR REPLACE FUNCTION {SCHEMA_NAME}.refuse_authorization_rewind() RETURNS trigger
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    IF NEW.calls_consumed < OLD.calls_consumed THEN
+        RAISE EXCEPTION 'authorized_calls_exhausted: a consumed attempt is never given back (ADR 0.6)'
+            USING ERRCODE = 'check_violation';
+    END IF;
+    IF NEW.authorization_digest <> OLD.authorization_digest OR NEW.nonce <> OLD.nonce
+       OR NEW.max_calls <> OLD.max_calls OR NEW.expires_at <> OLD.expires_at
+       OR NEW.first_consumed_at <> OLD.first_consumed_at THEN
+        RAISE EXCEPTION 'an authorization row never changes identity, ceiling or expiry'
+            USING ERRCODE = 'check_violation';
+    END IF;
+    RETURN NEW;
+END
+$$;
+DROP TRIGGER IF EXISTS commissioning_authorization_no_rewind ON {SCHEMA_NAME}.{AUTHORIZATION_TABLE};
+CREATE TRIGGER commissioning_authorization_no_rewind
+    BEFORE UPDATE ON {SCHEMA_NAME}.{AUTHORIZATION_TABLE}
+    FOR EACH ROW EXECUTE FUNCTION {SCHEMA_NAME}.refuse_authorization_rewind();
+
+-- 3. Row-level security. The authorization row is global (a nonce is not a tenant's),
+--    so its policy admits the runtime roles to every row; the consumption row is a
+--    tenant's and carries the same two policies as every other tenant table.
+ALTER TABLE {SCHEMA_NAME}.{AUTHORIZATION_TABLE} ENABLE ROW LEVEL SECURITY;
+ALTER TABLE {SCHEMA_NAME}.{AUTHORIZATION_TABLE} FORCE ROW LEVEL SECURITY;
+CREATE POLICY authorization_ledger ON {SCHEMA_NAME}.{AUTHORIZATION_TABLE}
+    USING (true) WITH CHECK (true);
+ALTER TABLE {SCHEMA_NAME}.{CONSUMPTION_TABLE} ENABLE ROW LEVEL SECURITY;
+ALTER TABLE {SCHEMA_NAME}.{CONSUMPTION_TABLE} FORCE ROW LEVEL SECURITY;
+CREATE POLICY tenant_isolation ON {SCHEMA_NAME}.{CONSUMPTION_TABLE}
+    USING (tenant_id = current_setting('{TENANT_SETTING}')::uuid)
+    WITH CHECK (tenant_id = current_setting('{TENANT_SETTING}')::uuid);
+CREATE POLICY identity_binding ON {SCHEMA_NAME}.{CONSUMPTION_TABLE} AS RESTRICTIVE
+    USING (tenant_id = {SCHEMA_NAME}.effective_tenant_id())
+    WITH CHECK (tenant_id = {SCHEMA_NAME}.effective_tenant_id());
+
+-- 4. The unit consumes; nobody deletes or rewinds; the worker may read.
+GRANT SELECT, INSERT, UPDATE (calls_consumed) ON {SCHEMA_NAME}.{AUTHORIZATION_TABLE} TO {UNIT_ROLE};
+GRANT SELECT, INSERT ON {SCHEMA_NAME}.{CONSUMPTION_TABLE} TO {UNIT_ROLE};
+GRANT SELECT ON {SCHEMA_NAME}.{AUTHORIZATION_TABLE}, {SCHEMA_NAME}.{CONSUMPTION_TABLE} TO {WORKER_ROLE};
+
+-- 5. The database half of the gate: a genuine result references its consumption.
+ALTER TABLE {SCHEMA_NAME}.egress_result
+    ADD COLUMN IF NOT EXISTS authorization_consumption_id uuid
+        REFERENCES {SCHEMA_NAME}.{CONSUMPTION_TABLE} (consumption_id);
+ALTER TABLE {SCHEMA_NAME}.egress_result DROP CONSTRAINT IF EXISTS egress_result_genuine_call_requires_custody;
+ALTER TABLE {SCHEMA_NAME}.egress_result
+    ADD CONSTRAINT egress_result_genuine_call_requires_custody_and_admission
+    CHECK (genuine_call = false
+           OR (custody_lease_id IS NOT NULL AND custody_authority_id IS NOT NULL
+               AND authorization_consumption_id IS NOT NULL AND provenance_kind = 'RESPONSE'));
+
+RESET ROLE;
+"""
+
 MIGRATIONS: Sequence[Migration] = (
     Migration(version=1, name="exchange_roles_tables_and_rls", sql=_0001),
     Migration(version=2, name="migrator_identity_tenant_binding_custody_and_reservation", sql=_0002),
+    Migration(version=3, name="live_validation_authorization_consumption_ledger", sql=_0003),
 )
 
 

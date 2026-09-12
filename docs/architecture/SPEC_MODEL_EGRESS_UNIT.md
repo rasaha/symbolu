@@ -854,8 +854,9 @@ Release 0.3.0 (same day, under the owner's confirmation in that ADR's §0.3) car
 LP-6 step 4 as migration 2: the controlled-migration identity, tenant-bound runtime
 identities with a restrictive binding policy, the constraint-only lifting of the
 reference-slice `genuine_call` restriction (custody identifiers required at the
-database; `EgressResult` refuses it until the two predecessor gates of that ADR's §0.5
-hold, MET being the outcome and never the prerequisite), and the durable LP-5 reservation
+database; `EgressResult` refuses it without the verified admission of the owner's typed,
+consumed live-validation authorization, that ADR's §0.6, MET being the outcome and never
+the prerequisite), and the durable LP-5 reservation
 with trigger-enforced no-refund. LP-6 step 6 is the separate distribution
 `ugence-model-egress-provider-openai` 0.1.0, which this unit never imports. What §8
 still leaves open is step 7 (the live transport, the unit reserving durably before each

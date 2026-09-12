@@ -1,6 +1,6 @@
 # Ugence Model Egress Unit
 
-**Version:** 0.4.1
+**Version:** 0.5.0
 **Maturity:** `REFERENCE_GRADE_SHADOW_ONLY` · `ENFORCEMENT_ENABLED = False` · `LIVE_VENDOR_EGRESS = False`
 
 The reference exchange between the governance worker and a model call, as a
@@ -51,10 +51,11 @@ boundary is specified while its commissioning as a running unit is not.
 | Migrator identity (0.3.0) | `meu_migrator`: a separately controlled migration identity, member of the owner with `SELECT, INSERT` on the ledger only; migration 2 is applied through it in a reviewed run, never at import or startup |
 | Tenant-bound identities (0.3.0) | `role_tenant_binding` plus a `RESTRICTIVE` policy `identity_binding` on every tenant table keyed on `current_user`: a bound login is refused every other tenant whatever its session setting claims; `postgres/provision.py` emits the statements for a per-tenant `LOGIN` member of each runtime group with **no password**, and reports every login member and whether it is bound |
 | Runtime roles cannot escalate (0.3.0) | from a genuine `LOGIN` probe in each runtime group, DDL, `DISABLE`/`NO FORCE ROW LEVEL SECURITY`, `DROP POLICY`, `DROP CONSTRAINT`, `DROP TRIGGER`, a binding write, a ledger write, `SET ROLE` to the owner or the migrator, `CREATE ROLE` and `ALTER ROLE … BYPASSRLS` are each `InsufficientPrivilege` |
-| Custody columns and the `genuine_call` constraint (0.3.0) | `custody_lease_id`, `custody_authority_id` outside every digest; `CHECK egress_result_genuine_call_requires_custody` replaces the reference-slice `CHECK egress_result_no_genuine_call` under the owner's confirmation (ADR §0.3.1). `EgressResult` refuses `genuine_call: true` until both predecessor gates hold: `COMMISSIONING_STATUS` in `PENDING_VALIDATION`/`MET` and `LIVE_SYNTHETIC_VALIDATION_AUTHORIZATION` given (`genuine_call_admitted()`, ADR §0.5). `MET` is the outcome of the validation, never its prerequisite |
+| Custody columns and the `genuine_call` constraint (0.3.0) | `custody_lease_id`, `custody_authority_id` outside every digest; `CHECK egress_result_genuine_call_requires_custody` replaces the reference-slice `CHECK egress_result_no_genuine_call` under the owner's confirmation (ADR §0.3.1). `EgressResult` refuses `genuine_call: true` without a verified `GenuineCallAdmission` for that request (ADR §0.6); `MET` is the outcome of the validation, never its prerequisite |
 | Durable reservation (0.3.0) | `commissioning_budget` and `commissioning_reservation`: `Exchange.reserve_commissioning_call` is one `UPDATE … RETURNING` under the LP-5 ceilings, taken before dispatch; a `BEFORE UPDATE` trigger raises on any decrement and no role may delete. The in-memory `CallBudget` remains for unit tests and fake-transport development only |
 | Migration compatibility (0.3.0) | fresh install applies `[1, 2]`; rows and digests written under migration 1 read back unchanged after migration 2; a failing upgrade leaves migration 1 intact |
 | Step-8 designation shape (0.4.0) | `infrastructure.Step8Designation` and `check_step8_designation`: the seventeen mandatory designation obligations of LP-7 ruling 12, represented by 23 checked fields (obligation 14, spend-control evidence and classification, is two typed fields; two derived scope subfields; three attestation fields; `step8_field_counts()` states the counts from the definitions), each refused when missing, a placeholder, `latest` or any non-numeric version, secret-shaped, a human or default-compute identity, an unconstrained principal, a project-level binding, a key scope other than `api.responses.write`, an unclassified spend control, a model name offered as availability evidence, a production environment, or unverified; `check_rotation_plan` accepts only the owner's eight-step order and refuses destruction during initial commissioning; `rollback_permitted` needs both versions valid and owner-authorized. Supplies no value; changes no status |
+| Typed, consumable live-validation authorization (0.5.0) | `authorization.LiveSyntheticValidationAuthorization`: the owner's typed, immutable record (ID, non-reusable nonce, owner, acceptance reference, validity window, `NON_PRODUCTION`, OpenAI organization/project/service account, provider, pinned model, exact endpoint, designation-record digest, validation-plan digest, bounded request digests, synthetic-only, calls ≤ 10, token limits, USD 25, concurrency 1, retries ≤ 1), pinned by digest in `MEU_LIVE_VALIDATION.json`; `admit_genuine_call` holds six conditions (G1 from the canonical record; present and canonical; every scope field; unexpired and unrevoked; nonce not replayed; durable capacity) and consumes the attempt durably before dispatch (migration 3's `commissioning_authorization` and `_consumption`, `ExchangeAuthorizationLedger`); a genuine result and a genuine row both need the consumption. A string, flag, name or altered constant never satisfies it |
 
 ## What 0.4.0 adds, and what it still cannot do
 
@@ -77,9 +78,8 @@ and which this unit never imports. The adapter's only transport is an injected f
 it has no credential access and no live network path.
 
 Still no HTTP client, no vendor SDK, no credential reader and no destination
-configuration here. `EgressResult` still refuses `genuine_call: true` while
-`COMMISSIONING_STATUS` reads `BLOCKED_PENDING_INFRASTRUCTURE_DESIGNATIONS` and the live synthetic
-validation authorization is `NOT_GIVEN` (`genuine_call_admitted()`), and
+configuration here. `EgressResult` still refuses `genuine_call: true` without a verified admission, and the
+canonical `live_synthetic_validation_authorization` is `NOT_GIVEN`, and
 `MEU_LIVE_VALIDATION.json` stays at that status with every row unexecuted: fake-transport
 evidence marks no row. The live transport, the unit's use of the durable reservation,
 the owner-run verifier and the acceptance-report generator are step 7, behind the

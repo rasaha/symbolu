@@ -46,10 +46,10 @@ def _dump(result) -> str:
 
 # --- posture ---------------------------------------------------------------------
 
-def test_the_genuine_call_gate_is_shut_so_the_adapter_refuses_a_production_posture(provider):
-    from ugence_model_egress_unit import genuine_call_admitted
-    assert COMMISSIONING_STATUS == "BLOCKED_PENDING_INFRASTRUCTURE_DESIGNATIONS" and genuine_call_admitted() is False
-    with pytest.raises(ProviderRefusedInProduction, match=COMMISSIONING_STATUS):
+def test_this_release_refuses_a_production_posture_outright(provider):
+    from ugence_model_egress_unit import status_admits_genuine_call
+    assert COMMISSIONING_STATUS == "BLOCKED_PENDING_INFRASTRUCTURE_DESIGNATIONS" and status_admits_genuine_call() is False
+    with pytest.raises(ProviderRefusedInProduction, match="no live transport"):
         provider.execute(make_request(), now=NOW, production=True)
 
 
@@ -168,25 +168,77 @@ def test_a_custody_refusal_is_terminal_dispatches_nothing_and_consumes_no_budget
     assert transport.dispatches == [] and budget.calls_reserved == 0
 
 
-def test_a_production_authoritative_lease_is_refused_while_the_genuine_call_gate_is_shut(transport, budget, monkeypatch):
+def _admission_for(request, *, now=NOW):
+    """A verified admission through the real gate, against the fixture ledger: the
+    typed authorization pins this request, and a fixture commissioning record pins the
+    authorization. Nothing canonical is touched."""
+
+    from ugence_model_egress_unit import (
+        CommissioningRecordView, InMemoryAuthorizationLedger, LiveSyntheticValidationAuthorization,
+        ScopeExpectation, admit_genuine_call, designation_record_digest)
+    designation = {"schema": "model-egress-unit.live-provider-designation.v1", "fixture": "adapter-test"}
+    scope = ScopeExpectation(openai_organization_id="org-a1b2c3d4e5", openai_project_id="proj_f6g7h8i9j0",
+                             openai_service_account_id="svc-acct-meu-validation-01", model=DESIGNATED_MODEL)
+    auth = LiveSyntheticValidationAuthorization(
+        authorization_id="lsva-adapter-test", nonce="nonce-" + uuid.uuid4().hex, authorizing_owner="Owner",
+        authority_reference="acceptance://fixture", issued_at=now - timedelta(minutes=1), expires_at=now + timedelta(hours=1),
+        environment="NON_PRODUCTION", openai_organization_id=scope.openai_organization_id,
+        openai_project_id=scope.openai_project_id, openai_service_account_id=scope.openai_service_account_id,
+        provider="openai", model=DESIGNATED_MODEL, endpoint=OPENAI_RESPONSES.url,
+        designation_record_digest=designation_record_digest(designation), validation_plan_digest="a" * 64,
+        authorized_request_digests=(request.digest(),), synthetic_non_sensitive_only=True, max_calls=1,
+        max_input_tokens=8_192, max_output_tokens=1_024, budget_usd_cents=2_500, concurrency=1, max_retries=1)
+    record = CommissioningRecordView(status="PENDING_VALIDATION", authorization_digest=auth.digest(), revoked_digests=(),
+                                     authorizing_owner="Owner", designation_digest=designation_record_digest(designation))
+    return admit_genuine_call(auth, record=record, request=request, expected=scope, plan_digest="a" * 64, now=now,
+                              ledger=InMemoryAuthorizationLedger(), estimated_cents=250)
+
+
+def test_a_production_authoritative_lease_is_refused_without_a_verified_admission_for_this_request(transport, budget, monkeypatch):
     custody = MarkerCustody(production_authoritative=True)
     p = OpenAIResponsesProvider(transport=transport, custody=custody, budget=budget, credential_profile=PROFILE)
-    result = p.execute(make_request(), now=NOW)
+    request = make_request()
+    result = p.execute(request, now=NOW)
     assert result.refusal_reason is RefusalReason.LIVE_EGRESS_NOT_AVAILABLE
     assert transport.dispatches == [] and budget.calls_reserved == 0
-    # once both predecessor gates hold (never MET alone), the same lease is usable: that is
-    # the non-production validation call; "production-authoritative" is the lease's custody
-    # authority, not a production deployment
+    # a string, a flag, an owner's name, an admission for another request: all refused
+    for bad in ("yes", True, "Owner", _admission_for(make_request())):
+        assert p.execute(request, now=NOW, admission=bad).refusal_reason is RefusalReason.LIVE_EGRESS_NOT_AVAILABLE
+    assert transport.dispatches == []
+    # a verified admission for this request, but the status mirror is still BLOCKED: refused (fails closed on drift)
+    admission = _admission_for(request)
+    assert p.execute(request, now=NOW, admission=admission).refusal_reason is RefusalReason.LIVE_EGRESS_NOT_AVAILABLE
+    # with G1's mirror admitting, the same lease is usable: that is the non-production validation call;
+    # "production-authoritative" is the lease's custody authority, not a production deployment
     import ugence_model_egress_unit.version as version
     monkeypatch.setattr(version, "COMMISSIONING_STATUS", "PENDING_VALIDATION")
-    monkeypatch.setattr(version, "LIVE_SYNTHETIC_VALIDATION_AUTHORIZATION", "owner-authorization-2026-09-xx")
-    assert version.genuine_call_admitted() is True
-    result = p.execute(make_request(), now=NOW)
-    assert result.outcome is ResultOutcome.ANSWERED and result.provenance["genuine_call"] is False  # fake transport: still never genuine
+    result = p.execute(request, now=NOW, admission=admission)
+    assert result.outcome is ResultOutcome.ANSWERED and result.provenance["genuine_call"] is False  # fake transport: never genuine
     assert len(transport.dispatches) == 1
     monkeypatch.setattr(version, "COMMISSIONING_STATUS", "MET")
-    monkeypatch.setattr(version, "LIVE_SYNTHETIC_VALIDATION_AUTHORIZATION", "NOT_GIVEN")
-    assert version.genuine_call_admitted() is False  # MET without the authorization admits nothing
+    assert p.execute(make_request(), now=NOW).refusal_reason is RefusalReason.LIVE_EGRESS_NOT_AVAILABLE  # MET without an admission admits nothing
+
+
+def test_a_genuine_transport_response_is_recorded_only_under_an_admission_and_a_production_authoritative_lease(budget, monkeypatch):
+    class GenuineOnceTransport(FakeTransport):
+        def send(self, prepared, *, bearer, now):
+            super().send(prepared, bearer=bearer, now=now)
+            return TransportOutcome.responded(200, {"output_text": "vendor text", "usage": {"total_tokens": 3}}, genuine=True)
+    request = make_request()
+    admission = _admission_for(request)
+    import ugence_model_egress_unit.version as version
+    monkeypatch.setattr(version, "COMMISSIONING_STATUS", "PENDING_VALIDATION")
+    # admission but a non-authoritative (fixture) lease: the response cannot be recorded
+    p = OpenAIResponsesProvider(transport=GenuineOnceTransport(), custody=MarkerCustody(), budget=budget, credential_profile=PROFILE)
+    with pytest.raises(GenuineResponseNotRecordable):
+        p.execute(request, now=NOW, admission=admission)
+    # admission and a production-authoritative lease: a genuine result carrying both
+    p = OpenAIResponsesProvider(transport=GenuineOnceTransport(), custody=MarkerCustody(production_authoritative=True),
+                                budget=CallBudget(), credential_profile=PROFILE)
+    result = p.execute(request, now=NOW, admission=admission)
+    assert result.provenance["genuine_call"] is True and result.admission is admission
+    assert result.custody_lease_id and result.custody_authority_id == "test-marker-custody"
+    assert result.trust == "UNTRUSTED_EVIDENCE" and result.payload == "vendor text"
 
 
 # --- retry, ambiguity, failure ---------------------------------------------------

@@ -157,10 +157,19 @@
   },
   "live_synthetic_validation_authorization": "NOT_GIVEN",
   "genuine_call_gate": {
-    "rule": "ADR section 0.5: EgressResult admits genuine_call true only when meu_live_status is PENDING_VALIDATION or MET AND live_synthetic_validation_authorization is not NOT_GIVEN (unit release constants COMMISSIONING_STATUS, LIVE_SYNTHETIC_VALIDATION_AUTHORIZATION; genuine_call_admitted()). MET is the outcome the validation's evidence feeds, never a prerequisite of row 12.",
-    "predecessor_gates": [
-      "meu_live_status = PENDING_VALIDATION (every one of the seventeen step-8 obligations independently verified)",
-      "live_synthetic_validation_authorization = the identifier of the owner's separate, explicit authorization of the first live synthetic validation call"
-    ]
-  }
+    "rule": "ADR section 0.6: a genuine call is admitted only by ugence_model_egress_unit.authorization.admit_genuine_call, which issues a GenuineCallAdmission after six conditions hold and the durable ledger has consumed the attempt before dispatch; EgressResult refuses genuine_call true without a verified admission for that request, and the database (migration 3) refuses a genuine row without its consumption. MET is the outcome the validation's evidence feeds, never a prerequisite of row 12.",
+    "conditions": [
+      "1 G1 from this record: meu_live_status is PENDING_VALIDATION (every one of the seventeen step-8 obligations independently verified) or MET",
+      "2 the typed LiveSyntheticValidationAuthorization is present, well-formed, and is the one this record pins in live_synthetic_validation_authorization (its digest)",
+      "3 every scope field matches the proposed request and the current step-8 designations: authorizing owner, NON_PRODUCTION environment, OpenAI organization, project and service-account IDs, provider, pinned model, exact endpoint, the exact designation-record digest, the exact validation-plan digest, the request's digest within the authorized set, the request within the authorized token limits",
+      "4 the authorization is within its issue/expiry window and its digest is not in revoked_authorization_digests",
+      "5 its nonce has not been replayed (durable ledger)",
+      "6 the durable reservation ledger proves remaining call and budget capacity; the attempt is then consumed durably, before dispatch, and an ambiguous dispatch keeps the consumption"
+    ],
+    "never_sufficient": "a non-empty string, a boolean, an owner's name, or an altered release constant",
+    "after_the_sequence": "further genuine calls stay refused unless separately authorized; expiry, revocation, the call limit or a transition to MET never create or extend an authorization"
+  },
+  "live_synthetic_validation_authorization_schema": "model-egress-unit.live-synthetic-validation-authorization.v1 (ugence_model_egress_unit.authorization.LiveSyntheticValidationAuthorization; ADR section 0.6). When given, this field carries the 64-hex digest of the owner's typed, immutable, consumable authorization record; the unit's LIVE_SYNTHETIC_VALIDATION_AUTHORIZATION_DIGEST mirrors it for drift detection only and never constitutes execution authority",
+  "revoked_authorization_digests": [],
+  "authorizing_owner": "Rakesh Mohan — Founder, Ugence Labs"
 }

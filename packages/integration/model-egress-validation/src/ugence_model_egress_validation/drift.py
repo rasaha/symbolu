@@ -125,9 +125,20 @@ def check_drift(designation: Mapping[str, Any], validation: Mapping[str, Any]) -
         drift.append("the adapter class and its version module disagree on the designated model")
 
     authorization = validation.get("live_synthetic_validation_authorization")
-    if authorization != meu.LIVE_SYNTHETIC_VALIDATION_AUTHORIZATION:
-        drift.append(f"MEU_LIVE_VALIDATION.live_synthetic_validation_authorization {authorization!r} is not "
-                     f"LIVE_SYNTHETIC_VALIDATION_AUTHORIZATION {meu.LIVE_SYNTHETIC_VALIDATION_AUTHORIZATION!r}")
+    if authorization != meu.LIVE_SYNTHETIC_VALIDATION_AUTHORIZATION_DIGEST:
+        drift.append(f"MEU_LIVE_VALIDATION.live_synthetic_validation_authorization {authorization!r} is not the unit's "
+                     f"mirror LIVE_SYNTHETIC_VALIDATION_AUTHORIZATION_DIGEST {meu.LIVE_SYNTHETIC_VALIDATION_AUTHORIZATION_DIGEST!r}")
+    if authorization != meu.NOT_GIVEN and not (isinstance(authorization, str) and len(authorization) == 64
+                                               and set(authorization) <= set("0123456789abcdef")):
+        drift.append("live_synthetic_validation_authorization is neither NOT_GIVEN nor a 64-hex digest of a typed authorization; "
+                     "a string, flag or name is never an authorization (ADR §0.6)")
+    if not isinstance(validation.get("revoked_authorization_digests"), list):
+        drift.append("the validation record carries no revoked_authorization_digests list")
+    expected_owner = designation.get("custody", {}).get("custody_owner")
+    if not validation.get("authorizing_owner") or validation.get("authorizing_owner") != expected_owner:
+        drift.append("the validation record's authorizing_owner is absent or is not the designated custody owner")
+    if authorization == meu.NOT_GIVEN and validation.get("meu_live_status") in meu.GENUINE_CALL_ADMITTING_STATUSES:
+        drift.append("the status admits a genuine call while no authorization is pinned; a genuine call needs both (ADR §0.6)")
     row12 = next((r for r in validation.get("validation_matrix", []) if r.get("row") == 12), {})
     if any("MET" in str(p).split(";")[0].split("(")[0] for p in row12.get("prerequisites", [])):
         drift.append("row 12 lists MET among its prerequisites; MET is the outcome, never a prerequisite (ADR §0.5)")

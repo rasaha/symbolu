@@ -94,6 +94,7 @@ def test_live_refuses_with_exit_2_before_any_custody_reservation_or_dispatch(cap
     assert hashlib.sha256((records / "MEU_LIVE_VALIDATION.json").read_bytes()).hexdigest() == before
     out = capsys.readouterr().out
     assert "live verifier refused" in out and "no live transport exists" in out
+    assert "live_synthetic_validation_authorization is 'NOT_GIVEN'" in out
     assert "17 mandatory designation obligations represented by 23 checked fields (LP-7 ruling 12)." in out
     assert f"17 of {STEP8_OBLIGATION_COUNT} mandatory designation obligations are undesignated:" in out
     obligations = [line[4:] for line in out.splitlines() if line.startswith("  - ") and ":" not in line]

@@ -6,7 +6,7 @@ wheel never has to import the package (and thus its dependencies).
 
 from __future__ import annotations
 
-__version__ = "0.4.1"
+__version__ = "0.5.0"
 
 #: Frozen identity of the exchange contract this package reads and writes.
 CONTRACT_VERSION = "model_egress_unit.exchange.v1"
@@ -32,12 +32,12 @@ ENFORCEMENT_ENABLED = False
 #: never a prerequisite of the validation call itself (ADR §0.5).
 COMMISSIONING_STATUS = "BLOCKED_PENDING_INFRASTRUCTURE_DESIGNATIONS"
 
-#: The owner's separate, explicit authorization for the first live synthetic validation
-#: call (LP-7 ruling 12), as a release constant mirroring
-#: ``MEU_LIVE_VALIDATION.json`` (``live_synthetic_validation_authorization``).
-#: ``NOT_GIVEN`` until the owner's authorization record is released into this constant
-#: by its identifier; no configuration and no adapter can supply it.
-LIVE_SYNTHETIC_VALIDATION_AUTHORIZATION = "NOT_GIVEN"
+#: A MIRROR, for drift detection only, of ``MEU_LIVE_VALIDATION.json`` →
+#: ``live_synthetic_validation_authorization``: ``NOT_GIVEN`` or the digest of the owner's
+#: typed ``LiveSyntheticValidationAuthorization`` record. It never constitutes execution
+#: authority (ADR §0.6): the gate validates the typed record against the canonical
+#: commissioning record and consumes it durably; an altered constant admits nothing.
+LIVE_SYNTHETIC_VALIDATION_AUTHORIZATION_DIGEST = "NOT_GIVEN"
 
 #: The two statuses under which a genuine call may be recorded: ``PENDING_VALIDATION``
 #: (every step-8 obligation independently verified; the validation call is what happens
@@ -45,16 +45,13 @@ LIVE_SYNTHETIC_VALIDATION_AUTHORIZATION = "NOT_GIVEN"
 GENUINE_CALL_ADMITTING_STATUSES = ("PENDING_VALIDATION", "MET")
 
 
-def genuine_call_admitted() -> bool:
-    """The application gate for ``genuine_call: true`` (ADR §0.5): both predecessor gates
-    hold — the status admits a genuine call and the live synthetic validation is
-    authorized. Reads the release constants at call time so a test can prove each gate
-    alone is insufficient. Row 12 of the validation matrix requires exactly this, plus a
-    production-authoritative custody lease, ``UNTRUSTED_EVIDENCE`` trust and the row-18
-    correlation; it never requires ``MET``."""
+def status_admits_genuine_call() -> bool:
+    """G1's mirror: whether the release constant's status is one that admits a genuine
+    call. Used only to fail closed on drift; G1 itself is read from the canonical
+    commissioning record by :func:`ugence_model_egress_unit.authorization.admit_genuine_call`."""
 
-    return (COMMISSIONING_STATUS in GENUINE_CALL_ADMITTING_STATUSES
-            and LIVE_SYNTHETIC_VALIDATION_AUTHORIZATION != "NOT_GIVEN")
+    return COMMISSIONING_STATUS in GENUINE_CALL_ADMITTING_STATUSES
+
 
 #: No live vendor egress exists in this distribution, and none is configurable.
 #: Asserted structurally by ``tests/test_boundaries.py`` over the whole source

@@ -29,7 +29,7 @@ def test_the_version_is_stated_once_and_agrees_everywhere():
 
 def test_the_only_dependency_is_the_unit_at_a_version_that_carries_the_lp_rulings():
     project = _pyproject()["project"]
-    assert project["dependencies"] == ["ugence-model-egress-unit>=0.4.1"]
+    assert project["dependencies"] == ["ugence-model-egress-unit>=0.5.0"]
     assert set(project.get("optional-dependencies", {})) == {"test"}
     assert project["license"] == {"text": "Proprietary"}
     assert (PKG / "LICENSE").read_text(encoding="utf-8").strip() == "Proprietary"

@@ -11,6 +11,7 @@ from __future__ import annotations
 
 from .drift import RecordsNotLocated, check_drift, load_records, records_directory
 from .harness import SYNTHETIC_PROMPT, OfflineRun, RowOutcome, run_offline
+from .plan import VALIDATION_PLAN_DIGEST_DOMAIN, validation_plan_digest
 from .report import build_report, render, write_report
 from .rows import OFFLINE_ROWS, ROWS, STATUS_VOCABULARY, Row
 from .secret_shapes import Finding, assert_clean, scan
@@ -21,6 +22,7 @@ __all__ = [
     "Row", "ROWS", "OFFLINE_ROWS", "STATUS_VOCABULARY",
     "SYNTHETIC_PROMPT", "RowOutcome", "OfflineRun", "run_offline",
     "build_report", "render", "write_report",
+    "VALIDATION_PLAN_DIGEST_DOMAIN", "validation_plan_digest",
     "RecordsNotLocated", "records_directory", "load_records", "check_drift",
     "Finding", "scan", "assert_clean",
 ]

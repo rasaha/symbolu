@@ -54,7 +54,10 @@ def main(argv: Optional[List[str]] = None) -> int:
         # Refused here, before any custody port, budget, transport or harness is touched.
         missing, attestation = _undesignated(records["designation"])
         counts = step8_field_counts()
-        print(f"live verifier refused: commissioning is {COMMISSIONING_STATUS}; no live transport exists in any distribution.")
+        pinned = records["validation"].get("live_synthetic_validation_authorization")
+        print(f"live verifier refused: commissioning is {COMMISSIONING_STATUS}; no live transport exists in any distribution; "
+              f"the canonical live_synthetic_validation_authorization is {pinned!r} (a typed, consumed authorization is the "
+              f"only thing that admits a genuine call, ADR §0.6).")
         print(f"{counts['statement']} (LP-7 ruling 12).")
         print(f"{len(missing)} of {STEP8_OBLIGATION_COUNT} mandatory designation obligations are undesignated:")
         for name in missing:

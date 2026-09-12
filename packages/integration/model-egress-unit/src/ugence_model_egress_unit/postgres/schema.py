@@ -48,6 +48,8 @@ __all__ = [
     "BINDING_TABLE",
     "BUDGET_TABLE",
     "RESERVATION_TABLE",
+    "AUTHORIZATION_TABLE",
+    "CONSUMPTION_TABLE",
 ]
 
 #: This package's own schema. Nothing here lives in ``public``: a dedicated
@@ -84,3 +86,9 @@ BINDING_TABLE = "role_tenant_binding"
 #: Migration 2: the durable LP-5 reservation, one row per tenant, non-compensatory.
 BUDGET_TABLE = "commissioning_budget"
 RESERVATION_TABLE = "commissioning_reservation"
+
+#: Migration 3 (ADR §0.6): the durable consumption ledger of the owner's typed
+#: live-validation authorization. Keyed on the nonce (global, never reused) and the
+#: authorization digest; every consumed attempt is a row the unit cannot delete.
+AUTHORIZATION_TABLE = "commissioning_authorization"
+CONSUMPTION_TABLE = "commissioning_authorization_consumption"

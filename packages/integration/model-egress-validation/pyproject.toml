@@ -32,8 +32,8 @@ authors = [{ name = "Rakesh Mohan" }]
 keywords = ["governance", "egress", "model", "validation", "commissioning", "ugence"]
 classifiers = ["Typing :: Typed"]
 dependencies = [
-    "ugence-model-egress-unit>=0.4.1",
-    "ugence-model-egress-provider-openai>=0.1.2",
+    "ugence-model-egress-unit>=0.5.0",
+    "ugence-model-egress-provider-openai>=0.2.0",
 ]
 
 [project.optional-dependencies]

@@ -109,10 +109,10 @@ jobs:
           import ugence_model_egress_unit as meu
           assert pkg.LIVE_VENDOR_EGRESS is False and pkg.ENFORCEMENT_ENABLED is False
           assert pkg.MATURITY == "REFERENCE_GRADE_SHADOW_ONLY", pkg.MATURITY
-          assert meu.genuine_call_admitted() is False, (meu.COMMISSIONING_STATUS, meu.LIVE_SYNTHETIC_VALIDATION_AUTHORIZATION)
+          assert meu.status_admits_genuine_call() is False and meu.LIVE_SYNTHETIC_VALIDATION_AUTHORIZATION_DIGEST == "NOT_GIVEN"
           requires = md.requires("ugence-model-egress-provider-openai") or []
           runtime = [r for r in requires if "extra ==" not in r]
-          assert runtime == ["ugence-model-egress-unit>=0.4.1"], runtime
+          assert runtime == ["ugence-model-egress-unit>=0.5.0"], runtime
           for forbidden in ("openai", "httpx", "requests", "aiohttp"):
               try:
                   md.distribution(forbidden)

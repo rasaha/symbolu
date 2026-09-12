@@ -5,7 +5,7 @@ Read statically by the build backend so building a wheel never imports the packa
 
 from __future__ import annotations
 
-__version__ = "0.1.2"
+__version__ = "0.2.0"
 
 #: The adapter's stable identity in every provenance record it writes.
 ADAPTER_ID = "ugence-openai-responses"

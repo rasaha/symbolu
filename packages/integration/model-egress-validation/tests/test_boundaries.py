@@ -53,7 +53,7 @@ def _dotted(path):
 
 def test_the_source_tree_is_what_the_readme_says():
     assert {p.name for p in SOURCES} == {"__init__.py", "__main__.py", "cli.py", "drift.py", "harness.py",
-                                          "report.py", "rows.py", "secret_shapes.py", "version.py"}
+                                          "plan.py", "report.py", "rows.py", "secret_shapes.py", "version.py"}
 
 
 @pytest.mark.parametrize("path", SOURCES, ids=lambda p: p.name)

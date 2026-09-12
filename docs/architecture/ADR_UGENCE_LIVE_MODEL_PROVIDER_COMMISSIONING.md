@@ -508,12 +508,12 @@ outcome only:
 | Predecessor gate | Record identifier | Release constant of the unit | Meaning |
 | --- | --- | --- | --- |
 | G1 status admits a genuine call | `MEU_LIVE_VALIDATION.json` → `meu_live_status` = `PENDING_VALIDATION` (or, afterwards, `MET`) | `COMMISSIONING_STATUS` ∈ `GENUINE_CALL_ADMITTING_STATUSES` = (`PENDING_VALIDATION`, `MET`) | every one of the seventeen step-8 obligations independently verified (ruling 12) |
-| G2 the live synthetic validation is authorized | `MEU_LIVE_VALIDATION.json` → `live_synthetic_validation_authorization` = the identifier of the owner's separate, explicit authorization (today `NOT_GIVEN`) | `LIVE_SYNTHETIC_VALIDATION_AUTHORIZATION` ≠ `NOT_GIVEN` | LP-7 ruling 12's "separate, explicit owner authorization" |
+| G2 the live synthetic validation is authorized | `MEU_LIVE_VALIDATION.json` → `live_synthetic_validation_authorization` = the digest of the owner's typed `LiveSyntheticValidationAuthorization` (today `NOT_GIVEN`) | none: the typed record itself, validated and consumed by `admit_genuine_call` (§0.6); `LIVE_SYNTHETIC_VALIDATION_AUTHORIZATION_DIGEST` only mirrors the record for drift | LP-7 ruling 12's "separate, explicit owner authorization" |
 
-`genuine_call_admitted()` is G1 ∧ G2 and is the only condition `EgressResult` and the
-adapter consult; `tests/test_genuine_call_gate.py` proves each gate alone is
-insufficient, that `PENDING_VALIDATION` with the authorization admits the genuine result,
-and that `MET` alone admits nothing. The database half (migration 2's CHECK) is unchanged.
+As corrected in §0.6, G1 ∧ G2 is evaluated by `admit_genuine_call` against the canonical
+record and the typed authorization, and consumed durably; no constant is authority.
+`tests/test_live_authorization.py` proves each gate alone is insufficient and that `MET`
+alone admits nothing.
 
 **Row 12, final wording.** Scenario "the live answer's provenance"; required outcome
 `GENUINE_CALL_TRUE_LEASE_PRODUCTION_AUTHORITATIVE_TRUST_UNTRUSTED_EVIDENCE`; prerequisites,
@@ -542,6 +542,131 @@ commissioned custody path rather than a fake, emulator or reference one. It says
 about the deployment the lease serves. The first live synthetic validation uses exactly
 such a lease within the non-production commissioning scope, and it authorizes no
 production deployment, which needs its own commissioning record (LP-7 preamble, ruling 7).
+
+### 0.6 — Owner correction of 2026-09-12: G2 is a typed, immutable, consumable authorization, never a constant
+
+> The row-12 circularity correction is accepted. Before merging PR #1751, correct the remaining G2 authorization shape.
+>
+> LIVE_SYNTHETIC_VALIDATION_AUTHORIZATION not NOT_GIVEN is insufficient as an authorization predicate. A package constant may mirror the canonical record for drift detection, but it must not itself constitute execution authority.
+>
+> Replace G2 with validation of a typed, immutable and consumable LiveSyntheticValidationAuthorization record, or keep G2 permanently closed until that record exists.
+>
+> The authorization must bind at minimum:
+>
+> * authorization ID and non-reusable nonce;
+> * authorizing owner and authority/acceptance reference;
+> * issue and expiry timestamps;
+> * NON_PRODUCTION environment;
+> * designated OpenAI organization, project and service-account IDs;
+> * exact provider, pinned model and endpoint;
+> * exact Step-8 designation-record digest;
+> * exact validation-plan digest and either the authorized request digest or an explicitly bounded set of request digests;
+> * synthetic_non_sensitive_only;
+> * maximum calls, not exceeding 10;
+> * input/output-token limits;
+> * USD 25 commissioning ceiling;
+> * concurrency and retry limits.
+>
+> genuine_call_admitted() must require:
+>
+> 1. G1 is satisfied from the canonical commissioning record;
+> 2. the typed authorization is present and valid;
+> 3. every scope field matches the proposed request and current Step-8 designations;
+> 4. the authorization is unexpired and unrevoked;
+> 5. its nonce has not been replayed;
+> 6. the durable reservation ledger proves remaining call and budget capacity.
+>
+> A nonempty string, boolean, arbitrary owner name or altered release constant must never satisfy G2.
+>
+> Authorization must be consumed durably before dispatch. An ambiguous dispatch consumes the attempt. Expiry, revocation, reaching the call limit, or transition to MET must not create or extend authorization. After the authorized validation sequence is consumed, further genuine calls remain refused unless separately authorized.
+>
+> Add negative tests for:
+>
+> * arbitrary non-NOT_GIVEN values;
+> * missing fields;
+> * wrong owner or environment;
+> * wrong organization, project, service account, provider, model or endpoint;
+> * designation-digest drift;
+> * wrong request or validation-plan digest;
+> * expired and revoked authorization;
+> * nonce replay;
+> * exhausted calls or budget;
+> * MET without a current authorization;
+> * attempted reuse after the validation sequence.
+>
+> The canonical authorization remains NOT_GIVEN, every validation row remains null, and offline fixtures must not mutate the canonical record.
+>
+> If introducing the typed authorization requires an owner decision about its canonical schema or authority protocol, stop and return that exact ballot instead of inventing it. Otherwise implement the correction, rerun the full CI matrix, update draft PR #1751 and return the final report.
+>
+> Do not merge, create infrastructure or credentials, make a live call, enable live vendor egress, or mark commissioning MET.
+
+#### 0.6.1 — What was implemented (unit 0.5.0, adapter 0.2.0, validation 0.2.0)
+
+No owner decision on schema or authority protocol was needed: the fields are the owner's
+list, and authority follows the repository's existing pattern for every ruling here —
+the owner's record, pinned by digest into the canonical commissioning record the owner
+edits. No signature scheme and no new key custody were introduced.
+
+**The typed record.** `ugence_model_egress_unit.authorization.LiveSyntheticValidationAuthorization`,
+schema `model-egress-unit.live-synthetic-validation-authorization.v1`, frozen, every
+field bound into its digest (domain `ugence.model-egress-unit/live-synthetic-validation-authorization/v1`):
+
+| Owner's obligation | Field(s) | Refused at construction when |
+| --- | --- | --- |
+| authorization ID and non-reusable nonce | `authorization_id`, `nonce` (≥16 chars) | missing, padded, placeholder or credential-shaped |
+| authorizing owner and authority/acceptance reference | `authorizing_owner`, `authority_reference` | as above |
+| issue and expiry timestamps | `issued_at`, `expires_at` | naive, or expiry not after issue |
+| NON_PRODUCTION environment | `environment` | anything but `NON_PRODUCTION` |
+| designated OpenAI organization, project, service-account IDs | `openai_organization_id`, `openai_project_id`, `openai_service_account_id` | missing or placeholder |
+| exact provider, pinned model, endpoint | `provider` (`openai`), `model` (dated snapshot), `endpoint` (exactly `OPENAI_RESPONSES`) | otherwise |
+| exact Step-8 designation-record digest | `designation_record_digest` | not a 64-hex digest |
+| exact validation-plan digest; the authorized request digest or a bounded set | `validation_plan_digest`, `authorized_request_digests` (non-empty, distinct, ≤ `max_calls`) | otherwise |
+| synthetic_non_sensitive_only | `synthetic_non_sensitive_only` | not exactly `true` |
+| maximum calls ≤ 10 | `max_calls` | outside 1..10 |
+| input/output-token limits | `max_input_tokens` ≤ 8,192, `max_output_tokens` ≤ 1,024 | beyond the ruling |
+| USD 25 ceiling | `budget_usd_cents` ≤ 2,500 | beyond the ruling |
+| concurrency and retry limits | `concurrency` = 1, `max_retries` ≤ 1 | beyond the ruling |
+
+**Canonical binding (record identifiers).** `MEU_LIVE_VALIDATION.json` →
+`live_synthetic_validation_authorization` is `NOT_GIVEN` or the record's digest;
+`revoked_authorization_digests` lists revoked digests; `authorizing_owner` is the owner
+the record must name. `LIVE_SYNTHETIC_VALIDATION_AUTHORIZATION_DIGEST` in `version.py`
+mirrors the first for drift detection only.
+
+**The gate.** `admit_genuine_call(authorization, record=CommissioningRecordView, request,
+expected=ScopeExpectation, plan_digest, now, ledger, estimated_cents)` is the only way to
+obtain a `GenuineCallAdmission`, and it holds, in order:
+
+| # | Owner's requirement | Where it is checked |
+| --- | --- | --- |
+| 1 | G1 from the canonical commissioning record | `CommissioningRecordView.status` ∈ (`PENDING_VALIDATION`, `MET`), read from the record, never a constant |
+| 2 | typed authorization present and valid | the argument is a `LiveSyntheticValidationAuthorization` whose digest equals the record's pinned digest; `NOT_GIVEN`, a string, a flag, a name or an edited copy are refused |
+| 3 | every scope field matches the request and the current designations | owner, environment, organization/project/service account, provider, model, endpoint against `ScopeExpectation` (from the designation record); the request's own binding; the designation-record digest; the plan digest; the request digest within the authorized set with its content still hashing; the request within the authorized token limits |
+| 4 | unexpired and unrevoked | `issued_at ≤ now < expires_at`; digest not in `revoked_authorization_digests` |
+| 5 | nonce not replayed | the ledger refuses a nonce already backing another digest |
+| 6 | the durable ledger proves capacity | `ledger.capacity` then `ledger.consume`, which writes the consumption and the LP-5 reservation in one transaction, before dispatch; a refusal rolls both back; nothing is ever given back, so an ambiguous dispatch keeps the consumption |
+
+The ledger is `postgres.ExchangeAuthorizationLedger` over migration 3's
+`commissioning_authorization` (nonce → one digest, `calls_consumed` only rises, `max_calls`
+and `expires_at` immutable by trigger) and `commissioning_authorization_consumption`
+(one row per consumed attempt, unique per request). `InMemoryAuthorizationLedger` is a
+fixture. The application half: `EgressResult` refuses `genuine_call: true` without a
+verified `GenuineCallAdmission` for that request; the database half: migration 3 adds
+`egress_result.authorization_consumption_id` (foreign key to the consumption) and the
+CHECK `egress_result_genuine_call_requires_custody_and_admission`. The adapter
+(`execute(..., admission=)`) refuses a production-authoritative lease without a verified
+admission for the request and records a genuine response only under one.
+
+**Negative tests** (`tests/test_live_authorization.py`, `tests/test_migration_3_authorization_ledger.py`,
+adapter `tests/test_provider.py`): arbitrary non-`NOT_GIVEN` values (strings, `True`, the
+owner's name, an altered mirror constant); every missing field; wrong owner or
+environment; wrong organization, project, service account, provider, model or endpoint;
+designation-digest drift; wrong request or plan digest and a tampered request; expired,
+not-yet-valid and revoked, including under `MET`; nonce replay (pure and durable);
+exhausted calls and budget (pure and durable, with the consumption rolled back); `MET`
+without a current authorization and `BLOCKED` with one; reuse after the sequence and of a
+consumed request. The canonical authorization stays `NOT_GIVEN`, every row stays `null`,
+and the validation package's tests hash both records before and after every command.
 
 ## 1 — The finding that shapes this record
 

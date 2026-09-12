@@ -42,6 +42,7 @@ acknowledgement never extends the hard deadline.
 from __future__ import annotations
 
 import enum
+import dataclasses
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from typing import Mapping, Optional, Sequence, Tuple
@@ -407,6 +408,66 @@ class EgressRequest:
             EGRESS_REQUEST_DIGEST_DOMAIN, "EgressRequest", self.digest_body())
 
 
+#: Domain of the admission token below. An admission is a fingerprint of a durable
+#: consumption, never an authorization by itself.
+ADMISSION_DIGEST_DOMAIN = "ugence.model-egress-unit/genuine-call-admission/v1"
+
+
+@dataclass(frozen=True)
+class GenuineCallAdmission:
+    """The receipt of one durable consumption of a live-validation authorization,
+    issued by :func:`ugence_model_egress_unit.authorization.admit_genuine_call` after
+    the six conditions of ADR §0.6 held and the ledger consumed the attempt.
+
+    It names the authorization (by digest and nonce), the one request it admits (by
+    id and digest), the consumption row and the call number. ``verify`` re-derives the
+    digest; a token whose fields were edited fails it. It is what a genuine
+    ``EgressResult`` must carry, and the database requires the same consumption row
+    (migration 3) — a token is never enough on its own.
+    """
+
+    authorization_digest: str
+    nonce: str
+    request_id: UUID
+    request_digest: str
+    consumption_id: str
+    consumed_at: datetime
+    call_number: int
+    admission_digest: str
+
+    @staticmethod
+    def _digest_of(body: dict) -> str:
+        return canonical_digest(ADMISSION_DIGEST_DOMAIN, "GenuineCallAdmission", body)
+
+    def _body(self) -> dict:
+        return {"authorization_digest": self.authorization_digest, "nonce": self.nonce,
+                "request_id": str(self.request_id), "request_digest": self.request_digest,
+                "consumption_id": self.consumption_id, "consumed_at": self.consumed_at,
+                "call_number": self.call_number}
+
+    @classmethod
+    def issue(cls, *, authorization_digest: str, nonce: str, request_id: UUID, request_digest: str,
+              consumption_id: str, consumed_at: datetime, call_number: int) -> "GenuineCallAdmission":
+        draft = cls(authorization_digest=authorization_digest, nonce=nonce, request_id=request_id,
+                    request_digest=request_digest, consumption_id=consumption_id, consumed_at=consumed_at,
+                    call_number=call_number, admission_digest="0" * 64)
+        return dataclasses.replace(draft, admission_digest=cls._digest_of(draft._body()))
+
+    def verify(self) -> bool:
+        try:
+            return (isinstance(self.consumption_id, str) and bool(self.consumption_id)
+                    and 1 <= int(self.call_number) <= 10
+                    and self.admission_digest == self._digest_of(self._body()))
+        except Exception:  # noqa: BLE001 — a malformed token verifies false, never raises
+            return False
+
+    def as_record(self) -> dict:
+        body = self._body()
+        body["consumed_at"] = self.consumed_at.isoformat()
+        body["admission_digest"] = self.admission_digest
+        return body
+
+
 @dataclass(frozen=True)
 class EgressResult:
     """What came back, or what could not be determined.
@@ -431,6 +492,10 @@ class EgressResult:
     #: this distribution, which makes no genuine call.
     custody_lease_id: Optional[str] = None
     custody_authority_id: Optional[str] = None
+    #: ADR §0.6 (migration 3). Outside every digest body: the durable consumption of the
+    #: live-validation authorization this genuine result ran under. ``None`` for every
+    #: result in this distribution, which makes no genuine call.
+    admission: Optional[GenuineCallAdmission] = None
 
     def __post_init__(self) -> None:
         if self.trust != TRUST_LEVEL:
@@ -448,24 +513,30 @@ class EgressResult:
             raise ValueError(f"a {self.outcome.value} result has no payload to carry")
         genuine = self.provenance.get("genuine_call")
         if genuine is not False:
-            # LP-2b: the application half of the gate. A genuine result needs the
-            # custody lease and authority it was produced under, a RESPONSE
-            # provenance, and both predecessor gates of ADR §0.5: a status that admits
-            # a genuine call (PENDING_VALIDATION or MET) and the owner's separate
-            # authorization of the live synthetic validation. Both are release
-            # constants, so no configuration can admit one. MET is never required
-            # here: it is the outcome the validation's evidence feeds, not its input.
+            # LP-2b and ADR §0.6: the application half of the gate. A genuine result
+            # carries the custody lease and authority it ran under, a RESPONSE
+            # provenance, and a verified GenuineCallAdmission for THIS request — the
+            # receipt of a durable consumption of the owner's typed live-validation
+            # authorization, issued by admit_genuine_call after its six conditions held.
+            # The release constant is consulted only to fail closed on drift (G1
+            # mirror); it is never authority. MET is never required: it is the
+            # outcome the validation's evidence feeds, not its input.
             from . import version as _version  # local: version imports nothing
 
             if genuine is not True:
                 raise ValueError("genuine_call is a boolean")
-            if not _version.genuine_call_admitted():
+            if not _version.status_admits_genuine_call():
                 raise ValueError(
                     f"no result may record a genuine call while commissioning is "
-                    f"{_version.COMMISSIONING_STATUS} and the live synthetic validation "
-                    f"authorization is {_version.LIVE_SYNTHETIC_VALIDATION_AUTHORIZATION}; a "
-                    f"provenance record mistakable for provider evidence is the failure this "
-                    f"check exists to prevent")
+                    f"{_version.COMMISSIONING_STATUS}; a provenance record mistakable for "
+                    f"provider evidence is the failure this check exists to prevent")
+            if not isinstance(self.admission, GenuineCallAdmission) or not self.admission.verify():
+                raise ValueError(
+                    "a genuine result carries a verified GenuineCallAdmission: the durable "
+                    "consumption of the owner's typed live-validation authorization (ADR §0.6); "
+                    "no string, flag, owner name or release constant stands in for it")
+            if self.admission.request_id != self.request_id:
+                raise ValueError("the admission names a different request than this result")
             if not self.custody_lease_id or not self.custody_authority_id:
                 raise ValueError("a genuine result names the custody lease and authority it ran under")
             if self.provenance.get("kind") != ProvenanceKind.RESPONSE.value:
@@ -492,6 +563,31 @@ class EgressResult:
             },
             payload=payload,
             content_digest=payload_digest(payload),
+        )
+
+    @classmethod
+    def answered_genuine(cls, *, request_id, tenant_id, correlation_id, recorded_at,
+                         adapter_id, payload, model_ref, custody_lease_id, custody_authority_id,
+                         admission: GenuineCallAdmission, token_count=None) -> "EgressResult":
+        """A genuine answer: only constructible with the custody identifiers and a
+        verified admission, and refused by ``__post_init__`` unless every gate holds."""
+
+        return cls(
+            request_id=request_id, tenant_id=tenant_id, correlation_id=correlation_id,
+            recorded_at=recorded_at, outcome=ResultOutcome.ANSWERED,
+            adapter_id=adapter_id,
+            provenance={
+                "kind": ProvenanceKind.RESPONSE.value,
+                "adapter_id": adapter_id,
+                "genuine_call": True,
+                "model_ref": model_ref,
+                "observed_at": recorded_at.isoformat(),
+                "token_count": token_count,
+            },
+            payload=payload,
+            content_digest=payload_digest(payload),
+            custody_lease_id=custody_lease_id, custody_authority_id=custody_authority_id,
+            admission=admission,
         )
 
     @classmethod

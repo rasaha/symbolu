@@ -239,3 +239,12 @@ verification that the designated model snapshot exists.
 | `is_production_authoritative` docstrings | `custody.py` | the lease's authority under the real custody contract, not a production deployment; the non-production validation call uses such a lease `[V]` |
 | row 12 `prerequisites` and `contributes_to`; `live_synthetic_validation_authorization`; `genuine_call_gate` | `MEU_LIVE_VALIDATION.json` | the five prerequisites recorded in the row; the drift check refuses a row-12 prerequisite naming MET |
 
+## Addendum, 0.5.0 (2026-09-12): the typed, consumable authorization and migration 3
+
+| Added | Where | What it closes |
+| --- | --- | --- |
+| `LiveSyntheticValidationAuthorization`, `CommissioningRecordView`, `ScopeExpectation`, `check_live_authorization`, `admit_genuine_call`, `AuthorizationLedger`, `InMemoryAuthorizationLedger` (fixture), `designation_record_digest` | `authorization.py` | the commissioning ADR §0.6: G2 is the owner's typed, immutable, consumable record pinned by digest in the canonical commissioning record, validated on six conditions and consumed durably before dispatch; a string, flag, name or altered constant never satisfies it `[V]` |
+| `GenuineCallAdmission`, `EgressResult.admission`, `EgressResult.answered_genuine` | `records.py` | the application half: a genuine result carries the verified receipt of its consumption for exactly its request `[V]` |
+| migration 3: `commissioning_authorization`, `commissioning_authorization_consumption`, trigger `refuse_authorization_rewind`, `egress_result.authorization_consumption_id` and `CHECK egress_result_genuine_call_requires_custody_and_admission` | `postgres/migrations.py`, `ExchangeAuthorizationLedger` | the durable half: nonce → one digest ever, `calls_consumed` only rises, one consumption per request, consumption and LP-5 reservation in one transaction, a genuine row must reference its consumption; fresh install `[1, 2, 3]` and upgrade from 2 both proven `[V]` |
+| `LIVE_SYNTHETIC_VALIDATION_AUTHORIZATION_DIGEST` (mirror), `status_admits_genuine_call` (G1 mirror) | `version.py` | drift detection only; never authority |
+

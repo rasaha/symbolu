@@ -18,6 +18,7 @@ from ugence_model_egress_provider_openai import FAKE_RESPONSE_MARKER
 from .harness import OfflineRun
 from ugence_model_egress_unit import STEP8_OBLIGATION_COUNT, step8_field_counts
 
+from .plan import validation_plan_digest
 from .rows import ROWS, STATUS_VOCABULARY
 from .secret_shapes import assert_clean
 from .version import REPORT_SCHEMA
@@ -49,6 +50,8 @@ def build_report(run: OfflineRun) -> Dict[str, Any]:
         "credential_present": False,
         "infrastructure_dependent_rows_not_executed": [r["row"] for r in rows if r["infrastructure_dependent"]],
         "audit_query_window": None,
+        "validation_plan_digest": validation_plan_digest(),
+        "live_synthetic_validation_authorization": "NOT_GIVEN; a typed authorization is consumed only by the live verifier (ADR §0.6)",
         "step8": {"statement": step8_field_counts()["statement"], "obligations": STEP8_OBLIGATION_COUNT,
                   "checked_fields": step8_field_counts()["checked_fields"], "supplied_here": 0},
         "content_policy": "statuses, refusal names, counts, digests and versions only; no prompt text, no response text, no credential",

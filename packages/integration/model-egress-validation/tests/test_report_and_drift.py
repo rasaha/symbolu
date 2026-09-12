@@ -82,6 +82,10 @@ def test_the_records_beside_the_unit_show_no_drift():
     assert records_directory().name == "model-egress-unit"
     assert check_drift(records["designation"], records["validation"]) == []
     assert records["validation"]["live_synthetic_validation_authorization"] == "NOT_GIVEN"
+    assert records["validation"]["revoked_authorization_digests"] == []
+    assert records["validation"]["authorizing_owner"] == records["designation"]["custody"]["custody_owner"]
+    from ugence_model_egress_validation import validation_plan_digest
+    assert len(validation_plan_digest()) == 64 and validation_plan_digest() == validation_plan_digest()
     row12 = records["validation"]["validation_matrix"][11]
     assert row12["row"] == 12 and len(row12["prerequisites"]) == 5 and "presuppose MET" in row12["contributes_to"]
     step8 = records["designation"]["step8_required_values"]
@@ -97,7 +101,10 @@ def test_the_records_beside_the_unit_show_no_drift():
     (lambda d, v: d["vendor"].__setitem__("endpoint", "/v1/chat/completions"), "endpoint"),
     (lambda d, v: d["vendor"].__setitem__("model", "gpt-5.4-mini (alias)"), "DESIGNATED_MODEL"),
     (lambda d, v: v.__setitem__("meu_live_status", "MET"), "COMMISSIONING_STATUS"),
-    (lambda d, v: v.__setitem__("live_synthetic_validation_authorization", "owner-authorization-x"), "LIVE_SYNTHETIC_VALIDATION_AUTHORIZATION"),
+    (lambda d, v: v.__setitem__("live_synthetic_validation_authorization", "owner-authorization-x"), "mirror LIVE_SYNTHETIC_VALIDATION_AUTHORIZATION_DIGEST"),
+    (lambda d, v: v.__setitem__("live_synthetic_validation_authorization", "yes"), "never an authorization"),
+    (lambda d, v: v.__setitem__("authorizing_owner", "Someone Else"), "authorizing_owner"),
+    (lambda d, v: v.__delitem__("revoked_authorization_digests"), "revoked_authorization_digests"),
     (lambda d, v: v["validation_matrix"].__getitem__(11).__setitem__("prerequisites", ["commissioning MET"]), "never a prerequisite"),
     (lambda d, v: v["validation_matrix"].__getitem__(11).__setitem__("prerequisites", []), "no prerequisites"),
     (lambda d, v: v["validation_matrix"].__getitem__(0).__setitem__("required", "PASS"), "differ from the harness"),

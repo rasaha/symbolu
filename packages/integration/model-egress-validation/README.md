@@ -1,6 +1,6 @@
 # Ugence Model Egress Validation
 
-**Version:** 0.1.0
+**Version:** 0.2.0
 **Maturity:** `REFERENCE_GRADE_SHADOW_ONLY` · `ENFORCEMENT_ENABLED = False` · `LIVE_VENDOR_EGRESS = False`
 **Ruling basis:** LP-4 (the matrix), LP-7 ruling 11 (the offline step-7 artifacts), LP-7 ruling 12 (`live` refuses) — `docs/architecture/ADR_UGENCE_LIVE_MODEL_PROVIDER_COMMISSIONING.md` §0.4
 
@@ -57,6 +57,10 @@ response marker, or any credential-shaped string (`secret_shapes.scan`). It reco
 
 The two records are located by exactly one rule or refused: beside the unit when it is imported from a source checkout, or in the git checkout that contains the working directory. When both exist they must be the same directory; when they differ, or neither exists, `RecordsNotLocated` is raised and `--records <dir>` names the intended one. A parent, sibling or unrelated checkout is never consulted, and a directory whose designation record is not of the live-provider schema is refused. Reads are read-only; the offline command never writes to either record.
 
+## The validation plan digest
+
+`validation_plan_digest()` digests this distribution's row table and the three distribution versions. The owner's typed `LiveSyntheticValidationAuthorization` (ADR §0.6) binds it as `validation_plan_digest`; an authorization issued for one plan admits no call under another. The offline report records it.
+
 ## Drift checks
 
 The designation record's limits, host, endpoint and model against
@@ -69,7 +73,7 @@ row's result is `null` and no evidence is recorded.
 ## Dependency direction
 
 ```
-ugence-model-egress-unit >= 0.4.1        ugence-model-egress-provider-openai >= 0.1.2
+ugence-model-egress-unit >= 0.5.0        ugence-model-egress-provider-openai >= 0.2.0
                     ▲                                     ▲
                     └──── ugence-model-egress-validation ─┘
 ```
