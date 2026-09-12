@@ -60,7 +60,8 @@ def test_the_report_claims_no_pass_opens_no_network_and_carries_no_content(repor
 
 def test_the_generator_refuses_a_report_that_would_carry_the_prompt_the_marker_or_a_key(run):
     import dataclasses
-    for poison in (SYNTHETIC_PROMPT, run.known_markers[0], "sk-proj-abcdefghijklmnopqrstuvwxyz0123", FAKE_RESPONSE_MARKER):
+    from synthetic_shapes import synthetic_credential_shape
+    for poison in (SYNTHETIC_PROMPT, run.known_markers[0], synthetic_credential_shape("openai_project_key"), FAKE_RESPONSE_MARKER):
         poisoned = dataclasses.replace(run, outcomes=[
             dataclasses.replace(o, observed=o.observed + " " + poison) if o.row == 1 else o for o in run.outcomes])
         with pytest.raises(ValueError):

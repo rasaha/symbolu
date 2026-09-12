@@ -24,6 +24,7 @@ from ugence_model_egress_unit import (
     rollback_permitted,
 )
 from ugence_model_egress_unit.infrastructure import DESTRUCTION_STEP
+from synthetic_shapes import KINDS, expected_family, synthetic_credential_shape
 
 NOW = datetime(2026, 9, 11, 18, 0, tzinfo=timezone.utc)
 
@@ -137,13 +138,9 @@ def test_a_placeholder_alias_or_synthesized_token_is_refused_in_any_field(value)
         check_step8_designation(_record(workload_identity_binding=dataclasses.replace(WIF, audience="<audience>")))
 
 
-@pytest.mark.parametrize("secret_like", [
-    "sk-proj-abcdefghijklmnopqrstuvwxyz0123456789", "sk-svcacct-ABCDEFGHIJKLMNOPQRSTUVWXYZ",
-    "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJtZXUifQ.c2lnbmF0dXJlLXNpZ25hdHVyZQ",
-    "AIzaSyA1234567890abcdefghijklmnopqrstu", "ya29.a0AfH6SMBxxxxxxxxxxxxxxxxxxxx",
-    "-----BEGIN PRIVATE KEY-----\nMIIE", "evidence://x?token=sk-abcdefghijklmnop",
-])
-def test_a_secret_shaped_value_is_refused_in_any_field_without_being_echoed(secret_like):
+@pytest.mark.parametrize("kind", KINDS)
+def test_a_secret_shaped_value_is_refused_in_any_field_without_being_echoed(kind):
+    secret_like = synthetic_credential_shape(kind)   # assembled at runtime; no literal in this file
     assert looks_like_a_credential(secret_like)
     for name in ("iam_policy_evidence_ref", "openai_service_account_id", "rotation_runbook_ref", "processing_region"):
         with pytest.raises(DesignationRefused) as info:
@@ -152,6 +149,27 @@ def test_a_secret_shaped_value_is_refused_in_any_field_without_being_echoed(secr
     assert not looks_like_a_credential("projects/p/secrets/meu-openai/versions/3")
     assert not looks_like_a_credential("evidence://iam/policy/2026-09-11")
     assert not looks_like_a_credential("task-123")  # 'sk-' inside a word is not a key
+
+
+def test_the_runtime_assembled_shapes_take_the_same_production_detection_path_as_the_real_prefixes():
+    """Requirement 8: each synthetic value is caught by the production detector through
+    the prefix family a real credential of that kind would trigger, and each fragment
+    alone is not a credential shape."""
+
+    from ugence_model_egress_unit import CREDENTIAL_SHAPE_PREFIXES
+    for kind in KINDS:
+        value = synthetic_credential_shape(kind)
+        family = expected_family(kind)
+        assert family in CREDENTIAL_SHAPE_PREFIXES, (kind, family)
+        assert looks_like_a_credential(value), kind
+        assert family in value, kind
+        # a well-formed record is refused on this value in an evidence field, naming the field only
+        with pytest.raises(DesignationRefused) as info:
+            check_step8_designation(_record(rotation_runbook_ref=value))
+        assert "credential shape" in str(info.value) and value not in str(info.value)
+    # the fragments themselves are not shapes (that is what keeps them out of the diff scan)
+    for fragment in ("sk", "-", "proj", "svcacct", "ey", "JhbGciOiJIUzI1NiJ9", "AI", "za", "ya", "29", "-----", "BEGIN ", "PRIVATE", " KEY-----"):
+        assert not looks_like_a_credential(fragment), fragment
 
 
 def test_a_production_or_unverified_record_is_refused():

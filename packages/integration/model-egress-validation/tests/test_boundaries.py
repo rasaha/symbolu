@@ -86,7 +86,9 @@ def test_the_declared_posture():
 
 
 def test_no_module_carries_a_credential_shape():
+    from synthetic_shapes import BOUNDARY_FAMILIES
     for path in SOURCES:
         text = path.read_text(encoding="utf-8")
-        for shape in ("sk-proj-", "sk-svcacct-", "AIza", "BEGIN PRIVATE KEY", "ya29."):
-            assert shape not in text.replace('"sk-svcacct-"', "").replace('"sk-proj-"', "").replace('"AIza"', "").replace('"ya29."', ""), (path.name, shape)
+        for family in BOUNDARY_FAMILIES:
+            # a family may appear only as a bare quoted prefix constant, never followed by a body
+            assert family not in text.replace(f'"{family}"', ""), (path.name, family)
