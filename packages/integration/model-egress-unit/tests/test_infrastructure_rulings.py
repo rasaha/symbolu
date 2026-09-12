@@ -303,3 +303,112 @@ def test_rollback_needs_both_versions_valid_and_the_owner():
     for flags in [(False, True, True), (True, False, True), (True, True, False)]:
         assert not rollback_permitted(previous_secret_version_valid=flags[0], previous_openai_credential_valid=flags[1],
                                       owner_authorized=flags[2])
+
+
+# --- LP-8 (2026-09-12): where the credential may be possessed and exercised ----------
+
+from ugence_model_egress_unit import (  # noqa: E402  (LP-8 names, kept beside their tests)
+    CI_ENVIRONMENT_MARKERS,
+    FORBIDDEN_CREDENTIAL_HOLDERS,
+    LIVE_VALIDATION_EXECUTION_POSTURE,
+    NON_PRODUCTION_VALIDATION_OUTCOME_SCOPE,
+    PRODUCTION_FORM_CUSTODY_ADAPTER,
+    ExecutionPosture,
+    ExecutionPostureRefused,
+    check_execution_posture,
+    ci_environment_markers_present,
+    sequence_complete,
+)
+
+#: A well-formed posture SHAPE: nothing here designates an instance or a principal.
+DEPLOYED = ExecutionPosture(
+    posture=LIVE_VALIDATION_EXECUTION_POSTURE,
+    instance_reference="deployment://meu-nonprod/instances/meu-runtime-01",
+    workload_identity_principal=WIF.principal_binding,
+    custody_adapter=PRODUCTION_FORM_CUSTODY_ADAPTER,
+)
+
+
+def test_lp8_the_deployed_meu_instance_under_its_workload_identity_is_the_only_accepted_posture():
+    assert check_execution_posture(DEPLOYED, variables={}) is DEPLOYED
+    assert LIVE_VALIDATION_EXECUTION_POSTURE == "DEPLOYED_MEU_INSTANCE"
+    assert FORBIDDEN_CREDENTIAL_HOLDERS == ("DEVELOPER_MACHINE", "CI_RUNNER", "BROWSER",
+                                           "SHARED_HOSTING_ENVIRONMENT", "PRODUCTION_BUSINESS_WORKFLOW")
+    assert "no production commissioning" in NON_PRODUCTION_VALIDATION_OUTCOME_SCOPE
+
+
+@pytest.mark.parametrize("holder", FORBIDDEN_CREDENTIAL_HOLDERS)
+def test_lp8_each_forbidden_holder_is_refused_by_name(holder):
+    with pytest.raises(ExecutionPostureRefused, match=f"posture: {holder} may not possess or exercise the credential"):
+        check_execution_posture(dataclasses.replace(DEPLOYED, posture=holder), variables={})
+
+
+def test_lp8_an_unknown_posture_and_a_bare_string_are_refused():
+    with pytest.raises(ExecutionPostureRefused, match="only DEPLOYED_MEU_INSTANCE may execute"):
+        check_execution_posture(dataclasses.replace(DEPLOYED, posture="STAGING_VM"), variables={})
+    with pytest.raises(ExecutionPostureRefused, match="a string or a flag asserts nothing"):
+        check_execution_posture("DEPLOYED_MEU_INSTANCE", variables={})  # type: ignore[arg-type]
+
+
+@pytest.mark.parametrize("marker", CI_ENVIRONMENT_MARKERS)
+def test_lp8_a_ci_runner_is_refused_first_whatever_posture_it_claims(marker):
+    environ = {marker: "true", "HOME": "/x"}
+    assert ci_environment_markers_present(environ) == (marker,)
+    with pytest.raises(ExecutionPostureRefused, match=f"environment: a CI runner \\({marker} set\\)"):
+        check_execution_posture(DEPLOYED, variables=environ)
+    # an empty or falsy marker is not a CI runner
+    assert ci_environment_markers_present({marker: ""}) == () and ci_environment_markers_present({marker: "0"}) == ()
+
+
+def test_lp8_the_ci_refusal_precedes_every_other_refusal():
+    bad = dataclasses.replace(DEPLOYED, posture="BROWSER", custody_adapter="reference")
+    with pytest.raises(ExecutionPostureRefused, match="a CI runner"):
+        check_execution_posture(bad, variables={"CI": "1"})
+
+
+@pytest.mark.parametrize("field", ["instance_reference", "workload_identity_principal"])
+def test_lp8_a_missing_placeholder_or_credential_shaped_reference_is_refused_without_echo(field):
+    for value in ("", "   ", "TODO-instance", "<instance>", synthetic_credential_shape("openai_project_key")):
+        with pytest.raises(ExecutionPostureRefused, match=f"^{field}: ") as info:
+            check_execution_posture(dataclasses.replace(DEPLOYED, **{field: value}), variables={})
+        assert value.strip() not in str(info.value) or not value.strip()
+
+
+@pytest.mark.parametrize("principal", [
+    "user:someone@ugence.invalid",
+    "meu-runtime@gmail.com",
+    "000000000000-compute@developer.gserviceaccount.com",
+    "meu-runtime@developer.gserviceaccount.com",
+])
+def test_lp8_a_human_or_default_compute_identity_is_not_the_workload_identity(principal):
+    with pytest.raises(ExecutionPostureRefused, match="workload_identity_principal: a human or default-compute identity"):
+        check_execution_posture(dataclasses.replace(DEPLOYED, workload_identity_principal=principal), variables={})
+
+
+def test_lp8_an_arbitrary_string_is_not_a_workload_identity_principal():
+    with pytest.raises(ExecutionPostureRefused, match="workload_identity_principal: must be the instance's workload-identity principal"):
+        check_execution_posture(dataclasses.replace(DEPLOYED, workload_identity_principal="meu-runtime-01"), variables={})
+    ok = dataclasses.replace(DEPLOYED, workload_identity_principal=SHAPE["meu_service_account"].split("serviceAccounts/")[1])
+    assert check_execution_posture(ok, variables={}) is ok
+
+
+@pytest.mark.parametrize("adapter", ["ReferenceCustodyAdapter", "PinnedSecretVersionCustodyAdapter", "fake", ""])
+def test_lp8_only_the_production_form_custody_adapter_may_materialize_the_credential(adapter):
+    with pytest.raises(ExecutionPostureRefused, match="custody_adapter: only PRODUCTION_FORM_SECRET_MANAGER_ADAPTER"):
+        check_execution_posture(dataclasses.replace(DEPLOYED, custody_adapter=adapter), variables={})
+
+
+@pytest.mark.parametrize("environment", ["production", "PRODUCTION", "prod", "staging", ""])
+def test_lp8_the_initial_validation_is_non_production_only(environment):
+    with pytest.raises(ExecutionPostureRefused, match="environment: the initial validation is non-production only"):
+        check_execution_posture(dataclasses.replace(DEPLOYED, environment=environment), variables={})
+    assert check_execution_posture(dataclasses.replace(DEPLOYED, environment=" Non-Production "), variables={}) is not None
+
+
+def test_lp8_the_sequence_completes_only_at_exactly_the_authorized_number_of_calls():
+    assert sequence_complete(1, 1) and sequence_complete(10, 10)
+    assert not sequence_complete(0, 1), "no call made is not a validation"
+    assert not sequence_complete(2, 3), "fewer than authorized is incomplete"
+    assert not sequence_complete(4, 3), "more than authorized never happens; the ledger refuses"
+    assert not sequence_complete(0, 0) and not sequence_complete(True, 1) and not sequence_complete(3, "3")  # type: ignore[arg-type]
+

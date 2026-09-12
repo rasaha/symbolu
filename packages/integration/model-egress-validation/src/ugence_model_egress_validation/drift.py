@@ -168,6 +168,23 @@ def check_drift(designation: Mapping[str, Any], validation: Mapping[str, Any]) -
         evidence = validation.get("evidence", {})
         if evidence.get("runs") or evidence.get("accepting_owner") or evidence.get("ci_run_or_signed_report"):
             drift.append("the validation record carries evidence while the provider is blocked")
+    posture = validation.get("live_execution_posture")
+    if not isinstance(posture, dict):
+        drift.append("the validation record carries no live_execution_posture (LP-8)")
+    else:
+        if posture.get("required") != meu.LIVE_VALIDATION_EXECUTION_POSTURE:
+            drift.append(f"live_execution_posture.required {posture.get('required')!r} is not "
+                         f"{meu.LIVE_VALIDATION_EXECUTION_POSTURE!r} (LP-8)")
+        if list(posture.get("forbidden_holders", [])) != list(meu.FORBIDDEN_CREDENTIAL_HOLDERS):
+            drift.append("live_execution_posture.forbidden_holders is not the unit's FORBIDDEN_CREDENTIAL_HOLDERS, in order (LP-8)")
+        if not str(posture.get("custody_adapter", "")).startswith(meu.PRODUCTION_FORM_CUSTODY_ADAPTER):
+            drift.append("live_execution_posture.custody_adapter is not the production-form Secret Manager adapter (LP-8)")
+        if "exactly" not in str(posture.get("sequence_completion", "")) or "max_calls" not in str(posture.get("sequence_completion", "")):
+            drift.append("live_execution_posture.sequence_completion does not require exactly max_calls consumed (LP-8)")
+        if "no production commissioning" not in str(posture.get("outcome_scope", "")):
+            drift.append("live_execution_posture.outcome_scope does not deny production commissioning (LP-8)")
+    if not any("deployed MEU instance" in str(p) for p in row12.get("prerequisites", [])):
+        drift.append("row 12 does not require execution by the deployed MEU instance (LP-8)")
     if meu.LIVE_VENDOR_EGRESS is not False:
         drift.append("LIVE_VENDOR_EGRESS is not False")
     return drift

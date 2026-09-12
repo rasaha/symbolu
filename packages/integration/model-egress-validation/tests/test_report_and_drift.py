@@ -88,7 +88,8 @@ def test_the_records_beside_the_unit_show_no_drift():
     from ugence_model_egress_validation import validation_plan_digest
     assert len(validation_plan_digest()) == 64 and validation_plan_digest() == validation_plan_digest()
     row12 = records["validation"]["validation_matrix"][11]
-    assert row12["row"] == 12 and len(row12["prerequisites"]) == 5 and "presuppose MET" in row12["contributes_to"]
+    assert row12["row"] == 12 and len(row12["prerequisites"]) == 6 and "presuppose MET" in row12["contributes_to"]
+    assert "deployed MEU instance" in row12["prerequisites"][5]  # LP-8
     step8 = records["designation"]["step8_required_values"]
     assert step8["obligation_count"] == 17 and step8["checked_fields"] == 23 and len(step8["obligations"]) == 17
     assert step8["attestation"]["independently_checked_by"] is None
@@ -111,6 +112,14 @@ def test_the_records_beside_the_unit_show_no_drift():
     (lambda d, v: v["validation_matrix"].__getitem__(0).__setitem__("required", "PASS"), "differ from the harness"),
     (lambda d, v: v["validation_matrix"].__getitem__(11).__setitem__("result", "PASS"), "carries a result while the provider is blocked"),
     (lambda d, v: v["evidence"].__setitem__("runs", [{"fixture": True}]), "carries evidence while the provider is blocked"),
+    # LP-8
+    (lambda d, v: v.pop("live_execution_posture"), "carries no live_execution_posture (LP-8)"),
+    (lambda d, v: v["live_execution_posture"].__setitem__("required", "DEVELOPER_MACHINE"), "is not 'DEPLOYED_MEU_INSTANCE' (LP-8)"),
+    (lambda d, v: v["live_execution_posture"]["forbidden_holders"].remove("CI_RUNNER"), "forbidden_holders is not the unit's FORBIDDEN_CREDENTIAL_HOLDERS"),
+    (lambda d, v: v["live_execution_posture"].__setitem__("custody_adapter", "PinnedSecretVersionCustodyAdapter (fake path)"), "not the production-form Secret Manager adapter (LP-8)"),
+    (lambda d, v: v["live_execution_posture"].__setitem__("sequence_completion", "at most max_calls"), "does not require exactly max_calls consumed (LP-8)"),
+    (lambda d, v: v["live_execution_posture"].__setitem__("outcome_scope", "MET for production too"), "does not deny production commissioning (LP-8)"),
+    (lambda d, v: v["validation_matrix"][11]["prerequisites"].pop(), "does not require execution by the deployed MEU instance (LP-8)"),
 ], ids=lambda x: x if isinstance(x, str) else "")
 def test_each_named_drift_is_caught(mutate, expected):
     records = load_records()

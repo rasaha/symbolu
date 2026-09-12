@@ -1,6 +1,6 @@
 # Ugence Model Egress Validation
 
-**Version:** 0.2.0
+**Version:** 0.2.1
 **Maturity:** `REFERENCE_GRADE_SHADOW_ONLY` · `ENFORCEMENT_ENABLED = False` · `LIVE_VENDOR_EGRESS = False`
 **Ruling basis:** LP-4 (the matrix), LP-7 ruling 11 (the offline step-7 artifacts), LP-7 ruling 12 (`live` refuses) — `docs/architecture/ADR_UGENCE_LIVE_MODEL_PROVIDER_COMMISSIONING.md` §0.4
 
@@ -44,6 +44,17 @@ python -m ugence_model_egress_validation live
 Refuses (exit 2) before any custody port, budget, transport or harness is touched, stating "17 mandatory designation obligations represented by 23 checked fields" and naming every undesignated obligation, then the independent-check attestation separately: no live transport exists in
 any distribution, and LP-7 ruling 12 keeps the owner-run verifier from executing until
 every designation is supplied and independently checked.
+
+LP-8 (that ADR's §0.7) adds the first refusal of all: when any CI environment marker is
+set (`ugence_model_egress_unit.CI_ENVIRONMENT_MARKERS`) the process is a CI runner, which
+may not possess or exercise the credential, and `live` exits 2 before reading a record.
+That is the one environment read in this distribution, and it reads exactly the marker
+names, never a key, a DSN or any other variable; the boundary tests hold `cli.py` to that
+single expression and keep every other module free of environment reads.
+The refusal text names the only permitted execution posture, the deployed MEU instance,
+and the five holders LP-8 forbids. The drift checks require the validation record's
+`live_execution_posture` to match the unit's constants and row 12 to require execution by
+the deployed MEU instance.
 
 ## The report
 

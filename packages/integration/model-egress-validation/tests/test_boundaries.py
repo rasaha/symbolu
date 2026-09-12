@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import ast
 import pathlib
+import re
 
 import pytest
 
@@ -59,6 +60,13 @@ def test_the_source_tree_is_what_the_readme_says():
 @pytest.mark.parametrize("path", SOURCES, ids=lambda p: p.name)
 def test_no_module_imports_anything_that_could_reach_a_network_or_a_vendor(path):
     roots = {n.split(".")[0] for n in _imports(path)}
+    if path.name == "cli.py" and "os" in roots:
+        # The one exception, LP-8: ``os`` for the CI-marker read and for nothing else. The
+        # module's only use of ``os.`` is that one expression (asserted textually below).
+        text = path.read_text(encoding="utf-8")
+        assert len(re.findall(r"\bos\.", text)) == 1
+        assert 'ci_environment_markers_present({m: os.environ.get(m, "") for m in CI_ENVIRONMENT_MARKERS})' in text
+        roots.discard("os")
     assert not roots & FORBIDDEN_IMPORTS, sorted(roots & FORBIDDEN_IMPORTS)
     assert roots <= STDLIB_ALLOWED | FIRST_PARTY, sorted(roots - STDLIB_ALLOWED - FIRST_PARTY)
     assert not any(n.startswith("ugence_model_egress_unit.postgres") for n in _imports(path)), "the exchange is not this package's"
@@ -66,11 +74,20 @@ def test_no_module_imports_anything_that_could_reach_a_network_or_a_vendor(path)
 
 @pytest.mark.parametrize("path", SOURCES, ids=lambda p: p.name)
 def test_clock_and_environment_reads_are_confined(path):
+    """Only ``cli.py`` reads a clock, and only ``cli.py`` reads the environment: exactly
+    the CI marker names (LP-8, the CI-runner refusal), through one expression, never a
+    key, a DSN or any other variable."""
+
     used = _dotted(path)
-    assert not used & {"os.environ", "os.getenv", "getenv", "environ", "input", "eval", "exec", "__import__"}
+    assert not used & {"os.getenv", "getenv", "environ", "input", "eval", "exec", "__import__"}
     clocks = {"datetime.now", "datetime.utcnow", "datetime.datetime.now", "date.today", "time.time", "time.monotonic"}
     if path.name != "cli.py":
         assert not used & clocks, sorted(used & clocks)
+        assert "os.environ" not in used
+    else:
+        text = path.read_text(encoding="utf-8")
+        assert text.count("os.environ") == 1
+        assert 'ci_environment_markers_present({m: os.environ.get(m, "") for m in CI_ENVIRONMENT_MARKERS})' in text
 
 
 def test_neither_the_unit_nor_the_adapter_imports_this_package():

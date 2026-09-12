@@ -5,18 +5,30 @@ harness with fake components, checks the records for drift, writes the redacted 
 and exits non-zero on any non-conformant offline row or any drift. ``live`` never
 executes: no live transport exists in any distribution, and LP-7 ruling 12 keeps the
 owner-run verifier from executing until every step-8 designation is supplied and
-independently checked. It prints the undesignated values and exits 2.
+independently checked. It prints the undesignated values and exits 2. LP-8 adds the
+first refusal of all: when any CI environment marker is set the process is a CI runner,
+which may not possess or exercise the credential, and ``live`` exits 2 before reading a
+record.
 """
 
 from __future__ import annotations
 
 import argparse
+import os
 import pathlib
 import sys
 from datetime import datetime, timezone
 from typing import List, Optional
 
-from ugence_model_egress_unit import COMMISSIONING_STATUS, STEP8_OBLIGATION_COUNT, step8_field_counts
+from ugence_model_egress_unit import (
+    CI_ENVIRONMENT_MARKERS,
+    COMMISSIONING_STATUS,
+    FORBIDDEN_CREDENTIAL_HOLDERS,
+    LIVE_VALIDATION_EXECUTION_POSTURE,
+    STEP8_OBLIGATION_COUNT,
+    ci_environment_markers_present,
+    step8_field_counts,
+)
 
 from .drift import check_drift, load_records
 from .harness import run_offline
@@ -49,6 +61,19 @@ def main(argv: Optional[List[str]] = None) -> int:
     live.add_argument("--records", default=None, type=pathlib.Path)
     args = parser.parse_args(argv)
 
+    if args.command == "live":
+        # LP-8, first of all: a CI runner may not possess or exercise the credential, whatever
+        # it claims. Refused before the records are even read.
+        # The only environment read in this distribution, and it reads exactly the CI marker
+        # names: never a key, a DSN or anything else (tests/test_boundaries.py holds it to this).
+        markers = ci_environment_markers_present({m: os.environ.get(m, "") for m in CI_ENVIRONMENT_MARKERS})
+        if markers:
+            print(f"live verifier refused: this process is a CI runner ({', '.join(markers)} set); no developer machine, "
+                  f"CI runner, browser, shared hosting environment or production business workflow may possess or "
+                  f"exercise the credential; only the {LIVE_VALIDATION_EXECUTION_POSTURE} may (LP-8). Offline "
+                  f"fake-transport testing is what runs in CI.")
+            return 2
+
     records = load_records(args.records)
     if args.command == "live":
         # Refused here, before any custody port, budget, transport or harness is touched.
@@ -67,6 +92,10 @@ def main(argv: Optional[List[str]] = None) -> int:
             print(f"  - {line}")
         print("Supplying and verifying them closes only the infrastructure-designation blocker; the first live synthetic "
               "validation needs the owner's separate explicit authorization.")
+        posture = records["validation"].get("live_execution_posture", {})
+        print(f"execution posture (LP-8): only the {LIVE_VALIDATION_EXECUTION_POSTURE} may execute the validation "
+              f"(instance: {str(posture.get('instance_reference', 'UNDESIGNATED')).split(' ')[0]}); never "
+              f"{', '.join(h.lower().replace('_', ' ') for h in FORBIDDEN_CREDENTIAL_HOLDERS)}.")
         return 2
 
     now = datetime.fromisoformat(args.now) if args.now else datetime.now(timezone.utc)

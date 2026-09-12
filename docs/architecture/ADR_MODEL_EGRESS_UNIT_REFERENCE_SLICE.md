@@ -248,3 +248,10 @@ verification that the designated model snapshot exists.
 | migration 3: `commissioning_authorization`, `commissioning_authorization_consumption`, trigger `refuse_authorization_rewind`, `egress_result.authorization_consumption_id` and `CHECK egress_result_genuine_call_requires_custody_and_admission` | `postgres/migrations.py`, `ExchangeAuthorizationLedger` | the durable half: nonce → one digest ever, `calls_consumed` only rises, one consumption per request, consumption and LP-5 reservation in one transaction, a genuine row must reference its consumption; fresh install `[1, 2, 3]` and upgrade from 2 both proven `[V]` |
 | `LIVE_SYNTHETIC_VALIDATION_AUTHORIZATION_DIGEST` (mirror), `status_admits_genuine_call` (G1 mirror) | `version.py` | drift detection only; never authority |
 
+## Addendum, 0.5.1 (2026-09-12): the execution posture (LP-8)
+
+| Added | Where | What it closes |
+| --- | --- | --- |
+| `LIVE_VALIDATION_EXECUTION_POSTURE`, `FORBIDDEN_CREDENTIAL_HOLDERS`, `CI_ENVIRONMENT_MARKERS`, `PRODUCTION_FORM_CUSTODY_ADAPTER`, `NON_PRODUCTION_VALIDATION_OUTCOME_SCOPE`, `ExecutionPosture`, `ExecutionPostureRefused`, `check_execution_posture`, `ci_environment_markers_present`, `sequence_complete` | `infrastructure.py` | the commissioning ADR §0.7 (LP-8): only a deployed MEU instance under its non-human workload identity, through the production-form custody adapter, in a non-production environment, may execute the validation; a developer machine, CI runner, browser, shared hosting environment or production business workflow is refused by name, and a CI runner is refused first whatever it claims; the sequence completes at exactly `max_calls`; success authorizes no production commissioning `[V]` |
+| `live_execution_posture`, a row-12 prerequisite, a `blocked_by` entry | `MEU_LIVE_VALIDATION.json` | the record states the posture; the validation package's drift checks bind it to the constants; the instance reference and principal stay `UNDESIGNATED`, outside the seventeen obligations `[V]` |
+
