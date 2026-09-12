@@ -48,10 +48,14 @@ ROWS: Tuple[Row, ...] = (
     Row(10, "secret version named as latest, or a service-account-key identity", "REFUSED_AT_CONSTRUCTION", True),
     Row(11, "custody lease expired at use", "REFUSED_CUSTODY_UNAVAILABLE", True),
     Row(12, "the live answer's provenance", "GENUINE_CALL_TRUE_LEASE_PRODUCTION_AUTHORITATIVE_TRUST_UNTRUSTED_EVIDENCE", False,
-        "a genuine answer needs the live transport, the commissioned credential and MET; fake evidence cannot satisfy this row", True,
-        "an EgressResult written by the live verifier after the separate live-validation authorization: provenance.genuine_call true, "
-        "custody_lease_id and custody_authority_id naming a lease whose is_production_authoritative is true, trust UNTRUSTED_EVIDENCE, "
-        "the response digest, and the correlated Secret Manager access event (row 18); requires COMMISSIONING_STATUS MET"),
+        "a genuine answer needs the live transport, the commissioned credential and both predecessor gates of ADR §0.5; fake evidence cannot satisfy this row", True,
+        "prerequisites (ADR §0.5; never MET, which is the outcome this row's evidence feeds): all seventeen step-8 designations "
+        "independently verified (meu_live_status PENDING_VALIDATION); a production-authoritative custody lease within the "
+        "non-production commissioning scope (the lease's authority under the real custody contract, not a production deployment); "
+        "the owner's separate explicit authorization for the synthetic validation call (live_synthetic_validation_authorization); "
+        "evidence: an EgressResult written by the live verifier with provenance.genuine_call true, custody_lease_id and "
+        "custody_authority_id naming that lease, trust UNTRUSTED_EVIDENCE and the response digest, correlated with the row-18 "
+        "secret-access evidence by non-secret identifiers and bounded timestamps"),
     Row(13, "TAP verification of the answer; INDETERMINATE", "TYPED_REFUSAL_NOT_DEGRADED_RESULT", False,
         "TAP verification is composed in the deployment unit, which does not exist yet (LP-1); not this distribution's to fake",
         False,

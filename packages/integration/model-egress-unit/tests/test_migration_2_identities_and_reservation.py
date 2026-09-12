@@ -275,8 +275,9 @@ def test_the_database_admits_a_genuine_row_only_with_custody_and_the_application
         conn.execute(f"""UPDATE {SCHEMA_NAME}.egress_result SET genuine_call = false,
                          custody_lease_id = NULL, custody_authority_id = NULL WHERE request_id = %s""",
                      (str(req.request_id),))
-    # the application half: no result may claim a genuine call while commissioning is not MET
-    assert COMMISSIONING_STATUS != "MET"
+    # the application half: no result may claim a genuine call while the predecessor gates do not hold
+    from ugence_model_egress_unit import genuine_call_admitted
+    assert COMMISSIONING_STATUS == "BLOCKED_PENDING_INFRASTRUCTURE_DESIGNATIONS" and genuine_call_admitted() is False
     fake = DeterministicFakeProvider().execute(_make_request(tenant), now=NOW)
     with pytest.raises(ValueError, match="while commissioning is"):
         EgressResult(request_id=fake.request_id, tenant_id=fake.tenant_id, correlation_id=fake.correlation_id,

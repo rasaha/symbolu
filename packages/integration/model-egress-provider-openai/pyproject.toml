@@ -35,7 +35,7 @@ authors = [{ name = "Rakesh Mohan" }]
 keywords = ["governance", "egress", "model", "openai", "responses", "ugence"]
 classifiers = ["Typing :: Typed"]
 dependencies = [
-    "ugence-model-egress-unit>=0.3.0",
+    "ugence-model-egress-unit>=0.4.1",
 ]
 
 [project.optional-dependencies]

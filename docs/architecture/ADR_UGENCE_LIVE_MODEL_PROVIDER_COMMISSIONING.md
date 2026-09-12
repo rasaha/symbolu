@@ -199,7 +199,7 @@ credential and reaches nothing.
 | no `exchange.v2` is introduced | yes | `EXCHANGE_SCHEMA_VERSION` and `MEU_CANONICALIZATION_VERSION` unchanged; migration 2 is `meu_schema_version` row 2 of the same contract |
 | existing rows and digests remain valid | yes | `test_the_upgrade_path_keeps_existing_rows_and_digests_valid` seeds rows under migration 1 and reads them back unchanged after migration 2 |
 | the migration merely lifts the reference-slice restriction | yes | `CHECK egress_result_no_genuine_call` is dropped and replaced by `CHECK egress_result_genuine_call_requires_custody`: `genuine_call = false OR (custody_lease_id IS NOT NULL AND custody_authority_id IS NOT NULL AND provenance_kind = 'RESPONSE')` |
-| application and deployment gates continue to refuse genuine calls until `MET` | yes | `EgressResult.__post_init__` refuses `genuine_call: true` unless `COMMISSIONING_STATUS == "MET"`, a release constant of the unit; the OpenAI adapter refuses a production posture and raises on a transport claiming a genuine response; `MEU_LIVE_VALIDATION.json` stays `BLOCKED_PENDING_INFRASTRUCTURE_DESIGNATIONS` |
+| application and deployment gates continue to refuse genuine calls until `MET` | yes, as clarified in §0.5 | `EgressResult.__post_init__` refuses `genuine_call: true` until both predecessor gates hold (`genuine_call_admitted()`: status `PENDING_VALIDATION`/`MET` and the owner's live-validation authorization, both release constants); MET is the outcome, never the validation's prerequisite; the OpenAI adapter refuses a production posture and raises on a transport claiming a genuine response; `MEU_LIVE_VALIDATION.json` stays `BLOCKED_PENDING_INFRASTRUCTURE_DESIGNATIONS` |
 
 No condition was false, so the migration proceeded and no contract version change is required.
 
@@ -467,6 +467,81 @@ credential shape, and the record is refused unless `environment` reads `non-prod
 and `verified_by` and `verified_at` name the independent check. Supplying all seventeen
 closes only the infrastructure-designation blocker: the first live synthetic validation
 needs the owner's separate explicit authorization, and production use another record.
+
+### 0.5 — Owner clarification of 2026-09-12: row 12 must not presuppose MET; "production-authoritative" is custody authority
+
+> The 17-obligation-to-23-field mapping is accepted as the correct interpretation of LP-7, subject to final green CI.
+>
+> Before finalizing PR #1751, clarify row 12's statement that live provenance "needs MET."
+>
+> If MET refers to this same live-provider commissioning status, that is circular: row 12 cannot require the final status that row 12 itself helps establish. Correct the contract so that row 12 requires:
+>
+> * all Step-8 infrastructure designations independently verified;
+> * a production-authoritative custody lease within the non-production commissioning scope;
+> * separate explicit owner authorization for the synthetic validation call;
+> * a genuine-call result carrying UNTRUSTED_EVIDENCE;
+> * correlation with the row-18 secret-access evidence.
+>
+> The successful row then contributes evidence toward the later owner decision to move commissioning to MET; it must not presuppose MET.
+>
+> If "needs MET" refers to a different predecessor gate, name that exact gate and record identifier unambiguously.
+>
+> Also clarify that "production-authoritative lease" describes the lease's authority under the real custody contract, not authorization of a production deployment. LP-7 remains strictly non-production.
+>
+> Make only the documentation, contract or test changes required to remove ambiguity. Allow all CI runs on the resulting final head to complete, update the PR body, and return: the final commit; the complete CI matrix; confirmation of 17 obligations represented by 23 checked fields; the final wording and prerequisites of row 12; confirmation that every canonical validation result remains null; any remaining blocker.
+>
+> Do not merge, create infrastructure or credentials, authorize a live call, enable live vendor egress, or mark commissioning MET.
+
+#### 0.5.1 — What "needs MET" referred to, and the correction
+
+It referred to this same commissioning status. Unit 0.3.0 implemented the sixth condition
+of §0.3 ("application and deployment gates continue to refuse genuine calls until
+commissioning reaches MET") literally: `EgressResult` refused `genuine_call: true` unless
+the release constant `COMMISSIONING_STATUS` read `MET`, and the adapter refused a
+production-authoritative lease on the same condition. Read together with LP-4 (MET is
+reached only by the owner's separate acceptance statement after the validation run) that
+is circular: the validation call that produces row 12's evidence could never be recorded.
+
+The correction (unit 0.4.1, adapter 0.1.2) names two predecessor gates and makes MET the
+outcome only:
+
+| Predecessor gate | Record identifier | Release constant of the unit | Meaning |
+| --- | --- | --- | --- |
+| G1 status admits a genuine call | `MEU_LIVE_VALIDATION.json` → `meu_live_status` = `PENDING_VALIDATION` (or, afterwards, `MET`) | `COMMISSIONING_STATUS` ∈ `GENUINE_CALL_ADMITTING_STATUSES` = (`PENDING_VALIDATION`, `MET`) | every one of the seventeen step-8 obligations independently verified (ruling 12) |
+| G2 the live synthetic validation is authorized | `MEU_LIVE_VALIDATION.json` → `live_synthetic_validation_authorization` = the identifier of the owner's separate, explicit authorization (today `NOT_GIVEN`) | `LIVE_SYNTHETIC_VALIDATION_AUTHORIZATION` ≠ `NOT_GIVEN` | LP-7 ruling 12's "separate, explicit owner authorization" |
+
+`genuine_call_admitted()` is G1 ∧ G2 and is the only condition `EgressResult` and the
+adapter consult; `tests/test_genuine_call_gate.py` proves each gate alone is
+insufficient, that `PENDING_VALIDATION` with the authorization admits the genuine result,
+and that `MET` alone admits nothing. The database half (migration 2's CHECK) is unchanged.
+
+**Row 12, final wording.** Scenario "the live answer's provenance"; required outcome
+`GENUINE_CALL_TRUE_LEASE_PRODUCTION_AUTHORITATIVE_TRUST_UNTRUSTED_EVIDENCE`; prerequisites,
+recorded in the row itself:
+
+1. all seventeen step-8 infrastructure designations independently verified
+   (`meu_live_status` = `PENDING_VALIDATION`) — G1;
+2. a production-authoritative custody lease within the non-production commissioning
+   scope: the lease's authority under the real custody contract (the commissioned Secret
+   Manager path, the pinned numeric version, the designated workload identity), not
+   authorization of a production deployment;
+3. the owner's separate explicit authorization for the synthetic validation call
+   (`live_synthetic_validation_authorization`) — G2;
+4. a genuine-call result carrying trust `UNTRUSTED_EVIDENCE`, with `custody_lease_id` and
+   `custody_authority_id`;
+5. correlation with the row-18 secret-access evidence by non-secret identifiers and
+   bounded timestamps.
+
+The successful row contributes evidence toward the owner's later decision to move
+`meu_live_status` to `MET`; it does not presuppose MET, and the drift check refuses a
+row-12 prerequisite that names MET.
+
+**"Production-authoritative", clarified.** `CredentialLease.is_production_authoritative`
+describes the lease's authority under the real custody contract: materialized by the
+commissioned custody path rather than a fake, emulator or reference one. It says nothing
+about the deployment the lease serves. The first live synthetic validation uses exactly
+such a lease within the non-production commissioning scope, and it authorizes no
+production deployment, which needs its own commissioning record (LP-7 preamble, ruling 7).
 
 ## 1 — The finding that shapes this record
 

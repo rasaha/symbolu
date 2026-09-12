@@ -9,12 +9,12 @@
     "NOT_MET",
     "MET"
   ],
-  "status_note": "LP-1 to LP-6 are ratified and the owner's confirmation of 2026-09-11 is recorded (ADR §0.3). LP-7 (2026-09-11, ADR section 0.4) designed the NON-PRODUCTION step-8 infrastructure and supplied no value; the offline step-7 artifacts it permits (ruling 11) exist in ugence-model-egress-validation and can mark no infrastructure-dependent row. Steps 4 and 6 are built (unit 0.3.0: migration 2, migrator identity, tenant-bound identities, durable reservation; adapter 0.1.0 with an injected fake transport only). No row can execute: the GCP project, workload identity, secret-version resource, IAM binding, audit-log evidence, rotation procedure and OpenAI organization/project identifiers are undesignated (step 8); the live transport, the owner-run verifier and the acceptance-report generator are unbuilt (step 7); no credential is commissioned (step 9). Fake-transport tests pass in CI and mark no row here: fake evidence cannot satisfy a live row. Rows are executed only on the owner's machine by a verifier that never prints the credential or the full request content, and MET is reached only by the owner's separate acceptance statement; a successful HTTP response alone is insufficient (LP-4).",
+  "status_note": "LP-1 to LP-6 are ratified and the owner's confirmation of 2026-09-11 is recorded (ADR §0.3). LP-7 (2026-09-11, ADR section 0.4) designed the NON-PRODUCTION step-8 infrastructure and supplied no value; the offline step-7 artifacts it permits (ruling 11) exist in ugence-model-egress-validation and can mark no infrastructure-dependent row. Steps 4 and 6 are built (unit 0.3.0: migration 2, migrator identity, tenant-bound identities, durable reservation; adapter 0.1.0 with an injected fake transport only). No row can execute: the GCP project, workload identity, secret-version resource, IAM binding, audit-log evidence, rotation procedure and OpenAI organization/project identifiers are undesignated (step 8); the live transport, the owner-run verifier and the acceptance-report generator are unbuilt (step 7); no credential is commissioned (step 9). Fake-transport tests pass in CI and mark no row here: fake evidence cannot satisfy a live row. Rows are executed only on the owner's machine by a verifier that never prints the credential or the full request content, and MET is the outcome reached only by the owner's separate acceptance statement after the validation's evidence; the validation call itself needs the two predecessor gates of ADR section 0.5, never MET; a successful HTTP response alone is insufficient (LP-4).",
   "blocked_by": [
     "LP-6 step 8 / LP-7 ruling 12: the seventeen exact, externally verified values and evidence references — GCP project ID; GCP project number; MEU GCP service-account resource name; deployment-platform identity mechanism; WIF pool/provider and constrained principal binding or the native GCP equivalent; full numeric Secret Manager version resource; secret-level IAM-policy evidence reference; Data Access audit-log configuration and retention reference; approved rotation-runbook reference; OpenAI organization ID; OpenAI project ID; OpenAI project service-account ID; OpenAI role and API-key scope evidence; vendor spend-control evidence and hard-stop/advisory classification; designated-model availability evidence; applicable data-processing-terms reference; approved processing/data-residency region — all UNDESIGNATED; none may be guessed, synthesized, represented as completed by a placeholder or inferred (infrastructure.check_step8_designation refuses each)",
     "LP-6 step 7: the live transport (TLS-verified, proof of no-bytes-dispatched on transient failure), the unit wired to reserve against commissioning_budget before every dispatch, the owner-run verifier and the acceptance-report generator — NOT STARTED, blocked on step 8",
     "LP-6 step 9: the credential commissioned manually by the custody owner through Secret Manager — no credential exists",
-    "LP-4: genuine_call True stays refused by EgressResult while COMMISSIONING_STATUS is BLOCKED_PENDING_INFRASTRUCTURE_DESIGNATIONS; only the owner's separate MET statement, released as a new version of the unit, changes that (migration 2 lifted the database restriction only, ADR §0.3.1)",
+    "LP-4 / ADR section 0.5: genuine_call True stays refused by EgressResult until both predecessor gates hold — meu_live_status PENDING_VALIDATION (every step-8 obligation independently verified) and live_synthetic_validation_authorization given by the owner's separate explicit statement, each released into the unit's constants; MET is the outcome of the validation, never its prerequisite (migration 2 lifted the database restriction only, ADR section 0.3.1)",
     "LP-1: CR-1 amended (DONE 2026-09-11); the MEU deployment unit itself is not yet built or composed",
     "LP-3: the model snapshot gpt-5.4-mini-2026-03-17 is designated, not verified; fake-transport evidence marks no row",
     "LP-7 ruling 12: supplying and verifying the seventeen values closes only the infrastructure-designation blocker; the first live synthetic validation requires a separate, explicit owner authorization, not yet given; production use requires another commissioning record"
@@ -90,7 +90,15 @@
       "row": 12,
       "scenario": "the live answer's provenance",
       "required": "GENUINE_CALL_TRUE_LEASE_PRODUCTION_AUTHORITATIVE_TRUST_UNTRUSTED_EVIDENCE",
-      "result": null
+      "result": null,
+      "prerequisites": [
+        "all seventeen step-8 infrastructure designations independently verified (meu_live_status PENDING_VALIDATION)",
+        "a production-authoritative custody lease within the non-production commissioning scope: the lease's authority under the real custody contract (commissioned Secret Manager path, pinned numeric version, designated workload identity), not authorization of a production deployment",
+        "the owner's separate explicit authorization for the synthetic validation call (live_synthetic_validation_authorization)",
+        "a genuine-call result carrying trust UNTRUSTED_EVIDENCE, with custody_lease_id and custody_authority_id",
+        "correlation with the row-18 secret-access evidence by non-secret identifiers and bounded timestamps"
+      ],
+      "contributes_to": "the owner's later decision to move meu_live_status to MET; this row does not presuppose MET"
     },
     {
       "row": 13,
@@ -146,5 +154,13 @@
     "command": "python -m ugence_model_egress_validation offline --report <path>",
     "effect_on_this_record": "none: the harness writes a separate redacted report; this matrix is edited only by the owner-run live verifier after step 8 and the separate live-validation authorization",
     "infrastructure_dependent_rows_offline": "NOT_EXECUTABLE_OFFLINE, never PASS"
+  },
+  "live_synthetic_validation_authorization": "NOT_GIVEN",
+  "genuine_call_gate": {
+    "rule": "ADR section 0.5: EgressResult admits genuine_call true only when meu_live_status is PENDING_VALIDATION or MET AND live_synthetic_validation_authorization is not NOT_GIVEN (unit release constants COMMISSIONING_STATUS, LIVE_SYNTHETIC_VALIDATION_AUTHORIZATION; genuine_call_admitted()). MET is the outcome the validation's evidence feeds, never a prerequisite of row 12.",
+    "predecessor_gates": [
+      "meu_live_status = PENDING_VALIDATION (every one of the seventeen step-8 obligations independently verified)",
+      "live_synthetic_validation_authorization = the identifier of the owner's separate, explicit authorization of the first live synthetic validation call"
+    ]
   }
 }

@@ -124,6 +124,15 @@ def check_drift(designation: Mapping[str, Any], validation: Mapping[str, Any]) -
     if OpenAIResponsesProvider.designated_model != DESIGNATED_MODEL:
         drift.append("the adapter class and its version module disagree on the designated model")
 
+    authorization = validation.get("live_synthetic_validation_authorization")
+    if authorization != meu.LIVE_SYNTHETIC_VALIDATION_AUTHORIZATION:
+        drift.append(f"MEU_LIVE_VALIDATION.live_synthetic_validation_authorization {authorization!r} is not "
+                     f"LIVE_SYNTHETIC_VALIDATION_AUTHORIZATION {meu.LIVE_SYNTHETIC_VALIDATION_AUTHORIZATION!r}")
+    row12 = next((r for r in validation.get("validation_matrix", []) if r.get("row") == 12), {})
+    if any("MET" in str(p).split(";")[0].split("(")[0] for p in row12.get("prerequisites", [])):
+        drift.append("row 12 lists MET among its prerequisites; MET is the outcome, never a prerequisite (ADR §0.5)")
+    if not row12.get("prerequisites"):
+        drift.append("row 12 carries no prerequisites (ADR §0.5)")
     status = validation.get("meu_live_status")
     if status != meu.COMMISSIONING_STATUS:
         drift.append(f"MEU_LIVE_VALIDATION.meu_live_status {status!r} is not COMMISSIONING_STATUS {meu.COMMISSIONING_STATUS!r}")

@@ -24,7 +24,7 @@ def test_the_version_is_stated_once_and_agrees_everywhere():
 
 def test_the_dependencies_are_the_unit_and_the_adapter_and_nothing_else():
     project = _pyproject()["project"]
-    assert project["dependencies"] == ["ugence-model-egress-unit>=0.4.0", "ugence-model-egress-provider-openai>=0.1.1"]
+    assert project["dependencies"] == ["ugence-model-egress-unit>=0.4.1", "ugence-model-egress-provider-openai>=0.1.2"]
     assert project["license"] == {"text": "Proprietary"}
     assert (PKG / "LICENSE").read_text(encoding="utf-8").strip() == "Proprietary"
 

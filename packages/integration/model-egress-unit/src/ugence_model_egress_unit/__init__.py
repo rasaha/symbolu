@@ -145,6 +145,9 @@ from .records import (
 from .unit import EgressUnit, UnitPass
 from .version import (
     COMMISSIONING_STATUS,
+    GENUINE_CALL_ADMITTING_STATUSES,
+    LIVE_SYNTHETIC_VALIDATION_AUTHORIZATION,
+    genuine_call_admitted,
     CONTRACT_VERSION,
     ENFORCEMENT_ENABLED,
     LIVE_VENDOR_EGRESS,
@@ -156,6 +159,9 @@ __all__ = [
     "__version__",
     "CONTRACT_VERSION",
     "COMMISSIONING_STATUS",
+    "LIVE_SYNTHETIC_VALIDATION_AUTHORIZATION",
+    "GENUINE_CALL_ADMITTING_STATUSES",
+    "genuine_call_admitted",
     "MATURITY",
     "ENFORCEMENT_ENABLED",
     "LIVE_VENDOR_EGRESS",

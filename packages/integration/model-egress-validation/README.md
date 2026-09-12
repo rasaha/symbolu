@@ -69,7 +69,7 @@ row's result is `null` and no evidence is recorded.
 ## Dependency direction
 
 ```
-ugence-model-egress-unit >= 0.4.0        ugence-model-egress-provider-openai >= 0.1.1
+ugence-model-egress-unit >= 0.4.1        ugence-model-egress-provider-openai >= 0.1.2
                     ▲                                     ▲
                     └──── ugence-model-egress-validation ─┘
 ```

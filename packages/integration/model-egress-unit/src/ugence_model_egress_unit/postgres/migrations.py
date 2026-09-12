@@ -365,7 +365,8 @@ CREATE POLICY identity_binding ON {SCHEMA_NAME}.egress_result AS RESTRICTIVE
 --    lease and authority it was produced under. Two nullable columns outside every
 --    digest body; the reference-slice restriction that forced every row non-genuine
 --    is replaced, not removed. The application gate (records.py) keeps refusing a
---    genuine result until commissioning is MET; this is the database's half.
+--    genuine result until both predecessor gates hold (a status that admits one
+--    and the owner's live-validation authorization; ADR §0.5); this is the database's half.
 ALTER TABLE {SCHEMA_NAME}.egress_result
     ADD COLUMN IF NOT EXISTS custody_lease_id text,
     ADD COLUMN IF NOT EXISTS custody_authority_id text;

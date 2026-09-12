@@ -179,7 +179,7 @@ class ResponsesTransport(Protocol):
 
     ``NON_PRODUCTION`` is the transport's own declaration that it cannot reach a vendor.
     The adapter refuses, before dispatch, any transport that does not declare it while
-    commissioning is not ``MET``.
+    the genuine-call gate is shut (ADR §0.5).
     """
 
     NON_PRODUCTION: bool

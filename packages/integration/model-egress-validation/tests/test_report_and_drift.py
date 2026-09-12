@@ -81,6 +81,9 @@ def test_the_records_beside_the_unit_show_no_drift():
     records = load_records()
     assert records_directory().name == "model-egress-unit"
     assert check_drift(records["designation"], records["validation"]) == []
+    assert records["validation"]["live_synthetic_validation_authorization"] == "NOT_GIVEN"
+    row12 = records["validation"]["validation_matrix"][11]
+    assert row12["row"] == 12 and len(row12["prerequisites"]) == 5 and "presuppose MET" in row12["contributes_to"]
     step8 = records["designation"]["step8_required_values"]
     assert step8["obligation_count"] == 17 and step8["checked_fields"] == 23 and len(step8["obligations"]) == 17
     assert step8["attestation"]["independently_checked_by"] is None
@@ -94,6 +97,9 @@ def test_the_records_beside_the_unit_show_no_drift():
     (lambda d, v: d["vendor"].__setitem__("endpoint", "/v1/chat/completions"), "endpoint"),
     (lambda d, v: d["vendor"].__setitem__("model", "gpt-5.4-mini (alias)"), "DESIGNATED_MODEL"),
     (lambda d, v: v.__setitem__("meu_live_status", "MET"), "COMMISSIONING_STATUS"),
+    (lambda d, v: v.__setitem__("live_synthetic_validation_authorization", "owner-authorization-x"), "LIVE_SYNTHETIC_VALIDATION_AUTHORIZATION"),
+    (lambda d, v: v["validation_matrix"].__getitem__(11).__setitem__("prerequisites", ["commissioning MET"]), "never a prerequisite"),
+    (lambda d, v: v["validation_matrix"].__getitem__(11).__setitem__("prerequisites", []), "no prerequisites"),
     (lambda d, v: v["validation_matrix"].__getitem__(0).__setitem__("required", "PASS"), "differ from the harness"),
     (lambda d, v: v["validation_matrix"].__getitem__(11).__setitem__("result", "PASS"), "carries a result while the provider is blocked"),
     (lambda d, v: v["evidence"].__setitem__("runs", [{"fixture": True}]), "carries evidence while the provider is blocked"),

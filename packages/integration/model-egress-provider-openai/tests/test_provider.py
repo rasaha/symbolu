@@ -46,8 +46,9 @@ def _dump(result) -> str:
 
 # --- posture ---------------------------------------------------------------------
 
-def test_commissioning_is_not_met_so_the_adapter_refuses_a_production_posture(provider):
-    assert COMMISSIONING_STATUS != "MET"
+def test_the_genuine_call_gate_is_shut_so_the_adapter_refuses_a_production_posture(provider):
+    from ugence_model_egress_unit import genuine_call_admitted
+    assert COMMISSIONING_STATUS == "BLOCKED_PENDING_INFRASTRUCTURE_DESIGNATIONS" and genuine_call_admitted() is False
     with pytest.raises(ProviderRefusedInProduction, match=COMMISSIONING_STATUS):
         provider.execute(make_request(), now=NOW, production=True)
 
@@ -167,12 +168,25 @@ def test_a_custody_refusal_is_terminal_dispatches_nothing_and_consumes_no_budget
     assert transport.dispatches == [] and budget.calls_reserved == 0
 
 
-def test_a_production_authoritative_lease_is_refused_while_commissioning_is_not_met(transport, budget):
+def test_a_production_authoritative_lease_is_refused_while_the_genuine_call_gate_is_shut(transport, budget, monkeypatch):
     custody = MarkerCustody(production_authoritative=True)
     p = OpenAIResponsesProvider(transport=transport, custody=custody, budget=budget, credential_profile=PROFILE)
     result = p.execute(make_request(), now=NOW)
     assert result.refusal_reason is RefusalReason.LIVE_EGRESS_NOT_AVAILABLE
     assert transport.dispatches == [] and budget.calls_reserved == 0
+    # once both predecessor gates hold (never MET alone), the same lease is usable: that is
+    # the non-production validation call; "production-authoritative" is the lease's custody
+    # authority, not a production deployment
+    import ugence_model_egress_unit.version as version
+    monkeypatch.setattr(version, "COMMISSIONING_STATUS", "PENDING_VALIDATION")
+    monkeypatch.setattr(version, "LIVE_SYNTHETIC_VALIDATION_AUTHORIZATION", "owner-authorization-2026-09-xx")
+    assert version.genuine_call_admitted() is True
+    result = p.execute(make_request(), now=NOW)
+    assert result.outcome is ResultOutcome.ANSWERED and result.provenance["genuine_call"] is False  # fake transport: still never genuine
+    assert len(transport.dispatches) == 1
+    monkeypatch.setattr(version, "COMMISSIONING_STATUS", "MET")
+    monkeypatch.setattr(version, "LIVE_SYNTHETIC_VALIDATION_AUTHORIZATION", "NOT_GIVEN")
+    assert version.genuine_call_admitted() is False  # MET without the authorization admits nothing
 
 
 # --- retry, ambiguity, failure ---------------------------------------------------

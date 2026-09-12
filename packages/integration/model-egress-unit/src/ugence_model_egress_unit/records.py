@@ -450,17 +450,22 @@ class EgressResult:
         if genuine is not False:
             # LP-2b: the application half of the gate. A genuine result needs the
             # custody lease and authority it was produced under, a RESPONSE
-            # provenance, and a commissioning record that reached MET; the last is
-            # a release constant, so no configuration can admit one.
-            from .version import COMMISSIONING_STATUS  # local: version imports nothing
+            # provenance, and both predecessor gates of ADR §0.5: a status that admits
+            # a genuine call (PENDING_VALIDATION or MET) and the owner's separate
+            # authorization of the live synthetic validation. Both are release
+            # constants, so no configuration can admit one. MET is never required
+            # here: it is the outcome the validation's evidence feeds, not its input.
+            from . import version as _version  # local: version imports nothing
 
             if genuine is not True:
                 raise ValueError("genuine_call is a boolean")
-            if COMMISSIONING_STATUS != "MET":
+            if not _version.genuine_call_admitted():
                 raise ValueError(
                     f"no result may record a genuine call while commissioning is "
-                    f"{COMMISSIONING_STATUS}; a provenance record mistakable for "
-                    f"provider evidence is the failure this check exists to prevent")
+                    f"{_version.COMMISSIONING_STATUS} and the live synthetic validation "
+                    f"authorization is {_version.LIVE_SYNTHETIC_VALIDATION_AUTHORIZATION}; a "
+                    f"provenance record mistakable for provider evidence is the failure this "
+                    f"check exists to prevent")
             if not self.custody_lease_id or not self.custody_authority_id:
                 raise ValueError("a genuine result names the custody lease and authority it ran under")
             if self.provenance.get("kind") != ProvenanceKind.RESPONSE.value:
