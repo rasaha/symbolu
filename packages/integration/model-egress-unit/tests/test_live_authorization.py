@@ -13,6 +13,7 @@ import uuid
 from datetime import datetime, timedelta, timezone
 
 import pytest
+from synthetic_shapes import synthetic_credential_shape
 
 import ugence_model_egress_unit as meu
 import ugence_model_egress_unit.version as version
@@ -137,7 +138,19 @@ def test_the_admission_is_what_a_genuine_result_needs_and_a_token_alone_is_not_e
 
 # --- the negative matrix -----------------------------------------------------------
 
-@pytest.mark.parametrize("value", ["yes", "GIVEN", "owner-authorization-2026-09-12", True, OWNER, "sk-not-a-key", 1])
+@pytest.mark.parametrize(
+    "value",
+    [
+        "yes",
+        "GIVEN",
+        "owner-authorization-2026-09-12",
+        True,
+        OWNER,
+        # a SYNTHETIC credential-shaped string, assembled at runtime (never a literal)
+        pytest.param(synthetic_credential_shape("openai_project_key"), id="credential-shaped-string"),
+        1,
+    ],
+)
 def test_arbitrary_non_not_given_values_never_satisfy_g2(value, monkeypatch):
     r = _request()
     # even with the mirror constant altered to a non-NOT_GIVEN value
