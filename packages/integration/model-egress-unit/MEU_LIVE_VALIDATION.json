@@ -17,7 +17,8 @@
     "LP-4 / ADR section 0.5: genuine_call True stays refused by EgressResult until both predecessor gates hold — meu_live_status PENDING_VALIDATION (every step-8 obligation independently verified) and live_synthetic_validation_authorization given by the owner's separate explicit statement, each released into the unit's constants; MET is the outcome of the validation, never its prerequisite (migration 2 lifted the database restriction only, ADR section 0.3.1)",
     "LP-1: CR-1 amended (DONE 2026-09-11); the MEU deployment unit itself is not yet built or composed",
     "LP-3: the model snapshot gpt-5.4-mini-2026-03-17 is designated, not verified; fake-transport evidence marks no row",
-    "LP-7 ruling 12: supplying and verifying the seventeen values closes only the infrastructure-designation blocker; the first live synthetic validation requires a separate, explicit owner authorization, not yet given; production use requires another commissioning record"
+    "LP-7 ruling 12: supplying and verifying the seventeen values closes only the infrastructure-designation blocker; the first live synthetic validation requires a separate, explicit owner authorization, not yet given; production use requires another commissioning record",
+    "LP-8: the deployed MEU instance (its reference and workload-identity principal, live_execution_posture) and the production-form Secret Manager custody adapter (LP-6 step 7, its own distribution) — UNDESIGNATED and unbuilt; no developer machine, CI runner, browser, shared hosting environment or production business workflow may stand in for either"
   ],
   "validation_matrix": [
     {
@@ -96,7 +97,8 @@
         "a production-authoritative custody lease within the non-production commissioning scope: the lease's authority under the real custody contract (commissioned Secret Manager path, pinned numeric version, designated workload identity), not authorization of a production deployment",
         "the owner's separate explicit authorization for the synthetic validation call (live_synthetic_validation_authorization)",
         "a genuine-call result carrying trust UNTRUSTED_EVIDENCE, with custody_lease_id and custody_authority_id",
-        "correlation with the row-18 secret-access evidence by non-secret identifiers and bounded timestamps"
+        "correlation with the row-18 secret-access evidence by non-secret identifiers and bounded timestamps",
+        "executed by the deployed MEU instance in the dedicated non-production GCP project under its dedicated non-human workload identity, through the production-form Secret Manager custody adapter at the pinned numeric version, against the dedicated non-production OpenAI project; never by a developer machine, CI runner, browser, shared hosting environment or production business workflow (LP-8, live_execution_posture)"
       ],
       "contributes_to": "the owner's later decision to move meu_live_status to MET; this row does not presuppose MET"
     },
@@ -168,6 +170,28 @@
     ],
     "never_sufficient": "a non-empty string, a boolean, an owner's name, or an altered release constant",
     "after_the_sequence": "further genuine calls stay refused unless separately authorized; expiry, revocation, the call limit or a transition to MET never create or extend an authorization"
+  },
+  "live_execution_posture": {
+    "ruling": "LP-8 test-environment ruling (owner, 2026-09-12; ADR section 0.7)",
+    "required": "DEPLOYED_MEU_INSTANCE",
+    "instance_reference": "UNDESIGNATED (the deployed MEU instance in the dedicated non-production GCP project; designated together with step 8, outside the seventeen obligations; never a developer machine, CI runner, browser, shared hosting environment or production business workflow)",
+    "workload_identity_principal": "UNDESIGNATED (the instance's dedicated non-human workload identity: obligations 3, 4 and 5 designate it)",
+    "custody_adapter": "PRODUCTION_FORM_SECRET_MANAGER_ADAPTER (unbuilt: LP-6 step 7, its own distribution; the reference adapter and the fake-path PinnedSecretVersionCustodyAdapter never satisfy row 12)",
+    "secret_version": "the pinned numeric Secret Manager version of obligation 6; latest is refused",
+    "openai_project": "the dedicated non-production OpenAI project of obligations 10, 11 and 12",
+    "input": "synthetic non-sensitive only; a fixed approved request, bound as request digests in the typed authorization (ADR section 0.6); each authorized digest is one instance of that fixed request and is consumed once",
+    "limits": "the LP-5 token and monetary limits carried by the typed authorization; strict, never widened for the validation",
+    "forbidden_holders": [
+      "DEVELOPER_MACHINE",
+      "CI_RUNNER",
+      "BROWSER",
+      "SHARED_HOSTING_ENVIRONMENT",
+      "PRODUCTION_BUSINESS_WORKFLOW"
+    ],
+    "ci_runner_refusal": "the live verifier refuses first, before any record, custody port, budget or transport, when any CI environment marker is set (ugence_model_egress_unit.CI_ENVIRONMENT_MARKERS)",
+    "sequence_completion": "exactly the separately authorized number of live calls (max_calls) consumed: fewer is an incomplete validation, more is impossible because the durable ledger refuses the call after max_calls",
+    "offline_testing": "fake-transport testing remains in repository CI and marks no infrastructure-dependent row",
+    "outcome_scope": "successful non-production validation is evidence toward the owner's MET decision for this non-production record only; it authorizes no production commissioning (production_commissioning_record NONE)"
   },
   "live_synthetic_validation_authorization_schema": "model-egress-unit.live-synthetic-validation-authorization.v1 (ugence_model_egress_unit.authorization.LiveSyntheticValidationAuthorization; ADR section 0.6). When given, this field carries the 64-hex digest of the owner's typed, immutable, consumable authorization record; the unit's LIVE_SYNTHETIC_VALIDATION_AUTHORIZATION_DIGEST mirrors it for drift detection only and never constitutes execution authority",
   "revoked_authorization_digests": [],

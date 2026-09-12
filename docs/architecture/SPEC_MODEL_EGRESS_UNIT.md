@@ -877,6 +877,19 @@ network connection and can mark no infrastructure-dependent row. The first live 
 validation stays behind a separate explicit owner authorization; production behind another
 commissioning record.
 
+LP-8 (2026-09-12, that ADR's §0.7) names the test environment: the initial genuine-provider
+validation runs in the dedicated non-production GCP project through a *deployed* MEU
+instance under its non-human workload identity, the production-form Secret Manager custody
+adapter, a pinned numeric secret version and a dedicated non-production OpenAI project,
+with synthetic input, a fixed approved request, the LP-5 limits and exactly the authorized
+number of calls; no developer machine, CI runner, browser, shared hosting environment or
+production business workflow may possess or exercise the credential. Release 0.5.1 carries
+this as `infrastructure.ExecutionPosture` and `check_execution_posture` (a CI runner is
+refused first, whatever it claims) and `sequence_complete`; the validation package's `live`
+refuses inside a CI runner before reading a record. Offline fake-transport testing stays in
+repository CI, and a successful non-production validation authorizes no production
+commissioning.
+
 ## 9 — What exists to build on
 
 | | |

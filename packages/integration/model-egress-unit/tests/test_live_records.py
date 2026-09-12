@@ -73,3 +73,22 @@ def test_the_records_limits_and_destination_agree_with_the_code():
     assert meu.OPENAI_RESPONSES.host == d["vendor"]["api_host"]
     assert d["vendor"]["endpoint"].startswith(meu.OPENAI_RESPONSES.path)
     assert meu.is_pinned_snapshot(d["vendor"]["model"].split(" ")[0])
+
+
+def test_lp8_the_validation_record_binds_the_execution_posture_to_the_unit_constants():
+    v = json.loads(VALIDATION.read_text(encoding="utf-8"))
+    posture = v["live_execution_posture"]
+    assert posture["required"] == meu.LIVE_VALIDATION_EXECUTION_POSTURE == "DEPLOYED_MEU_INSTANCE"
+    assert posture["forbidden_holders"] == list(meu.FORBIDDEN_CREDENTIAL_HOLDERS)
+    assert posture["custody_adapter"].startswith(meu.PRODUCTION_FORM_CUSTODY_ADAPTER)
+    assert posture["instance_reference"].startswith("UNDESIGNATED") and posture["workload_identity_principal"].startswith("UNDESIGNATED")
+    assert "exactly" in posture["sequence_completion"] and "max_calls" in posture["sequence_completion"]
+    assert "no production commissioning" in posture["outcome_scope"]
+    assert "repository CI" in posture["offline_testing"]
+    row12 = next(r for r in v["validation_matrix"] if r["row"] == 12)
+    assert any("deployed MEU instance" in p and "never by a developer machine, CI runner, browser" in p for p in row12["prerequisites"])
+    assert row12["result"] is None
+    assert any(b.startswith("LP-8:") for b in v["blocked_by"])
+    # the seventeen obligations are untouched: LP-8 adds no eighteenth
+    d = json.loads(DESIGNATION.read_text(encoding="utf-8"))
+    assert d["step8_required_values"]["obligation_count"] == 17 and len(d["step8_required_values"]["obligations"]) == 17

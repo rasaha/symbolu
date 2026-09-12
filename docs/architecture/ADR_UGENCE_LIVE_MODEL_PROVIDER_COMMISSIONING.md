@@ -668,6 +668,55 @@ without a current authorization and `BLOCKED` with one; reuse after the sequence
 consumed request. The canonical authorization stays `NOT_GIVEN`, every row stays `null`,
 and the validation package's tests hash both records before and after every command.
 
+### 0.7 — LP-8 test-environment ruling (owner, 2026-09-12), verbatim
+
+> LP-8 TEST-ENVIRONMENT RULING: Initial genuine-provider validation shall occur in a dedicated non-production GCP project through a deployed MEU instance using its dedicated non-human workload identity, the production-form Secret Manager custody adapter, a pinned numeric secret version, and a dedicated non-production OpenAI project. Validation shall use synthetic non-sensitive input, a fixed approved request, strict token and monetary limits, and exactly the separately authorized number of live calls. No developer machine, CI runner, browser, shared hosting environment, or production business workflow may possess or exercise the credential. Offline fake-transport testing remains in repository CI. Successful non-production validation does not authorize production commissioning.
+
+#### 0.7.1 — Where each element of LP-8 lives
+
+Most of LP-8 restates, as the test environment, what LP-2, LP-5, LP-7 and §0.6 already
+bind. Three elements were not yet expressible and are now (unit 0.5.1, validation 0.2.1):
+the execution posture, the exact call count as a completion criterion, and the scope of
+a successful outcome. No value is supplied and nothing here is designated.
+
+| LP-8 element | Where it lives | New in this ruling |
+| --- | --- | --- |
+| a dedicated non-production GCP project | LP-7 ruling 1; obligations 1 and 2 (`gcp_project_id`, `gcp_project_number`) | — |
+| a deployed MEU instance | `MEU_LIVE_VALIDATION.json` → `live_execution_posture` (`required: DEPLOYED_MEU_INSTANCE`, `instance_reference` UNDESIGNATED); `infrastructure.ExecutionPosture` and `check_execution_posture`; row 12's new prerequisite; `blocked_by` names the instance and the adapter | **yes**: the instance reference is designated with step 8, outside the seventeen obligations, which stay seventeen |
+| its dedicated non-human workload identity | LP-7 ruling 2; obligations 3, 4 and 5; `live_execution_posture.workload_identity_principal` UNDESIGNATED; `check_execution_posture` refuses a human or default-compute identity and anything that is not a workload-identity principal or the instance's service-account identity | posture-side check |
+| the production-form Secret Manager custody adapter | LP-6 step 5 (fake path only, built) and step 7 (the production adapter, its own distribution, unbuilt); `PRODUCTION_FORM_CUSTODY_ADAPTER`; `check_execution_posture` refuses the reference and fake-path adapters; row 12 already requires a production-authoritative lease | posture-side check |
+| a pinned numeric secret version | LP-2; obligation 6; `custody.is_pinned_secret_version` refuses `latest` | — |
+| a dedicated non-production OpenAI project | LP-7 rulings 7 and 10; obligations 10, 11, 12 and 13 | — |
+| synthetic non-sensitive input | §0.6 `synthetic_non_sensitive_only` (must be exactly `true`) | — |
+| a fixed approved request | §0.6 `authorized_request_digests`: each digest binds one instance of the fixed request (its content digest, parameters and request identity); the validation plan digest names the request; see 0.7.2 | interpretation recorded |
+| strict token and monetary limits | LP-5 `COMMISSIONING_LIMITS`; §0.6 token limits and `budget_usd_cents ≤ 2,500` carried by the authorization; the durable reservation | — |
+| exactly the separately authorized number of live calls | §0.6 `max_calls` as the ceiling the ledger enforces; **new**: `infrastructure.sequence_complete(calls_consumed, max_calls)` is equality, and `live_execution_posture.sequence_completion` says fewer is incomplete and more is impossible | **yes** |
+| no developer machine, CI runner, browser, shared hosting environment or production business workflow may possess or exercise the credential | `FORBIDDEN_CREDENTIAL_HOLDERS` (the owner's five, in order), each refused by name; `CI_ENVIRONMENT_MARKERS` and `ci_environment_markers_present`: a CI runner is refused first, whatever posture it claims; the validation package's `live` exits 2 before reading a record when any marker is set; `live_execution_posture.forbidden_holders` and `ci_runner_refusal` in the record; drift checks bind the record to the constants | **yes** |
+| offline fake-transport testing remains in repository CI | LP-7 ruling 11; the three workflows; `offline` runs under `GITHUB_ACTIONS` (tested) and marks no infrastructure-dependent row | — |
+| successful non-production validation does not authorize production commissioning | `NON_PRODUCTION_VALIDATION_OUTCOME_SCOPE`; `live_execution_posture.outcome_scope`; `step8_required_values.production_commissioning_record: NONE`; §0.5 (row 12 contributes to the MET decision of this non-production record) | **yes**, as a stated constant and record field |
+
+#### 0.7.2 — "A fixed approved request" and "exactly the authorized number of calls", reconciled with §0.6
+
+The durable ledger consumes each authorized request digest once
+(`commissioning_consumption_once_per_request`). A request digest binds the request's
+identity (`request_id`, `submitted_at`, correlation) together with its content digest and
+parameters, so the one fixed approved request, issued *n* times, is *n* request instances
+with *n* distinct digests and identical content. The owner's authorization therefore
+lists *n* authorized request digests for `max_calls = n`, each one instance of the fixed
+request, and the validation is complete when exactly *n* have been consumed. Nothing in
+the ledger or the authorization schema changes; no ballot is needed. Should the owner
+prefer the authorization to carry the fixed request's content digest once and the count
+separately, that is a v2 of the authorization schema and a separate decision.
+
+#### 0.7.3 — What LP-8 does not change
+
+The seventeen obligations remain seventeen and the 23 checked fields remain 23; the
+instance reference and principal of `live_execution_posture` are recorded beside them,
+not among them. The canonical authorization stays `NOT_GIVEN`, every row stays `null`,
+`meu_live_status` stays `BLOCKED_PENDING_INFRASTRUCTURE_DESIGNATIONS`. No instance is
+deployed, no adapter is built, no project, identity, secret or credential is created, and
+no live call is made by this record.
+
 ## 1 — The finding that shapes this record
 
 **AP-3 did not gate the live model provider, and its acceptance unblocks none of the

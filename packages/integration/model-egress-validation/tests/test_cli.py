@@ -15,6 +15,17 @@ from ugence_model_egress_validation.cli import main
 from ugence_model_egress_validation.drift import records_directory
 
 
+@pytest.fixture(autouse=True)
+def _not_a_ci_runner(monkeypatch):
+    """The suite itself runs in CI. LP-8 makes ``live`` refuse a CI runner before anything
+    else, so every test starts with the CI markers cleared and the two tests that exercise
+    the CI-runner refusal set a marker themselves."""
+
+    from ugence_model_egress_unit import CI_ENVIRONMENT_MARKERS
+    for marker in CI_ENVIRONMENT_MARKERS:
+        monkeypatch.delenv(marker, raising=False)
+
+
 def _digests(directory: pathlib.Path) -> dict:
     return {name: hashlib.sha256((directory / name).read_bytes()).hexdigest()
             for name in ("MEU_LIVE_PROVIDER_DESIGNATION.json", "MEU_LIVE_VALIDATION.json")}
@@ -106,3 +117,36 @@ def test_live_refuses_with_exit_2_before_any_custody_reservation_or_dispatch(cap
 def test_a_command_is_required():
     with pytest.raises(SystemExit):
         main([])
+
+
+# --- LP-8 (2026-09-12): a CI runner may not possess or exercise the credential -------
+
+def test_live_names_the_deployed_meu_instance_as_the_only_execution_posture(capsys):
+    assert main(["live"]) == 2
+    out = capsys.readouterr().out
+    assert "execution posture (LP-8): only the DEPLOYED_MEU_INSTANCE may execute the validation (instance: UNDESIGNATED)" in out
+    assert "never developer machine, ci runner, browser, shared hosting environment, production business workflow." in out
+
+
+@pytest.mark.parametrize("marker", ["CI", "GITHUB_ACTIONS", "GITLAB_CI", "BUILDKITE"])
+def test_live_refuses_first_of_all_inside_a_ci_runner_before_reading_a_record(marker, capsys, monkeypatch, tmp_path):
+    import ugence_model_egress_validation.cli as cli
+
+    monkeypatch.setenv(marker, "true")
+
+    def boom(*a, **k):
+        raise AssertionError("live read a record while running as a CI runner")
+
+    monkeypatch.setattr(cli, "load_records", boom)
+    rc = main(["live", "--records", str(tmp_path / "nowhere")])
+    assert rc == 2
+    out = capsys.readouterr().out
+    assert f"live verifier refused: this process is a CI runner ({marker} set)" in out
+    assert "only the DEPLOYED_MEU_INSTANCE may (LP-8)" in out and "Offline fake-transport testing is what runs in CI." in out
+
+
+def test_offline_still_runs_inside_a_ci_runner(tmp_path, monkeypatch):
+    """LP-8: offline fake-transport testing remains in repository CI."""
+
+    monkeypatch.setenv("GITHUB_ACTIONS", "true")
+    assert main(["offline", "--report", str(tmp_path / "r.json"), "--now", "2026-09-11T18:30:00+00:00"]) == 0

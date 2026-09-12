@@ -19,7 +19,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, fields
 from datetime import datetime, timedelta
-from typing import Optional, Sequence, Tuple, Union
+from typing import Mapping, Optional, Sequence, Tuple, Union
 
 from .custody import is_pinned_secret_version
 
@@ -46,6 +46,16 @@ __all__ = [
     "RotationRefused",
     "check_rotation_plan",
     "rollback_permitted",
+    "LIVE_VALIDATION_EXECUTION_POSTURE",
+    "FORBIDDEN_CREDENTIAL_HOLDERS",
+    "CI_ENVIRONMENT_MARKERS",
+    "PRODUCTION_FORM_CUSTODY_ADAPTER",
+    "NON_PRODUCTION_VALIDATION_OUTCOME_SCOPE",
+    "ExecutionPostureRefused",
+    "ExecutionPosture",
+    "check_execution_posture",
+    "ci_environment_markers_present",
+    "sequence_complete",
 ]
 
 #: Ruling 12: exactly SEVENTEEN mandatory designation obligations, in the owner's order
@@ -425,3 +435,124 @@ def rollback_permitted(*, previous_secret_version_valid: bool, previous_openai_c
     version and its OpenAI credential remain valid, and the owner has authorized it."""
 
     return bool(previous_secret_version_valid and previous_openai_credential_valid and owner_authorized)
+
+
+# --- LP-8 (2026-09-12): where the credential may be possessed and exercised -----------
+
+#: LP-8: the initial genuine-provider validation runs through a DEPLOYED MEU instance in
+#: the dedicated non-production GCP project, under the instance's dedicated non-human
+#: workload identity. Nothing else may possess or exercise the credential.
+LIVE_VALIDATION_EXECUTION_POSTURE = "DEPLOYED_MEU_INSTANCE"
+
+#: LP-8, in the owner's words and order: none of these may possess or exercise the
+#: credential. A posture naming one of them is refused, and so is a claimed
+#: DEPLOYED_MEU_INSTANCE posture presented from inside a CI runner.
+FORBIDDEN_CREDENTIAL_HOLDERS: Tuple[str, ...] = (
+    "DEVELOPER_MACHINE",
+    "CI_RUNNER",
+    "BROWSER",
+    "SHARED_HOSTING_ENVIRONMENT",
+    "PRODUCTION_BUSINESS_WORKFLOW",
+)
+
+#: Environment variables that CI systems set on their runners. Any one present means the
+#: process is a CI runner whatever posture it claims; the live verifier refuses before
+#: touching anything. Offline fake-transport testing is what runs in CI (LP-8).
+CI_ENVIRONMENT_MARKERS: Tuple[str, ...] = (
+    "CI", "GITHUB_ACTIONS", "GITLAB_CI", "BUILDKITE", "CIRCLECI", "TRAVIS", "TF_BUILD",
+    "JENKINS_URL", "TEAMCITY_VERSION", "BITBUCKET_BUILD_NUMBER", "CODEBUILD_BUILD_ID",
+    "CLOUD_BUILD", "DRONE",
+)
+
+#: LP-8: the validation uses the production-form Secret Manager custody adapter over a
+#: pinned numeric version. The reference adapter and the fake-path
+#: ``PinnedSecretVersionCustodyAdapter`` over an injected reader never satisfy it.
+PRODUCTION_FORM_CUSTODY_ADAPTER = "PRODUCTION_FORM_SECRET_MANAGER_ADAPTER"
+
+#: LP-8, last sentence: what a successful non-production validation is evidence for, and
+#: what it is not.
+NON_PRODUCTION_VALIDATION_OUTCOME_SCOPE = (
+    "evidence toward the owner's MET decision for the NON-PRODUCTION commissioning record only; "
+    "authorizes no production commissioning, which needs its own commissioning record"
+)
+
+
+class ExecutionPostureRefused(RuntimeError):
+    """An execution posture under which the credential may not be possessed or
+    exercised (LP-8). The message names the field and the rule, never the value."""
+
+    def __init__(self, field_name: str, detail: str) -> None:
+        super().__init__(f"{field_name}: {detail}")
+        self.field_name = field_name
+
+
+@dataclass(frozen=True)
+class ExecutionPosture:
+    """Where the live validation is about to execute, as the executing process asserts
+    it. Accepted only when it is the deployed MEU instance, under its non-human workload
+    identity, through the production-form custody adapter, in a non-production
+    environment, and not inside a CI runner."""
+
+    posture: str
+    instance_reference: str
+    workload_identity_principal: str
+    custody_adapter: str
+    environment: str = "non-production"
+
+
+def ci_environment_markers_present(variables: Mapping[str, str]) -> Tuple[str, ...]:
+    """The CI markers set in ``variables``, in :data:`CI_ENVIRONMENT_MARKERS` order.
+    Non-empty means: the process those variables describe is a CI runner. This unit
+    never reads its own process environment (the boundary tests forbid it); the caller
+    that may, the validation command, passes the marker names' values in."""
+
+    return tuple(m for m in CI_ENVIRONMENT_MARKERS if str(variables.get(m, "")).strip() not in ("", "0", "false", "False"))
+
+
+def check_execution_posture(posture: ExecutionPosture, *, variables: Mapping[str, str]) -> ExecutionPosture:
+    """``posture`` back, or :class:`ExecutionPostureRefused` naming the first rule broken.
+
+    Order: a CI runner is refused first, whatever it claims; then a posture that is not
+    the deployed MEU instance (each forbidden holder is named as itself); then the
+    instance reference and the workload-identity principal (required, no placeholder, no
+    credential shape, not a human or default-compute identity); then the custody adapter
+    (production-form only); then the environment (non-production only).
+    """
+
+    markers = ci_environment_markers_present(variables)
+    if markers:
+        raise ExecutionPostureRefused(
+            "environment", f"a CI runner ({', '.join(markers)} set) may not possess or exercise the credential; "
+                           "offline fake-transport testing is what runs in CI (LP-8)")
+    if not isinstance(posture, ExecutionPosture):
+        raise ExecutionPostureRefused("posture", "an ExecutionPosture record is required; a string or a flag asserts nothing (LP-8)")
+    if posture.posture in FORBIDDEN_CREDENTIAL_HOLDERS:
+        raise ExecutionPostureRefused("posture", f"{posture.posture} may not possess or exercise the credential (LP-8)")
+    if posture.posture != LIVE_VALIDATION_EXECUTION_POSTURE:
+        raise ExecutionPostureRefused("posture", f"only {LIVE_VALIDATION_EXECUTION_POSTURE} may execute the validation (LP-8)")
+    for name in ("instance_reference", "workload_identity_principal"):
+        try:
+            _refuse_bad_string(name, getattr(posture, name))
+        except DesignationRefused as refused:
+            raise ExecutionPostureRefused(name, str(refused).split(": ", 1)[1]) from None
+    principal = posture.workload_identity_principal
+    lowered = principal.lower()
+    if lowered.startswith("user:") or "@gmail." in lowered or "@googlemail." in lowered or "-compute@" in lowered \
+            or lowered.endswith("developer.gserviceaccount.com"):
+        raise ExecutionPostureRefused("workload_identity_principal", "a human or default-compute identity is not the dedicated non-human workload identity (LP-8, ruling 2)")
+    if not (lowered.startswith("principal://") or lowered.startswith("principalset://") or lowered.startswith("serviceaccount:")
+            or ".iam.gserviceaccount.com" in lowered):
+        raise ExecutionPostureRefused("workload_identity_principal", "must be the instance's workload-identity principal or its service-account identity (LP-8)")
+    if posture.custody_adapter != PRODUCTION_FORM_CUSTODY_ADAPTER:
+        raise ExecutionPostureRefused("custody_adapter", f"only {PRODUCTION_FORM_CUSTODY_ADAPTER} may materialize the credential for the validation; the reference and fake-path adapters never satisfy row 12 (LP-8)")
+    if str(posture.environment).strip().lower() != "non-production":
+        raise ExecutionPostureRefused("environment", "the initial validation is non-production only; production is another commissioning record (LP-8)")
+    return posture
+
+
+def sequence_complete(calls_consumed: int, max_calls: int) -> bool:
+    """LP-8: the validation exercises EXACTLY the separately authorized number of live
+    calls. Fewer is an incomplete validation; more is impossible, because the durable
+    ledger refuses the call after ``max_calls``. Only equality completes the sequence."""
+
+    return type(calls_consumed) is int and type(max_calls) is int and 1 <= max_calls and calls_consumed == max_calls
