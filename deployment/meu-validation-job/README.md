@@ -26,22 +26,36 @@ transport and the owner-run verifier composition are the next slice.
 
 ## The five gates
 
-Every gate is evaluated on every run and all five appear in the report, whether or not
-an earlier one blocked, so an operator sees everything outstanding rather than the first
-thing. What they *authorize* is ordered: **reading the real credential needs the first
-three**, and a genuine call needs all five.
+Every gate is evaluated on every run and all seven appear in the report, whether or not
+an earlier one blocked, so an operator sees everything outstanding rather than only the
+first thing. The **refusal**, however, names the earliest: leading with the missing
+transport would be wrong twice over, because it is not the first thing outstanding and
+because it invites the reading "authorize it and it will run".
 
-| Gate | Passes when |
-|---|---|
-| `EXECUTION_POSTURE` | the deployed MEU instance, under its non-human workload identity, through the production-form custody adapter, in a non-production environment, and not a CI runner (LP-8) |
-| `STEP8_DESIGNATION` | all seventeen obligations supplied and independently verified (LP-7 ruling 12) |
-| `LIVE_SYNTHETIC_VALIDATION_AUTHORIZATION` | the canonical record pins the owner's typed authorization and the supplied record is that one, unrevoked (ADR §0.6) |
-| `COMMISSIONING_CEILINGS` | the endpoint is exactly the designated destination and no authorized limit exceeds an LP-5 ceiling |
-| `LIVE_TRANSPORT` | **cannot pass in this slice**: no live transport exists and `LIVE_VENDOR_EGRESS` is `False` |
+The order is the owner's order (ADR §0.9), declared as data and enforced —
+`GateReport.__post_init__` refuses a report whose gates are not exactly this tuple:
 
-A run that may not call may not read: the authorization gates credential materialization
-and not only dispatch, so a lapse in the dispatch path cannot become a credential that
-was fetched anyway.
+| # | Gate | Passes when |
+|---|---|---|
+| 1 | `CONFIGURATION` | the configuration parses, names no credential material, and pins a numeric secret version |
+| 2 | `EXECUTION_POSTURE` | the deployed MEU instance, under its non-human workload identity, through the production-form custody adapter, in a non-production environment, and not a developer machine, a browser or a CI runner (LP-8) |
+| 3 | `STEP8_DESIGNATIONS` | all seventeen obligations supplied, none `UNDESIGNATED`, none placeholder- or credential-shaped (LP-7 ruling 12) |
+| 4 | `STEP8_INDEPENDENT_VERIFICATION` | somebody independently checked them — supplying the values is not verifying them |
+| 5 | `LIVE_SYNTHETIC_VALIDATION_AUTHORIZATION` | the canonical record pins the owner's typed authorization, the supplied record is that one, unrevoked, and no authorized limit exceeds an LP-5 ceiling (ADR §0.6) |
+| 6 | `LIVE_VENDOR_EGRESS` | the flag is enabled |
+| — | | **composition may begin only here** |
+| 7 | `LIVE_TRANSPORT` | **cannot pass in this slice**: no live transport exists in any installed distribution |
+
+`may_compose_components` is exactly "gates 1 to 6 passed". While any of them is blocked,
+`build_custody_adapter` raises before a Google client is built, before a custody adapter
+exists, before any transport is constructed and before any Secret Manager materialization
+is attempted. A refused run's report carries `components_composed` with every entry
+false, so "nothing was built" is a field an operator can check rather than a claim in
+prose.
+
+A run that may not call may not read: the governance gates gate credential
+materialization and not only dispatch, so a lapse in the dispatch path cannot become a
+credential that was fetched anyway.
 
 ## Configuration
 
@@ -116,8 +130,8 @@ audit-log configuration reference. Still no credential.
    `MEU_LIVE_VALIDATION.json` → `live_execution_posture`.
 
 **Exit artifact:** a complete, attested designation record. `dry-run` now shows
-`STEP8_DESIGNATION` passing. `EXECUTION_POSTURE` passes once the real instance reference
-and principal replace the placeholders.
+`STEP8_DESIGNATIONS` and `STEP8_INDEPENDENT_VERIFICATION` passing. `EXECUTION_POSTURE`
+passes once the real instance reference and principal replace the placeholders.
 
 ## Phase 4 — credential commissioning
 

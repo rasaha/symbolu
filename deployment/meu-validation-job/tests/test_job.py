@@ -7,7 +7,7 @@ import json
 
 import pytest
 
-from meu_validation_job import JobConfigRefused, evaluate_gates, load_config, run
+from meu_validation_job import GATES, JobConfigRefused, evaluate_gates, load_config, run
 from meu_validation_job.cli import main
 from meu_validation_job.job import ci_marker_variables, load_records
 from meu_validation_job.version import EXIT_NONCONFORMANT, EXIT_OK, EXIT_REFUSED
@@ -268,8 +268,10 @@ def test_the_dry_run_writes_nothing_and_prints_every_gate(tmp_path, capsys, monk
     assert main(["dry-run", "--config", str(path)]) == EXIT_NONCONFORMANT
     out = capsys.readouterr().out
     assert "nothing was run and no report was written" in out
-    for gate in ("EXECUTION_POSTURE", "STEP8_DESIGNATION", "LIVE_TRANSPORT"):
-        assert gate in out
+    # Every gate, by its exact name and in the declared order -- a substring of a gate
+    # name is not a gate, and the dry run is what an operator reads the order off.
+    positions = [out.index(gate) for gate in GATES]
+    assert positions == sorted(positions), "the dry run must print the gates in order"
     assert not (tmp_path / "report.json").exists()
 
 

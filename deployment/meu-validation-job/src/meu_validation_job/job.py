@@ -2,9 +2,12 @@
 
 Offline (the default) exercises the eighteen-row harness over fake components, evaluates
 every gate, writes a redacted report and exits zero **without reading a real secret**.
-Live fails closed: no live Responses transport exists in any installed distribution and
-``LIVE_VENDOR_EGRESS`` is False, so there is nothing to dispatch with. The refusal names
-that first, so nobody reads it as "authorize it and it will run".
+Live fails closed, and it is refused by the **earliest** outstanding governance gate
+rather than by the missing transport. In the present repository state that is the
+seventeen undesignated Step-8 obligations, four gates before a transport is consulted.
+Naming the transport first would invite the reading "authorize it and it will run",
+which is false: the designations, their independent verification, the owner's separate
+authorization and the egress flag are each outstanding before it.
 """
 
 from __future__ import annotations
