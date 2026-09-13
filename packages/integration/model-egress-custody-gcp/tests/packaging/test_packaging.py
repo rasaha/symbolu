@@ -35,7 +35,12 @@ def test_the_package_installs_as_one_source_tree_with_typing_marker():
     tool = _pyproject()["tool"]["setuptools"]
     assert tool["packages"]["find"]["where"] == ["src"]
     assert (PKG / "src" / "ugence_model_egress_custody_gcp" / "py.typed").is_file()
-    assert len([p for p in (PKG / "src").iterdir() if p.is_dir()]) == 1
+    # Exactly one IMPORTABLE package under src/. Counted by __init__.py rather than by
+    # directory, because `pip install` leaves a build-metadata directory (.egg-info)
+    # beside the source tree and build metadata is not a second package.
+    importable = sorted(d.name for d in (PKG / "src").iterdir()
+                        if d.is_dir() and (d / "__init__.py").is_file())
+    assert importable == ["ugence_model_egress_custody_gcp"], importable
 
 
 def test_the_readme_states_the_posture_plainly():
