@@ -22,7 +22,7 @@ from typing import Callable, Mapping, Optional, Any
 from ..crypto.keys import KeyRing, SigningKeyRecord
 from ..domain.actions import ActionAuthorization, CanonicalAction
 from ..domain.binding import AdmittedContext, CaseBindingContext, usable_control_results
-from ..domain.controls import ControlResult
+from ..domain.controls import ControlResult, freshness_horizon
 from ..domain.decision import RiskDecision
 from ..domain.enums import (
     ControlStatus,
@@ -723,6 +723,22 @@ class RiskAuthorityApplication:
             # decision, so the instant downstream admission depends on is covered by
             # ``decision_digest`` rather than by an outer field anyone may rewrite (R-12b).
             evaluated_at=req.evaluated_at,
+            # The decision may not outlive any prerequisite that authorized it. The
+            # control-freshness bound is derived here from the case's own persisted
+            # control state and the *authoritative* required set — never from the
+            # caller's advisory evaluation — for the same reason the recommendation is
+            # re-derived above; that is also what keeps unrelated or rejected results
+            # from capping a decision they did not contribute to.
+            #
+            # ``subject_assertion`` is the caller's, because only the subject-binding seam
+            # holds the validated ``SubjectContext``. It is a bound on the caller's own
+            # assertion, so honouring it can only shorten the decision, never widen it.
+            prerequisite_horizons={
+                "control_freshness": freshness_horizon(
+                    authoritative.required_controls, controls
+                ),
+                "subject_assertion": req.subject_valid_until,
+            },
         )
         self.decisions.save(decision)
 

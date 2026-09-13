@@ -149,6 +149,32 @@ through `compose(config, clock=, workload=)` from its own entrypoint.
   adapter's in-process issuer: park, list, decide over HTTP with a signed proof
   (`IDP_AUTHENTICATED`, `authentication_reference`), re-arm, consume, run once, link,
   and no DSN or token in any answer or output (row 8).
+- `tests/test_ap3_designation_conformance.py` — AP-3 (ADR §20.6, §20.7): the committed
+  designation record is the owner's (Cloudflare Access team `ugence` backed by Google
+  Workspace, `MET` since the owner's acceptance of 2026-09-11), the five mapping fields carry rulings AP3-D1 to
+  AP3-D5 and none is `UNRULED`, the file holds nothing token- or secret-shaped, and its
+  `conformance_harness` block says exactly what the adapter under the `cloudflare-access`
+  profile, the write gate, the `Cf-Access-Jwt-Assertion` boundary
+  (`cloudflare_access_boundary.py`, AP3-D4) and the test-only authorizer
+  (`tests/_conformance_authorizer.py`, AP3-D5, not AX-5) do with in-process tokens
+  shaped like Cloudflare Access tokens. Rows 1 to 13 are implementation evidence only
+  and stay null until live Cloudflare evidence is recorded; rows 14 to 16 take their
+  result from this suite under AP3-D5's evidence classification. `ci/ap3_jwks_probe.py`
+  prints the designated JWKS's key identifiers and document digest and nothing else,
+  for the owner to run from a host with egress; `ci/ap3_token_capture.py` reads one
+  token on standard input and prints only the redacted capture the record needs
+  (`alg`, `typ`, `kid`, payload key names, `iss`, `aud`, whether `sub` is non-empty,
+  `type`, a SHA-256 fingerprint), never the token or any other value; it verifies nothing,
+  by design. `ci/ap3_live_verify.py` is the verifier: on the owner's machine it obtains a
+  fresh token only through `cloudflared` (output filtered), verifies it with the real
+  adapter against the live JWKS, drives the matrix rows a human login can drive, and
+  prints only redacted evidence and per-row PASS/FAIL/BLOCKED; it aborts rather than
+  print anything token-shaped. `AP3_ACCEPTANCE_REPORT.md` is the canonical acceptance
+  artifact, rendered from the record by `ci/ap3_acceptance_report.py` and pinned by the
+  harness; it records the owner's acceptance statement as issued.
+- `tests/test_authority_plane_contract.py`, `tests/test_authority_reads.py`,
+  `tests/test_authority_writes.py` — the plane's contract (no write served while AP-3
+  is not `MET`), the four reads, and the two implemented writes behind the AW-5 gate.
 
 ## Container image and gate set (step 4)
 

@@ -1,7 +1,7 @@
 {
   "schema_version": "1",
   "deployment": "governance-studio-private-hosted",
-  "deployment_version": "0.12.0",
+  "deployment_version": "0.13.0",
   "single_process": true,
   "exposed_ports": [
     "8443/tcp"
@@ -57,8 +57,8 @@
     "openapi_sha256": "dc309eab216e1a4c2f63f286887a4ef218a96ac34f8fa8614bff176db7c36656",
     "served_api": "create_combined_app: governance_studio.api.v1 with governance_studio.api.v2 mounted behind it (CR-2)",
     "api_v2_contract": "governance_studio.api.v2",
-    "openapi_v2_sha256": "c6785b267dafe9e2593b58744890606727b26d450ffd1a32f9b544f95a2d0f3e",
-    "openapi_v2_amendment": "v2-A7 (MS-3 OBSERVE_DEPLOYMENT_ONE_READ, 2026-09-06): previous f42472ab78a34cd24be4c9454c532074c5d000009c3ca72da243cc9139874431; record apps/ugence-governance-studio/contracts/openapi_v2.amendments.json; operations added v2_observe_deployment. v2-A6 (CE-5 EXPORT_IS_A_READ, 2026-09-06): previous 907f360f2ba2127d005c140d6146ab441056794ba2b1f1a35580cf4148956e73; record apps/ugence-governance-studio/contracts/openapi_v2.amendments.json; operations added v2_export_read. v2-A5 (FD-13.3, 2026-09-06): previous 956c8289e77c31afa304a58a2cf94023b057a44f78c9159c83496338202b3b51; record apps/ugence-governance-studio/contracts/openapi_v2.amendments.json; operations added v2_vendor_declare, v2_vendor_list. v2-A4 (FD-12.4, 2026-09-06): previous 6346f2b7cd10430874f2f077ac69c12ce74be138a9462b0c4ccdcb503c624d7b; record apps/ugence-governance-studio/contracts/openapi_v2.amendments.json; operations added v2_data_use_declare, v2_data_use_list. v2-A3 (FD-11.5, 2026-09-06): previous 9d958f9c70ca133509aa7cff02657f7f39c5f98068f9dc6fd12bfb9c2a665cdb; record apps/ugence-governance-studio/contracts/openapi_v2.amendments.json; operations added v2_observe_ledger_chain. v2-A2 (FD-10.4, 2026-09-06): previous 1dbc612681b37b4b82a244a3c30631000856accfd8869f74a3c7a0b69e63cf97; record apps/ugence-governance-studio/contracts/openapi_v2.amendments.json; operations added v2_review_start_shadow_run. v2-A1 (FD-9.4, 2026-09-06): previous dd63180dc91ba7842dc1dc2b6efb3dbc155ea3bd47200f40de7bac85d373f39a; operations added v2_registry_register, v2_registry_list"
+    "openapi_v2_sha256": "afb675471bbdf01459a464c2eaf18c04622fed3f16956ed877cd9c3e90e38932",
+    "openapi_v2_amendment": "v2-A8 (BW-3A DRAFTS_AUTHORIZED_NOW, 2026-09-10): previous c6785b267dafe9e2593b58744890606727b26d450ffd1a32f9b544f95a2d0f3e; record apps/ugence-governance-studio/contracts/openapi_v2.amendments.json; operations added v2_workflow_drafts_save, v2_workflow_drafts_list, v2_workflow_drafts_read. v2-A7 (MS-3 OBSERVE_DEPLOYMENT_ONE_READ, 2026-09-06): previous f42472ab78a34cd24be4c9454c532074c5d000009c3ca72da243cc9139874431; record apps/ugence-governance-studio/contracts/openapi_v2.amendments.json; operations added v2_observe_deployment. v2-A6 (CE-5 EXPORT_IS_A_READ, 2026-09-06): previous 907f360f2ba2127d005c140d6146ab441056794ba2b1f1a35580cf4148956e73; record apps/ugence-governance-studio/contracts/openapi_v2.amendments.json; operations added v2_export_read. v2-A5 (FD-13.3, 2026-09-06): previous 956c8289e77c31afa304a58a2cf94023b057a44f78c9159c83496338202b3b51; record apps/ugence-governance-studio/contracts/openapi_v2.amendments.json; operations added v2_vendor_declare, v2_vendor_list. v2-A4 (FD-12.4, 2026-09-06): previous 6346f2b7cd10430874f2f077ac69c12ce74be138a9462b0c4ccdcb503c624d7b; record apps/ugence-governance-studio/contracts/openapi_v2.amendments.json; operations added v2_data_use_declare, v2_data_use_list. v2-A3 (FD-11.5, 2026-09-06): previous 9d958f9c70ca133509aa7cff02657f7f39c5f98068f9dc6fd12bfb9c2a665cdb; record apps/ugence-governance-studio/contracts/openapi_v2.amendments.json; operations added v2_observe_ledger_chain. v2-A2 (FD-10.4, 2026-09-06): previous 1dbc612681b37b4b82a244a3c30631000856accfd8869f74a3c7a0b69e63cf97; record apps/ugence-governance-studio/contracts/openapi_v2.amendments.json; operations added v2_review_start_shadow_run. v2-A1 (FD-9.4, 2026-09-06): previous dd63180dc91ba7842dc1dc2b6efb3dbc155ea3bd47200f40de7bac85d373f39a; operations added v2_registry_register, v2_registry_list"
   },
   "prohibited": [
     "permission_granting",
@@ -79,7 +79,8 @@
     "UGENCE_STUDIO_SIMULATION_PROVIDER": "optional; exactly '1' enables the one pinned in-image simulation provider handed to build_studio_context(provider_registry=...) and nowhere else; unset leaves the Simulate screen on its typed gap simulation_providers; any other value is refused before bind (front-door seam 3, FD-7)",
     "UGENCE_STUDIO_SYSTEM_REGISTRY_PATH": "optional; an absolute sqlite file path under the writable runtime volume; the tenant-bound system registry (ai-system-registry 0.2.0 SqliteSystemRegistry) handed to build_studio_context(system_registry=..., registered_by=<deployment name/version>) and nowhere else; requires UGENCE_STUDIO_TENANT_ID (front-door seam 5, FD-9)",
     "UGENCE_STUDIO_DATA_USE_DECLARATIONS_PATH": "optional; an absolute sqlite file path under the writable runtime volume; the tenant-bound data-use declarations file (data-use-admission 0.2.0 SqliteDataUseDeclarations) handed to build_studio_context(data_use_declarations=..., recorded_by=<deployment name/version>) and nowhere else; requires UGENCE_STUDIO_TENANT_ID (front-door seam 8, FD-12)",
-    "UGENCE_STUDIO_VENDOR_DECLARATIONS_PATH": "optional; an absolute sqlite file path under the writable runtime volume; the tenant-bound vendor declarations file (vendor-dependency 0.2.0 SqliteVendorDeclarations) handed to build_studio_context(vendor_declarations=..., recorded_by=<deployment name/version>) and nowhere else; requires UGENCE_STUDIO_TENANT_ID (front-door seam 9, FD-13)"
+    "UGENCE_STUDIO_VENDOR_DECLARATIONS_PATH": "optional; an absolute sqlite file path under the writable runtime volume; the tenant-bound vendor declarations file (vendor-dependency 0.2.0 SqliteVendorDeclarations) handed to build_studio_context(vendor_declarations=..., recorded_by=<deployment name/version>) and nowhere else; requires UGENCE_STUDIO_TENANT_ID (front-door seam 9, FD-13)",
+    "UGENCE_STUDIO_WORKFLOW_DRAFTS_PATH": "optional; an absolute sqlite file path under the writable runtime volume; the tenant-bound workflow drafts file (workflow-drafts 0.1.0 SqliteWorkflowDrafts) handed to build_studio_context(workflow_drafts=..., recorded_by=<deployment name/version>) and nowhere else; requires UGENCE_STUDIO_TENANT_ID, which is the tenant of every draft kept and is never taken from a request (Bring Your Workflow phase 3A, ADR_UGENCE_AUTHORITY_PLANE_SCOPING.md section 24, BW-3A)"
   },
   "constitution_registry": {
     "ruling": "ADR_UGENCE_STUDIO_FRONT_DOOR_SCOPING.md FD-1 ONE_SEAM_PER_STEP, FD-5 SCREEN_1_ONLY (activation root)",
@@ -106,11 +107,12 @@
     "packages/integration/ai-system-registry",
     "packages/integration/data-use-admission",
     "packages/integration/vendor-dependency",
+    "packages/integration/workflow-drafts",
     "packages/capabilities/action-clearance",
     "packages/integration/clearance-export"
   ],
   "front_door_seams": {
-    "ruling": "ADR_UGENCE_STUDIO_FRONT_DOOR_SCOPING.md FD-1 ONE_SEAM_PER_STEP; FD-5 seam 1; FD-6 seam 2; FD-7 seam 3; FD-9 seam 5; FD-10 seam 6; FD-11 seam 7; FD-12 seam 8; FD-13 seam 9",
+    "ruling": "ADR_UGENCE_STUDIO_FRONT_DOOR_SCOPING.md FD-1 ONE_SEAM_PER_STEP; FD-5 seam 1; FD-6 seam 2; FD-7 seam 3; FD-9 seam 5; FD-10 seam 6; FD-11 seam 7; FD-12 seam 8; FD-13 seam 9; ADR_UGENCE_AUTHORITY_PLANE_SCOPING.md section 24 BW-3A seam 12 (Bring Your Workflow phase 3A)",
     "handed_to_build_studio_context": [
       "review_service_base_url (CR-2; since seam 6 also the Simulate screen's worker shadow-run relay, FD-10; since seam 7 also the Observe screen's worker-ledger read, FD-11)",
       "activation_root (seam 1)",
@@ -119,7 +121,8 @@
       "provider_registry (seam 3: the one pinned in-image no-I/O simulation provider, only while UGENCE_STUDIO_SIMULATION_PROVIDER=1)",
       "system_registry (seam 5: the tenant-bound SqliteSystemRegistry file under the runtime volume, with registered_by = this deployment's name and version)",
       "data_use_declarations (seam 8: the tenant-bound SqliteDataUseDeclarations file under the runtime volume, with the recording composition = this deployment's name and version)",
-      "vendor_declarations (seam 9: the tenant-bound SqliteVendorDeclarations file under the runtime volume, with the recording composition = this deployment's name and version)"
+      "vendor_declarations (seam 9: the tenant-bound SqliteVendorDeclarations file under the runtime volume, with the recording composition = this deployment's name and version)",
+      "workflow_drafts (seam 12: the tenant-bound SqliteWorkflowDrafts file under the runtime volume, with the recording composition = this deployment's name and version; the seam-5 system registry is the one a draft may link to by reference plus digest)"
     ],
     "absent_by_ruling": [
       "decision_store (no durable Decision Authority record store exists; the decision read keeps its typed gap decision_authority_store)",
@@ -127,7 +130,7 @@
       "console_base_url"
     ],
     "tenant_binding": "records of any tenant other than UGENCE_STUDIO_TENANT_ID are refused with a typed refusal and never displayed",
-    "persistent_database": "prohibition stands: the registry is the seam-1 sqlite file under the runtime volume, the seam-5 registrations, the seam-8 data-use declarations and the seam-9 vendor declarations three more files beside it; no server, no driver, no DSN"
+    "persistent_database": "prohibition stands: the registry is the seam-1 sqlite file under the runtime volume, the seam-5 registrations, the seam-8 data-use declarations, the seam-9 vendor declarations and the seam-12 workflow drafts four more files beside it; no server, no driver, no DSN"
   },
   "prohibited_definitions": {
     "agent_execution": "agent execution against any non-fixture provider (FD-7.1 FIXTURE_RUN_ADMISSIBLE, ruled 2026-09-06): a run whose every provider is the in-image no-I/O simulation provider, under DRY_RUN, SIMULATION or SHADOW, is a demonstration and not agent execution; LIVE is absent from the mode list and refused by the studio; external_model_calls and external_tool_calls stand unchanged; asking the separate governed runtime worker to start the fixture workflow it already owns, over FIXTURE_ONLY providers, with nothing supplied by the studio, is display and transmit in FD-7.1's sense and not execution (FD-10.1 START_IS_A_RELAY, ruled 2026-09-06)"
@@ -217,7 +220,7 @@
     "operations": [
       "v2_export_read"
     ],
-    "reads_only": "one GET and nothing else; no write, no operation that accepts a receipt, no new egress destination and no credential (CE-5, ADR \u00a713.3)",
+    "reads_only": "one GET and nothing else; no write, no operation that accepts a receipt, no new egress destination and no credential (CE-5, ADR §13.3)",
     "source": "seeded from clearance_receipts.json inside the scenario directories the pinned synthetic manifest already hashes; read at composition time and never written (CE-7). No store, no server, no driver, no DSN",
     "sd1_entries_added": [
       "ugence_clearance_export"
@@ -231,7 +234,7 @@
       "authenticity": "UNSIGNED",
       "data_classification": "SYNTHETIC_DEMONSTRATION_ONLY"
     },
-    "confers": "nothing: a seeded receipt exercises the export path and the verifier and is evidence about serialization and integrity and nothing else. No authority granted it and it satisfies no obligation (ADR \u00a713.1)",
+    "confers": "nothing: a seeded receipt exercises the export path and the verifier and is evidence about serialization and integrity and nothing else. No authority granted it and it satisfies no obligation (ADR §13.1)",
     "authenticity_prerequisite": "TrustAnchorResolverPort exists in trusted-evidence-authority and no signing key or trust root is configured; content-addressing establishes integrity, never authenticity"
   },
   "deployment_status": {
@@ -249,7 +252,8 @@
         "simulation_provider",
         "system_registry",
         "data_use_declarations",
-        "vendor_declarations"
+        "vendor_declarations",
+        "workflow_drafts"
       ],
       "checks": "the gate's checks map, name to pass/fail",
       "result_and_failure_code": "PASS/FAIL and the gate's failure code",
@@ -273,5 +277,21 @@
     "sd1_entries_added": [],
     "screen": "/studio/status, a separate panel (MS-5); the Observe screen keeps its two labelled sources (FD-11.4)",
     "composition_record": "composition-record.json (an ai-system-registry SystemRegistration, FD-3), superseding the seam-10 clearance-export record kept byte-for-byte as composition-record.seam-10.json"
+  },
+  "workflow_drafts": {
+    "ruling": "ADR_UGENCE_AUTHORITY_PLANE_SCOPING.md section 24 BW-3A DRAFTS_AUTHORIZED_NOW: BW-3A.1 STORE_VALIDATED_IR_NOT_THE_FILE, BW-3A.2 TENANT_FROM_SERVER_CONFIGURATION, BW-3A.3 APPEND_ONLY_SUPERSESSION, BW-3A.4 REGISTRATION_LINK_REF_PLUS_DIGEST, BW-3A.5 CLAIMED_OWNER_PRESENTED_UNPROVEN; phase 3B (verified owners, directory grants, submit for approval) stays blocked on AP-3",
+    "store": "SqliteWorkflowDrafts (workflow-drafts 0.1.0) at UGENCE_STUDIO_WORKFLOW_DRAFTS_PATH, a file under the writable runtime volume /var/run/ugence-studio; no server, no driver, no DSN, no network",
+    "durability": "that of the runtime volume's mount; the prohibited persistent_database (an external database server, driver or DSN) stands",
+    "tenant_binding": "the file is bound to UGENCE_STUDIO_TENANT_ID at first open and never re-bound; the tenant of every draft is that configuration and is never accepted from the client (a caller-supplied tenant_id is a contract refusal); a file bound to another tenant is refused before bind; a read or write for another tenant is a typed refusal, never an empty answer",
+    "what_is_recorded": "the validated, normalized Workflow IR document in the studio's canonical encoding and its sha256 digest (the same digest validate_workflow reports), the declared contract version, a title, notes, the lineage (supersedes), the recording composition and the validator; never the uploaded n8n or BPMN file and never the text the operator pasted",
+    "validation": "the composer's adapter, the same call validate_workflow makes, dispatching explicitly by the declared contract version and failing closed; only a document that validates is kept; the BW-2 structural limits (1 MiB, depth 32, 200 nodes, 400 edges) apply before validation",
+    "claimed_owner": "claimed_owner_ref is a typed opaque handle recorded as PRESENTED_UNPROVEN (the package's constant claimed_owner_assurance); it confers no read, write, approval or execution authority; no identity is claimed until an enterprise issuer exists (AP-3, phase 3B)",
+    "registration_link": "optional; a link to an ai-system-registry registration is registration_ref plus registration_digest, both or neither, admitted only when the reference names a registration this deployment's own tenant-bound system registry holds and the digest is that record's digest; recorded, never resolved afterwards",
+    "lifecycle": "DRAFT, a constant of the package rather than a field: no route here approves, compiles, publishes, exports, clears or hands a draft to a runtime, and the Policy Workflow Compiler's refusal to compile a DRAFT stands because nothing here is a pack",
+    "reachable_acts": "save (the only write: append-only, a duplicate derived id refused, an inadmissible supersession refused - a predecessor must be recorded, must be the head of its lineage and the revision must change something), read (one draft with its document, lineage and successor) and list (the tenant's heads, or every revision on request); no edit, deletion, approval, compilation, publication, export, clearance or runtime consumption has a route; a draft confers nothing",
+    "contract": "v2_workflow_drafts_save, v2_workflow_drafts_list and v2_workflow_drafts_read, the eighth amendment of the frozen v2 contract (v2-A8), recorded in frozen.openapi_v2_amendment; the frozen v1 contract and its twenty approved operations are unchanged",
+    "maturity": "REFERENCE_GRADE: suitable for synthetic and demonstration content until the production identity and data-handling posture is separately verified; genuine customer workflow content is not to be kept before that verification",
+    "unset": "the Bring Your Workflow screen's draft controls report the typed gap workflow_drafts (available false); the screen's three v1 operations are unaffected",
+    "composition_record": "composition-record.json (an ai-system-registry SystemRegistration, FD-3), superseding the seam-11 deployment-status record kept byte-for-byte as composition-record.seam-11.json"
   }
 }

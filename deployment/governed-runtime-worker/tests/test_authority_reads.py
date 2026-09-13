@@ -82,7 +82,7 @@ def _ok(response):
     assert body["tenant_id"] == TENANT and body["as_of"] == NOW.isoformat()
     assert body["read_authenticated"] is False
     assert body["decision_identity_proof"] == PRESENTED_UNPROVEN
-    assert body["issuer_validation"] == "IN_PROCESS_ISSUER_ONLY"
+    assert body["issuer_validation"] == "CLOUDFLARE_ACCESS_HUMAN_WORKSPACE_GROUP_NONPROD_VALIDATED_2026_09_11_AP3_D6"
     assert "administrator loaded" in body["provenance"]
     return body
 
@@ -183,7 +183,7 @@ def test_the_decision_proof_label_follows_whether_an_identity_port_is_composed(t
         body = client.get("/authority/grants", params={"principal_id": "bob"}).json()
     assert body["decision_identity_proof"] == IDP_AUTHENTICATED
     assert body["read_authenticated"] is False, "a composed port authenticates decisions, not reads"
-    assert body["issuer_validation"] == "IN_PROCESS_ISSUER_ONLY"
+    assert body["issuer_validation"] == "CLOUDFLARE_ACCESS_HUMAN_WORKSPACE_GROUP_NONPROD_VALIDATED_2026_09_11_AP3_D6"
 
 
 def test_a_foreign_or_untyped_tenant_cannot_be_composed(tmp_path):

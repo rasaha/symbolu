@@ -1,31 +1,49 @@
 {
   "schema": "governed-runtime-worker.external-deployment-evidence.v1",
   "deployment": "governed-runtime-worker",
-  "deployment_version": "0.5.1",
+  "deployment_version": "0.5.3",
   "maturity": "REFERENCE_GRADE_SHADOW_ONLY",
-  "ruling": "CR-5 ALLOWLISTED_JWKS_HOST (ADR_UGENCE_REVIEW_SERVICE_COMPOSITION_ROOT_SCOPING.md, section 5)",
+  "ruling": "CR-5 ALLOWLISTED_JWKS_HOST (ADR_UGENCE_REVIEW_SERVICE_COMPOSITION_ROOT_SCOPING.md, section 5), as clarified 2026-09-10: internal connectivity is not vendor egress, but it must still be declared.",
   "evidence_class": "EXTERNAL_DEPLOYMENT_EVIDENCE",
-  "evidence_class_note": "The egress rule is platform configuration outside this process and is recorded here as such. It is not application behaviour: the worker's only outbound connection is the JWKS fetch its identity adapter makes to UGENCE_REVIEW_IDENTITY_JWKS_URL over HTTPS, and nothing in the application enforces the allowlist. A deployment that does not configure the platform rule has no egress control and must say so.",
+  "evidence_class_note": "The egress rule is platform configuration outside this process and is recorded here as such. It is not application behaviour: nothing in the application enforces the allowlist, and a deployment that does not configure the platform rule has no egress control and must say so. SUPERSEDED 2026-09-10: this note previously said the worker's only outbound connection is the JWKS fetch. That was false in the deployment it described. The worker also dials PostgreSQL at boot for its application and DBOS durable state (composition.py:223-260). PostgreSQL is outbound network connectivity even when addressed through postgres.railway.internal, and it is declared below rather than excused by redefining it as something other than egress.",
   "permitted_egress": [
     {
       "purpose": "JWKS retrieval by the approver identity adapter (AI-C, IA-3)",
-      "host": null,
-      "host_note": "the host component of UGENCE_REVIEW_IDENTITY_JWKS_URL, filled in by the owner when the issuer is provisioned; null until then",
+      "host": "ugence.cloudflareaccess.com",
+      "host_note": "the host component of UGENCE_REVIEW_IDENTITY_JWKS_URL: designated by the owner on 2026-09-11 as the Cloudflare Access team domain (AP3_ENTERPRISE_ISSUER_VALIDATION.json designation.jwks_trust); recorded here as the one permitted JWKS host and enforced by platform configuration, not by the application",
       "scheme": "https",
       "verification": "default TLS verification; never disabled"
+    },
+    {
+      "purpose": "the application database, for DBOS durable state and the adapter's schema (CR-1, RW-5)",
+      "host": null,
+      "host_note": "the host component of UGENCE_REVIEW_APP_DATABASE_URL, a private persistence endpoint the owner configures; null until then",
+      "scheme": "postgresql",
+      "verification": "RW-5's encrypted, certificate-verified connection is policy ahead of the code: validate() tests the DSN prefix only, so a plaintext DSN passes [G]"
+    },
+    {
+      "purpose": "the DBOS system database, which must differ from the application database (RW-5)",
+      "host": null,
+      "host_note": "the host component of UGENCE_REVIEW_SYSTEM_DATABASE_URL, a private persistence endpoint the owner configures; null until then",
+      "scheme": "postgresql",
+      "verification": "as above [G]"
     }
   ],
   "forbidden_egress": [
     "the issuer's discovery document (no OIDC discovery, IA-3)",
     "docker.io or any registry (the worker image is built elsewhere; the mirror ruling applies)",
     "any model, agent, cloud or tool SDK endpoint (none is imported)",
+    "the Model Egress Unit, in either its ratified pull design or any other shape: the worker opens no connection to it (SPEC_MODEL_EGRESS_UNIT.md section 3)",
+    "any model provider (D-2 SEPARATE_EGRESS_UNIT keeps vendor access outside this unit entirely)",
+    "any other private service, however reachable; a private address is not an authorization",
+    "the public internet",
     "the Governance Studio (the worker never calls the studio; the studio calls the worker)"
   ],
   "inbound": {
     "listener": "one private TLS listener, UGENCE_REVIEW_BIND_HOST:UGENCE_REVIEW_PORT (default 8444)",
     "reachable_from": "the Governance Studio's network segment only (CR-3)",
     "authentication": "no gate of its own; an identity port is mandatory in production and every decision requires a proof (CR-3, AI-A)",
-    "routes": "the review service's six routes: four reads, the decision relay, and since 0.2.0 the start relay POST /review/runs (front-door ruling FD-10.2), which starts this deployment's own shadow workflow under its own definition digest and takes nothing from the caller but a typed correlation id (FD-10.3); since 0.3.0 also the ledger read GET /review/audit/{correlation_id} (front-door ruling FD-11.3), which returns this deployment's own tenant's audit-ledger rows for one correlation id, raw and in chain order, with the chain verification as a typed field; a chain that does not verify is a typed refusal with the entries withheld; since 0.4.0 also the authority plane's four reads under /authority/ (ADR_UGENCE_AUTHORITY_PLANE_SCOPING.md AP-5 READS_FIRST): grants for a principal, holders of a role, a committee report and a grant's event history, each for this deployment's own tenant, unauthenticated, labelled with the decision proof the deployment can give; no write of the plane is served: the two directory writes POST /authority/grants and POST /authority/grants/{grant_id}/revoke are implemented since 0.5.0 (section 16, AW-2 to AW-5: recorded only for an IDP_AUTHENTICATED human subject of this tenant presented on X-Ugence-Approver-Proof, refused with a typed reason otherwise) and since 0.5.1 are not registered on the composed app (section 18: the owner reversed AW-1; AP-3 controls, and no write is served until the identity adapter is validated end to end against a real enterprise issuer); the in-process issuer evidence is implementation and conformance evidence only; a write path answers 405 or 404; activate and issue are never served"
+    "routes": "the review service's six routes: four reads, the decision relay, and since 0.2.0 the start relay POST /review/runs (front-door ruling FD-10.2), which starts this deployment's own shadow workflow under its own definition digest and takes nothing from the caller but a typed correlation id (FD-10.3); since 0.3.0 also the ledger read GET /review/audit/{correlation_id} (front-door ruling FD-11.3), which returns this deployment's own tenant's audit-ledger rows for one correlation id, raw and in chain order, with the chain verification as a typed field; a chain that does not verify is a typed refusal with the entries withheld; since 0.4.0 also the authority plane's four reads under /authority/ (ADR_UGENCE_AUTHORITY_PLANE_SCOPING.md AP-5 READS_FIRST): grants for a principal, holders of a role, a committee report and a grant's event history, each for this deployment's own tenant, unauthenticated, labelled with the decision proof the deployment can give; no write of the plane is served: the two directory writes POST /authority/grants and POST /authority/grants/{grant_id}/revoke are implemented since 0.5.0 (section 16, AW-2 to AW-5: recorded only for an IDP_AUTHENTICATED human subject of this tenant presented on X-Ugence-Approver-Proof, refused with a typed reason otherwise) and since 0.5.1 are not registered on the composed app (section 18: the owner reversed AW-1; AP-3 controls, and no write is served until the identity adapter is validated end to end against a real enterprise issuer); the in-process issuer evidence is implementation and conformance evidence only; a write path answers 405 or 404; activate and issue are never served; since 0.5.2 the write gate carries two default-off seams for the AP-3 validation slice (section 20.7, AP3-D4 and AP3-D5): a Cloudflare transport boundary that reads Cf-Access-Jwt-Assertion through the identity adapter's cloudflare-access profile and emits the plane's normalized identity, and an AX-5 writer-authorizer stage; composition.py constructs neither, so the composed app is unchanged and still serves no write"
   },
   "secrets_held": [
     "UGENCE_REVIEW_APP_DATABASE_URL",
@@ -52,6 +70,8 @@
     "exposed_ports": [
       "8444/tcp"
     ],
-    "secrets_in_layers": "none; the two DSNs are environment at run time only and the image-layer secret scan is a gate"
-  }
+    "secrets_in_layers": "none; the two DSNs are environment at run time only and the image-layer secret scan is a gate",
+    "runtime_user_note": "Established by entrypoint.py, which holds root only to chown the mounted data directory and then drops groups, gid and uid, verifying that root is unreachable before exec'ing the worker. The image carries no USER instruction: one would have already dropped and could not chown a volume the platform mounts as root. A drop that does not verify exits non-zero rather than running the worker as root."
+  },
+  "permitted_egress_note": "Three destinations, and adding a fourth requires a separate CR-family amendment. The JWKS endpoint and the two private persistence endpoints are the whole of what this worker may connect to."
 }

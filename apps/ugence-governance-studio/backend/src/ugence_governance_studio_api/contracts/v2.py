@@ -278,3 +278,33 @@ class VendorDeclareRequest(StrictModel):
     declared_by: str = ""
     correlation_id: str = ""
     notes: str = ""
+
+
+# --------------------------------------------------------------------------- #
+# Workflow drafts (Bring Your Workflow phase 3A, ADR_UGENCE_AUTHORITY_PLANE_SCOPING §24)
+# --------------------------------------------------------------------------- #
+class WorkflowDraftSaveRequest(StrictModel):
+    """Keep one validated Workflow IR document as an unapproved draft for this
+    deployment's tenant (typed intake only, FD-4).
+
+    No ``tenant_id`` (the deployment's, never the caller's), no ``draft_id`` (derived by
+    the package, never chosen), no ``recorded_by`` (the deployment's name and version),
+    no ``lifecycle`` (the constant ``DRAFT``). ``claimed_owner_ref`` is an opaque handle
+    recorded as ``PRESENTED_UNPROVEN``; ``registration_ref`` and ``registration_digest``
+    link an existing AI-system registration by reference plus digest, both or neither;
+    ``supersedes`` names the draft this revision replaces. The document is validated by
+    the composer's adapter before anything is kept, and what is kept is its canonical
+    encoding, never the text that was brought.
+    """
+
+    workflow: Dict[str, Any]
+    contract_version: str = Field(min_length=1, max_length=32)
+    title: str = Field(min_length=1, max_length=200)
+    claimed_owner_ref: str = Field(default="", max_length=512)
+    registration_ref: str = Field(default="", max_length=512)
+    registration_digest: str = Field(default="", max_length=64)
+    supersedes: str = Field(default="", max_length=64)
+    notes: str = Field(default="", max_length=2000)
+    #: The client's own canonical digest of the document, compared with the server's
+    #: and reported back; never trusted over the server's computation.
+    source_digest: Optional[str] = Field(default=None, max_length=128)

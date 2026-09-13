@@ -125,11 +125,156 @@ bundle. The same switch never enables LIVE execution: `ENFORCEMENT_ENABLED` stay
 
 | # | Ruling |
 |---|---|
-| **CR-1** | **`SEPARATE_WORKER_UNIT`.** A companion deployment unit, the governed runtime worker, hosts the DBOS engine, the runtime host, the three SQLite stores and the review service. The P3E container is not extended and the studio backend composes nothing. |
+| **CR-1** | **`SEPARATE_WORKER_UNIT`.** A companion deployment unit, the governed runtime worker, hosts the DBOS engine, the runtime host, the three SQLite stores and the review service. The P3E container is not extended and the studio backend composes nothing. **Amended 2026-09-11 under `ADR_UGENCE_LIVE_MODEL_PROVIDER_COMMISSIONING.md` LP-1:** two named companion deployment units, the governed runtime worker and the Model Egress Unit; see the CR-1 amendment block below. |
 | **CR-2** | **`AMEND_P3E_SERVE_V2`.** The P3E profile gains one configuration value, `UGENCE_STUDIO_REVIEW_SERVICE_URL`, and serves the combined v1 and v2 application under its existing gate; `approved-runtime-config` and its freeze test are amended to say so. **Amended 2026-09-06 under `ADR_UGENCE_STUDIO_FRONT_DOOR_SCOPING.md` FD-10.4 (`ONE_STEP_AMENDMENT`):** the permitted route set over that one destination is six, the five review routes plus `POST /review/runs`, the relayed start of the worker's own shadow run (FD-10.1 to FD-10.3); the egress record, its freeze test, the studio's review client and the frontend manifest name all six; no second configuration value, credential or destination. **Amended again 2026-09-06 under FD-11.5 (`READ_ONLY_ONE_STEP_AMENDMENT`):** seven routes, the seventh `GET /review/audit/{correlation_id}`, a raw read of the worker's own tenant's audit-ledger rows by correlation id with the worker's chain verification (FD-11.3); read-only, no write route; still one destination, no configuration value, credential or package. |
 | **CR-3** | **`PRIVATE_NETWORK_TLS_IDENTITY_MANDATORY`.** The worker's listener binds the private segment only, over TLS, and in production mode an identity port is mandatory. No second access gate and no second credential. |
-| **CR-4** | **`ONE_DEPLOYMENT_MODE_SWITCH`.** `UGENCE_REVIEW_DEPLOYMENT_MODE=production` sets every production switch together and refuses any fixture adapter, in-memory store or non-authoritative bundle at composition. It certifies nothing and enables no LIVE execution. |
-| **CR-5** | **`ALLOWLISTED_JWKS_HOST`.** The worker's only egress is the configured JWKS host over HTTPS, as platform configuration recorded as `EXTERNAL_DEPLOYMENT_EVIDENCE`; no discovery document, no docker.io, nothing else. |
+| **CR-4** | **`ONE_DEPLOYMENT_MODE_SWITCH`.** `UGENCE_REVIEW_DEPLOYMENT_MODE=production` sets every production switch together and refuses any fixture adapter, in-memory store or non-authoritative bundle at composition. It certifies nothing and enables no LIVE execution. **Amended 2026-09-10 under `OWNER_RATIFICATION_LIVE_MODEL_PROVIDER.md` D-2 (`SEPARATE_EGRESS_UNIT`):** the mode continues to certify nothing and to enable no LIVE execution, and that is unchanged by the existence of a Model Egress Unit; setting it does not commission an MEU, admit a model-provider credential to any unit, or authorize a genuine provider call. The switch governs the worker's composition only — it is not a deployment-wide LIVE switch and must not be implemented or documented as one. A genuine provider call stays blocked by D-3 until credential custody, rotation, an audit trail and a named custody owner are separately commissioned, and by §6's ceiling until AI-E, the external security review and the mirror are cleared. |
+| **CR-5** | **`ALLOWLISTED_JWKS_HOST`.** The worker's only egress is the configured JWKS host over HTTPS, as platform configuration recorded as `EXTERNAL_DEPLOYMENT_EVIDENCE`; no discovery document, no docker.io, nothing else. **Clarified 2026-09-10** — see the subsection below: three declared destinations, PostgreSQL named rather than renamed. **Amended 2026-09-10 under `OWNER_RATIFICATION_LIVE_MODEL_PROVIDER.md` D-2 (`SEPARATE_EGRESS_UNIT`):** the worker's permitted destinations are unchanged, and it still may not connect to the Model Egress Unit, to model providers, to arbitrary private services or to the public internet; the MEU still may not connect to the worker. The Model Egress Unit, as a distinct deployment unit, carries its **own** egress record under this family, as its own `EXTERNAL_DEPLOYMENT_EVIDENCE` and never merged into the worker's, with exactly two permitted destinations: the model-egress exchange schema over its own database role and credential under the grants ratified in `OWNER_RATIFICATION_MEU_EXCHANGE_TENANCY.md` — never the worker's application schema, `runtime_events` or DBOS-owned tables — and approved model provider endpoints, only where a credential has been commissioned for the named provider; where none has, the unit composes, claims work and refuses the call. Everything else is forbidden to it, including the worker's listener, the authority plane, the studio and the console. A destination beyond these two requires a further CR-family amendment, on the same terms as the worker's. Two units, two records, one rule: a boundary is narrowed by naming what crosses, never by renaming it. |
+
+#### CR-5 clarification, 2026-09-10 — internal connectivity is not vendor egress, but it must still be declared
+
+> Supersede the statement that the worker has only one outbound connection. The worker
+> currently initiates:
+>
+> - JWKS retrieval to its ratified identity endpoint;
+> - PostgreSQL connections for application and DBOS durable state.
+>
+> PostgreSQL is outbound network connectivity even when addressed through
+> `postgres.railway.internal`. It must appear explicitly in the deployment evidence and
+> network allowlist; do not hide it by redefining it as "not egress."
+>
+> CR-5's security boundary is clarified as:
+>
+> - the worker may connect only to its approved JWKS endpoint and explicitly configured
+>   private PostgreSQL persistence endpoints;
+> - it may not connect to the MEU, model providers, arbitrary private services or the
+>   public internet;
+> - adding any new destination requires a separate CR-family amendment.
+>
+> The asynchronous MEU design may use the existing PostgreSQL/DBOS connection for an
+> authorized-request outbox only if this introduces no additional network destination.
+> Schema, authorization and tenancy changes to that outbox remain separately reviewable.
+> — owner, 2026-09-10
+
+This clarification was prompted by a finding recorded in `SPEC_MODEL_EGRESS_UNIT.md` §3.1:
+`EXTERNAL_DEPLOYMENT_EVIDENCE.json` claimed the JWKS fetch was the worker's only outbound
+connection while the worker had been dialling PostgreSQL since it first composed
+(`composition.py:223-260`) `[V]`. The record now declares three destinations rather than
+one, and the ruling's refusal to solve the problem by redefining the word is the substance
+of it: the boundary is narrowed by naming what crosses, never by renaming it.
+
+
+#### CR-4 and CR-5 amendments for the Model Egress Unit, 2026-09-10 — **RATIFIED**
+
+D-2 `SEPARATE_EGRESS_UNIT` (`OWNER_RATIFICATION_LIVE_MODEL_PROVIDER.md`) placed the vendor
+call in a second deployment unit and recorded that the amendments it requires to CR-5 and
+CR-4 are **owner acts, not consequences of the specification**. Both were ratified on
+2026-09-10 and are now carried inline on the CR-4 and CR-5 cells of §5, in this ADR's
+amendment convention. The audit behind them, and the one gap they do not close, follow.
+
+##### What each ruling says, and what actually contradicts it
+
+**CR-4** as ratified `[V]` (§5 above): *"`UGENCE_REVIEW_DEPLOYMENT_MODE=production` sets every
+production switch together and refuses any fixture adapter, in-memory store or
+non-authoritative bundle at composition. It certifies nothing and enables no LIVE
+execution."*
+
+**Nothing contradicts it today** `[V]`. D-3 `NO_CREDENTIAL_IN_THIS_DEPLOYMENT` forbids a
+genuine provider call, so no LIVE execution occurs and the clause holds. The risk CR-4 needs
+guarding against is a *future misreading*: once an MEU exists, a reader may take
+`production` as the switch that turns it on. It is not, and §6's ceiling already names what
+LIVE waits on — AI-E, the external security review and the mirror `[V]`. The draft below
+therefore **narrows** CR-4 rather than relaxing it.
+
+**CR-5** as ratified `[V]`, and as clarified on 2026-09-10 (above): the worker may connect
+only to its approved JWKS endpoint and its configured private PostgreSQL endpoints; it may
+not connect to the MEU, model providers, arbitrary private services or the public internet.
+
+**The MEU does not contradict CR-5 either — it falls outside it** `[V]`. Every clause of the
+CR family is written about *the worker*: CR-3 is "the worker's listener", CR-5 is "the
+worker's only egress", and the prohibitions of §5 read "no credential beyond the database
+DSNs **in the worker**". The MEU's own destinations — the exchange schema and approved
+provider endpoints (`SPEC_MODEL_EGRESS_UNIT.md` §5.1) — are governed by nothing. That is the
+gap, and it is not closed by weakening the worker's three destinations, which the draft below
+leaves exactly as they are.
+
+##### `[G]` — the gap neither draft closes, and which is prior to both
+
+**CR-1 `SEPARATE_WORKER_UNIT` authorizes one companion deployment unit, named** `[V]`: *"A
+companion deployment unit, the governed runtime worker, hosts…"*. The MEU is a **second**
+companion unit, and no ruling of this family authorizes its existence. Amending CR-5 to
+declare the egress of a unit CR-1 does not admit would record a boundary around something
+unauthorized.
+
+No amendment text for CR-1 is proposed here — it was outside the drafting request and outside
+the ratification of 2026-09-10, which covered CR-4 and CR-5 only. Stated plainly so the
+sequencing stays visible: **the two amendments above declare the egress of a unit CR-1 does
+not yet admit.** Until CR-1 is amended, the MEU's boundary is specified and the MEU's
+existence is not, and no deployment may treat the CR-5 amendment as authorization to run a
+second unit.
+
+##### CR-4 amendment, as ratified
+
+> **Amended 2026-09-10 under `OWNER_RATIFICATION_LIVE_MODEL_PROVIDER.md` D-2
+> (`SEPARATE_EGRESS_UNIT`):** `UGENCE_REVIEW_DEPLOYMENT_MODE=production` continues to
+> certify nothing and to enable no LIVE execution, and **that is unchanged by the existence
+> of a Model Egress Unit**. Setting the mode does not commission an MEU, does not admit a
+> model-provider credential to any unit, and does not authorize a genuine provider call. The
+> mode switch governs the worker's composition only; it is not a deployment-wide LIVE
+> switch and must not be implemented or documented as one. A genuine provider call remains
+> blocked by D-3 until credential custody, rotation, an audit trail and a named custody
+> owner are separately commissioned, and by §6's ceiling until AI-E, the external security
+> review and the mirror are cleared.
+
+##### CR-5 amendment, as ratified
+
+> **Amended 2026-09-10 under `OWNER_RATIFICATION_LIVE_MODEL_PROVIDER.md` D-2
+> (`SEPARATE_EGRESS_UNIT`):** the worker's permitted destinations are **unchanged** — its
+> approved JWKS endpoint and its explicitly configured private PostgreSQL persistence
+> endpoints, and nothing else. The worker still may not connect to the Model Egress Unit,
+> to model providers, to arbitrary private services or to the public internet, and the MEU
+> still may not connect to the worker.
+>
+> The Model Egress Unit, as a distinct deployment unit, carries its **own** egress record
+> under this family, recorded as its own `EXTERNAL_DEPLOYMENT_EVIDENCE` and not merged into
+> the worker's. Its permitted destinations are exactly two:
+>
+> - the model-egress exchange schema, over its own database role and credential, under the
+>   grants ratified in `OWNER_RATIFICATION_MEU_EXCHANGE_TENANCY.md` — never the worker's
+>   application schema, `runtime_events` or DBOS-owned tables;
+> - approved model provider endpoints, **only where a credential has been commissioned for
+>   the named provider**; where none has, the unit composes, claims work and refuses the
+>   call.
+>
+> Everything else is forbidden to it, including the worker's listener, the authority plane,
+> the studio and the console. A destination beyond these two requires a further CR-family
+> amendment, on the same terms as the worker's.
+>
+> Two units, two records, one rule: a boundary is narrowed by naming what crosses, never by
+> renaming it.
+
+##### CR-1 amendment, as ratified (2026-09-11)
+
+> **Amended 2026-09-11 under `ADR_UGENCE_LIVE_MODEL_PROVIDER_COMMISSIONING.md` LP-1:**
+> CR-1 admits exactly **two** named companion deployment units: the governed runtime
+> worker, as before, and the **Model Egress Unit**. Each carries its own egress record,
+> image, credentials and gate set. The worker retains its existing egress restriction
+> without change. Only the Model Egress Unit may contact the designated model-provider
+> host, `api.openai.com`, at the designated endpoint, and only where a credential has
+> been commissioned for it under LP-2. This amendment admits no other deployment unit and
+> no other destination; a third unit or a further destination requires a further
+> CR-family amendment on the same terms.
+
+This closes the `[G]` named above: the MEU's existence is now admitted as well as its
+boundary. It builds, commissions and credentials nothing.
+
+##### What ratifying these did and did not do
+
+It placed the MEU's egress under the same family that governs the worker's, and pinned
+`production` as a composition switch rather than a LIVE switch. It did **not** commission the
+unit, create the credential, build the exchange, or satisfy any gate: `SPEC_MODEL_EGRESS_UNIT.md`
+§8 lists thirteen unbuilt mechanisms, and this changed none of them.
+
 
 Ruled alongside, on evidence: **`SEPARATE_P3E_EQUIVALENT_EVIDENCE`**. The worker image
 gets its own P3E-equivalent gate set and evidence manifest; the studio profile is not
@@ -267,7 +412,7 @@ The ruling, in the owner's terms:
 | RW-1 | `config.py:36-55` tests `is_unspecified` before `is_private`, so `::` is refused and a unique-local address passes; a hostname is refused outright, so no `*.internal` name is a bind value. `config.py:158-162` raises the CR-3 refusal in production. `config.py:1-6` states that nothing is discovered, which is why bind-by-discovery would be a change and not a configuration. | `[V]` |
 | RW-2 | `CONTAINER_GATE_SET.json` is `DEFINED_NOT_RATIFIED` and `NOT_EXECUTED`; eight of ten gates halt at `RESOURCE_BLOCKER_MIRROR_UNCONFIGURED`. `BASE_IMAGE_MIRROR_DECISION.json` carries `registry_host`, `repository_prefix` and `secret_name` as `null`. A host that builds from the `Dockerfile` pulls the base from docker.io, the first entry of this gate set's `never` list. | `[V]` |
 | RW-3 | `config.py:163-170` requires a readable certificate and key in production and refuses a plain listener. Nothing verifies that certificate. | `[V]` |
-| RW-4 | `config.py:172-181` requires issuer, audience and an `https` JWKS URL in production; `composition.py:149-150` refuses composition without an identity port; every authority read carries `PRESENTED_UNPROVEN` and `IN_PROCESS_ISSUER_ONLY` until AP-3's validation is recorded. | `[V]` |
+| RW-4 | `config.py:172-181` requires issuer, audience and an `https` JWKS URL in production; `composition.py:149-150` refuses composition without an identity port; every authority read carries `PRESENTED_UNPROVEN` and the adapter's `ISSUER_VALIDATION` label (`IN_PROCESS_ISSUER_ONLY` when this was written; the scoped Cloudflare label since adapter 0.1.4, which describes the package's validation, never this deployment's composition) until AP-3's validation is recorded. | `[V]` |
 | RW-5 | `config.py:139-147` requires both DSNs, requires the `postgresql` prefix and requires them to differ; `composition.py:221-229` hands them to DBOS as the system and application databases. | `[V]` |
 | RW-6 | `composition.py:205-217` opens the authority directory, the approval ledger and the audit ledger as three SQLite files under `data_dir`. The image declared that path a volume until 2026-09-09; the `VOLUME` instruction was removed because Railway rejects it, so the single-instance property now rests on the platform-managed volume an operator attaches, which the image does not require and no test pins. | `[V]` for the three stores; `[G]` for the constraint |
 

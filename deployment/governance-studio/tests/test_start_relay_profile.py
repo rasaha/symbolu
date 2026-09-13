@@ -269,7 +269,9 @@ def test_the_egress_record_names_six_routes_one_destination_and_the_frontend_man
                                                    "UGENCE_STUDIO_SYSTEM_REGISTRY_PATH"], "seam 6 added no value (FD-10.4)"
     assert list(cfg["configuration_added"])[6:] == [
         "UGENCE_STUDIO_DATA_USE_DECLARATIONS_PATH",
-        "UGENCE_STUDIO_VENDOR_DECLARATIONS_PATH"], "later values belong to seams 8 and 9"
+        "UGENCE_STUDIO_VENDOR_DECLARATIONS_PATH",
+            "UGENCE_STUDIO_WORKFLOW_DRAFTS_PATH"], \
+        "later values belong to seams 8 and 9 and to phase 3A (workflow drafts, BW-3A)"
     assert cfg["first_party_packages_in_image"][:13][-1] == "packages/integration/ai-system-registry"
     # Membership, not the whole tail: a later seam appends its own packages and
     # the two named here stay in the image either way.

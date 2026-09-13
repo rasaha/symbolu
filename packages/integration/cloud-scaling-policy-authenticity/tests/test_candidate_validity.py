@@ -198,14 +198,21 @@ def test_an_instant_after_the_recommendation_expires_is_refused():
 def test_an_expired_decision_is_refused_independently_of_the_recommendation_window():
     """A live recommendation can carry a dead decision, so the two are checked separately.
 
-    The fixture's decision outlives its recommendation, so the ordering cannot be reached by
-    choosing an instant — the candidate has to state it.
+    The genuine fixture's decision bound cannot be reached by choosing an instant — the
+    candidate has to state it — which is why the short decision below is synthesized.
+
+    That premise used to hold because the decision *outlived* the recommendation
+    (``>``). Under RA 0.13.0's T-2 cap it holds for the stronger reason that the decision
+    can no longer outlive the subject assertion that authorized it at all: the two bounds
+    now coincide (``==``), so the assertion is ``>=``. Either way no instant separates
+    them, and the separation this test exists to prove is still proved by the synthesized
+    case below.
     """
 
     authority, record, candidate = _pair()
-    assert candidate.decision_expires_at_fact > candidate.subject_valid_until_fact, (
-        "the fixture's decision outlives its recommendation; this test exists because that "
-        "makes the decision bound unreachable by instant choice alone"
+    assert candidate.decision_expires_at_fact >= candidate.subject_valid_until_fact, (
+        "the fixture's decision does not expire before its recommendation; this test "
+        "exists because that makes the decision bound unreachable by instant choice alone"
     )
     short = _with_times(
         candidate,

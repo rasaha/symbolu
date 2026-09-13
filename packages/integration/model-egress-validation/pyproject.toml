@@ -1,0 +1,54 @@
+# Ugence Model Egress Validation — the offline step-7 artifacts LP-7 ruling 11 permits.
+#
+#   THIS DISTRIBUTION OPENS NO NETWORK CONNECTION AND HOLDS NO CREDENTIAL.
+#   IT MARKS NO INFRASTRUCTURE-DEPENDENT VALIDATION ROW AS PASSED.
+#
+# What it carries: the validation harness over the eighteen-row matrix with injected
+# fake components; the fake-transport cases; the negative-test matrix; the redacted
+# report generator; the drift checks between the records beside the unit and the code;
+# secret-shape scanning. The `live` command exists only to refuse: it names every
+# undesignated step-8 value and exits, because no live transport exists and the
+# owner-run verifier may not execute until every designation is supplied and
+# independently checked (LP-7 rulings 11 and 12).
+#
+# Dependency direction (one-way; neither the unit nor the adapter imports this):
+#     ugence-model-egress-unit, ugence-model-egress-provider-openai
+#         ▲
+#     ugence-model-egress-validation (this package)
+#
+# Build:   python -m build packages/integration/model-egress-validation
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ugence-model-egress-validation"
+dynamic = ["version"]
+description = "Ugence Model Egress Validation — the offline step-7 artifacts for commissioning a live model provider: the eighteen-row harness over injected fake components, the negative-test matrix, a redacted report generator, drift checks and secret-shape scanning. Opens no network connection, holds no credential, and marks no infrastructure-dependent row as passed."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "Proprietary" }
+authors = [{ name = "Rakesh Mohan" }]
+keywords = ["governance", "egress", "model", "validation", "commissioning", "ugence"]
+classifiers = ["Typing :: Typed"]
+dependencies = [
+    "ugence-model-egress-unit>=0.5.0",
+    "ugence-model-egress-provider-openai>=0.2.0",
+]
+
+[project.optional-dependencies]
+test = ["pytest>=7.0"]
+
+[tool.setuptools.dynamic]
+version = { attr = "ugence_model_egress_validation.version.__version__" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["ugence_model_egress_validation*"]
+
+[tool.setuptools.package-data]
+ugence_model_egress_validation = ["py.typed"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"

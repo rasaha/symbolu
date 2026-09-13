@@ -13,6 +13,7 @@ import pathlib
 import pytest
 
 from _producer_fixtures import repo_root as _repo_root
+from _tree_guard import tree_was_modified
 
 import phase5a_fixtures as P5A
 from _producer_fixtures import AS_OF, build_attestation, build_verifier
@@ -183,31 +184,39 @@ def test_the_v1_attestation_object_is_not_admitted_by_the_v2_verifier(candidate)
 
 
 def test_no_phase_5a_source_file_was_modified():
-    """P-11: this package's tree adds files; it edits none of Phase 5A's."""
+    """P-11: this package's tree adds files; it edits none of Phase 5A's.
 
-    import subprocess
+    Both halves are checked — pending *and* committed on this branch. Until ``d46cf6cb``
+    this asked only ``git status --porcelain``, which observes the workspace, so the same
+    edit was caught while pending and invisible once committed. See ``_tree_guard`` for
+    why an unresolvable base fails rather than skips.
 
-    changed = subprocess.run(
-        ["git", "status", "--porcelain", "--", str(PHASE_5A_DIR)],
-        cwd=str(REPO),
-        capture_output=True,
-        text=True,
-    ).stdout.strip()
+    **This is a change-scope guard, not a freeze.** Its promise is "this change did not
+    edit those packages" — never "those packages are permanently frozen". So it carries no
+    allow-list and grants no standing exemption: a branch that legitimately edits the
+    Phase 5A tree makes this guard report the truth, and the right response is to justify
+    the edit in review, not to add an entry that silences it forever.
+
+    An earlier revision of this file did carry such a list, for the ratified T-2 re-freeze
+    at ``d46cf6cb``. It was removed on owner ruling: a permanent exemption never expires,
+    is never re-examined, and quietly widens the guard for every change that follows. The
+    ratification record for that re-freeze lives where it belongs — the
+    ``SUPERSEDED_PRE_T2_*`` negative anchors in Phase 5A's own ``test_frozen_digests.py``.
+    """
+
+    changed = tree_was_modified(REPO, PHASE_5A_DIR)
     assert changed == "", f"Phase 5A tree was modified:\n{changed}"
 
 
 def test_the_controller_package_was_not_modified():
-    """P-12: the Cloud Scaling Controller stays a key-free advisory leaf, byte for byte."""
+    """P-12: the Cloud Scaling Controller stays a key-free advisory leaf, byte for byte.
 
-    import subprocess
+    Same shape and same reasoning as P-11 above. No authorized edit is on record for this
+    tree.
+    """
 
     controller = REPO / "packages" / "capabilities" / "cloud-scaling-controller"
-    changed = subprocess.run(
-        ["git", "status", "--porcelain", "--", str(controller)],
-        cwd=str(REPO),
-        capture_output=True,
-        text=True,
-    ).stdout.strip()
+    changed = tree_was_modified(REPO, controller)
     assert changed == "", f"the controller tree was modified:\n{changed}"
 
 
@@ -238,7 +247,7 @@ PHASE_5A_FROZEN_DIGESTS = {
     ),
     # Moved by R-12b: the decision snapshot gained ``evaluated_at``.
     "decision_digest": (
-        "sha256:6aba137d8d2c057d768b1243469636e4c1137037883adfb9a078c9a3fbbf0ca2"
+        "sha256:4636dee22546d8f801f1da9482fc85c78c991e44368ea6207ea3f0fb012e1ed6"
     ),
     "producer_signing_payload_digest": (
         "sha256:1035d2fc2ab8f4b443f815562f9f6ad8e4ce0032633f03a12e04e691c24cf2d0"
@@ -256,7 +265,7 @@ PHASE_5A_FROZEN_DIGESTS = {
     # ``decision_snapshot_digest``, so the candidate digest moved beneath an unchanged
     # field set.
     "candidate_digest": (
-        "sha256:357bb3d4d660034c9abe50000986808a1e9c15fce05b4a22b6cb82836cc50e79"
+        "sha256:7ffeefce768d3fbfb23a0d3ed0be2a028e222b26d84767d392455b9f76d1e930"
     ),
 }
 

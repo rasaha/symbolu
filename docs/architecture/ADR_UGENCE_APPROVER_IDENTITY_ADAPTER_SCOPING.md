@@ -113,3 +113,28 @@ AI-D shipped (`ADR_UGENCE_APPROVER_IDENTITY_SCOPING.md` §6). Fact 9, the compos
 root, is scoped in `ADR_UGENCE_REVIEW_SERVICE_COMPOSITION_ROOT_SCOPING.md`, awaiting
 rulings CR-1 to CR-5. Enterprise-issuer validation of this adapter waits on an
 owner-provisioned issuer and is not claimed.
+
+## 8 — Amendment: the Cloudflare Access issuer profile (owner rulings AP3-D1 to AP3-D3, 2026-09-11) `[V]`
+
+The owner designated Cloudflare Access (team `ugence`, backed by Google Workspace) as
+the AP-3 enterprise issuer and ratified three rulings in
+`ADR_UGENCE_AUTHORITY_PLANE_SCOPING.md` §20.7 that touch IA-1 and IA-4. They are applied
+in release 0.1.2 as one issuer profile, and they change nothing for any other issuer.
+
+| Ruling | Amends | How, and how narrowly |
+|---|---|---|
+| AP3-D1 | IA-1 | `AdapterConfig.issuer_profile` is `rfc9068` by default (IA-1 exactly). The one other value, `cloudflare-access`, is structurally tied to an issuer of exactly `https://<team>.cloudflareaccess.com` and that team's `/cdn-cgi/access/certs`; under it the header `typ` must be exactly `JWT` (`Refusal.TYP_NOT_PROFILE_TYPE` otherwise, `at+jwt` included). IA-2 and IA-3 are untouched. |
+| AP3-D2 | IA-4 (tenant) | Under the profile `tenant_claim` must be unset; the tenant is the configured `bound_tenant`, selected by the verified issuer-and-audience pair and corroborated by a verified `email` whose domain (NFC, trimmed, case-insensitive) is exactly `verified_email_domain` (`Refusal.EMAIL_DOMAIN_MISMATCH`). A static mapping, never a derivation; no top-level claim is read. |
+| AP3-D3 | IA-4 (actor type) | Under the profile `actor_type_claim` must be unset; `HUMAN` is the shape non-empty `sub` + verified-domain `email` + no `common_name`; the service-token shape (`common_name`, empty or absent `sub`, no `email`) is `SYSTEM` with `common_name` as subject and no tenant; everything else is `Refusal.ACTOR_SHAPE_AMBIGUOUS`. `type: app` decides nothing. `sub` is therefore not a decode-time requirement under the profile (`CLOUDFLARE_REQUIRED_CLAIMS`); the shape mapping decides what its absence means. |
+
+The §5 prohibitions stand in full. `ISSUER_VALIDATION` stayed `IN_PROCESS_ISSUER_ONLY`
+while the profile was conformance-tested in `tests/test_cloudflare_access_profile.py` and
+in the worker's AP-3 harness against the in-process issuer only. The owner accepted the
+AP-3 record on 2026-09-11 (`ADR_UGENCE_AUTHORITY_PLANE_SCOPING.md` §20.7), and release
+0.1.4 moved the label to `CLOUDFLARE_ACCESS_HUMAN_WORKSPACE_GROUP_NONPROD_VALIDATED_2026_09_11_AP3_D6`
+with `ISSUER_VALIDATION_SCOPE` beside it: Cloudflare Access; human identities through the
+designated Google Workspace group; a non-production application; AP3-D6; service
+identities not commissioned; `production_certified: False`. `MATURITY` and
+`ENFORCEMENT_ENABLED` are unchanged. The service-token shape is stated from Cloudflare's
+documentation `[I]` and is confirmed or amended from the owner's redacted live-token
+capture before any live row is marked passed.

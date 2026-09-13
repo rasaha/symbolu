@@ -60,7 +60,7 @@ what may be deployed on a managed cloud host and what may be claimed of it.
 | RW-1 `DEFER_PENDING_NETWORK_PROOF` | The worker's `is_private_bind` check is unchanged. It is not applied in `test` mode, which is the only reason `BIND_HOST=::` appears in part 7. |
 | RW-2 `EXTERNALLY_GATED_DIGEST_PINNED_IMAGE_ONLY` | A Railway-built image is ungated. Admissible here because this is demonstration evidence; never for production. |
 | RW-3 `OWNER_CA_ISSUED_AND_CLIENT_VERIFIED` | No certificate authority exists yet, so the worker runs `test` mode over plain HTTP inside the private network rather than unverified TLS. |
-| RW-4 `REAL_AP3_HTTPS_JWKS_ISSUER_REQUIRED_FOR_PRODUCTION` | No identity port is composed. Every authority read stays `PRESENTED_UNPROVEN` and `IN_PROCESS_ISSUER_ONLY`. |
+| RW-4 `REAL_AP3_HTTPS_JWKS_ISSUER_REQUIRED_FOR_PRODUCTION` | No identity port is composed. Every authority read stays `PRESENTED_UNPROVEN`; `issuer_validation` shows the adapter package's own label (the scoped Cloudflare label since adapter 0.1.4), which says nothing about this deployment's composition. |
 | RW-5 `ONE_POSTGRES_SERVICE_TWO_LOGICAL_DATABASES` | One PostgreSQL service, two databases, no public database endpoint. |
 | RW-6 `SINGLE_INSTANCE_REFERENCE_DEPLOYMENT_ONLY` | One replica. The volume is not shared and no availability claim follows. |
 | CR-3 (`ADR_UGENCE_AUTHORITY_PLANE_SCOPING.md`) | The plane's proxy reaches the worker over a private segment and does not verify its certificate. This is what forbids a public worker origin, and it is what makes part 0.4 a constraint rather than a preference. |
@@ -152,6 +152,7 @@ pip install "pydantic>=2" "fastapi>=0.110" "uvicorn>=0.27" "starlette>=0.36" \
   ./packages/integration/ai-system-registry \
   ./packages/integration/data-use-admission \
   ./packages/integration/vendor-dependency \
+  ./packages/integration/workflow-drafts \
   ./packages/capabilities/action-clearance \
   ./packages/integration/clearance-export \
   ./apps/ugence-governance-studio/backend
@@ -541,7 +542,7 @@ credential rotation no longer propagates — update both DSNs by hand when Postg
 Never paste a resolved DSN into a screenshot, ticket or chat: it carries the password.
 The worker's own startup line prints it as `postgresql://<redacted>@…` `[V]`.
 
-**Do not set `RAILWAY_RUN_UID=0`.** Railway mounts the volume owned by root, and the
+**Do not set `RAILWAY_RUN_UID=0`, and remove it if an earlier deployment set it.** Railway mounts the volume owned by root, and the
 image's build-time `chown` is discarded by the mount, so a container that has already
 dropped to uid 10001 dies on `sqlite3.OperationalError: unable to open database file`
 `[V]`. The platform's escape hatch is to run the whole worker as root, which fixes the
@@ -553,9 +554,9 @@ verifies that root is unreachable, and only then exec's the worker. A drop that 
 verify, or a directory root cannot prepare, exits non-zero rather than running the worker
 as root `[V]`. Started unprivileged, it changes nothing and exec's directly.
 
-If you set `RAILWAY_RUN_UID=0` during an earlier deployment, remove it: the worker no
-longer needs it and it would keep the process as root for no benefit. Confirm the drop in
-the deploy log, immediately before the startup line:
+Removing it is also the only way the drop gets tested: with the variable set the container
+runs as root anyway, so the entrypoint's work is invisible. Confirm it in the deploy log,
+immediately before the startup line:
 
 ```
 entrypoint: prepared /var/lib/ugence-review and dropped to uid 10001
@@ -602,7 +603,7 @@ enter any typed token — non-empty, ≤256 characters, NFC, no whitespace (`_is
 ```
 read_authenticated: false
 decision proof: PRESENTED_UNPROVEN
-issuer validation: IN_PROCESS_ISSUER_ONLY
+issuer validation: CLOUDFLARE_ACCESS_HUMAN_WORKSPACE_GROUP_NONPROD_VALIDATED_2026_09_11_AP3_D6
 REFERENCE_GRADE_SHADOW_ONLY          … holds 0 active grants
 ```
 
@@ -679,6 +680,23 @@ service. Do it deliberately while nothing depends on it: note what a read return
 mounted where `UGENCE_REVIEW_DATA_DIR` points and the stores are being written to the
 container filesystem — the failure 7.3 warns about, which is silent until exactly this
 moment `[G]`. This has not been exercised on any deployment.
+
+The check, precisely, because a vague version of it proves nothing:
+
+1. On the plane's **Grants** tab, read a typed token and note the `as_of` timestamp and the
+   grant count.
+2. Worker → **Deployments** → **Redeploy**. Wait for Online and for the startup banner.
+3. Read the **same** token again.
+
+**Pass:** the read answers, and the identity envelope and count are unchanged. That is the
+worker reopening the same three SQLite files on the same volume.
+
+**Fail:** the reads stop answering, or the worker restarts with a fresh directory. On an
+empty directory both outcomes look identical to a passing read — every typed token returns
+zero either way — so this check is only conclusive once something has been written. Until
+authority records can be loaded (no commissioned seed path exists, see 7.7), it
+distinguishes *the stores reopen* from *the worker cannot start*, and no more. Say that
+rather than claiming durability from a zero that would have been zero regardless `[G]`.
 
 **8.3 Back up the two stores that matter, and know they differ.** Postgres has a
 **Backups** tab; the volume is snapshotted separately, if at all. The audit ledger and the
@@ -1032,8 +1050,19 @@ so what remains unproven is narrower and worth naming precisely:
   coordinates are null. A Railway build is not that pipeline (RW-2).
 - **The entrypoint on Railway.** The privilege drop is verified in this repository — a
   root-owned directory is chowned, the process reaches uid 10001, and a SQLite store opens
-  there `[V]` — but the image carrying it has not yet been deployed. The
-  2026-09-09 deployment ran under `RAILWAY_RUN_UID=0` `[V]`.
+  there `[V]`. On 2026-09-10 the owner removed `RAILWAY_RUN_UID=0` from the worker and
+  redeployed `[I]`, which is the deploy that actually exercises the drop: with the variable
+  set the container was root regardless and the entrypoint's work went untested. What
+  raises this to `[V]` is one line from that deployment's log, immediately above the
+  startup banner:
+
+  ```
+  entrypoint: prepared /var/lib/ugence-review and dropped to uid 10001
+  ```
+
+  Until that line is on the record, the deployment is reported and not observed. A failure
+  here is loud rather than silent: the entrypoint exits non-zero with
+  `ENTRYPOINT_REFUSED: …` rather than running the worker as root `[V]`.
 - **Durability.** No restart, redeploy or volume-detach has been exercised against the
   three SQLite stores; that they survive is designed, not observed.
 

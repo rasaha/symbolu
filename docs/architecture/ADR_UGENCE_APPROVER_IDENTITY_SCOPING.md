@@ -165,7 +165,9 @@ Entry conditions are met; each step is entered only by its own implementation pr
    returned. Proven only against its in-process issuer: label
    `REFERENCE_GRADE_SHADOW_ONLY`, `ISSUER_VALIDATION = IN_PROCESS_ISSUER_ONLY`;
    real enterprise-issuer validation remains unproven, and no composition root
-   wires it yet.
+   wires it yet. (Superseded 2026-09-11: the governed runtime worker composes it, and
+   adapter 0.1.4 carries the scoped label recorded in
+   `ADR_UGENCE_AUTHORITY_PLANE_SCOPING.md` §20.7 after the owner accepted AP-3.)
 4. **AI-D · Ledger and linkage carry the proof** (ID-2): `authentication_reference` as
    an additive field of the approval record and of `ReviewLinkage`, digest-bound; row 9.
    Label: **Core implemented**.

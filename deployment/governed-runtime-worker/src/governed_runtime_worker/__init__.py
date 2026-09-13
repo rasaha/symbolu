@@ -16,8 +16,14 @@ opens. 0.5.0 implemented the plane's two directory writes, load and revoke a rol
 (section 16, AW-2 to AW-5), each behind the identity port the decision route uses and
 refused outright without one; since 0.5.1 they are implemented but not served, the
 owner having reversed AW-1 (section 18): under AP-3 no write is served until the
-identity adapter is validated end to end against a real enterprise issuer. Activate and
-issue are never served here.
+identity adapter is validated end to end against a real enterprise issuer. 0.5.2 adds
+the AP-3 validation slice's two default-off seams to the write gate (section 20.7,
+AP3-D4 and AP3-D5: the ``Cf-Access-Jwt-Assertion`` boundary and an AX-5 authorizer
+stage), neither composed here, so the composed app is unchanged. 0.5.3 raises the
+adapter floor to 0.1.4: every answer's ``issuer_validation`` now carries the scoped
+Cloudflare Access label of AP3-D6 (the owner accepted AP-3 on 2026-09-11), which
+describes the adapter package and not this deployment's composition; no write is served.
+Activate and issue are never served here.
 """
 
 from __future__ import annotations

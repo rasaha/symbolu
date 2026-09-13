@@ -1,0 +1,199 @@
+{
+  "schema": "model-egress-unit.live-validation.v1",
+  "ruling": "ADR_UGENCE_LIVE_MODEL_PROVIDER_COMMISSIONING.md LP-4 (RATIFIED 2026-09-11); the AP-3 pattern of ADR_UGENCE_AUTHORITY_PLANE_SCOPING.md section 20",
+  "meu_live_status": "BLOCKED_PENDING_INFRASTRUCTURE_DESIGNATIONS",
+  "status_vocabulary": [
+    "BLOCKED_PENDING_OWNER_RULINGS",
+    "BLOCKED_PENDING_INFRASTRUCTURE_DESIGNATIONS",
+    "PENDING_VALIDATION",
+    "NOT_MET",
+    "MET"
+  ],
+  "status_note": "LP-1 to LP-6 are ratified and the owner's confirmation of 2026-09-11 is recorded (ADR §0.3). LP-7 (2026-09-11, ADR section 0.4) designed the NON-PRODUCTION step-8 infrastructure and supplied no value; the offline step-7 artifacts it permits (ruling 11) exist in ugence-model-egress-validation and can mark no infrastructure-dependent row. Steps 4 and 6 are built (unit 0.3.0: migration 2, migrator identity, tenant-bound identities, durable reservation; adapter 0.1.0 with an injected fake transport only). No row can execute: the GCP project, workload identity, secret-version resource, IAM binding, audit-log evidence, rotation procedure and OpenAI organization/project identifiers are undesignated (step 8); the live transport, the owner-run verifier and the acceptance-report generator are unbuilt (step 7); no credential is commissioned (step 9). Fake-transport tests pass in CI and mark no row here: fake evidence cannot satisfy a live row. Rows are executed only on the owner's machine by a verifier that never prints the credential or the full request content, and MET is the outcome reached only by the owner's separate acceptance statement after the validation's evidence; the validation call itself needs the two predecessor gates of ADR section 0.5, never MET; a successful HTTP response alone is insufficient (LP-4).",
+  "blocked_by": [
+    "LP-6 step 8 / LP-7 ruling 12: the seventeen exact, externally verified values and evidence references — GCP project ID; GCP project number; MEU GCP service-account resource name; deployment-platform identity mechanism; WIF pool/provider and constrained principal binding or the native GCP equivalent; full numeric Secret Manager version resource; secret-level IAM-policy evidence reference; Data Access audit-log configuration and retention reference; approved rotation-runbook reference; OpenAI organization ID; OpenAI project ID; OpenAI project service-account ID; OpenAI role and API-key scope evidence; vendor spend-control evidence and hard-stop/advisory classification; designated-model availability evidence; applicable data-processing-terms reference; approved processing/data-residency region — all UNDESIGNATED; none may be guessed, synthesized, represented as completed by a placeholder or inferred (infrastructure.check_step8_designation refuses each)",
+    "LP-6 step 7: the live transport (TLS-verified, proof of no-bytes-dispatched on transient failure), the unit wired to reserve against commissioning_budget before every dispatch, the owner-run verifier and the acceptance-report generator — NOT STARTED, blocked on step 8",
+    "LP-6 step 9: the credential commissioned manually by the custody owner through Secret Manager — no credential exists",
+    "LP-4 / ADR section 0.5: genuine_call True stays refused by EgressResult until both predecessor gates hold — meu_live_status PENDING_VALIDATION (every step-8 obligation independently verified) and live_synthetic_validation_authorization given by the owner's separate explicit statement, each released into the unit's constants; MET is the outcome of the validation, never its prerequisite (migration 2 lifted the database restriction only, ADR section 0.3.1)",
+    "LP-1: CR-1 amended (DONE 2026-09-11); the MEU deployment unit itself is not yet built or composed",
+    "LP-3: the model snapshot gpt-5.4-mini-2026-03-17 is designated, not verified; fake-transport evidence marks no row",
+    "LP-7 ruling 12: supplying and verifying the seventeen values closes only the infrastructure-designation blocker; the first live synthetic validation requires a separate, explicit owner authorization, not yet given; production use requires another commissioning record",
+    "LP-8: the deployed MEU instance (its reference and workload-identity principal, live_execution_posture) and the production-form Secret Manager custody adapter (LP-6 step 7, its own distribution) — UNDESIGNATED and unbuilt; no developer machine, CI runner, browser, shared hosting environment or production business workflow may stand in for either"
+  ],
+  "validation_matrix": [
+    {
+      "row": 1,
+      "scenario": "custody absent",
+      "required": "REFUSED_CREDENTIAL_NOT_COMMISSIONED",
+      "result": null
+    },
+    {
+      "row": 2,
+      "scenario": "credential never in any log, ledger row, exchange row, evidence report or answer",
+      "required": "NO_OCCURRENCE",
+      "result": null
+    },
+    {
+      "row": 3,
+      "scenario": "egress to any URL but https://api.openai.com/v1/responses",
+      "required": "REFUSED_DESTINATION_NOT_PERMITTED",
+      "result": null
+    },
+    {
+      "row": 4,
+      "scenario": "request digest binds the minimized context; a substituted prompt",
+      "required": "REFUSED_CONTENT_DIGEST_MISMATCH",
+      "result": null
+    },
+    {
+      "row": 5,
+      "scenario": "model identifier is the floating alias, not the pinned snapshot",
+      "required": "REFUSED_MODEL_NOT_PINNED",
+      "result": null
+    },
+    {
+      "row": 6,
+      "scenario": "input over 8,192 tokens",
+      "required": "REFUSED_REQUEST_LIMIT_EXCEEDED",
+      "result": null
+    },
+    {
+      "row": 7,
+      "scenario": "max_output_tokens over 1,024",
+      "required": "REFUSED_REQUEST_LIMIT_EXCEEDED",
+      "result": null
+    },
+    {
+      "row": 8,
+      "scenario": "streaming, store, tools, background or a previous response requested",
+      "required": "REFUSED_REQUEST_LIMIT_EXCEEDED",
+      "result": null
+    },
+    {
+      "row": 9,
+      "scenario": "eleventh genuine call, or a reservation over USD 25, or a second concurrent request",
+      "required": "REFUSED_COMMISSIONING_BUDGET_EXHAUSTED",
+      "result": null
+    },
+    {
+      "row": 10,
+      "scenario": "secret version named as latest, or a service-account-key identity",
+      "required": "REFUSED_AT_CONSTRUCTION",
+      "result": null
+    },
+    {
+      "row": 11,
+      "scenario": "custody lease expired at use",
+      "required": "REFUSED_CUSTODY_UNAVAILABLE",
+      "result": null
+    },
+    {
+      "row": 12,
+      "scenario": "the live answer's provenance",
+      "required": "GENUINE_CALL_TRUE_LEASE_PRODUCTION_AUTHORITATIVE_TRUST_UNTRUSTED_EVIDENCE",
+      "result": null,
+      "prerequisites": [
+        "all seventeen step-8 infrastructure designations independently verified (meu_live_status PENDING_VALIDATION)",
+        "a production-authoritative custody lease within the non-production commissioning scope: the lease's authority under the real custody contract (commissioned Secret Manager path, pinned numeric version, designated workload identity), not authorization of a production deployment",
+        "the owner's separate explicit authorization for the synthetic validation call (live_synthetic_validation_authorization)",
+        "a genuine-call result carrying trust UNTRUSTED_EVIDENCE, with custody_lease_id and custody_authority_id",
+        "correlation with the row-18 secret-access evidence by non-secret identifiers and bounded timestamps",
+        "executed by the deployed MEU instance in the dedicated non-production GCP project under its dedicated non-human workload identity, through the production-form Secret Manager custody adapter at the pinned numeric version, against the dedicated non-production OpenAI project; never by a developer machine, CI runner, browser, shared hosting environment or production business workflow (LP-8, live_execution_posture)"
+      ],
+      "contributes_to": "the owner's later decision to move meu_live_status to MET; this row does not presuppose MET"
+    },
+    {
+      "row": 13,
+      "scenario": "TAP verification of the answer; INDETERMINATE",
+      "required": "TYPED_REFUSAL_NOT_DEGRADED_RESULT",
+      "result": null
+    },
+    {
+      "row": 14,
+      "scenario": "purge replaces content with a tombstone on schedule",
+      "required": "TOMBSTONE_WITH_DIGESTS_ONLY",
+      "result": null
+    },
+    {
+      "row": 15,
+      "scenario": "lease expiry after dispatch",
+      "required": "OUTCOME_UNKNOWN_NEVER_A_SECOND_BILLED_CALL",
+      "result": null
+    },
+    {
+      "row": 16,
+      "scenario": "retry after a transient failure before dispatch",
+      "required": "AT_MOST_ONE_RETRY_THEN_FAILED",
+      "result": null
+    },
+    {
+      "row": 17,
+      "scenario": "vendor error, timeout and malformed answer",
+      "required": "TYPED_OUTCOMES_FAILED_OR_OUTCOME_UNKNOWN",
+      "result": null
+    },
+    {
+      "row": 18,
+      "scenario": "Secret Manager Data Access audit log shows the read of the pinned version",
+      "required": "AUDIT_LOG_EVIDENCE_PRESENT",
+      "result": null
+    }
+  ],
+  "evidence": {
+    "verifier": null,
+    "runs": [],
+    "test_timestamp": null,
+    "ci_run_or_signed_report": null,
+    "accepting_owner": null
+  },
+  "must_never_contain": [
+    "a credential",
+    "a prompt or response",
+    "a fixture result recorded as a live pass"
+  ],
+  "offline_harness": {
+    "distribution": "ugence-model-egress-validation",
+    "command": "python -m ugence_model_egress_validation offline --report <path>",
+    "effect_on_this_record": "none: the harness writes a separate redacted report; this matrix is edited only by the owner-run live verifier after step 8 and the separate live-validation authorization",
+    "infrastructure_dependent_rows_offline": "NOT_EXECUTABLE_OFFLINE, never PASS"
+  },
+  "live_synthetic_validation_authorization": "NOT_GIVEN",
+  "genuine_call_gate": {
+    "rule": "ADR section 0.6: a genuine call is admitted only by ugence_model_egress_unit.authorization.admit_genuine_call, which issues a GenuineCallAdmission after six conditions hold and the durable ledger has consumed the attempt before dispatch; EgressResult refuses genuine_call true without a verified admission for that request, and the database (migration 3) refuses a genuine row without its consumption. MET is the outcome the validation's evidence feeds, never a prerequisite of row 12.",
+    "conditions": [
+      "1 G1 from this record: meu_live_status is PENDING_VALIDATION (every one of the seventeen step-8 obligations independently verified) or MET",
+      "2 the typed LiveSyntheticValidationAuthorization is present, well-formed, and is the one this record pins in live_synthetic_validation_authorization (its digest)",
+      "3 every scope field matches the proposed request and the current step-8 designations: authorizing owner, NON_PRODUCTION environment, OpenAI organization, project and service-account IDs, provider, pinned model, exact endpoint, the exact designation-record digest, the exact validation-plan digest, the request's digest within the authorized set, the request within the authorized token limits",
+      "4 the authorization is within its issue/expiry window and its digest is not in revoked_authorization_digests",
+      "5 its nonce has not been replayed (durable ledger)",
+      "6 the durable reservation ledger proves remaining call and budget capacity; the attempt is then consumed durably, before dispatch, and an ambiguous dispatch keeps the consumption"
+    ],
+    "never_sufficient": "a non-empty string, a boolean, an owner's name, or an altered release constant",
+    "after_the_sequence": "further genuine calls stay refused unless separately authorized; expiry, revocation, the call limit or a transition to MET never create or extend an authorization"
+  },
+  "live_execution_posture": {
+    "ruling": "LP-8 test-environment ruling (owner, 2026-09-12; ADR section 0.7)",
+    "required": "DEPLOYED_MEU_INSTANCE",
+    "instance_reference": "UNDESIGNATED (the deployed MEU instance in the dedicated non-production GCP project; designated together with step 8, outside the seventeen obligations; never a developer machine, CI runner, browser, shared hosting environment or production business workflow)",
+    "workload_identity_principal": "UNDESIGNATED (the instance's dedicated non-human workload identity: obligations 3, 4 and 5 designate it)",
+    "custody_adapter": "PRODUCTION_FORM_SECRET_MANAGER_ADAPTER (unbuilt: LP-6 step 7, its own distribution; the reference adapter and the fake-path PinnedSecretVersionCustodyAdapter never satisfy row 12)",
+    "secret_version": "the pinned numeric Secret Manager version of obligation 6; latest is refused",
+    "openai_project": "the dedicated non-production OpenAI project of obligations 10, 11 and 12",
+    "input": "synthetic non-sensitive only; a fixed approved request, bound as request digests in the typed authorization (ADR section 0.6); each authorized digest is one instance of that fixed request and is consumed once",
+    "limits": "the LP-5 token and monetary limits carried by the typed authorization; strict, never widened for the validation",
+    "forbidden_holders": [
+      "DEVELOPER_MACHINE",
+      "CI_RUNNER",
+      "BROWSER",
+      "SHARED_HOSTING_ENVIRONMENT",
+      "PRODUCTION_BUSINESS_WORKFLOW"
+    ],
+    "ci_runner_refusal": "the live verifier refuses first, before any record, custody port, budget or transport, when any CI environment marker is set (ugence_model_egress_unit.CI_ENVIRONMENT_MARKERS)",
+    "sequence_completion": "exactly the separately authorized number of live calls (max_calls) consumed: fewer is an incomplete validation, more is impossible because the durable ledger refuses the call after max_calls",
+    "offline_testing": "fake-transport testing remains in repository CI and marks no infrastructure-dependent row",
+    "outcome_scope": "successful non-production validation is evidence toward the owner's MET decision for this non-production record only; it authorizes no production commissioning (production_commissioning_record NONE)"
+  },
+  "live_synthetic_validation_authorization_schema": "model-egress-unit.live-synthetic-validation-authorization.v1 (ugence_model_egress_unit.authorization.LiveSyntheticValidationAuthorization; ADR section 0.6). When given, this field carries the 64-hex digest of the owner's typed, immutable, consumable authorization record; the unit's LIVE_SYNTHETIC_VALIDATION_AUTHORIZATION_DIGEST mirrors it for drift detection only and never constitutes execution authority",
+  "revoked_authorization_digests": [],
+  "authorizing_owner": "Rakesh Mohan — Founder, Ugence Labs"
+}

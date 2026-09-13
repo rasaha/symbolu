@@ -22,6 +22,7 @@ import {
   type DataUseDeclareBody,
   type RegistryRegisterBody,
   type VendorDeclareBody,
+  type WorkflowDraftSaveBody,
   type ReviewDecisionBody,
   type ReviewStartShadowRunBody,
   type SimulateRunBody,
@@ -70,6 +71,13 @@ export const V2_OPERATIONS = [
   // attested about itself before its port bound; seam states, checks and pins only,
   // no registry rows (MS-1), nothing probed live.
   "v2_observe_deployment",
+  // Bring Your Workflow phase 3A (ADR_UGENCE_AUTHORITY_PLANE_SCOPING.md §24, BW-3A):
+  // the drafts an operator keeps. Save is the only write — it keeps a document the
+  // server validated, as an unapproved DRAFT for the deployment's tenant, and confers
+  // nothing; read and list answer the tenant's own drafts and their lineage.
+  "v2_workflow_drafts_save",
+  "v2_workflow_drafts_list",
+  "v2_workflow_drafts_read",
 ] as const;
 
 async function v2Request<T>(pathAndQuery: string, init?: RequestInit): Promise<T> {
@@ -279,3 +287,23 @@ export const listVendorDeclarations = (asOf = "") => {
   const query = asOf ? `?as_of=${enc(asOf)}` : "";
   return gap("/api/v2/vendor/declarations" + query);
 };
+
+// -- 11 · Workflow drafts (Bring Your Workflow phase 3A, ADR §24) -----------
+/**
+ * Keep one validated Workflow IR document as an unapproved DRAFT for this deployment's
+ * tenant. The tenant, the derived draft id, the lifecycle and the recording
+ * composition are never sent from here; `claimed_owner_ref` is recorded as presented
+ * and unproven (`PRESENTED_UNPROVEN`); a registration link is a reference plus a
+ * digest the server matches against the tenant's own registry. What the server keeps
+ * is the canonical document and its digest, never the text that was pasted.
+ */
+export const saveWorkflowDraft = (body: WorkflowDraftSaveBody) =>
+  gap("/api/v2/workflow-drafts", postJson(body));
+
+/** The drafts this deployment's tenant keeps: heads only, or every revision. */
+export const listWorkflowDrafts = (includeSuperseded = false) =>
+  gap("/api/v2/workflow-drafts" + (includeSuperseded ? "?include_superseded=true" : ""));
+
+/** One draft with its document, lineage and successor, if any. */
+export const readWorkflowDraft = (draftId: string) =>
+  gap(`/api/v2/workflow-drafts/${enc(draftId)}`);

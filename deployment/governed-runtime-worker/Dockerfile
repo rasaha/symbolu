@@ -37,7 +37,10 @@ COPY packages/integration/governed-review /build/pkgs/governed-review
 COPY packages/integration/governed-review-service /build/pkgs/governed-review-service
 COPY packages/integration/approver-identity-jwt /build/pkgs/approver-identity-jwt
 COPY deployment/governed-runtime-worker /build/worker
-RUN pip install --no-cache-dir \
+# -c: the exact deployment constraint (constraints.txt, inside /build/worker). The
+# distributions below declare `dbos>=2.0` as library compatibility; this build fixes the
+# version that compatibility is exercised at. See ci/verify_dbos_constraint.py.
+RUN pip install --no-cache-dir -c /build/worker/constraints.txt \
       /build/pkgs/governance-contracts /build/pkgs/agent-runtime /build/pkgs/risk_authority \
       /build/pkgs/decision-authority /build/pkgs/governance-provider-framework /build/pkgs/actiongate \
       /build/pkgs/risk-authority-runtime /build/pkgs/risk-authority-status-runtime \
@@ -74,7 +77,7 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
   CMD ["python", "/app/container-healthcheck.py"]
 
 LABEL org.opencontainers.image.title="governed-runtime-worker" \
-      org.opencontainers.image.version="0.5.1" \
+      org.opencontainers.image.version="0.5.3" \
       org.opencontainers.image.description="Governed runtime worker: the governed review service composition root over the DBOS engine, behind one private TLS listener. Reference-grade, shadow-only; production mode is a posture, not a certification. No LIVE execution." \
       org.opencontainers.image.source="https://github.com/rasaha/symbolu" \
       org.opencontainers.image.licenses="UNLICENSED"

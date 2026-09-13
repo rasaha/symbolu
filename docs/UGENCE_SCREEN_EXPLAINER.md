@@ -48,7 +48,7 @@ evidence is implementation and conformance evidence only.
 |---|---|
 | Context Minimization, Truth Assurance, ActionGate, Autonomous Control Plane | Console: probes on Modules, stages of the Governed Loop, entries in Audit |
 | Agent Runtime | Studio: Simulate (the in-studio path over fixtures), and the worker's shadow run started from Simulate and watched from Review |
-| Agent Workforce Composer's adapter over an operator's own document | Studio: Bring Your Workflow (validate, adapt, compare; ephemeral) |
+| Agent Workforce Composer's adapter over an operator's own document | Studio: Bring Your Workflow (validate, adapt, compare; since BW-3A also keep as an unapproved DRAFT, list, read back, supersede) |
 | Model Selection, Hybrid LLM, LLM Steering, Autonomous Runtime | No screen. By ruling MS-1 their registry rows do not reach the studio either |
 | The authority directory and approval workflow (not among the nine modules) | Authority Plane: all four screens; Studio: Review Queue and Run Detail |
 
@@ -951,16 +951,20 @@ The one screen on which a document the operator supplies enters the studio. Owne
 ruling BW-1 to BW-5 (§22) admitted it as a read-only Workflow IR inspector and
 superseded, for this surface only, the earlier "no arbitrary JSON / fixture-upload
 input" sentences. The frozen v1 OpenAPI document did not change: three operations it
-already carried moved from the front end's forbidden list to its approved list.
+already carried moved from the front end's forbidden list to its approved list. Owner
+ruling BW-3A (§24, 2026-09-10) split phase 3 and shipped its drafts half: the screen
+may keep a server-validated document as an unapproved `DRAFT` for the deployment's own
+tenant through three operations of the v2 contract (amendment v2-A8); the identity
+half (verified owners, directory grants, submit for approval) is phase 3B, behind AP-3.
 
 ### 33 · Bring Your Workflow (`/bring-your-workflow`)
 ![Screen 33, as captured 2026-09-07](screens/explainer/33.png)
 
-- **Shows:** what a pasted or locally chosen Ugence Workflow IR JSON document declares (version, size, nodes, edges, node kinds, dispositions, human review and authority requirements, tool and capability refs, policy pack, fingerprint, canonical digest); then, on request, the server's validation, adaptation (adapter mode, node dispositions, role requirements, fingerprints, diagnostics) and comparison of a v1 and a v2 adaptation. The disclaimer, verbatim: "Accepts Ugence Workflow IR JSON. It does not execute, publish or persist the submitted workflow."
-- **Answered by:** `validate_workflow`, `adapt_workflow`, `compare_adaptations`; nothing else. The guided example is the procurement compiled workflow the catalog serves, bundled with the screen.
-- **Operator can:** paste JSON or choose a local `.json` file (read in the browser); load the guided example; validate; adapt; compare against the same workflow in the other contract version; download the report and the adapted envelope to their device.
-- **Never:** executes, simulates, publishes or persists the document; fetches a URL; reads an archive; accepts code, YAML, a framework-native object or a credential-shaped value; adds to or changes the scenario catalog; converts from LangGraph, CrewAI, AutoGen, n8n or BPMN (a later, separately scoped phase). Both the browser gate and the server refuse a document over 1 MiB, deeper than 32 levels, or with more than 200 nodes or 400 edges; the server's refusal is the typed 422 `workflow_too_complex`.
-- **Ruling:** BW-1 `READ_ONLY_WORKFLOW_IR_INSPECTOR`, BW-2 `PASTE_OR_LOCAL_FILE_BODY_ONLY` with the owner's figures, BW-3 `VALIDATE_ADAPT_COMPARE_ONLY`, BW-4 `EPHEMERAL_NO_SERVER_STORAGE`, BW-5 `REFERENCE_GRADE` (§22).
+- **Shows:** what a pasted or locally chosen Ugence Workflow IR JSON document declares (version, size, nodes, edges, node kinds, dispositions, human review and authority requirements, tool and capability refs, policy pack, fingerprint, canonical digest); then, on request, the server's validation, adaptation (adapter mode, node dispositions, role requirements, fingerprints, diagnostics) and comparison of a v1 and a v2 adaptation; and, since BW-3A, the draft the server kept (derived id, lifecycle `DRAFT`, kept digest, record digest, the claimed owner with its assurance `PRESENTED_UNPROVEN`, lineage, what it confers: nothing) and the drafts the deployment keeps, read on request and never on load. The disclaimer, verbatim: "Accepts Ugence Workflow IR JSON. It does not execute, compile, approve or publish the submitted workflow. A validated document may be kept only as an unapproved DRAFT for this deployment's tenant."
+- **Answered by:** `validate_workflow`, `adapt_workflow`, `compare_adaptations` on the v1 contract and `v2_workflow_drafts_save`, `v2_workflow_drafts_list`, `v2_workflow_drafts_read` on the v2 contract; nothing else. The guided example is the procurement compiled workflow the catalog serves, bundled with the screen.
+- **Operator can:** paste JSON or choose a local `.json` file (read in the browser); load the guided example; validate; adapt; compare against the same workflow in the other contract version; download the report and the adapted envelope to their device; keep the gated document as a draft with a title, a claimed owner, an optional link to an AI-system registration (reference plus digest) and an optional predecessor; list the deployment's drafts; load a kept draft back through the gate, which pre-fills the revision's lineage.
+- **Never:** executes, simulates, compiles, approves, publishes or exports the document; keeps the pasted text (the server keeps its own canonical encoding, validated first); keeps a draft under a tenant the browser names (the tenant is server configuration); authenticates an owner; edits or deletes a draft (a revision supersedes); fetches a URL; reads an archive; accepts code, YAML, a framework-native object or a credential-shaped value; adds to or changes the scenario catalog; converts from LangGraph, CrewAI, AutoGen, n8n or BPMN in the browser. Both the browser gate and the server refuse a document over 1 MiB, deeper than 32 levels, or with more than 200 nodes or 400 edges; the server's refusal is the typed 422 `workflow_too_complex`. Without a drafts file configured, the draft controls report the typed gap `workflow_drafts`.
+- **Ruling:** BW-1 `READ_ONLY_WORKFLOW_IR_INSPECTOR`, BW-2 `PASTE_OR_LOCAL_FILE_BODY_ONLY` with the owner's figures, BW-3 `VALIDATE_ADAPT_COMPARE_ONLY`, BW-4 `EPHEMERAL_NO_SERVER_STORAGE` as amended for the one draft write, BW-5 `REFERENCE_GRADE` (§22); BW-3A `DRAFTS_AUTHORIZED_NOW` with BW-3A.1 to BW-3A.5 (§24).
 
 #### Enter, press, expect
 

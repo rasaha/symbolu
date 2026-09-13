@@ -29,6 +29,7 @@ from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Tuple
 
 import ugence_agent_runtime.api as art
+import ugence_agent_workforce_composer.api as awc
 import ugence_policy_workflow_compiler.api as compiler
 
 from ugence_clearance_export import (
@@ -68,6 +69,18 @@ from ugence_data_use_admission import (
     declaration_record,
     validity_from_dict as declaration_validity_from_dict,
 )
+from ugence_workflow_drafts import (
+    CLAIMED_OWNER_ASSURANCE,
+    LIFECYCLE as DRAFT_LIFECYCLE,
+    SUPPORTED_WORKFLOW_CONTRACTS,
+    ContractViolation as DraftContractViolation,
+    CrossTenantRefused as DraftCrossTenantRefused,
+    DraftStorageError,
+    DraftSupersessionError,
+    DuplicateDraftError,
+    build_draft,
+    draft_record,
+)
 from ugence_ai_system_registry import (
     ContractViolation as RegistryContractViolation,
     CrossTenantRefused,
@@ -95,6 +108,10 @@ __all__ = [
     "RegistryService",
     "DeclarationService",
     "VendorDeclarationService",
+    "WorkflowDraftService",
+    "CLAIMED_OWNER_STATUS",
+    "DRAFT_CONFERS",
+    "DRAFT_LIFECYCLE_NOTE",
     "VENDOR_RISK_POSTURE_NOTE",
     "VENDOR_DECLARATION_CONFERS",
     "DECLARED_BY_STATUS",
@@ -1509,6 +1526,8 @@ SEAM_STATE_FIELDS: Tuple[str, ...] = (
     "system_registry",
     "data_use_declarations",
     "vendor_declarations",
+    # Bring Your Workflow phase 3A (authority-plane ADR §24): the drafts file.
+    "workflow_drafts",
 )
 
 #: The identity and pin fields that travel with the seam states (MS-4
@@ -1589,4 +1608,240 @@ class DeploymentStatusService:
             "seam_state_fields": list(SEAM_STATE_FIELDS),
             "excluded_fields": ["cert_subject", "cert_expiry"],
             "result": result,
+        }
+
+
+# --------------------------------------------------------------------------- #
+# 13 · Workflow drafts (Bring Your Workflow phase 3A,
+#      ADR_UGENCE_AUTHORITY_PLANE_SCOPING.md §24)
+# --------------------------------------------------------------------------- #
+#: Any owner on a draft is a claim the form supplied. No identity is claimed; every
+#: answer says so, in the package's own constant.
+CLAIMED_OWNER_STATUS = CLAIMED_OWNER_ASSURANCE
+DRAFT_CONFERS = (
+    "nothing: a draft is a record of a validated document, not an approval, a "
+    "compilation, a publication, an export or a permission; a claimed owner confers no "
+    "read, write, approval or execution authority (authority-plane ADR §24, phase 3A)"
+)
+DRAFT_LIFECYCLE_NOTE = (
+    "DRAFT and nothing else: no route here approves, compiles, publishes, exports, "
+    "clears or hands a draft to a runtime, and the Policy Workflow Compiler's refusal "
+    "to compile a DRAFT stands; a verified owner, a directory grant and submission for "
+    "approval are phase 3B, blocked on AP-3"
+)
+
+
+class WorkflowDraftService:
+    """Typed intake over the deployment's ``SqliteWorkflowDrafts`` (phase 3A).
+
+    The tenant is the store's, never the caller's. The document is validated through
+    the composer's adapter (the same call ``validate_workflow`` makes) and kept only when
+    it validates; what is kept is its canonical encoding and digest, never the text that
+    was brought. The draft id is derived by the package, never chosen. A claimed owner
+    is recorded as presented and unproven. A registration link is admitted only when
+    the reference names a registration the deployment's own tenant-bound registry holds
+    and the digest is that record's digest. The only write is ``save``; a revision is a
+    new record superseding its predecessor, admitted by the package's supersession rule.
+    """
+
+    CAPABILITY = "workflow_drafts"
+
+    def __init__(self, drafts: Any = None, recorded_by: str = "", registry: Any = None) -> None:
+        self._drafts = drafts
+        self._recorded_by = recorded_by
+        #: The seam-5 system registry, when the deployment configured one. Read only,
+        #: and only to match a link; a draft never writes to it.
+        self._registry = registry
+
+    def _gap(self) -> Dict[str, Any]:
+        return _unavailable(
+            self.CAPABILITY,
+            "no workflow drafts file is configured: this deployment keeps no drafts, so "
+            "nothing can be kept, read or listed",
+        )
+
+    @staticmethod
+    def _refused(code: str, message: str, **extra: Any) -> Dict[str, Any]:
+        answer = {"available": True, "refused": True, "code": code, "reason": message, "result": None}
+        answer.update(extra)
+        return answer
+
+    def _validated_by(self) -> str:
+        return f"ugence-agent-workforce-composer/{awc.__version__}"
+
+    def _match_registration(self, tenant_id: str, ref: str, digest: str) -> Optional[Dict[str, Any]]:
+        """A typed refusal, or ``None`` when the link is admissible (or absent)."""
+        if not ref and not digest:
+            return None
+        if bool(ref) != bool(digest):
+            return self._refused(
+                "registration_link_refused",
+                "registration_ref and registration_digest travel together: a link is a "
+                "reference plus the digest of the record it names, never one alone")
+        if self._registry is None:
+            return self._refused(
+                "registration_link_refused",
+                "no system registry is configured for this deployment, so no registration "
+                "can be matched; a link names a record the tenant's own registry holds")
+        try:
+            registration = self._registry.get_registration(ref)
+        except (RegistryStorageError, RegistryContractViolation) as exc:
+            return _unavailable(self.CAPABILITY, f"the registry could not be read: {exc}")
+        if registration is None or registration.tenant_id != tenant_id:
+            return self._refused(
+                "registration_link_refused",
+                f"registration_ref {ref!r} names no registration this tenant's registry holds")
+        if registration.record_digest() != digest:
+            return self._refused(
+                "registration_link_refused",
+                "registration_digest is not the digest of the registration named; a link "
+                "binds one exact record, and a changed record is a new registration")
+        return None
+
+    def save(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+        if self._drafts is None:
+            return self._gap()
+        tenant_id = self._drafts.tenant_id
+        workflow = payload.get("workflow")
+        if not isinstance(workflow, dict) or not workflow:
+            return self._refused("draft_refused", "workflow must be a non-empty JSON object")
+        contract_version = str(payload.get("contract_version") or "").strip()
+        if contract_version not in SUPPORTED_WORKFLOW_CONTRACTS:
+            return self._refused(
+                "draft_refused",
+                f"contract_version {contract_version!r} is not one of "
+                f"{', '.join(SUPPORTED_WORKFLOW_CONTRACTS)}; the version is never guessed")
+        declared = awc.declared_contract_version(workflow)
+        if declared and declared != contract_version:
+            return self._refused(
+                "draft_refused",
+                f"the document declares {declared!r} but the request names {contract_version!r}")
+        # The same validation ``validate_workflow`` performs: the composer's adapter,
+        # dispatching explicitly by the declared contract, failing closed.
+        envelope = awc.adapt_workflow(workflow, contract_version=contract_version)
+        diagnostics = to_jsonable(envelope.diagnostics)
+        if not envelope.ok:
+            return self._refused(
+                "draft_refused",
+                "the document does not validate under the composer's adapter; only a "
+                "validated document is kept", diagnostics=diagnostics)
+        computed = canonical_digest(workflow)
+        integrity: Dict[str, Any] = {"checked": payload.get("source_digest") is not None}
+        if payload.get("source_digest") is not None:
+            source = str(payload["source_digest"])
+            integrity.update({"source_digest": source, "computed_digest": computed,
+                              "match": computed == source or computed.endswith(source)})
+        ref = str(payload.get("registration_ref") or "").strip()
+        link_digest = str(payload.get("registration_digest") or "").strip()
+        refusal = self._match_registration(tenant_id, ref, link_digest)
+        if refusal is not None:
+            return refusal
+        try:
+            draft = build_draft(
+                tenant_id=tenant_id, title=str(payload.get("title") or ""),
+                contract_version=contract_version, workflow=workflow,
+                claimed_owner_ref=str(payload.get("claimed_owner_ref") or ""),
+                registration_ref=ref, registration_digest=link_digest,
+                supersedes=str(payload.get("supersedes") or ""),
+                recorded_by=self._recorded_by, validated_by=self._validated_by(),
+                notes=str(payload.get("notes") or ""),
+            )
+        except DraftContractViolation as exc:
+            return self._refused("draft_refused", str(exc))
+        except (TypeError, ValueError) as exc:
+            return self._refused("draft_refused", f"typed input refused: {exc}")
+        try:
+            self._drafts.save(draft)
+        except DuplicateDraftError as exc:
+            return self._refused("draft_duplicate", str(exc))
+        except DraftSupersessionError as exc:
+            return self._refused("supersession_refused", str(exc))
+        except DraftCrossTenantRefused as exc:
+            return self._refused("draft_refused", str(exc))
+        except DraftStorageError as exc:
+            return _unavailable(self.CAPABILITY, f"the drafts file could not be written: {exc}")
+        record = draft_record(draft)
+        return {
+            "available": True,
+            "saved": True,
+            "tenant_id": tenant_id,
+            "store_kind": type(self._drafts).__name__,
+            "draft_id": draft.draft_id,
+            "workflow_digest": draft.workflow_digest,
+            "lifecycle": DRAFT_LIFECYCLE,
+            "lifecycle_note": DRAFT_LIFECYCLE_NOTE,
+            "record": record,
+            "record_digest": draft.record_digest(),
+            "claimed_owner_ref": draft.claimed_owner_ref,
+            "claimed_owner_status": CLAIMED_OWNER_STATUS,
+            "recorded_by": self._recorded_by,
+            "validated_by": draft.validated_by,
+            "validation_diagnostics": diagnostics,
+            "integrity": integrity,
+            "confers": DRAFT_CONFERS,
+            "result": record,
+        }
+
+    def read(self, draft_id: str) -> Dict[str, Any]:
+        if self._drafts is None:
+            return self._gap()
+        tenant_id = self._drafts.tenant_id
+        try:
+            draft = self._drafts.get_draft(str(draft_id or ""))
+            if draft is None:
+                return {"available": True, "found": False, "tenant_id": tenant_id,
+                        "draft_id": str(draft_id or ""), "result": None}
+            chain = self._drafts.lineage_of(draft.draft_id)
+            successor = self._drafts.superseded_by(draft.draft_id)
+        except DraftCrossTenantRefused as exc:
+            return self._refused("draft_refused", str(exc))
+        except (DraftStorageError, DraftContractViolation) as exc:
+            return _unavailable(self.CAPABILITY, f"the drafts file could not be read: {exc}")
+        record = draft_record(draft)
+        return {
+            "available": True,
+            "found": True,
+            "tenant_id": tenant_id,
+            "store_kind": type(self._drafts).__name__,
+            "draft_id": draft.draft_id,
+            "lifecycle": DRAFT_LIFECYCLE,
+            "lifecycle_note": DRAFT_LIFECYCLE_NOTE,
+            "record": record,
+            "record_digest": draft.record_digest(),
+            "lineage": [d.draft_id for d in chain],
+            "superseded_by": successor,
+            "claimed_owner_status": CLAIMED_OWNER_STATUS,
+            "confers": DRAFT_CONFERS,
+            "result": record,
+        }
+
+    def list(self, *, include_superseded: bool = False) -> Dict[str, Any]:
+        if self._drafts is None:
+            return self._gap()
+        tenant_id = self._drafts.tenant_id
+        try:
+            drafts = self._drafts.drafts_for_tenant(tenant_id=tenant_id,
+                                                    include_superseded=bool(include_superseded))
+            rows = []
+            for draft in drafts:
+                fields = draft.to_dict()
+                fields["superseded_by"] = self._drafts.superseded_by(draft.draft_id)
+                fields["record_digest"] = draft.record_digest()
+                rows.append(fields)
+        except DraftCrossTenantRefused as exc:
+            return self._refused("draft_refused", str(exc))
+        except (DraftStorageError, DraftContractViolation) as exc:
+            return _unavailable(self.CAPABILITY, f"the drafts file could not be read: {exc}")
+        return {
+            "available": True,
+            "tenant_id": tenant_id,
+            "store_kind": type(self._drafts).__name__,
+            "include_superseded": bool(include_superseded),
+            "count": len(rows),
+            "lifecycle": DRAFT_LIFECYCLE,
+            "lifecycle_note": DRAFT_LIFECYCLE_NOTE,
+            "claimed_owner_status": CLAIMED_OWNER_STATUS,
+            "recorded_by": self._recorded_by,
+            "confers": DRAFT_CONFERS,
+            "result": rows,
         }

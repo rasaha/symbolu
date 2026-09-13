@@ -151,7 +151,7 @@ running works here — `npm ci && npm run build`, then `npm start` for the plane
 
 ## The labels in the interface are deliberate
 
-`PRESENTED_UNPROVEN`, `IN_PROCESS_ISSUER_ONLY`, `REFERENCE_GRADE_SHADOW_ONLY`, "Synthetic
+`PRESENTED_UNPROVEN`, the adapter's scoped issuer-validation label, `REFERENCE_GRADE_SHADOW_ONLY`, "Synthetic
 demonstration data", and the plane's standing notice that no write is served before
 enterprise issuer validation, are the product stating what it can and cannot prove. They
 are not placeholders and must not be removed for a demonstration.
@@ -287,7 +287,7 @@ def export(out: str, repo: str = REPO, skip_verify: bool = False) -> int:
             "in the source repository, so this verifier cannot run here; it ran there, above",
             "the studio's verify:version — reads a P3D audit record that stays there",
         ],
-        "maturity_labels": ("PRESENTED_UNPROVEN, IN_PROCESS_ISSUER_ONLY and "
+        "maturity_labels": ("PRESENTED_UNPROVEN, the adapter's scoped issuer-validation label and "
                             "REFERENCE_GRADE_SHADOW_ONLY are shown by the applications on "
                             "purpose and must not be removed for a demonstration."),
         "file_count": count,

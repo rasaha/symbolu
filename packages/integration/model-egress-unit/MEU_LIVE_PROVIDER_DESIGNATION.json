@@ -1,0 +1,103 @@
+{
+  "schema": "model-egress-unit.live-provider-designation.v1",
+  "ruling": "ADR_UGENCE_LIVE_MODEL_PROVIDER_COMMISSIONING.md LP-1 to LP-6 (RATIFIED by the owner 2026-09-11, recorded verbatim in section 0; confirmation in 0.3); LP-7 step-8 NON-PRODUCTION infrastructure design rulings (owner 2026-09-11, recorded verbatim in section 0.4; they govern the first non-production commissioning only and supply no value); OWNER_RATIFICATION_LIVE_MODEL_PROVIDER.md D-1 to D-5 (ratified 2026-09-10, standing)",
+  "status": "RULED_INFRASTRUCTURE_DESIGNATIONS_PENDING",
+  "status_note": "LP-1 to LP-6 were ratified on 2026-09-11 and the vendor, model, endpoint, account scope, content scope, custody system, custody owner, limits and order are designated below. Live invocation stays blocked (LP-2, last requirement) until the GCP project ID, the MEU workload identity, the exact secret-version resource, the IAM binding, the Secret Manager Data Access audit-log evidence, the rotation procedure and the exact OpenAI organization/project identifiers are designated and accepted. No credential exists in any Ugence deployment or repository; no MEU deployment unit exists yet; MEU_LIVE_VALIDATION.json is BLOCKED_PENDING_INFRASTRUCTURE_DESIGNATIONS. Every field here is configuration or a placeholder, never a secret.",
+  "designated_by": "Rakesh Mohan",
+  "designated_at": "2026-09-11",
+  "vendor": {
+    "name": "OpenAI",
+    "api_host": "api.openai.com",
+    "permitted_egress": "https://api.openai.com only, from the Model Egress Unit deployment unit once CR-1 admits it (LP-1); the governed runtime worker's egress record is unchanged and names no vendor host",
+    "model": "gpt-5.4-mini-2026-03-17 (pinned snapshot; the floating alias gpt-5.4-mini is not permitted; the adapter reads authorized_model from the authorization binding and refuses an unpinned identifier: limits.is_pinned_snapshot)",
+    "account": "a dedicated non-production OpenAI project named ugence-meu-validation within the Ugence OpenAI organization (LP-3, LP-7 ruling 7); an OpenAI project-owned service account, not a human user's API key, with a custom project role containing only api.responses.write, an API key scoped only to api.responses.write, access only to the designated model and the ratified ceilings; the credential is unavailable to browsers, developers, CI jobs, other Ugence services and repository automation; the exact organization, project and service-account identifiers are UNDESIGNATED; a production project and credential require later owner approval; the API key is never recorded",
+    "data_processing_terms": "UNDESIGNATED (acceptance recorded by reference before the validation run)",
+    "region": "UNDESIGNATED",
+    "endpoint": "/v1/responses (the only permitted path; egress_policy.OPENAI_RESPONSES; LP-7 ruling 8: no floating model alias, wildcard host, alternate endpoint, redirect, proxy, hosted tool, background operation, fallback model or fallback provider)",
+    "content_scope": "synthetic, non-sensitive validation content only; the provider is treated as potentially retaining abuse-monitoring data, so no genuine enterprise, personal, confidential or credential-bearing content is sent even with store=false",
+    "request_features": "store=false; provider-hosted tools, web search, file retrieval, MCP, code execution and background execution disabled; streaming disabled (limits.FORBIDDEN_REQUEST_FEATURES)",
+    "model_availability": "UNDESIGNATED evidence (LP-7 ruling 8: before live validation, independently verify the designated snapshot is available to the designated OpenAI project; recording the model name is not availability evidence)",
+    "spend_and_data_controls": "UNDESIGNATED (LP-7 ruling 9: before live validation record the configured OpenAI project spend control and whether it is a true enforcement stop or only an alert; evidence that the MEU's durable USD 25 ceiling remains the controlling hard stop; the applicable OpenAI data-processing terms; the approved processing/data-residency region; confirmation that validation content stays synthetic and non-sensitive; confirmation that store=false is enforced. Vendor-side limits are defense in depth and replace neither the durable authorization-side reservation nor the MEU ceiling)"
+  },
+  "custody": {
+    "secret_manager": "Google Cloud Secret Manager (initial external credential-custody system, LP-2)",
+    "api_host": "secretmanager.googleapis.com",
+    "gcp_project": "UNDESIGNATED (LP-7 ruling 1: a dedicated non-production GCP project for MEU provider validation, sharing nothing with production, general development, public demonstrations, CI or unrelated workloads; a later production project is a separate designation and commissioning record; the record must carry the project ID and the project number, never judged by name)",
+    "secret_name": "UNDESIGNATED (LP-7 ruling 3: a dedicated MEU secret; runtime configuration references projects/<project-number-or-id>/secrets/<secret-name>/versions/<number>; latest and every non-numeric reference are prohibited (custody.is_pinned_secret_version); no record holds the secret value, a reversible encoding or a verification digest, and every record field is refused when it carries a credential shape)",
+    "rotation_policy": "at least every 90 days and immediately following suspected exposure (custody adapters refuse max_credential_age over 90 days); rotation, disablement and destruction of superseded versions are recorded",
+    "audit_trail": "every materialization, granted or refused, is a CustodyAuditEvent of identifiers and digests appended under meu.credential_leased / meu.credential_refused (ledger_kinds.py); the secret is never a field of any record",
+    "custody_owner": "Rakesh Mohan — Founder, Ugence Labs",
+    "meu_identity_to_secret_manager": "RULED (LP-2): workload identity federation preferred; a long-lived Google service-account key is not introduced; the identity is UNDESIGNATED until LP-6 step 8",
+    "port": "ugence_model_egress_unit.custody.ModelCredentialCustodyPort; adapters in this distribution: ReferenceCustodyAdapter (inert) and PinnedSecretVersionCustodyAdapter over an injected reader (the fake/emulator path LP-6 step 5 authorizes); the real Secret Manager client is a separate distribution that does not exist yet; selection of Secret Manager authorizes the port and its tests, not creating, entering, retrieving or exercising a provider credential through Claude or CI",
+    "workload_identity": "UNDESIGNATED (LP-7 ruling 2: a dedicated non-human GCP service account; no human identity, default compute identity, downloadable service-account key or shared runtime identity; the deployment platform and its identity mechanism are recorded as either workload identity federation — OIDC issuer, audience, subject constraints, pool, provider, exact principal binding — or the native GCP path with no-static-key evidence; no project-wide privilege unrelated to reading the designated secret; infrastructure.check_step8_designation refuses the default compute identity, a human principal, a key file and an unconstrained principal set)",
+    "iam_binding": "UNDESIGNATED (LP-7 ruling 4: roles/secretmanager.secretAccessor only to the dedicated MEU workload identity, only on the designated secret, with no project-level accessor grant; human users, CI identities, other workloads and the database migrator identity receive no runtime-secret-read authority; administrative authority to add, disable or destroy versions stays separate from runtime read authority and no operator gains read permission by managing rotation; the record must carry a secret-level IAM-policy evidence reference and iam_binding_scope = secret)",
+    "audit_logging": "UNDESIGNATED evidence (LP-7 ruling 5: Secret Manager Data Access audit logs enabled and retained before any credential materialization; evidence must demonstrate the IAM policy on the exact secret, a successful access event by the designated MEU identity, the immutable numeric version accessed, within a precisely defined commissioning window no secret-access event by an identity outside the approved set, and correlation of the access event to the MEU validation attempt by non-secret identifiers, workload identity and bounded timestamps; no universal absence claim; no credential, prompt or response content in the evidence)",
+    "rotation_procedure": "UNDESIGNATED runbook (LP-7 ruling 6, eight steps: create a new project-scoped OpenAI service-account credential; store it as a new Secret Manager version; designate that numeric version as a candidate; run offline/fake-transport conformance checks; separately authorize a controlled validation; accept and activate the candidate; verify operation; revoke the superseded OpenAI credential and disable its version. Rollback only while both the previous version and credential remain valid and owner-authorized; destruction needs separately retained evidence and explicit authorization and never occurs during initial commissioning; maximum normal interval 90 days, immediate on suspected exposure; infrastructure.check_rotation_plan and rollback_permitted encode this)",
+    "never_placed_in": "source code, repository files, container layers, environment-variable configuration, GitHub Actions secrets, logs or evidence reports",
+    "provisioning_boundary": "LP-7 ruling 10: infrastructure provisioning, OpenAI service-account creation and credential creation are controlled operator actions outside the repository; repository implementation must not create, retrieve, transmit, display, log or test a real credential; no infrastructure-as-code exists in the repository"
+  },
+  "record_contract": {
+    "genuine_call": "Migration 2 (0.3.0) replaced CHECK egress_result_no_genuine_call with a custody requirement under the owner's confirmation of 2026-09-11 (ADR section 0.3); migration 3 (0.5.0, ADR section 0.6) adds egress_result.authorization_consumption_id and CHECK egress_result_genuine_call_requires_custody_and_admission: the database admits genuine_call True only with a custody lease id, a custody authority id, RESPONSE provenance and a reference to the durable consumption of the owner's typed LiveSyntheticValidationAuthorization. The application gate: EgressResult refuses genuine_call other than False without a verified GenuineCallAdmission for that request, issued only by admit_genuine_call after six conditions hold against the canonical commissioning record and the ledger has consumed the attempt; so genuine_call True admitted only for a result produced by the provider adapter holding a CredentialLease whose is_production_authoritative is True (the lease's authority under the real custody contract, within the non-production scope), under a verified admission, recording the lease id, custody authority and consumption, trust UNTRUSTED_EVIDENCE. MET is the outcome that result's evidence feeds, never its prerequisite; no string, flag, owner name or release constant admits anything",
+    "provider_adapter": "ugence_model_egress_unit.provider.EgressProvider; the OpenAI adapter is the separate MEU-only distribution ugence-model-egress-provider-openai 0.1.0 (LP-6 step 6, DONE): it builds a request only from the EgressRequest's minimized context, accepts exactly https://api.openai.com/v1/responses and no other URL (egress_policy.check_destination at PreparedRequest construction), takes its credential only through CredentialLease.use inside the one transport call, honours limits.check_request and CallBudget before dispatch, retries once only with transport proof that no bytes were dispatched, records OUTCOME_UNKNOWN for every ambiguous dispatch, and labels every answer UNTRUSTED_EVIDENCE under D-1. Its only transport is an injected fake; a live transport is step 7 work behind step 8"
+  },
+  "must_never_contain": [
+    "an API key, OAuth token, service-account key or any credential",
+    "a Google Cloud secret payload",
+    "a prompt, response or any customer content",
+    "a fixture recorded as a commissioned adapter"
+  ],
+  "limits": {
+    "ruling": "LP-5, bound into every authorized request and enforced non-compensatorily before dispatch by the unit (limits.check_request, limits.CallBudget); the model adapter cannot override them",
+    "max_input_tokens_per_request": 8192,
+    "max_output_tokens_per_request": 1024,
+    "max_genuine_validation_calls": 10,
+    "total_commissioning_budget_usd": 25,
+    "concurrency": 1,
+    "retries": "at most 1, only for a failure explicitly classified TRANSIENT_BEFORE_DISPATCH; never after a possible dispatch (spec 3.5, OUTCOME_UNKNOWN is terminal)",
+    "streaming": false,
+    "vendor_side_control": "UNDESIGNATED: the narrowest available OpenAI project budget or spend control as defense in depth; if advisory rather than a hard stop, the MEU reservation ledger enforces the hard limit before issuing a request (durable reservation row: unbuilt, see MEU_LIVE_VALIDATION.json blocked_by)"
+  },
+  "order": [
+    "1 record the rulings and amend CR-1 (DONE 2026-09-11)",
+    "2 ledger-kind schema and content-bearing-key refusals (DONE 0.2.0)",
+    "3 TLS-protected database transport (DONE as policy, 0.2.0) and provider transport verification (destination policy DONE 0.2.0; TLS verification belongs to the live transport, which does not exist: step 7)",
+    "4 production role provisioning, controlled migrations and tenant-bound database identities (DONE 0.3.0: migration 2, meu_migrator, role_tenant_binding, postgres/provision.py; no login identity is created by the migration and no password exists anywhere)",
+    "5 Google Secret Manager custody port, fake/emulator path only (DONE 0.2.0: PinnedSecretVersionCustodyAdapter over an injected reader)",
+    "6 OpenAI provider as a separate MEU-only distribution (DONE 0.1.0 of ugence-model-egress-provider-openai: injected fake transport only, exact destination and request shape, no credential access, no live network path)",
+    "7 validation matrix (DONE, blocked), durable LP-5 reservation (DONE 0.3.0, not yet wired in front of the adapter); offline step-7 artifacts under LP-7 ruling 11 — validation harness, fake-transport cases, negative-test matrix, redacted report generator, drift checks, secret-shape scanning — in ugence-model-egress-validation (DONE 0.1.0, offline only); the live transport and the owner-run live verifier's execution (BLOCKED on step 8)",
+    "8 stop and request the exact GCP and OpenAI designations (LP-7 of 2026-09-11 designs the non-production infrastructure, section 0.4; the seventeen exact values of ruling 12 remain UNDESIGNATED and are the owner's to supply and have independently checked; supplying them does not authorize a live call)",
+    "9 commission the credential manually through Secret Manager (owner)",
+    "10 synthetic validation run after every prerequisite gate passes",
+    "11 genuine enterprise content and production use stay blocked behind a later, separate commissioning record"
+  ],
+  "step8_required_values": {
+    "ruling": "LP-7 ruling 12 (ADR section 0.4.2); 17 mandatory designation obligations represented by 23 checked fields in ugence_model_egress_unit.infrastructure (obligation 14 is two typed fields; iam_binding_scope and openai_key_scope are derived subfields of obligations 7 and 13; environment, verified_by and verified_at are attestation fields, not obligations; the exact mapping is ADR section 0.4.2 and STEP8_OBLIGATIONS); none may be guessed, synthesized, represented as completed by a placeholder or inferred from a naming convention; supplying and verifying them closes only the infrastructure-designation blocker and does not authorize a genuine call",
+    "obligation_count": 17,
+    "checked_fields": 23,
+    "obligations": {
+      "gcp_project_id": "UNDESIGNATED",
+      "gcp_project_number": "UNDESIGNATED",
+      "meu_gcp_service_account_resource_name": "UNDESIGNATED",
+      "deployment_platform_identity_mechanism": "UNDESIGNATED",
+      "wif_pool_provider_and_constrained_principal_binding_or_native_gcp_equivalent": "UNDESIGNATED",
+      "full_numeric_secret_manager_version_resource": "UNDESIGNATED",
+      "secret_level_iam_policy_evidence_reference": "UNDESIGNATED",
+      "data_access_audit_log_configuration_and_retention_reference": "UNDESIGNATED",
+      "approved_rotation_runbook_reference": "UNDESIGNATED",
+      "openai_organization_id": "UNDESIGNATED",
+      "openai_project_id": "UNDESIGNATED",
+      "openai_project_service_account_id": "UNDESIGNATED",
+      "openai_role_and_api_key_scope_evidence": "UNDESIGNATED",
+      "vendor_spend_control_evidence_and_hard_stop_or_advisory_classification": "UNDESIGNATED",
+      "designated_model_availability_evidence": "UNDESIGNATED",
+      "applicable_data_processing_terms_reference": "UNDESIGNATED",
+      "approved_processing_or_data_residency_region": "UNDESIGNATED"
+    },
+    "attestation": {
+      "independently_checked_by": null,
+      "environment": "non-production (LP-7 preamble; a production designation is a separate record)"
+    },
+    "first_live_synthetic_validation_authorization": "NOT GIVEN (a separate, explicit owner authorization, LP-7 ruling 12)",
+    "production_commissioning_record": "NONE (production use requires another commissioning record)"
+  }
+}

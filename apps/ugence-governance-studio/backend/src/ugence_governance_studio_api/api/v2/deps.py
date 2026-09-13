@@ -47,6 +47,12 @@ def _absent_vendor() -> Any:
     return VendorDeclarationService(declarations=None)
 
 
+def _absent_workflow_drafts() -> Any:
+    from ...services.studio_v2 import WorkflowDraftService
+
+    return WorkflowDraftService(drafts=None)
+
+
 def _absent_clearance_export() -> Any:
     from ...services.studio_v2 import ClearanceExportService
 
@@ -87,6 +93,7 @@ class V2Context:
         start_run: Any = None,
         data_use: Any = None,
         vendor: Any = None,
+        workflow_drafts: Any = None,
         clearance_export: Any = None,
         ledger_observe: Any = None,
         deployment_status: Any = None,
@@ -112,6 +119,10 @@ class V2Context:
         # Front-door seam 9 (FD-13): the vendor-dependency intake. Absent, the vendor
         # routes report the gap.
         self.vendor = vendor if vendor is not None else _absent_vendor()
+        # Bring Your Workflow phase 3A (authority-plane ADR §24): the workflow-draft
+        # intake. Absent, the draft routes report the gap.
+        self.workflow_drafts = (
+            workflow_drafts if workflow_drafts is not None else _absent_workflow_drafts())
         # Clearance export (CE-5 EXPORT_IS_A_READ): the one read that returns the
         # portable form of a clearance the deployment already holds. Absent, the
         # route reports the gap rather than answering as though the tenant simply

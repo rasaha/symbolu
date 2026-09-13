@@ -1,0 +1,52 @@
+{
+  "available": true,
+  "claimed_owner_status": "PRESENTED_UNPROVEN",
+  "confers": "nothing: a draft is a record of a validated document, not an approval, a compilation, a publication, an export or a permission; a claimed owner confers no read, write, approval or execution authority (authority-plane ADR \u00a724, phase 3A)",
+  "count": 2,
+  "include_superseded": true,
+  "lifecycle": "DRAFT",
+  "lifecycle_note": "DRAFT and nothing else: no route here approves, compiles, publishes, exports, clears or hands a draft to a runtime, and the Policy Workflow Compiler's refusal to compile a DRAFT stands; a verified owner, a directory grant and submission for approval are phase 3B, blocked on AP-3",
+  "recorded_by": "governance-studio-private-hosted/0.13.0",
+  "result": [
+    {
+      "claimed_owner_assurance": "PRESENTED_UNPROVEN",
+      "claimed_owner_ref": "directory://people/owner-1",
+      "contract_version": "workflow_ir.v1",
+      "draft_id": "wfd_65ba6c944d16bc380dc643ac0889a18b",
+      "lifecycle": "DRAFT",
+      "notes": "guided example",
+      "record_digest": "dd623b0dfd4b63a723dc9a3f0aa8c8469c1e7ecdc682151ae96ef28a1d3a6c09",
+      "record_version": "workflow_draft.v1",
+      "recorded_by": "governance-studio-private-hosted/0.13.0",
+      "registration_digest": "",
+      "registration_ref": "",
+      "superseded_by": "wfd_e79e348bbb27c2848a314462bd1b5e68",
+      "supersedes": "",
+      "tenant_id": "tenant-1",
+      "title": "Procurement intake",
+      "validated_by": "ugence-agent-workforce-composer/0.2.1",
+      "workflow_digest": "sha256:07a010387450da9323d9612edb84527aa03519da8ea64a2f6bcbc2724bd1d86d"
+    },
+    {
+      "claimed_owner_assurance": "PRESENTED_UNPROVEN",
+      "claimed_owner_ref": "",
+      "contract_version": "workflow_ir.v1",
+      "draft_id": "wfd_e79e348bbb27c2848a314462bd1b5e68",
+      "lifecycle": "DRAFT",
+      "notes": "",
+      "record_digest": "21bdda1725b6a775b04d1ab6fbb365b413272f720d9895efbaea14f75cbb6ab5",
+      "record_version": "workflow_draft.v1",
+      "recorded_by": "governance-studio-private-hosted/0.13.0",
+      "registration_digest": "",
+      "registration_ref": "",
+      "superseded_by": "",
+      "supersedes": "wfd_65ba6c944d16bc380dc643ac0889a18b",
+      "tenant_id": "tenant-1",
+      "title": "Procurement intake, revised",
+      "validated_by": "ugence-agent-workforce-composer/0.2.1",
+      "workflow_digest": "sha256:07a010387450da9323d9612edb84527aa03519da8ea64a2f6bcbc2724bd1d86d"
+    }
+  ],
+  "store_kind": "SqliteWorkflowDrafts",
+  "tenant_id": "tenant-1"
+}

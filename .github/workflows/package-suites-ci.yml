@@ -136,10 +136,23 @@ jobs:
           - packages/integration/execution-reservation
           - packages/integration/incident-response
           - packages/integration/vendor-dependency
+          - packages/integration/workflow-drafts
           - packages/tooling/workflow-converters
           - packages/uvi-policy-contracts
     steps:
       - uses: actions/checkout@v4
+        with:
+          # approval-workflow's frozen-tree guards ask whether *this branch*
+          # changed the Decision Authority kernel, which is a question about a
+          # committed diff and needs a base to diff against. A shallow checkout
+          # leaves no remote branch sharing history with HEAD, and the guard fails
+          # rather than skipping — deliberately, because a guard that quietly stops
+          # guarding is indistinguishable from one that passed.
+          #
+          # cloud-scaling-producer-attestation-ci.yml already checks out this way
+          # for its own copy of the same guard. The repository packs to ~67 MiB, so
+          # full history is cheap next to installing the dependency set.
+          fetch-depth: 0
       - uses: actions/setup-python@v5
         with:
           python-version: "${{ matrix.python-version }}"

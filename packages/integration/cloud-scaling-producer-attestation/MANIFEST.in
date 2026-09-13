@@ -45,6 +45,10 @@ include public_api.json
 exclude tests/test_import_boundary.py
 exclude tests/test_phase5a_invariants.py
 exclude tests/test_frozen_digests.py
+# The tree guards' base resolution and the module that measures it: both need a git
+# checkout with a resolvable base branch, which no distribution contains.
+exclude tests/_tree_guard.py
+exclude tests/test_tree_guard.py
 # The property ledger shells out to pytest over the full repository suite and asserts ratios
 # computed from it; from a subset it would report different numbers and assert the wrong thing.
 exclude tests/test_property_ledger.py

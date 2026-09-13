@@ -28,6 +28,12 @@ import cyberReplay from "./fixtures/cybersecurity_no_feasible_team.replay.json";
 import bringValidate from "./fixtures/bring.validate.json";
 import bringAdapt from "./fixtures/bring.adapt.json";
 import bringCompare from "./fixtures/bring.compare.json";
+import bringDraftSaved from "./fixtures/bring.draft-saved.json";
+import bringDraftDuplicate from "./fixtures/bring.draft-duplicate.json";
+import bringDraftRead from "./fixtures/bring.draft-read.json";
+import bringDraftsList from "./fixtures/bring.drafts-list.json";
+import bringDraftsListAll from "./fixtures/bring.drafts-list-all.json";
+import bringDraftsGap from "./fixtures/bring.drafts-gap.json";
 
 const RESULT: Record<string, unknown> = {
   "/api/v1/scenarios": scenarios,
@@ -70,6 +76,14 @@ export interface FetchMockOptions {
   workflowTooComplex?: boolean;
   notReady?: boolean;
   unreachable?: boolean;
+  /** Bring Your Workflow phase 3A: no drafts file is configured in this deployment. */
+  draftsGap?: boolean;
+  /** Bring Your Workflow phase 3A: the save answers with the typed duplicate refusal. */
+  draftDuplicate?: boolean;
+}
+
+function v2Envelope(result: unknown) {
+  return { ...envelope(result), api_version: "governance_studio.api.v2" };
 }
 
 export function installFetchMock(opts: FetchMockOptions = {}) {
@@ -123,6 +137,21 @@ export function installFetchMock(opts: FetchMockOptions = {}) {
       return jsonResponse(envelope(bringAdapt));
     }
     if (path === "/api/v1/workflows/compare-adaptations") return jsonResponse(envelope(bringCompare));
+    // Bring Your Workflow phase 3A (ADR §24): the three draft operations, answered from
+    // fixtures the real backend produced for the guided example over a real store.
+    if (path === "/api/v2/workflow-drafts") {
+      if (opts.draftsGap) return jsonResponse(v2Envelope(bringDraftsGap));
+      if ((init?.method ?? "GET") === "POST") {
+        return jsonResponse(v2Envelope(opts.draftDuplicate ? bringDraftDuplicate : bringDraftSaved));
+      }
+      return jsonResponse(v2Envelope(url.includes("include_superseded=true") ? bringDraftsListAll : bringDraftsList));
+    }
+    if (path.startsWith("/api/v2/workflow-drafts/")) {
+      if (opts.draftsGap) return jsonResponse(v2Envelope(bringDraftsGap));
+      const id = decodeURIComponent(path.slice("/api/v2/workflow-drafts/".length));
+      if (id === bringDraftRead.draft_id) return jsonResponse(v2Envelope(bringDraftRead));
+      return jsonResponse(v2Envelope({ available: true, found: false, tenant_id: "tenant-1", draft_id: id, result: null }));
+    }
     if (path.endsWith("/what-if")) return jsonResponse(envelope(procWhatIf));
     if (path === "/api/v1/explanations/eligibility") {
       let scenarioId = "procurement";

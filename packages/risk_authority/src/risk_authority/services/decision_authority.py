@@ -22,12 +22,12 @@ ruler here must not be mistaken for that canonical kernel.
 from __future__ import annotations
 
 from datetime import datetime, timedelta
-from typing import Optional, Protocol, runtime_checkable
+from typing import Mapping, Optional, Protocol, runtime_checkable
 
 from ..domain.authority import AuthorityGrant, authority_violations
 from ..domain.decision import RiskDecision
 from ..domain.enums import RiskClass, RiskOutcome, RiskRecommendation
-from ..domain.errors import AuthorityDeniedError
+from ..domain.errors import AuthorityDeniedError, NoRemainingValidityError
 from ..domain.risk_case import RiskDecisionCase
 from ..domain.scope import Scope
 from .risk_engine import RiskEvaluation
@@ -71,6 +71,7 @@ class DecisionAuthorityPort(Protocol):
         now: datetime,
         evaluated_at: Optional[datetime] = None,
         ttl: timedelta = DEFAULT_DECISION_TTL,
+        prerequisite_horizons: "Mapping[str, Optional[datetime]] | None" = None,
     ) -> RiskDecision: ...
 
 
@@ -97,6 +98,7 @@ class ReferenceDecisionAuthority:
         now: datetime,
         evaluated_at: Optional[datetime] = None,
         ttl: timedelta = DEFAULT_DECISION_TTL,
+        prerequisite_horizons: "Mapping[str, Optional[datetime]] | None" = None,
     ) -> RiskDecision:
         """Issue a binding :class:`RiskDecision`.
 
@@ -116,6 +118,8 @@ class ReferenceDecisionAuthority:
 
         bound_scope = requested_scope.normalized()
 
+        expires_at = now + ttl
+
         if grants_authority:
             reasons = authority_violations(
                 grant,
@@ -128,8 +132,58 @@ class ReferenceDecisionAuthority:
             )
             if reasons:
                 raise AuthorityDeniedError(reasons)
+
+            # Derived authority is capped by the earliest prerequisite that actually
+            # authorized it. Previously ``now + ttl`` was applied unconditionally, so a
+            # grant expiring moments after the decision was minted still yielded a full
+            # hour of decision validity — and a further envelope TTL on top of that. The
+            # half-open operator on ``AuthorityGrant.is_active`` only closes the boundary
+            # instant; this is what closes the reach.
+            #
+            # Each bound is named so the refusal below can say which one bound, and so a
+            # reader can tell which prerequisites participate. Only prerequisites that
+            # contributed to *this* authorization appear here: the caller passes the
+            # control-freshness horizon computed over the required set that was actually
+            # satisfied, never over every result that happened to be in the request.
+            #
+            # Evidence bounds are covered transitively and by construction, not by
+            # omission: ``binding._freshness_is_monotonic`` refuses any trusted control
+            # result whose ``valid_until`` outlives the earliest ``valid_until`` of its
+            # admitted backing evidence, so the control horizon is already no later than
+            # the evidence floor beneath it.
+            horizons: "dict[str, Optional[datetime]]" = {
+                "authority_grant": grant.expires_at,
+            }
+            if prerequisite_horizons:
+                horizons.update(prerequisite_horizons)
+
+            binding_prerequisite: Optional[str] = None
+            for name, bound in horizons.items():
+                # An absent bound imposes no cap, never a cap of zero.
+                if bound is not None and bound < expires_at:
+                    expires_at, binding_prerequisite = bound, name
+
+            # Windows are half-open, so ``expires_at == now`` authorizes nothing at any
+            # instant. Refuse rather than mint a decision that is already expired: a
+            # point-in-time fact may remain valid at its final instant, but it cannot
+            # create authority that survives beyond that instant, and returning a
+            # zero-width decision would push the failure to a later, less obvious refusal.
+            if expires_at <= now:
+                bound_by = binding_prerequisite or "decision_ttl"
+                raise NoRemainingValidityError(
+                    [
+                        f"no validity remains for a decision at this instant "
+                        f"(bound by {bound_by}): "
+                        + ", ".join(
+                            f"{name}={bound.isoformat() if bound else None}"
+                            for name, bound in horizons.items()
+                        )
+                    ],
+                    prerequisite=bound_by,
+                )
         else:
-            # A refusal grants nothing.
+            # A refusal grants nothing, so neither cap applies: the decision conveys no
+            # authority whose lifetime could exceed the grant's or the evidence's.
             bound_scope = Scope()
 
         return RiskDecision(
@@ -150,7 +204,7 @@ class ReferenceDecisionAuthority:
             # rather than substituting ``now``, which would make the authority's own clock
             # masquerade as the evaluator's (R-12b).
             evaluated_at=evaluated_at,
-            expires_at=now + ttl,
+            expires_at=expires_at,
             applicable_rules=evaluation.applicable_rules,
             reason=("; ".join(evaluation.trace))[:512],
         )

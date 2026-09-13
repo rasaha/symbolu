@@ -1,8 +1,16 @@
 # Owner ratification — a live model-calling provider
 
-**Status:** ballot, not a decision. Nothing here is implemented, scheduled or authorized.
-No gate identifier is marked satisfied and no ratified pin, gate record or evidence
-manifest is modified by this document.
+**Status:** D-1 through D-5 **all RATIFIED 2026-09-10**, together with §3's direction, a
+CR-5 clarification recorded in the composition-root ADR, three transport rulings — a
+worker-owned reconciliation driver, a dedicated exchange schema under least privilege, and
+`OUTCOME_UNKNOWN` as a terminal outcome — recorded in `SPEC_MODEL_EGRESS_UNIT.md` §3.3-§3.5,
+and the exchange grants and tenancy ruling in
+`OWNER_RATIFICATION_MEU_EXCHANGE_TENANCY.md`. **No design question remains open**; what
+remains is unbuilt mechanism and one owner decision on retention. Nothing is
+implemented. No exchange table is designed and no exchange exists. No gate identifier is
+marked satisfied and no ratified pin, gate record or evidence manifest is modified by this
+document. The implementation specification opened by these rulings is
+`SPEC_MODEL_EGRESS_UNIT.md`.
 
 **The question:** may the agent runtime gain a provider that calls a model vendor's API,
 and under what constraints?
@@ -58,7 +66,18 @@ the largest in the product, because *does not execute* is the claim every screen
 Five decisions. Each changes the specification materially; the first changes whether the
 others are asked at all.
 
-### D-1 — Is inference an action?
+### D-1 — Is inference an action? — **RATIFIED: `INFERENCE_IS_AN_ACTION`**
+
+> **D-1 — INFERENCE_IS_AN_ACTION.** An inference invocation is a governed external action
+> because it may create data-egress, vendor, cost and compliance effects. The resulting
+> model output carries no decision or execution authority.
+> — owner, 2026-09-10
+
+The qualification is the substance of the ruling and must not be lost in implementation:
+what is governed is the **request**, because it transmits data outward, incurs cost,
+invokes a vendor and creates compliance exposure. The **response** is thereby granted
+nothing. It returns as an untrusted proposal or as evidence, and stays untrusted until
+independently verified and separately authorized for any consequential use.
 
 Does a model call pass through the governed execution hook and require clearance, or is
 reasoning exempt from it?
@@ -71,11 +90,23 @@ reasoning exempt from it?
 
 *Everything below assumes this is not `DEFER`.*
 
-### D-2 — Where does the provider run, and what happens to CR-5?
+### D-2 — Where does the provider run, and what happens to CR-5? — **RATIFIED: `SEPARATE_EGRESS_UNIT`**
 
-**Owner's stated preference: `SEPARATE_EGRESS_UNIT`** — keep the worker private and
-preserve CR-5 rather than allow it to call vendors. Recorded as a preference; the decision
-is open, and §4b states what each option costs.
+> **D-2 — SEPARATE_EGRESS_UNIT.** Preserve CR-5 and keep all model-provider network
+> access, SDKs and credentials outside Agent Runtime. Commission a separately deployed
+> Model Egress Unit with a narrow authorized interface. It may perform approved inference
+> calls but may not approve requests, interpret provider output as trusted evidence or
+> execute resulting actions.
+> — owner, 2026-09-10
+
+CR-5's **worker clause** is not amended. The worker's egress claim stands as written, and the
+vendor call moves outside it. §4b's cost is accepted with the ruling: a deployment unit, a
+trust boundary, and a new CR-family ruling for what may cross it — **ratified 2026-09-10** as
+the CR-4 and CR-5 amendments recorded in
+`ADR_UGENCE_REVIEW_SERVICE_COMPOSITION_ROOT_SCOPING.md` §5 `[V]`. The MEU now carries its own
+egress record with two permitted destinations; the worker's three are untouched. **CR-1 is
+not amended `[G]`** — it admits one companion unit, and the MEU is a second, so the boundary
+is specified while the unit's existence is not.
 
 | Option | Consequence |
 |---|---|
@@ -83,7 +114,33 @@ is open, and §4b states what each option costs.
 | `SEPARATE_EGRESS_UNIT` | A second deployment unit holds the vendor call; the worker's egress claim survives intact. A new unit, a new boundary, a new CR-family ruling. |
 | `NO_LIVE_PROVIDER_IN_THIS_ARCHITECTURE` | The seam stays unimplemented and the claim stays absolute. |
 
-### D-3 — Credential custody
+### D-3 — Credential custody — **RATIFIED: `NO_CREDENTIAL_IN_THIS_DEPLOYMENT`**
+
+> **D-3 — NO_CREDENTIAL_IN_THIS_DEPLOYMENT.** The reference deployment must contain no
+> model-provider credential and must make no genuine provider call. It may implement and
+> test:
+>
+> - the MEU deployment boundary;
+> - authorized-request leasing;
+> - minimized-context validation;
+> - provider-adapter interfaces using deterministic fakes;
+> - response correlation;
+> - refusal and retry behavior;
+> - provenance placeholders that do not claim genuine provider evidence.
+>
+> Production model invocation remains blocked until an external secret-manager integration,
+> rotation policy, audit trail and custody owner are separately commissioned.
+> `PLATFORM_ENVIRONMENT_VARIABLE` is rejected as a production custody mechanism.
+>
+> A customer-managed credential may not be smuggled into the reference deployment through an
+> environment variable, fixture or undocumented operator step. The absence of custody must
+> produce an explicit non-production/refusal posture.
+> — owner, 2026-09-10
+
+The last paragraph is the enforceable part and the specification treats it as such: absence
+of custody is a **posture the unit states and acts on**, not a configuration gap it happens
+to have. A deployment with no credential refuses to call and says so; it does not merely
+fail to find a key.
 
 | Option | Consequence |
 |---|---|
@@ -91,11 +148,52 @@ is open, and §4b states what each option costs.
 | `EXTERNAL_SECRET_MANAGER` | Custody is a named dependency with rotation and audit. Correct, and prerequisite work before any provider ships. |
 | `NO_CREDENTIAL_IN_THIS_DEPLOYMENT` | A live provider is scoped to a customer-operated deployment only. |
 
-### D-4 — What is recorded
+### D-4 — What is recorded — **RATIFIED: the exchange is the temporary content plane**
 
 Prompts and responses are the highest-value evidence and the highest-risk payload. This
 collides directly with context minimization and data-use admission, both of which are
 already composed into the loop.
+
+> **D-4.** The dedicated model-egress exchange is the temporary content plane. It may carry
+> structured canonical content consisting only of the authorized, minimized context required
+> for inference and the resulting provider output. It may never carry unminimized source
+> material, removed context, credentials, authority decisions, grant contents, clearance
+> contents, workflow state, or another tenant's data.
+>
+> `request_digest` must bind the complete immutable inference request — not merely unit
+> identifiers — including tenant identity, exchange schema version, ordered minimized unit
+> identifiers and exact text, model-selection constraints, inference parameters, and the
+> clearance reference and digest. Mutable lease, claim, attempt and processing timestamps are
+> excluded. The response record must bind the canonical returned payload and its provenance
+> through a response digest.
+>
+> The append-only audit ledger may retain only identifiers, digests, references, enumerated
+> outcomes, metering and provenance. For Model Egress Unit ledger kinds, enforce this through
+> a kind-specific schema that refuses content-bearing keys; record this as an unimplemented
+> gap until built.
+>
+> No application-level encrypted-object mechanism is commissioned for the reference
+> deployment. This does not waive transport security, database protection or future
+> production key custody. No genuine customer content or genuine provider call is authorized
+> until exchange tenancy, least-privilege database grants, retention and deletion policy,
+> transport protection, and production credential custody are separately verified.
+>
+> Content remains only until the terminal result has been durably consumed by the worker,
+> followed by an owner-approved grace period. Purging replaces content with a non-content
+> tombstone containing request identity, digests, outcome, consumption acknowledgement and
+> purge time. Engineering may not choose the grace period or maximum retention duration.
+>
+> Exchange grants and tenancy must be ratified before any content-bearing table is designed
+> or implemented.
+> — owner, 2026-09-10
+
+**The ballot's framing did not survive the ruling, and that is the point.** Each option below
+assumes one store and asks how much of the exchange goes into it. The ruling separates the
+planes instead: content lives in the exchange, where it can be purged; the record lives in
+the append-only ledger, where it cannot. So it is neither `RECORD_FULL_EXCHANGE` nor
+`RECORD_DIGEST_AND_METADATA`, and it is stricter than `RECORD_MINIMIZED_EXCHANGE` — minimized
+content is admitted to the exchange only, never to the ledger, and only until the worker has
+durably consumed the result.
 
 | Option | Consequence |
 |---|---|
@@ -103,16 +201,129 @@ already composed into the loop.
 | `RECORD_DIGEST_AND_METADATA` | Hash, token counts, model id, latency, disposition — no content. Defensible, and cannot reconstruct what happened. |
 | `RECORD_MINIMIZED_EXCHANGE` | Content admitted through context minimization only. Consistent with the existing gate; the most work. |
 
-### D-5 — Do concentration limits carry into execution?
+Two consequences are worth stating separately, because they are the ones an implementation
+would otherwise soften. **The ledger's content rule has no enforcement today** —
+`LedgerEntry.payload` accepts any canonically serializable dict `[G]`, so until the
+kind-specific schema exists the rule is stated and unpoliced. And **the grace period and the
+maximum retention duration are owner decisions withheld from engineering** `[R]`: until they
+are set, no content may be held at all. Recorded in full at `SPEC_MODEL_EGRESS_UNIT.md` §4.4.
 
-The registry already reasons about provider concentration in **planning** — the
-procurement scenario is non-greedy team selection under provider concentration limits
-`[V]`. A live provider makes those limits enforceable at execution for the first time.
+### D-5 — Do concentration limits carry into execution? — **RATIFIED: `BIND_AT_AUTHORIZATION`**
+
+> **D-5 — BIND_AT_AUTHORIZATION.** Any enforceable model-vendor mix requirement is evaluated
+> by Model Authority before an authorized request is written to the model-egress exchange.
+> `PLANNING_ONLY` is insufficient for a binding organizational limit, and `BIND_AT_THE_MEU` is
+> rejected because it would give the MEU governance authority expressly denied by the
+> architecture.
+>
+> The existing `AgentProfile.provider_id` concentration limit concerns suppliers of assigned
+> agent roles and must not be interpreted as a model-invocation vendor limit. Before
+> vendor-mix enforcement can operate, Policy Authority must define the invocation quantity,
+> scope, tenant, measurement window, denominator, policy reference/version/digest, and
+> treatment of refused, failed and uncertain outcomes. A durable, idempotent per-vendor
+> reservation/counter owned by the authorization side is also required. Record both as `[G]`.
+>
+> When an applicable vendor-mix policy exists, Model Authority must durably reserve capacity
+> before the request is admitted to the exchange. Its authorization must bind tenant, selected
+> vendor, selected model, policy identity and reservation identity. If the applicable policy or
+> durable counter cannot be resolved, authorization fails closed and no request is dispatched.
+>
+> The MEU does not calculate concentration, choose policy or update governance limits. It only
+> verifies that the requested vendor and model match the authorization binding. A mismatch uses
+> the existing/general authorization-binding refusal rather than a new D-5 vendor-mix refusal.
+> Remove §6's D-5 refusal placeholder.
+>
+> A request reaching `OUTCOME_UNKNOWN` after possible provider dispatch is conservatively
+> counted as consumed until an independently authorized reconciliation proves otherwise. Lease
+> expiry alone never releases the reservation or permits another billed call.
+> — owner, 2026-09-10
+
+**The ruling took the audit's finding and made it a prohibition.** This document observed that
+the composer's limit measures role assignments rather than invocations; the ruling turns that
+from a discrepancy into a rule — the existing limit **must not be interpreted** as a
+model-invocation vendor limit. A future implementer who finds `provider_concentration_limit_pct`
+and reaches for it is now doing something forbidden rather than something plausible.
+
+**Two additions the audit did not reach, and both close real holes.** *Fail closed on an
+unresolvable policy or counter*: the audit argued where the check belongs and left unstated
+what happens when the mechanism is present but unreadable — silence there would have defaulted
+to allow. And *`OUTCOME_UNKNOWN` counts as consumed*: §3.5 already made that outcome terminal
+for the request, but a reservation is a different object, and without this rule an ambiguous
+dispatch would have quietly returned capacity that may well have been spent. Lease expiry
+releasing a reservation would have reintroduced, at the quota layer, exactly the duplicate
+billed call §3.5 exists to prevent.
+
+**What the ruling does not do is start the work.** Both prerequisites stay `[G]`, and neither
+is designed here: the policy quantity is Policy Authority's to define, and the reservation
+counter is the authorization side's to build.
+
+
+
+**Audit first, because the question contains an assumption the repository does not support.**
+D-5 asks whether "the vendor mix a plan promised" binds at execution. There is no such
+quantity today. Three unrelated things are called a provider:
+
+| | |
+|---|---|
+| `AgentProfile.provider_id` (`agent-workforce-composer/…/agents.py:119`) `[V]` | Who supplies the **agent**. This is what `provider_concentration_limit_pct` — "max % of **roles** to one provider" — constrains (`composition.py:38, 177-183`) |
+| `Candidate.provider` (`model-selection/…/model.py:37`) `[V]` | The **serving model vendor** — `anthropic`, `google`, `alibaba_modelstudio` — bounded by an optional enterprise allowlist, `approved_providers` (`model.py:26`) |
+| `ShadowProvider.provider_id = "shadow-recorder"` (`governed-runtime-worker/…/workload.py:48`) `[V]` | A **tool provider** in the runtime's registry |
+
+Only the second is a model vendor, and it is not the one the concentration limit measures.
+The composer's constraint is over **role assignments in a team at composition time**: a
+three-role team at 67% may give at most two roles to one agent supplier. It says nothing
+about how many times anything calls a vendor. So a limit that "carries into execution"
+cannot simply be re-evaluated later — **the quantity it would bind does not exist yet** `[G]`.
+
+**Neither capability reaches the runtime `[V]`.** Outside their own packages,
+`ugence_agent_workforce_composer` and `ugence_model_selection` appear only in boundary tests
+that **forbid importing them** (for example `agent-runtime/tests/test_import_boundaries.py:42`)
+and in the compiler's capability registry — where `MODEL_SELECTION` is
+`disposition=ADVISORY, optional=True`, described as "policy-bounded model eligibility
+(mandatory) + selection (advisory)" (`policy-workflow-compiler/…/capability_registry.py:105-112`),
+and the workforce composer **is not a listed capability at all**. The governed loop the worker
+runs composes neither.
+
+**Concentration is a property of a sequence, and nothing in the selection path counts `[V]`.**
+`ExecutionGate`'s `quota_available` condition reads a `quota_state` **signal the caller
+supplies** (`gate.py:113-119`); the gate holds no history. The only stateful counter anywhere
+in the runtime is the budget ledger — `PostgresBudgetLedger.reserve()`, idempotent per key,
+with the ceiling enforced by a PostgreSQL `CHECK` constraint rather than in-process
+bookkeeping (`durable-execution/…/budgets.py:43-72`, `postgres/schema.py:62-78`). Whatever
+binds a mix at execution has to look like that, and nothing today does.
+
+**Where the MEU would get the knowledge, and why it cannot.** §3.4 forbids the MEU reading
+the worker's application schema, so a count would have to come from the exchange, from a third
+store, or not from the MEU at all. The exchange is ruled out by D-4 itself: content is purged
+once the terminal result is consumed, and §4.4's tombstone retains request identity, digests,
+outcome, consumption acknowledgement and purge time — **it does not retain `model_ref` or
+provenance** `[V]`. After a purge the exchange cannot say which vendor was called, so a
+counter derived from it silently resets at the retention horizon. A third store is a new trust
+boundary, refused by the same reasoning that settled D-4. And a counter the MEU both writes
+and enforces against is the MEU marking its own homework.
 
 | Option | Consequence |
 |---|---|
-| `LIMITS_BIND_AT_EXECUTION` | The vendor mix a plan promised is the mix that runs. Closes the gap between planned and actual governance. |
-| `PLANNING_ONLY` | Concentration limits stay advisory. A plan may promise a mix the runtime does not honour, which is a gap worth stating plainly rather than discovering. |
+| `PLANNING_ONLY` | Concentration limits stay advisory. Honest about today, and it leaves a plan free to promise a mix the runtime does not honour — the gap worth stating plainly rather than discovering. |
+| `BIND_AT_AUTHORIZATION` | The limit binds before the request is written to the exchange: the worker refuses, the MEU never sees the request, and §6 gains no refusal. Consistent with `ModelAuthority` already issuing a **binding** ALLOW/DENY/HOLD/ESCALATE under non-compensatory eligibility (`authority.py:146, 172`) `[V]`, and with the registry's split of eligibility (mandatory) from selection (advisory). Needs a durable per-vendor counter shaped like the budget ledger, and a vendor-mix quantity that does not exist yet. |
+| `BIND_AT_THE_MEU` | The MEU refuses a call that would breach the mix. Places the check closest to the act — and requires the MEU to hold state it also authors, over a store whose purge horizon resets the denominator. It also gives the MEU a second reason to refuse that is not derived from the authorization it was handed, which is the shape D-1 was careful to deny it. |
+
+**Recommendation: `BIND_AT_AUTHORIZATION`, with the prerequisite stated rather than assumed.**
+Binding at execution is right — a plan that promises a mix the runtime ignores is governance
+theatre — but "at execution" must mean *before the authorized request is written*, not *at the
+MEU*. That keeps the MEU what D-1 and §7 make it: a unit that performs one call and returns
+one result, with no authority to refuse on grounds the authorization did not already settle.
+So **§6 gains no D-5 refusal**, and the placeholder there resolves by removal rather than by
+addition.
+
+Two things must be built before this means anything, and neither is licensed by ruling D-5
+`[G]`: a **vendor-mix quantity** over model invocations rather than role assignments, since
+none of the three `provider` vocabularies is the one D-5 names; and a **durable per-vendor
+counter** with a database-enforced ceiling, shaped like `PostgresBudgetLedger` and owned by
+the worker. The audit ledger is not a substitute: it retains metering and provenance under D-4,
+but deriving a live quota from an append-only audit trail makes the record load-bearing for
+admission, which is not what it is for.
+
 
 ## 4a — The execution sequence, and where it still needs a decision
 
@@ -214,18 +425,26 @@ recorded in this repository today `[G]`. Until one is, the amendment buys nothin
 spends a claim.
 
 Nothing in §4a or §4b ratifies anything. Whether the loop is arranged this way is part of
-D-1; where the first step runs is D-2; and both remain unanswered.
+D-1; where the first step runs is D-2.
+
+**Superseded 2026-09-10.** §4a and §4b are kept as the pre-ratification record and their
+present tense is read as of the day they were written. D-1 and D-2 have since been ratified
+(§4), and `SEPARATE_EGRESS_UNIT` is the answer §4b argued toward.
 
 ## 5 — What this document does not do
 
 It specifies nothing. No interface, no package layout, no configuration surface, no
-sequencing. An implementation specification written before D-1 and D-2 are answered would
-be a specification of one arbitrary reading among several, and the two readings of D-2 are
-different products.
+sequencing. An implementation specification written before D-1 and D-2 were answered would
+have been a specification of one arbitrary reading among several, and the two readings of
+D-2 were different products.
 
 It also marks no gate identifier satisfied, admits nothing to the P3E-CTR or GRW-CTR
 families, and changes no ratified pin.
 
-**On ratification of D-1 through D-5, the next artifact is an implementation
-specification** written against the answers, followed by the amendments D-2 requires to
-CR-5 and CR-4 — which are owner acts, not consequences of the spec.
+**The implementation specification opened by these rulings is
+`SPEC_MODEL_EGRESS_UNIT.md`,** written against D-1 through D-5. The amendments D-2 required
+to CR-5 and CR-4 were ratified on 2026-09-10 and are recorded in
+`ADR_UGENCE_REVIEW_SERVICE_COMPOSITION_ROOT_SCOPING.md` §5; **CR-1 remains unamended `[G]`**,
+so no deployment may read the CR-5 amendment as authorization to run a second unit. Nothing
+is implemented: no exchange table is designed by these documents, and no genuine provider
+call is authorized.
