@@ -21,8 +21,20 @@ them. Three rules apply throughout.
   top-level `[V]` (`frontend/src/app/App.tsx:46-61`).
 - **Four scenario ids exist and no others:** `procurement`, `customer_support`, `cybersecurity_success`,
   `cybersecurity_no_feasible_team` `[V]` (`backend/.../scenarios/catalog.py:36-41`). Any other id is a 404.
+- **Two deployments serve these same screens, and they answer differently.** `studio-web` is the
+  frontend alone, calling a separate `studio-api` across services on a Railway-managed domain with
+  a trusted certificate; it is the browser-friendly demo, and its Governed Agent Studio seams are
+  unconfigured. The private hosted profile of part 9 of the Railway walkthrough
+  (`docs/deployment/RAILWAY_REFERENCE_DEPLOYMENT.md`) is one container serving the frontend and the
+  API on a single origin through a raw TCP proxy, behind Basic authentication, with the record
+  stores on a persistent volume; its seams are configured, so the screens that report a gap on
+  `studio-web` record for real there. The routes are identical on both, so a path below applies to
+  whichever origin you opened. Use the hosted profile for acceptance and persistence testing, and
+  `studio-web` for external demonstration until the hosted profile has trusted TLS on a suitable
+  domain; expect a certificate warning on the hosted one until then.
 - **A typed gap is a correct answer, not a fault.** On the live studio most Governed Agent Studio
-  screens report *Not available in this deployment* with the seam they lack. Read the notice aloud;
+  screens report *Not available in this deployment* with the seam they lack, and on the hosted
+  profile most do not. Read the notice aloud where it appears;
   it is the deployment saying what it does not have rather than showing a green tick over nothing.
 
 The demo order that works is the console first, then the studio, then the plane
@@ -420,7 +432,7 @@ or executes, and a test enforces it on every operation id, path and summary.
 
 #### Enter, press, expect
 
-*On the live deployment:* typed gap `system_registry`: *no system registry is configured: this deployment holds no registration file, so nothing can be recorded or listed* `[I]`. The values below succeed where a registry and the classification vocabulary are composed.
+*On the live deployment:* on `studio-web` this is the typed gap `system_registry`: *no system registry is configured: this deployment holds no registration file, so nothing can be recorded or listed* `[I]`. On the private hosted profile of part 9 of the Railway walkthrough the values below record for real: on 2026-09-13 this screen registered `hiring-screener` there and answered `registry_kind SqliteSystemRegistry` `[V]`.
 
 | Step | Do this | Expect |
 |---|---|---|
