@@ -40,7 +40,7 @@ owner is. Those are the owner's designations (LP-2) and live in
 from __future__ import annotations
 
 import enum
-from dataclasses import InitVar, dataclass, field
+from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from typing import Any, Callable, Optional, Protocol, TypeVar, runtime_checkable
 from uuid import UUID
@@ -144,54 +144,74 @@ class CredentialRequest:
         return canonical_digest(CUSTODY_REQUEST_DOMAIN, "CredentialRequest", self.digest_body())
 
 
-@dataclass(frozen=True, eq=False)
 class CredentialLease:
     """A short-lived grant of one credential to one consumer.
 
-    The secret is **not a field of this dataclass**. It arrives as an ``InitVar`` and is
-    stored under a private name, so it is absent from ``fields()``, ``asdict()``,
-    ``astuple()``, ``repr``, ``str``, ``==`` and :meth:`as_record`, and ``__getstate__``
-    refuses pickling. It is reachable through :meth:`use` and, deliberately, through
-    ``__dict__``.
+    **Not a dataclass, and it has no instance ``__dict__``.** Both are deliberate. The
+    adversarial pass of 2026-09-13 found that a secret kept as a dataclass field with
+    ``repr=False`` was still returned by ``dataclasses.asdict``, which walks ``fields()``
+    and ignores ``repr``; moving it to an ``InitVar`` closed that but left
+    ``vars(lease)`` and ``lease.__dict__`` open, and those are routine surfaces, not
+    exotic ones — ``vars`` is what a structured logger or a generic JSON encoder reaches
+    for. A plain class with ``__slots__`` closes the whole family at once:
 
-    ``repr=False`` on a *field* was not enough, and that is worth saying plainly because
-    it is what an earlier version of this class did: ``dataclasses.asdict`` walks
-    ``fields()`` and ignores ``repr``, so a secret kept as a field leaks through the one
-    call a reasonable person makes when turning a record into JSON. The adversarial pass
-    of 2026-09-13 found exactly that, which is why the shape is now an ``InitVar``.
+    ============================== ==========================================
+    Surface                        Result
+    ============================== ==========================================
+    ``vars(lease)``                ``TypeError`` — there is no ``__dict__``
+    ``lease.__dict__``             ``AttributeError``
+    ``dataclasses.asdict/astuple`` ``TypeError`` — not a dataclass instance
+    ``repr`` / ``str`` / f-string  identifiers only
+    ``==`` / ``hash``              identity; neither reads the credential
+    ``json.dumps``                 ``TypeError``; with ``default=str``, the repr
+    ``pickle`` / ``copy``          refused by ``__reduce__``
+    ``as_record()``                identifiers and instants only
+    attribute assignment           refused; the lease is immutable after birth
+    ============================== ==========================================
 
-    ``vars(lease)`` still reaches it. That is Python's floor rather than this class's
-    choice: any attribute of any object is reachable by code that goes looking. The
-    property this class can offer, and does, is that **no routine path** — a repr, an
-    f-string, an equality check, a JSON dump of a record, a pickle, a traceback, a log
-    line — passes through it. Every record this repository writes is built by
-    :meth:`as_record`, never by ``vars``.
+    The credential is reachable through :meth:`use` and through nothing else this class
+    provides. The honest boundary: code running in this process can still read the slot
+    through ``CredentialLease.__slots__`` or ``gc``, and no Python object can prevent
+    that. What is closed is every surface that a normal serializer, logger, debugger
+    repr or exception renderer touches without being asked to go looking.
     """
 
-    lease_id: str
-    custody_authority_id: str
-    credential_profile: str
-    vendor: str
-    tenant_id: UUID
-    #: A non-secret reference to *which* secret version was leased, for the audit
-    #: trail and for rotation evidence. Never the secret.
-    secret_version_ref: str
-    issued_at: datetime
-    expires_at: datetime
-    #: The lease's authority under the real custody contract (materialized by the
-    #: commissioned custody path, not a fake or reference one). Not a statement about
-    #: a production deployment: the non-production validation call uses such a lease.
-    is_production_authoritative: bool
-    _secret: InitVar[str] = ""
+    __slots__ = ("lease_id", "custody_authority_id", "credential_profile", "vendor",
+                 "tenant_id", "secret_version_ref", "issued_at", "expires_at",
+                 "is_production_authoritative", "_held", "_sealed")
 
-    def __post_init__(self, _secret: str) -> None:
-        if self.expires_at <= self.issued_at:
+    def __init__(self, *, lease_id: str, custody_authority_id: str, credential_profile: str,
+                 vendor: str, tenant_id: UUID, secret_version_ref: str, issued_at: datetime,
+                 expires_at: datetime, is_production_authoritative: bool,
+                 _secret: str = "") -> None:
+        if expires_at <= issued_at:
             raise ValueError("a lease must expire after it is issued")
         if not _secret:
             raise ValueError("a lease carries a credential or it is not a lease")
-        if self.issued_at.tzinfo is None or self.expires_at.tzinfo is None:
+        if issued_at.tzinfo is None or expires_at.tzinfo is None:
             raise ValueError("lease instants must be timezone-aware")
-        object.__setattr__(self, "_held", _secret)
+        set_ = object.__setattr__
+        set_(self, "lease_id", lease_id)
+        set_(self, "custody_authority_id", custody_authority_id)
+        set_(self, "credential_profile", credential_profile)
+        set_(self, "vendor", vendor)
+        set_(self, "tenant_id", tenant_id)
+        set_(self, "secret_version_ref", secret_version_ref)
+        set_(self, "issued_at", issued_at)
+        set_(self, "expires_at", expires_at)
+        set_(self, "is_production_authoritative", bool(is_production_authoritative))
+        set_(self, "_held", _secret)
+        set_(self, "_sealed", True)
+
+    # --- immutable after birth --------------------------------------------------------
+
+    def __setattr__(self, name: str, value: object) -> None:
+        raise AttributeError(f"a CredentialLease is immutable; {name!r} may not be reassigned")
+
+    def __delattr__(self, name: str) -> None:
+        raise AttributeError(f"a CredentialLease is immutable; {name!r} may not be deleted")
+
+    # --- what it may say --------------------------------------------------------------
 
     def __repr__(self) -> str:  # never the secret
         return (f"CredentialLease(lease_id={self.lease_id!r}, "
@@ -203,11 +223,32 @@ class CredentialLease:
 
     __str__ = __repr__
 
+    def __format__(self, spec: str) -> str:  # f"{lease}" and f"{lease:anything}"
+        return self.__repr__()
+
+    def __eq__(self, other: object) -> bool:
+        """Identity. Two leases never compare by content, so ``==`` never reads the
+        credential and a timing difference never reveals one."""
+
+        return self is other
+
+    def __ne__(self, other: object) -> bool:
+        return self is not other
+
+    def __hash__(self) -> int:
+        return id(self)
+
+    # --- and what it refuses ----------------------------------------------------------
+
     def __getstate__(self):
         raise TypeError("a CredentialLease is never pickled, copied or serialized")
 
-    def __reduce__(self):
-        raise TypeError("a CredentialLease is never pickled, copied or serialized")
+    __reduce__ = __getstate__
+    __reduce_ex__ = lambda self, protocol: CredentialLease.__getstate__(self)  # noqa: E731
+    __copy__ = __getstate__
+    __deepcopy__ = lambda self, memo: CredentialLease.__getstate__(self)  # noqa: E731
+
+    # --- the contract -----------------------------------------------------------------
 
     def expired(self, now: datetime) -> bool:
         return now >= self.expires_at

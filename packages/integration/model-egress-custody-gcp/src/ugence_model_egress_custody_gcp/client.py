@@ -14,7 +14,6 @@ therefore reaches no network, needs no SDK installed, and constructs no client.
 
 from __future__ import annotations
 
-from dataclasses import InitVar, dataclass
 from typing import Any, Optional, Protocol, runtime_checkable
 
 __all__ = [
@@ -30,37 +29,40 @@ class GoogleClientUnavailable(RuntimeError):
     no provider message: see :mod:`.errors`."""
 
 
-@dataclass(frozen=True)
 class AccessedSecretVersion:
     """One ``AccessSecretVersion`` answer: which version answered, and its bytes.
 
-    The bytes are **not a field of this dataclass**. They arrive as an ``InitVar`` and
-    are read back through :attr:`payload`, so ``dataclasses.asdict`` and ``astuple``
-    return the version name and nothing else. ``repr=False`` on a field would not have
-    done that: ``asdict`` walks ``fields()`` and ignores ``repr``, which the adversarial
-    pass of 2026-09-13 found on this class and on ``CredentialLease``.
+    A plain class with ``__slots__``, for the same reason
+    :class:`ugence_model_egress_unit.CredentialLease` is one: a payload kept as a
+    dataclass field is returned by ``dataclasses.asdict`` whatever ``repr=False`` says,
+    and moving it out of ``fields()`` still leaves ``vars()`` and ``__dict__`` open.
+    Here there is no ``__dict__`` to open and no ``fields()`` to walk, so ``vars()``
+    raises ``TypeError``, ``asdict`` and ``astuple`` raise ``TypeError``, ``repr`` gives
+    a size and not a value, ``==`` compares versions, and pickling and copying are
+    refused.
 
-    Bytes on purpose: decoding is the adapter's job and a decode failure is a refusal, so
-    a payload that is not UTF-8 text never becomes a lease.
+    Bytes on purpose, and stored as given rather than coerced: decoding is the adapter's
+    job and a decode failure is a refusal with the adapter's own message, so a payload
+    that is not UTF-8 text never becomes a lease and a payload that is not bytes at all
+    is the adapter's refusal rather than a constructor's ``TypeError``.
     """
 
-    name: str
-    _payload: InitVar[bytes] = b""
+    __slots__ = ("name", "_held")
 
-    def __post_init__(self, _payload: bytes) -> None:
-        object.__setattr__(self, "_held", _payload)
-
-    def __init__(self, *, name: str, payload: bytes) -> None:  # type: ignore[no-redef]
-        # Written out rather than generated so the keyword stays ``payload`` for callers
-        # while the value never becomes a field. Frozen, so both names are set directly.
-        # The value is stored AS GIVEN and not coerced: a client that answers with
-        # something that is not bytes is the adapter's refusal to make, with its own
-        # message, rather than a TypeError from a constructor.
+    def __init__(self, *, name: str, payload: bytes) -> None:
         object.__setattr__(self, "name", name)
         object.__setattr__(self, "_held", payload)
 
+    def __setattr__(self, attribute: str, value: object) -> None:
+        raise AttributeError(f"an AccessedSecretVersion is immutable; {attribute!r} may not be reassigned")
+
+    def __delattr__(self, attribute: str) -> None:
+        raise AttributeError(f"an AccessedSecretVersion is immutable; {attribute!r} may not be deleted")
+
     @property
     def payload(self) -> bytes:
+        """The bytes, for the adapter that validates them. The only way to them."""
+
         return self._held
 
     def __repr__(self) -> str:
@@ -70,17 +72,25 @@ class AccessedSecretVersion:
 
     __str__ = __repr__
 
+    def __format__(self, spec: str) -> str:
+        return self.__repr__()
+
     def __eq__(self, other: object) -> bool:
-        # Names only: two answers never compare by payload.
+        # Versions only: two answers never compare by payload.
         return isinstance(other, AccessedSecretVersion) and other.name == self.name
+
+    def __ne__(self, other: object) -> bool:
+        return not self.__eq__(other)
 
     __hash__ = None  # type: ignore[assignment]
 
     def __getstate__(self):
         raise TypeError("an AccessedSecretVersion is never pickled, copied or serialized")
 
-    def __reduce__(self):
-        raise TypeError("an AccessedSecretVersion is never pickled, copied or serialized")
+    __reduce__ = __getstate__
+    __reduce_ex__ = lambda self, protocol: AccessedSecretVersion.__getstate__(self)  # noqa: E731
+    __copy__ = __getstate__
+    __deepcopy__ = lambda self, memo: AccessedSecretVersion.__getstate__(self)  # noqa: E731
 
 
 @runtime_checkable

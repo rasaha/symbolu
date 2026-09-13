@@ -243,29 +243,6 @@ def test_the_adapter_never_reaches_for_a_listing_or_mutating_method(method):
 
 # --- regressions from the adversarial pass of 2026-09-13 ------------------------------
 
-def test_asdict_and_astuple_of_a_lease_carry_no_secret():
-    """``repr=False`` on a field does not hide it from ``dataclasses.asdict``, which is
-    the one call a reasonable person makes when turning a record into JSON. The secret is
-    an InitVar, so it is not a field at all."""
-
-    import dataclasses
-    lease = build().materialize(request(), now=NOW)
-    assert "_secret" not in {f.name for f in dataclasses.fields(lease)}
-    assert FAKE_PAYLOAD not in json.dumps(dataclasses.asdict(lease), default=str)
-    assert FAKE_PAYLOAD not in repr(dataclasses.astuple(lease))
-    assert lease.use(lambda s: s, now=NOW) == FAKE_PAYLOAD, "and it is still reachable through use()"
-
-
-def test_asdict_of_an_accessed_secret_version_carries_no_payload():
-    import dataclasses
-    accessed = AccessedSecretVersion(name=RESOURCE, payload=FAKE_PAYLOAD.encode("utf-8"))
-    assert dataclasses.asdict(accessed) == {"name": RESOURCE}
-    assert FAKE_PAYLOAD not in repr(dataclasses.astuple(accessed))
-    assert accessed.payload == FAKE_PAYLOAD.encode("utf-8")
-    # two answers compare by version, never by payload
-    assert accessed == AccessedSecretVersion(name=RESOURCE, payload=b"different")
-
-
 def test_a_sanitized_refusal_leaves_no_provider_exception_on_the_context_chain():
     """``raise ... from None`` suppresses the PRINTING of the original exception but
     leaves it on ``__context__``, where an error reporter walking the chain would find

@@ -45,11 +45,28 @@ SDK object is private inside the wrapper, so a holder of the wrapper cannot reac
 ## Where the secret is, and is not
 
 The payload exists inside one function and reaches the caller only inside the unit's
-`CredentialLease`, which keeps it out of `repr`, `str`, equality, `as_record()` and
-pickling and hands it to exactly one consumer through `use()`. The adapter's own
-`as_record()` is identifiers only; its `repr` names no principal secret and no client;
-it refuses pickling. The audit trail is the unit's existing `CustodyAuditEvent` of
-identifiers and digests.
+`CredentialLease`, which hands it to exactly one consumer through `use()`. Both
+secret-bearing objects here — `AccessedSecretVersion` and the lease — are slotted plain
+classes with no instance `__dict__`, so every routine way of turning an object into data
+is closed rather than merely unlikely to be taken:
+
+| Surface | What happens |
+| --- | --- |
+| `vars(obj)`, `obj.__dict__` | `TypeError` / `AttributeError` — there is no `__dict__` |
+| `dataclasses.asdict`, `astuple` | `TypeError` — neither object is a dataclass, so there are no `fields()` to walk |
+| `repr`, `str`, `format`, f-strings, `%s` | identifiers and a payload *size*, never the payload |
+| logging, structured logging, `json.dumps(default=…)` | reaches only the renderings above |
+| `copy`, `deepcopy`, `pickle`, `__reduce__` | refused with `TypeError` rather than silently partial |
+| `==`, `hash` | identity (lease) or version name (`AccessedSecretVersion`); neither reads the secret |
+| exception rendering, including `__cause__` and `__context__` | provider errors are reduced to a sanitized type name outside the `except` block |
+
+The boundary is stated accurately: this closes the routine serialization, rendering and
+copying surfaces. It does not — and no Python object can — defend against arbitrary
+same-process memory inspection by code already running in the interpreter.
+
+The adapter's own `as_record()` is identifiers only; its `repr` names no principal
+secret and no client; it refuses pickling. The audit trail is the unit's existing
+`CustodyAuditEvent` of identifiers and digests.
 
 ## Composition
 
