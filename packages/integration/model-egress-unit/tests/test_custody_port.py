@@ -215,3 +215,4 @@ def test_a_reader_failure_or_empty_payload_is_unavailable_without_the_managers_w
     with pytest.raises(CustodyRefused) as excinfo:
         _pinned(reader=lambda r: "  ").materialize(request(vendor="openai", credential_profile="openai-validation"), now=NOW)
     assert excinfo.value.reason is CustodyRefusal.CUSTODY_UNAVAILABLE
+

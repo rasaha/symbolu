@@ -61,6 +61,8 @@ __all__ = [
     "ReferenceCustodyAdapter",
     "CustodyIdentity",
     "IDENTITY_KINDS",
+    "PRODUCTION_AUTHORITATIVE_IDENTITY_KINDS",
+    "is_service_account_resource",
     "is_pinned_secret_version",
     "PinnedSecretVersionCustodyAdapter",
     "materialize_with_audit",
@@ -142,38 +144,74 @@ class CredentialRequest:
         return canonical_digest(CUSTODY_REQUEST_DOMAIN, "CredentialRequest", self.digest_body())
 
 
-@dataclass(frozen=True, eq=False)
 class CredentialLease:
     """A short-lived grant of one credential to one consumer.
 
-    The secret is held in a field that is excluded from ``repr`` and from every
-    record, and is reachable only through :meth:`use`. ``eq=False`` so two leases
-    never compare by content, and ``__getstate__`` refuses pickling.
+    **Not a dataclass, and it has no instance ``__dict__``.** Both are deliberate. The
+    adversarial pass of 2026-09-13 found that a secret kept as a dataclass field with
+    ``repr=False`` was still returned by ``dataclasses.asdict``, which walks ``fields()``
+    and ignores ``repr``; moving it to an ``InitVar`` closed that but left
+    ``vars(lease)`` and ``lease.__dict__`` open, and those are routine surfaces, not
+    exotic ones — ``vars`` is what a structured logger or a generic JSON encoder reaches
+    for. A plain class with ``__slots__`` closes the whole family at once:
+
+    ============================== ==========================================
+    Surface                        Result
+    ============================== ==========================================
+    ``vars(lease)``                ``TypeError`` — there is no ``__dict__``
+    ``lease.__dict__``             ``AttributeError``
+    ``dataclasses.asdict/astuple`` ``TypeError`` — not a dataclass instance
+    ``repr`` / ``str`` / f-string  identifiers only
+    ``==`` / ``hash``              identity; neither reads the credential
+    ``json.dumps``                 ``TypeError``; with ``default=str``, the repr
+    ``pickle`` / ``copy``          refused by ``__reduce__``
+    ``as_record()``                identifiers and instants only
+    attribute assignment           refused; the lease is immutable after birth
+    ============================== ==========================================
+
+    The credential is reachable through :meth:`use` and through nothing else this class
+    provides. The honest boundary: code running in this process can still read the slot
+    through ``CredentialLease.__slots__`` or ``gc``, and no Python object can prevent
+    that. What is closed is every surface that a normal serializer, logger, debugger
+    repr or exception renderer touches without being asked to go looking.
     """
 
-    lease_id: str
-    custody_authority_id: str
-    credential_profile: str
-    vendor: str
-    tenant_id: UUID
-    #: A non-secret reference to *which* secret version was leased, for the audit
-    #: trail and for rotation evidence. Never the secret.
-    secret_version_ref: str
-    issued_at: datetime
-    expires_at: datetime
-    #: The lease's authority under the real custody contract (materialized by the
-    #: commissioned custody path, not a fake or reference one). Not a statement about
-    #: a production deployment: the non-production validation call uses such a lease.
-    is_production_authoritative: bool
-    _secret: str = field(repr=False, compare=False, default="")
+    __slots__ = ("lease_id", "custody_authority_id", "credential_profile", "vendor",
+                 "tenant_id", "secret_version_ref", "issued_at", "expires_at",
+                 "is_production_authoritative", "_held", "_sealed")
 
-    def __post_init__(self) -> None:
-        if self.expires_at <= self.issued_at:
+    def __init__(self, *, lease_id: str, custody_authority_id: str, credential_profile: str,
+                 vendor: str, tenant_id: UUID, secret_version_ref: str, issued_at: datetime,
+                 expires_at: datetime, is_production_authoritative: bool,
+                 _secret: str = "") -> None:
+        if expires_at <= issued_at:
             raise ValueError("a lease must expire after it is issued")
-        if not self._secret:
+        if not _secret:
             raise ValueError("a lease carries a credential or it is not a lease")
-        if self.issued_at.tzinfo is None or self.expires_at.tzinfo is None:
+        if issued_at.tzinfo is None or expires_at.tzinfo is None:
             raise ValueError("lease instants must be timezone-aware")
+        set_ = object.__setattr__
+        set_(self, "lease_id", lease_id)
+        set_(self, "custody_authority_id", custody_authority_id)
+        set_(self, "credential_profile", credential_profile)
+        set_(self, "vendor", vendor)
+        set_(self, "tenant_id", tenant_id)
+        set_(self, "secret_version_ref", secret_version_ref)
+        set_(self, "issued_at", issued_at)
+        set_(self, "expires_at", expires_at)
+        set_(self, "is_production_authoritative", bool(is_production_authoritative))
+        set_(self, "_held", _secret)
+        set_(self, "_sealed", True)
+
+    # --- immutable after birth --------------------------------------------------------
+
+    def __setattr__(self, name: str, value: object) -> None:
+        raise AttributeError(f"a CredentialLease is immutable; {name!r} may not be reassigned")
+
+    def __delattr__(self, name: str) -> None:
+        raise AttributeError(f"a CredentialLease is immutable; {name!r} may not be deleted")
+
+    # --- what it may say --------------------------------------------------------------
 
     def __repr__(self) -> str:  # never the secret
         return (f"CredentialLease(lease_id={self.lease_id!r}, "
@@ -185,11 +223,32 @@ class CredentialLease:
 
     __str__ = __repr__
 
+    def __format__(self, spec: str) -> str:  # f"{lease}" and f"{lease:anything}"
+        return self.__repr__()
+
+    def __eq__(self, other: object) -> bool:
+        """Identity. Two leases never compare by content, so ``==`` never reads the
+        credential and a timing difference never reveals one."""
+
+        return self is other
+
+    def __ne__(self, other: object) -> bool:
+        return self is not other
+
+    def __hash__(self) -> int:
+        return id(self)
+
+    # --- and what it refuses ----------------------------------------------------------
+
     def __getstate__(self):
         raise TypeError("a CredentialLease is never pickled, copied or serialized")
 
-    def __reduce__(self):
-        raise TypeError("a CredentialLease is never pickled, copied or serialized")
+    __reduce__ = __getstate__
+    __reduce_ex__ = lambda self, protocol: CredentialLease.__getstate__(self)  # noqa: E731
+    __copy__ = __getstate__
+    __deepcopy__ = lambda self, memo: CredentialLease.__getstate__(self)  # noqa: E731
+
+    # --- the contract -----------------------------------------------------------------
 
     def expired(self, now: datetime) -> bool:
         return now >= self.expires_at
@@ -204,7 +263,7 @@ class CredentialLease:
         if self.expired(now):
             raise CustodyRefused(CustodyRefusal.CUSTODY_UNAVAILABLE,
                                  f"lease {self.lease_id} expired at {self.expires_at.isoformat()}")
-        return consumer(self._secret)
+        return consumer(self._held)
 
     def as_record(self) -> dict:
         """Identifiers and instants only. The secret is not a field of the record."""
@@ -377,14 +436,58 @@ def materialize_with_audit(
 
 #: LP-2: how the unit proves who it is to the secret manager. A long-lived
 #: service-account key is refused at construction, not discouraged in prose.
-IDENTITY_KINDS = ("workload_identity_federation", "application_default_credentials",
-                  "fake_emulator", "service_account_key")
+#:
+#: ``native_gcp_workload_identity`` is the identity a Google-hosted runtime carries by
+#: attachment — for the commissioning path, the Cloud Run Job's dedicated non-human
+#: service account. ``application_default_credentials`` is NOT that: ADC is how a Google
+#: client library *finds* some credential, and the thing it finds may be a developer's
+#: user credential, a downloaded key or the default compute identity. It is a discovery
+#: mechanism, never proof of identity, and it is never production-authoritative
+#: (LP-8 identity clarification, 2026-09-13).
+IDENTITY_KINDS = ("workload_identity_federation", "native_gcp_workload_identity",
+                  "application_default_credentials", "fake_emulator", "service_account_key")
+
+#: The two mechanisms LP-7 ruling 2 designates, and the only two that may back a
+#: production-authoritative lease. Both must still name a non-human principal, and the
+#: native one must be bound to the exact designated service-account resource.
+PRODUCTION_AUTHORITATIVE_IDENTITY_KINDS = ("workload_identity_federation",
+                                           "native_gcp_workload_identity")
+
+#: A GCP service-account resource: ``projects/<project>/serviceAccounts/<email>``.
+def is_service_account_resource(resource: str) -> bool:
+    if not isinstance(resource, str):
+        return False
+    parts = resource.split("/")
+    return (len(parts) == 4 and parts[0] == "projects" and parts[2] == "serviceAccounts"
+            and bool(parts[1]) and "@" in parts[3] and parts[3].endswith(".iam.gserviceaccount.com"))
+
+
+def _human_or_default_identity(principal: str) -> Optional[str]:
+    """Why ``principal`` is not a dedicated non-human identity, or ``None``."""
+
+    lowered = principal.strip().lower()
+    if lowered.startswith("user:") or "@gmail." in lowered or "@googlemail." in lowered:
+        return "a user credential is a human identity"
+    if "-compute@" in lowered or lowered.endswith("developer.gserviceaccount.com"):
+        return "the default compute identity is not the dedicated MEU identity"
+    return None
 
 
 @dataclass(frozen=True)
 class CustodyIdentity:
+    """How the unit proves who it is, and what that proof is worth.
+
+    ``designated_service_account``, ``designation_attested_by`` and
+    ``designation_record_digest`` are the binding and attestation inputs a native GCP
+    workload identity needs before it may be production-authoritative. They are
+    identifiers and a digest: no credential is a field of this record.
+    """
+
     kind: str
     principal: str
+    designated_service_account: str = ""
+    designation_attested_by: str = ""
+    designation_record_digest: str = ""
 
     def __post_init__(self) -> None:
         if self.kind not in IDENTITY_KINDS:
@@ -395,6 +498,48 @@ class CustodyIdentity:
                 "and is refused (LP-2); use workload identity federation")
         if not self.principal:
             raise ValueError("an identity names its principal")
+
+    def production_authority_refusal(self) -> Optional[str]:
+        """Why this identity may not back a production-authoritative lease, or ``None``.
+
+        The message names the rule and never the principal's secret-bearing content,
+        because a principal is an identifier and nothing here is a credential.
+        """
+
+        if self.kind == "application_default_credentials":
+            return ("application default credentials name no identity: ADC is how a client library "
+                    "finds a credential, not proof of which one, so it is never production-authoritative; "
+                    "assert native_gcp_workload_identity bound to the designated service account, or "
+                    "workload identity federation (LP-8 identity clarification)")
+        if self.kind not in PRODUCTION_AUTHORITATIVE_IDENTITY_KINDS:
+            return (f"a {self.kind} identity is never production-authoritative; only workload identity "
+                    f"federation or native GCP workload identity attached to the designated service "
+                    f"account may be (LP-2, LP-8)")
+        human = _human_or_default_identity(self.principal)
+        if human is not None:
+            return f"{human}; the MEU runs as a dedicated non-human identity (LP-7 ruling 2)"
+        if self.kind == "native_gcp_workload_identity":
+            if not is_service_account_resource(self.designated_service_account):
+                return ("a native GCP workload identity is production-authoritative only when bound to the "
+                        "exact designated service-account resource projects/<project>/serviceAccounts/<email> "
+                        "(step-8 obligation 3)")
+            if _human_or_default_identity(self.designated_service_account) is not None:
+                return "the designated service account is a human or default-compute identity (LP-7 ruling 2)"
+            if self.principal.strip() != self.designated_service_account.strip():
+                return ("the runtime principal is not the designated service-account resource; a native "
+                        "identity binds to exactly one account (step-8 obligation 3)")
+            if not self.designation_attested_by.strip():
+                return ("the step-8 designation record carries no independent verification; a native identity "
+                        "is production-authoritative only under an attested designation (LP-7 ruling 12)")
+            if not (len(self.designation_record_digest) == 64
+                    and all(c in "0123456789abcdef" for c in self.designation_record_digest)):
+                return ("the designation-record digest is absent or malformed; the identity binds to the exact "
+                        "designation the owner attested (LP-7 ruling 12)")
+        elif not (self.principal.startswith("principal://") or self.principal.startswith("principalSet://")
+                  or ".iam.gserviceaccount.com" in self.principal):
+            return ("a federated principal is the pool-constrained principal:// binding or the impersonated "
+                    "service account (step-8 obligation 5)")
+        return None
 
 
 def is_pinned_secret_version(resource: str) -> bool:
@@ -438,8 +583,10 @@ class PinnedSecretVersionCustodyAdapter:
                 "'latest' is never resolved during execution (LP-2)")
         if max_credential_age > timedelta(days=90):
             raise ValueError("rotation is at least every 90 days (LP-2)")
-        if production_authoritative and identity.kind != "workload_identity_federation":
-            raise ValueError("only workload identity federation may be production-authoritative (LP-2)")
+        if production_authoritative:
+            why = identity.production_authority_refusal()
+            if why is not None:
+                raise ValueError(why)
         self.custody_authority_id = custody_authority_id
         self.credential_profile = credential_profile
         self.vendor = vendor

@@ -717,6 +717,197 @@ not among them. The canonical authorization stays `NOT_GIVEN`, every row stays `
 deployed, no adapter is built, no project, identity, secret or credential is created, and
 no live call is made by this record.
 
+### 0.8 — Owner identity clarification of 2026-09-13: native GCP workload identity is production-authoritative; ADC never is
+
+> Native GCP workload identity attached to the designated Cloud Run Job is an approved production-authoritative identity mechanism equivalent to WIF for this non-production commissioning path. Generic `application_default_credentials` is not itself proof of that identity and must never become production-authoritative. Represent the mechanism explicitly as `native_gcp_workload_identity`, bind it to the exact designated service-account resource, and require the designation/attestation inputs. Continue to refuse developer credentials, user credentials, default-compute identities, downloaded service-account keys, fake/emulator identities and unverified generic ADC.
+
+#### 0.8.1 — The inconsistency this resolves
+
+Three contracts disagreed once the runtime became a Cloud Run Job:
+
+| Where | Said |
+| --- | --- |
+| `infrastructure.py` (LP-7 ruling 2) | the deployment-platform identity mechanism is `workload_identity_federation` **or** `native_gcp_workload_identity` |
+| `custody.CustodyIdentity` | the identity kinds were WIF, `application_default_credentials`, `fake_emulator` and (refused) `service_account_key` — with no native kind at all |
+| `PinnedSecretVersionCustodyAdapter` | production-authoritative **only** under `workload_identity_federation` |
+
+So a designation could name the native mechanism that the custody layer had no way to
+express, and the nearest thing it could express, ADC, is the one thing that must not
+carry that authority. The contract admitted the mechanism and the code did not.
+
+#### 0.8.2 — Why ADC is refused by name, and what replaces it
+
+**How a process obtained a credential is not which identity that credential is.**
+Application default credentials are a *search order*: on Cloud Run it finds the attached
+service account, with `GOOGLE_APPLICATION_CREDENTIALS` set it finds a downloaded key
+file, and on a laptop it finds a developer's own `gcloud auth login`. All three succeed
+identically, and the calling code cannot tell them apart from the fact that ADC worked.
+Treating "ADC succeeded" as proof of the designated identity would make a developer
+laptop production-authoritative, which is exactly what LP-8 forbids.
+
+So the operator **declares the source explicitly** and the code checks the declaration
+against the designation rather than trusting a discovery result:
+
+| Declared source | Treatment |
+| --- | --- |
+| `attached_service_account` | the native mechanism. Production-authoritative **only** when the declared account is a valid `projects/<p>/serviceAccounts/<email>`, is exactly the designated MEU account (obligation 3), is not a human or default-compute identity, and the designation carries an independent verification and a 64-hex record digest |
+| `workload_identity_federation` | unchanged: production-authoritative under a pool-constrained principal (obligation 5) that is not a human identity |
+| `application_default_credentials` | refused by name, with the reason above |
+| `developer_credentials` | refused: a human identity |
+| `service_account_key_file` | refused: a downloaded key is itself a credential in the deployment (LP-2) |
+| `emulator` | refused: a test double is never production-authoritative |
+
+The Google client libraries still obtain the Cloud Run Job's runtime credentials through
+ADC — that is how Google's libraries work and this clarification does not change it. What
+changed is that ADC's success is no longer *evidence*: the authority comes from the
+declared, designated, attested binding, and the discovery mechanism underneath it is not
+asked to prove anything.
+
+#### 0.8.3 — What was implemented (unit 0.6.0, custody-gcp 0.1.0, meu-validation-job 0.1.0)
+
+**The unit.** `IDENTITY_KINDS` gains `native_gcp_workload_identity`;
+`PRODUCTION_AUTHORITATIVE_IDENTITY_KINDS` names the two mechanisms;
+`CustodyIdentity` gains `designated_service_account`, `designation_attested_by` and
+`designation_record_digest`, and one method, `production_authority_refusal()`, which is
+the single place the rule lives. `PinnedSecretVersionCustodyAdapter` now delegates to it
+instead of naming WIF itself, so the fixture path and the production-form path cannot
+drift apart. `is_service_account_resource` is the shared shape check.
+
+**The custody distribution.** `ugence-model-egress-custody-gcp` is the production-form
+adapter LP-8 names: one pinned numeric version, an injected client whose protocol carries
+exactly one method so listing is not expressible, a configuration scan that refuses
+credential material in any field, a designation check that refuses until all seventeen
+obligations are supplied and attested, payload validation (right version, decodable,
+non-empty, no control characters), and provider exceptions sanitized to their **type name
+only**. The Google SDK is an optional extra imported inside one function at the
+deployment composition root; importing the package loads no SDK.
+
+**The deployment unit.** `deployment/meu-validation-job` is a Cloud Run **Job** that
+evaluates five gates, runs the offline harness over fakes and writes one redacted report.
+Reading the real credential requires the posture, the designation **and** the canonical
+authorization, because a run that may not call may not read. `mode: live` fails closed:
+no live transport exists and `LIVE_VENDOR_EGRESS` is `False`.
+
+#### 0.8.4 — What this clarification does not change
+
+It creates no infrastructure and no credential, retrieves no Secret Manager payload,
+makes no vendor call, and does not populate `MEU_LIVE_PROVIDER_DESIGNATION.json`: the
+seventeen obligations remain `UNDESIGNATED`, the canonical authorization remains
+`NOT_GIVEN`, every validation row remains `null`, and `COMMISSIONING_STATUS` remains
+`BLOCKED_PENDING_INFRASTRUCTURE_DESIGNATIONS`. The prohibitions of LP-2, LP-7 and LP-8
+on credentials and live calls are unchanged; this section only says which identity
+mechanism may carry custody authority once the owner supplies the designations.
+
+### 0.9 — Owner correction of 2026-09-13: close the serialization surfaces, and fix the gate order
+
+Recorded verbatim, as every ruling in this record is.
+
+> **1. Credential serialization leak.** You reported four real leaks but fixed only
+> three, and the implementation/docstring explicitly admits that `vars(lease)` or
+> `lease.__dict__` still exposes the credential. Redesign `CredentialLease` and any
+> equivalent secret-bearing object so that: it has no instance `__dict__`;
+> `vars(object)` raises `TypeError`; `dataclasses.asdict()` and `dataclasses.astuple()`
+> cannot expose the credential; `repr()`, `str()`, exception rendering, logging and
+> structured logging cannot expose it; JSON/default serializers cannot expose it;
+> copying, deep-copying and pickling are either safely supported without the secret or
+> explicitly refused; equality and hashing never inspect or expose the credential;
+> provider exceptions including `__cause__` and `__context__` contain no credential;
+> the credential is accessible only through the narrow callback/consumer operation
+> needed for Secret Manager custody. A non-dataclass class with `__slots__` is
+> acceptable if it preserves the required public contract. Do not claim protection
+> against arbitrary malicious same-process memory inspection; state the boundary
+> accurately. However, `vars()` and `__dict__` are routine surfaces and must be closed.
+> Add regression tests covering every listed surface, with explicit assertions that the
+> object has no `__dict__`, `vars()` fails, and the complete credential string is absent
+> from every captured value and exception chain. Account explicitly for all four leaks:
+> identify each one, state whether it was fixed, and point to its regression test.
+> "Four found, three fixed" is not acceptable for completion.
+>
+> **2. Live-mode gate ordering.** Your report says live mode fails closed on the missing
+> transport rather than authorization. Correct the order so no transport or custody
+> client is composed and no Secret Manager materialization is attempted until the
+> applicable governance gates have passed. Required order: (1) validate configuration;
+> (2) reject prohibited execution postures, including developer machines, browsers and
+> CI; (3) require all 17 Step-8 designations; (4) require independent designation
+> verification; (5) require a separate explicit controlled-live-call authorization;
+> (6) require the live-vendor-egress flag to be enabled; (7) only then compose custody
+> and transport components. In the present repository state, live mode must fail before
+> transport composition.
+
+#### 0.9.1 — The four leaks, each one accounted for
+
+The adversarial pass of 2026-09-13 probed twenty-six serialization, rendering, copying
+and exception surfaces against a marker credential. Four returned the complete
+credential string. All four are now closed, and each has a named regression test.
+
+| # | Leak | Why it leaked | Fixed | Regression test |
+| --- | --- | --- | --- | --- |
+| 1 | `dataclasses.asdict(lease)` / `astuple(lease)` returned the credential | `asdict` walks `fields()` and **ignores `repr=False`**; marking the field non-`repr` hid it from the repr and from nothing else | Yes — `CredentialLease` is no longer a dataclass, so there are no `fields()` to walk and both calls raise `TypeError` | `test_credential_lease_surfaces.py::test_the_lease_is_not_a_dataclass_so_asdict_and_astuple_cannot_walk_it`, and the `asdict` / `astuple` rows of `test_no_routine_surface_yields_the_credential` |
+| 2 | `json.dumps(lease, default=vars)` and structured-log encoders returned the credential | a generic encoder falls back to `vars()`, which returned the instance `__dict__` | Yes — there is no `__dict__`; `default=vars` now raises and `default=str`/`default=repr` reach only the identifier-only repr | `test_a_structured_logger_that_serializes_its_record_cannot_reach_the_credential`, plus the `json-default-str` / `json-default-repr` / `json-default-vars` rows |
+| 3 | the provider exception chain carried credential-shaped vendor text on `__context__` | `raise … from None` suppresses the *printing* of the cause but leaves the original exception on `__context__`, where `traceback` and most log handlers still find it | Yes — `ProductionFormSecretManagerCustodyAdapter._access` reduces the provider error to a sanitized type name and raises the refusal **outside** the `except` block, so no `__context__` link exists at all | `test_secret_surfaces.py::test_no_link_of_a_refusal_chain_carries_credential_shaped_provider_text` (parametrized over every provider error kind) |
+| 4 | `vars(lease)` and `lease.__dict__` returned the credential | the first correction moved the secret to an `InitVar`, which closed `asdict` but left the instance dictionary open — and `vars` is exactly what a structured logger or a debugger reaches for | **Yes** — this is the leak the owner's correction required closed. `CredentialLease` and `AccessedSecretVersion` are slotted plain classes: `vars()` raises `TypeError`, `.__dict__` raises `AttributeError` | `test_the_lease_has_no_instance_dict_and_vars_raises`, `test_secret_surfaces.py::test_the_accessed_version_has_no_instance_dict_and_is_not_a_dataclass`, and the `vars` / `dict` rows of the surface tables |
+
+Copying, deep-copying and pickling are **refused** rather than silently supported
+without the secret: a lease that survived a `deepcopy` minus its credential would be a
+lease that lies about being usable. Equality is identity and `hash` is `id`; neither
+reads the held value. The credential is reachable through `use(consumer, now=…)` and
+through nothing else the class provides.
+
+#### 0.9.2 — The boundary, stated accurately
+
+What is closed is every surface a normal serializer, logger, debugger repr, JSON
+encoder, copier or exception renderer touches without being told to go looking. What is
+**not** closed, and cannot be by any Python object, is deliberate same-process memory
+inspection: code already executing in this interpreter can read the slot through
+`CredentialLease.__slots__`, `gc.get_referents` or `ctypes`. This record does not claim
+otherwise. The defence against that is the custody boundary itself — the credential
+exists in one process, for one lease lifetime, reachable only by a consumer the adapter
+handed it to — not the object's shape.
+
+#### 0.9.3 — The corrected gate order
+
+`meu_validation_job.gates` now declares the owner's order as data, and
+`GateReport.__post_init__` refuses a report whose gates are not exactly that tuple:
+
+| # | Gate | What it requires |
+| --- | --- | --- |
+| 1 | `CONFIGURATION` | the job configuration parses, names no credential material and pins a numeric secret version |
+| 2 | `EXECUTION_POSTURE` | not a developer machine, not a browser, not a CI runner (LP-8) |
+| 3 | `STEP8_DESIGNATIONS` | all 17 Step-8 obligations supplied, none `UNDESIGNATED`, none placeholder- or credential-shaped |
+| 4 | `STEP8_INDEPENDENT_VERIFICATION` | the designations were independently checked; supplying values is not verifying them |
+| 5 | `LIVE_SYNTHETIC_VALIDATION_AUTHORIZATION` | a separate, explicit, digest-bound owner authorization within the commissioning ceilings |
+| 6 | `LIVE_VENDOR_EGRESS` | the flag is enabled |
+| — | | **composition may begin only here** (`GATES_BEFORE_COMPOSITION` is gates 1–6) |
+| 7 | `LIVE_TRANSPORT` | a genuine dispatch path exists — it does not, in any installed distribution |
+
+`may_compose_components` is exactly "gates 1 to 6 passed". While any of them is blocked,
+`build_custody_adapter` raises `CompositionRefused` before a Google client is built,
+before a custody adapter exists, before any transport is constructed and before any
+Secret Manager materialization is attempted. A refused run's report carries
+`components_composed = {"google_secret_manager_client": false, "custody_adapter": false,
+"transport": "none"}`, and the refusal message leads with the **earliest** outstanding
+gate rather than the transport.
+
+In the present repository state the seventeen obligations are `UNDESIGNATED`, so a live
+run is refused at gate 3 — four gates before the transport is even consulted. Leading
+with the missing transport was wrong twice over: it is not the first thing outstanding,
+and it invites the false reading "authorize it and it will run".
+
+`deployment/meu-validation-job/tests/test_gate_order.py` holds all of this: each earlier
+gate is proved to be reported before the transport, the refusal is proved to walk forward
+one gate at a time and never to start at the transport, every construction path is armed
+to raise on each refusal state, and offline mode is proved to build the harness's injected
+fakes and nothing on the credential path while leaving both canonical records
+byte-identical.
+
+#### 0.9.4 — What this correction does not change
+
+It creates no infrastructure and no credential, retrieves no Secret Manager payload and
+makes no vendor call. The seventeen obligations remain `UNDESIGNATED`, the canonical
+authorization remains `NOT_GIVEN`, every validation row remains `null`,
+`LIVE_VENDOR_EGRESS` remains `False`, and `COMMISSIONING_STATUS` remains
+`BLOCKED_PENDING_INFRASTRUCTURE_DESIGNATIONS`.
+
 ## 1 — The finding that shapes this record
 
 **AP-3 did not gate the live model provider, and its acceptance unblocks none of the

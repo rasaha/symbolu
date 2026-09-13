@@ -1,0 +1,34 @@
+{
+  "schema": "meu-validation-job.config.v1",
+  "mode": "offline",
+  "environment": "non-production",
+
+  "_comment_placeholders": "EVERY VALUE BELOW IS AN UNMISTAKABLE NON-SECRET PLACEHOLDER. Nothing here designates anything. The owner supplies the real references at designation acceptance; until then the job's gates report them as outstanding and no credential is materialized.",
+
+  "instance_reference": "REPLACE-ME-cloud-run-job-execution://EXAMPLE-PROJECT/jobs/EXAMPLE-JOB/executions/EXAMPLE-EXECUTION",
+  "workload_identity_principal": "projects/REPLACE-ME-EXAMPLE-PROJECT/serviceAccounts/REPLACE-ME-EXAMPLE-SA@REPLACE-ME-EXAMPLE-PROJECT.iam.gserviceaccount.com",
+
+  "designation_record_path": "/etc/meu-validation-job/MEU_LIVE_PROVIDER_DESIGNATION.json",
+  "validation_record_path": "/etc/meu-validation-job/MEU_LIVE_VALIDATION.json",
+  "authorization_record_path": "",
+
+  "endpoint": "https://api.openai.com/v1/responses",
+  "report_path": "/var/lib/meu-validation-job/report.json",
+
+  "custody": {
+    "custody_authority_id": "REPLACE-ME-EXAMPLE-CUSTODY-AUTHORITY",
+    "credential_profile": "openai-validation",
+    "vendor": "openai",
+    "secret_version_resource": "projects/REPLACE-ME-EXAMPLE-PROJECT/secrets/REPLACE-ME-EXAMPLE-SECRET/versions/1",
+    "lease_ttl_seconds": 300,
+    "max_credential_age_days": 90,
+    "environment": "non-production",
+    "identity": {
+      "source": "attached_service_account",
+      "service_account_resource": "projects/REPLACE-ME-EXAMPLE-PROJECT/serviceAccounts/REPLACE-ME-EXAMPLE-SA@REPLACE-ME-EXAMPLE-PROJECT.iam.gserviceaccount.com",
+      "designated_service_account": "projects/REPLACE-ME-EXAMPLE-PROJECT/serviceAccounts/REPLACE-ME-EXAMPLE-SA@REPLACE-ME-EXAMPLE-PROJECT.iam.gserviceaccount.com",
+      "designation_attested_by": "REPLACE-ME-NAME-OF-THE-INDEPENDENT-REVIEWER",
+      "designation_record_digest": "0000000000000000000000000000000000000000000000000000000000000000"
+    }
+  }
+}
