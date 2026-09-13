@@ -125,6 +125,8 @@ jobs:
           - packages/integration/ai-system-registry
           - packages/integration/approval-workflow
           - packages/integration/authority-directory
+          - packages/integration/change-effect-policy
+          - packages/integration/change-effect-records
           - packages/integration/cloud-scaling-action-admission
           - packages/integration/cloud-scaling-bounded-execution
           - packages/integration/cloud-scaling-credential-broker
