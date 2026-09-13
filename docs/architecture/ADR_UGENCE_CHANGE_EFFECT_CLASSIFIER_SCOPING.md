@@ -688,3 +688,49 @@ nameable in configuration, no provider registered under it, and no conformance p
 `[G]` Package test collection across the whole repository fails in this environment for want
 of installed distributions; that failure is present on a clean tree and is not caused by this
 change.
+
+## 9 — Owner decision 6, taken — 2026-09-13
+
+Recorded verbatim, in the owner's own words:
+
+> 6a. The authority that issued the authorization for the classification's governance
+> route may sign the ResolutionRevocationRecord and may take the documentary CANCEL claim.
+> The signer must never be the candidate's proposer or reviewer. A separate incident
+> authority is not authorized by this ruling; one may be added later only through a
+> separately ratified authority assignment.
+>
+> 6b. When an applied delta is revoked, a state-repair or compensating candidate is
+> required in every case, regardless of whether the governed read port served the changed
+> state.
+>
+> Downstream-exposure remediation is a separate obligation. It is required when at least
+> one read was served under the revoked state. Until archive custody exists and the
+> served-read log is custody-assured, the conservative presumption is that exposure
+> occurred. Once custody assurance exists, a verified zero-read record may waive
+> downstream-exposure remediation, but it may not waive the state-repair candidate.
+
+The owner also confirmed the Stage 1 package split recorded in §8 and confirmed that the
+`CHANGE_EFFECT_CLASSIFICATION` conformance profile belongs to Stage 2, with Stage 1
+continuing to register no provider. Both assumptions §8 recorded are therefore closed.
+
+**6b improves on what was presented.** The drafting family's memo offered a single
+remediation question and recommended "always, narrowing to read-triggered once custody
+exists". The ruling separates two obligations the memo had conflated: **state repair**,
+which follows from the fact that governed memory now holds a delta whose authorization was
+withdrawn and which nothing waives; and **downstream-exposure remediation**, which follows
+from reads actually served and which a custody-assured zero-read record may one day waive.
+Under the memo's wording a future zero-read finding would have waived both. It should not,
+because a withdrawn authorization leaves the state wrong whether or not anyone read it.
+
+The distinction is carried into the contracts: `RemediationRequirement` has three members
+— `NONE`, `STATE_REPAIR_REQUIRED`, and
+`STATE_REPAIR_AND_EXPOSURE_REMEDIATION_REQUIRED` — and `RevocationImpactRecord` refuses a
+record that reports an applied delta with no remediation at all, and equally one that
+reports remediation where nothing was applied. `exposure_presumed` carries the conservative
+presumption explicitly, so a record written before custody exists cannot be mistaken later
+for a verified zero-read finding.
+
+6a is carried as `signer` and `signer_authority` on `ResolutionRevocationRecord`. Which
+authority issued which route is a Stage 3 verification against the authorization; the
+contract holds the fields and checks neither, because checking would require reading
+another record.

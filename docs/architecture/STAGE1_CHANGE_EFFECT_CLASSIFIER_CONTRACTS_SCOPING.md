@@ -1,7 +1,10 @@
 # Change Effect Classifier — Stage 1 scoping: contracts and inert substrate
 
 **Status:** **authorized as tracked work** by the owner on 2026-09-13 (ADR §8), strictly
-contracts-only and inert. Item 3.1 is delivered; 3.2 to 3.6 are not yet started. Originally
+contracts-only and inert. Items 3.1, 3.3 and the admission data of 3.6 are delivered in
+`packages/integration/change-effect-records`; items 3.2, 3.4 and 3.5 are not yet started.
+The package split and the Stage 2 timing of the conformance profile are confirmed by the
+owner, closing Stage 1 decisions 2 and 3 (ADR §9). Originally
 produced as scoping only. Produced 2026-09-12 under the
 reviewer's staging recommendation, adopted by the owner the same day (ADR §5).
 Revised 2026-09-13 to the record graph of GERL classification rule version 4.2.10, per
@@ -314,9 +317,11 @@ entry. Each depends on the rule's text or on a ruling that is open.
 and 3.5 independently. Freeze the schema only after a version passes review, because the
 record surface has changed at every review so far and may change again.
 
-## 5 — Owner decisions `[R]`
+## 5 — Owner decisions
 
 1. Adopted 2026-09-12 (ADR §5).
-2. Confirm the package split: one contracts package for records, linkage and admission
-   state; one policy-family package; kind and read port in the substrate.
-3. Whether the conformance profile for the fourth kind is Stage 1 or the first task of Stage 2.
+2. **Confirmed 2026-09-13** (ADR §9): one contracts package for records, linkage and
+   admission state; one policy-family package; kind and read port in the substrate.
+3. **Confirmed 2026-09-13** (ADR §9): the conformance profile for the fourth kind belongs
+   to Stage 2. Stage 1 continues to register no provider, and a test asserts the profile's
+   continued absence so the ruling fails loudly if someone adds one.

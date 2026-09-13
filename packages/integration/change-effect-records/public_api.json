@@ -1,0 +1,558 @@
+{
+  "curated_api_module": "ugence_change_effect_records",
+  "distribution": "ugence-change-effect-records",
+  "namespace": "ugence_change_effect_records",
+  "note": "Machine-readable snapshot of the curated public API (ugence_change_effect_records.__all__). tests/packaging/test_packaging.py asserts this file equals the live package surface. Regenerate with scripts/generate_public_api.py when the curated API changes deliberately.",
+  "package_version": "0.1.0",
+  "symbols": {
+    "AdmissionClaimRecord": {
+      "fields": [
+        "chain_id",
+        "reservation_digest",
+        "claim_kind",
+        "expected_control_version",
+        "expected_target_versions",
+        "signer"
+      ],
+      "kind": "dataclass"
+    },
+    "AdmissionCompletionRecord": {
+      "fields": [
+        "chain_id",
+        "claim_digest",
+        "state",
+        "prior_state",
+        "post_state_digest",
+        "post_target_versions",
+        "reason",
+        "signer"
+      ],
+      "kind": "dataclass"
+    },
+    "AdmissionReservationRecord": {
+      "fields": [
+        "chain_id",
+        "final_resolution_digest",
+        "authorization_digest",
+        "classification_digest",
+        "amendment_digest",
+        "pre_state_digest",
+        "delta_digest",
+        "idempotency_key",
+        "head_version",
+        "control_version",
+        "tenant",
+        "expected_target_versions",
+        "state",
+        "signer"
+      ],
+      "kind": "dataclass"
+    },
+    "AdmissionResolutionRecord": {
+      "fields": [
+        "chain_id",
+        "completion_digest",
+        "resolved_state",
+        "evidence",
+        "resolving_authority"
+      ],
+      "kind": "dataclass"
+    },
+    "AdmissionState": {
+      "kind": "enum",
+      "values": [
+        "RESERVED",
+        "APPLIED",
+        "FAILED",
+        "OUTCOME_UNKNOWN"
+      ]
+    },
+    "AuthorizationBinding": {
+      "fields": [
+        "chain_id",
+        "final_resolution_digest",
+        "authorization_digest",
+        "issuing_authority",
+        "validity_window"
+      ],
+      "kind": "dataclass"
+    },
+    "BlockingObligation": {
+      "fields": [
+        "obligation_id",
+        "obligation_kind",
+        "coordinate",
+        "ordinal"
+      ],
+      "kind": "dataclass"
+    },
+    "CODES_RAISED_HERE": {
+      "kind": "frozenset",
+      "values": [
+        "CANONICAL_BOOLEAN_REFUSED",
+        "CANONICAL_NULL_FORBIDDEN",
+        "CANONICAL_NUMBER_REFUSED",
+        "CANONICAL_TYPE_REFUSED"
+      ]
+    },
+    "COMMITTING_CLAIM": {
+      "kind": "constant",
+      "value": "APPLY"
+    },
+    "CONTRACT_VERSION": {
+      "kind": "constant",
+      "value": "change_effect_records.v1"
+    },
+    "CONTROL_REGISTER_TRANSITIONS": {
+      "kind": "tuple",
+      "values": [
+        "('ACTIVE', 'APPLY_COMMITTED', 'an APPLY claim')",
+        "('ACTIVE', 'REVOKED', 'a revocation, pre-commit')",
+        "('APPLY_COMMITTED', 'REVOKED', 'a revocation, post-commit')",
+        "('APPLIED', 'REVOKED', 'a revocation, post-commit')",
+        "('APPLY_COMMITTED', 'ACTIVE', 'a FAILED completion or a human resolution to FAILED, winning before a revocation')",
+        "('APPLY_COMMITTED', 'APPLIED', 'an APPLIED completion or a human resolution to APPLIED')",
+        "('APPLY_COMMITTED', 'APPLY_COMMITTED', 'an OUTCOME_UNKNOWN completion: the register waits for a human')"
+      ]
+    },
+    "CanonicalFormRefused": {
+      "kind": "class",
+      "methods": []
+    },
+    "ChangeEffectRecordsError": {
+      "kind": "class",
+      "methods": []
+    },
+    "ClaimKind": {
+      "kind": "enum",
+      "values": [
+        "APPLY",
+        "CANCEL"
+      ]
+    },
+    "ClassificationRecord": {
+      "fields": [
+        "chain_id",
+        "tenant",
+        "candidate_digest",
+        "anomaly_family",
+        "chain_instance_id",
+        "family_seed_digest",
+        "family_sample_digest",
+        "anchor_snapshot_digest",
+        "current_snapshot_digest",
+        "proposed_snapshot_digest",
+        "evaluator_version",
+        "replay_environment_digest",
+        "model_code_digest",
+        "policy_versions",
+        "delegation_table_version",
+        "registry_list_version",
+        "mapping_version",
+        "results",
+        "jurisdictional_route",
+        "provisional",
+        "blocking_obligations",
+        "signer"
+      ],
+      "kind": "dataclass"
+    },
+    "ClosureEffectBundle": {
+      "fields": [
+        "obligation_id",
+        "mapping_version",
+        "evaluation_result_digest",
+        "effects",
+        "declared_write_set"
+      ],
+      "kind": "dataclass"
+    },
+    "ClosureOutcome": {
+      "kind": "enum",
+      "values": [
+        "COMPLETED",
+        "EXPIRED",
+        "CLOSED_INSUFFICIENT_EVIDENCE"
+      ]
+    },
+    "CompletionAbsence": {
+      "kind": "enum",
+      "values": [
+        "NO_APPLY_CLAIM"
+      ]
+    },
+    "ConfirmationAmendment": {
+      "fields": [
+        "chain_id",
+        "classification_digest",
+        "confirmation_seed_digest",
+        "confirmation_sample_digest",
+        "confirmation_result_digest",
+        "closes_obligation_ids",
+        "introduces",
+        "signer"
+      ],
+      "kind": "dataclass"
+    },
+    "ContractViolation": {
+      "kind": "class",
+      "methods": []
+    },
+    "ControlRegisterState": {
+      "kind": "enum",
+      "values": [
+        "ACTIVE",
+        "APPLY_COMMITTED",
+        "APPLIED",
+        "REVOKED"
+      ]
+    },
+    "DOCUMENTARY_CLAIM": {
+      "kind": "constant",
+      "value": "CANCEL"
+    },
+    "ENFORCEMENT_ENABLED": {
+      "kind": "constant",
+      "value": false
+    },
+    "EffectClass": {
+      "kind": "enum",
+      "values": [
+        "DESCRIPTIVE_STATE",
+        "POLICY_ENFORCEMENT",
+        "AUTHORITY",
+        "IDENTITY"
+      ]
+    },
+    "EvaluationStatus": {
+      "kind": "enum",
+      "values": [
+        "MEASURED",
+        "NO_EFFECT",
+        "UNEVALUATED"
+      ]
+    },
+    "FinalResolutionRecord": {
+      "fields": [
+        "chain_id",
+        "classification_digest",
+        "amendment_digest",
+        "closure_digests",
+        "jurisdictional_route",
+        "routing_rule",
+        "effective_set_empty",
+        "signer"
+      ],
+      "kind": "dataclass"
+    },
+    "INT64_MAX": {
+      "kind": "int"
+    },
+    "INT64_MIN": {
+      "kind": "int"
+    },
+    "IntroducingRole": {
+      "kind": "enum",
+      "values": [
+        "CLASSIFICATION",
+        "CONFIRMATION_AMENDMENT"
+      ]
+    },
+    "InvestigationClosureRecord": {
+      "fields": [
+        "chain_id",
+        "obligation_id",
+        "opening_digest",
+        "outcome",
+        "extension_digest",
+        "bundle",
+        "sample_binding",
+        "reason",
+        "signer"
+      ],
+      "kind": "dataclass"
+    },
+    "InvestigationExtensionRecord": {
+      "fields": [
+        "chain_id",
+        "opening_digest",
+        "extended_deadline",
+        "owner_identity"
+      ],
+      "kind": "dataclass"
+    },
+    "InvestigationRecord": {
+      "fields": [
+        "chain_id",
+        "obligation_id",
+        "introducing_role",
+        "introducing_digest",
+        "candidate_digest",
+        "anomaly_family",
+        "named_evaluation",
+        "owner_identity",
+        "deadline"
+      ],
+      "kind": "dataclass"
+    },
+    "JurisdictionalRoute": {
+      "kind": "enum",
+      "values": [
+        "GERL_BASE",
+        "GERL_DELEGATED",
+        "POLICY_GOVERNANCE",
+        "UNDETERMINED_PENDING_EVALUATION"
+      ]
+    },
+    "LEGAL_SUCCESSIONS": {
+      "kind": "mappingproxy"
+    },
+    "MATURITY": {
+      "kind": "constant",
+      "value": "REFERENCE_GRADE_CONTRACT_ONLY"
+    },
+    "ObligationKind": {
+      "kind": "enum",
+      "values": [
+        "UNEVALUABLE_REGISTRY",
+        "UNDERSIZED_CELL",
+        "ZERO_DENOMINATOR",
+        "MISSING_BASELINE",
+        "MIXED_DIRECTION",
+        "D1_BOUND_ADMITS_WORSENING",
+        "CUSTODY_UNVERIFIED",
+        "NO_ANCHOR",
+        "CONFIRMATION_PENDING",
+        "INSUFFICIENT_EVALUATION",
+        "INSUFFICIENT_ARCHIVE"
+      ]
+    },
+    "PrimitiveEffect": {
+      "fields": [
+        "kind",
+        "target",
+        "value_digest"
+      ],
+      "kind": "dataclass"
+    },
+    "PrimitiveEffectKind": {
+      "kind": "enum",
+      "values": [
+        "SET_SAMPLE",
+        "SET_CELL_MEASUREMENT",
+        "SET_REGISTRY_OBSERVATION",
+        "SET_BASELINE",
+        "SET_EVIDENCE_CUSTODY",
+        "SET_CONFIRMATION_RESULT"
+      ]
+    },
+    "RECORD_TYPES": {
+      "kind": "tuple",
+      "values": [
+        "<class 'ugence_change_effect_records.records.ClassificationRecord'>",
+        "<class 'ugence_change_effect_records.records.ConfirmationAmendment'>",
+        "<class 'ugence_change_effect_records.records.InvestigationRecord'>",
+        "<class 'ugence_change_effect_records.records.InvestigationExtensionRecord'>",
+        "<class 'ugence_change_effect_records.records.InvestigationClosureRecord'>",
+        "<class 'ugence_change_effect_records.records.FinalResolutionRecord'>",
+        "<class 'ugence_change_effect_records.records.AuthorizationBinding'>",
+        "<class 'ugence_change_effect_records.records.ResolutionRevocationRecord'>",
+        "<class 'ugence_change_effect_records.records.RevocationImpactRecord'>",
+        "<class 'ugence_change_effect_records.records.AdmissionReservationRecord'>",
+        "<class 'ugence_change_effect_records.records.AdmissionClaimRecord'>",
+        "<class 'ugence_change_effect_records.records.AdmissionCompletionRecord'>",
+        "<class 'ugence_change_effect_records.records.AdmissionResolutionRecord'>"
+      ]
+    },
+    "RECOVERY_OUTCOMES": {
+      "kind": "mappingproxy"
+    },
+    "REFUSAL_CODES": {
+      "kind": "mappingproxy"
+    },
+    "RESERVATION_REFUSAL_BY_STATE": {
+      "kind": "mappingproxy"
+    },
+    "RULE_VERSION": {
+      "kind": "constant",
+      "value": "GERL target classification 4.2.10, with the recorded erratum"
+    },
+    "RegistryEffectResult": {
+      "fields": [
+        "registry",
+        "evaluation_status",
+        "effect_class",
+        "blocking_obligation_id"
+      ],
+      "kind": "dataclass"
+    },
+    "RemediationRequirement": {
+      "kind": "enum",
+      "values": [
+        "NONE",
+        "STATE_REPAIR_REQUIRED",
+        "STATE_REPAIR_AND_EXPOSURE_REMEDIATION_REQUIRED"
+      ]
+    },
+    "ResolutionRevocationRecord": {
+      "fields": [
+        "chain_id",
+        "final_resolution_digest",
+        "basis",
+        "ordering",
+        "control_version_at_revocation",
+        "signer",
+        "signer_authority"
+      ],
+      "kind": "dataclass"
+    },
+    "ReviewOutcome": {
+      "kind": "enum",
+      "values": [
+        "SUPPORTED",
+        "REPLAY_MISMATCH",
+        "INSUFFICIENT_EVALUATION",
+        "MISCLASSIFIED"
+      ]
+    },
+    "RevocationImpactRecord": {
+      "fields": [
+        "chain_id",
+        "revocation_digest",
+        "applied",
+        "ordering",
+        "remediation",
+        "exposure_presumed",
+        "completion_digest",
+        "completion_absence",
+        "post_target_versions",
+        "exposure_receipt_digests",
+        "signer"
+      ],
+      "kind": "dataclass"
+    },
+    "RevocationOrdering": {
+      "kind": "enum",
+      "values": [
+        "REVOKE_THEN_APPLY",
+        "APPLY_THEN_REVOKE"
+      ]
+    },
+    "SampleBinding": {
+      "fields": [
+        "seed_digest",
+        "seed_authority",
+        "archive_snapshot_digest",
+        "sampling_algorithm",
+        "sampling_algorithm_version",
+        "population_digest",
+        "sample_digest",
+        "prior_sample_digests"
+      ],
+      "kind": "dataclass"
+    },
+    "TERMINAL_CONTROL_STATES": {
+      "kind": "frozenset",
+      "values": [
+        "REVOKED"
+      ]
+    },
+    "__version__": {
+      "kind": "constant",
+      "value": "0.1.0"
+    },
+    "assign_ordinals": {
+      "kind": "function",
+      "parameters": [
+        "specs"
+      ]
+    },
+    "canonical_json": {
+      "kind": "function",
+      "parameters": [
+        "payload"
+      ]
+    },
+    "chain_id": {
+      "kind": "function",
+      "parameters": [
+        "tenant",
+        "candidate_digest",
+        "anomaly_family",
+        "family_seed_digest",
+        "chain_instance_id"
+      ]
+    },
+    "domain_digest": {
+      "kind": "function",
+      "parameters": [
+        "domain",
+        "payload"
+      ]
+    },
+    "iso": {
+      "kind": "function",
+      "parameters": [
+        "value",
+        "name"
+      ]
+    },
+    "normalize_tenant": {
+      "kind": "function",
+      "parameters": [
+        "value"
+      ]
+    },
+    "normalize_text": {
+      "kind": "function",
+      "parameters": [
+        "value"
+      ]
+    },
+    "obligation_id": {
+      "kind": "function",
+      "parameters": [
+        "chain",
+        "introducing_role",
+        "obligation_kind",
+        "coordinate",
+        "ordinal"
+      ]
+    },
+    "profile": {
+      "kind": "function",
+      "parameters": [
+        "value",
+        "path"
+      ]
+    },
+    "require_digest": {
+      "kind": "function",
+      "parameters": [
+        "value",
+        "name"
+      ]
+    },
+    "require_nonempty": {
+      "kind": "function",
+      "parameters": [
+        "value",
+        "name"
+      ]
+    },
+    "require_ordinal": {
+      "kind": "function",
+      "parameters": [
+        "value",
+        "name"
+      ]
+    },
+    "require_tzaware": {
+      "kind": "function",
+      "parameters": [
+        "value",
+        "name"
+      ]
+    }
+  }
+}

@@ -1,0 +1,58 @@
+# Ugence Change Effect Records — the contracts-only record shapes of the GERL
+# classification chain (Stage 1 item 3.3, with the admission succession data of 3.6).
+#
+# Scoped by docs/architecture/ADR_UGENCE_CHANGE_EFFECT_CLASSIFIER_SCOPING.md and
+# docs/architecture/STAGE1_CHANGE_EFFECT_CLASSIFIER_CONTRACTS_SCOPING.md, against GERL
+# target classification 4.2.10 and its recorded erratum (outside-family ruling:
+# RATIFIED WITH ONE CONFORMANCE CORRECTION). Ratifying a design authorizes no operation.
+#
+#   THIS PACKAGE HOLDS THE SHAPES A CLASSIFICATION CHAIN IS WRITTEN IN.
+#   IT NEVER CLASSIFIES, MEASURES, REPLAYS, PROJECTS, ROUTES, RESOLVES POLICY,
+#   ADMITS, SAMPLES, READS OR WRITES GOVERNED MEMORY, OR REGISTERS ANYTHING.
+#
+# Contracts only: thirteen frozen record types, the canonical-bytes profile of rule
+# section 6a, the chain and obligation identifier derivations, closed vocabularies, the
+# admission succession and control-register tables as data, and the refusal register.
+# No classifier, no replay harness, no projection, no router, no policy resolver, no
+# sampler, no admission boundary, no store, no clock, no network.
+#
+# Dependency direction (one-way), and deliberately short:
+#     ugence-governance-contracts (leaf)
+#         ▲
+#     ugence-change-effect-records (this package)
+#
+# Build:   python -m build packages/integration/change-effect-records
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ugence-change-effect-records"
+dynamic = ["version"]
+description = "Ugence Change Effect Records — the contracts-only record shapes of the GERL classification chain: thirteen frozen digest-bound record types, the canonical-bytes profile, the identifier derivations, and the admission succession tables as data. Holds shapes; never classifies, projects, admits or registers."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "Proprietary" }
+authors = [{ name = "Rakesh Mohan" }]
+keywords = ["governance", "classification", "recalibration", "records", "contracts", "ugence"]
+classifiers = ["Typing :: Typed"]
+dependencies = [
+    "ugence-governance-contracts>=0.8.0",
+]
+
+[project.optional-dependencies]
+test = ["pytest>=7.0"]
+
+[tool.setuptools.dynamic]
+version = { attr = "ugence_change_effect_records.version.__version__" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["ugence_change_effect_records*"]
+
+[tool.setuptools.package-data]
+ugence_change_effect_records = ["py.typed"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
