@@ -43,7 +43,8 @@ def test_enum_values():
     assert [m.value for m in A.ExecutionBusinessOutcome] == [
         "SUCCEEDED", "FAILED", "REJECTED", "PENDING", "DUPLICATE", "UNKNOWN"]
     assert [m.value for m in A.ProviderKind] == [
-        "ASSERTION_GOVERNANCE", "ACTION_GOVERNANCE", "EXTERNAL_EXECUTION"]
+        "ASSERTION_GOVERNANCE", "ACTION_GOVERNANCE", "EXTERNAL_EXECUTION",
+        "CHANGE_EFFECT_CLASSIFICATION"]
     assert [m.value for m in A.ProviderLifecycleState] == [
         "REGISTERED", "INITIALIZING", "AVAILABLE", "DEGRADED", "UNAVAILABLE",
         "STOPPING", "STOPPED"]

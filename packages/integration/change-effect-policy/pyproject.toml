@@ -1,0 +1,68 @@
+# The change-effect classification policy family — Stage 1 item 3.2 of the
+# Change Effect Classifier (M15), and a policy family registered from OUTSIDE
+# the shared Policy Authority's own distribution.
+#
+# The artifact has THREE members that version and digest together: the
+# protected-registry list, the delegation table (EMPTY in Stage 1), and a typed
+# coordinate naming a SEPARATELY GOVERNED ClosureBundleMapping. The mapping's
+# CONTENT is not here, is not deferred-but-sketched here, and is not activated
+# here; it is a separate governance object outside Stage 1.
+#
+# Exactly one first-party dependency:
+#
+#   * ugence-policy-authority — reached through its public api module only, for
+#     PolicyCoordinate, PolicyArtifactDescriptor and the canonicalizer. Every
+#     ...core module is internal and the authority's own suite enforces that.
+#     The coordinate is the repository's existing one, carrying tenant, scope,
+#     family, policy identity, version and digest; a reduced ad-hoc reference
+#     would have omitted four of the six.
+#
+# There is deliberately NO dependency on:
+#
+#   * ugence-change-effect-records — a policy family must not import the record
+#     graph it is nominally about. Nothing here reads, builds or validates a
+#     classification, confirmation, investigation, resolution, revocation,
+#     admission or closure record.
+#   * ugence-control-plane-root — the ledger dependency is confined to the
+#     change-effect-records linkage module by owner ruling; a policy package has
+#     no business appending anything.
+#   * any classifier, resolver, executor, admission boundary or governed-memory
+#     implementation — none of which exists, and none of which this package may
+#     imply exists.
+#
+# Build:  python -m build packages/integration/change-effect-policy
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ugence-change-effect-policy"
+dynamic = ["version"]
+description = "Change-effect classification policy family and Policy Authority adapter — protected-registry list, empty delegation table and a mapping coordinate, versioned atomically. Contract only: no classifier, no resolution, no authorization."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "Proprietary" }
+authors = [{ name = "Rakesh Mohan" }]
+keywords = ["ugence", "change-effect", "classifier", "policy", "adapter", "contract"]
+classifiers = ["Typing :: Typed"]
+dependencies = [
+    "ugence-policy-authority>=0.1.0",
+]
+
+[project.optional-dependencies]
+test = ["pytest>=7.0"]
+dev = ["pytest>=7.0", "build>=1.0"]
+
+[tool.setuptools.dynamic]
+version = { attr = "ugence_change_effect_policy.version.__version__" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["ugence_change_effect_policy*"]
+
+[tool.setuptools.package-data]
+ugence_change_effect_policy = ["py.typed"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"

@@ -35,6 +35,12 @@ from .metadata import (
     ProviderKind,
 )
 from .contracts import (
+    GovernedReadPort,
+    GovernedReadRequest,
+    ReadEligibility,
+    ReadEligibilityStatus,
+    ReadIneligibilityReason,
+    ReadPurpose,
     ActionGovernanceOutcome,
     ActionGovernanceProvider,
     ActionGovernanceRequest,
@@ -91,6 +97,9 @@ from .contracts import (
 )
 
 __all__ = [
+    # governed-read port (Stage 1 item 3.5): a declared contract, no implementation
+    "GovernedReadPort", "GovernedReadRequest", "ReadEligibility",
+    "ReadEligibilityStatus", "ReadIneligibilityReason", "ReadPurpose",
     "__version__", "CONTRACT_VERSION",
     "FailureClass", "ProviderError", "ProviderRegistrationError",
     "ProviderResolutionError", "ProviderCompatibilityError",

@@ -300,6 +300,19 @@
       ],
       "kind": "dataclass"
     },
+    "GovernedReadPort": {
+      "kind": "protocol"
+    },
+    "GovernedReadRequest": {
+      "fields": [
+        "tenant_id",
+        "consumer_id",
+        "purpose",
+        "target_id",
+        "target_version"
+      ],
+      "kind": "dataclass"
+    },
     "IdempotencyContractError": {
       "failure_class": null,
       "kind": "exception"
@@ -463,7 +476,8 @@
       "values": [
         "ASSERTION_GOVERNANCE",
         "ACTION_GOVERNANCE",
-        "EXTERNAL_EXECUTION"
+        "EXTERNAL_EXECUTION",
+        "CHANGE_EFFECT_CLASSIFICATION"
       ]
     },
     "ProviderLifecycleState": {
@@ -501,6 +515,48 @@
     "ProviderUnavailableError": {
       "failure_class": "RETRYABLE",
       "kind": "exception"
+    },
+    "ReadEligibility": {
+      "fields": [
+        "status",
+        "tenant_id",
+        "consumer_id",
+        "purpose",
+        "target_id",
+        "target_version",
+        "authorization_digest",
+        "reason"
+      ],
+      "kind": "dataclass"
+    },
+    "ReadEligibilityStatus": {
+      "kind": "enum",
+      "values": [
+        "ELIGIBLE",
+        "INELIGIBLE",
+        "INDETERMINATE"
+      ]
+    },
+    "ReadIneligibilityReason": {
+      "kind": "enum",
+      "values": [
+        "NO_AUTHORIZATION",
+        "AUTHORIZATION_REVOKED",
+        "AUTHORIZATION_EXPIRED",
+        "NOT_APPLIED",
+        "TARGET_VERSION_MISMATCH",
+        "PURPOSE_NOT_PERMITTED",
+        "CONSUMER_NOT_PERMITTED",
+        "DETERMINATION_UNAVAILABLE"
+      ]
+    },
+    "ReadPurpose": {
+      "kind": "enum",
+      "values": [
+        "DECISION_INPUT",
+        "EXPLANATION",
+        "AUDIT"
+      ]
     },
     "SYSTEM_MANIFEST_COMPONENT_FAMILIES": {
       "kind": "tuple"

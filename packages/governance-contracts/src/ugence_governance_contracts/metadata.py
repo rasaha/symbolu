@@ -24,11 +24,20 @@ class ProviderKind(str, Enum):
       adapts onto ``ActionControlPlanePort``.
     * ``EXTERNAL_EXECUTION`` — dispatch to / observe an external system; adapts
       onto ``ExternalExecutionPort``. Distinct from assertion governance.
+    * ``CHANGE_EFFECT_CLASSIFICATION`` — measure what a frozen change to governed
+      persistent state affects, and name the governance process with jurisdiction
+      over it. It evaluates and **never authorizes**: a classification is a record,
+      not a permission. Distinct from assertion governance, which evaluates an
+      assertion against evidence; this kind evaluates a change against replay.
+      Added under ``docs/architecture/ADR_UGENCE_CHANGE_EFFECT_CLASSIFIER_SCOPING.md``
+      (CEC-1) as Stage 1 substrate. **No provider registers under it**: the kind is
+      a name until Stage 2 composes a classifier.
     """
 
     ASSERTION_GOVERNANCE = "ASSERTION_GOVERNANCE"
     ACTION_GOVERNANCE = "ACTION_GOVERNANCE"
     EXTERNAL_EXECUTION = "EXTERNAL_EXECUTION"
+    CHANGE_EFFECT_CLASSIFICATION = "CHANGE_EFFECT_CLASSIFICATION"
 
 
 @dataclass(frozen=True)
