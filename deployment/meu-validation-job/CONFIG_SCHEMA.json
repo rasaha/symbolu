@@ -1,0 +1,151 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "meu-validation-job.config.v1",
+  "title": "MEU validation job configuration",
+  "description": "References, a mode and an output path. There is no field that may hold a provider key, a token or a secret payload: a value carrying credential material is refused before the job does anything else.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "instance_reference",
+    "workload_identity_principal",
+    "designation_record_path",
+    "validation_record_path",
+    "custody"
+  ],
+  "properties": {
+    "schema": {
+      "const": "meu-validation-job.config.v1"
+    },
+    "mode": {
+      "enum": [
+        "offline",
+        "live"
+      ],
+      "default": "offline",
+      "description": "offline is the default and the only mode that can succeed in this slice; live fails closed because no live Responses transport exists and LIVE_VENDOR_EGRESS is False."
+    },
+    "environment": {
+      "const": "non-production"
+    },
+    "instance_reference": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Which deployed Cloud Run Job execution this is. Not a secret."
+    },
+    "workload_identity_principal": {
+      "type": "string",
+      "minLength": 1,
+      "description": "The job's attached service account, as projects/<project>/serviceAccounts/<email>."
+    },
+    "designation_record_path": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Path to MEU_LIVE_PROVIDER_DESIGNATION.json."
+    },
+    "validation_record_path": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Path to MEU_LIVE_VALIDATION.json."
+    },
+    "authorization_record_path": {
+      "type": "string",
+      "default": "",
+      "description": "Path to the owner's typed LiveSyntheticValidationAuthorization record. Empty until the owner issues one."
+    },
+    "endpoint": {
+      "const": "https://api.openai.com/v1/responses",
+      "description": "The one designated destination (LP-3). Any other value is refused."
+    },
+    "report_path": {
+      "type": "string",
+      "default": "/tmp/meu-validation-report.json"
+    },
+    "custody": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "custody_authority_id",
+        "credential_profile",
+        "vendor",
+        "secret_version_resource",
+        "identity"
+      ],
+      "description": "Handed to the custody distribution, which validates it for itself.",
+      "properties": {
+        "custody_authority_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "credential_profile": {
+          "type": "string",
+          "minLength": 1
+        },
+        "vendor": {
+          "type": "string",
+          "minLength": 1
+        },
+        "secret_version_resource": {
+          "type": "string",
+          "pattern": "^projects/[^/]+/secrets/[^/]+/versions/[1-9][0-9]*$",
+          "description": "The full numeric version. 'latest' and every alias are refused."
+        },
+        "lease_ttl_seconds": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 3600,
+          "default": 300
+        },
+        "max_credential_age_days": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 90,
+          "default": 90
+        },
+        "environment": {
+          "const": "non-production"
+        },
+        "identity": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "source",
+            "service_account_resource"
+          ],
+          "properties": {
+            "source": {
+              "enum": [
+                "attached_service_account",
+                "workload_identity_federation",
+                "application_default_credentials",
+                "developer_credentials",
+                "service_account_key_file",
+                "emulator"
+              ],
+              "description": "Only attached_service_account and workload_identity_federation may be production-authoritative. application_default_credentials is a discovery order, not an identity, and is refused by name."
+            },
+            "service_account_resource": {
+              "type": "string",
+              "pattern": "^projects/[^/]+/serviceAccounts/[^/]+@[^/]+\\.iam\\.gserviceaccount\\.com$"
+            },
+            "designated_service_account": {
+              "type": "string"
+            },
+            "designation_attested_by": {
+              "type": "string"
+            },
+            "designation_record_digest": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            }
+          }
+        }
+      }
+    }
+  },
+  "patternProperties": {
+    "^_": {
+      "description": "A key beginning with an underscore is an operator comment and is ignored."
+    }
+  }
+}

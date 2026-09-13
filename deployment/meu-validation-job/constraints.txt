@@ -1,0 +1,17 @@
+# Pinned build inputs for the MEU validation job image.
+#
+# The distributions this job composes declare compatibility ranges; this file fixes the
+# versions that compatibility is exercised at for the image the operator builds, the
+# same way deployment/governed-runtime-worker/constraints.txt does. ci/verify_pins.py
+# asserts the image installs exactly these, offline.
+#
+# Only the Google client is pinned here: the four first-party distributions are
+# installed from this checkout, so their versions are the checkout's.
+google-cloud-secret-manager==2.20.2
+google-api-core==2.19.1
+google-auth==2.32.0
+googleapis-common-protos==1.63.2
+grpcio==1.65.1
+grpcio-status==1.62.3
+proto-plus==1.24.0
+protobuf==4.25.4

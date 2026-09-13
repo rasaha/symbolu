@@ -6,7 +6,7 @@ wheel never has to import the package (and thus its dependencies).
 
 from __future__ import annotations
 
-__version__ = "0.5.1"
+__version__ = "0.6.0"
 
 #: Frozen identity of the exchange contract this package reads and writes.
 CONTRACT_VERSION = "model_egress_unit.exchange.v1"

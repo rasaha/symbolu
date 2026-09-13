@@ -1,0 +1,213 @@
+name: model-egress-custody-gcp-ci
+
+# Scoped CI for the production-form custody adapter (ugence-model-egress-custody-gcp) and
+# the Cloud Run Job that composes it (deployment/meu-validation-job).
+#
+# Two properties this workflow proves that a local run cannot:
+#   1. the suites pass with NO Google SDK installed, so nothing imports one at module
+#      scope and no test can reach Google even by accident;
+#   2. socket connections are patched to raise for the whole run, so a test that opened
+#      one fails rather than passing slowly.
+#
+# The job's own entrypoint refuses to run inside a CI runner (LP-8), so what runs here is
+# the package suites and the offline path, never the deployed job.
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+on:
+  pull_request:
+    paths:
+      - "packages/integration/model-egress-custody-gcp/**"
+      - "packages/integration/model-egress-unit/**"
+      - "packages/integration/model-egress-validation/**"
+      - "packages/integration/model-egress-provider-openai/**"
+      - "deployment/meu-validation-job/**"
+      - ".github/workflows/model-egress-custody-gcp-ci.yml"
+  push:
+    branches:
+      - "claude/**"
+    paths:
+      - "packages/integration/model-egress-custody-gcp/**"
+      - "packages/integration/model-egress-unit/**"
+      - "packages/integration/model-egress-validation/**"
+      - "packages/integration/model-egress-provider-openai/**"
+      - "deployment/meu-validation-job/**"
+      - ".github/workflows/model-egress-custody-gcp-ci.yml"
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  custody-suite:
+    name: Custody adapter suite, no Google SDK (py${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.11", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+          cache-dependency-path: requirements.txt
+      - name: Install the unit and the custody adapter WITHOUT the google extra
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest tomli
+          pip install --no-deps packages/integration/model-egress-unit
+          pip install --no-deps packages/integration/model-egress-custody-gcp
+      - name: The Google SDK must not be installed for this job
+        run: |
+          python - <<'PY'
+          import importlib.util, sys
+          if importlib.util.find_spec("google") is not None:
+              print("a Google SDK is installed; this job proves the suite needs none"); sys.exit(1)
+          print("no Google SDK present, as intended")
+          PY
+      - name: Suite, with every socket refused
+        run: |
+          cd packages/integration/model-egress-custody-gcp
+          python - <<'PY'
+          import socket, sys, pytest
+          def refuse(*a, **k):
+              raise AssertionError("the custody suite opened a socket")
+          socket.socket.connect = refuse
+          socket.create_connection = refuse
+          sys.exit(pytest.main(["-o", "addopts=", "-v", "--no-header",
+                                "--junitxml=/tmp/custody.xml", "tests"]))
+          PY
+      - name: Fail if any test was skipped
+        run: |
+          python - <<'PY'
+          import sys, xml.etree.ElementTree as ET
+          root = ET.parse("/tmp/custody.xml").getroot()
+          skipped = [tc.get("name") for tc in root.iter("testcase") if tc.find("skipped") is not None]
+          total = len(list(root.iter("testcase")))
+          if total == 0:
+              print("No tests were collected at all — that is not a pass."); sys.exit(1)
+          if skipped:
+              print("A skipped row is NOT a passing row. Skipped:"); [print(f"  - {n}") for n in skipped]; sys.exit(1)
+          print(f"{total} tests, none skipped.")
+          PY
+
+  validation-job-suite:
+    name: Cloud Run Job suite (py${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.11", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+          cache-dependency-path: requirements.txt
+      - name: Install the four distributions the job composes, without the google extra
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest tomli
+          pip install --no-deps packages/integration/model-egress-unit
+          pip install --no-deps packages/integration/model-egress-provider-openai
+          pip install --no-deps packages/integration/model-egress-validation
+          pip install --no-deps packages/integration/model-egress-custody-gcp
+          pip install --no-deps deployment/meu-validation-job
+      - name: Suite, with every socket refused
+        run: |
+          cd deployment/meu-validation-job
+          python - <<'PY'
+          import socket, sys, pytest
+          def refuse(*a, **k):
+              raise AssertionError("the validation-job suite opened a socket")
+          socket.socket.connect = refuse
+          socket.create_connection = refuse
+          sys.exit(pytest.main(["-o", "addopts=", "-v", "--no-header",
+                                "--junitxml=/tmp/job.xml", "tests"]))
+          PY
+      - name: Fail if any test was skipped
+        run: |
+          python - <<'PY'
+          import sys, xml.etree.ElementTree as ET
+          root = ET.parse("/tmp/job.xml").getroot()
+          skipped = [tc.get("name") for tc in root.iter("testcase") if tc.find("skipped") is not None]
+          total = len(list(root.iter("testcase")))
+          if total == 0:
+              print("No tests were collected at all — that is not a pass."); sys.exit(1)
+          if skipped:
+              print("A skipped row is NOT a passing row. Skipped:"); [print(f"  - {n}") for n in skipped]; sys.exit(1)
+          print(f"{total} tests, none skipped.")
+          PY
+      - name: The job's own entrypoint refuses to run inside this CI runner (LP-8)
+        run: |
+          set +e
+          python deployment/meu-validation-job/entrypoint.py validate
+          code=$?
+          set -e
+          if [ "$code" != "2" ]; then
+            echo "the entrypoint exited $code; a CI runner must be refused with 2"; exit 1
+          fi
+          echo "the entrypoint refused this CI runner, as LP-8 requires"
+
+      - name: Offline validation from the repository root, sockets refused, records untouched
+        run: |
+          python - <<'PY'
+          import hashlib, json, pathlib, socket, sys, tempfile
+          def refuse(*a, **k):
+              raise AssertionError("the offline job opened a socket")
+          socket.socket.connect = refuse
+          socket.create_connection = refuse
+          from meu_validation_job import load_config, run
+          records = pathlib.Path("packages/integration/model-egress-unit")
+          before = {n: hashlib.sha256((records / n).read_bytes()).hexdigest()
+                    for n in ("MEU_LIVE_PROVIDER_DESIGNATION.json", "MEU_LIVE_VALIDATION.json")}
+          work = pathlib.Path(tempfile.mkdtemp())
+          example = json.loads(pathlib.Path("deployment/meu-validation-job/config.example.json").read_text())
+          example.update({
+              "designation_record_path": str(records / "MEU_LIVE_PROVIDER_DESIGNATION.json"),
+              "validation_record_path": str(records / "MEU_LIVE_VALIDATION.json"),
+              "report_path": str(work / "report.json")})
+          config_path = work / "config.json"
+          config_path.write_text(json.dumps(example))
+          # The environment passed in is empty: the offline path is what CI exercises, and
+          # the job's live path and its entrypoint both refuse a CI runner (proven above).
+          result = run(load_config(config_path), environ={})
+          assert result.exit_code == 0, f"offline run exited {result.exit_code}"
+          assert result.report["credential_materialized"] is False
+          assert result.report["secret_version_accessed"] is None
+          assert result.report["network_opened"] is False
+          assert result.report["live_vendor_egress"] is False
+          text = pathlib.Path(example["report_path"]).read_text()
+          for forbidden in ("quick brown fox", "MARKER-HARNESS", "NOT A MODEL RESPONSE"):
+              assert forbidden not in text, forbidden
+          after = {n: hashlib.sha256((records / n).read_bytes()).hexdigest() for n in before}
+          assert after == before, "the offline run mutated a canonical record"
+          print("offline run: exit 0, no credential, no network, records byte-identical")
+          PY
+
+      - name: Live mode fails closed
+        run: |
+          python - <<'PY'
+          import json, pathlib, sys, tempfile
+          from meu_validation_job import load_config, run
+          records = pathlib.Path("packages/integration/model-egress-unit")
+          work = pathlib.Path(tempfile.mkdtemp())
+          example = json.loads(pathlib.Path("deployment/meu-validation-job/config.example.json").read_text())
+          example.update({
+              "mode": "live",
+              "designation_record_path": str(records / "MEU_LIVE_PROVIDER_DESIGNATION.json"),
+              "validation_record_path": str(records / "MEU_LIVE_VALIDATION.json"),
+              "report_path": str(work / "report.json")})
+          path = work / "config.json"
+          path.write_text(json.dumps(example))
+          result = run(load_config(path), environ={})
+          assert result.exit_code == 2, f"live mode exited {result.exit_code}, expected 2"
+          assert "no live Responses transport exists" in result.messages[0]
+          assert result.report["credential_materialized"] is False
+          print("live mode failed closed, as LIVE_VENDOR_EGRESS=False requires")
+          PY

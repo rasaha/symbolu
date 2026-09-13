@@ -215,3 +215,22 @@ def test_a_reader_failure_or_empty_payload_is_unavailable_without_the_managers_w
     with pytest.raises(CustodyRefused) as excinfo:
         _pinned(reader=lambda r: "  ").materialize(request(vendor="openai", credential_profile="openai-validation"), now=NOW)
     assert excinfo.value.reason is CustodyRefusal.CUSTODY_UNAVAILABLE
+
+
+def test_a_leases_secret_is_not_a_dataclass_field_so_asdict_cannot_reach_it():
+    """Regression, adversarial pass 2026-09-13: ``dataclasses.asdict`` walks ``fields()``
+    and ignores ``repr=False``, so a secret kept as a field leaked through the one call a
+    reasonable person makes when serializing a record. It is an InitVar now."""
+
+    import dataclasses
+    lease = CredentialLease(
+        lease_id="l", custody_authority_id="c", credential_profile="p", vendor="v",
+        tenant_id=TENANT, secret_version_ref="projects/p/secrets/s/versions/1",
+        issued_at=NOW, expires_at=NOW + timedelta(minutes=5),
+        is_production_authoritative=False, _secret="MARKER-SECRET-VALUE")
+    assert "_secret" not in {f.name for f in dataclasses.fields(lease)}
+    assert "MARKER-SECRET-VALUE" not in json.dumps(dataclasses.asdict(lease), default=str)
+    assert "MARKER-SECRET-VALUE" not in repr(dataclasses.astuple(lease))
+    assert "MARKER-SECRET-VALUE" not in repr(lease) and "MARKER-SECRET-VALUE" not in str(lease)
+    assert "MARKER-SECRET-VALUE" not in json.dumps(lease.as_record())
+    assert lease.use(lambda s: s, now=NOW) == "MARKER-SECRET-VALUE"

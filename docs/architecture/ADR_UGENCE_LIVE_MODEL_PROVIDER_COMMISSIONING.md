@@ -717,6 +717,87 @@ not among them. The canonical authorization stays `NOT_GIVEN`, every row stays `
 deployed, no adapter is built, no project, identity, secret or credential is created, and
 no live call is made by this record.
 
+### 0.8 — Owner identity clarification of 2026-09-13: native GCP workload identity is production-authoritative; ADC never is
+
+> Native GCP workload identity attached to the designated Cloud Run Job is an approved production-authoritative identity mechanism equivalent to WIF for this non-production commissioning path. Generic `application_default_credentials` is not itself proof of that identity and must never become production-authoritative. Represent the mechanism explicitly as `native_gcp_workload_identity`, bind it to the exact designated service-account resource, and require the designation/attestation inputs. Continue to refuse developer credentials, user credentials, default-compute identities, downloaded service-account keys, fake/emulator identities and unverified generic ADC.
+
+#### 0.8.1 — The inconsistency this resolves
+
+Three contracts disagreed once the runtime became a Cloud Run Job:
+
+| Where | Said |
+| --- | --- |
+| `infrastructure.py` (LP-7 ruling 2) | the deployment-platform identity mechanism is `workload_identity_federation` **or** `native_gcp_workload_identity` |
+| `custody.CustodyIdentity` | the identity kinds were WIF, `application_default_credentials`, `fake_emulator` and (refused) `service_account_key` — with no native kind at all |
+| `PinnedSecretVersionCustodyAdapter` | production-authoritative **only** under `workload_identity_federation` |
+
+So a designation could name the native mechanism that the custody layer had no way to
+express, and the nearest thing it could express, ADC, is the one thing that must not
+carry that authority. The contract admitted the mechanism and the code did not.
+
+#### 0.8.2 — Why ADC is refused by name, and what replaces it
+
+**How a process obtained a credential is not which identity that credential is.**
+Application default credentials are a *search order*: on Cloud Run it finds the attached
+service account, with `GOOGLE_APPLICATION_CREDENTIALS` set it finds a downloaded key
+file, and on a laptop it finds a developer's own `gcloud auth login`. All three succeed
+identically, and the calling code cannot tell them apart from the fact that ADC worked.
+Treating "ADC succeeded" as proof of the designated identity would make a developer
+laptop production-authoritative, which is exactly what LP-8 forbids.
+
+So the operator **declares the source explicitly** and the code checks the declaration
+against the designation rather than trusting a discovery result:
+
+| Declared source | Treatment |
+| --- | --- |
+| `attached_service_account` | the native mechanism. Production-authoritative **only** when the declared account is a valid `projects/<p>/serviceAccounts/<email>`, is exactly the designated MEU account (obligation 3), is not a human or default-compute identity, and the designation carries an independent verification and a 64-hex record digest |
+| `workload_identity_federation` | unchanged: production-authoritative under a pool-constrained principal (obligation 5) that is not a human identity |
+| `application_default_credentials` | refused by name, with the reason above |
+| `developer_credentials` | refused: a human identity |
+| `service_account_key_file` | refused: a downloaded key is itself a credential in the deployment (LP-2) |
+| `emulator` | refused: a test double is never production-authoritative |
+
+The Google client libraries still obtain the Cloud Run Job's runtime credentials through
+ADC — that is how Google's libraries work and this clarification does not change it. What
+changed is that ADC's success is no longer *evidence*: the authority comes from the
+declared, designated, attested binding, and the discovery mechanism underneath it is not
+asked to prove anything.
+
+#### 0.8.3 — What was implemented (unit 0.6.0, custody-gcp 0.1.0, meu-validation-job 0.1.0)
+
+**The unit.** `IDENTITY_KINDS` gains `native_gcp_workload_identity`;
+`PRODUCTION_AUTHORITATIVE_IDENTITY_KINDS` names the two mechanisms;
+`CustodyIdentity` gains `designated_service_account`, `designation_attested_by` and
+`designation_record_digest`, and one method, `production_authority_refusal()`, which is
+the single place the rule lives. `PinnedSecretVersionCustodyAdapter` now delegates to it
+instead of naming WIF itself, so the fixture path and the production-form path cannot
+drift apart. `is_service_account_resource` is the shared shape check.
+
+**The custody distribution.** `ugence-model-egress-custody-gcp` is the production-form
+adapter LP-8 names: one pinned numeric version, an injected client whose protocol carries
+exactly one method so listing is not expressible, a configuration scan that refuses
+credential material in any field, a designation check that refuses until all seventeen
+obligations are supplied and attested, payload validation (right version, decodable,
+non-empty, no control characters), and provider exceptions sanitized to their **type name
+only**. The Google SDK is an optional extra imported inside one function at the
+deployment composition root; importing the package loads no SDK.
+
+**The deployment unit.** `deployment/meu-validation-job` is a Cloud Run **Job** that
+evaluates five gates, runs the offline harness over fakes and writes one redacted report.
+Reading the real credential requires the posture, the designation **and** the canonical
+authorization, because a run that may not call may not read. `mode: live` fails closed:
+no live transport exists and `LIVE_VENDOR_EGRESS` is `False`.
+
+#### 0.8.4 — What this clarification does not change
+
+It creates no infrastructure and no credential, retrieves no Secret Manager payload,
+makes no vendor call, and does not populate `MEU_LIVE_PROVIDER_DESIGNATION.json`: the
+seventeen obligations remain `UNDESIGNATED`, the canonical authorization remains
+`NOT_GIVEN`, every validation row remains `null`, and `COMMISSIONING_STATUS` remains
+`BLOCKED_PENDING_INFRASTRUCTURE_DESIGNATIONS`. The prohibitions of LP-2, LP-7 and LP-8
+on credentials and live calls are unchanged; this section only says which identity
+mechanism may carry custody authority once the owner supplies the designations.
+
 ## 1 — The finding that shapes this record
 
 **AP-3 did not gate the live model provider, and its acceptance unblocks none of the

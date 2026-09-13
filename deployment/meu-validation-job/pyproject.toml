@@ -1,0 +1,51 @@
+# MEU validation job — the Cloud Run Job deployment unit for the commissioning validation.
+#
+#   OFFLINE BY DEFAULT. LIVE FAILS CLOSED. NO GENUINE DISPATCH PATH IN THIS SLICE.
+#
+# This is a composition root, not a library: it is the only place in the repository that
+# constructs a real Google Secret Manager client, and it does so through the custody
+# distribution's seam, never by importing a Google SDK itself.
+#
+# Build:   python -m build deployment/meu-validation-job
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "meu-validation-job"
+dynamic = ["version"]
+description = "MEU validation job — a GCP Cloud Run Job that evaluates the commissioning gates, runs the eighteen-row offline harness over fake components and writes one redacted report. Offline by default; live fails closed; no genuine dispatch path exists."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "Proprietary" }
+authors = [{ name = "Rakesh Mohan" }]
+classifiers = ["Typing :: Typed"]
+dependencies = [
+    "ugence-model-egress-unit>=0.6.0",
+    "ugence-model-egress-custody-gcp>=0.1.0",
+    "ugence-model-egress-validation>=0.2.1",
+]
+
+[project.optional-dependencies]
+# The real Secret Manager client, installed in the deployment image only. The job
+# imports no Google SDK itself: build_google_secret_manager_client() does, inside one
+# function, in the custody distribution.
+google = ["ugence-model-egress-custody-gcp[google]>=0.1.0"]
+test = ["pytest>=7.0"]
+
+[project.scripts]
+meu-validation-job = "meu_validation_job.cli:main"
+
+[tool.setuptools.dynamic]
+version = { attr = "meu_validation_job.version.__version__" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["meu_validation_job*"]
+
+[tool.setuptools.package-data]
+meu_validation_job = ["py.typed"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
