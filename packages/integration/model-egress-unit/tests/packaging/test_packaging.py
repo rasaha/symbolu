@@ -72,8 +72,13 @@ def test_every_module_is_inside_the_one_import_namespace():
     found = _pyproject()["tool"]["setuptools"]["packages"]["find"]
     assert found["where"] == ["src"]
     assert found["include"] == ["ugence_model_egress_unit*"]
-    assert {p.name for p in (SRC.parent).iterdir() if p.is_dir()
-            and not p.name.startswith("__")} == {"ugence_model_egress_unit"}
+    # Counted by ``__init__.py`` rather than by directory: ``pip install`` from the
+    # source tree leaves a build-metadata directory (``.egg-info``) beside the package,
+    # and build metadata is not a second import namespace. Counting directories made
+    # this test fail in the installed layout while passing in the source layout.
+    importable = sorted(d.name for d in SRC.parent.iterdir()
+                        if d.is_dir() and (d / "__init__.py").is_file())
+    assert importable == ["ugence_model_egress_unit"], importable
 
 
 def test_the_maturity_is_machine_readable_from_the_installed_package():
