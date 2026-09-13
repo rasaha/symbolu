@@ -17,9 +17,9 @@
 # sampler, no admission boundary, no store, no clock, no network.
 #
 # Dependency direction (one-way), and deliberately short:
-#     ugence-governance-contracts (leaf)
-#         ▲
-#     ugence-change-effect-records (this package)
+#     ugence-governance-contracts (leaf)        ugence-control-plane-root (LedgerEntry only,
+#         ▲                                         and only for linkage.py)
+#         └──────────── ugence-change-effect-records (this package) ────────────┘
 #
 # Build:   python -m build packages/integration/change-effect-records
 [build-system]
@@ -38,6 +38,12 @@ keywords = ["governance", "classification", "recalibration", "records", "contrac
 classifiers = ["Typing :: Typed"]
 dependencies = [
     "ugence-governance-contracts>=0.8.0",
+    # Admissible for the item 3.4 linkage module ALONE, by the owner's ruling of
+    # 2026-09-13, and for the immutable LedgerEntry contract type alone. No record,
+    # identifier, canonicalization, vocabulary or admission-data module may import it;
+    # a boundary test enforces that by file. AuditLedger is never imported: a package
+    # that must not append does not hold the means to.
+    "ugence-control-plane-root>=0.1.0",
 ]
 
 [project.optional-dependencies]

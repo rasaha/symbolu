@@ -2,6 +2,14 @@
 from __future__ import annotations
 
 from .base import BaseProvider, Provider
+from .governed_read import (
+    GovernedReadPort,
+    GovernedReadRequest,
+    ReadEligibility,
+    ReadEligibilityStatus,
+    ReadIneligibilityReason,
+    ReadPurpose,
+)
 from .assertion import (
     AssertionCoverage,
     AssertionGovernanceProvider,
@@ -77,6 +85,9 @@ from .evidence import (
 )
 
 __all__ = [
+    # the governed-read port: declared here, implemented nowhere
+    "GovernedReadPort", "GovernedReadRequest", "ReadEligibility",
+    "ReadEligibilityStatus", "ReadIneligibilityReason", "ReadPurpose",
     "Provider", "BaseProvider",
     "AssertionGovernanceProvider", "AssertionGovernanceRequest",
     "AssertionGovernanceResult", "AssertionCoverage",

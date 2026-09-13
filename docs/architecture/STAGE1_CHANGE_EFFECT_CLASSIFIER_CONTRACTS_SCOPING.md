@@ -1,8 +1,8 @@
 # Change Effect Classifier — Stage 1 scoping: contracts and inert substrate
 
 **Status:** **authorized as tracked work** by the owner on 2026-09-13 (ADR §8), strictly
-contracts-only and inert. Items 3.1, 3.3 and the admission data of 3.6 are delivered in
-`packages/integration/change-effect-records`; items 3.2, 3.4 and 3.5 are not yet started.
+contracts-only and inert. Items 3.1, 3.3, 3.4, 3.5 and the admission data of 3.6 are
+delivered; item 3.2, the policy family, is not yet started.
 The package split and the Stage 2 timing of the conformance profile are confirmed by the
 owner, closing Stage 1 decisions 2 and 3 (ADR §9). Originally
 produced as scoping only. Produced 2026-09-12 under the
@@ -267,6 +267,13 @@ carrying digests and never back-references:
   Stage 2 under the CEC-3 record contract: immutable storage, signer identity,
   idempotency, append-failure behaviour, and the rule that a classification without its
   audit record is not admissible.
+- **Delivered** `[V]`: `linkage.py` in `change-effect-records` — thirteen `LedgerEntry`
+  kinds, a payload schema that locates a record by digest rather than copying it, the
+  transition kinds the uniqueness constraint is taken over, and the four required audit-root
+  capabilities as data, **every one `DECLARED_GAP`**. Per the owner's ruling of 2026-09-13
+  the second dependency is admissible in this module alone; a boundary test enforces that by
+  file, and a second asserts only `LedgerEntry` is imported — never `AuditLedger`, so a
+  package that must not append does not hold the means to.
 - **Inert because:** no writer.
 
 ### 3.5 Read-port contract
@@ -280,6 +287,14 @@ carrying digests and never back-references:
   computed under.
 - **Must not:** be implemented in Stage 1. No store, no cache, no consumer adapter for M3
   or M11.
+- **Delivered** `[V]`: `contracts/governed_read.py` in `governance-contracts` —
+  `GovernedReadRequest`, the typed `ReadEligibility` determination, and the
+  `GovernedReadPort` Protocol. The determination **refuses truthiness**, so `if eligibility:`
+  raises rather than treating INDETERMINATE as permission; it carries the authorization
+  digest it was computed under; and `answers()` ties it to one question so it cannot be
+  reused for another. The port names no record type and imports nothing from
+  `change-effect-records`: a read port that depended on the producer of the state it guards
+  would make every reader a dependent of the classifier.
 - **Inert because:** a Protocol with no implementation.
 
 ### 3.6 Admission-state contract

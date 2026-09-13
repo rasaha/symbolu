@@ -16,6 +16,9 @@ for _src in (
     os.path.join(_HERE, "src"),
     os.path.join(_HERE, "tests"),
     os.path.join(_REPO, "packages", "governance-contracts", "src"),
+    # The item 3.4 linkage module's single extra dependency. It is on the path because
+    # linkage.py imports the immutable entry contract from it; nothing here appends.
+    os.path.join(_REPO, "packages", "integration", "control-plane-root", "src"),
 ):
     if os.path.isdir(_src) and _src not in sys.path:
         sys.path.insert(0, _src)

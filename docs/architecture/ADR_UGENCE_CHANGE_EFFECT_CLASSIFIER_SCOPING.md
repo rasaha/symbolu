@@ -734,3 +734,58 @@ for a verified zero-read finding.
 authority issued which route is a Stage 3 verification against the authorization; the
 contract holds the fields and checks neither, because checking would require reading
 another record.
+
+## 10 — Stage 1 items 3.4 and 3.5, and the second dependency — 2026-09-13
+
+The owner's ruling, recorded verbatim:
+
+> The second dependency is admissible only for the item 3.4 linkage module. No record,
+> identifier, canonicalization, vocabulary or admission-data module may import
+> ugence_control_plane_root. Add a boundary test enforcing that restriction. Import only
+> the immutable ledger/entry contract types actually needed; do not call or wrap
+> AuditLedger.append, instantiate a ledger, or imply that the existing ledger satisfies
+> conditional append, linearizable control-register, chain-head or target-version
+> requirements. Those capabilities remain declared gaps. For item 3.5, keep the read-port
+> contract neutral: define its request and typed eligibility result in
+> governance-contracts, with no dependency back to change-effect-records, no
+> implementation, cache, store or eligibility computation.
+
+Both items are delivered on those terms.
+
+**3.4, and why the confinement is structural rather than documentary.** `linkage.py` is the
+only module in `change-effect-records` that imports `ugence_control_plane_root`, and it
+imports `LedgerEntry` alone. `AuditLedger` is deliberately absent: a package that must not
+append should not hold the means to, and importing the thing that appends would have made
+the prohibition a matter of discipline. Two boundary tests hold the line — one over every
+source file, naming any offender, and one that pins the imported names to exactly
+`{LedgerEntry}`. A third asserts nothing instantiates a ledger type or appends to a
+ledger-shaped receiver; it distinguishes that from Python's list `.append`, because a bare
+ban on the word would have caught every list in the package and proved nothing.
+
+**The declaration claims nothing about the existing ledger.** `REQUIRED_AUDIT_ROOT_CAPABILITIES`
+names four capabilities the rule requires — atomic conditional append, linearizable chain
+head, linearizable control register, linearizable target-version registry — each with what it
+must guarantee and why it cannot be assumed, and **each carrying status `DECLARED_GAP`.** A
+test asserts all four remain gaps, so a future commit that quietly marks one satisfied has to
+change a test that says why it cannot be. `APPEND_UNIQUENESS_UNAVAILABLE` is named as the
+fail-closed refusal of a Stage 3 boundary that does not exist.
+
+**3.5, kept neutral.** The read port lives in `governance-contracts` beside `Provider` and
+names no record type; it would be a coherent contract if `change-effect-records` did not
+exist. Two properties are held by the shapes rather than by discipline. The determination
+**refuses truthiness** — `bool(eligibility)` raises — because `if eligibility:` is the
+mistake the port exists to prevent: it would read `INDETERMINATE` as permission and would
+keep working after a revocation. And it carries the `authorization_digest` it was computed
+under, with `answers()` tying it to one tenant, consumer, purpose, target and version, so a
+determination cannot be detached from the question it answered. There is no implementation
+here or anywhere; tests assert the Protocol method's body is `...`, that the module holds no
+state and memoizes nothing, and that it imports no store, clock or network.
+
+`[V]` change-effect-records 103 passed; governance-contracts 252 passed, 3 skipped.
+Unchanged, each run alone: governance-provider-framework 88, tap 82, actiongate 62,
+control-plane-root, agent-assurance-evidence and policy-authority pass. `[G]`
+governed-review-service fails collection in this environment for want of installed
+distributions, on a clean tree as well as this one.
+
+Stage 1 item 3.2, the policy family, is not started. Progress beyond Stage 1 remains
+unauthorized.

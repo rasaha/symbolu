@@ -25,12 +25,19 @@ SOURCES = sorted(PKG_DIR.rglob("*.py"))
 STDLIB = set(sys.stdlib_module_names)
 ALLOWED_FIRST_PARTY = {"ugence_change_effect_records", "ugence_governance_contracts"}
 
+#: The second dependency is admissible in exactly one module. The owner's ruling of
+#: 2026-09-13: "The second dependency is admissible only for the item 3.4 linkage module.
+#: No record, identifier, canonicalization, vocabulary or admission-data module may
+#: import ugence_control_plane_root."
+LEDGER_DEPENDENCY = "ugence_control_plane_root"
+LEDGER_DEPENDENCY_ALLOWED_IN = {"linkage.py"}
+
 #: Anything a classifier, replay harness, sampler, admission boundary, store or network
 #: client would need, and the neighbours whose work this package must not duplicate.
 FORBIDDEN = {
     "ugence_governance_provider_framework", "governance_providers",
     "ugence_policy_authority", "ugence_trusted_evidence_authority",
-    "ugence_control_plane_root", "ugence_governed_review_service",
+    "ugence_governed_review_service",
     "ugence_tap_provider", "ugence_actiongate_provider",
     "ugence_agent_assurance_evidence", "ugence_ai_system_registry",
     "ugence_data_use_admission", "ugence_execution_reservation",
@@ -40,15 +47,21 @@ FORBIDDEN = {
 }
 
 
+def _imports_of(path: pathlib.Path) -> set[str]:
+    found: set[str] = set()
+    tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            found.update(alias.name.split(".")[0] for alias in node.names)
+        elif isinstance(node, ast.ImportFrom) and node.level == 0 and node.module:
+            found.add(node.module.split(".")[0])
+    return found
+
+
 def _imported_modules() -> set[str]:
     found: set[str] = set()
     for path in SOURCES:
-        tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
-        for node in ast.walk(tree):
-            if isinstance(node, ast.Import):
-                found.update(alias.name.split(".")[0] for alias in node.names)
-            elif isinstance(node, ast.ImportFrom) and node.level == 0 and node.module:
-                found.add(node.module.split(".")[0])
+        found |= _imports_of(path)
     return found
 
 
@@ -56,14 +69,100 @@ def test_nothing_forbidden_is_imported():
     assert not _imported_modules() & FORBIDDEN
 
 
-def test_every_import_is_stdlib_or_the_one_declared_first_party_dependency():
-    outside = _imported_modules() - STDLIB - ALLOWED_FIRST_PARTY
+def test_every_import_is_stdlib_or_a_declared_first_party_dependency():
+    outside = _imported_modules() - STDLIB - ALLOWED_FIRST_PARTY - {LEDGER_DEPENDENCY}
     assert not outside, outside
 
 
-def test_the_declared_dependency_set_is_exactly_one_package():
+def test_the_ledger_dependency_is_confined_to_the_linkage_module():
+    """The owner's ruling, made mechanical.
+
+    A record type that could see a ledger is a record type someone will eventually ask
+    to write itself. Confining the import is what makes that impossible rather than
+    discouraged, so this test names every offending file rather than merely failing.
+    """
+
+    offenders = sorted(
+        path.name for path in SOURCES
+        if LEDGER_DEPENDENCY in _imports_of(path)
+        and path.name not in LEDGER_DEPENDENCY_ALLOWED_IN
+    )
+    assert not offenders, (
+        f"{LEDGER_DEPENDENCY} is admissible only in {sorted(LEDGER_DEPENDENCY_ALLOWED_IN)}; "
+        f"found in {offenders}")
+
+
+def test_the_record_identifier_canon_vocabulary_and_admission_modules_are_named_and_clean():
+    """Each module the ruling names, checked by name rather than by inference.
+
+    A future module added to the package is caught by the test above; these five are
+    named here so that renaming or emptying one cannot silently remove the check.
+    """
+
+    ruled = ("records.py", "identifiers.py", "_canon.py", "vocabulary.py", "admission.py")
+    present = {path.name for path in SOURCES}
+    for name in ruled:
+        assert name in present, f"{name} is named in the ruling but absent from the package"
+        assert LEDGER_DEPENDENCY not in _imports_of(PKG_DIR / name), name
+
+
+def test_the_linkage_module_imports_the_entry_contract_and_not_the_ledger():
+    """Importing the thing that appends, in a package that must not append, would make
+    the prohibition a matter of discipline rather than of structure."""
+
+    source = (PKG_DIR / "linkage.py").read_text(encoding="utf-8")
+    tree = ast.parse(source, filename="linkage.py")
+    imported_names: set[str] = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.ImportFrom) and node.module == LEDGER_DEPENDENCY:
+            imported_names.update(alias.name for alias in node.names)
+    assert imported_names == {"LedgerEntry"}, imported_names
+    for forbidden in ("AuditLedger", "StoredEntry", "AuditReferenceFactory"):
+        assert forbidden not in imported_names
+
+
+def test_nothing_appends_instantiates_a_ledger_or_builds_an_entry():
+    """No ledger constructed, no entry built, no append on anything ledger-shaped.
+
+    A bare ban on ``.append`` would catch every list in the package and prove nothing,
+    so the check is on what the call is made *on*: a ledger-ish receiver, or a direct
+    call to one of the ledger's own types.
+    """
+
+    ledger_types = {"AuditLedger", "LedgerEntry", "StoredEntry", "AuditReferenceFactory"}
+    for path in SOURCES:
+        tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.Call):
+                continue
+            func = node.func
+            if isinstance(func, ast.Name):
+                assert func.id not in ledger_types, f"{path.name} instantiates {func.id}"
+            elif isinstance(func, ast.Attribute) and func.attr == "append":
+                receiver = getattr(func.value, "id", "") or getattr(func.value, "attr", "")
+                assert "ledger" not in receiver.lower() and "audit" not in receiver.lower(), (
+                    f"{path.name} appends to {receiver}")
+
+
+def test_the_capability_requirements_are_all_declared_gaps():
+    """Declaring an entry kind must not be read as a claim the ledger can host the graph."""
+
+    from ugence_change_effect_records import linkage
+
+    assert linkage.REQUIRED_AUDIT_ROOT_CAPABILITIES
+    for capability, (status, _, _) in linkage.REQUIRED_AUDIT_ROOT_CAPABILITIES.items():
+        assert status == "DECLARED_GAP", capability
+    assert linkage.CAPABILITY_UNAVAILABLE_REFUSAL == "APPEND_UNIQUENESS_UNAVAILABLE"
+
+
+def test_the_declared_dependency_set_is_exactly_two_packages():
+    """The second is admissible for the linkage module alone, and is declared as such."""
+
     data = tomllib.loads((DIST / "pyproject.toml").read_text(encoding="utf-8"))
-    assert data["project"]["dependencies"] == ["ugence-governance-contracts>=0.8.0"]
+    assert data["project"]["dependencies"] == [
+        "ugence-governance-contracts>=0.8.0",
+        "ugence-control-plane-root>=0.1.0",
+    ]
 
 
 def test_no_clock_is_read_anywhere():
