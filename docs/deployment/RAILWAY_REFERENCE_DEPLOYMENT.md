@@ -731,8 +731,10 @@ this**: no screen reads Postgres; the studio's records are sqlite files under
 `UGENCE_STUDIO_RUNTIME_DIR`, and the worker's Postgres holds only the durable engine's state.
 
 **Read 9.0 first.** Until 2026-09-12 the profile could not be driven from a browser; 9.0
-records the two gaps and their closure. This walkthrough has not been run on Railway: steps
-9.1 to 9.7 are what the source accepts `[V]` and what Railway's documentation says `[I]`.
+records the two gaps and their closure. This walkthrough was run on Railway on 2026-09-13 and
+9.7.1 records what that run established, including one variable 9.4 was missing. Two claims
+remain inferred: the privilege variable in 9.2, and Railway's own HTTP edge and healthcheck
+behaviour in 9.6, which this deployment never exercises because it uses a TCP proxy.
 
 **9.0 Two gaps in the profile's own frontend, both closed on 2026-09-12 (owner-ratified).**
 
@@ -742,8 +744,10 @@ records the two gaps and their closure. This walkthrough has not been run on Rai
    on. **Closed:** the frontend stage now declares `ARG VITE_API_BASE_URL` and exports it to
    the build (`deployment/governance-studio/Dockerfile`, frontend stage, before
    `npm run build`) `[V]`. The same build run outside Docker with the variable set compiles
-   the given origin into the bundle and nothing else `[V]`; that Railway hands a service
-   variable to a Dockerfile build as this `ARG` stays `[I]` until a Railway build has done it.
+   the given origin into the bundle and nothing else `[V]`. Railway does hand a service
+   variable to a Dockerfile build as this `ARG` `[V]`, observed 2026-09-13: the app served
+   from `studio-hosted` reached the API at the proxy origin and recorded a registration,
+   which the loopback default could not have done.
 2. *The SPA never sent the deployment request header.* `middleware.py:55-84` returns 403 on
    every mutating `/api` request that lacks `X-Ugence-Request: GovernanceStudio`, and the two
    clients sent only `Accept` and `Content-Type`. **Closed:** `deploymentHeaders` in
@@ -796,6 +800,9 @@ The image runs as uid 10001 and Railway mounts the volume root-owned, so the gat
 every configured seam `unwritable` and refuse to bind. The studio image has no privilege
 drop of its own (its entrypoint runs the gate and the server, nothing else), so the only
 platform fix is `RAILWAY_RUN_UID=0` `[I]`: the process runs as root for the demo's lifetime.
+The 2026-09-13 deployment writes to the volume — its report returns every `*_writable` check
+true `[V]` — but that shows the mount is writable by whatever user it runs as, not that this
+variable was needed or set, which stays `[I]` until a deployment log shows the uid.
 Part 7 explains why the worker avoids this; the studio cannot yet.
 
 **9.3 Generate a password hash** locally, once (Argon2id; the password is never printed):
@@ -819,6 +826,7 @@ UGENCE_STUDIO_TENANT_ID=tenant-demo
 UGENCE_STUDIO_SYSTEM_REGISTRY_PATH=/var/run/ugence-studio/system-registry.sqlite3
 UGENCE_STUDIO_DATA_USE_DECLARATIONS_PATH=/var/run/ugence-studio/data-use.sqlite3
 UGENCE_STUDIO_VENDOR_DECLARATIONS_PATH=/var/run/ugence-studio/vendor.sqlite3
+UGENCE_STUDIO_WORKFLOW_DRAFTS_PATH=/var/run/ugence-studio/workflow-drafts.sqlite3
 UGENCE_STUDIO_CONSTITUTION_REGISTRY_PATH=/var/run/ugence-studio/policy-registry.sqlite3
 UGENCE_STUDIO_POLICY_IDENTITIES=agent_governance.agent_constitution|agent-constitution-baseline|TENANT
 UGENCE_STUDIO_SIMULATION_PROVIDER=1
@@ -833,10 +841,17 @@ slash. It must equal `window.location.origin` character for character, or the SP
 reaches the API (CSP `connect-src 'self'`) nor sends the request header (9.0); `config.ts`
 silently replaces a relative value such as `/api` with the loopback default `[V]`. Because
 9.6 assigns the address after the first deploy, the first deploy runs without this variable;
-set it once the proxy exists and redeploy to rebuild `[I]`.
+set it once the proxy exists and redeploy to rebuild `[V]`: the 2026-09-13 bundle carries the
+proxy origin, which only a build with this variable set produces.
 
-`validate()` accepts exactly this set in production mode `[V]` (`config.py:175-258`): the
-three record paths and the registry path require the tenant; the policy identities require
+`UGENCE_STUDIO_WORKFLOW_DRAFTS_PATH` is the Bring Your Workflow phase 3A seam (BW-3A). It
+arrived after this part was first written, and a deployment without it answers the typed gap
+`workflow_drafts` on the draft controls of screen 33 while every other seam works `[V]`,
+observed 2026-09-13. Like the other record files it must lie under the runtime volume and it
+requires the tenant (`config.py:273-279`).
+
+`validate()` accepts exactly this set in production mode `[V]` (`config.py:175-279`): the
+four record paths and the registry path require the tenant; the policy identities require
 the registry path and the tenant; the simulation flag must be exactly `1`. Do **not** set
 `UGENCE_STUDIO_REVIEW_SERVICE_URL`: production mode requires `https`, the worker serves plain
 `http` under RW-3, and test mode allows `http` only on loopback `[V]`. Review Queue, Run
@@ -853,7 +868,9 @@ sh -c "mkdir -p /tmp/tls && openssl req -x509 -newkey rsa:2048 -nodes -days 30 \
   && python /app/entrypoint.py"
 ```
 
-`openssl` is present in the base image through `ca-certificates` `[I]`; the tests generate
+`openssl` is present in the base image and this command produces a usable pair `[V]`,
+observed 2026-09-13: the deployment's own report returns `tls_certificate_valid` and
+`tls_certificate_not_expired` true. The tests generate
 their certificates the same way (`tests/conftest.py:36-49`). The gate checks the file exists,
 is readable and is not expired; it does not check the issuer `[V]`. This certificate is
 self-signed and publicly untrusted: it is not production-grade TLS and Railway manages no
@@ -861,16 +878,18 @@ part of it. It gives the listener the TLS it insists on, and nothing more.
 
 **9.6 Networking.** Railway's HTTP edge forwards plain HTTP to the container `[I]`, which this
 listener refuses. Use **Settings → Networking → TCP Proxy** on port `8443`; Railway assigns
-`<name>.proxy.rlwy.net:<port>` `[I]`. Generate no Railway HTTP domain for this service. The
+`<name>.proxy.rlwy.net:<port>` `[V]`, observed 2026-09-13. Generate no Railway HTTP domain
+for this service. The
 TCP proxy is the sole public origin for `studio-hosted`: the browser loads the SPA from it
 and the SPA sends its `/api/*` requests to it, and both reach the same uvicorn TLS listener
 in the container (`app.py:185-215` serves `index.html`, `/assets/*` and `/api/*` from one
 listener `[V]`). There is no cross-origin hop and no CORS preflight.
 
-Raw TCP passthrough carries the container's own TLS unchanged `[I]`; Railway terminates no
-TLS on this path and provides no browser-trusted certificate. What the browser sees is the
+Raw TCP passthrough carries the container's own TLS unchanged `[V]`, observed 2026-09-13;
+Railway terminates no TLS on this path and provides no browser-trusted certificate. What the browser sees is the
 self-signed certificate from 9.5, so it shows an interstitial on first load and the operator
-accepts it once for that host and port `[I]`. Put the host in `UGENCE_STUDIO_ALLOWED_HOSTS`
+accepts it once for that host and port `[V]`: `curl` needs `--insecure` against this
+listener, and the browser needs the interstitial accepted once. Put the host in `UGENCE_STUDIO_ALLOWED_HOSTS`
 (the host only; `_host_only` strips the port `[V]`). Leave the HTTP healthcheck path empty:
 Railway's healthcheck speaks HTTP and would fail against TLS `[I]`.
 
@@ -883,9 +902,11 @@ curl -k -u <operator> https://<proxy-host>:<port>/readyz
 curl -k -u <operator> https://<proxy-host>:<port>/api/v2/observe/deployment
 ```
 
-Pass condition: `/readyz` 200, and the deployment report lists `system_registry`,
-`data_use_declarations`, `vendor_declarations`, `constitution_registry` and
-`simulation_provider` as `configured` and `authority_reads` as `configured`.
+Pass condition: `/readyz` 200, and the deployment report lists all seven seams as
+`configured` — `constitution_registry`, `authority_reads`, `simulation_provider`,
+`system_registry`, `data_use_declarations`, `vendor_declarations` and `workflow_drafts` —
+with `result PASS` and `failure_code OK`. A seam reading `unset` is a variable missing from
+9.4, not a fault.
 
 Then from the browser, with `VITE_API_BASE_URL` compiled in: open `/studio/status` and the
 six chips render `configured`; open `/studio/registration` and register `hiring-screener`
@@ -895,24 +916,53 @@ redeploy, which is the volume test of 8.2 applied to the studio. A 403 on that p
 the bundle was built without `VITE_API_BASE_URL` or with one that is not the page's origin
 (9.4); the *API is not compatible* screen means the same.
 
+This press is also the only check that exercises the two front-end fixes of 9.0 together,
+because it is the one place both are required at once: the app can only reach the API if the
+origin was compiled in, and the server only accepts the write if the request header rode it.
+
+**9.7.1 Run on Railway, 2026-09-13 `[V]`, reported by the owner.** `studio-hosted` reached
+Online behind a TCP proxy at `<name>.proxy.rlwy.net:<port>` and its startup report returned
+`result PASS`, `failure_code OK`, every check true, and the pins for deployment 0.13.0,
+frontend 0.2.0 and contract `governance_studio.api.v1` with the OpenAPI digest unchanged.
+
+Two things this walkthrough had inferred were corrected or confirmed by that run:
+
+- The first attempt returned `workflow_drafts: unset` because 9.4 predated BW-3A and listed
+  no drafts path. Adding `UGENCE_STUDIO_WORKFLOW_DRAFTS_PATH` turned that seam `configured`
+  and added `workflow_drafts_writable` to the checks; the other six seams were unaffected,
+  and the frontend build hash was identical across both reports, so a variable added at
+  runtime does not rebuild the bundle.
+- From a browser on the proxy origin, the Registration screen recorded
+  `hiring-screener` with the screen guide's own values and answered `registry_kind
+  SqliteSystemRegistry`, `owner_ref_status PRESENTED_UNPROVEN`, `registered_by
+  governance-studio-private-hosted/0.13.0` and a `reg_…` identifier, then listed one
+  registration in force for `tenant-demo`. That press is a POST, which the origin guard
+  refuses 403 without the request header, from a page the app could only have loaded if the
+  API origin was compiled in — so it settles both items of 9.0 at once.
+
+What that run did not settle: whether `RAILWAY_RUN_UID=0` was required (9.2), and whether
+the records survive a redeploy or a volume detach, which is designed and not yet observed.
+
 **9.8 What this changes for the demo.** `studio-hosted` replaces `studio-web` and `studio-api`
 for the Governed Agent Studio segment; the explorer screens work on both. The console and the
 authority plane are untouched. Nothing here grants, issues, activates or executes: the record
 screens record what an administrator typed, the preflight still fails its approval row
 against the deny-all verifier, and Simulate still blocks on the runtime's default hook.
 
-**Next step.** Run part 9 on Railway, then correct this part from what the builder and the
-browser actually did.
+**Next step.** Part 9 has been run and corrected from it (9.7.1). What remains is the
+durability claim and the privilege question.
 
-> Part 9 of `docs/deployment/RAILWAY_REFERENCE_DEPLOYMENT.md` was run on Railway. Paste the
-> deploy log from the `studio-hosted` build and start, the `/readyz` and
-> `/api/v2/observe/deployment` answers, and what the browser showed on
-> `/studio/registration` after pressing Register. Replace every `[I]` in part 9 with `[V]`
-> or `[G]` from that evidence only: Railway passing `VITE_API_BASE_URL` to the Dockerfile
-> build, the TCP proxy on 8443, `RAILWAY_RUN_UID=0` against the volume, and `openssl` in
-> the image. Add any new failure to the *If something fails* table with its fix. Do not
-> change code; if a step failed, record it and stop. Documentation labels stay as defined
-> in the file.
+> On the `studio-hosted` service described in part 9 of
+> `docs/deployment/RAILWAY_REFERENCE_DEPLOYMENT.md`, settle the two items 9.7.1 leaves open.
+> First, redeploy the service and re-run the Registration screen's list: report whether the
+> `hiring-screener` registration from 2026-09-13 is still in force, which is the durability
+> claim of 8.2 applied to the studio. Then remove `RAILWAY_RUN_UID=0`, redeploy, and paste
+> the deploy log: if the startup gate now reports the seams `unwritable` and refuses to bind,
+> 9.2 is verified as written; if it binds anyway, 9.2 is wrong and the variable was never
+> needed. Replace 9.2's `[I]` and the durability gap from that evidence only, leaving 9.6's
+> HTTP-edge and healthcheck inferences alone since a TCP proxy never exercises them, and add
+> any new failure to the *If something fails* table with its fix. Do not change code.
+> Documentation labels stay as defined in the file.
 
 ## The five variables, in one place
 
@@ -920,6 +970,7 @@ browser actually did.
 |---|---|---|---|
 | `VITE_API_BASE_URL` | `studio-web` | `https://<studio-api>.up.railway.app` | build time — redeploy |
 | `VITE_API_BASE_URL` | `studio-hosted` | `https://<proxy-host>:<port>`, its own origin | build time — redeploy |
+| `UGENCE_STUDIO_WORKFLOW_DRAFTS_PATH` | `studio-hosted` | a sqlite file under `/var/run/ugence-studio` | restart |
 | `VITE_CONSOLE_API_URL` | `console-web` | `https://<console-api>.up.railway.app` | build time — redeploy |
 | `UGS_API_CORS_ALLOWED_ORIGINS` | `studio-api` | `https://<studio-web>.up.railway.app` | restart |
 | `WORKER_URL` | `authority-plane` | `http://<worker's RAILWAY_PRIVATE_DOMAIN>:8444` | restart |
@@ -959,6 +1010,8 @@ environment.
 | A service builds from `rasaha/demo` | That repository is a generated snapshot, not a deployment source | the note in *One repository* |
 | `studio-hosted` serves the SPA but it shows *API is not compatible* | The bundle was built without `VITE_API_BASE_URL` and calls `127.0.0.1:8000` | 9.4 — set it, redeploy |
 | Register or Declare answers 403 from the browser on `studio-hosted` | The compiled API origin is not the page's origin, so the SPA sends no `X-Ugence-Request` | 9.4 — the exact proxy origin, then redeploy |
+| A seam reads `unset` in the deployment report while the rest are `configured` | That seam's variable is missing; the report names the seam | 9.4 — `workflow_drafts` was the one 9.4 originally omitted |
+| Bring Your Workflow's draft controls report a typed gap on `studio-hosted` | `UGENCE_STUDIO_WORKFLOW_DRAFTS_PATH` is unset | 9.4 |
 
 ## Verification of this document
 

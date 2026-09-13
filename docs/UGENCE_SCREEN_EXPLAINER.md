@@ -420,7 +420,7 @@ or executes, and a test enforces it on every operation id, path and summary.
 
 #### Enter, press, expect
 
-*On the live deployment:* typed gap `system_registry`: *no system registry is configured: this deployment holds no registration file, so nothing can be recorded or listed* `[I]`. The values below succeed where a registry and the classification vocabulary are composed.
+*On the live deployment:* on `studio-web` this is the typed gap `system_registry`: *no system registry is configured: this deployment holds no registration file, so nothing can be recorded or listed* `[I]`. On the private hosted profile of part 9 of the Railway walkthrough the values below record for real: on 2026-09-13 this screen registered `hiring-screener` there and answered `registry_kind SqliteSystemRegistry` `[V]`.
 
 | Step | Do this | Expect |
 |---|---|---|
