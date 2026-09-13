@@ -23,6 +23,10 @@ _KIND_LABELS: dict[str, ProviderKind] = {
     "action": ProviderKind.ACTION_GOVERNANCE,
     "execution": ProviderKind.EXTERNAL_EXECUTION,
     "external_execution": ProviderKind.EXTERNAL_EXECUTION,
+    # CEC-1: nameable in configuration so the kind is not silently unaddressable.
+    # Nothing registers under it in Stage 1, so no entry can resolve to a provider.
+    "change_effect_classification": ProviderKind.CHANGE_EFFECT_CLASSIFICATION,
+    "classification": ProviderKind.CHANGE_EFFECT_CLASSIFICATION,
 }
 
 

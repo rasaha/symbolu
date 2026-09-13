@@ -463,7 +463,8 @@
       "values": [
         "ASSERTION_GOVERNANCE",
         "ACTION_GOVERNANCE",
-        "EXTERNAL_EXECUTION"
+        "EXTERNAL_EXECUTION",
+        "CHANGE_EFFECT_CLASSIFICATION"
       ]
     },
     "ProviderLifecycleState": {

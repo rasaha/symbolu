@@ -15,9 +15,12 @@ from ugence_governance_provider_framework.reference import (
     DeterministicActionGovernanceProvider, DeterministicAssertionProvider)
 
 
-def test_three_distinct_kinds():
+def test_four_distinct_kinds():
+    # CHANGE_EFFECT_CLASSIFICATION added under CEC-1 as Stage 1 substrate; peers, never
+    # conflated. Nothing registers under the fourth kind until Stage 2.
     assert {k.value for k in ProviderKind} == {
-        "ASSERTION_GOVERNANCE", "ACTION_GOVERNANCE", "EXTERNAL_EXECUTION"}
+        "ASSERTION_GOVERNANCE", "ACTION_GOVERNANCE", "EXTERNAL_EXECUTION",
+        "CHANGE_EFFECT_CLASSIFICATION"}
 
 
 def test_contracts_are_distinct_protocols():
