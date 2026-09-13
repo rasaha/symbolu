@@ -1,8 +1,10 @@
 # Change Effect Classifier — Stage 1 scoping: contracts and inert substrate
 
 **Status:** **authorized as tracked work** by the owner on 2026-09-13 (ADR §8), strictly
-contracts-only and inert. Items 3.1, 3.3, 3.4, 3.5 and the admission data of 3.6 are
-delivered; item 3.2, the policy family, is not yet started.
+contracts-only and inert. **All of items 3.1 to 3.6 are delivered**, item 3.2 last, on
+2026-09-13 under the owner's eight-point ruling (ADR §11). Stage 1's contract surface is
+complete, and it supplies no classifier, admission enforcement, memory writer or
+operational permission.
 The package split and the Stage 2 timing of the conformance profile are confirmed by the
 owner, closing Stage 1 decisions 2 and 3 (ADR §9). Originally
 produced as scoping only. Produced 2026-09-12 under the
@@ -62,7 +64,12 @@ which Stage 1 does not need.
   that pinned the enum to three members are updated (ADR §8.1); a dedicated test asserts
   peer-ness, nameability, non-registration and the profile's continued absence.
 
-### 3.2 Policy family: protected-registry list and delegation table
+### 3.2 Policy family: protected-registry list, delegation table, mapping coordinate
+
+**Amended 2026-09-13** by the owner's eight-point ruling (ADR §11), which this section
+restates rather than paraphrases. The section previously described a **two**-member artifact;
+GERL 4.2.10's `ClosureBundleMapping` makes it three. The amendment was made **before** the
+item was implemented, not alongside it.
 
 - **Lives in:** a new integration package on the strategy-permission pattern `[V]`
   (`integration/agentic-proposer-strategy-permission-policy/.../policy.py:128-151,220`):
@@ -71,14 +78,43 @@ which Stage 1 does not need.
   property; an adapter through `ugence_policy_authority.api`.
 - **Imports:** `ugence_governance_contracts`, `ugence_policy_authority.api` (the adapter
   only). Nothing from the proposer or the classifier.
-- **Content:** one artifact holding both the protected-registry list (seven registries with
-  admission rules) and the delegation table, versioned atomically per CEC-2, pinning the
+- **Content — three members, versioned atomically.** One artifact holding (a) the
+  protected-registry list, seven registries with admission rules; (b) the delegation table,
+  **empty** in Stage 1; and (c) a typed coordinate referencing a separately governed
+  `ClosureBundleMapping`. All three participate in the artifact's single version and content
+  digest: changing any one requires a new artifact version. The artifact also pins the
   intent-specification and constitution references it applies under.
-- **Must not:** ship any operative delegation entry. The initial table is empty or every
-  entry carries `active = false`; D1, D3, D4 and D5 are not encoded until their parameters
-  and mechanisms are ratified. Must not resolve itself: resolution is `resolve_policy`
-  under configured trust `[V]` (`policy-authority/.../core/resolution.py:121`).
+- **The coordinate is the repository's existing one** `[V]`, not a reduced ad-hoc reference:
+  `PolicyCoordinate` (`policy-authority/.../core/adapters.py:65`) carries `policy_family`,
+  `policy_id`, `version`, `content_digest`, `scope` and `tenant_id`, so tenant, scope, family
+  and policy identity are all present. Ruling 3's "stop and report" branch did not fire.
+- **Coordinate versus content — two authorities, not two views.** CEC-2 governs the
+  **coordinate**. The mapping **content** is governed separately and is **deferred out of
+  Stage 1**: Stage 1 does not define, embed or activate it, and encodes no obligation-to-effect
+  rule, required-primitive table or executable predicate, and no D1, D3, D4 or D5 semantics or
+  parameters. The artifact's digest covering a coordinate says nothing about whether the
+  mapping it names is sound or ratified.
+- **Must not:** ship any operative delegation entry — the Stage 1 table is empty, and a
+  non-empty one is refused at construction rather than tolerated behind an `active = false`
+  flag. Must not use a sentinel identifier, fabricated digest or placeholder mapping: an
+  artifact whose coordinate is absent cannot enter an operative lifecycle state, and a
+  `COMPLETED` closure is therefore unreachable through it. Must not resolve itself: resolution
+  is `resolve_policy` under configured trust `[V]`
+  (`policy-authority/.../core/resolution.py:121`). A policy artifact is not an authorization.
 - **Inert because:** nothing reads the family in Stage 1, and an empty table matches no delta.
+- **Inertness condition, not invented behaviour** (ruling 7). The absence of mapping content
+  creates no new GERL routing outcome and no new refusal code in Stage 1, because Stage 1 has
+  no classifier, closure verifier, resolver consumer, admission boundary or executor. The
+  refusal the constructor raises is a construction-time type refusal inside the contract
+  package.
+- **Delivered** `[V]`: `packages/integration/change-effect-policy`, 93 tests passing. The
+  nine proofs the owner required are in `tests/test_artifact.py` (empty delegation table;
+  no operative state without a coordinate), `tests/test_mapping_reference_only.py` (no
+  D-entry structures or semantics; no mapping content embedded; no sentinel coordinate
+  accepted), `tests/test_atomic_versioning.py` (the three-member projection is atomically
+  digest-bound) and `tests/test_no_authority_claimed.py` (never resolves itself; no
+  artifact treated as authorization; no closure, classification, routing, projection or
+  admission computation). `tests/test_inertness_condition.py` records ruling 7.
 
 ### 3.3 Record contracts
 

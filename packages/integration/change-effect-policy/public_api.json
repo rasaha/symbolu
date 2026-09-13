@@ -1,0 +1,167 @@
+{
+  "curated_api_module": "ugence_change_effect_policy",
+  "distribution": "ugence-change-effect-policy",
+  "namespace": "ugence_change_effect_policy",
+  "note": "Machine-readable snapshot of the curated public API (ugence_change_effect_policy.__all__). tests/packaging/test_packaging.py asserts this file equals the live package surface. Regenerate with scripts/generate_public_api.py when the curated API changes deliberately.",
+  "package_version": "0.1.0",
+  "symbols": {
+    "ACTIVE_LIFECYCLE_STATE": {
+      "kind": "constant",
+      "value": "APPROVED_ACTIVE"
+    },
+    "ADMITTED_LIFECYCLE_STATES": {
+      "kind": "frozenset",
+      "values": [
+        "APPROVED_ACTIVE",
+        "DRAFT",
+        "SUPERSEDED",
+        "WITHDRAWN"
+      ]
+    },
+    "ADMITTED_POLICY_SCOPES": {
+      "kind": "frozenset",
+      "values": [
+        "GLOBAL",
+        "TENANT"
+      ]
+    },
+    "CHANGE_EFFECT_ADAPTER_ID": {
+      "kind": "constant",
+      "value": "ugence.change-effect.policy/v1"
+    },
+    "CHANGE_EFFECT_POLICY_FAMILY": {
+      "kind": "constant",
+      "value": "change_effect.classification_policy"
+    },
+    "CHANGE_EFFECT_POLICY_TYPE": {
+      "kind": "constant",
+      "value": "ChangeEffectClassificationPolicy"
+    },
+    "CONTRACT_VERSION": {
+      "kind": "constant",
+      "value": "change_effect_policy.v1"
+    },
+    "ChangeEffectClassificationPolicy": {
+      "fields": [
+        "metadata",
+        "constitution_ref",
+        "intent_specification_refs",
+        "protected_registries",
+        "delegation_table",
+        "mapping_coordinate"
+      ],
+      "kind": "dataclass"
+    },
+    "ChangeEffectPolicyError": {
+      "kind": "class",
+      "methods": []
+    },
+    "ChangeEffectPolicyFamilyAdapter": {
+      "kind": "class",
+      "methods": [
+        "coordinate_for",
+        "describe",
+        "recognizes"
+      ]
+    },
+    "ChangeEffectPolicyFieldError": {
+      "kind": "class",
+      "methods": []
+    },
+    "ChangeEffectPolicyMetadata": {
+      "fields": [
+        "policy_id",
+        "version",
+        "content_digest",
+        "scope",
+        "lifecycle_state",
+        "tenant_id",
+        "supersedes_ref",
+        "effective_from",
+        "effective_to"
+      ],
+      "kind": "dataclass"
+    },
+    "DelegationEntryRefused": {
+      "kind": "class",
+      "methods": []
+    },
+    "ENFORCEMENT_ENABLED": {
+      "kind": "constant",
+      "value": false
+    },
+    "LIFECYCLE_APPROVED_ACTIVE": {
+      "kind": "constant",
+      "value": "APPROVED_ACTIVE"
+    },
+    "LIFECYCLE_DRAFT": {
+      "kind": "constant",
+      "value": "DRAFT"
+    },
+    "LIFECYCLE_SUPERSEDED": {
+      "kind": "constant",
+      "value": "SUPERSEDED"
+    },
+    "LIFECYCLE_WITHDRAWN": {
+      "kind": "constant",
+      "value": "WITHDRAWN"
+    },
+    "MAPPING_POLICY_FAMILY": {
+      "kind": "constant",
+      "value": "change_effect.closure_bundle_mapping"
+    },
+    "MATURITY": {
+      "kind": "constant",
+      "value": "REFERENCE_GRADE_CONTRACT_ONLY"
+    },
+    "MappingCoordinateRefused": {
+      "kind": "class",
+      "methods": []
+    },
+    "OperativeWithoutMappingRefused": {
+      "kind": "class",
+      "methods": []
+    },
+    "POLICY_SCOPE_GLOBAL": {
+      "kind": "constant",
+      "value": "GLOBAL"
+    },
+    "POLICY_SCOPE_TENANT": {
+      "kind": "constant",
+      "value": "TENANT"
+    },
+    "PROTECTED_REGISTRY_IDS": {
+      "kind": "tuple",
+      "values": [
+        "subject_classes",
+        "governance_roles",
+        "observables",
+        "context_predicates",
+        "constraint_inputs",
+        "identity_links",
+        "obligated_actions"
+      ]
+    },
+    "ProtectedRegistryEntry": {
+      "fields": [
+        "registry_id",
+        "admission_rule"
+      ],
+      "kind": "dataclass"
+    },
+    "RULE_VERSION": {
+      "kind": "constant",
+      "value": "GERL target classification 4.2.10, with the recorded erratum"
+    },
+    "__version__": {
+      "kind": "constant",
+      "value": "0.1.0"
+    },
+    "change_effect_coordinate": {
+      "kind": "function",
+      "parameters": [
+        "metadata"
+      ]
+    }
+  }
+}

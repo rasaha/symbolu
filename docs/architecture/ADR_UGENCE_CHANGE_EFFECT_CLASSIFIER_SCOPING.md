@@ -196,7 +196,7 @@ not verify repository-specific claims; those in this ADR carry their own labels.
 | Placement 2, memory readers | ACCEPT, amended | Every consumer reads through a neutral read port declared in M0. M3 and M11 shown as proposed consumers; adapters to be built and verified. No direct store access. |
 | Placement 2, ownership | AMEND | M15 owns classification, not authorization or mutation. Governed memory enforces read eligibility; a separately scoped recalibration executor is the sole mutation path; M6 supplies authorization. M15 is not to be expanded into a preventive execution module. |
 | CEC-1, fourth provider kind | CONFIRM, compatibility gate | Add CHANGE_EFFECT_CLASSIFICATION subject to checking registry dispatch, serialized values, exhaustive enum handling and provider conformance. |
-| CEC-2, one policy family | CONFIRM | Version the registry list and delegation table atomically. Pin applicable intent specifications and constitution references explicitly. |
+| CEC-2, one policy family | CONFIRM, amended 2026-09-13 (§11) | Version the protected-registry list, the delegation table **and the ClosureBundleMapping coordinate** atomically as one three-member artifact. Pin applicable intent specifications and constitution references explicitly. The mapping **content** is separately governed and deferred; CEC-2 governs the coordinate only. |
 | CEC-3, linkage entries | CONFIRM, record contract | No classifier ledger. Specify immutable storage, signer identity, idempotency and append-failure behaviour. A classification lacking its audit record is not admissible for mutation. |
 | CEC-4, general scope | CONFIRM, amended | General contract; first implementation limited to enumerated learning-update types and one enforcing consumer. "Learning" is an input scope, never evidence of low impact. Unsupported targets stay unevaluated. |
 | CEC-5, classifier first | CONFIRM, offline only | Contracts, replay infrastructure and an auditable prototype before the consumer. Not preventive, not production-ready, until the consumer demonstrably rejects stale, mismatched, revoked, unauthorized and duplicate updates. |
@@ -787,5 +787,115 @@ control-plane-root, agent-assurance-evidence and policy-authority pass. `[G]`
 governed-review-service fails collection in this environment for want of installed
 distributions, on a clean tree as well as this one.
 
-Stage 1 item 3.2, the policy family, is not started. Progress beyond Stage 1 remains
-unauthorized.
+At the time of that ruling Stage 1 item 3.2, the policy family, was not started; §11
+records its authorization. Progress beyond Stage 1 remains unauthorized.
+
+## 11 — CEC-2 amended: the ClosureBundleMapping coordinate — 2026-09-13
+
+GERL 4.2.10's ratification adopted a `ClosureBundleMapping` — the policy-governance-owned
+table that fixes which closure effects a closure may assert, replacing evaluator discretion
+— at the normative-design level. The CEC-2 row above and Stage 1 §3.2 predate it and
+described a **two**-member artifact. Implementing item 3.2 against the rule would therefore
+have silently widened both documents. Item 3.2 was halted and the conflict reported instead.
+
+The owner's ruling, recorded verbatim:
+
+> 1. GERL 4.2.10's ratification adopts the ClosureBundleMapping as an extension of the CEC-2
+> policy family at the normative-design level. This does not silently amend the earlier ADR
+> or Stage 1 implementation scope. Amend both documents explicitly before implementing item
+> 3.2.
+> 2. Adopt Option 3. The Stage 1 policy artifact contains: the protected-registry list; an
+> empty delegation table; and a typed coordinate referencing a separately governed
+> ClosureBundleMapping.
+> 3. Use the repository's existing Policy Authority coordinate or authoritative-source-linkage
+> contract if it is publicly available and suitable. Do not create a reduced ad-hoc reference
+> containing only version and digest if that would omit tenant, scope, family or policy
+> identity. If no suitable existing coordinate is available, stop and report the exact missing
+> contract.
+> 4. The mapping coordinate participates in the policy artifact's atomic version and content
+> digest together with the protected-registry list and delegation table. Changing any of the
+> three requires a new artifact version.
+> 5. Stage 1 does not define, embed or activate ClosureBundleMapping content. It must not
+> encode obligation-to-effect rules, required-primitive tables, executable predicates, D1,
+> D3, D4 or D5 semantics or parameters. Those remain outside Stage 1 and require separate
+> review and activation.
+> 6. The initial shipped artifact is non-operative, carries an empty delegation table and may
+> omit the mapping coordinate. Do not use a sentinel identifier, fabricated digest or
+> placeholder mapping. An artifact without a valid mapping coordinate cannot enter an
+> operative lifecycle state or support a COMPLETED closure.
+> 7. The absence of mapping content creates no new GERL routing or refusal result in Stage 1
+> because Stage 1 has no classifier, closure verifier, resolver consumer, admission boundary
+> or executor. Record this as an inertness condition, not as invented runtime behaviour.
+> 8. Amend CEC-2 and Stage 1 §3.2 to distinguish: atomic versioning of the protected-registry
+> list, delegation table and mapping coordinate; from the separately governed mapping content,
+> which remains deferred.
+
+**The CEC-2 row is amended in place above** (ruling 1 and 8): the artifact has three members
+— protected-registry list, delegation table, mapping coordinate — versioned and digested
+atomically, and CEC-2 governs the **coordinate** only. The mapping **content** — its schema,
+its obligation-to-effect rules, its required-primitive tables — is governed separately and
+remains deferred out of Stage 1. The two are distinct authorities, not two views of one: the
+artifact's digest changes when the coordinate it points at changes, and says nothing about
+whether the mapping that coordinate names is itself sound or ratified.
+
+**Ruling 3's conditional did not fire** `[V]`. The repository's existing coordinate is
+suitable: `PolicyCoordinate`
+(`packages/policy-authority/src/ugence_policy_authority/core/adapters.py:65`) carries
+`policy_family`, `policy_id`, `version`, `content_digest`, `scope` and `tenant_id` — all six
+of tenant, scope, family, policy identity, version and digest, so no reduced ad-hoc
+reference was created and there is no missing contract to report.
+
+**The inertness condition** (ruling 7). An artifact without a valid mapping coordinate cannot
+reach an operative lifecycle state, and a `COMPLETED` closure is therefore unreachable
+through it. In Stage 1 this produces **no** new routing outcome and **no** new refusal code,
+because there is no classifier, closure verifier, resolver consumer, admission boundary or
+executor to route or refuse. The refusal raised by the constructor is a **construction-time
+type refusal inside the contract package**, not a runtime governance decision; claiming
+otherwise would be inventing behaviour for a stage that executes nothing.
+
+**What was built, and the three proofs that are weaker than they look.** The artifact,
+the adapter and the two refusals live in `packages/integration/change-effect-policy`, with
+93 tests. Three of the nine required proofs cannot be carried the obvious way, and the
+tests say so rather than overstating:
+
+* **The delegation table's participation in the digest is shown on the projection, not by
+  digesting two artifacts** — a populated table is refused at construction, so no second
+  artifact exists to digest. What the atomicity claim needs is that the *path* is inside
+  the digested body, and that is what is asserted.
+* **"No D1/D3/D4/D5 semantics" is asserted over the AST, not the source text.** A
+  substring ban would have been satisfiable by deleting the README and error docstrings
+  that name those entries as exclusions. The discriminator used instead: a D-entry as
+  *data* is a bare `"D1"` constant; a D-entry in prose is a sentence.
+* **"No exported name claims a permission" is restricted to callables.** Over every
+  exported name it flagged `ENFORCEMENT_ENABLED`, `ADMITTED_LIFECYCLE_STATES` and
+  `LIFECYCLE_APPROVED_ACTIVE` — one of which exists precisely to record that enforcement
+  is off. A test answerable by renaming an honest constant degrades the package. The real
+  proof is the exhaustive callable-surface inventory: five callables, none of which takes
+  a change, delta, record, target or caller.
+
+**The strongest single test** is that removal from the projection is **by path, not by
+name**. `content_digest` appears twice in an operative artifact: the metadata's declared
+digest, which is removed, and the mapping coordinate's, which must not be. A name-based
+removal would have unbound the second, and the artifact could then have been repointed at
+different mapping content without changing its own digest — the separate governance of the
+mapping would have been unenforceable from this side.
+
+`[V]` change-effect-policy 93 passed. Unchanged, each alone: policy-authority,
+governance-contracts 252 passed 3 skipped, change-effect-records 103 passed,
+agentic-proposer-strategy-permission-policy. Combined across the five, 1063 passed,
+3 skipped.
+
+`[G]` **Pre-existing, repository-wide, not introduced here and not fixed here.** Seventeen
+packages ship `scripts/generate_public_api.py`, and their packaging tests reach it with
+`sys.path.insert` plus `import generate_public_api`. That module name is global, so in a
+combined multi-package run the first import wins and every later package compares its own
+manifest against a sibling's generator. Reproduced between two untouched packages
+(`change-effect-records` with `incident-response`), so it is not a consequence of this
+work. This package's own packaging test loads its generator by file path so that its
+result means what it says; the other sixteen are untouched, being outside this item's
+authorization.
+
+Stage 1's contract surface is complete. It supplies **no** classifier, admission
+enforcement, memory writer or operational permission, and progress beyond Stage 1 remains
+unauthorized: archive custody, verified linearizable audit-root operations, verified atomic
+target-version compare-and-apply, the `[R]` parameters, and a separate owner authorization.
