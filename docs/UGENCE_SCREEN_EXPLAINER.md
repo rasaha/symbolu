@@ -1,6 +1,6 @@
 # Ugence screens — an explainer, one entry per screen
 
-**Status:** reference, 2026-09-07; revised 2026-09-12 with an *Enter, press, expect* block per screen and the live-deployment state. Written after the owner's ruling that AP-3 controls
+**Status:** reference, 2026-09-07; revised 2026-09-12 with an *Enter, press, expect* block per screen and the live-deployment state. Screen 33 revised 2026-09-13 for the Bring Your Workflow phase 3A draft controls (BW-3A). Written after the owner's ruling that AP-3 controls
 (`ADR_UGENCE_AUTHORITY_PLANE_SCOPING.md` §18) and the Bring Your Workflow ruling (§22). Every entry is taken from the screen's
 own source: its stated purpose, its stated disclaimer, the operations it calls, and the
 ruling that shaped it. Nothing here describes a screen as doing more than its code does.
@@ -977,20 +977,28 @@ half (verified owners, directory grants, submit for approval) is phase 3B, behin
 | 3 | Press **Adapt**. | `ok yes`; adaptation fingerprint `sha256:bfec6412…bf4e`, envelope `sha256:fa7ea8fe…70b30`; 9 node dispositions with reason codes such as `deterministic_kind:DECISION_RULE`; 3 role requirements (`role::proc_supplier_evidence`, `role::proc_supplier_risk`, `role::proc_recommendation`). |
 | 4 | Paste the v2 counterpart of the same workflow into the second textarea (see values) and press **Compare adaptations**. | `equivalence_state SEMANTICALLY_EQUIVALENT`, `differences: []`, v1 `sha256:91c1f7d2…e25a`, v2 `sha256:ae122481…317f`. |
 | 5 | Press **Download report** and **Download adapted envelope**. | Two JSON files saved locally; nothing was stored on the server. |
-| 6 | Press **Clear**, paste `{"ir_version":"workflow_ir.v9"}`. | Gate refusal `UNSUPPORTED_VERSION`: *declared version "workflow_ir.v9" is not one of workflow_ir.v1, workflow_ir.v2*; Validate and Adapt disabled. |
+| 6 | With the gate still passing, fill **Keep as an unapproved draft (phase 3A)**: **Title** `procurement baseline`, **Claimed owner** `directory://people/owner-1`, leave both registration fields and **Supersedes** empty, **Notes** free text. Press **Keep as draft**. | The one v2 draft write is sent. *draft id* a derived identifier; *lifecycle* `DRAFT` with its note; *kept digest* and *record digest*; *integrity* client and server agree; *claimed owner* `directory://people/owner-1` · `PRESENTED_UNPROVEN`; *supersedes* none, the first of its lineage; *registration link* none; *recorded by* and *validated by*; *confers* nothing. The pasted text is never kept — the server keeps its own canonical encoding, validated again first. |
+| 7 | Press **Show kept drafts** in *Drafts this deployment keeps*. | The count, `lifecycle DRAFT`, the claimed-owner status and what a draft confers; then one row per draft with its id, title, claimed owner, supersedes and superseded-by. Read on request, never on page load, and only this deployment’s own tenant is ever answered. |
+| 8 | Press **Load** on that row. | The draft returns through the same gate as anything pasted. The form pre-fills and **Supersedes** is set to the loaded draft id, with the note *keeping it again records a revision that supersedes it*. Nothing is edited in place. |
+| 9 | Change **Title** to `procurement baseline rev 2` and press **Keep as draft** again. | A second draft whose *supersedes* names the first. Tick **include superseded revisions** and press **Show kept drafts** to see both; unticked, only the head of the lineage is listed. |
+| 10 | Press **Clear**, paste `{"ir_version":"workflow_ir.v9"}`. | Gate refusal `UNSUPPORTED_VERSION`: *declared version "workflow_ir.v9" is not one of workflow_ir.v1, workflow_ir.v2*; Validate and Adapt disabled. |
 
 **Values you can type**
 
 - Smallest document the browser gate accepts: `{"ir_version":"workflow_ir.v1","nodes":[],"edges":[]}` (the server then reports the adapter's diagnostics).
 - A v2 counterpart for Compare: `frontend/tests/fixtures/bring.example-v2.json` or `backend/.../data/conformance_v2/procurement/v2_workflow.json` (top-level `ir_version workflow_ir.v2`, `base_ir`, nine `node_semantics`). Compare needs exactly one v1 and one v2 document.
+- Draft form: **Title** is the only required field. **Claimed owner** is an opaque handle recorded as `PRESENTED_UNPROVEN`; it confers no read, write, approval or execution authority. An **AI-system registration id** must be accompanied by the **Registration record digest** of that exact record, and both are matched against this tenant’s own registry — use the identifier and record digest from screen 14. **Supersedes** must name the head of its lineage.
+- The tenant is never sent from the browser on any draft operation; it is this deployment’s server configuration.
 - Browser gate limits: 1 MiB, depth 32, 200 nodes, 400 edges, 50 000 values. A local file over 1 MiB is never read: *<name>: <size> bytes exceed the limit of 1048576 (1 MiB); not read*.
 
 **Refusals to expect**
 
 - Gate codes and text: `EMPTY` *paste a Workflow IR document or choose a local JSON file*; `NOT_JSON` *not JSON: … YAML, code and archives are never accepted*; `NOT_AN_OBJECT`; `TOO_DEEP` *nesting deeper than 32 levels*; `TOO_MANY_NODES` *<n> nodes exceed the limit of 200*; `TOO_MANY_EDGES`; `CREDENTIAL_SHAPED`; `REMOTE_REFERENCE`.
+- Draft refusals, rendered as *code · reason*: `draft_refused` for a document that does not validate under the composer’s adapter, for a contract version the server does not support, for a declared version disagreeing with the one named, or for typed input it rejects; `draft_duplicate` for the same document kept twice; `supersession_refused` when the named predecessor is not the head of its lineage; `registration_link_refused` when the digest is not that of the registration named, because a link binds one exact record.
+- With no drafts file configured, all three draft operations answer the typed gap `workflow_drafts` rather than an error, and the controls say so.
 - Server 422 `workflow_too_complex`, e.g. *workflow: nodes 201 exceeds the limit 200*, *workflow: depth 33 exceeds the limit 32*; a raw body over 1 MiB is a 413 before parsing; an unsupported version on Adapt is 422 `unsupported_contract_version`. Rendered as *The server refused: <code> · <message>*.
 
-*Source:* `features/bring/BringYourWorkflowScreen.tsx:120-519`; `features/bring/gate.ts:11-236`; `backend/.../api/workflows.py:31-131`; `workflow_limits.py:35-102`; `frontend/tests/fixtures/bring.validate.json`, `bring.compare.json`.
+*Source:* `features/bring/BringYourWorkflowScreen.tsx:120-888`; `features/bring/gate.ts:11-236`; `backend/.../api/workflows.py:31-131`; `workflow_limits.py:35-102`; drafts: `services/studio_v2.py:1647-1845` and `UGENCE_STUDIO_WORKFLOW_DRAFTS_PATH` (`config.py:98-101`); `frontend/tests/fixtures/bring.validate.json`, `bring.compare.json`.
 
 ---
 
