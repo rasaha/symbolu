@@ -12,13 +12,14 @@ is bound to.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Mapping
+from typing import Any, Mapping, Optional
 
 from ugence_model_egress_unit import STEP8_OBLIGATION_COUNT, looks_like_a_credential
 
 from .resource import ResourceRefused, parse_secret_version
 
-__all__ = ["DesignationRefused", "AcceptedDesignation", "check_designation_accepted"]
+__all__ = ["DesignationRefused", "AcceptedDesignation", "check_designation_accepted",
+           "designation_completeness_refusal", "designation_attestation_refusal"]
 
 #: The obligation keys this adapter reads. The record carries all seventeen; these four
 #: are the ones that must agree with the adapter's own configuration.
@@ -43,57 +44,79 @@ class AcceptedDesignation:
     attested_by: str
 
 
-def check_designation_accepted(step8: Any) -> AcceptedDesignation:
-    """``step8_required_values`` from ``MEU_LIVE_PROVIDER_DESIGNATION.json``, accepted.
+def designation_completeness_refusal(step8: Any) -> Optional[str]:
+    """Why the seventeen obligations are not all supplied, or ``None``.
 
-    Refused when: the mapping is absent or misshapen; the obligation count is not
-    seventeen; any obligation is missing, blank or still ``UNDESIGNATED``; any
-    obligation carries a credential shape; or the independent verification is absent.
+    Separate from the attestation check because they are separate gates: supplying the
+    values and having someone else verify them are different acts, and an operator whose
+    run is blocked deserves to be told which one is outstanding.
     """
 
     if not isinstance(step8, Mapping):
-        raise DesignationRefused("a step8_required_values mapping is required")
+        return "a step8_required_values mapping is required"
     obligations = step8.get("obligations")
     if not isinstance(obligations, Mapping):
-        raise DesignationRefused("the designation record carries no obligations mapping")
+        return "the designation record carries no obligations mapping"
     if len(obligations) != STEP8_OBLIGATION_COUNT or step8.get("obligation_count") != STEP8_OBLIGATION_COUNT:
-        raise DesignationRefused(
-            f"the designation record must carry exactly {STEP8_OBLIGATION_COUNT} obligations "
-            f"(LP-7 ruling 12); it carries {len(obligations)}")
+        return (f"the designation record must carry exactly {STEP8_OBLIGATION_COUNT} obligations "
+                f"(LP-7 ruling 12); it carries {len(obligations)}")
     undesignated = sorted(k for k, v in obligations.items()
                           if not isinstance(v, str) or not v.strip() or v.strip().startswith("UNDESIGNATED"))
     if undesignated:
-        raise DesignationRefused(
-            f"{len(undesignated)} of {STEP8_OBLIGATION_COUNT} designation obligations are not supplied "
-            f"({undesignated[0]} first); no credential is materialized until every one is (LP-7 ruling 12)")
+        return (f"{len(undesignated)} of {STEP8_OBLIGATION_COUNT} designation obligations are not supplied "
+                f"({undesignated[0]} first); no credential is materialized until every one is (LP-7 ruling 12)")
     for key, value in obligations.items():
         if looks_like_a_credential(value):
-            raise DesignationRefused(
-                f"obligation {key} carries a credential shape; the designation record names references and "
-                f"never a secret value, encoding or digest (LP-7 ruling 3)")
+            return (f"obligation {key} carries a credential shape; the designation record names references and "
+                    f"never a secret value, encoding or digest (LP-7 ruling 3)")
+    try:
+        version = parse_secret_version(str(obligations[_SECRET_VERSION]))
+    except ResourceRefused as refused:
+        return f"obligation {_SECRET_VERSION}: {refused}"
+    project = str(obligations[_PROJECT]).strip()
+    if version.project not in (project, str(obligations["gcp_project_number"]).strip()):
+        return (f"obligation {_SECRET_VERSION} names a different project than {_PROJECT}; the secret lives in "
+                f"the designated project and nowhere else (LP-7 ruling 1)")
+    return None
+
+
+def designation_attestation_refusal(step8: Any) -> Optional[str]:
+    """Why the designation carries no usable independent verification, or ``None``."""
+
+    if not isinstance(step8, Mapping):
+        return "a step8_required_values mapping is required"
     attestation = step8.get("attestation")
     attested_by = ""
     if isinstance(attestation, Mapping):
         attested_by = str(attestation.get("independently_checked_by") or "").strip()
     if not attested_by:
-        raise DesignationRefused(
-            "the designation record records no independent verification; supplying the seventeen values is "
-            "not the same as someone having checked them (LP-7 ruling 12)")
+        return ("the designation record records no independent verification; supplying the seventeen values is "
+                "not the same as someone having checked them (LP-7 ruling 12)")
     if looks_like_a_credential(attested_by):
-        raise DesignationRefused("the attestation field carries a credential shape")
-    try:
-        version = parse_secret_version(str(obligations[_SECRET_VERSION]))
-    except ResourceRefused as refused:
-        raise DesignationRefused(f"obligation {_SECRET_VERSION}: {refused}") from None
-    project = str(obligations[_PROJECT]).strip()
-    if version.project not in (project, str(obligations["gcp_project_number"]).strip()):
-        raise DesignationRefused(
-            f"obligation {_SECRET_VERSION} names a different project than {_PROJECT}; the secret lives in "
-            f"the designated project and nowhere else (LP-7 ruling 1)")
+        return "the attestation field carries a credential shape"
+    return None
+
+
+def check_designation_accepted(step8: Any) -> AcceptedDesignation:
+    """``step8_required_values`` from ``MEU_LIVE_PROVIDER_DESIGNATION.json``, accepted.
+
+    Completeness first, then the independent verification: the two gates in the order the
+    owner's correction of 2026-09-13 requires, so a record missing both reports the
+    missing values rather than the missing signature.
+    """
+
+    incomplete = designation_completeness_refusal(step8)
+    if incomplete is not None:
+        raise DesignationRefused(incomplete)
+    unattested = designation_attestation_refusal(step8)
+    if unattested is not None:
+        raise DesignationRefused(unattested)
+    obligations = step8["obligations"]
+    version = parse_secret_version(str(obligations[_SECRET_VERSION]))
     return AcceptedDesignation(
-        gcp_project_id=project,
+        gcp_project_id=str(obligations[_PROJECT]).strip(),
         service_account_resource=str(obligations[_SERVICE_ACCOUNT]).strip(),
         secret_version_resource=version.resource,
         identity_mechanism=str(obligations[_MECHANISM]).strip(),
-        attested_by=attested_by,
+        attested_by=str(step8["attestation"]["independently_checked_by"]).strip(),
     )

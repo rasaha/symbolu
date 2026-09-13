@@ -62,22 +62,27 @@ def test_a_run_leaves_the_canonical_records_byte_identical(tmp_path):
 
 # --- live fails closed ------------------------------------------------------------------
 
-def test_live_fails_closed_because_no_transport_exists_and_egress_stays_false(tmp_path):
+def test_live_fails_closed_and_leads_with_the_earliest_outstanding_gate(tmp_path):
+    """Not with the missing transport: that reads as "authorize it and it will run"."""
+
     assert LIVE_VENDOR_EGRESS is False
     result = _run(tmp_path, mode="live")
     assert result.exit_code == EXIT_REFUSED and result.outcome == "REFUSED"
-    assert "no live Responses transport exists" in result.messages[0]
-    assert "LIVE_VENDOR_EGRESS is False" in result.messages[0]
+    assert result.messages[0].startswith("live mode refused at STEP8_DESIGNATIONS")
+    assert "LIVE_TRANSPORT" not in result.messages[0]
     assert result.report["credential_materialized"] is False
+    assert "no Google client, custody adapter or transport was composed" in " ".join(result.messages)
 
 
-def test_live_stays_refused_even_with_every_other_gate_satisfied(tmp_path):
-    """The transport gate is not something an authorization unblocks. A run with the
-    designations accepted still cannot dispatch, and the refusal says why first."""
+def test_with_the_designations_accepted_live_is_refused_at_the_authorization_not_the_transport(tmp_path):
+    """Accepting the designations moves the refusal forward one gate at a time. It never
+    jumps to the transport, which is last."""
 
     result = _run(tmp_path, designation=complete_designation(), mode="live")
     assert result.exit_code == EXIT_REFUSED
-    assert "LIVE_TRANSPORT" in result.report["blocked_gates"]
+    assert result.messages[0].startswith("live mode refused at LIVE_SYNTHETIC_VALIDATION_AUTHORIZATION")
+    assert result.report["blocked_gates"] == ["LIVE_SYNTHETIC_VALIDATION_AUTHORIZATION",
+                                              "LIVE_VENDOR_EGRESS", "LIVE_TRANSPORT"]
     assert result.report["credential_materialized"] is False
 
 
@@ -86,15 +91,16 @@ def test_live_stays_refused_even_with_every_other_gate_satisfied(tmp_path):
 def test_every_gate_is_reported_even_when_an_earlier_one_blocked(tmp_path):
     report = _run(tmp_path).report
     assert [g["gate"] for g in report["gates"]] == [
-        "EXECUTION_POSTURE", "STEP8_DESIGNATION", "LIVE_SYNTHETIC_VALIDATION_AUTHORIZATION",
-        "COMMISSIONING_CEILINGS", "LIVE_TRANSPORT"]
+        "CONFIGURATION", "EXECUTION_POSTURE", "STEP8_DESIGNATIONS",
+        "STEP8_INDEPENDENT_VERIFICATION", "LIVE_SYNTHETIC_VALIDATION_AUTHORIZATION",
+        "LIVE_VENDOR_EGRESS", "LIVE_TRANSPORT"]
     assert all(g["reason"] for g in report["gates"]), "a gate reported no reason"
 
 
 def test_the_canonical_records_block_the_designation_and_the_authorization_gates(tmp_path):
     report = _run(tmp_path).report
     blocked = {g["gate"]: g["reason"] for g in report["gates"] if g["status"] == "BLOCKED"}
-    assert "17 of 17 designation obligations are not supplied" in blocked["STEP8_DESIGNATION"]
+    assert "17 of 17 designation obligations are not supplied" in blocked["STEP8_DESIGNATIONS"]
     assert "NOT_GIVEN" in blocked["LIVE_SYNTHETIC_VALIDATION_AUTHORIZATION"]
 
 
@@ -105,8 +111,8 @@ def test_an_incomplete_designation_blocks_materialization(tmp_path):
     gates = evaluate_gates(config, designation_record=designation,
                            validation_record=load_records(config)[1],
                            variables=ci_marker_variables(NO_CI), now=NOW)
-    assert gates.may_materialize_a_credential is False
-    assert "1 of 17" in dict((o.gate, o.reason) for o in gates.outcomes)["STEP8_DESIGNATION"]
+    assert gates.may_compose_components is False
+    assert "1 of 17" in dict((o.gate, o.reason) for o in gates.outcomes)["STEP8_DESIGNATIONS"]
 
 
 def test_a_designation_without_independent_verification_blocks_materialization(tmp_path):
@@ -116,9 +122,9 @@ def test_a_designation_without_independent_verification_blocks_materialization(t
     gates = evaluate_gates(config, designation_record=designation,
                            validation_record=load_records(config)[1],
                            variables=ci_marker_variables(NO_CI), now=NOW)
-    assert gates.may_materialize_a_credential is False
+    assert gates.may_compose_components is False
     assert "no independent verification" in dict(
-        (o.gate, o.reason) for o in gates.outcomes)["STEP8_DESIGNATION"]
+        (o.gate, o.reason) for o in gates.outcomes)["STEP8_INDEPENDENT_VERIFICATION"]
 
 
 def test_a_complete_attested_designation_is_not_enough_to_materialize_a_credential(tmp_path):
@@ -131,10 +137,12 @@ def test_a_complete_attested_designation_is_not_enough_to_materialize_a_credenti
     gates = evaluate_gates(config, designation_record=designation, validation_record=validation,
                            variables=ci_marker_variables(NO_CI), now=NOW)
     assert gates.status("EXECUTION_POSTURE") == "PASSED"
-    assert gates.status("STEP8_DESIGNATION") == "PASSED"
-    assert gates.may_materialize_a_credential is False
+    assert gates.status("STEP8_DESIGNATIONS") == "PASSED"
+    assert gates.status("STEP8_INDEPENDENT_VERIFICATION") == "PASSED"
+    assert gates.may_compose_components is False
     assert gates.may_dispatch_a_genuine_call is False
-    assert set(gates.blocked) == {"LIVE_SYNTHETIC_VALIDATION_AUTHORIZATION", "LIVE_TRANSPORT"}
+    assert gates.blocked == ("LIVE_SYNTHETIC_VALIDATION_AUTHORIZATION", "LIVE_VENDOR_EGRESS",
+                             "LIVE_TRANSPORT")
 
 
 @pytest.mark.parametrize("marker", ["CI", "GITHUB_ACTIONS", "GITLAB_CI", "BUILDKITE"])
@@ -143,7 +151,7 @@ def test_a_ci_runner_blocks_the_posture_gate_whatever_the_configuration_says(mar
     designation, validation, _ = load_records(config)
     gates = evaluate_gates(config, designation_record=designation, validation_record=validation,
                            variables=ci_marker_variables({marker: "true"}), now=NOW)
-    assert gates.may_materialize_a_credential is False
+    assert gates.may_compose_components is False
     assert "CI runner" in dict((o.gate, o.reason) for o in gates.outcomes)["EXECUTION_POSTURE"]
 
 
@@ -164,7 +172,7 @@ def test_a_human_or_default_compute_principal_blocks_the_posture_gate(principal,
     designation, validation, _ = load_records(config)
     gates = evaluate_gates(config, designation_record=designation, validation_record=validation,
                            variables=ci_marker_variables(NO_CI), now=NOW)
-    assert gates.may_materialize_a_credential is False
+    assert gates.may_compose_components is False
 
 
 # --- configuration refusals ---------------------------------------------------------------

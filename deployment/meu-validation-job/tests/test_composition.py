@@ -7,7 +7,8 @@ import json
 
 import pytest
 
-from meu_validation_job import evaluate_gates, load_config
+from meu_validation_job import GATES, GateOutcome, GateReport, evaluate_gates, load_config
+from meu_validation_job.gates import LIVE_TRANSPORT
 from meu_validation_job.composition import CompositionRefused, build_custody_adapter
 from meu_validation_job.job import ci_marker_variables, load_records
 from ugence_model_egress_custody_gcp import (
@@ -21,8 +22,30 @@ NO_CI = {"HOME": "/home/ugence"}
 FAKE_PAYLOAD = "MARKER-FAKE-JOB-PAYLOAD-NOT-A-KEY"
 
 
-def _fully_gated(tmp_path):
-    """A run with every gate passed except the transport, which cannot pass in this slice."""
+def _gates_with(config, designation, validation, authorization=None):
+    return evaluate_gates(config, designation_record=designation, validation_record=validation,
+                          authorization_record=authorization,
+                          variables=ci_marker_variables(NO_CI), now=NOW)
+
+
+def all_composition_gates_passed() -> GateReport:
+    """A report with every gate before LIVE_TRANSPORT passed.
+
+    Built rather than reached, because `LIVE_VENDOR_EGRESS` is False in every installed
+    distribution and no configuration can make it true. The composition root's contract
+    is "compose only when gates 1 to 6 have passed", and this is how a test states those
+    gates without pretending the repository is in a state it is not in. The test below
+    proves the real state refuses.
+    """
+
+    return GateReport(tuple(
+        GateOutcome(gate, "PASSED" if gate != LIVE_TRANSPORT else "BLOCKED",
+                    "asserted by this fixture" if gate != LIVE_TRANSPORT else "no transport exists")
+        for gate in GATES))
+
+
+def _designated(tmp_path):
+    """A configuration and designation that pass every gate this repository can pass."""
 
     authorization = authorization_record()
     path = write_config(tmp_path, designation=complete_designation(),
@@ -31,35 +54,44 @@ def _fully_gated(tmp_path):
     (tmp_path / "auth.json").write_text(json.dumps(authorization), encoding="utf-8")
     config = load_config(path)
     designation, validation, authorization_doc = load_records(config)
-    gates = evaluate_gates(config, designation_record=designation, validation_record=validation,
-                           authorization_record=authorization_doc,
-                           variables=ci_marker_variables(NO_CI), now=NOW)
-    return config, designation, gates
+    return config, designation, _gates_with(config, designation, validation, authorization_doc)
 
 
-def test_no_credential_path_is_composed_while_any_credential_gate_is_outstanding(tmp_path):
+def test_nothing_is_composed_while_any_earlier_gate_is_outstanding(tmp_path):
     config = load_config(write_config(tmp_path))
     designation, validation, _ = load_records(config)
-    gates = evaluate_gates(config, designation_record=designation, validation_record=validation,
-                           variables=ci_marker_variables(NO_CI), now=NOW)
+    gates = _gates_with(config, designation, validation)
     client = FakeClient()
-    with pytest.raises(CompositionRefused, match="STEP8_DESIGNATION"):
+    with pytest.raises(CompositionRefused) as info:
         build_custody_adapter(config, designation_record=designation, gates=gates, client=client)
+    assert "nothing is composed while STEP8_DESIGNATIONS is outstanding" in str(info.value)
     assert client.calls == [], "a refused composition still reached Secret Manager"
 
 
 def test_a_designated_run_without_the_canonical_authorization_composes_nothing(tmp_path):
     config = load_config(write_config(tmp_path, designation=complete_designation()))
     designation, validation, _ = load_records(config)
-    gates = evaluate_gates(config, designation_record=designation, validation_record=validation,
-                           variables=ci_marker_variables(NO_CI), now=NOW)
-    with pytest.raises(CompositionRefused, match="LIVE_SYNTHETIC_VALIDATION_AUTHORIZATION"):
+    gates = _gates_with(config, designation, validation)
+    with pytest.raises(CompositionRefused, match="LIVE_SYNTHETIC_VALIDATION_AUTHORIZATION is outstanding"):
         build_custody_adapter(config, designation_record=designation, gates=gates, client=FakeClient())
 
 
-def test_with_every_credential_gate_passed_an_injected_client_composes_the_adapter(tmp_path):
-    config, designation, gates = _fully_gated(tmp_path)
-    assert gates.may_materialize_a_credential is True
+def test_an_authorized_run_still_composes_nothing_while_live_egress_is_disabled(tmp_path):
+    """The real repository state: everything an owner can supply is supplied, and the
+    egress flag alone still refuses composition."""
+
+    config, designation, gates = _designated(tmp_path)
+    assert gates.first_blocked == "LIVE_VENDOR_EGRESS"
+    client = FakeClient()
+    with pytest.raises(CompositionRefused, match="LIVE_VENDOR_EGRESS is outstanding"):
+        build_custody_adapter(config, designation_record=designation, gates=gates, client=client)
+    assert client.calls == []
+
+
+def test_with_every_composition_gate_passed_an_injected_client_composes_the_adapter(tmp_path):
+    config, designation, _ = _designated(tmp_path)
+    gates = all_composition_gates_passed()
+    assert gates.may_compose_components is True
     assert gates.may_dispatch_a_genuine_call is False, "the transport gate cannot pass in this slice"
     client = FakeClient()
     adapter = build_custody_adapter(config, designation_record=designation, gates=gates, client=client)
@@ -78,15 +110,16 @@ def test_the_real_google_client_is_only_reached_when_nothing_is_injected(tmp_pat
     """With no client the composition root calls the builder. Here the SDK is absent, so
     it raises the typed unavailability rather than reaching a network."""
 
-    config, designation, gates = _fully_gated(tmp_path)
+    config, designation, _ = _designated(tmp_path)
+    gates = all_composition_gates_passed()
     with pytest.raises(GoogleClientUnavailable, match="not installed"):
         build_custody_adapter(config, designation_record=designation, gates=gates)
 
 
 def test_a_composed_adapter_audits_with_identifiers_only(tmp_path):
-    config, designation, gates = _fully_gated(tmp_path)
-    adapter = build_custody_adapter(config, designation_record=designation, gates=gates,
-                                    client=FakeClient())
+    config, designation, _ = _designated(tmp_path)
+    adapter = build_custody_adapter(config, designation_record=designation,
+                                    gates=all_composition_gates_passed(), client=FakeClient())
     import uuid
     _, event = materialize_with_audit(
         adapter, CredentialRequest(request_id=uuid.uuid4(), tenant_id=uuid.uuid4(), vendor="openai",

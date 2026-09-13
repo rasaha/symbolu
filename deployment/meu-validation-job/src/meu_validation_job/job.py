@@ -22,8 +22,8 @@ from ugence_model_egress_validation.report import build_report as build_offline_
 from .composition import CompositionRefused, build_custody_adapter
 from .config import JobConfig, JobConfigRefused
 from .gates import GateReport, evaluate_gates
-from .report import build_report, write_report
-from .version import EXIT_NONCONFORMANT, EXIT_OK, EXIT_REFUSED, GENUINE_DISPATCH_IMPLEMENTED
+from .report import NOTHING_COMPOSED, build_report, write_report
+from .version import EXIT_NONCONFORMANT, EXIT_OK, EXIT_REFUSED
 
 __all__ = ["JobResult", "ci_marker_variables", "load_records", "run"]
 
@@ -85,20 +85,38 @@ def run(config: JobConfig, *, now: Optional[datetime] = None, environ: Mapping[s
                            authorization_record=authorization, variables=variables, now=started_at)
 
     if config.mode == "live":
-        return _refuse_live(config, gates, started_at)
+        if not gates.may_dispatch_a_genuine_call:
+            return _refuse_live(config, gates, started_at)
+        # Unreachable in this slice: LIVE_TRANSPORT cannot pass while
+        # GENUINE_DISPATCH_IMPLEMENTED is False. Guarded rather than assumed, so a future
+        # slice that flips that flag without building the dispatch path fails loudly.
+        raise CompositionRefused(  # pragma: no cover
+            "every gate passed but no genuine dispatch path is implemented in this distribution")
     return _offline(config, gates, started_at)
 
 
 def _refuse_live(config: JobConfig, gates: GateReport, started_at: datetime) -> JobResult:
-    messages = [
-        "live mode refused: no live Responses transport exists in any installed distribution and "
-        "LIVE_VENDOR_EGRESS is False, so this job has nothing to dispatch with. Implementing that "
-        "transport is the next slice and is not what an authorization unblocks.",
-    ]
-    messages += [f"also outstanding: {gate}" for gate in gates.blocked if gate != "LIVE_TRANSPORT"]
-    finished_at = datetime.now(timezone.utc) if started_at is None else started_at
+    """Refuse a live run, leading with the EARLIEST outstanding gate.
+
+    The order matters more than it looks. Leading with the missing transport invites the
+    reading "authorize it and it will run", which is false: in the present repository
+    state the designations are undesignated, nobody has verified them, no authorization
+    exists and live vendor egress is disabled, and each of those is outstanding before
+    the transport is. Nothing is composed on this path at all — no Google client, no
+    custody adapter, no transport — because :attr:`GateReport.may_compose_components` is
+    false while any of gates 1 to 6 is blocked.
+    """
+
+    first = gates.first_blocked
+    messages = [f"live mode refused at {first}: {gates.reason(first)}"]
+    messages += [f"also outstanding, in order: {gate} — {gates.reason(gate)}"
+                 for gate in gates.blocked if gate != first]
+    messages.append("no Google client, custody adapter or transport was composed, and no Secret Manager "
+                    "materialization was attempted: composition begins only after every gate before "
+                    "LIVE_TRANSPORT has passed.")
     report = build_report(config=config, gates=gates, mode="live", outcome=REFUSED,
-                          started_at=started_at, finished_at=finished_at, notes=messages)
+                          started_at=started_at, finished_at=started_at,
+                          components=NOTHING_COMPOSED, notes=messages)
     path = write_report(report, pathlib.Path(config.report_path))
     return JobResult(EXIT_REFUSED, REFUSED, report, path, messages)
 
@@ -127,7 +145,11 @@ def _offline(config: JobConfig, gates: GateReport, started_at: datetime) -> JobR
         messages.append(f"non-conformant offline rows: {nonconformant}")
     report = build_report(config=config, gates=gates, mode="offline", outcome=outcome,
                           started_at=started_at, finished_at=started_at,
-                          offline_report=offline_report, notes=messages)
+                          offline_report=offline_report,
+                          # The harness's own injected doubles, and nothing else: no
+                          # Google client was built and no custody adapter was composed.
+                          components={**NOTHING_COMPOSED, "transport": "fake"},
+                          notes=messages)
     path = write_report(report, pathlib.Path(config.report_path),
                         known_markers=tuple(run_result.known_markers))
     return JobResult(EXIT_OK if not nonconformant else EXIT_NONCONFORMANT,

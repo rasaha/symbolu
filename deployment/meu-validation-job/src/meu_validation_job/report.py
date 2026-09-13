@@ -22,11 +22,22 @@ from ugence_model_egress_validation.secret_shapes import assert_clean
 from .gates import GateReport
 from .version import REPORT_SCHEMA, __version__ as job_version
 
-__all__ = ["build_report", "write_report"]
+__all__ = ["NOTHING_COMPOSED", "build_report", "write_report"]
+
+
+#: What a run that composed nothing looks like. A refused live run reports exactly this,
+#: and ``tests/test_gate_order.py`` holds it to that: no Google client was built, no
+#: custody adapter exists and no transport of any kind — real or fake — was constructed.
+NOTHING_COMPOSED: Dict[str, Any] = {
+    "google_secret_manager_client": False,
+    "custody_adapter": False,
+    "transport": "none",
+}
 
 
 def build_report(*, config, gates: GateReport, mode: str, outcome: str, started_at: datetime,
                  finished_at: datetime, offline_report: Optional[Mapping[str, Any]] = None,
+                 components: Optional[Mapping[str, Any]] = None,
                  notes: Sequence[str] = ()) -> Dict[str, Any]:
     limits = COMMISSIONING_LIMITS
     report: Dict[str, Any] = {
@@ -52,6 +63,7 @@ def build_report(*, config, gates: GateReport, mode: str, outcome: str, started_
         "blocked_gates": list(gates.blocked),
         "credential_materialized": False,
         "secret_version_accessed": None,
+        "components_composed": dict(components if components is not None else NOTHING_COMPOSED),
         "genuine_calls": {"authorized": None, "consumed": 0},
         "accounting": {"input_tokens": 0, "output_tokens": 0, "usd_cents": 0},
         "ceilings": {

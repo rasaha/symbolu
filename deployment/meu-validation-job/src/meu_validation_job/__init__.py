@@ -16,7 +16,7 @@ designations are outstanding.
 from __future__ import annotations
 
 from .config import JobConfig, JobConfigRefused, load_config
-from .gates import GATES, GateOutcome, GateReport, evaluate_gates
+from .gates import GATES, GATES_BEFORE_COMPOSITION, GateOutcome, GateReport, evaluate_gates
 from .job import JobResult, ci_marker_variables, run
 from .version import (
     CONFIG_SCHEMA,
@@ -31,6 +31,6 @@ __all__ = [
     "__version__", "MATURITY", "DEPLOYMENT_KIND", "GENUINE_DISPATCH_IMPLEMENTED",
     "CONFIG_SCHEMA", "REPORT_SCHEMA",
     "JobConfig", "JobConfigRefused", "load_config",
-    "GATES", "GateOutcome", "GateReport", "evaluate_gates",
+    "GATES", "GATES_BEFORE_COMPOSITION", "GateOutcome", "GateReport", "evaluate_gates",
     "JobResult", "ci_marker_variables", "run",
 ]

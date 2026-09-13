@@ -28,7 +28,13 @@ from .client import (
     build_google_secret_manager_client,
 )
 from .config import FORBIDDEN_CONFIG_KEYS, ConfigRefused, CustodyConfig, refuse_credential_material
-from .designation import AcceptedDesignation, DesignationRefused, check_designation_accepted
+from .designation import (
+    AcceptedDesignation,
+    DesignationRefused,
+    check_designation_accepted,
+    designation_attestation_refusal,
+    designation_completeness_refusal,
+)
 from .errors import SANITIZED_UNKNOWN, sanitize_exception_type
 from .identity import (
     PRODUCTION_FORM_IDENTITY_SOURCES,
@@ -64,6 +70,8 @@ __all__ = [
     "AcceptedDesignation",
     "DesignationRefused",
     "check_designation_accepted",
+    "designation_completeness_refusal",
+    "designation_attestation_refusal",
     "RuntimeIdentityAssertion",
     "IdentityRefused",
     "check_production_identity",

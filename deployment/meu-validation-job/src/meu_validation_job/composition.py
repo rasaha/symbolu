@@ -39,16 +39,19 @@ def build_custody_adapter(
 ) -> ProductionFormSecretManagerCustodyAdapter:
     """The production-form custody adapter for this run.
 
-    ``client`` is injected by tests and by the offline path. Left as ``None`` — which
-    only the deployed job does — the real Google Secret Manager client is built here.
+    ``client`` is injected by tests. Left as ``None`` — which only the deployed job does
+    — the real Google Secret Manager client is built here, and that call is reached only
+    after the guard below.
     """
 
-    if not gates.may_materialize_a_credential:
+    if not gates.may_compose_components:
         raise CompositionRefused(
-            "no credential path is composed while "
-            f"{', '.join(gates.blocked)} is outstanding; the execution posture, the seventeen "
-            f"designations and the owner's canonical authorization all come before any credential "
-            f"is materialized, because a run that may not call may not read "
+            f"nothing is composed while {gates.first_blocked} is outstanding "
+            f"(all outstanding: {', '.join(gates.blocked)}). No Google client is built, no custody "
+            f"adapter exists, no transport exists and no Secret Manager materialization is attempted "
+            f"until the configuration, the execution posture, the seventeen designations, their "
+            f"independent verification, the owner's separate explicit authorization and the "
+            f"live-vendor-egress flag have all passed, in that order "
             f"(LP-7 ruling 12, LP-8, commissioning ADR §0.6)")
     config = CustodyConfig.from_mapping(job_config.custody)
     if client is None:
