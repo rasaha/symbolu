@@ -197,7 +197,7 @@
   "public_api_manifests": {
     "actiongate_provider.api": "9eeb66e31430d9e65982826e9910fc571fbae0331b797c5bb1b735bc53887300",
     "decision_governance.api": "1b89386992bb9572b82eca40fb36760ab9451c85db76e6ce43d3339c13ad5543",
-    "governance_providers.api": "98dd02649e5fbb37879ef05e1b06afce1abd0cc10b5692b81974437d59f7a59b",
+    "governance_providers.api": "2b3cfe2e69b93e758e02403dc22b47e2bd78666830347ce5b96fd893f6e38982",
     "tap_provider.api": "68763307437994a94397b51f6ae9eff305f7e27fd03ac716085a35a74d51300a"
   }
 }

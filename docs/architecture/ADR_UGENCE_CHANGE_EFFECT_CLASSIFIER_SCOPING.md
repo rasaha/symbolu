@@ -899,3 +899,50 @@ Stage 1's contract surface is complete. It supplies **no** classifier, admission
 enforcement, memory writer or operational permission, and progress beyond Stage 1 remains
 unauthorized: archive custody, verified linearizable audit-root operations, verified atomic
 target-version compare-and-apply, the `[R]` parameters, and a separate owner authorization.
+
+## 12 — Platform-freeze classification of the fourth provider kind — 2026-09-13
+
+Adding `ProviderKind.CHANGE_EFFECT_CLASSIFICATION` (CEC-1) moved the
+`governance_providers.api` public-API snapshot, which `platform_freeze.verify` compares
+against `platform/PLATFORM_FREEZE_V1.json`. The freeze contradicted itself on the case:
+its `approved_change_classes` admit **MINOR** — "additive optional fields, additive public
+APIs, new capabilities" — and its own `api_compatibility` check classified the change
+`MINOR` / `ADDITIVE` and passed it; but its **MAJOR** class names "new provider families".
+A fourth provider kind reads as both, so the classification was put to the owner rather
+than resolved by rewriting a frozen artifact on a reading of an ambiguous rule.
+
+The owner's ruling, recorded verbatim:
+
+> Classify the addition of `ProviderKind.CHANGE_EFFECT_CLASSIFICATION` in Stage 1 as MINOR
+> / ADDITIVE for the platform freeze.
+> Reason: this change reserves and exposes an inert provider-kind vocabulary member only.
+> Stage 1 registers no provider under it, supplies no conformance profile, performs no
+> classification, adds no runtime dispatch path and makes no provider operational.
+> Therefore, it falls under the freeze's "additive public APIs / new capabilities" MINOR
+> class.
+> For this ruling, "new provider families" under the MAJOR class means introduction of an
+> operative provider family: registration of a provider, publication of its conformance
+> profile, runtime dispatch to it or another change that makes the family usable. This
+> ruling does not pre-authorize that later transition. Unless separately ruled otherwise,
+> making `CHANGE_EFFECT_CLASSIFICATION` operational requires the MAJOR-version path.
+
+**The boundary this ruling draws, stated so a later commit cannot cross it quietly.** What
+is classified MINOR is the *vocabulary member*. Four acts are **not** covered and each
+requires the MAJOR-version path unless separately ruled: registering a provider under the
+kind; publishing its conformance profile; adding runtime dispatch to it; and any other
+change that makes the family usable. Stage 1 does none of them, and the tests that hold
+that line are the ones asserting non-registration and the conformance profile's continued
+absence — so the first commit to cross this boundary must change a test that says why it
+must not.
+
+**The correction applied** `[V]`: one value in `platform/PLATFORM_FREEZE_V1.json`,
+`public_api_manifests["governance_providers.api"]`, from `98dd0264…` to the verifier's
+computed `2b3cfe2e69b93e758e02403dc22b47e2bd78666830347ce5b96fd893f6e38982`. Exactly one
+key differed and exactly one line changed. Nothing else in the freeze file was touched, and
+the historical migration baselines under `docs/migrations/` and
+`Project_documentation/` were left unchanged: they record a past state and are not a
+statement about the current tree.
+
+Two verifier checks reported this failure — `public_api_snapshots` and
+`manifest:public_api_manifests` — but they are one check, not two: `verify.py:106` aliases
+the first to the second. The single authorized edit clears both.
