@@ -579,7 +579,7 @@ or executes, and a test enforces it on every operation id, path and summary.
 | Step | Do this | Expect |
 |---|---|---|
 | 1 | Open the screen. | One read, no controls. Live: the gap notice above. |
-| 2 | Where a sqlite policy registry is composed (compose profile). | *No issued records for the identities this deployment queries* plus `registry_kind SqlitePolicyRegistry` and `identities_queried` such as `agent_governance.agent_constitution|agent-constitution-baseline|TENANT|tenant-1`. The registry ships empty; issuance is outside the studio's allowlist, so nothing ever appears here from a screen. |
+| 2 | Where a sqlite policy registry is composed (compose profile). | *No issued records for the identities this deployment queries* plus `registry_kind SqlitePolicyRegistry` and `identities_queried` such as `agent_governance.agent_constitution\|agent-constitution-baseline\|TENANT\|tenant-1`. The registry ships empty; issuance is outside the studio's allowlist, so nothing ever appears here from a screen. |
 
 **Values you can type**
 
